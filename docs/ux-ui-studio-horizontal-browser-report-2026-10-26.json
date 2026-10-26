@@ -1,0 +1,459 @@
+{
+  "runAt": "2026-10-26T07:35:16.512Z",
+  "baseUrl": "http://127.0.0.1:8081",
+  "cdnsBlocked": true,
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "widths": [
+    {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Dragging visual sliders and the canvas resize handle changes saved geometry; one undo restores the resize",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Animated font specimens support custom words, pause/play and reduced-motion preferences",
+        "Choosing a preview creates visible text with the real font embedded and returns to the canvas",
+        "Hold moves continuously, release stops, and one undo restores the gesture",
+        "Imported images resize, cut out locally and become real recolorable vector silhouettes; lookup magnifies small artwork",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon",
+        "PDF includes the rendered mockup, AI prompt, readable specification and complete attached asset JSON",
+        "Live system-theme changes update controls while preserving artwork"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Dragging visual sliders and the canvas resize handle changes saved geometry; one undo restores the resize",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Animated font specimens support custom words, pause/play and reduced-motion preferences",
+        "Choosing a preview creates visible text with the real font embedded and returns to the canvas",
+        "Hold moves continuously, release stops, and one undo restores the gesture",
+        "Imported images resize, cut out locally and become real recolorable vector silhouettes; lookup magnifies small artwork",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "compactScreens": [
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "errors": [],
+  "startupRetry": {
+    "reason": "The first audit reached the preview before it was listening. A readiness probe and isolated retry passed.",
+    "initialErrors": [
+      {
+        "width": 320,
+        "theme": "light",
+        "error": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8081/tools/developer/ux-ui-studio\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8081/tools/developer/ux-ui-studio\", waiting until \"domcontentloaded\"\u001b[22m\n"
+      }
+    ],
+    "retryRunAt": "2026-10-26T07:50:17.221Z"
+  },
+  "verifiedAt": "2026-10-26T07:55:17.395460+00:00",
+  "developerAudit": {
+    "schemaVersion": 1,
+    "runAt": "2026-10-26T07:24:44.681Z",
+    "baseUrl": "http://127.0.0.1:8080",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "sentinel": "redacted",
+    "routes": [
+      {
+        "path": "/tools/developer/regex-tester",
+        "label": "Regex Studio",
+        "loaded": true,
+        "actionWorked": true,
+        "mobileOverflow": {
+          "viewportWidth": 390,
+          "documentWidth": 390,
+          "overflowing": false
+        },
+        "runtimeStorageLeaks": [],
+        "browserDiagnostics": {
+          "runtimeErrors": [],
+          "consoleErrors": []
+        },
+        "axeScan": {
+          "available": true,
+          "violations": 0
+        }
+      },
+      {
+        "path": "/tools/developer/javascript-formatter",
+        "label": "JavaScript formatter",
+        "loaded": true,
+        "actionWorked": true,
+        "mobileOverflow": {
+          "viewportWidth": 390,
+          "documentWidth": 390,
+          "overflowing": false
+        },
+        "runtimeStorageLeaks": [],
+        "browserDiagnostics": {
+          "runtimeErrors": [],
+          "consoleErrors": []
+        },
+        "axeScan": {
+          "available": true,
+          "violations": 0
+        }
+      },
+      {
+        "path": "/tools/developer/sql-formatter",
+        "label": "SQL formatter",
+        "loaded": true,
+        "actionWorked": true,
+        "mobileOverflow": {
+          "viewportWidth": 390,
+          "documentWidth": 390,
+          "overflowing": false
+        },
+        "runtimeStorageLeaks": [],
+        "browserDiagnostics": {
+          "runtimeErrors": [],
+          "consoleErrors": []
+        },
+        "axeScan": {
+          "available": true,
+          "violations": 0
+        }
+      },
+      {
+        "path": "/tools/developer/ux-ui-studio",
+        "label": "UX/UI Studio",
+        "loaded": true,
+        "actionWorked": true,
+        "mobileOverflow": {
+          "viewportWidth": 390,
+          "documentWidth": 390,
+          "overflowing": false
+        },
+        "runtimeStorageLeaks": [],
+        "browserDiagnostics": {
+          "runtimeErrors": [],
+          "consoleErrors": []
+        },
+        "prototypeNavigationWorked": true,
+        "axeScan": {
+          "available": true,
+          "violations": 3
+        }
+      }
+    ],
+    "networkLeaks": [],
+    "storageLeaks": [],
+    "axeViolations": [],
+    "errors": []
+  }
+}

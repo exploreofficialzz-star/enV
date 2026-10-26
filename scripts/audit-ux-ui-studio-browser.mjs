@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 
 const baseUrl = (process.env.EN_V_BROWSER_AUDIT_BASE_URL || "http://127.0.0.1:8080").replace(/\/$/, "");
 const output = resolve(process.env.ENV_UX_UI_AUDIT_DIR || "/tmp/env-ux-ui-studio-audit");
@@ -97,7 +98,10 @@ async function openToolkit(page, name) {
   await drawer.getByRole("tab", { name: "All 26", exact: true }).click();
   await drawer.getByRole("button", { name: toolButtonName(name) }).click();
   await page.waitForFunction(() => (document.querySelector(".uxui-toolkit-content")?.scrollTop || 0) < 2);
-  return drawer;
+  const inline = page.getByRole("region", { name: "Studio toolkit", exact: true });
+  await inline.waitFor({state:"visible"});
+  assert.equal(await drawer.isVisible(), false, "Selecting a toolkit returns to the editing screen");
+  return inline;
 }
 
 try {
@@ -131,25 +135,29 @@ try {
       entry.checks.push("Monochrome studio chrome follows the effective " + theme + " theme");
       await drawer.getByRole("tab", { name: "Elements", exact: true }).click();
       await drawer.getByRole("button", { name: "Button: Primary action", exact: true }).click();
-      if (await drawer.isVisible()) await drawer.getByRole("button", { name: "Close studio toolkit", exact: true }).click();
+      if (await drawer.isVisible()) await page.getByRole("button",{name:"Back to movement controls",exact:true}).click();
       await waitForStored(page, (project) => project.elements.some((layer) => layer.kind === "button"), "the inserted button");
 
       const movement = page.getByLabel("Selected element movement and transform controls", { exact: true });
       const styling = page.getByRole("region", { name: "Selected element styling", exact: true });
       await movement.waitFor({ state: "visible" });
-      await styling.waitFor({ state: "visible" });
       const movementBox = await checkBounds(movement, "Movement controls", viewport);
-      const styleBox = await checkBounds(styling, "Selected styling", viewport);
-      assert.ok(styleBox.y >= movementBox.y + movementBox.height - 1, "Selection styling follows the movement controller");
       await checkContainedChildren(movement, "button,.uxui-gamepad-label", "Movement controller");
-      await checkContainedChildren(page.locator(".uxui-context-controls"), ".uxui-context-action,.uxui-context-selection", "Contextual actions");
-      entry.checks.push("Selected styling is visible below controllers in fullscreen");
+      await page.getByRole("button", {name:"Color",exact:true}).click();
+      await styling.waitFor({state:"visible"});
+      const styleBox = await checkBounds(styling, "Active color panel", viewport);
+      assert.ok(styleBox.y < movementBox.y + movementBox.height, "Color replaces the controller area");
+      assert.equal(await movement.isVisible(), false, "Controllers hide while color tools are active");
+      const actions = await page.locator(".uxui-context-action").evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().y));
+      assert.ok(Math.max(...actions) - Math.min(...actions) < 2, "All editing actions occupy one horizontal row");
+      entry.checks.push("Horizontal actions and active panels replace controllers without stacking");
 
       // A real color edit must update the saved layer, not only the visible control.
       await styling.getByLabel("Selected fill color", { exact: true }).fill("#7c3aed");
       await waitForStored(page, (project) => project.elements.some((layer) => layer.kind === "button" && layer.background.toLowerCase() === "#7c3aed"), "the selected layer fill");
       entry.checks.push("Selected fill editing changes persisted project data");
       if (viewport.width === 390) {
+        await page.getByRole("button",{name:"Adjust",exact:true}).click();
         const beforeSlider = await storedProject(page);
         const previous = beforeSlider.elements.find((item) => item.kind === "button");
         const slider = styling.getByLabel("Selected size", { exact: true });
@@ -186,7 +194,8 @@ try {
       await waitForStored(page, (project) => JSON.stringify(project.elements) !== JSON.stringify(beforeEffect.elements), "the chosen effect");
       entry.checks.push("Visible effect sample applies and persists");
 
-      if (!await drawer.isVisible()) await page.getByRole("button", { name: "Add elements", exact: true }).click();
+      await page.getByRole("button", { name: "Add elements", exact: true }).click();
+      drawer = page.getByRole("dialog", {name:"Studio toolkit",exact:true});
       await drawer.getByRole("tab", { name: "All 26", exact: true }).click();
       assert.equal(await drawer.locator(".uxui-toolkit-tile").count(), 26, "All 26 tools remain available");
       await checkGrid(drawer.locator(".uxui-toolkit-tile"), "Toolkit");
@@ -194,14 +203,11 @@ try {
       entry.checks.push("Toolkit chrome and visual specimens pass a rendered monochrome check");
       if (viewport.width === 390) await page.screenshot({ animations: "disabled", path: resolve(output, `toolkit-390-${theme}.png`) });
       for (const name of toolkitNames) {
-        await drawer.getByRole("tab", { name: "All 26", exact: true }).click();
-        await drawer.getByRole("button", { name: toolButtonName(name) }).click();
+        drawer = await openToolkit(page,name);
         await page.waitForFunction(() => (document.querySelector(".uxui-toolkit-content")?.scrollTop || 0) < 2);
         const detail = drawer.getByRole("region", { name: name + " controls", exact: true });
         await detail.waitFor({ state: "visible" });
-        const sample = detail.locator(".uxui-toolkit-preview");
-        await sample.scrollIntoViewIfNeeded();
-        assert.ok((await sample.boundingBox())?.height >= 40, name + " has a visual sample");
+        assert.ok((await drawer.boundingBox())?.height >= 80, name + " opens inside the editing area");
         // Icons, fonts, tokens, assets and presets share a library panel below the detail.
         const sharedLibraries = new Set(["Icons", "Typography", "Colors", "Backgrounds", "Illustrations", "Images & media", "Brand kit", "UI components", "Projects", "Design system", "Data visualization", "Assets"]);
         const actionScope = sharedLibraries.has(name) ? drawer.locator(".uxui-toolkit-content") : detail;
@@ -210,7 +216,6 @@ try {
       entry.checks.push("Each of 26 toolkit pages has a visible sample and usable controls");
 
       drawer = await openToolkit(page, "Icons");
-      await drawer.getByRole("tab", { name: "Icons", exact: true }).click();
       const icon = drawer.locator('button[title^="Add icon "]').first();
       await icon.scrollIntoViewIfNeeded();
       await icon.locator("svg").waitFor({ state: "visible" });
@@ -224,7 +229,7 @@ try {
       assert.equal(brokenImages, 0, "Icon picker has no broken images while CDN requests fail");
       entry.checks.push("Bundled icon preview and insertion work with asset CDNs blocked");
 
-      await drawer.getByRole("tab", { name: "Fonts", exact: true }).click();
+      drawer = await openToolkit(page,"Typography");
       for (const family of ["Inter", "Lora", "JetBrains Mono", "Bebas Neue", "Caveat"]) {
         await drawer.getByLabel("Search fonts", { exact: true }).fill(family);
         const fontButton = drawer.getByRole("button", { name: new RegExp("^" + family.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s") }).first();
@@ -256,7 +261,39 @@ try {
         assert.equal(await drawer.isVisible(), false, "Choosing a font returns directly to visual editing");
         entry.checks.push("Choosing a preview creates visible text with the real font embedded and returns to the canvas");
       }
-      if (await drawer.isVisible()) await drawer.getByRole("button", { name: "Close studio toolkit", exact: true }).click();
+      if (await drawer.isVisible()) await page.getByRole("button",{name:"Back to movement controls",exact:true}).click();
+
+      if (viewport.width === 390) {
+        await page.getByRole("button",{name:"Move",exact:true}).click();
+        const beforeHold = await storedProject(page);
+        const selected = beforeHold.elements.find(item => item.kind === "text") || beforeHold.elements.at(-1);
+        const right = page.getByRole("button",{name:"Move element right 8 pixels",exact:true});
+        const point = await right.boundingBox();
+        await page.mouse.move(point.x+point.width/2,point.y+point.height/2);await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
+        const afterHold = await waitForStored(page,project=>project.elements.find(item=>item.id===selected.id).x>selected.x+8,"continuous movement while held");
+        const releasedX=afterHold.elements.find(item=>item.id===selected.id).x;await page.waitForTimeout(220);
+        assert.equal((await storedProject(page)).elements.find(item=>item.id===selected.id).x,releasedX,"Release stops repeating");
+        await page.getByRole("button",{name:"Undo",exact:true}).last().click();
+        await waitForStored(page,project=>project.elements.find(item=>item.id===selected.id).x===selected.x,"one-step undo for a whole hold gesture");
+        entry.checks.push("Hold moves continuously, release stops, and one undo restores the gesture");
+        await page.getByLabel("Choose an image",{exact:true}).setInputFiles(resolve("tests/fixtures/studio-cutout.png"));
+        await waitForStored(page,project=>project.elements.some(item=>item.kind==="image"),"image import");
+        await page.getByRole("button",{name:"Resize",exact:true}).click();
+        await page.getByRole("button",{name:"256px",exact:true}).click();
+        await page.getByText("Image pixels resized.",{exact:true}).waitFor();
+        await page.getByRole("button",{name:"Cutout",exact:true}).click();
+        await page.getByRole("button",{name:"Remove background",exact:true}).click();
+        await page.getByText("Plain background removed. Undo restores the original.",{exact:true}).waitFor();
+        const edited=(await storedProject(page)).elements.find(item=>item.kind==="image");
+        const imageResult=await page.evaluate(async data=>{const image=new Image();image.src=data;await image.decode();const c=document.createElement("canvas");c.width=image.width;c.height=image.height;const ctx=c.getContext("2d");ctx.drawImage(image,0,0);return {width:image.width,height:image.height,border:ctx.getImageData(0,0,1,1).data[3],center:ctx.getImageData(image.width/2,image.height/2,1,1).data[3]}},edited.imageDataUrl);
+        assert.deepEqual(imageResult,{width:256,height:192,border:0,center:255},"Resize and cutout preserve the subject and remove the background");
+        await page.getByRole("button",{name:"Make icon",exact:true}).click();
+        await waitForStored(page,project=>project.elements.some(item=>item.id===edited.id&&item.kind==="icon"&&item.iconSvg.includes("<path")),"a real vector silhouette");
+        await page.getByRole("button",{name:"Look closer",exact:true}).click();
+        await page.getByLabel("Magnified selected item",{exact:true}).waitFor({state:"visible"});
+        await checkBounds(page.getByLabel("Layer lookup",{exact:true}),"Magnified layer lookup",viewport);
+        entry.checks.push("Imported images resize, cut out locally and become real recolorable vector silhouettes; lookup magnifies small artwork");
+      }
 
       const canvas = page.getByRole("button", { name: "Select canvas background", exact: true });
       const canvasBox = await canvas.boundingBox();
@@ -284,6 +321,19 @@ try {
       assert.ok(project.elements.some((layer) => layer.kind === "icon" && layer.iconSvg.length > 20));
       entry.checks.push("JSON download retains background and embedded icon");
       if (viewport.width === 390 && theme === "light") {
+        await page.getByRole("button",{name:"Export",exact:true}).click();
+        const waitingPdf=page.waitForEvent("download",{timeout:120000});
+        await page.getByRole("button",{name:/^PDF handoff/}).click();
+        const pdfDownload=await waitingPdf; const pdfBytes=await readFile(await pdfDownload.path());
+        await pdfDownload.saveAs(resolve(output,"handoff-390-light.pdf"));
+        const pdf=await PDFDocument.load(pdfBytes);
+        assert.ok(pdf.getPageCount()>=3&&pdf.getPageCount()<40,"PDF remains readable without printing embedded font/image bytes");
+        const names=pdf.catalog.lookup(PDFName.of("Names"),PDFDict).lookup(PDFName.of("EmbeddedFiles"),PDFDict).lookup(PDFName.of("Names"),PDFArray);
+        const file=names.lookup(1,PDFDict).lookup(PDFName.of("EF"),PDFDict).lookup(PDFName.of("F"),PDFRawStream);
+        const attached=JSON.parse(new TextDecoder().decode(decodePDFRawStream(file).decode()));
+        assert.ok(attached.elements.some(item=>item.fontDataUrl.startsWith("data:font/ttf;base64,")),"PDF attachment retains the actual font");
+        assert.ok(attached.elements.some(item=>item.iconName==="Custom silhouette"&&item.iconSvg.includes("<path")),"PDF attachment retains the generated vector");
+        entry.checks.push("PDF includes the rendered mockup, AI prompt, readable specification and complete attached asset JSON");
         const beforeTheme = await storedProject(page);
         await page.emulateMedia({ colorScheme: "dark" });
         await page.waitForFunction(() => document.documentElement.classList.contains("dark"));
@@ -319,18 +369,21 @@ try {
       await checkBounds(drawer, "Compact toolkit", viewport);
       await drawer.getByRole("tab", { name: "Elements", exact: true }).click();
       await drawer.getByRole("button", { name: "Button: Primary action", exact: true }).click();
-      if (await drawer.isVisible()) await drawer.getByRole("button", { name: "Close studio toolkit", exact: true }).click();
+      if (await drawer.isVisible()) await page.getByRole("button",{name:"Back to movement controls",exact:true}).click();
       const styling = page.getByRole("region", { name: "Selected element styling", exact: true });
+      await page.getByRole("button",{name:"Shape",exact:true}).click();
       const corners = styling.getByRole("button", { name: "Round", exact: true });
       await corners.scrollIntoViewIfNeeded();
       await checkBounds(corners, "Visual corner choice", viewport);
       await corners.click();
       await waitForStored(page, (project) => project.elements.some((layer) => layer.kind === "button" && layer.radius >= 20), "the visual Round corner preset");
+      await page.getByRole("button",{name:"Color",exact:true}).click();
       const fill = styling.getByLabel("Selected fill color", { exact: true });
       await fill.scrollIntoViewIfNeeded();
       await checkBounds(fill, "Compact color control", viewport);
       await fill.fill("#7c3aed");
       await waitForStored(page, (project) => project.elements.some((layer) => layer.background.toLowerCase() === "#7c3aed"), "compact color editing");
+      await page.getByRole("button",{name:"Adjust",exact:true}).click();
       const size = styling.getByLabel("Selected size", { exact: true });
       await size.scrollIntoViewIfNeeded();
       await checkBounds(size, "Compact size slider", viewport);

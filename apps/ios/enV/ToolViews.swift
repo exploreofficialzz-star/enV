@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import AVFoundation
 import AVKit
@@ -10011,11 +10012,94 @@ private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
     UxUiStudioToolkit(id: "qa", name: "Design QA", description: "Review overlaps, bounds and touch targets.", status: "Advisory checks")
 ]
 
+private struct StudioHoldControl: View {
+    let symbol: String
+    let label: String
+    let begin: () -> Void
+    let step: () -> Void
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var pressed = false
+    @State private var task: Task<Void, Never>?
+    private func stop() { pressed = false; task?.cancel(); task = nil }
+    var body: some View {
+        Image(systemName: symbol).frame(width: 44, height: 44)
+            .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                guard !pressed else { return }; pressed = true; begin(); step()
+                task = Task { @MainActor in
+                    do { try await Task.sleep(nanoseconds: 330_000_000)
+                        while !Task.isCancelled { step(); try await Task.sleep(nanoseconds: 75_000_000) }
+                    } catch { }
+                }
+            }.onEnded { _ in stop() })
+            .accessibilityElement().accessibilityLabel(label).accessibilityAddTraits(.isButton)
+            .accessibilityAction { begin(); step() }.onDisappear { stop() }.onChange(of: scenePhase) { if $0 != .active { stop() } }
+    }
+}
+
+private enum StudioImageEditor {
+    struct Result: Sendable { let data: String; let width: Int; let height: Int }
+    static func process(_ source: String, operation: String, strength: Int = 40, maxEdge: Int = 1024) throws -> Result {
+        guard let encoded = source.split(separator: ",", maxSplits: 1).last, let bytes = Data(base64Encoded: String(encoded)), let imageSource = CGImageSourceCreateWithData(bytes as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else { throw failure("Could not decode image.") }
+        let limit = operation == "icon" ? 128 : maxEdge
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: limit, kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary) else { throw failure("Could not decode image.") }
+        let image = UIImage(cgImage: thumbnail)
+        let ratio = min(1, CGFloat(limit) / max(image.size.width, image.size.height))
+        let w = max(1, Int((image.size.width * ratio).rounded())), h = max(1, Int((image.size.height * ratio).rounded()))
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = false
+        let normalized = UIGraphicsImageRenderer(size: CGSize(width: CGFloat(w), height: CGFloat(h)), format: format).image { _ in image.draw(in: CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h))) }
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        guard let cg = normalized.cgImage else { throw failure("Could not render image.") }
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: bitmapInfo) else { return false }
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h))); return true
+        }
+        guard drawn else { throw failure("Image editing is unavailable.") }
+        if operation != "resize" {
+            var border: [Int] = []
+            for x in 0..<w { border.append(x); border.append((h - 1) * w + x) }
+            for y in 0..<h { border.append(y * w); border.append(y * w + w - 1) }
+            func median(_ channel: Int) -> Int { let values = border.filter { pixels[$0 * 4 + 3] > 200 }.map { Int(pixels[$0 * 4 + channel]) }.sorted(); return values.isEmpty ? 255 : values[values.count / 2] }
+            let r = median(0), g = median(1), b = median(2)
+            var visited = [Bool](repeating: false, count: w * h), queue = [Int](repeating: 0, count: w * h), head = 0, tail = 0
+            func push(_ i: Int) {
+                if visited[i] { return }; let p = i * 4
+                let dr = Int(pixels[p]) - r, dg = Int(pixels[p + 1]) - g, db = Int(pixels[p + 2]) - b
+                if pixels[p + 3] < 8 || dr * dr + dg * dg + db * db <= strength * strength { visited[i] = true; queue[tail] = i; tail += 1 }
+            }
+            for i in border { push(i) }
+            while head < tail { let i = queue[head]; head += 1; let x = i % w, y = i / w
+                if x > 0 { push(i - 1) }; if x < w - 1 { push(i + 1) }; if y > 0 { push(i - w) }; if y < h - 1 { push(i + w) }
+            }
+            for i in 0..<(w * h) where visited[i] { pixels[i * 4] = 0; pixels[i * 4 + 1] = 0; pixels[i * 4 + 2] = 0; pixels[i * 4 + 3] = 0 }
+        }
+        if operation == "icon" {
+            var path = ""
+            for y in 0..<h { var x = 0; while x < w {
+                if pixels[(y * w + x) * 4 + 3] < 96 { x += 1; continue }
+                let start = x; while x < w && pixels[(y * w + x) * 4 + 3] >= 96 { x += 1 }
+                path += "M\(start) \(y)h\(x - start)v1H\(start)z"
+            } }
+            guard !path.isEmpty else { throw failure("No foreground found. Lower the cutout strength.") }
+            return Result(data: "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 \(w) \(h)\"><path fill=\"currentColor\" d=\"\(path)\"/></svg>", width: w, height: h)
+        }
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData), let result = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: bitmapInfo), provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent), let png = UIImage(cgImage: result).pngData() else { throw failure("Could not save edited image.") }
+        return Result(data: "data:image/png;base64," + png.base64EncodedString(), width: w, height: h)
+    }
+    private static func failure(_ message: String) -> NSError { NSError(domain: "enV.StudioImage", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+}
+
 private struct NativeUxUiStudioView: View {
     private let storageKey = "env.ux-ui-studio.project.v1"
     @State private var onboarding = true
     @State private var didInitialize = false
     @State private var showComponentPalette = false
+    @State private var editTool = "move"
+    @State private var inlineToolkit = false
+    @State private var imageBusy = false
+    @State private var cutoutStrength = 40.0
     @State private var toolkitTab = "All 26"
     @State private var activeToolkitID = "icons"
     @State private var qaReport: [String] = []
@@ -10300,7 +10384,9 @@ private struct NativeUxUiStudioView: View {
                     elements[index].kind = "image"
                     elements[index].imageData = "data:\(mime);base64,\(fileData.base64EncodedString())"
                     elements[index].text = ""
-                    notice = "Image imported and embedded in your design project."
+                    if let image = UIImage(data: fileData) { let ratio = min(280 / image.size.width, 400 / image.size.height); elements[index].width = max(12, Int(image.size.width * ratio)); elements[index].height = max(12, Int(image.size.height * ratio)); elements[index].padding = 0 }
+                    showComponentPalette = false; inlineToolkit = false; editTool = "move"
+                    notice = "Image imported. Try Cutout, Resize or Make icon."
                 } catch {
                     notice = error.localizedDescription
                 }
@@ -10405,7 +10491,7 @@ private struct NativeUxUiStudioView: View {
                         elements.append(contentsOf: imported)
                     }
                     selectedID = imported.first?.id
-                    showComponentPalette = false
+                    showComponentPalette = false; inlineToolkit = false; editTool = "move"
                     onboarding = false
                     notice = "Imported \(imported.count) design element(s). You can now edit and customise them."
                 } catch {
@@ -10447,7 +10533,7 @@ private struct NativeUxUiStudioView: View {
                             elements[index].iconSvg = cleaned
                         }
                     }
-                    showComponentPalette = false
+                    showComponentPalette = false; inlineToolkit = false; editTool = "move"
                     notice = "Imported SVG icon."
                 } catch {
                     notice = "Could not import that icon: \(error.localizedDescription)"
@@ -10476,7 +10562,7 @@ private struct NativeUxUiStudioView: View {
     private var editorContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 7) {
-                Button { onboarding = true; showComponentPalette = false; showAdvancedCanvas = false; showAdvancedInspector = false } label: {
+                Button { onboarding = true; showComponentPalette = false; inlineToolkit = false; editTool = "move"; showAdvancedCanvas = false; showAdvancedInspector = false } label: {
                     Image(systemName: "chevron.left").font(.system(size: 14, weight: .semibold))
                         .frame(width: 36, height: 42).foregroundStyle(Color.uxUiInk)
                         .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 10))
@@ -10560,7 +10646,7 @@ private struct NativeUxUiStudioView: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(showScreenManager ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
                 }.accessibilityLabel(showScreenManager ? "Close app screens" : "App screens")
                 Spacer(minLength: 3)
-                Button { showComponentPalette.toggle() } label: {
+                Button { toolkitTab = "All 26"; toolkitQuery = ""; inlineToolkit = false; showComponentPalette.toggle() } label: {
                     Image(systemName: showComponentPalette ? "xmark" : "plus")
                         .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
                         .foregroundStyle(Color.uxUiInk).background(Color.uxUiCard, in: Circle())
@@ -10572,9 +10658,10 @@ private struct NativeUxUiStudioView: View {
             if showScreenManager { appScreensPanel }
             if let index = selectedIndex {
                 selectedElementToolbar(for: index)
-                inspector(for: index)
             } else if canvasSelected {
                 canvasStylePanel
+            } else if inlineToolkit {
+                compactStudioLibrary
             }
             if showComponentPalette { componentPalette }
             if showScreenManager { layerListPanel }
@@ -10866,7 +10953,7 @@ private struct NativeUxUiStudioView: View {
             HStack {
                 Text("Studio toolkit").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Spacer()
-                Button { showComponentPalette = false } label: {
+                Button { showComponentPalette = false; inlineToolkit = false; editTool = "move" } label: {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.uxUiMuted).frame(width: 44, height: 44)
                         .background(Color.uxUiSurface2, in: Circle())
@@ -10902,6 +10989,7 @@ private struct NativeUxUiStudioView: View {
                         ForEach(uxUiStudioToolkits.filter { toolkitQuery.isEmpty || $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.description.localizedCaseInsensitiveContains(toolkitQuery) }) { toolkit in
                             Button {
                                 activeToolkitID = toolkit.id
+                                showComponentPalette = false; inlineToolkit = true; editTool = "library"
                                 toolkitTab = toolkit.id == "icons" ? "Icons" : toolkit.id == "typography" ? "Fonts" : "Toolkit"
                             } label: {
                                 HStack(alignment: .center, spacing: 12) {
@@ -11023,7 +11111,7 @@ private struct NativeUxUiStudioView: View {
             case "media", "assets", "inspiration":
                 Button("Import image or visual reference") { prepareImageImport() }.buttonStyle(.borderedProminent)
                 ForEach(elements.filter { $0.imageData != nil || $0.iconSvg != nil }) { item in
-                    Button { selectedID = item.id; showComponentPalette = false } label: {
+                    Button { selectedID = item.id; showComponentPalette = false; inlineToolkit = false; editTool = "move" } label: {
                         HStack { layerPreview(item, scale: min(1, 44 / CGFloat(max(1, item.height)))).frame(width: 60, height: 44).clipped(); Text(item.name).font(.callout); Spacer(); Image(systemName: "arrow.right") }.padding(8)
                     }.buttonStyle(.bordered)
                 }
@@ -11036,7 +11124,7 @@ private struct NativeUxUiStudioView: View {
             case "components": Button("Browse visual components") { toolkitTab = "Elements" }.buttonStyle(.borderedProminent)
             case "device", "responsive", "platform":
                 HStack { targetButton("Mobile", icon: "iphone", value: "mobile"); targetButton("Tablet", icon: "ipad", value: "tablet"); targetButton("Web", icon: "laptopcomputer", value: "desktop") }
-                Button("Style canvas and dimensions") { selectCanvas(); showComponentPalette = false }.buttonStyle(.bordered)
+                Button("Style canvas and dimensions") { selectCanvas(); showComponentPalette = false; inlineToolkit = false; editTool = "move" }.buttonStyle(.bordered)
                 if activeToolkitID == "platform" { presetLibraryPanel }
                 if activeToolkitID == "responsive", let index = selectedIndex { inspectorResponsiveFields(layerBinding(index)) }
             case "projects": appScreensPanel; presetLibraryPanel
@@ -11045,7 +11133,7 @@ private struct NativeUxUiStudioView: View {
                 appScreensPanel
                 if let index = selectedIndex { selectedElementToolbar(for: index) }
                 else { Text("Select a layer to set its destination screen, then preview the flow.").font(.callout) }
-                Button("Preview flow") { showComponentPalette = false; startPrototypePreview() }.buttonStyle(.borderedProminent).disabled(!hasActivePrototypeLinks)
+                Button("Preview flow") { showComponentPalette = false; inlineToolkit = false; editTool = "move"; startPrototypePreview() }.buttonStyle(.borderedProminent).disabled(!hasActivePrototypeLinks)
             case "accessibility", "qa":
                 Button("Review design") { runStudioAudit() }.buttonStyle(.borderedProminent)
                 Text("Checks cover bounds, overlaps, contrast and tap targets. Review findings in context.").font(.caption).foregroundStyle(Color.uxUiMuted)
@@ -11149,7 +11237,7 @@ private struct NativeUxUiStudioView: View {
         if selectedIndex.map({ ["icon", "image", "rect", "ellipse", "divider", "line", "triangle", "diamond", "hexagon", "star"].contains(elements[$0].kind) }) ?? true { addLayer("text") }
         guard let index = selectedIndex else { return }
         checkpoint(); elements[index].fontFamily = family; elements[index].fontData = asset.dataURL
-        notice = "Applied \(family). Drag your words to place them."; showComponentPalette = false
+        notice = "Applied \(family). Drag your words to place them."; showComponentPalette = false; inlineToolkit = false; editTool = "move"
     }
 
     private var effectsLibraryPanel: some View {
@@ -11205,7 +11293,7 @@ private struct NativeUxUiStudioView: View {
                     }.buttonStyle(.plain)
                 }
             }
-            Button("Choose solid background") { selectCanvas(); showComponentPalette = false }.buttonStyle(.bordered)
+            Button("Choose solid background") { selectCanvas(); showComponentPalette = false; inlineToolkit = false; editTool = "move" }.buttonStyle(.bordered)
         }
     }
 
@@ -11275,64 +11363,130 @@ private struct NativeUxUiStudioView: View {
         }
     }
 
+    @ViewBuilder private var compactStudioLibrary: some View {
+        if toolkitTab != "Icons" && toolkitTab != "Fonts" { ScrollView { componentPalette }.frame(height: 260) }
+        else {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack { Text(toolkitTab).font(.caption.bold()); Spacer(); Button("Done") { inlineToolkit = false; editTool = "move" }.frame(minHeight: 44) }
+                ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {
+                    if toolkitTab == "Icons" { TextField("Search icons", text: $iconQuery).frame(width: 200).textFieldStyle(.roundedBorder) }
+                    else { TextField("Try your words", text: $fontPreviewWords).frame(width: 210).textFieldStyle(.roundedBorder); Button(animateFontPreviews ? "Pause" : "Play") { animateFontPreviews.toggle() }.buttonStyle(.bordered) }
+                } }
+                ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {
+                    if toolkitTab == "Icons" {
+                        ForEach(Array(uxUiBundledIcons.keys.sorted().filter { iconQuery.isEmpty || $0.localizedCaseInsensitiveContains(iconQuery) }.prefix(128)), id: \.self) { name in
+                            Button { insertIcon(name) } label: { VStack { UxUiIconifyThumbnail(iconName: name).frame(width: 44, height: 44); Text(name.components(separatedBy: ":").last ?? name).font(.caption2).lineLimit(1) }.frame(width: 80, height: 80) }.buttonStyle(.bordered)
+                        }
+                    } else {
+                        ForEach(uxUiFontFamilies.filter { uxUiFontAsset($0.0) != nil }, id: \.0) { family, _ in
+                            Button { applyFontFamily(family) } label: { VStack(alignment: .leading) { Text(family).font(.caption); UxUiAnimatedFontPreview(family: family, words: fontPreviewWords, animated: animateFontPreviews) }.frame(width: 200, height: 90) }.buttonStyle(.bordered)
+                        }
+                    }
+                } }
+            }.padding(8).frame(height: 220)
+        }
+    }
+
     private func selectedElementToolbar(for index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(elements[index].name).font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted).lineLimit(1)
-            Picker("On tap, navigate to", selection: Binding(
-                get: { elements[index].prototypeTargetScreenID },
-                set: { destination in checkpoint(); elements[index].prototypeTargetScreenID = destination }
-            )) {
-                Text("No navigation").tag("")
-                ForEach(screens.filter { $0.id != activeScreenID }) { screen in
-                    Text(screen.name).tag(screen.id)
-                }
-            }
-            .pickerStyle(.menu)
-            .accessibilityLabel("Prototype destination for \(elements[index].name)")
-            HStack(alignment: .top, spacing: 12) {
+            if editTool == "move" {
+            HStack(alignment: .top, spacing: 2) {
                 VStack(spacing: 4) {
                     Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
-                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
-                    HStack(spacing: 3) {
-                        Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
-                        Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
-                        Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                    StudioHoldControl(symbol: "arrow.up", label: "arrow up", begin: { checkpoint() }, step: { elements[index].y = max(0, elements[index].y - 8) }).id(elements[index].id)
+                    HStack(spacing: 1) {
+                        StudioHoldControl(symbol: "arrow.left", label: "arrow left", begin: { checkpoint() }, step: { elements[index].x = max(0, elements[index].x - 8) }).id(elements[index].id)
+                        StudioHoldControl(symbol: "dot.circle", label: "dot circle", begin: { checkpoint() }, step: { elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) }).id(elements[index].id)
+                        StudioHoldControl(symbol: "arrow.right", label: "arrow right", begin: { checkpoint() }, step: { elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) }).id(elements[index].id)
                     }
-                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                    StudioHoldControl(symbol: "arrow.down", label: "arrow down", begin: { checkpoint() }, step: { elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) }).id(elements[index].id)
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Move selected element")
-                Spacer(minLength: 2)
+                Spacer(minLength: 0)
                 VStack(spacing: 4) {
                     Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
-                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
-                    HStack(spacing: 3) {
-                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.left").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
-                        Button { checkpoint(); elements[index].rotation = 0 } label: { Text("0°").font(.envScaled(size: 10, weight: .semibold)).frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
-                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.right").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                    StudioHoldControl(symbol: "plus.magnifyingglass", label: "plus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) }).id(elements[index].id)
+                    HStack(spacing: 1) {
+                        StudioHoldControl(symbol: "rotate.left", label: "rotate left", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
+                        StudioHoldControl(symbol: "arrow.counterclockwise", label: "arrow counterclockwise", begin: { checkpoint() }, step: { elements[index].rotation = 0 }).id(elements[index].id)
+                        StudioHoldControl(symbol: "rotate.right", label: "rotate right", begin: { checkpoint() }, step: { elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) }).id(elements[index].id)
                     }
-                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                    StudioHoldControl(symbol: "minus.magnifyingglass", label: "minus magnifyingglass", begin: { checkpoint() }, step: { elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) }).id(elements[index].id)
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Adjust selected element size and rotation")
             }
+
+            } else if editTool == "library" {
+                compactStudioLibrary
+            } else if editTool == "more" {
+                ScrollView { inspector(for: index) }.frame(height: 240)
+            } else { editingPanel(for: index) }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    if !["icon", "image", "ellipse", "rect", "divider"].contains(elements[index].kind) {
-                        Button { showAdvancedInspector = true } label: { Label("Edit text", systemImage: "text.alignleft") }.buttonStyle(.bordered)
+                HStack(spacing: 8) {
+                    ForEach(["Move", "Color", "Shape", "Effects", "Adjust", "Look closer", "More"], id: \.self) { title in
+                        Button { inlineToolkit = false; editTool = title == "Look closer" ? "lookup" : title.lowercased() } label: { Text(title).font(.caption).frame(minWidth: 52, minHeight: 44) }.buttonStyle(.bordered)
                     }
-                    Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
-                    Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
-                    Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
-                    Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(Color.uxUiInk)
-                }.padding(.vertical, 3)
+                    if elements[index].kind == "image" {
+                        Button("Replace") { imageTargetID = elements[index].id; isImportingImage = true }.buttonStyle(.bordered)
+                        Button("Cutout") { inlineToolkit = false; editTool = "cutout" }.buttonStyle(.bordered)
+                        Button("Make icon") { processStudioImage("icon") }.buttonStyle(.bordered).disabled(imageBusy)
+                        Button("Resize") { inlineToolkit = false; editTool = "resize" }.buttonStyle(.bordered)
+                    }
+                    if !["image", "icon", "rect", "ellipse", "divider"].contains(elements[index].kind) { Button("Text") { editTool = "text" }.buttonStyle(.bordered) }
+                    Button(elements[index].kind == "icon" ? "Icons" : "Fonts") { toolkitTab = elements[index].kind == "icon" ? "Icons" : "Fonts"; inlineToolkit = true; editTool = "library" }.buttonStyle(.bordered)
+                }
             }
+        }.padding(4).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder))
+    }
+
+    private func editingPanel(for index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack { Text(editTool.capitalized).font(.caption.bold()); Spacer(); Button("Done") { editTool = "move" }.frame(minHeight: 44) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    if editTool == "color" {
+                        ColorPicker("Fill", selection: Binding(get: { uxUiUIColor(elements[index].fill) }, set: { checkpoint(); elements[index].fill = uxUiHex(UIColor($0)) }), supportsOpacity: false).frame(width: 130)
+                        ColorPicker(elements[index].kind == "icon" ? "Icon color" : "Text color", selection: Binding(get: { uxUiUIColor(elements[index].color) }, set: { checkpoint(); elements[index].color = uxUiHex(UIColor($0)) }), supportsOpacity: false).frame(width: 150)
+                    } else if editTool == "shape" {
+                        ForEach(["Square", "Soft", "Round"], id: \.self) { title in
+                            Button { checkpoint(); elements[index].radius = title == "Square" ? 0 : title == "Soft" ? 14 : min(elements[index].width, elements[index].height) / 2 } label: { VStack { RoundedRectangle(cornerRadius: title == "Square" ? 0 : title == "Soft" ? 7 : 99).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 32, height: 24); Text(title).font(.caption) }.frame(minWidth: 64, minHeight: 64) }.buttonStyle(.bordered)
+                        }
+                    } else if editTool == "adjust" || editTool == "resize" {
+                        VStack { Text("Size").font(.caption); Slider(value: Binding(get: { Double(elements[index].width) }, set: { value in let ratio = value / Double(max(1, elements[index].width)); elements[index].width = Int(value); elements[index].height = max(12, Int(Double(elements[index].height) * ratio)) }), in: 12...Double(max(13, boardWidth - elements[index].x)), onEditingChanged: { if $0 { checkpoint() } }) }.frame(width: 170)
+                        if editTool == "adjust" { VStack { Text("Turn").font(.caption); Slider(value: Binding(get: { elements[index].rotation }, set: { elements[index].rotation = $0 }), in: 0...360, onEditingChanged: { if $0 { checkpoint() } }) }.frame(width: 170) } else { ForEach([256, 512, 1024], id: \.self) { edge in Button("\(edge)px") { processStudioImage("resize", edge: edge) }.buttonStyle(.bordered).disabled(imageBusy) } }
+                    } else if editTool == "effects" {
+                        ForEach(["Flat", "Shadow", "Outline", "Faded"], id: \.self) { name in Button(name) { checkpoint(); switch name { case "Flat": elements[index].shadow = false; elements[index].borderWidth = 0; elements[index].opacity = 1; case "Shadow": elements[index].shadow = true; case "Outline": elements[index].borderWidth = 2; default: elements[index].opacity = 0.5 } }.buttonStyle(.bordered).frame(minHeight: 64) }
+                    } else if editTool == "cutout" {
+                        VStack { Text("Plain backgrounds · strength").font(.caption); Slider(value: $cutoutStrength, in: 5...140) }.frame(width: 180)
+                        Button(imageBusy ? "Working…" : "Remove background") { processStudioImage("cutout") }.buttonStyle(.bordered).disabled(imageBusy)
+                    } else if editTool == "text" {
+                        TextField("Your words", text: Binding(get: { elements[index].text }, set: { checkpoint(); elements[index].text = $0 }), axis: .vertical).frame(width: 240).textFieldStyle(.roundedBorder)
+                    } else if editTool == "lookup" {
+                        layerPreview(elements[index], scale: min(100 / CGFloat(max(1, elements[index].width)), 100 / CGFloat(max(1, elements[index].height)))).frame(width: 100, height: 100)
+                        ForEach(elements) { item in Button { selectedID = item.id } label: { VStack { layerPreview(item, scale: min(40 / CGFloat(max(1, item.width)), 40 / CGFloat(max(1, item.height)))).frame(width: 44, height: 44); Text(item.name).font(.caption).lineLimit(1) }.frame(width: 90, height: 70) }.buttonStyle(.bordered) }
+                    }
+                }
+            }.frame(height: 104)
+        }.frame(height: 160)
+    }
+
+    private func processStudioImage(_ operation: String, edge: Int = 1024) {
+        guard let index = selectedIndex, let data = elements[index].imageData, !data.isEmpty, !imageBusy else { return }
+        let id = elements[index].id, strength = Int(cutoutStrength); imageBusy = true
+        Task {
+            do {
+                let result = try await Task.detached { try StudioImageEditor.process(data, operation: operation, strength: strength, maxEdge: edge) }.value
+                if let current = elements.firstIndex(where: { $0.id == id }) { checkpoint(); if operation == "icon" { elements[current].kind = "icon"; elements[current].iconSvg = result.data; elements[current].iconViewBox = "0 0 \(result.width) \(result.height)"; elements[current].iconName = "Custom silhouette"; elements[current].imageData = nil; elements[current].fill = "transparent"; elements[current].padding = 0 } else { elements[current].imageData = result.data; if operation == "cutout" { elements[current].fill = "transparent" } } }
+                if operation == "icon" { inlineToolkit = false; editTool = "move" }
+                notice = "Image updated. Undo restores the original."
+            } catch { notice = error.localizedDescription }
+            imageBusy = false
         }
-        .padding(10)
-        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
     }
 
     private var layerListPanel: some View {
@@ -11944,7 +12098,7 @@ private struct NativeUxUiStudioView: View {
         prototypePreview = true
         selectedID = nil
         showScreenManager = false
-        showComponentPalette = false
+        showComponentPalette = false; inlineToolkit = false; editTool = "move"
         showAdvancedInspector = false
         notice = "Prototype preview started. Tap linked elements to navigate."
     }
@@ -12069,7 +12223,7 @@ private struct NativeUxUiStudioView: View {
         selectedID = nil
         undoHistory = []
         redoHistory = []
-        showComponentPalette = false
+        showComponentPalette = false; inlineToolkit = false; editTool = "move"
         showAllLayers = false
         showAdvancedInspector = false
         showAdvancedCanvas = false
@@ -12194,7 +12348,7 @@ private struct NativeUxUiStudioView: View {
         case "divider": newItem = UxUiNativeLayer(kind: kind, name: "Divider", x: 24, y: 640, width: 300, height: 1, text: "", fill: "#CBD5E1")
         default: newItem = UxUiNativeLayer(kind: "rect", name: "Rectangle", x: 24, y: 540, width: 140, height: 90, text: "", fill: "#DBEAFE")
         }
-        checkpoint(); elements.append(newItem); selectedID = newItem.id; canvasSelected = false; notice = "\(newItem.name) added."
+        showComponentPalette = false; inlineToolkit = false; editTool = "move"; checkpoint(); elements.append(newItem); selectedID = newItem.id; canvasSelected = false; notice = "\(newItem.name) added."
     }
 
     private func duplicateLayer(_ element: UxUiNativeLayer) {
@@ -12285,7 +12439,7 @@ private struct NativeUxUiStudioView: View {
                     elements[index].name = iconName
                     elements[index].iconSvg = sourceSVG
                     elements[index].padding = 0
-                    notice = "Applied \(iconName). Artwork is saved in your project."
+                    showComponentPalette = false; inlineToolkit = false; editTool = "move"; notice = "Applied \(iconName). Artwork is saved in your project."
                 }
             } catch {
                 await MainActor.run { notice = "Icon unavailable. Choose a bundled icon or retry when connected." }
@@ -12373,8 +12527,9 @@ private struct NativeUxUiStudioView: View {
             "Visual interface preview rendered from the design layers.".draw(at: CGPoint(x: 32, y: 817), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: UIColor.secondaryLabel])
 
             var pdfElements = elements
-            for index in pdfElements.indices where pdfElements[index].kind == "image" {
-                pdfElements[index].imageData = nil
+            for index in pdfElements.indices {
+                pdfElements[index].imageData = nil; pdfElements[index].fontData = nil
+                if (pdfElements[index].iconSvg?.count ?? 0) > 500 { pdfElements[index].iconSvg = nil }
             }
             let pdfProject = UxUiNativeProject(
                 name: projectName, target: target, background: background,

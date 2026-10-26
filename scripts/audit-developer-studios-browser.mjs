@@ -159,22 +159,15 @@ try {
         const toolkitNames = await page.locator('.uxui-toolkit-tile .uxui-toolkit-tile-label').allTextContents();
         if (toolkitNames.length !== 26) throw new Error('Expected 26 Toolkit entries, found ' + toolkitNames.length);
         for (const toolkitName of toolkitNames.map((name) => name.trim()).filter(Boolean)) {
-          await page.getByRole('tab', { name: 'All 26', exact: true }).click();
-          const tile = page.locator('.uxui-toolkit-tile').filter({ hasText: toolkitName }).first();
-          await tile.waitFor({ state: 'visible', timeout });
-          await tile.click();
-          const selectedPageState = await page.locator('.uxui-toolkit-tabs').evaluate((tabs) => ({
-            selectedCount: tabs.querySelectorAll('[role="tab"][aria-selected="true"]').length,
-            activeTab: tabs.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || '',
-            drawerVisible: !!tabs.closest('[role="dialog"]')?.checkVisibility(),
-            contentHeight: tabs.closest('[role="dialog"]')?.querySelector('.uxui-toolkit-content')?.getBoundingClientRect().height || 0,
-          }));
-          if (selectedPageState.selectedCount !== 1 || !selectedPageState.drawerVisible || selectedPageState.contentHeight < 80) {
-            throw new Error('Toolkit tile did not open a usable connected page: ' + toolkitName + ' ' + JSON.stringify(selectedPageState));
-          }
+          if (!await toolkitDialog.isVisible()) await page.getByLabel('Add elements', {exact:true}).click();
+          await toolkitDialog.getByRole('tab',{name:'All 26',exact:true}).click();
+          await toolkitDialog.locator('.uxui-toolkit-tile').filter({hasText:toolkitName}).first().click();
+          await toolkitDialog.waitFor({state:'hidden',timeout});
+          const inline = page.getByRole('region',{name:'Studio toolkit',exact:true});
+          await inline.waitFor({state:'visible',timeout});
+          if ((await inline.boundingBox())?.height < 80) throw new Error('Inline toolkit has insufficient space: '+toolkitName);
         }
-        await page.getByRole('tab', { name: 'All 26', exact: true }).click();
-        await page.getByRole('button', { name: 'Close studio toolkit', exact: true }).click();
+        await page.getByRole('button',{name:'Back to movement controls',exact:true}).click();
 
         // The sketch-first workspace hides the screen/layer inspector until explicitly opened.
         await page.getByRole('button', { name: 'App screens and layers' }).click();
@@ -217,6 +210,7 @@ try {
         await page.getByRole('button', { name: /^Button\b/ }).click();
         // One tap inserts the layer and returns to its visual styling controls.
         await toolkitDialog.waitFor({ state: 'hidden', timeout });
+        await page.getByRole('button',{name:'Color',exact:true}).click();
         await page.getByRole('region', { name: 'Selected element styling', exact: true }).waitFor({ state: 'visible', timeout });
         await page.getByRole('button', { name: 'App screens and layers', exact: true }).click();
         await page.getByRole('button', { name: 'Add app screen', exact: true }).click();

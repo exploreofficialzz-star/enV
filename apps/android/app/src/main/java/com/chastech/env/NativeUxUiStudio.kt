@@ -1117,6 +1117,10 @@ private fun NativeUxUiStudioContent() {
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)};var hasSavedDraft by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
+    var editTool by remember{mutableStateOf("move")}
+    var inlineToolkit by remember{mutableStateOf(false)}
+    var imageBusy by remember{mutableStateOf(false)}
+    var cutoutStrength by remember{mutableFloatStateOf(40f)}
     val selected=elements.firstOrNull{it.id==selectedId}
     val hasActivePrototypeLinks=elements.any{layer->layer.prototypeTargetScreenId.isNotBlank()&&screens.any{screen->screen.id==layer.prototypeTargetScreenId}}
     val presetWidth=if(target=="mobile")390 else if(target=="tablet")768 else 1440
@@ -1240,7 +1244,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
             "spacer"->UxUiNativeLayer(id,kind,"Layout spacer",24,540,80,24,"",fill="transparent",radius=0,padding=0)
             else->UxUiNativeLayer(id,"rect","Rectangle",24,540,140,90,"",fill="#DBEAFE")
         }
-        checkpoint();elements.add(if(e.kind=="icon")e.copy(iconSvg=UxNativeArtworkLibrary.icon(context,e.iconName).orEmpty(),padding=0)else e);selectedId=id;notice=e.name+" added."
+        showElementTray=false;inlineToolkit=false;editTool="move";checkpoint();elements.add(if(e.kind=="icon")e.copy(iconSvg=UxNativeArtworkLibrary.icon(context,e.iconName).orEmpty(),padding=0)else e);selectedId=id;notice=e.name+" added."
     }
 
     fun searchIcons(loadMore:Boolean=false){
@@ -1284,7 +1288,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     }
                 }.onSuccess { dataUrl ->
                     val index=elements.indexOfFirst{it.id==layerId}
-                    if(index>=0){checkpoint();elements[index]=elements[index].copy(kind="image",name="Image",imageData=dataUrl);notice="Image imported and saved in the design project."}
+                    if(index>=0){checkpoint();val old=elements[index];val raw=Base64.decode(dataUrl.substringAfter(','),Base64.DEFAULT);val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true};BitmapFactory.decodeByteArray(raw,0,raw.size,bounds);val ratio=minOf(280f/bounds.outWidth.coerceAtLeast(1),400f/bounds.outHeight.coerceAtLeast(1));elements[index]=old.copy(kind="image",name="Image",imageData=dataUrl,width=(bounds.outWidth*ratio).roundToInt().coerceAtLeast(12),height=(bounds.outHeight*ratio).roundToInt().coerceAtLeast(12),padding=0);inlineToolkit=false;showElementTray=false;editTool="move";notice="Image imported and saved in the design project."}
                 }.onFailure { notice=it.message?:"Image import failed." }
             }
         }
@@ -1361,7 +1365,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     elements.addAll(imported.map{it.copy(referenceWidth=bw,referenceHeight=bh)})
                 }
                 selectedId=imported.lastOrNull()?.id.orEmpty()
-                showElementTray=false;onboarding=false
+                showElementTray=false;inlineToolkit=false;editTool="move";onboarding=false
                 notice="Imported "+imported.size+" design element(s)."
             }.onFailure{notice=it.message?:"Project import failed."}
         }
@@ -1387,7 +1391,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     val newId=selectedId
                     edit(newId){it.copy(name=name.ifBlank{"Imported icon"},iconName="custom:"+(name.ifBlank{"icon"}),iconSvg=svg,iconViewBox=viewBox)}
                 }
-                showElementTray=false;notice="Imported SVG icon."
+                showElementTray=false;inlineToolkit=false;editTool="move";notice="Imported SVG icon."
             }.onFailure{notice=it.message?:"SVG icon import failed."}
         }
     }
@@ -1417,7 +1421,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
             return
         }
         prototypeStartScreenId=activeScreenId;prototypeHistory.clear();prototypePreview=true
-        selectedId="";showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showScreenManager=false
+        selectedId="";showElementTray=false;inlineToolkit=false;editTool="move";showCanvasSettings=false;showAdvancedControls=false;showScreenManager=false
         notice="Prototype preview started. Tap linked elements to navigate."
     }
     fun navigatePrototype(destinationId:String){
@@ -1479,220 +1483,241 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                 withContext(Dispatchers.IO) { UxNativeArtworkLibrary.fetchIcon(context,icon) }
             }.onSuccess { svg ->
                 edit(layerId){it.copy(iconName=icon,name=icon,iconSvg=uxNativeCleanIconSvg(svg))}
-                notice="Loaded actual SVG artwork for "+icon+". Check its source licence before shipping."
+                showElementTray=false;inlineToolkit=false;editTool="move";notice="Loaded actual SVG artwork for "+icon+". Check its source licence before shipping."
             }.onFailure { notice=it.message ?: "Could not load selected icon artwork." }
             iconBusy=false
         }
     }
 
-    Surface(color=MaterialTheme.colorScheme.background,modifier=Modifier.fillMaxWidth()){
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-            Text("UX/UI Studio",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-            Text("Design by eye. Export exact developer and AI handoff.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            if(onboarding){
-                Card { Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(72.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(50)),contentAlignment=Alignment.Center) {
-                        Text("＋",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Normal)
-                    }
-                    Text("New project",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-                    Text("Start with a blank design. Add elements only when you need them.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;showScreenManager=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;val id="screen-"+System.nanoTime();screens.clear();screens.add(UxUiNativeScreen(id,"Screen 1","mobile","#FFFFFF",false,390,844,emptyList()));activeScreenId=id;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
-                }}
-                Text("Drafts",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                if(hasSavedDraft) {
-                    Card { Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                        Text(projectName,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
-                        Text(if(elements.isEmpty())"Blank canvas" else elements.size.toString()+" design elements",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedButton(onClick={onboarding=false;notice="Draft opened."},modifier=Modifier.fillMaxWidth()){Text("Open draft")}
-                    }}
-                } else {
-                    Card { Column(Modifier.fillMaxWidth().padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                        Text("No drafts yet",fontWeight=FontWeight.SemiBold)
-                        Text("Your designs will appear here as you work.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }}
-                }
-            }else{
-                OutlinedTextField(projectName,{projectName=it},label={Text("Project title")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                    TextButton(onClick={onboarding=true;showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;selectedId=""}) { Text("← Projects") }
-                    Spacer(Modifier.weight(1f))
-                }
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")},enabled=!prototypePreview)
-                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")},enabled=!prototypePreview)
-                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")},enabled=!prototypePreview)
-                    if(prototypePreview){
-                        OutlinedButton(onClick={backPrototypePreview()},enabled=prototypeHistory.isNotEmpty()){Text("Back")}
-                        Button(onClick={ stopPrototypePreview() }){Text("Exit preview")}
-                    }else{
-                        OutlinedButton(onClick={ startPrototypePreview() },enabled=hasActivePrototypeLinks){Text("Preview prototype")}
-                        OutlinedButton(onClick={selectedId="";showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
-                    }
-                }
-                Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
-                    Text(if(target=="mobile")"Phone mockup" else if(target=="tablet")"Tablet mockup" else "Desktop mockup",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                    BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.TopCenter){
-                        val bezel=if(target=="mobile")8f else if(target=="tablet")12f else 10f
-                        val width=(maxWidth.value-bezel*2).coerceAtLeast(140f).coerceAtMost(if(target=="mobile")390f else if(target=="tablet")768f else 1040f)
-                        val scale=width/bw.toFloat()
-                        Column(horizontalAlignment=Alignment.CenterHorizontally){
-                            Box(Modifier.width((width+bezel*2).dp).clip(RoundedCornerShape(if(target=="mobile")46.dp else if(target=="tablet")25.dp else 10.dp)).background(Color(0xFF0B0C0E)).clickable(enabled=!prototypePreview){selectedId="";showCanvasSettings=true;showElementTray=false}.padding(bezel.dp)){
-                                Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(if(target=="mobile")38.dp else if(target=="tablet")16.dp else 2.dp)).background(uxNativeColor(background)).clickable(enabled=!prototypePreview){selectedId="";showCanvasSettings=true;showElementTray=false}){
-                            Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
-                                val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
-                        elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
-                                    val shape=uxNativeComposeShape(e.kind,e.radius)
-                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation,alpha=e.opacity).shadow(if(e.shadow)12.dp else 0.dp,shape).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).then(if(selectedId==e.id||e.borderWidth>0)Modifier.border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape)else Modifier).padding(e.padding.dp).clickable(enabled=!prototypePreview){if(e.name=="Background artwork"){selectedId="";showCanvasSettings=true}else{selectedId=e.id;showCanvasSettings=false};showElementTray=false}.pointerInput(e.id,scale,dragDensity,prototypePreview){
-                                        if(prototypePreview){
-                                            detectTapGestures(onTap={navigatePrototype(e.prototypeTargetScreenId)})
-                                        }else if(e.name=="Background artwork"){
-                                            detectTapGestures(onTap={selectedId="";showCanvasSettings=true;showElementTray=false})
-                                        }else{
-                                            val density=dragDensity
-                                            detectDragGestures(onDragStart={selectedId=e.id;showCanvasSettings=false;showElementTray=false;checkpoint()}){change,dragAmount->
-                                                change.consume()
-                                                val index=elements.indexOfFirst{it.id==e.id}
-                                                if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
-                                            }
-                                        }
-                                    }){
-                                        if(e.kind=="chart") {
-                                            val chart=uxUiParseChartData(e.text)
-                                            Column(Modifier.fillMaxSize().padding(3.dp)) {
-                                                Text(chart.title,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.coerceIn(8,16).sp,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis)
-                                                if(chart.points.isEmpty()) {
-                                                    Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.Center){Text("Enter data as Label: value",fontSize=8.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                                                } else {
-                                                    val maxValue=chart.points.maxOfOrNull{it.value}?.coerceAtLeast(1.0)?:1.0
-                                                    val barAreaHeight=(e.height-e.padding*2-e.fontSize-28).coerceAtLeast(16)
-                                                    Row(Modifier.fillMaxWidth().height((barAreaHeight+24).dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(2.dp)) {
-                                                        chart.points.forEach { point ->
-                                                            Column(Modifier.weight(1f).fillMaxHeight(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Bottom) {
-                                                                Text(if(point.value%1.0==0.0)point.value.toLong().toString() else String.format(java.util.Locale.US,"%.1f",point.value),fontSize=7.sp,maxLines=1,overflow=TextOverflow.Clip,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
-                                                                Spacer(Modifier.height(1.dp))
-                                                                val barHeight=if(point.value<=0)0 else (barAreaHeight*point.value/maxValue).roundToInt().coerceIn(2,barAreaHeight)
-                                                                Box(Modifier.fillMaxWidth(.62f).height(barHeight.dp).clip(RoundedCornerShape(3.dp)).background(uxNativeColor(e.color,android.graphics.Color.BLACK)))
-                                                                Text(point.label,fontSize=6.sp,maxLines=1,overflow=TextOverflow.Ellipsis,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+
+    fun processImage(operation:String,edge:Int=1024) {
+        val layer=elements.firstOrNull{it.id==selectedId}?:return
+        if(layer.imageData.isBlank()||imageBusy)return
+        imageBusy=true
+        scope.launch {
+            runCatching{withContext(Dispatchers.Default){StudioImageEditor.process(layer.imageData,operation,cutoutStrength.roundToInt(),edge)}}.onSuccess{result->
+                edit(layer.id){if(operation=="icon")it.copy(kind="icon",iconSvg=result.data,iconName="Custom silhouette",iconViewBox="0 0 ${result.width} ${result.height}",imageData="",fill="transparent",padding=0)else it.copy(imageData=result.data,fill=if(operation=="cutout")"transparent" else it.fill)}
+                if(operation=="icon"){inlineToolkit=false;editTool="move"}
+                notice=if(operation=="icon")"Silhouette icon created. Change its color in Color." else "Image updated. Undo restores the original."
+            }.onFailure{notice=it.message?:"Image editing failed"}
+            imageBusy=false
+        }
+    }
+    @Composable fun ToolkitContent(){
+                    Card(Modifier.fillMaxWidth().padding(horizontal=12.dp).heightIn(max=if(inlineToolkit)260.dp else LocalConfiguration.current.screenHeightDp.dp*.84f)) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Studio toolkit",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={showElementTray=false;inlineToolkit=false;editTool="move"}){Text("Done")}}
+
+                        OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            listOf("All 26","Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
+                        }
+                        when(toolkitTab){
+                            "All 26" -> {
+                                Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                                Text("Browse visual samples, then open a tool. Changes apply to the selected layer; canvas tools style the screen background.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                uxNativeToolkits.filter{toolkit->toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
+                                    Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                        UxNativeToolkitSample(toolkit.id)
+                                        Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                        Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                            Text(toolkit.status,style=MaterialTheme.typography.labelSmall,color=if(toolkit.status=="Not complete")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,modifier=Modifier.weight(1f))
+                                            OutlinedButton(onClick={
+                                                activeToolkitId=toolkit.id;showElementTray=false;inlineToolkit=true;editTool="library"
+                                                when(toolkit.id){
+                                                    "icons"->{toolkitTab="Icons"}
+                                                    "typography"->{toolkitTab="Fonts"}
+                                                    "color","brand","design-system"->{toolkitTab="Tokens"}
+                                                    "illustrations","media","components","assets","inspiration"->{toolkitTab="Elements"}
+                                                    "projects"->{toolkitTab="Presets"}
+                                                    "accessibility","qa"->{
+                                                        val findings=mutableListOf<String>()
+                                                        if(elements.isEmpty())findings.add("No layers have been added yet.")
+                                                        elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
+                                                        val decorativeKinds=setOf("image","icon","rect","ellipse","divider","spacer","triangle","diamond","hexagon","star","line")
+                                                        elements.filter{it.kind !in decorativeKinds && it.text.isNotBlank()}.forEach{e->
+                                                            val rawFill=e.fill.trim()
+                                                            val surface=if(rawFill.isEmpty()||rawFill.equals("transparent",true)||rawFill.equals("none",true))background else rawFill
+                                                            val ratio=NativeAccessibilityEngine.contrastRatio(e.color,surface)
+                                                            if(ratio==null)findings.add(e.name+" text contrast could not be calculated for these colors; manually review contrast.")
+                                                            else{
+                                                                val large=e.fontSize>=24||(e.fontSize>=19&&e.fontWeight>=700)
+                                                                val threshold=if(large)3.0 else 4.5
+                                                                if(ratio+1e-9<threshold)findings.add(e.name+" text contrast is "+((ratio*100).roundToInt()/100.0)+":1; WCAG AA "+(if(large)"large-text" else "normal-text")+" requires at least "+threshold+":1 for this solid-color pair.")
                                                             }
                                                         }
+                                                        for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
+                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
                                                     }
+                                                    else->{toolkitTab="Details"}
                                                 }
-                                                if(chart.invalidRows>0)Text(chart.invalidRows.toString()+" invalid row(s) ignored",fontSize=6.sp,color=Color(0xFFB45309),maxLines=1)
+                                            },contentPadding=PaddingValues(horizontal=10.dp,vertical=6.dp)){Text("Open")}
+                                        }
+                                    }}
+                                }
+                                if(qaReport.isNotEmpty()||activeToolkitId=="qa"||activeToolkitId=="accessibility"){
+                                    Text("Review results · ${qaReport.size}",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                    if(qaReport.isEmpty())Text("No findings in the limited checks run.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    qaReport.take(80).forEach{finding->Text("• "+finding,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                }
+                            }
+                            "Details" -> {
+                                val tool=uxNativeToolkits.firstOrNull{it.id==activeToolkitId}
+                                Text(tool?.name.orEmpty(),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                                UxNativeToolkitSample(activeToolkitId)
+                                Text(tool?.description.orEmpty(),style=MaterialTheme.typography.bodySmall)
+                                when(activeToolkitId){
+                                    "effects"->{
+                                        Text("Apply an effect to the selected layer. Add a surface to try the samples.",style=MaterialTheme.typography.bodySmall)
+                                        if(selected==null)Button(onClick={add("card")},modifier=Modifier.fillMaxWidth()){Text("Add a surface to style")}
+                                        listOf("None","Soft shadow","Translucent","Outline","Rounded","Pill","Tilt left","Tilt right").chunked(2).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                                            row.forEach{effect->OutlinedButton(enabled=selected!=null,onClick={selected?.let{layer->edit(layer.id){item->when(effect){"None"->item.copy(opacity=1f,shadow=false,borderWidth=0,rotation=0f);"Soft shadow"->item.copy(shadow=true);"Translucent"->item.copy(opacity=.5f);"Outline"->item.copy(borderWidth=2,borderColor="#2563EB");"Rounded"->item.copy(radius=18);"Pill"->item.copy(radius=minOf(item.width,item.height)/2);"Tilt left"->item.copy(rotation=-12f);else->item.copy(rotation=12f)}}}},modifier=Modifier.weight(1f),shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(12.dp)){
+                                                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
+                                                    val shape=RoundedCornerShape(if(effect=="Pill")30.dp else if(effect=="Rounded")14.dp else 6.dp)
+                                                    Box(Modifier.size(62.dp,38.dp).graphicsLayer(alpha=if(effect=="Translucent").5f else 1f,rotationZ=if(effect=="Tilt left")-12f else if(effect=="Tilt right")12f else 0f).shadow(if(effect=="Soft shadow")8.dp else 0.dp,shape).background(MaterialTheme.colorScheme.primaryContainer,shape).then(if(effect=="Outline")Modifier.border(2.dp,MaterialTheme.colorScheme.primary,shape)else Modifier))
+                                                    Text(effect,fontSize=12.sp,maxLines=2)
+                                                }
+                                            }}
+                                        }}
+                                    }
+                                    "background","patterns"->{
+                                        Text("Portable background artwork is embedded in the project and exports.",style=MaterialTheme.typography.bodySmall)
+                                        val samples=if(activeToolkitId=="patterns")listOf("Dots","Grid","Stripes","Checkerboard") else listOf("Ocean","Sunset","Forest","Radial glow")
+                                        samples.forEach{sample->OutlinedButton(onClick={
+                                            checkpoint()
+                                            val artwork=UxUiNativeLayer("background-"+System.nanoTime(),"image","Background artwork",0,0,bw,bh,"",padding=0,radius=0,imageData=uxNativeBackgroundArtwork(sample,bw,bh),referenceWidth=bw,referenceHeight=bh)
+                                            elements.removeAll{it.name=="Background artwork"};elements.add(0,artwork);selectedId="";showCanvasSettings=true;notice=sample+" background applied."
+                                        },modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp)){
+                                            val preview=remember(sample){uxNativeBackgroundArtwork(sample,280,68)}
+                                            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){UxUiNativeArtworkPreview(UxUiNativeLayer("sample","image",sample,0,0,280,68,"",imageData=preview),Modifier.fillMaxWidth().height(68.dp),monochrome=true);Text(sample)}
+                                        }}
+                                        OutlinedButton(onClick={checkpoint();elements.removeAll{it.name=="Background artwork"}},modifier=Modifier.fillMaxWidth()){Text("Remove background artwork")}
+                                        OutlinedButton(onClick={selectedId="";showCanvasSettings=true;showElementTray=false;inlineToolkit=false;editTool="move"},modifier=Modifier.fillMaxWidth()){Text("Canvas color & size")}
+                                    }
+                                    "motion","transform"->{
+                                        if(selected==null)Text("Select a layer in the canvas or add a shape to transform.")
+                                        else{
+                                            Text("Rotation · "+selected.rotation.roundToInt()+"°")
+                                            Slider(selected.rotation.coerceIn(-180f,180f),{angle->edit(selected.id){it.copy(rotation=angle)}},valueRange=-180f..180f)
+                                            OutlinedButton(onClick={edit(selected.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},modifier=Modifier.fillMaxWidth()){Text("Center on canvas")}
+                                            OutlinedButton(onClick={edit(selected.id){it.copy(rotation=0f)}},modifier=Modifier.fillMaxWidth()){Text("Reset rotation")}
+                                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={edit(selected.id){it.copy(width=(it.width*1.1f).roundToInt(),height=(it.height*1.1f).roundToInt())}},modifier=Modifier.weight(1f)){Text("Size +")};OutlinedButton(onClick={edit(selected.id){it.copy(width=(it.width*.9f).roundToInt().coerceAtLeast(1),height=(it.height*.9f).roundToInt().coerceAtLeast(1))}},modifier=Modifier.weight(1f)){Text("Size −")}}
+                                        }
+                                        OutlinedButton(onClick={add("rect")},modifier=Modifier.fillMaxWidth()){Text("Add a shape")}
+                                        Text("Rotation edits the saved design. Animated timelines are not part of this editor.",style=MaterialTheme.typography.bodySmall)
+                                    }
+                                    "device","platform"->{
+                                        listOf("mobile" to "Phone · 390 × 844","tablet" to "Tablet · 768 × 1024","desktop" to "Desktop · 1440 × 900").forEach{(mode,label)->OutlinedButton(onClick={target=mode;customArtboard=false;customWidth=if(mode=="mobile")390 else if(mode=="tablet")768 else 1440;customHeight=if(mode=="mobile")844 else if(mode=="tablet")1024 else 900},modifier=Modifier.fillMaxWidth()){Text(if(target==mode)"✓ "+label else label)}}
+                                        selected?.let{layer->Text("Show selected layer on",style=MaterialTheme.typography.labelLarge);listOf("mobile","tablet","desktop").forEach{mode->Row(verticalAlignment=Alignment.CenterVertically){val visible=layer.visibleOn.split(",");Checkbox(checked=mode in visible,onCheckedChange={checked->val next=if(checked)visible+mode else visible-mode;if(next.isNotEmpty())edit(layer.id){it.copy(visibleOn=next.distinct().joinToString(","))}});Text(mode)}}}
+                                    }
+                                    "responsive"->{
+                                        OutlinedButton(onClick={selectedId="";showCanvasSettings=true;showElementTray=false;inlineToolkit=false;editTool="move"},modifier=Modifier.fillMaxWidth()){Text("Edit canvas dimensions")}
+                                        selected?.let{layer->Text("Horizontal constraint");listOf("left","center","right","stretch").forEach{anchor->FilterChip(selected=layer.horizontalConstraint==anchor,onClick={edit(layer.id){it.copy(horizontalConstraint=anchor,referenceWidth=bw,referenceHeight=bh)}},label={Text(anchor)})};Text("Vertical constraint");listOf("top","center","bottom","stretch").forEach{anchor->FilterChip(selected=layer.verticalConstraint==anchor,onClick={edit(layer.id){it.copy(verticalConstraint=anchor,referenceWidth=bw,referenceHeight=bh)}},label={Text(anchor)})}}
+                                    }
+                                    "layers"->{
+                                        if(elements.isEmpty())Text("Your layers will appear here after you add an element.")
+                                        elements.reversed().forEach{layer->OutlinedButton(onClick={selectedId=layer.id;showElementTray=false;inlineToolkit=false;editTool="move";showCanvasSettings=false},modifier=Modifier.fillMaxWidth()){Text(layer.name+" · "+layer.kind)}}
+                                    }
+                                    "flows"->{
+                                        if(screens.size<2)Text("Add another screen, then select a layer and choose its tap destination.")
+                                        OutlinedButton(onClick={addAppScreen()},modifier=Modifier.fillMaxWidth()){Text("Add screen")}
+                                        selected?.let{layer->Text("When ${layer.name} is tapped:");screens.filter{it.id!=activeScreenId}.forEach{screen->OutlinedButton(onClick={edit(layer.id){it.copy(prototypeTargetScreenId=screen.id)}},modifier=Modifier.fillMaxWidth()){Text(if(layer.prototypeTargetScreenId==screen.id)"✓ "+screen.name else screen.name)}}}
+                                        Button(onClick={startPrototypePreview()},enabled=hasActivePrototypeLinks,modifier=Modifier.fillMaxWidth()){Text("Preview connected screens")}
+                                    }
+                                    "content"->{
+                                        listOf("Heading" to "Your next idea starts here","Paragraph" to "Tell your story with clear, thoughtful content.","Button" to "Get started").forEach{(label,text)->OutlinedButton(onClick={add(if(label=="Button")"button" else "text");val layer=elements.last();edit(layer.id){it.copy(name=label,text=text,fontSize=if(label=="Heading")26 else 16)}},modifier=Modifier.fillMaxWidth()){Column(Modifier.fillMaxWidth()){Text(text,fontSize=if(label=="Heading")22.sp else 14.sp);Text("Add "+label,style=MaterialTheme.typography.labelSmall)}}}
+                                    }
+                                    "data-viz"->{
+                                        OutlinedButton(onClick={add("chart")},modifier=Modifier.fillMaxWidth()){Text("Add editable bar chart")}
+                                        selected?.takeIf{it.kind=="chart"}?.let{layer->OutlinedTextField(layer.text,{v->edit(layer.id){it.copy(text=v)}},label={Text("Title, then Label: value on each line")},modifier=Modifier.fillMaxWidth(),minLines=5)}
+                                    }
+                                    "handoff"->{
+                                        Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId);jsonLauncher.launch("design-project.json")},modifier=Modifier.fillMaxWidth()){Text("Save portable project JSON")}
+                                        Button(onClick={pdfBytes=UxUiNativePdf.build(context,projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson),bw,bh);pdfLauncher.launch("design-preview.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF")}
+                                        Text("HTML, Kotlin and SwiftUI source exports are also available in Export and handoff below.",style=MaterialTheme.typography.bodySmall)
+                                    }
+                                    else->Text("Choose an item in this toolkit to edit the design.")
+                                }
+                                OutlinedButton(onClick={toolkitTab="All 26"},modifier=Modifier.fillMaxWidth()){Text("Back to all 26 tools")}
+                            }
+                            "Icons" -> {
+                                OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){uxNativeIconCategories.keys.forEach{category->FilterChip(selected=iconCategory==category,onClick={iconCategory=category},label={Text(category)})}}
+                                val browseIcons=(if(iconQuery.isBlank()){if(iconCategory=="All bundled")bundledIconNames else uxNativeIconCategories[iconCategory].orEmpty().filter{it in bundledIconNames}}else bundledIconNames.filter{it.contains(iconQuery,true)}+iconResults).distinct().filter{it.contains(toolkitSearch,true)}
+                                browseIcons.take(iconBrowseLimit).chunked(3).forEach{row->
+                                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                        row.forEach{icon->OutlinedButton(onClick={val id=selected?.takeIf{it.kind=="icon"}?.id?:run{add("icon");selectedId};chooseIcon(id,icon)},modifier=Modifier.weight(1f),shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(8.dp)){
+                                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                                UxNativeIconThumbnail(icon)
+                                                Text(icon.substringAfter(":"),fontSize=10.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
                                             }
-                                        } else if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
-                                            UxUiNativeArtworkPreview(e,Modifier.fillMaxSize())
-                                        } else {
-                                            Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=FontFamily(uxNativeTypeface(context,e)),maxLines=5,overflow=TextOverflow.Clip)
+                                        }}
+                                        repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                                    }
+                                }
+                                if(browseIcons.size>iconBrowseLimit)OutlinedButton(onClick={iconBrowseLimit+=36},modifier=Modifier.fillMaxWidth()){Text("Show more icons · $iconBrowseLimit / ${browseIcons.size}")}
+                                if(browseIcons.isEmpty())Text("No matching icons. Try another search or browse a category.")
+                                Button(onClick={searchIcons(false)},enabled=iconQuery.isNotBlank()&&!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search online catalog")}
+                                OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
+                                Text("Bundled icons work offline. Tap an icon to add or replace it. Online results show Retry if artwork is unavailable.",style=MaterialTheme.typography.bodySmall)
+                            }
+                            "Elements" -> {
+                                if(activeToolkitId in setOf("illustrations","media","assets","inspiration")){
+                                    Text("Import artwork and preview it directly on the canvas.",style=MaterialTheme.typography.bodySmall)
+                                    OutlinedButton(onClick={add("image");imageTargetId=selectedId;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text("Import image / visual reference")}
+                                    OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG illustration")}
+                                }
+                                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                                    listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").filter{(kind,label)->label.contains(toolkitSearch,true)||kind.contains(toolkitSearch,true)}.chunked(2).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){row.forEach{(kind,label)->OutlinedButton(onClick={add(if(kind=="circle")"ellipse" else kind);if(kind=="image"){imageTargetId=selectedId;imageLauncher.launch("image/*")}},modifier=Modifier.weight(1f),contentPadding=PaddingValues(9.dp),shape=RoundedCornerShape(12.dp)){Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(7.dp)){UxNativeElementSample(kind,label);Text(label,fontSize=12.sp)}}};repeat(2-row.size){Spacer(Modifier.weight(1f))}}}
+                                }
+                            }
+                            "Presets" -> {
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                    listOf("mobile-dashboard" to "Mobile app","mobile-login" to "Login screen","tablet-dashboard" to "Tablet app","desktop-landing" to "Website").filter{(id,label)->label.contains(toolkitSearch,true)||id.contains(toolkitSearch,true)}.forEach{(id,label)->OutlinedButton(onClick={checkpoint();val newTarget=when{ id.startsWith("tablet")->"tablet";id.startsWith("desktop")->"desktop";else->"mobile"};target=newTarget;customArtboard=false;customWidth=if(newTarget=="mobile")390 else if(newTarget=="tablet")768 else 1440;customHeight=if(newTarget=="mobile")844 else if(newTarget=="tablet")1024 else 900;elements.clear();elements.addAll(uxNativePreset(newTarget,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)});selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label)}}
+                                }
+                                OutlinedButton(onClick={presetImportLauncher.launch(arrayOf("application/json"))},modifier=Modifier.fillMaxWidth()){Text("Import preset / project JSON")}
+                                Text("Presets can be loaded into this project and customised.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            "Fonts" -> {
+                                Text("Preview real font faces before applying. Tap a sample to style text or add a text layer.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Search font families")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                OutlinedTextField(fontPreviewWords,{fontPreviewWords=it.take(80)},label={Text("Try your words")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=animateFontPreviews,onCheckedChange={animateFontPreviews=it});Text("Play font previews")}
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("All","Sans serif","Serif","Monospace","Display","Handwriting").forEach{category->FilterChip(selected=fontCategory==category,onClick={fontCategory=category},label={Text(category)})}}
+                                uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)&&it.contains(toolkitSearch,true)}.forEach{family->
+                                    OutlinedButton(onClick={val fontLayer=selected?.takeUnless{it.kind in setOf("icon","image","rect","ellipse","divider","line","triangle","diamond","hexagon","star") }?:run{add("text");elements.last()};edit(fontLayer.id){it.copy(fontFamily=family,fontData=uxNativeBundledFontData(context,family))};showElementTray=false;inlineToolkit=false;editTool="move"},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp)){
+                                        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                            Text(family,style=MaterialTheme.typography.labelLarge)
+                                            UxNativeAnimatedFontSpecimen(family,fontPreviewWords,animateFontPreviews)
+                                            Text(if(family in uxNativeBundledFonts)"Bundled font · available offline" else "Android system font",style=MaterialTheme.typography.labelSmall)
                                         }
                                     }
+                                    uxNativeBundledFonts[family]?.let{file->OutlinedButton(onClick={fontExportBytes=context.assets.open("fonts/"+file).use{it.readBytes()};fontExportLauncher.launch(file)},modifier=Modifier.fillMaxWidth()){Text("Save "+family+" font · TTF")}}
                                 }
+                                if(selected!=null)OutlinedButton(onClick={fontTargetId=selected.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text("Import font (TTF / OTF)")}
                             }
-                                if(target=="mobile")Box(Modifier.align(Alignment.TopCenter).padding(top=4.dp).width((width*0.28f).dp).height((width*0.055f).dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
-                                else if(target=="tablet")Box(Modifier.align(Alignment.TopCenter).padding(top=3.dp).size(6.dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
-                        }
-                    }
-                        if(target=="desktop"){
-                            Column(horizontalAlignment=Alignment.CenterHorizontally){
-                                Box(Modifier.width(76.dp).height(25.dp).background(Color(0xFF9BA0A5),RoundedCornerShape(4.dp)))
-                                Box(Modifier.width(180.dp).height(7.dp).background(Color(0xFF777C82),RoundedCornerShape(99.dp)))
+                            "Tokens" -> {
+                                Text("Tap a colour to apply it to the selected element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){colorTokens.filter{it.first.contains(toolkitSearch,true)||it.second.contains(toolkitSearch,true)}.forEach{(name,value)->OutlinedButton(onClick={val colorLayer=selected;if(colorLayer!=null)edit(colorLayer.id){it.copy(fill=value)}else background=value}){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}}
                             }
                         }
-                        }
-                    }
-                    Text("Your design automatically fits the preview.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                }}
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
-                        OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↶")}
-                        OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↷")}
-                    }
-                    Spacer(Modifier.weight(1f))
-                    OutlinedButton(onClick={showElementTray=!showElementTray},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
-                    Spacer(Modifier.weight(1f))
-                    Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
-                        OutlinedButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp),contentPadding=PaddingValues(2.dp)){Text("▣")}
-                        Text(screens.size.toString(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if(showScreenManager){
-                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-                        Row(verticalAlignment=Alignment.CenterVertically){
-                            Column(Modifier.weight(1f)){Text("App screens",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold);Text("Choose which screen is open in the mockup.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                            Button(onClick={addAppScreen()}){Text("＋ New screen")}
-                        }
-                        screens.forEachIndexed{screenIndex,screen->
-                            Card(colors=CardDefaults.cardColors(containerColor=if(screen.id==activeScreenId)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)){
-                                Column(Modifier.fillMaxWidth().padding(9.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-                                    OutlinedTextField(value=screen.name,onValueChange={renameAppScreen(screen.id,it)},label={Text("Screen name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                                    Text(screen.target+" · "+screen.elements.size+" layers · "+screen.customWidth+"×"+screen.customHeight,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically){
-                                        Button(onClick={activateScreen(screen.id)},enabled=screen.id!=activeScreenId){Text(if(screen.id==activeScreenId)"Editing" else "Open")}
-                                        OutlinedButton(onClick={reorderAppScreen(screen.id,-1)},enabled=screenIndex>0,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↑")}
-                                        OutlinedButton(onClick={reorderAppScreen(screen.id,1)},enabled=screenIndex<screens.lastIndex,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↓")}
-                                        OutlinedButton(onClick={duplicateAppScreen(screen.id)},contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Duplicate")}
-                                        OutlinedButton(onClick={deleteAppScreen(screen.id)},enabled=screens.size>1,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Delete")}
-                                    }
-                                }
-                            }
-                        }
-                        OutlinedButton(onClick={showScreenManager=false},modifier=Modifier.fillMaxWidth()){Text("Done")}
                     }}
-                }
-                val selectedElement=selected
-                if(selectedElement!=null){
-                    Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-                        Text("Move · ${selectedElement.name}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
-                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)){
-                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(y=(it.y-8).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("↑")}
-                                Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
-                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=(it.x-8).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("←")}
-                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("•")}
-                                    OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=(it.x+8).coerceAtMost((bw-it.width).coerceAtLeast(0)))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("→")}
-                                }
-                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(y=(it.y+8).coerceAtMost((bh-it.height).coerceAtLeast(0)))}},contentPadding=PaddingValues(8.dp),modifier=Modifier.size(44.dp)){Text("↓")}
-                            }
-                            Spacer(Modifier.weight(1f))
-                            Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
-                                OutlinedButton(
-                                    onClick = {
-                                        edit(selectedElement.id) { layer ->
-                                            layer.copy(
-                                                width = (layer.width * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw - layer.x).coerceAtLeast(12)),
-                                                height = (layer.height * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh - layer.y).coerceAtLeast(12))
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.widthIn(min = 100.dp)
-                                ) { Text("＋ Size") }
-                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation-15f+360f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↶ Rotate")}
-                                OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}},modifier=Modifier.widthIn(min=100.dp)){Text("↻ Rotate")}
-                                OutlinedButton(
-                                    onClick = {
-                                        edit(selectedElement.id) { layer ->
-                                            layer.copy(
-                                                width = (layer.width * 0.9f).roundToInt().coerceAtLeast(12),
-                                                height = (layer.height * 0.9f).roundToInt().coerceAtLeast(12)
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.widthIn(min = 100.dp)
-                                ) { Text("－ Size") }
-                            }
-                        }
-                    }
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
-                        Text(selectedElement.name.take(12),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                        if(selectedElement.kind !in setOf("icon","ellipse","rect","divider"))OutlinedButton(onClick={showAdvancedControls=false;notice="Edit the text in the Style section below."}){Text("Edit text")}
-                        OutlinedButton(onClick={fontTargetId=selectedElement.id;showElementTray=true;toolkitTab="Fonts"}){Text("Fonts")}
-                        OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw-it.x).coerceAtLeast(12)),height=(it.height*1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh-it.y).coerceAtLeast(12)))}}){Text("Size +")}
-                        OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*0.9f).roundToInt().coerceAtLeast(12),height=(it.height*0.9f).roundToInt().coerceAtLeast(12))}}){Text("Size −")}
-                        OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}}){Text("Rotate")}
-                        OutlinedButton(onClick={showAdvancedControls=true}){Text("Style")}
-                        OutlinedButton(onClick={selectedId="";showAdvancedControls=false}){Text("Cancel")}
-                        OutlinedButton(onClick={checkpoint();elements.removeAll{it.id==selectedElement.id};selectedId="";showAdvancedControls=false}){Text("Delete")}
-                    }
-                }
+    }
+    @Composable fun CompactLibrary(){
+        if(toolkitTab !in setOf("Icons","Fonts")){ToolkitContent();return}
+        Card { Column(Modifier.fillMaxWidth().height(220.dp).padding(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(toolkitTab,modifier=Modifier.weight(1f));TextButton(onClick={inlineToolkit=false;editTool="move"}){Text("Done")}}
+            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                if(toolkitTab=="Icons")OutlinedTextField(iconQuery,{iconQuery=it},label={Text("Search icons")},modifier=Modifier.width(200.dp),singleLine=true)
+                else {OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Find font")},modifier=Modifier.width(140.dp),singleLine=true);OutlinedTextField(fontPreviewWords,{fontPreviewWords=it.take(80)},label={Text("Try your words")},modifier=Modifier.width(180.dp),singleLine=true);TextButton(onClick={animateFontPreviews=!animateFontPreviews}){Text(if(animateFontPreviews)"Pause" else "Play")}}
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                if(toolkitTab=="Icons")bundledIconNames.filter{iconQuery.isBlank()||it.contains(iconQuery,true)}.take(iconBrowseLimit).forEach{name->OutlinedButton(onClick={val id=selected?.takeIf{it.kind=="icon"}?.id?:run{add("icon");selectedId};chooseIcon(id,name)}){Column(Modifier.width(70.dp),horizontalAlignment=Alignment.CenterHorizontally){UxUiNativeArtworkPreview(UxUiNativeLayer("preview","icon",name,0,0,44,44,"",iconSvg=UxNativeArtworkLibrary.icon(context,name).orEmpty()),Modifier.size(44.dp));Text(name.substringAfter(':'),maxLines=1,fontSize=10.sp)}}}
+                else uxNativeFontFamilies.filter{it.contains(fontQuery,true)}.forEach{family->OutlinedButton(onClick={val layer=selected?.takeUnless{it.kind in setOf("icon","image","rect","ellipse","divider") }?:run{add("text");elements.last()};edit(layer.id){it.copy(fontFamily=family,fontData=uxNativeBundledFontData(context,family))};inlineToolkit=false;editTool="move"}){Column(Modifier.width(190.dp)){Text(family,fontSize=11.sp);UxNativeAnimatedFontSpecimen(family,fontPreviewWords,animateFontPreviews)}}}
+            }
+        }}
+    }
+    @Composable fun AdvancedStyle(){
                 selected?.let{e->
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                         val shortEdge=minOf(e.width,e.height).coerceAtLeast(1)
@@ -1851,6 +1876,226 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         }
                     }}
                 }
+
+    }
+    @Composable fun EditingPanel(e:UxUiNativeLayer){
+        Card { Column(Modifier.fillMaxWidth().height(190.dp).verticalScroll(rememberScrollState()).padding(10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(editTool.replaceFirstChar{it.uppercase()},modifier=Modifier.weight(1f));TextButton(onClick={editTool="move"}){Text("Done")}}
+            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                when(editTool){
+                    "color" -> { listOf("#111111","#FFFFFF","#64748B","#2563EB","#7C3AED","#DB2775","#DC2626","#059669").forEach{hex->OutlinedButton(onClick={edit(e.id){if(it.kind=="icon")it.copy(color=hex)else it.copy(fill=hex)}}){Box(Modifier.size(32.dp).background(uxNativeColor(hex),RoundedCornerShape(8.dp)))}} }
+                    "shape" -> {listOf("Square" to 0,"Soft" to 14,"Round" to minOf(e.width,e.height)/2).forEach{(label,radius)->OutlinedButton(onClick={edit(e.id){it.copy(radius=radius)}}){Column(horizontalAlignment=Alignment.CenterHorizontally){Box(Modifier.size(32.dp,24.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(radius.dp)));Text(label)}}}}
+                    "effects" -> {listOf("Flat","Shadow","Outline","Faded").forEach{effect->OutlinedButton(onClick={edit(e.id){when(effect){"Flat"->it.copy(shadow=false,borderWidth=0,opacity=1f);"Shadow"->it.copy(shadow=true);"Outline"->it.copy(borderWidth=2);else->it.copy(opacity=.5f)}}}){Text(effect)}}}
+                    "adjust","resize" -> {Column(Modifier.width(170.dp)){UxNativeVisualSlider("Size",e.width.toFloat(),12f..(bw-e.x).coerceAtLeast(13).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(width=v.roundToInt(),height=(it.height*v/it.width.coerceAtLeast(1)).roundToInt().coerceAtLeast(12))}}};if(editTool=="adjust"){Column(Modifier.width(170.dp)){UxNativeVisualSlider("Turn",e.rotation.coerceIn(-180f,180f),-180f..180f,{checkpoint()}){v->visualEdit(e.id){it.copy(rotation=v)}}};Column(Modifier.width(170.dp)){UxNativeVisualSlider("Visibility",e.opacity,0f..1f,{checkpoint()}){v->visualEdit(e.id){it.copy(opacity=v)}}}}else listOf(256,512,1024).forEach{edge->OutlinedButton(onClick={processImage("resize",edge)},enabled=!imageBusy){Text("${edge}px")}}}
+                    "cutout" -> {Column(Modifier.width(170.dp)){Text("Plain backgrounds");Slider(cutoutStrength,{cutoutStrength=it},valueRange=5f..140f)};OutlinedButton(onClick={processImage("cutout")},enabled=!imageBusy){Text(if(imageBusy)"Working…" else "Remove background")}}
+                    "text" -> {OutlinedTextField(e.text,{text->edit(e.id){it.copy(text=text)}},modifier=Modifier.width(260.dp),label={Text("Your words")})}
+                    "lookup" -> {UxUiNativeArtworkPreview(e,Modifier.size(100.dp));elements.forEach{layer->OutlinedButton(onClick={selectedId=layer.id}){Column(Modifier.width(70.dp)){UxUiNativeArtworkPreview(layer,Modifier.size(50.dp));Text(layer.name,maxLines=1)}}}}
+                }
+            }
+        }}
+    }
+
+    Surface(color=MaterialTheme.colorScheme.background,modifier=Modifier.fillMaxWidth()){
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Text("UX/UI Studio",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+            Text("Design by eye. Export exact developer and AI handoff.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            if(onboarding){
+                Card { Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.size(72.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(50)),contentAlignment=Alignment.Center) {
+                        Text("＋",style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Normal)
+                    }
+                    Text("New project",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                    Text("Start with a blank design. Add elements only when you need them.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick={target="mobile";customArtboard=false;background="#FFFFFF";projectName="Untitled design";customWidth=390;customHeight=844;elements.clear();selectedId="";undoHistory.clear();redoHistory.clear();showElementTray=false;inlineToolkit=false;editTool="move";showScreenManager=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;val id="screen-"+System.nanoTime();screens.clear();screens.add(UxUiNativeScreen(id,"Screen 1","mobile","#FFFFFF",false,390,844,emptyList()));activeScreenId=id;notice="Your blank canvas is ready. Tap + to add your first element.";onboarding=false},modifier=Modifier.fillMaxWidth()) { Text("New project") }
+                }}
+                Text("Drafts",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                if(hasSavedDraft) {
+                    Card { Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Text(projectName,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                        Text(if(elements.isEmpty())"Blank canvas" else elements.size.toString()+" design elements",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(onClick={onboarding=false;notice="Draft opened."},modifier=Modifier.fillMaxWidth()){Text("Open draft")}
+                    }}
+                } else {
+                    Card { Column(Modifier.fillMaxWidth().padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                        Text("No drafts yet",fontWeight=FontWeight.SemiBold)
+                        Text("Your designs will appear here as you work.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }}
+                }
+            }else{
+                OutlinedTextField(projectName,{projectName=it},label={Text("Project title")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    TextButton(onClick={onboarding=true;showElementTray=false;inlineToolkit=false;editTool="move";showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;selectedId=""}) { Text("← Projects") }
+                    Spacer(Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")},enabled=!prototypePreview)
+                    FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")},enabled=!prototypePreview)
+                    FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")},enabled=!prototypePreview)
+                    if(prototypePreview){
+                        OutlinedButton(onClick={backPrototypePreview()},enabled=prototypeHistory.isNotEmpty()){Text("Back")}
+                        Button(onClick={ stopPrototypePreview() }){Text("Exit preview")}
+                    }else{
+                        OutlinedButton(onClick={ startPrototypePreview() },enabled=hasActivePrototypeLinks){Text("Preview prototype")}
+                        OutlinedButton(onClick={selectedId="";showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
+                    }
+                }
+                Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
+                    Text(if(target=="mobile")"Phone mockup" else if(target=="tablet")"Tablet mockup" else "Desktop mockup",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                    BoxWithConstraints(Modifier.fillMaxWidth(),contentAlignment=Alignment.TopCenter){
+                        val bezel=if(target=="mobile")8f else if(target=="tablet")12f else 10f
+                        val width=(maxWidth.value-bezel*2).coerceAtLeast(140f).coerceAtMost(if(target=="mobile")390f else if(target=="tablet")768f else 1040f)
+                        val scale=width/bw.toFloat()
+                        Column(horizontalAlignment=Alignment.CenterHorizontally){
+                            Box(Modifier.width((width+bezel*2).dp).clip(RoundedCornerShape(if(target=="mobile")46.dp else if(target=="tablet")25.dp else 10.dp)).background(Color(0xFF0B0C0E)).clickable(enabled=!prototypePreview){selectedId="";showCanvasSettings=true;showElementTray=false;inlineToolkit=false;editTool="move"}.padding(bezel.dp)){
+                                Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(if(target=="mobile")38.dp else if(target=="tablet")16.dp else 2.dp)).background(uxNativeColor(background)).clickable(enabled=!prototypePreview){selectedId="";showCanvasSettings=true;showElementTray=false;inlineToolkit=false;editTool="move"}){
+                            Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
+                                val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
+                        elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
+                                    val shape=uxNativeComposeShape(e.kind,e.radius)
+                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation,alpha=e.opacity).shadow(if(e.shadow)12.dp else 0.dp,shape).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).then(if(selectedId==e.id||e.borderWidth>0)Modifier.border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape)else Modifier).padding(e.padding.dp).clickable(enabled=!prototypePreview){if(e.name=="Background artwork"){selectedId="";showCanvasSettings=true}else{selectedId=e.id;showCanvasSettings=false};showElementTray=false;inlineToolkit=false;editTool="move"}.pointerInput(e.id,scale,dragDensity,prototypePreview){
+                                        if(prototypePreview){
+                                            detectTapGestures(onTap={navigatePrototype(e.prototypeTargetScreenId)})
+                                        }else if(e.name=="Background artwork"){
+                                            detectTapGestures(onTap={selectedId="";showCanvasSettings=true;showElementTray=false;inlineToolkit=false;editTool="move"})
+                                        }else{
+                                            val density=dragDensity
+                                            detectDragGestures(onDragStart={selectedId=e.id;showCanvasSettings=false;showElementTray=false;inlineToolkit=false;editTool="move";checkpoint()}){change,dragAmount->
+                                                change.consume()
+                                                val index=elements.indexOfFirst{it.id==e.id}
+                                                if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
+                                            }
+                                        }
+                                    }){
+                                        if(e.kind=="chart") {
+                                            val chart=uxUiParseChartData(e.text)
+                                            Column(Modifier.fillMaxSize().padding(3.dp)) {
+                                                Text(chart.title,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.coerceIn(8,16).sp,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                                                if(chart.points.isEmpty()) {
+                                                    Box(Modifier.fillMaxWidth().weight(1f),contentAlignment=Alignment.Center){Text("Enter data as Label: value",fontSize=8.sp,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                                } else {
+                                                    val maxValue=chart.points.maxOfOrNull{it.value}?.coerceAtLeast(1.0)?:1.0
+                                                    val barAreaHeight=(e.height-e.padding*2-e.fontSize-28).coerceAtLeast(16)
+                                                    Row(Modifier.fillMaxWidth().height((barAreaHeight+24).dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(2.dp)) {
+                                                        chart.points.forEach { point ->
+                                                            Column(Modifier.weight(1f).fillMaxHeight(),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Bottom) {
+                                                                Text(if(point.value%1.0==0.0)point.value.toLong().toString() else String.format(java.util.Locale.US,"%.1f",point.value),fontSize=7.sp,maxLines=1,overflow=TextOverflow.Clip,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+                                                                Spacer(Modifier.height(1.dp))
+                                                                val barHeight=if(point.value<=0)0 else (barAreaHeight*point.value/maxValue).roundToInt().coerceIn(2,barAreaHeight)
+                                                                Box(Modifier.fillMaxWidth(.62f).height(barHeight.dp).clip(RoundedCornerShape(3.dp)).background(uxNativeColor(e.color,android.graphics.Color.BLACK)))
+                                                                Text(point.label,fontSize=6.sp,maxLines=1,overflow=TextOverflow.Ellipsis,color=uxNativeColor(e.color,android.graphics.Color.BLACK))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if(chart.invalidRows>0)Text(chart.invalidRows.toString()+" invalid row(s) ignored",fontSize=6.sp,color=Color(0xFFB45309),maxLines=1)
+                                            }
+                                        } else if((e.kind=="icon" && e.iconSvg.isNotBlank()) || (e.kind=="image" && e.imageData.isNotBlank())) {
+                                            UxUiNativeArtworkPreview(e,Modifier.fillMaxSize())
+                                        } else {
+                                            Text(if(e.kind=="icon")e.iconName.substringAfterLast(":").take(3).uppercase() else e.text,color=uxNativeColor(e.color,android.graphics.Color.BLACK),fontSize=e.fontSize.sp,fontWeight=if(e.fontWeight>=700)FontWeight.Bold else if(e.fontWeight>=600)FontWeight.SemiBold else FontWeight.Normal,fontFamily=FontFamily(uxNativeTypeface(context,e)),maxLines=5,overflow=TextOverflow.Clip)
+                                        }
+                                    }
+                                }
+                            }
+                                if(target=="mobile")Box(Modifier.align(Alignment.TopCenter).padding(top=4.dp).width((width*0.28f).dp).height((width*0.055f).dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
+                                else if(target=="tablet")Box(Modifier.align(Alignment.TopCenter).padding(top=3.dp).size(6.dp).clip(RoundedCornerShape(99.dp)).background(Color.Black))
+                        }
+                    }
+                        if(target=="desktop"){
+                            Column(horizontalAlignment=Alignment.CenterHorizontally){
+                                Box(Modifier.width(76.dp).height(25.dp).background(Color(0xFF9BA0A5),RoundedCornerShape(4.dp)))
+                                Box(Modifier.width(180.dp).height(7.dp).background(Color(0xFF777C82),RoundedCornerShape(99.dp)))
+                            }
+                        }
+                        }
+                    }
+                    Text("Your design automatically fits the preview.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }}
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
+                        OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↶")}
+                        OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty(),contentPadding=PaddingValues(8.dp)){Text("↷")}
+                    }
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;showElementTray=true},modifier=Modifier.size(58.dp),shape=RoundedCornerShape(50)){Text("＋",style=MaterialTheme.typography.headlineMedium)}
+                    Spacer(Modifier.weight(1f))
+                    Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(0.dp)){
+                        OutlinedButton(onClick={showScreenManager=!showScreenManager},modifier=Modifier.size(44.dp),contentPadding=PaddingValues(2.dp)){Text("▣")}
+                        Text(screens.size.toString(),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if(showScreenManager){
+                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                        Row(verticalAlignment=Alignment.CenterVertically){
+                            Column(Modifier.weight(1f)){Text("App screens",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold);Text("Choose which screen is open in the mockup.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                            Button(onClick={addAppScreen()}){Text("＋ New screen")}
+                        }
+                        screens.forEachIndexed{screenIndex,screen->
+                            Card(colors=CardDefaults.cardColors(containerColor=if(screen.id==activeScreenId)MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)){
+                                Column(Modifier.fillMaxWidth().padding(9.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                    OutlinedTextField(value=screen.name,onValueChange={renameAppScreen(screen.id,it)},label={Text("Screen name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                    Text(screen.target+" · "+screen.elements.size+" layers · "+screen.customWidth+"×"+screen.customHeight,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically){
+                                        Button(onClick={activateScreen(screen.id)},enabled=screen.id!=activeScreenId){Text(if(screen.id==activeScreenId)"Editing" else "Open")}
+                                        OutlinedButton(onClick={reorderAppScreen(screen.id,-1)},enabled=screenIndex>0,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↑")}
+                                        OutlinedButton(onClick={reorderAppScreen(screen.id,1)},enabled=screenIndex<screens.lastIndex,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↓")}
+                                        OutlinedButton(onClick={duplicateAppScreen(screen.id)},contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Duplicate")}
+                                        OutlinedButton(onClick={deleteAppScreen(screen.id)},enabled=screens.size>1,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Delete")}
+                                    }
+                                }
+                            }
+                        }
+                        OutlinedButton(onClick={showScreenManager=false},modifier=Modifier.fillMaxWidth()){Text("Done")}
+                    }}
+                }
+                if(selected==null && inlineToolkit) CompactLibrary()
+                val selectedElement=selected
+                if(selectedElement!=null){
+                    if(editTool=="move") {
+                    Column(Modifier.fillMaxWidth().padding(vertical=4.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                        Text("Move · ${selectedElement.name}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
+                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(3.dp)){
+                                StudioHoldButton("↑ · Move",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(y=(it.y-8).coerceAtLeast(0))}}
+                                Row(horizontalArrangement=Arrangement.spacedBy(3.dp)){
+                                    StudioHoldButton("← · Move",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(x=(it.x-8).coerceAtLeast(0))}}
+                                    StudioHoldButton("• · Move",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}}
+                                    StudioHoldButton("→ · Move",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(x=(it.x+8).coerceAtMost((bw-it.width).coerceAtLeast(0)))}}
+                                }
+                                StudioHoldButton("↓ · Move",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(y=(it.y+8).coerceAtMost((bh-it.height).coerceAtLeast(0)))}}
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                StudioHoldButton("＋ Size · Adjust",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){layer ->
+                                            layer.copy(
+                                                width = (layer.width * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bw - layer.x).coerceAtLeast(12)),
+                                                height = (layer.height * 1.1f).roundToInt().coerceAtLeast(12).coerceAtMost((bh - layer.y).coerceAtLeast(12))
+                                            )
+                                        }}
+                                StudioHoldButton("↶ Rotate · Rotate",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(rotation=(it.rotation-15f+360f)%360f)}}
+                                StudioHoldButton("↻ Rotate · Rotate",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){it.copy(rotation=(it.rotation+15f)%360f)}}
+                                StudioHoldButton("－ Size · Adjust",selectedElement.id,{checkpoint()}){visualEdit(selectedElement.id){layer ->
+                                            layer.copy(
+                                                width = (layer.width * 0.9f).roundToInt().coerceAtLeast(12),
+                                                height = (layer.height * 0.9f).roundToInt().coerceAtLeast(12)
+                                            )
+                                        }}
+                            }
+                        }
+                    }
+                    } else if(editTool=="library") { CompactLibrary() } else if(editTool=="more") { Column(Modifier.height(240.dp).verticalScroll(rememberScrollState())){ AdvancedStyle() } } else { EditingPanel(selectedElement) }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                        listOf("Move","Color","Shape","Effects","Adjust","Look closer","More").forEach{label->OutlinedButton(onClick={inlineToolkit=false;editTool=if(label=="Look closer")"lookup" else label.lowercase()}){Text(label)}}
+                        if(selectedElement.kind=="image"){
+                            OutlinedButton(onClick={imageTargetId=selectedElement.id;imageLauncher.launch("image/*")}){Text("Replace")}
+                            OutlinedButton(onClick={editTool="cutout";inlineToolkit=false}){Text("Cutout")}
+                            OutlinedButton(onClick={processImage("icon")},enabled=!imageBusy){Text("Make icon")}
+                            OutlinedButton(onClick={editTool="resize";inlineToolkit=false}){Text("Resize")}
+                        }
+                        if(selectedElement.kind !in setOf("image","icon","rect","ellipse","divider"))OutlinedButton(onClick={editTool="text";inlineToolkit=false}){Text("Text")}
+                        OutlinedButton(onClick={inlineToolkit=true;editTool="library";toolkitTab=if(selectedElement.kind=="icon")"Icons" else "Fonts"}){Text(if(selectedElement.kind=="icon")"Icons" else "Fonts")}
+                    }
+                }
                 if(selected==null && showCanvasSettings && !prototypePreview){
                     Card{Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                         Text("Canvas styling",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
@@ -1873,211 +2118,11 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     Text("Studio toolkit",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick={showElementTray=!showElementTray}){Text(if(showElementTray)"Close" else "+ Add")}
+                    TextButton(onClick={toolkitTab="All 26";toolkitSearch="";inlineToolkit=false;showElementTray=true}){Text(if(showElementTray)"Close" else "+ Add")}
                 }
-                if(showElementTray){
-                    Dialog(onDismissRequest={showElementTray=false},properties=DialogProperties(usePlatformDefaultWidth=false)){
-                    Card(Modifier.fillMaxWidth().padding(horizontal=12.dp).heightIn(max=LocalConfiguration.current.screenHeightDp.dp*.84f)) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Studio toolkit",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={showElementTray=false}){Text("Done")}}
-
-                        OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                            listOf("All 26","Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
-                        }
-                        when(toolkitTab){
-                            "All 26" -> {
-                                Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                                Text("Browse visual samples, then open a tool. Changes apply to the selected layer; canvas tools style the screen background.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                uxNativeToolkits.filter{toolkit->toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
-                                    Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-                                        UxNativeToolkitSample(toolkit.id)
-                                        Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
-                                        Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                            Text(toolkit.status,style=MaterialTheme.typography.labelSmall,color=if(toolkit.status=="Not complete")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,modifier=Modifier.weight(1f))
-                                            OutlinedButton(onClick={
-                                                activeToolkitId=toolkit.id
-                                                when(toolkit.id){
-                                                    "icons"->{toolkitTab="Icons"}
-                                                    "typography"->{toolkitTab="Fonts"}
-                                                    "color","brand","design-system"->{toolkitTab="Tokens"}
-                                                    "illustrations","media","components","assets","inspiration"->{toolkitTab="Elements"}
-                                                    "projects"->{toolkitTab="Presets"}
-                                                    "accessibility","qa"->{
-                                                        val findings=mutableListOf<String>()
-                                                        if(elements.isEmpty())findings.add("No layers have been added yet.")
-                                                        elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
-                                                        val decorativeKinds=setOf("image","icon","rect","ellipse","divider","spacer","triangle","diamond","hexagon","star","line")
-                                                        elements.filter{it.kind !in decorativeKinds && it.text.isNotBlank()}.forEach{e->
-                                                            val rawFill=e.fill.trim()
-                                                            val surface=if(rawFill.isEmpty()||rawFill.equals("transparent",true)||rawFill.equals("none",true))background else rawFill
-                                                            val ratio=NativeAccessibilityEngine.contrastRatio(e.color,surface)
-                                                            if(ratio==null)findings.add(e.name+" text contrast could not be calculated for these colors; manually review contrast.")
-                                                            else{
-                                                                val large=e.fontSize>=24||(e.fontSize>=19&&e.fontWeight>=700)
-                                                                val threshold=if(large)3.0 else 4.5
-                                                                if(ratio+1e-9<threshold)findings.add(e.name+" text contrast is "+((ratio*100).roundToInt()/100.0)+":1; WCAG AA "+(if(large)"large-text" else "normal-text")+" requires at least "+threshold+":1 for this solid-color pair.")
-                                                            }
-                                                        }
-                                                        for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
-                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
-                                                    }
-                                                    else->{toolkitTab="Details"}
-                                                }
-                                            },contentPadding=PaddingValues(horizontal=10.dp,vertical=6.dp)){Text("Open")}
-                                        }
-                                    }}
-                                }
-                                if(qaReport.isNotEmpty()||activeToolkitId=="qa"||activeToolkitId=="accessibility"){
-                                    Text("Review results · ${qaReport.size}",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
-                                    if(qaReport.isEmpty())Text("No findings in the limited checks run.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                    qaReport.take(80).forEach{finding->Text("• "+finding,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                                }
-                            }
-                            "Details" -> {
-                                val tool=uxNativeToolkits.firstOrNull{it.id==activeToolkitId}
-                                Text(tool?.name.orEmpty(),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-                                UxNativeToolkitSample(activeToolkitId)
-                                Text(tool?.description.orEmpty(),style=MaterialTheme.typography.bodySmall)
-                                when(activeToolkitId){
-                                    "effects"->{
-                                        Text("Apply an effect to the selected layer. Add a surface to try the samples.",style=MaterialTheme.typography.bodySmall)
-                                        if(selectedElement==null)Button(onClick={add("card")},modifier=Modifier.fillMaxWidth()){Text("Add a surface to style")}
-                                        listOf("None","Soft shadow","Translucent","Outline","Rounded","Pill","Tilt left","Tilt right").chunked(2).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){
-                                            row.forEach{effect->OutlinedButton(enabled=selectedElement!=null,onClick={selectedElement?.let{layer->edit(layer.id){item->when(effect){"None"->item.copy(opacity=1f,shadow=false,borderWidth=0,rotation=0f);"Soft shadow"->item.copy(shadow=true);"Translucent"->item.copy(opacity=.5f);"Outline"->item.copy(borderWidth=2,borderColor="#2563EB");"Rounded"->item.copy(radius=18);"Pill"->item.copy(radius=minOf(item.width,item.height)/2);"Tilt left"->item.copy(rotation=-12f);else->item.copy(rotation=12f)}}}},modifier=Modifier.weight(1f),shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(12.dp)){
-                                                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
-                                                    val shape=RoundedCornerShape(if(effect=="Pill")30.dp else if(effect=="Rounded")14.dp else 6.dp)
-                                                    Box(Modifier.size(62.dp,38.dp).graphicsLayer(alpha=if(effect=="Translucent").5f else 1f,rotationZ=if(effect=="Tilt left")-12f else if(effect=="Tilt right")12f else 0f).shadow(if(effect=="Soft shadow")8.dp else 0.dp,shape).background(MaterialTheme.colorScheme.primaryContainer,shape).then(if(effect=="Outline")Modifier.border(2.dp,MaterialTheme.colorScheme.primary,shape)else Modifier))
-                                                    Text(effect,fontSize=12.sp,maxLines=2)
-                                                }
-                                            }}
-                                        }}
-                                    }
-                                    "background","patterns"->{
-                                        Text("Portable background artwork is embedded in the project and exports.",style=MaterialTheme.typography.bodySmall)
-                                        val samples=if(activeToolkitId=="patterns")listOf("Dots","Grid","Stripes","Checkerboard") else listOf("Ocean","Sunset","Forest","Radial glow")
-                                        samples.forEach{sample->OutlinedButton(onClick={
-                                            checkpoint()
-                                            val artwork=UxUiNativeLayer("background-"+System.nanoTime(),"image","Background artwork",0,0,bw,bh,"",padding=0,radius=0,imageData=uxNativeBackgroundArtwork(sample,bw,bh),referenceWidth=bw,referenceHeight=bh)
-                                            elements.removeAll{it.name=="Background artwork"};elements.add(0,artwork);selectedId="";showCanvasSettings=true;notice=sample+" background applied."
-                                        },modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp)){
-                                            val preview=remember(sample){uxNativeBackgroundArtwork(sample,280,68)}
-                                            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){UxUiNativeArtworkPreview(UxUiNativeLayer("sample","image",sample,0,0,280,68,"",imageData=preview),Modifier.fillMaxWidth().height(68.dp),monochrome=true);Text(sample)}
-                                        }}
-                                        OutlinedButton(onClick={checkpoint();elements.removeAll{it.name=="Background artwork"}},modifier=Modifier.fillMaxWidth()){Text("Remove background artwork")}
-                                        OutlinedButton(onClick={selectedId="";showCanvasSettings=true;showElementTray=false},modifier=Modifier.fillMaxWidth()){Text("Canvas color & size")}
-                                    }
-                                    "motion","transform"->{
-                                        if(selectedElement==null)Text("Select a layer in the canvas or add a shape to transform.")
-                                        else{
-                                            Text("Rotation · "+selectedElement.rotation.roundToInt()+"°")
-                                            Slider(selectedElement.rotation.coerceIn(-180f,180f),{angle->edit(selectedElement.id){it.copy(rotation=angle)}},valueRange=-180f..180f)
-                                            OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},modifier=Modifier.fillMaxWidth()){Text("Center on canvas")}
-                                            OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=0f)}},modifier=Modifier.fillMaxWidth()){Text("Reset rotation")}
-                                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*1.1f).roundToInt(),height=(it.height*1.1f).roundToInt())}},modifier=Modifier.weight(1f)){Text("Size +")};OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*.9f).roundToInt().coerceAtLeast(1),height=(it.height*.9f).roundToInt().coerceAtLeast(1))}},modifier=Modifier.weight(1f)){Text("Size −")}}
-                                        }
-                                        OutlinedButton(onClick={add("rect")},modifier=Modifier.fillMaxWidth()){Text("Add a shape")}
-                                        Text("Rotation edits the saved design. Animated timelines are not part of this editor.",style=MaterialTheme.typography.bodySmall)
-                                    }
-                                    "device","platform"->{
-                                        listOf("mobile" to "Phone · 390 × 844","tablet" to "Tablet · 768 × 1024","desktop" to "Desktop · 1440 × 900").forEach{(mode,label)->OutlinedButton(onClick={target=mode;customArtboard=false;customWidth=if(mode=="mobile")390 else if(mode=="tablet")768 else 1440;customHeight=if(mode=="mobile")844 else if(mode=="tablet")1024 else 900},modifier=Modifier.fillMaxWidth()){Text(if(target==mode)"✓ "+label else label)}}
-                                        selectedElement?.let{layer->Text("Show selected layer on",style=MaterialTheme.typography.labelLarge);listOf("mobile","tablet","desktop").forEach{mode->Row(verticalAlignment=Alignment.CenterVertically){val visible=layer.visibleOn.split(",");Checkbox(checked=mode in visible,onCheckedChange={checked->val next=if(checked)visible+mode else visible-mode;if(next.isNotEmpty())edit(layer.id){it.copy(visibleOn=next.distinct().joinToString(","))}});Text(mode)}}}
-                                    }
-                                    "responsive"->{
-                                        OutlinedButton(onClick={selectedId="";showCanvasSettings=true;showElementTray=false},modifier=Modifier.fillMaxWidth()){Text("Edit canvas dimensions")}
-                                        selectedElement?.let{layer->Text("Horizontal constraint");listOf("left","center","right","stretch").forEach{anchor->FilterChip(selected=layer.horizontalConstraint==anchor,onClick={edit(layer.id){it.copy(horizontalConstraint=anchor,referenceWidth=bw,referenceHeight=bh)}},label={Text(anchor)})};Text("Vertical constraint");listOf("top","center","bottom","stretch").forEach{anchor->FilterChip(selected=layer.verticalConstraint==anchor,onClick={edit(layer.id){it.copy(verticalConstraint=anchor,referenceWidth=bw,referenceHeight=bh)}},label={Text(anchor)})}}
-                                    }
-                                    "layers"->{
-                                        if(elements.isEmpty())Text("Your layers will appear here after you add an element.")
-                                        elements.reversed().forEach{layer->OutlinedButton(onClick={selectedId=layer.id;showElementTray=false;showCanvasSettings=false},modifier=Modifier.fillMaxWidth()){Text(layer.name+" · "+layer.kind)}}
-                                    }
-                                    "flows"->{
-                                        if(screens.size<2)Text("Add another screen, then select a layer and choose its tap destination.")
-                                        OutlinedButton(onClick={addAppScreen()},modifier=Modifier.fillMaxWidth()){Text("Add screen")}
-                                        selectedElement?.let{layer->Text("When ${layer.name} is tapped:");screens.filter{it.id!=activeScreenId}.forEach{screen->OutlinedButton(onClick={edit(layer.id){it.copy(prototypeTargetScreenId=screen.id)}},modifier=Modifier.fillMaxWidth()){Text(if(layer.prototypeTargetScreenId==screen.id)"✓ "+screen.name else screen.name)}}}
-                                        Button(onClick={startPrototypePreview()},enabled=hasActivePrototypeLinks,modifier=Modifier.fillMaxWidth()){Text("Preview connected screens")}
-                                    }
-                                    "content"->{
-                                        listOf("Heading" to "Your next idea starts here","Paragraph" to "Tell your story with clear, thoughtful content.","Button" to "Get started").forEach{(label,text)->OutlinedButton(onClick={add(if(label=="Button")"button" else "text");val layer=elements.last();edit(layer.id){it.copy(name=label,text=text,fontSize=if(label=="Heading")26 else 16)}},modifier=Modifier.fillMaxWidth()){Column(Modifier.fillMaxWidth()){Text(text,fontSize=if(label=="Heading")22.sp else 14.sp);Text("Add "+label,style=MaterialTheme.typography.labelSmall)}}}
-                                    }
-                                    "data-viz"->{
-                                        OutlinedButton(onClick={add("chart")},modifier=Modifier.fillMaxWidth()){Text("Add editable bar chart")}
-                                        selectedElement?.takeIf{it.kind=="chart"}?.let{layer->OutlinedTextField(layer.text,{v->edit(layer.id){it.copy(text=v)}},label={Text("Title, then Label: value on each line")},modifier=Modifier.fillMaxWidth(),minLines=5)}
-                                    }
-                                    "handoff"->{
-                                        Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId);jsonLauncher.launch("design-project.json")},modifier=Modifier.fillMaxWidth()){Text("Save portable project JSON")}
-                                        Button(onClick={pdfBytes=UxUiNativePdf.build(context,projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson),bw,bh);pdfLauncher.launch("design-preview.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF")}
-                                        Text("HTML, Kotlin and SwiftUI source exports are also available in Export and handoff below.",style=MaterialTheme.typography.bodySmall)
-                                    }
-                                    else->Text("Choose an item in this toolkit to edit the design.")
-                                }
-                                OutlinedButton(onClick={toolkitTab="All 26"},modifier=Modifier.fillMaxWidth()){Text("Back to all 26 tools")}
-                            }
-                            "Icons" -> {
-                                OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){uxNativeIconCategories.keys.forEach{category->FilterChip(selected=iconCategory==category,onClick={iconCategory=category},label={Text(category)})}}
-                                val browseIcons=(if(iconQuery.isBlank()){if(iconCategory=="All bundled")bundledIconNames else uxNativeIconCategories[iconCategory].orEmpty().filter{it in bundledIconNames}}else bundledIconNames.filter{it.contains(iconQuery,true)}+iconResults).distinct().filter{it.contains(toolkitSearch,true)}
-                                browseIcons.take(iconBrowseLimit).chunked(3).forEach{row->
-                                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                        row.forEach{icon->OutlinedButton(onClick={val id=selectedElement?.takeIf{it.kind=="icon"}?.id?:run{add("icon");selectedId};chooseIcon(id,icon)},modifier=Modifier.weight(1f),shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(8.dp)){
-                                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
-                                                UxNativeIconThumbnail(icon)
-                                                Text(icon.substringAfter(":"),fontSize=10.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
-                                            }
-                                        }}
-                                        repeat(3-row.size){Spacer(Modifier.weight(1f))}
-                                    }
-                                }
-                                if(browseIcons.size>iconBrowseLimit)OutlinedButton(onClick={iconBrowseLimit+=36},modifier=Modifier.fillMaxWidth()){Text("Show more icons · $iconBrowseLimit / ${browseIcons.size}")}
-                                if(browseIcons.isEmpty())Text("No matching icons. Try another search or browse a category.")
-                                Button(onClick={searchIcons(false)},enabled=iconQuery.isNotBlank()&&!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search online catalog")}
-                                OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
-                                Text("Bundled icons work offline. Tap an icon to add or replace it. Online results show Retry if artwork is unavailable.",style=MaterialTheme.typography.bodySmall)
-                            }
-                            "Elements" -> {
-                                if(activeToolkitId in setOf("illustrations","media","assets","inspiration")){
-                                    Text("Import artwork and preview it directly on the canvas.",style=MaterialTheme.typography.bodySmall)
-                                    OutlinedButton(onClick={add("image");imageTargetId=selectedId;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text("Import image / visual reference")}
-                                    OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG illustration")}
-                                }
-                                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
-                                    listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").filter{(kind,label)->label.contains(toolkitSearch,true)||kind.contains(toolkitSearch,true)}.chunked(2).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){row.forEach{(kind,label)->OutlinedButton(onClick={add(if(kind=="circle")"ellipse" else kind);if(kind=="image"){imageTargetId=selectedId;imageLauncher.launch("image/*")}},modifier=Modifier.weight(1f),contentPadding=PaddingValues(9.dp),shape=RoundedCornerShape(12.dp)){Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(7.dp)){UxNativeElementSample(kind,label);Text(label,fontSize=12.sp)}}};repeat(2-row.size){Spacer(Modifier.weight(1f))}}}
-                                }
-                            }
-                            "Presets" -> {
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                                    listOf("mobile-dashboard" to "Mobile app","mobile-login" to "Login screen","tablet-dashboard" to "Tablet app","desktop-landing" to "Website").filter{(id,label)->label.contains(toolkitSearch,true)||id.contains(toolkitSearch,true)}.forEach{(id,label)->OutlinedButton(onClick={checkpoint();val newTarget=when{ id.startsWith("tablet")->"tablet";id.startsWith("desktop")->"desktop";else->"mobile"};target=newTarget;customArtboard=false;customWidth=if(newTarget=="mobile")390 else if(newTarget=="tablet")768 else 1440;customHeight=if(newTarget=="mobile")844 else if(newTarget=="tablet")1024 else 900;elements.clear();elements.addAll(uxNativePreset(newTarget,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)});selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label)}}
-                                }
-                                OutlinedButton(onClick={presetImportLauncher.launch(arrayOf("application/json"))},modifier=Modifier.fillMaxWidth()){Text("Import preset / project JSON")}
-                                Text("Presets can be loaded into this project and customised.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            "Fonts" -> {
-                                Text("Preview real font faces before applying. Tap a sample to style text or add a text layer.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Search font families")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                                OutlinedTextField(fontPreviewWords,{fontPreviewWords=it.take(80)},label={Text("Try your words")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                                Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=animateFontPreviews,onCheckedChange={animateFontPreviews=it});Text("Play font previews")}
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("All","Sans serif","Serif","Monospace","Display","Handwriting").forEach{category->FilterChip(selected=fontCategory==category,onClick={fontCategory=category},label={Text(category)})}}
-                                uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)&&it.contains(toolkitSearch,true)}.forEach{family->
-                                    OutlinedButton(onClick={val fontLayer=selectedElement?.takeUnless{it.kind in setOf("icon","image","rect","ellipse","divider","line","triangle","diamond","hexagon","star") }?:run{add("text");elements.last()};edit(fontLayer.id){it.copy(fontFamily=family,fontData=uxNativeBundledFontData(context,family))};showElementTray=false},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp)){
-                                        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
-                                            Text(family,style=MaterialTheme.typography.labelLarge)
-                                            UxNativeAnimatedFontSpecimen(family,fontPreviewWords,animateFontPreviews)
-                                            Text(if(family in uxNativeBundledFonts)"Bundled font · available offline" else "Android system font",style=MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                    uxNativeBundledFonts[family]?.let{file->OutlinedButton(onClick={fontExportBytes=context.assets.open("fonts/"+file).use{it.readBytes()};fontExportLauncher.launch(file)},modifier=Modifier.fillMaxWidth()){Text("Save "+family+" font · TTF")}}
-                                }
-                                if(selectedElement!=null)OutlinedButton(onClick={fontTargetId=selectedElement.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text("Import font (TTF / OTF)")}
-                            }
-                            "Tokens" -> {
-                                Text("Tap a colour to apply it to the selected element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){colorTokens.filter{it.first.contains(toolkitSearch,true)||it.second.contains(toolkitSearch,true)}.forEach{(name,value)->OutlinedButton(onClick={val colorLayer=selectedElement;if(colorLayer!=null)edit(colorLayer.id){it.copy(fill=value)}else background=value}){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}}
-                            }
-                        }
-                    }}}
-                }
+                if(showElementTray){Dialog(onDismissRequest={showElementTray=false},properties=DialogProperties(usePlatformDefaultWidth=false)){ ToolkitContent() }}
                 Text(if(elements.isEmpty())"Layers" else "Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id;showCanvasSettings=false;showElementTray=false},label={Text(e.name,maxLines=1)})}
+                elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id;showCanvasSettings=false;showElementTray=false;inlineToolkit=false;editTool="move"},label={Text(e.name,maxLines=1)})}
                 if(elements.isEmpty())Text("No layers yet. Tap + to add your first element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 if(elements.size>6)OutlinedButton(onClick={showAllLayers=!showAllLayers}){Text(if(showAllLayers)"see less" else "see more")}
                 Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){

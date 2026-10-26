@@ -36,7 +36,7 @@ assert.ok(!engine.includes('target === "mobile" ? "Phone mockup" : target === "t
 assert.ok(engine.includes('role="toolbar" aria-label="Canvas view controls"'), "Canvas zoom, grid and prototype controls remain accessible after the text heading is removed");
 assert.ok(engine.includes('aria-label="Preview connected screen flow"'), "Prototype preview remains accessible as an icon-only canvas action");
 assert.ok(engine.includes('aria-label="Export" title="Export design"'), "Export keeps an accessible name when its visual label is hidden on narrow screens");
-assert.ok(engine.includes('selected && target !== "desktop" && isExpanded') === false && engine.includes('selected && target !== "desktop" && <div className="uxui-mobile-controls"'), "Movement/transform controls remain available in full-screen mobile and tablet editing");
+assert.ok(engine.includes('selected && editTool === "move"') && engine.includes('StudioRepeatButton'), "Movement controls are available with repeat-to-adjust in the editing tray");
 assert.ok(!engine.includes("Your canvas is ready. Tap + to add your first element."), "Blank-canvas prompt removed");
 assert.ok(!engine.includes("uxui-visual-property-dock"), "Compressed visual-properties dock removed");
 assert.ok(engine.includes("uxui-add-button"), "Main canvas Add button remains available");

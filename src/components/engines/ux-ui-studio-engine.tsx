@@ -1,3 +1,5 @@
+import { StudioRepeatButton } from "./ux-ui-studio-repeat-button";
+import { editStudioImage } from "./ux-ui-studio-image";
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
 import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
 import { ToolkitPreview } from "./ux-ui-toolkit-preview";
@@ -851,7 +853,9 @@ async function buildPdf(project: SavedProject, svg: SVGSVGElement, prompt: strin
   first.drawImage(image, { x: (first.getWidth() - width) / 2, y: Math.max(26, (first.getHeight() - height) / 2 - 24), width, height });
   first.drawText("Visual preview is rendered directly from the editable artboard.", { x: 28, y: 14, size: 7, font: regular, color: rgb(0.42, 0.45, 0.5) });
 
-  const spec = JSON.stringify(project, null, 2);
+  const completeSpec = JSON.stringify(project, null, 2);
+  await pdf.attach(new TextEncoder().encode(completeSpec), "design-spec.json", { mimeType: "application/json", description: "Complete editable design, including embedded fonts and artwork" });
+  const spec = JSON.stringify(project, (key, value) => typeof value === "string" && ((/^(imageDataUrl|fontDataUrl)$/.test(key) && value.startsWith("data:")) || (key === "iconSvg" && value.length > 500)) ? "[Embedded asset retained in attached design-spec.json]" : value, 2);
   const pages: Array<{ heading: string; lines: string[] }> = [
     { heading: "AI IMPLEMENTATION PROMPT", lines: prompt.split("\n").flatMap((line) => wrapPdfLine(line, 100)) },
     { heading: "MACHINE-READABLE DESIGN SPECIFICATION (JSON)", lines: spec.split("\n").flatMap((line) => wrapPdfLine(line, 100)) },
@@ -920,7 +924,7 @@ function ElementVisual({ kind }: { kind: LayerKind }) {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block min-w-0 text-xs font-medium text-muted"><span>{label}</span>{children}</label>;
+  return <label data-field={label} className="block min-w-0 text-xs font-medium text-muted"><span>{label}</span>{children}</label>;
 }
 
 export function UxUiStudioEngine() {
@@ -959,9 +963,14 @@ export function UxUiStudioEngine() {
   const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
   const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
-  const [leftTab, setLeftTab] = useState<PanelTab>("components");
+  const [leftTab, setLeftTab] = useState<PanelTab>("toolkits");
   const [activeToolkitId, setActiveToolkitId] = useState("icons");
   const [toolkitPage, setToolkitPage] = useState(false);
+  const [editTool, setEditTool] = useState("move");
+  const [inlineToolkit, setInlineToolkit] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [cutoutStrength, setCutoutStrength] = useState(40);
+  const imageReplaceId = useRef("");
   const [canvasSelected, setCanvasSelected] = useState(false);
   const [bundledIconNames, setBundledIconNames] = useState<string[]>([]);
   const [fontVisibleCount, setFontVisibleCount] = useState(24);
@@ -969,8 +978,6 @@ export function UxUiStudioEngine() {
   const [showQaReport, setShowQaReport] = useState(false);
   const [toolkitSearch, setToolkitSearch] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showTextEditor, setShowTextEditor] = useState(false);
-  const [showContextColors, setShowContextColors] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [clipboardLayers, setClipboardLayers] = useState<DesignLayer[]>([]);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
@@ -1035,7 +1042,7 @@ export function UxUiStudioEngine() {
     const focusable = () => Array.from(modal?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]') || []).filter((node) => node.getClientRects().length);
     const frame = window.requestAnimationFrame(() => focusable()[0]?.focus());
     const dismissOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); setShowToolsPanel(false); }
+      if (event.key === "Escape") { event.preventDefault(); closeToolkit(); }
       if (event.key === "Tab") {
         const items = focusable(); const first = items[0]; const last = items[items.length - 1];
         if (event.shiftKey && (document.activeElement === first || !modal?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
@@ -1260,7 +1267,7 @@ export function UxUiStudioEngine() {
   }, [project, onboarding, draftLoaded, activeDraftId, savedProject?.category, savedProject?.description, savedProject?.isFavorite, screens.length]);
 
   useEffect(() => {
-    if (!showToolsPanel || leftTab !== "fonts" || fontCatalogRequested.current) return;
+    if ((!showToolsPanel && !inlineToolkit) || leftTab !== "fonts" || fontCatalogRequested.current) return;
     fontCatalogRequested.current = true;
     const controller = new AbortController();
     setFontCatalogLoading(true);
@@ -1285,7 +1292,7 @@ export function UxUiStudioEngine() {
       })
       .finally(() => { if (!controller.signal.aborted) setFontCatalogLoading(false); });
     return () => { controller.abort(); fontCatalogRequested.current = false; };
-  }, [leftTab, fontCatalogReload, showToolsPanel]);
+  }, [leftTab, fontCatalogReload, showToolsPanel, inlineToolkit]);
 
   useEffect(() => {
     if (leftTab !== "icons" || iconQuery.trim().length < 2) return;
@@ -1350,8 +1357,8 @@ export function UxUiStudioEngine() {
     setScreens([{ id: nextScreenId, name: "Screen 1", target: nextTarget, background: created.background, customArtboard: false, customWidth: size.width, customHeight: size.height, elements: created.elements, updatedAt: new Date().toISOString() }]);
     setActiveScreenId(nextScreenId);
     setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
-    setUndoStack([]); setRedoStack([]); setLeftTab("components"); setToolkitSearch("");
-    setShowToolsPanel(false); setShowExportPanel(false); setShowTextEditor(false); setShowContextColors(false);
+    setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
+    closeToolkit(); setShowExportPanel(false);
     setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
     setPreferredTarget(nextTarget); setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);
     setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
@@ -1380,8 +1387,8 @@ export function UxUiStudioEngine() {
     })));
     setSelectedId(currentScreen.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
     setSavedProject(draft);
-    setLeftTab("components"); setToolkitSearch(""); setShowToolsPanel(false); setShowExportPanel(false);
-    setShowTextEditor(false); setShowContextColors(false); setOnboarding(false);
+    setLeftTab("toolkits"); setToolkitSearch(""); closeToolkit(); setShowExportPanel(false);
+      setOnboarding(false);
     setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);
     setNotice("Draft opened. Tap an element to continue designing.");
   }
@@ -1483,8 +1490,8 @@ export function UxUiStudioEngine() {
     setPrototypeHistory([]);
     setPrototypePreview(true);
     setSelectedId("");
-    setShowInspector(false); setShowToolsPanel(false); setShowExportPanel(false);
-    setShowTextEditor(false); setShowContextColors(false);
+    setShowInspector(false); closeToolkit(); setShowExportPanel(false);
+
     setNotice("Prototype preview started. Tap an element with a screen destination to navigate.");
   }
 
@@ -1753,7 +1760,7 @@ export function UxUiStudioEngine() {
     const layer = { ...makeLayer(kind, Math.max(8, Math.round(board.width * 0.08)), Math.max(24, Math.round(board.height * 0.16) + elements.length * 74), board.width, board.height), name, text: copy, width: Math.min(kind === "text" ? board.width - 24 : 240, board.width - 24) };
     checkpoint();
     setElements((previous) => [...previous, layer]);
-    selectLayer(layer.id); setShowToolsPanel(false);
+    selectLayer(layer.id); closeToolkit();
     setInspectorTab("design");
     setNotice(name + " added to the artboard.");
   }
@@ -1762,7 +1769,7 @@ export function UxUiStudioEngine() {
     const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)), board.width, board.height);
     checkpoint();
     setElements((previous) => [...previous, layer]);
-    selectLayer(layer.id); setShowToolsPanel(false);
+    selectLayer(layer.id); closeToolkit();
     setInspectorTab("design");
     setNotice(layer.name + " added to the artboard.");
   }
@@ -1862,8 +1869,8 @@ export function UxUiStudioEngine() {
 
   function selectCanvas() {
     if (prototypePreview) return;
-    setSelectedId(""); setSelectedIds([]); setCanvasSelected(true); dragRef.current = null;
-    setShowTextEditor(false); setShowContextColors(false);
+    setSelectedId(""); setSelectedIds([]); setCanvasSelected(true); setInlineToolkit(false); setEditTool("canvas"); dragRef.current = null;
+
   }
 
   function toggleExpandedPreview() {
@@ -1880,11 +1887,11 @@ export function UxUiStudioEngine() {
   function returnToProjects() {
     setOnboarding(true);
     setIsExpanded(false);
-    setShowToolsPanel(false);
+    closeToolkit();
     setShowExportPanel(false);
     setShowInspector(false);
-    setShowTextEditor(false);
-    setShowContextColors(false);
+
+
     setPrototypePreview(false);
     if (document.fullscreenElement && document.exitFullscreen) void document.exitFullscreen().catch(() => undefined);
   }
@@ -1962,7 +1969,7 @@ export function UxUiStudioEngine() {
         setProjectName(typeof parsed.name === "string" ? parsed.name : file.name.split(".").slice(0, -1).join("."));
         setBackground(typeof parsed.background === "string" ? parsed.background : "#FFFFFF");
         setTokens(parsed.tokens || DEFAULT_TOKENS); setReusableComponents(parsed.reusableComponents || []);
-        setElements(imported); setSelectedId(imported[0]?.id || ""); setShowToolsPanel(false); setActiveDraftId(""); setOnboarding(false);
+        setElements(imported); setSelectedId(imported[0]?.id || ""); closeToolkit(); setActiveDraftId(""); setOnboarding(false);
         setNotice("Preset imported. You can now customise every element.");
       } catch (error) { setNotice(error instanceof Error ? error.message : "Could not import that preset."); }
     };
@@ -2033,7 +2040,7 @@ export function UxUiStudioEngine() {
         const layer = { ...makeLayer("text", 24, 120, board.width, board.height), fontFamily: font.family, fontDataUrl };
         setElements((previous) => [...previous, layer]); selectLayer(layer.id);
       }
-      setShowToolsPanel(false);
+      closeToolkit();
       setNotice(font.family + " is ready. Drag your text to place it.");
     } catch {
       setNotice("Connect to preview this font, or choose one marked Ready offline.");
@@ -2187,52 +2194,24 @@ export function UxUiStudioEngine() {
     );
   }
 
-  return (
-    <section
-      ref={studioRootRef}
-      aria-label="UX/UI Studio editor workspace"
-      style={{ "--uxui-available-height": availableEditorHeight > 0 ? `${availableEditorHeight}px` : "calc(100dvh - 160px)" } as CSSProperties}
-      className={"ux-ui-studio target-" + target + " min-w-0 " + (isExpanded ? "is-expanded" : "")}
-    >
-      <header className="uxui-topbar">
-        <div className="uxui-fullscreen-brand" aria-label="enV brand">
-          <Logo size="hero" className="uxui-fullscreen-logo" />
-        </div>
-        <div className="uxui-topbar-left">
-          <div className="uxui-target-switch" role="group" aria-label="Preview device">
-            <button type="button" aria-label="Mobile" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
-            <button type="button" aria-label="Tablet" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
-            <button type="button" aria-label="Desktop" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={target === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
-          </div>
-        </div>
-        <div className="uxui-topbar-actions">
-          <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
-          <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
-          <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
-          <button type="button" aria-label="Export" title="Export design" onClick={() => { setShowInspector(false); setShowExportPanel((value) => !value); }} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
-          <button type="button" onClick={returnToProjects} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
-        </div>
-        {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
-          <div className="uxui-export-menu-title">Export your design</div>
-          <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
-          <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Layers, spacing, fonts, colors and generated code</small></span></button>
-          <button type="button" aria-label="React TSX" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
-          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
-          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Tablet size={15} /><span><strong>SwiftUI</strong><small>iOS implementation</small></span></button>
-          <button type="button" onClick={() => { downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8"); setShowExportPanel(false); }}><FileOutput size={15} /><span><strong>HTML + CSS</strong><small>Portable browser preview</small></span></button>
-        </div>}
-      </header>
-
-      {prototypePreview && <div className="uxui-prototype-toolbar" role="status" aria-live="polite">
-        <span>Prototype preview · {screens.find((screen) => screen.id === activeScreenId)?.name || "Current screen"}</span>
-        <div>
-          <button type="button" onClick={backPrototypePreview} disabled={prototypeHistory.length === 0}>Back</button>
-          <button type="button" onClick={stopPrototypePreview}>Exit preview</button>
-        </div>
-      </div>}
-      <div className="uxui-workspace grid min-w-0 gap-3">
-        {showToolsPanel && <div className="uxui-toolkit-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowToolsPanel(false); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role="dialog" aria-modal="true" aria-labelledby="uxui-toolkit-title">
-          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">Studio toolkit</span><button type="button" onClick={() => setShowToolsPanel(false)} aria-label="Close studio toolkit"><X size={17} /></button></div>
+  function closeToolkit() { setShowToolsPanel(false); setInlineToolkit(false); setEditTool("move"); }
+  function openToolkitHome() { setInlineToolkit(false); setLeftTab("toolkits"); setToolkitPage(false); setToolkitSearch(""); setShowToolsPanel(true); }
+  function chooseEditTool(tool: string) { setInlineToolkit(false); setEditTool(tool); }
+  function chooseToolkit(id: string) { openToolkit(id); setShowToolsPanel(false); setInlineToolkit(true); setEditTool("library"); }
+  function holdUpdate(id: string, patch: Partial<DesignLayer>) { updateLayer(id, patch, false); }
+  async function processImage(operation: "cutout" | "icon" | "resize", edge = 1024) {
+    if (!selected?.imageDataUrl || imageBusy) return;
+    const id = selected.id; setImageBusy(true);
+    try {
+      const result = await editStudioImage(selected.imageDataUrl,operation,cutoutStrength,edge);
+      updateLayer(id,operation === "icon" ? {kind:"icon",iconName:"Custom silhouette",iconSvg:sanitizeIconMarkup(result.data).body,iconViewBox:`0 0 ${result.width} ${result.height}`,background:"transparent",imageDataUrl:"",padding:0} : {imageDataUrl:result.data,...(operation === "cutout" ? {background:"transparent"} : {})});
+      if (operation === "icon") closeToolkit();
+      setNotice(operation === "icon" ? "Editable silhouette icon created. Change its color in Color." : operation === "cutout" ? "Plain background removed. Undo restores the original." : "Image pixels resized.");
+    } catch(error) { setNotice(error instanceof Error ? error.message : "Could not edit this image."); }
+    finally { setImageBusy(false); }
+  }
+  function renderToolkit(inline = false) { return (<div className={inline ? "uxui-inline-library" : "uxui-toolkit-overlay"} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeToolkit(); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role={inline ? "region" : "dialog"} aria-modal={inline ? undefined : true} aria-labelledby="uxui-toolkit-title">
+          <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">Studio toolkit</span><button type="button" onClick={() => closeToolkit()} aria-label="Close studio toolkit"><X size={17} /></button></div>
           <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search elements, icons, fonts, presets…" /></label>
           <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio Toolkit categories">
             {([
@@ -2246,17 +2225,27 @@ export function UxUiStudioEngine() {
             ] as Array<{id:PanelTab;label:string;icon:ReactNode}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => { setLeftTab(tab.id); setToolkitPage(false); setToolkitSearch(""); toolkitContentRef.current?.scrollTo({ top: 0 }); }} className={leftTab === tab.id ? "is-active" : ""}><span className="uxui-toolkit-tab-icon">{tab.icon}</span><span className="uxui-toolkit-tab-label">{tab.label}</span></button>)}
           </div>
           <div ref={toolkitContentRef} className="uxui-toolkit-content">
+          {inline && leftTab === "icons" && <section aria-label="Icons controls" className="uxui-compact-library">
+            <div className="uxui-library-options"><input aria-label="Search icons" type="search" value={iconQuery} onChange={event=>setIconQuery(event.target.value)} placeholder="Search icons…"/><select aria-label="Icon category" value={iconBrowseCategory} onChange={event=>setIconBrowseCategory(event.target.value)}>{[{name:"All bundled"},...ICON_BROWSE_CATEGORIES].map(category=><option key={category.name}>{category.name}</option>)}</select><button type="button" onClick={()=>iconImportInputRef.current?.click()}>Import SVG</button></div>
+            <div className="uxui-asset-strip">{visibleIconResults.map(name=><button type="button" key={name} title={"Add icon "+name} onClick={()=>void chooseIcon(name)}><StudioIconPreview name={name} size={38}/><span>{name.split(":").pop()}</span></button>)}</div>
+          </section>}
+          {inline && leftTab === "fonts" && <section aria-label="Typography controls" className="uxui-compact-library">
+            <div className="uxui-library-options"><input aria-label="Search fonts" value={fontQuery} onChange={event=>setFontQuery(event.target.value)} placeholder="Find a font…"/><input aria-label="Font preview text" maxLength={80} value={fontPreviewText} onChange={event=>setFontPreviewText(event.target.value)} placeholder="Try your words…"/><button type="button" aria-pressed={animateFontPreviews} onClick={()=>setAnimateFontPreviews(value=>!value)}>{animateFontPreviews?"Pause previews":"Play previews"}</button></div>
+            <div className="uxui-asset-strip uxui-font-strip">{filteredFonts.slice(0,fontVisibleCount).map(font=><button type="button" key={font.family} onClick={()=>void chooseFont(font)}><strong>{font.family}</strong><FontPreview family={font.family} provider={font.provider} className="text-lg" sample={fontPreviewText || "Design systems that scale 012345"} animated={animateFontPreviews}/><small>Tap to use</small></button>)}</div>
+            {filteredFonts.length>fontVisibleCount && <button type="button" onClick={()=>setFontVisibleCount(count=>count+24)}>More font previews</button>}
+          </section>}
+
 
           {leftTab === "toolkits" && !toolkitPage && <div className="mt-3 space-y-3">
             <div className="rounded-xl border border-border bg-surface-2 p-3">
               <strong className="text-sm text-fg">26 design tools</strong>
               <p className="mt-1 text-xs leading-5 text-muted">Every tool connects to editable layers, project settings, assets, or export actions.</p>
               <div className="uxui-toolkit-tiles">
-                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => openToolkit(toolkit.id)} className={"uxui-toolkit-tile " + (activeToolkitId === toolkit.id ? "is-active" : "")} aria-pressed={activeToolkitId === toolkit.id} title={toolkit.description}><ToolkitPreview id={toolkit.id} /><span className="uxui-toolkit-tile-label">{toolkit.name}</span><span className="uxui-toolkit-tile-description">{toolkit.description}</span></button>)}
+                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => chooseToolkit(toolkit.id)} className={"uxui-toolkit-tile " + (activeToolkitId === toolkit.id ? "is-active" : "")} aria-pressed={activeToolkitId === toolkit.id} title={toolkit.description}><ToolkitPreview id={toolkit.id} /><span className="uxui-toolkit-tile-label">{toolkit.name}</span><span className="uxui-toolkit-tile-description">{toolkit.description}</span></button>)}
               </div>
             </div>
           </div>}
-          {toolkitPage && <div className="mt-3 space-y-3">
+          {toolkitPage && !(inline && ["fonts","icons"].includes(leftTab)) && <div className="mt-3 space-y-3">
             <button type="button" className="uxui-toolkit-back" onClick={() => { setToolkitPage(false); setLeftTab("toolkits"); toolkitContentRef.current?.scrollTo({ top: 0 }); }}><ArrowLeft size={16} /> All 26 tools</button>
             {(() => { const toolkit = STUDIO_TOOLKITS.find((item) => item.id === activeToolkitId) || STUDIO_TOOLKITS[0]; return <section className="uxui-toolkit-selection rounded-xl border border-border p-3" aria-label={toolkit.name + " controls"}>
               <ToolkitPreview id={toolkit.id} />
@@ -2269,7 +2258,7 @@ export function UxUiStudioEngine() {
                   return <button type="button" key={effect.id} className="uxui-effect-card" aria-label={(selected ? "Apply " : "Add sample: ") + effect.name + " effect"} onClick={() => {
                     if (selected) updateLayer(selected.id, effect.patch);
                     else { const sample = { ...makeLayer("card", 24, 120, board.width, board.height), name: effect.name + " sample", text: effect.name + "\nMake this look your own", width: Math.min(300, board.width - 48), height: 132, ...effect.patch }; checkpoint(); setElements((old) => [...old, sample]); selectLayer(sample.id); }
-                    setShowToolsPanel(false);
+                    closeToolkit();
                     setNotice(effect.name + " applied. Styling controls are below the controllers.");
                   }}><span className="uxui-effect-stage"><span style={{ background: preview.background, color: preview.color, border: preview.borderWidth + "px solid " + preview.borderColor, borderRadius: Math.min(30, preview.radius), opacity: preview.opacity, boxShadow: preview.shadow ? "0 3px 10px #0F172A24" : "none" }}>Aa</span></span><strong>{effect.name}</strong><small>{effect.description}</small></button>;
                 })}</div>
@@ -2279,7 +2268,7 @@ export function UxUiStudioEngine() {
               {["accessibility","qa"].includes(toolkit.id) && showQaReport && <section className="uxui-qa-report mt-3 rounded-lg border border-border p-3" aria-label="Design QA results"><h4 className="text-xs font-bold text-fg" role="status">{qaReport.length ? qaReport.length + " potential findings" : "No issues found by these checks"}</h4><p className="mt-1 text-xs leading-5 text-muted">Review each finding in context. Decorative overlaps and small non-interactive details can be intentional.</p>{qaReport.length > 0 && <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs leading-5 text-fg">{qaReport.map((finding,index) => <li key={index}>{finding}</li>)}</ol>}<button type="button" className="uxui-toolkit-back mt-2" onClick={() => setShowQaReport(false)}>Dismiss report</button></section>}
               {["accessibility","qa"].includes(toolkit.id) && <div className="mt-3"><button type="button" onClick={runDesignAudit} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">{toolkit.id === "qa" ? "Run design QA" : "Run accessibility & structure review"}</button></div>}
               {toolkit.id === "patterns" && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>setShowGrid(true)} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Show canvas grid</button><button type="button" onClick={()=>addSample("star","Decorative star","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add star shape</button><button type="button" onClick={()=>addSample("hexagon","Geometric shape","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add hexagon</button><button type="button" onClick={()=>addSample("line","Decorative line","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add line</button></div>}
-              {toolkit.id === "layers" && <div className="mt-3"><button type="button" onClick={()=>{ setShowMoreLayers(true); setShowInspector(true); setShowToolsPanel(false); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Show all layers</button>{selected && <button type="button" onClick={duplicateSelected} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Duplicate selected</button>}</div>}
+              {toolkit.id === "layers" && <div className="mt-3"><button type="button" onClick={()=>{ setShowMoreLayers(true); setShowInspector(true); closeToolkit(); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Show all layers</button>{selected && <button type="button" onClick={duplicateSelected} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Duplicate selected</button>}</div>}
               {["device","platform"].includes(toolkit.id) && <div className="mt-3 flex flex-wrap gap-2">{(["mobile","tablet","desktop"] as DeviceTarget[]).map((device)=><button key={device} type="button" onClick={()=>changeTarget(device)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold capitalize text-fg">{device}</button>)}</div>}
               {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>{ setCustomArtboard(true); selectCanvas(); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
               {toolkit.id === "responsive" && <div className="uxui-inline-fields"><Field label="Canvas width"><input type="number" min="160" max="4096" value={board.width} className={fieldClass()} onChange={(event) => { setCustomArtboard(true); setCustomWidth(Math.max(160, Math.min(4096, Number(event.target.value) || 160))); setCustomHeight(board.height); }} /></Field><Field label="Canvas height"><input type="number" min="240" max="4096" value={board.height} className={fieldClass()} onChange={(event) => { setCustomArtboard(true); setCustomHeight(Math.max(240, Math.min(4096, Number(event.target.value) || 240))); setCustomWidth(board.width); }} /></Field></div>}
@@ -2308,7 +2297,7 @@ export function UxUiStudioEngine() {
                   </div>
                 </> : <p className="text-xs leading-5 text-muted">Select a layer on the artboard to control whether it appears on mobile, tablet and desktop.</p>}
               </div>}
-              {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>{ setShowToolsPanel(false); setShowExportPanel(true); }} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
+              {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>{ closeToolkit(); setShowExportPanel(true); }} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
               {toolkit.id === "transform" && <div className="mt-3 grid grid-cols-2 gap-2">{selected ? <><button type="button" onClick={() => updateLayer(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Center horizontally</button><button type="button" onClick={() => updateLayer(selected.id, { y: Math.max(0, Math.round((board.height - selected.height) / 2)) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Center vertically</button><button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Rotate −15°</button><button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Rotate +15°</button></> : <p className="col-span-2 text-xs text-muted">Select an artboard layer to use positioning and rotation actions.</p>}</div>}
               {toolkit.id === "flows" && <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface-2 p-3">
                 <p className="text-xs leading-5 text-muted">Assign a selected layer to another screen. During preview, tapping that layer opens its destination; Back follows the interaction history.</p>
@@ -2323,7 +2312,7 @@ export function UxUiStudioEngine() {
               </div>}
               {toolkit.id === "inspiration" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import reference image</button><p className="mt-1 text-[10px] text-muted">Keep reference source and licensing notes with the project before redistribution.</p></div>}
               {toolkit.id === "background" && <div className="mt-3"><label className="block text-xs font-semibold text-fg">Canvas background<input type="color" aria-label="Toolkit canvas background" value={background.startsWith("#") ? background : "#FFFFFF"} onChange={(event)=>setBackground(event.target.value)} className="mt-2 block h-10 w-full"/></label><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import background image as layer</button></div>}
-              {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);setShowToolsPanel(false);}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
+              {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);closeToolkit();}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
               {toolkit.id === "assets" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import assets</button></div>}
               {toolkit.id === "data-viz" && <div className="mt-3"><button type="button" onClick={() => addLayer("chart")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Add editable chart</button></div>}
               {toolkit.id === "illustrations" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import illustration (SVG/image)</button></div>}
@@ -2374,7 +2363,7 @@ export function UxUiStudioEngine() {
             </div>
           </div>}
 
-          {leftTab === "icons" && <div className="mt-3">
+          {leftTab === "icons" && !inline && <div className="mt-3">
             <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold text-fg">Icon library</h3><button type="button" onClick={() => iconImportInputRef.current?.click()} className="uxui-import-button">Import SVG</button></div>
             <p className="mt-1 text-[11px] leading-4 text-muted">Browse bundled, verified SVGs by category and style, or search for more online. Bundled icons work offline. Selected SVGs and collection identifiers are stored in the project.</p>
             <div className="mt-3 relative"><Search size={15} className="absolute left-2.5 top-2.5 text-muted" /><input value={iconQuery} aria-label="Search icons" onChange={(event)=>{setIconQuery(event.target.value);setIconStart(0);setIconResults([]);}} placeholder="Search icons: home, charts, payment…" className="w-full rounded-lg border border-border bg-surface pl-8 pr-2 py-2 text-sm text-fg outline-none focus:border-accent" /></div>
@@ -2397,7 +2386,7 @@ export function UxUiStudioEngine() {
             <p className="mt-3 text-[10px] leading-4 text-muted">The quick picker covers common UI categories and outline, filled, rounded and platform icon sets. The full online catalogue remains searchable. Check each collection’s licence; <a className="underline underline-offset-2" href="https://iconify.design/docs/api/search.html" target="_blank" rel="noreferrer">Iconify supports set filters and paging</a>.</p>
           </div>}
 
-          {leftTab === "fonts" && <div className="mt-3">
+          {leftTab === "fonts" && !inline && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Find your font</h3>
             <p className="mt-1 text-[11px] leading-4 text-muted">See your words in each font. Tap a card to use it in your design.</p>
             <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted">
@@ -2473,7 +2462,53 @@ export function UxUiStudioEngine() {
             <p className="mt-1 text-xs leading-5 text-fg">{Array.from(new Set(elements.flatMap((item) => [item.padding, item.marginTop, item.marginRight, item.marginBottom, item.marginLeft]))).sort((a,b)=>a-b).join(" · ") || "No spacing values yet"} px</p>
           </div>}
           </div>
-        </aside></div>}
+        </aside></div>); }
+
+  return (
+    <section
+      ref={studioRootRef}
+      aria-label="UX/UI Studio editor workspace"
+      style={{ "--uxui-available-height": availableEditorHeight > 0 ? `${availableEditorHeight}px` : "calc(100dvh - 160px)" } as CSSProperties}
+      className={"ux-ui-studio target-" + target + " min-w-0 " + (isExpanded ? "is-expanded" : "")}
+    >
+      <header className="uxui-topbar">
+        <div className="uxui-fullscreen-brand" aria-label="enV brand">
+          <Logo size="hero" className="uxui-fullscreen-logo" />
+        </div>
+        <div className="uxui-topbar-left">
+          <div className="uxui-target-switch" role="group" aria-label="Preview device">
+            <button type="button" aria-label="Mobile" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
+            <button type="button" aria-label="Tablet" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
+            <button type="button" aria-label="Desktop" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={target === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
+          </div>
+        </div>
+        <div className="uxui-topbar-actions">
+          <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
+          <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
+          <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
+          <button type="button" aria-label="Export" title="Export design" onClick={() => { setShowInspector(false); setShowExportPanel((value) => !value); }} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
+          <button type="button" onClick={returnToProjects} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
+        </div>
+        {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
+          <div className="uxui-export-menu-title">Export your design</div>
+          <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
+          <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Layers, spacing, fonts, colors and generated code</small></span></button>
+          <button type="button" aria-label="React TSX" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Tablet size={15} /><span><strong>SwiftUI</strong><small>iOS implementation</small></span></button>
+          <button type="button" onClick={() => { downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8"); setShowExportPanel(false); }}><FileOutput size={15} /><span><strong>HTML + CSS</strong><small>Portable browser preview</small></span></button>
+        </div>}
+      </header>
+
+      {prototypePreview && <div className="uxui-prototype-toolbar" role="status" aria-live="polite">
+        <span>Prototype preview · {screens.find((screen) => screen.id === activeScreenId)?.name || "Current screen"}</span>
+        <div>
+          <button type="button" onClick={backPrototypePreview} disabled={prototypeHistory.length === 0}>Back</button>
+          <button type="button" onClick={stopPrototypePreview}>Exit preview</button>
+        </div>
+      </div>}
+      <div className="uxui-workspace grid min-w-0 gap-3">
+        {showToolsPanel && renderToolkit()}
 
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
           <div className="uxui-canvas-heading">
@@ -2506,6 +2541,7 @@ export function UxUiStudioEngine() {
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
                 style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="group" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; resizeRef.current = null; }} onPointerCancel={() => { dragRef.current = null; resizeRef.current = null; }}>
+                {customFonts.length > 0 && <defs><style>{Array.from(new Map(customFonts.filter(layer => layer.fontDataUrl.startsWith("data:")).map(layer => [layer.fontFamily, layer])).values()).map(layer => "@font-face{font-family:" + JSON.stringify(layer.fontFamily) + ";src:url(" + JSON.stringify(layer.fontDataUrl) + ");font-weight:100 900;font-display:block;}").join("\n")}</style></defs>}
                 <rect width={board.width} height={board.height} fill={background} role="button" tabIndex={prototypePreview ? -1 : 0} aria-label="Select canvas background" onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectCanvas(); } }} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
@@ -2581,52 +2617,36 @@ export function UxUiStudioEngine() {
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
-            <button type="button" className="uxui-add-button" onClick={() => setShowToolsPanel((value) => !value)} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
+            <button type="button" className="uxui-add-button" onClick={openToolkitHome} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={42} strokeWidth={1.6} /></button>
             <div className="uxui-bottom-group">
               <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
               <button type="button" onClick={toggleExpandedPreview} aria-label={isExpanded ? "Exit full-screen studio" : "Expand studio to full screen"} title={isExpanded ? "Exit full screen" : "Full-screen studio"}>{isExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}</button>
             </div>
           </div>
-          {selected && target !== "desktop" && <div className="uxui-mobile-controls" aria-label="Selected element movement and transform controls">
+          {!prototypePreview && (selected || canvasSelected || inlineToolkit) && <div className="uxui-edit-tray" data-tool={editTool} aria-label="Editing controls">
+            {editTool !== "move" && <div className="uxui-edit-tray-heading"><button type="button" onClick={closeToolkit} aria-label="Back to movement controls"><ArrowLeft size={18} /></button><strong>{editTool === "library" ? STUDIO_TOOLKITS.find(item => item.id === activeToolkitId)?.name : editTool === "lookup" ? "Look closer · choose a layer" : editTool === "cutout" ? "Image cutout" : editTool === "canvas" ? "Canvas" : editTool.charAt(0).toUpperCase() + editTool.slice(1)}</strong><button type="button" onClick={closeToolkit}>Done</button></div>}
+            {selected && editTool === "move" && !prototypePreview && <div className="uxui-mobile-controls" key={selected.id} aria-label="Selected element movement and transform controls">
             <div className="uxui-gamepad" role="group" aria-label="Move selected element">
               <span className="uxui-gamepad-label">Move</span>
-              <button type="button" className="uxui-pad-up" aria-label="Move element up 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.max(0, selected.y - 8) })}><ArrowUp size={19} /></button>
-              <button type="button" className="uxui-pad-left" aria-label="Move element left 8 pixels" onClick={() => updateLayer(selected.id, { x: Math.max(0, selected.x - 8) })}><ArrowLeft size={19} /></button>
-              <button type="button" className="uxui-pad-center" aria-label="Center selected element" onClick={() => updateLayer(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)), y: Math.max(0, Math.round((board.height - selected.height) / 2)) })}>•</button>
-              <button type="button" className="uxui-pad-right" aria-label="Move element right 8 pixels" onClick={() => updateLayer(selected.id, { x: Math.min(Math.max(0, board.width - selected.width), selected.x + 8) })}><ArrowRight size={19} /></button>
-              <button type="button" className="uxui-pad-down" aria-label="Move element down 8 pixels" onClick={() => updateLayer(selected.id, { y: Math.min(Math.max(0, board.height - selected.height), selected.y + 8) })}><ArrowDown size={19} /></button>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-up" aria-label="Move element up 8 pixels" action={() => holdUpdate(selected.id, { y: Math.max(0, selected.y - 8) })}><ArrowUp size={19} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-left" aria-label="Move element left 8 pixels" action={() => holdUpdate(selected.id, { x: Math.max(0, selected.x - 8) })}><ArrowLeft size={19} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-center" aria-label="Center selected element" action={() => holdUpdate(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)), y: Math.max(0, Math.round((board.height - selected.height) / 2)) })}>•</StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-right" aria-label="Move element right 8 pixels" action={() => holdUpdate(selected.id, { x: Math.min(Math.max(0, board.width - selected.width), selected.x + 8) })}><ArrowRight size={19} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-down" aria-label="Move element down 8 pixels" action={() => holdUpdate(selected.id, { y: Math.min(Math.max(0, board.height - selected.height), selected.y + 8) })}><ArrowDown size={19} /></StudioRepeatButton>
             </div>
             <div className="uxui-gamepad uxui-gamepad-transform" role="group" aria-label={selected.kind === "icon" ? "Icon transform controls" : "Selected element transform controls"}>
               <span className="uxui-gamepad-label">{selected.kind === "icon" ? "Icon" : "Adjust"}</span>
-              <button type="button" className="uxui-pad-up" aria-label="Increase element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))) })}><ZoomIn size={18} /></button>
-              <button type="button" className="uxui-pad-left" aria-label="Rotate element left 15 degrees" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })}><RotateCw size={17} className="uxui-rotate-back" /></button>
-              <button type="button" className="uxui-pad-center" aria-label="Reset element rotation" onClick={() => updateLayer(selected.id, { rotation: 0 })}>0°</button>
-              <button type="button" className="uxui-pad-right" aria-label="Rotate element right 15 degrees" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })}><RotateCw size={17} /></button>
-              <button type="button" className="uxui-pad-down" aria-label="Decrease element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })}><ZoomOut size={18} /></button>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-up" aria-label="Increase element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.min(board.width - selected.x, Math.round(selected.width * 1.1))), height: Math.max(12, Math.min(board.height - selected.y, Math.round(selected.height * 1.1))) })}><ZoomIn size={18} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-left" aria-label="Rotate element left 15 degrees" action={() => holdUpdate(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })}><RotateCw size={17} className="uxui-rotate-back" /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-center" aria-label="Reset element rotation" action={() => holdUpdate(selected.id, { rotation: 0 })}>0°</StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-right" aria-label="Rotate element right 15 degrees" action={() => holdUpdate(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })}><RotateCw size={17} /></StudioRepeatButton>
+              <StudioRepeatButton begin={checkpoint} className="uxui-pad-down" aria-label="Decrease element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })}><ZoomOut size={18} /></StudioRepeatButton>
             </div>
           </div>}
-          {selected && !prototypePreview && <div className="uxui-context-controls">
-            <div className="uxui-context-toolbar" role="toolbar" aria-label={selected.kind + " editing actions"}>
-              <span className="uxui-context-selection" aria-live="polite">{selected.name || selected.kind + " selected"}</span>
-              {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => setShowTextEditor((value) => !value)} aria-expanded={showTextEditor}><Type size={21} /><span>{showTextEditor ? "Done" : "Text"}</span></button>}
-              {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => { openToolkit("typography"); setShowToolsPanel(true); }}><Type size={21} /><span>Fonts</span></button>}
-              {selected.kind === "image" && <button type="button" className="uxui-context-action" onClick={() => { setShowInspector(true); setInspectorTab("design"); }}><ImagePlus size={21} /><span>Replace</span></button>}
-              {selected.kind === "icon" && <button type="button" className="uxui-context-action" onClick={() => { openToolkit("icons"); setShowToolsPanel(true); }}><Shapes size={21} /><span>Icons</span></button>}
-              <button type="button" className="uxui-context-action" onClick={() => setShowContextColors((value) => !value)} aria-expanded={showContextColors}><Palette size={21} /><span>Color</span></button>
-              <button type="button" className="uxui-context-action" onClick={() => { openToolkit("effects"); setShowToolsPanel(true); }}><Palette size={21} /><span>Effects</span></button>
-              <button type="button" className="uxui-context-action" onClick={() => { setShowInspector(true); setInspectorTab("design"); }}><LayoutTemplate size={21} /><span>Adjust</span></button>
-            </div>
-            {showTextEditor && selectedHasText && <div className="uxui-context-editor"><label htmlFor="uxui-selected-text">Edit text</label><textarea id="uxui-selected-text" value={selected.text} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { text: event.target.value }, false)} rows={2} /></div>}
-            {showContextColors && <div className="uxui-context-color-picker">
-              <div className="uxui-context-color-header"><strong>Color</strong><div role="group" aria-label="Color target"><button type="button" aria-pressed={paletteMode === "fill"} onClick={() => setPaletteMode("fill")}>Fill</button><button type="button" aria-pressed={paletteMode === "text"} onClick={() => setPaletteMode("text")}>Text</button></div><input type="color" aria-label="Choose element color" value={(paletteMode === "text" ? selected.color : selected.background) === "transparent" ? "#FFFFFF" : (paletteMode === "text" ? selected.color : selected.background)} onChange={(event) => updateLayer(selected.id, paletteMode === "text" ? { color: event.target.value } : { background: event.target.value })} /></div>
-              <div className="uxui-context-swatches">{["#111827", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2775", "#DC2626", "#D97706", "#059669", "#0F766E", "#64748B", "#E5E7EB", "#DBEAFE"].map((color) => <button key={color} type="button" style={{ background: color }} onClick={() => updateLayer(selected.id, paletteMode === "text" ? { color } : { background: color })} aria-label={"Apply " + color} title={color} />)}</div>
-            </div>}
-          </div>}
-
-          {!prototypePreview && (selected || canvasSelected) && <section className="uxui-style-dock" aria-label={selected ? "Selected element styling" : "Canvas styling"}>
+{!prototypePreview && (selected || canvasSelected) && editTool !== "move" && editTool !== "library" && editTool !== "lookup" && editTool !== "cutout" && <section className="uxui-style-dock" aria-label={selected ? "Selected element styling" : "Canvas styling"}>
             <div className="uxui-style-dock-heading"><strong>{selected ? selected.name + " · Style" : "Canvas · Style"}</strong><button type="button" onClick={() => { setShowInspector(true); setInspectorTab("design"); }} aria-label="Open all styling properties">More <ArrowRight size={14} /></button></div>
             {selected ? <>
-              <p className="uxui-drag-hint">Drag to move · Pull the corner to resize</p>
+              <p className="uxui-drag-hint">Drag to move · Pull the corner to resize</p><div className="uxui-inline-effect-choices">{[{name:"Flat",patch:{shadow:false,borderWidth:0,opacity:1}},{name:"Shadow",patch:{shadow:true}},{name:"Outline",patch:{borderWidth:2,borderColor:selected.color}},{name:"Faded",patch:{opacity:.5}}].map(effect => <button type="button" key={effect.name} onClick={() => updateLayer(selected.id,effect.patch)}><span style={{border:"2px solid currentColor",borderRadius:8,boxShadow:effect.name === "Shadow"?"3px 4px 0 #888":undefined,opacity:effect.name === "Faded"?.5:1}}/>{effect.name}</button>)}</div>{selected.kind === "image" && <div className="uxui-resample-actions"><span>Image pixels</span>{[256,512,1024].map(size => <button type="button" key={size} disabled={imageBusy} onClick={() => void processImage("resize",size)}>{size}px</button>)}</div>}
               <div className="uxui-shape-choices" role="group" aria-label="Quick shape style">
                 {[{ name: "Square", radius: 0 }, { name: "Soft", radius: Math.min(14, Math.floor(Math.min(selected.width, selected.height) / 4)) }, { name: "Round", radius: Math.floor(Math.min(selected.width, selected.height) / 2) }].map((shape) => <button key={shape.name} type="button" aria-pressed={selected.radius === shape.radius} onClick={() => updateLayer(selected.id, { radius: shape.radius })}><span aria-hidden="true" style={{ borderRadius: shape.name === "Round" ? 99 : shape.name === "Soft" ? 7 : 0 }} /><strong>{shape.name}</strong></button>)}
               </div>
@@ -2641,7 +2661,7 @@ export function UxUiStudioEngine() {
                 {selectedHasText && <Field label="Text size"><input type="range" aria-label="Selected font size" min="8" max={Math.max(160, selected.fontSize)} value={selected.fontSize} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { fontSize: Number(event.target.value) }, false)} /></Field>}
               </div>
               {selectedHasText && <div className="uxui-inline-fields uxui-inline-text-fields"><Field label={selected.kind === "chart" ? "Chart title and values" : "Your words"}><textarea aria-label="Selected text content" rows={selected.kind === "chart" ? 4 : 2} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field><button type="button" onClick={() => { openToolkit("typography"); setShowToolsPanel(true); }}>Choose font</button></div>}
-              <details className="uxui-exact-options"><summary>More options</summary><div className="uxui-inline-fields"><Field label="Width"><input type="number" aria-label="Selected width" min="1" value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Height"><input type="number" aria-label="Selected height" min="1" value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Border color"><input type="color" aria-label="Selected border color" value={/^#[0-9a-f]{6}$/i.test(selected.borderColor) ? selected.borderColor : "#CCCCCC"} onChange={(event) => updateLayer(selected.id, { borderColor: event.target.value })} /></Field></div></details>
+              <details className="uxui-exact-options" open={editTool === "more"}><summary>More options</summary><div className="uxui-inline-fields"><Field label="X"><input type="number" aria-label="Selected X" min="0" value={selected.x} onChange={event=>updateLayer(selected.id,{x:Math.max(0,Number(event.target.value)||0)})}/></Field><Field label="Y"><input type="number" aria-label="Selected Y" min="0" value={selected.y} onChange={event=>updateLayer(selected.id,{y:Math.max(0,Number(event.target.value)||0)})}/></Field><Field label="Width"><input type="number" aria-label="Selected width" min="1" value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Height"><input type="number" aria-label="Selected height" min="1" value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Border color"><input type="color" aria-label="Selected border color" value={/^#[0-9a-f]{6}$/i.test(selected.borderColor) ? selected.borderColor : "#CCCCCC"} onChange={(event) => updateLayer(selected.id, { borderColor: event.target.value })} /></Field></div></details>
               <div className="uxui-inline-actions"><label><input type="checkbox" aria-label="Selected drop shadow" checked={selected.shadow} onChange={(event) => updateLayer(selected.id, { shadow: event.target.checked })} /> Soft shadow</label><button type="button" onClick={() => updateLayer(selected.id, { background: "transparent" })}>No fill</button><button type="button" onClick={() => { openToolkit("motion"); setShowToolsPanel(true); }}>Motion</button><button type="button" onClick={duplicateSelected}>Duplicate</button><button type="button" onClick={() => updateLayer(selected.id, { hidden: !selected.hidden })}>{selected.hidden ? "Show" : "Hide"}</button><button type="button" onClick={deleteSelected}>Delete</button>{selectedIds.length > 1 && <button type="button" onClick={groupSelectedLayers}>Group selection</button>}{selected.groupId && <button type="button" onClick={ungroupSelectedLayers}>Ungroup</button>}</div>
             </> : <>
               <div className="uxui-inline-fields"><Field label="Background"><input type="color" aria-label="Canvas background color" value={/^#[0-9a-f]{6}$/i.test(background) ? background : "#FFFFFF"} onChange={(event) => setBackground(event.target.value)} /></Field><Field label="Canvas width"><input type="number" aria-label="Canvas width" min="160" max="4096" value={board.width} onChange={(event) => { setCustomWidth(Math.min(4096, Math.max(160, Number(event.target.value) || 160))); setCustomHeight(board.height); setCustomArtboard(true); }} /></Field><Field label="Canvas height"><input type="number" aria-label="Canvas height" min="240" max="4096" value={board.height} onChange={(event) => { setCustomHeight(Math.min(4096, Math.max(240, Number(event.target.value) || 240))); setCustomWidth(board.width); setCustomArtboard(true); }} /></Field><label className="uxui-inline-toggle"><input type="checkbox" checked={showGrid} onChange={(event) => setShowGrid(event.target.checked)} /> Alignment grid</label></div>
@@ -2649,6 +2669,29 @@ export function UxUiStudioEngine() {
               <div className="uxui-inline-actions"><button type="button" onClick={() => quickImageInputRef.current?.click()}>Add background image layer</button><button type="button" onClick={() => { setCustomArtboard(false); }}>Use device dimensions</button></div>
             </>}
           </section>}
+            {editTool === "lookup" && <div className="uxui-layer-lookup" aria-label="Layer lookup">
+              {selected && <div className="uxui-detail-preview" aria-label="Magnified selected item">{selected.kind === "icon" ? <svg viewBox={selected.iconViewBox || "0 0 24 24"} style={{ color: selected.color }} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + selected.iconSvg + "</svg>").body }} /> : selected.imageDataUrl ? <img src={selected.imageDataUrl} alt={selected.name} /> : <span style={{ color: selected.color }}>{selected.text || selected.name}</span>}</div>}
+              <div className="uxui-layer-finder">{elements.filter(item => !item.hidden).map(item => <button type="button" key={item.id} aria-pressed={selectedId === item.id} onClick={() => selectLayer(item.id)}><span>{item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + item.iconSvg + "</svg>").body }} /> : item.imageDataUrl ? <img src={item.imageDataUrl} alt="" /> : item.text.slice(0, 3) || "□"}</span><strong>{item.name}</strong></button>)}</div>
+            </div>}
+            {selected?.kind === "image" && editTool === "cutout" && <div className="uxui-image-actions"><p>Remove a plain background. Your original stays available with Undo.</p><label>Strength<input type="range" aria-label="Cutout strength" min="5" max="140" value={cutoutStrength} onChange={event => setCutoutStrength(Number(event.target.value))} /></label><button type="button" disabled={imageBusy} onClick={() => void processImage("cutout")}>{imageBusy ? "Working…" : "Remove background"}</button><button type="button" disabled={imageBusy} onClick={() => void processImage("icon")}>Make silhouette icon</button></div>}
+            {inlineToolkit && renderToolkit(true)}
+          </div>}
+          {selected && !prototypePreview && <div className="uxui-context-controls">
+            <div className="uxui-context-toolbar" role="toolbar" aria-label={selected.kind + " editing actions"}>
+              <span className="uxui-context-selection" aria-live="polite">{selected.name || selected.kind + " selected"}</span>
+              <button type="button" className="uxui-context-action" onClick={closeToolkit} aria-pressed={editTool === "move"}><ArrowUp size={21}/><span>Move</span></button>
+              {selected.kind === "image" && <button type="button" className="uxui-context-action" onClick={() => { imageReplaceId.current = selected.id; quickImageInputRef.current?.click(); }}><ImagePlus size={21}/><span>Replace</span></button>}
+              {selected.kind === "icon" && <button type="button" className="uxui-context-action" onClick={() => chooseToolkit("icons")}><Shapes size={21}/><span>Icons</span></button>}
+              {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => chooseEditTool("text")}><Type size={21}/><span>Text</span></button>}
+              {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => chooseToolkit("typography")}><Type size={21}/><span>Fonts</span></button>}
+              {[{id:"color",label:"Color",icon:<Palette size={21}/>},{id:"shape",label:"Shape",icon:<Shapes size={21}/>},{id:"effects",label:"Effects",icon:<Palette size={21}/>},{id:"adjust",label:"Adjust",icon:<LayoutTemplate size={21}/>}].map(tool => <button type="button" className="uxui-context-action" key={tool.id} onClick={() => chooseEditTool(tool.id)} aria-pressed={editTool === tool.id}>{tool.icon}<span>{tool.label}</span></button>)}
+              {selected.kind === "image" && <><button type="button" className="uxui-context-action" onClick={() => chooseEditTool("cutout")}><Shapes size={21}/><span>Cutout</span></button><button type="button" className="uxui-context-action" disabled={imageBusy} onClick={() => void processImage("icon")}><Shapes size={21}/><span>Make icon</span></button><button type="button" className="uxui-context-action" onClick={() => chooseEditTool("resize")}><ZoomIn size={21}/><span>Resize</span></button></>}
+              <button type="button" className="uxui-context-action" onClick={() => chooseEditTool("lookup")}><Search size={21}/><span>Look closer</span></button>
+              <button type="button" className="uxui-context-action" onClick={duplicateSelected}><Copy size={21}/><span>Duplicate</span></button>
+              <button type="button" className="uxui-context-action" onClick={()=>chooseEditTool("more")}><LayoutTemplate size={21}/><span>More</span></button>
+            </div>
+          </div>}
+
 
           <input ref={elementImportInputRef} type="file" accept=".json,application/json,image/png,image/jpeg,image/webp,image/gif,.svg,image/svg+xml" className="sr-only" aria-label="Import elements" onChange={(event) => { const file = event.target.files?.[0]; if (file) importElementsFile(file); event.target.value = ""; }} />
           <input ref={presetImportInputRef} type="file" accept=".json,application/json" className="sr-only" aria-label="Import preset" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPresetFile(file); event.target.value = ""; }} />
@@ -2661,10 +2704,18 @@ export function UxUiStudioEngine() {
             reader.onload = () => {
               if (typeof reader.result !== "string") return;
               const layer = { ...makeLayer("image", Math.round(board.width / 2 - 125), Math.round(board.height * 0.28), board.width, board.height), name: file.name.replace(/\\.[^.]+$/, "") || "Image", text: file.name, imageDataUrl: reader.result };
-              checkpoint();
-              setElements((previous) => [...previous, layer]);
-              setSelectedId(layer.id);
-              setNotice("Image added to your mockup.");
+              const replacementId = imageReplaceId.current; imageReplaceId.current = "";
+              const decoded = new Image(); decoded.src = reader.result;
+              decoded.onload = () => {
+                const fit = Math.min(layer.width / Math.max(1,decoded.naturalWidth), (board.height - layer.y) / Math.max(1,decoded.naturalHeight));
+                const width = Math.max(12,Math.round(decoded.naturalWidth * fit));
+                const height = Math.max(12,Math.round(decoded.naturalHeight * fit));
+                checkpoint();
+                if (replacementId) setElements(previous => previous.map(item => item.id === replacementId ? {...item,imageDataUrl:layer.imageDataUrl} : item));
+                else setElements(previous => [...previous,{...layer,x:Math.max(0,Math.round((board.width-width)/2)),width,height,background:"transparent",padding:0}]);
+                selectLayer(replacementId || layer.id); closeToolkit(); setNotice(replacementId ? "Image replaced." : "Image added. Try Cutout, Resize or Make icon.");
+              };
+              decoded.onerror = () => setNotice("Could not decode this image. Try PNG or JPEG.");
             };
             reader.onerror = () => setNotice("Could not read the selected image.");
             reader.readAsDataURL(file);
