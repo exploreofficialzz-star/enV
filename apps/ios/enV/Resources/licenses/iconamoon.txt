@@ -1,0 +1,16 @@
+{
+  "collection": {
+    "name": "IconaMoon",
+    "author": {
+      "name": "Dariush Habibpour",
+      "url": "https://github.com/dariushhpg1/IconaMoon"
+    },
+    "license": {
+      "title": "CC BY 4.0",
+      "spdx": "CC-BY-4.0",
+      "url": "https://creativecommons.org/licenses/by/4.0/"
+    },
+    "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/iconamoon.json"
+  },
+  "modifications": "Selected icon subset; original vector geometry retained."
+}

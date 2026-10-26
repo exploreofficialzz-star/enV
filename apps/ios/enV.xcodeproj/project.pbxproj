@@ -57,6 +57,7 @@
         D50000000000000000000001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = D50000000000000000000002 /* libsqlite3.tbd */; };
         D60000000000000000000001 /* OfflineWalletProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000003 /* OfflineWalletProtocolTests.swift */; };
         D60000000000000000000002 /* offline-protocol-v1-fixtures.json in Test Resources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000004 /* offline-protocol-v1-fixtures.json */; };
+        E26000000000000000000001 /* Studio Resources in Resources */ = {isa = PBXBuildFile; fileRef = E26000000000000000000002 /* Studio Resources */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -115,6 +116,7 @@
         D50000000000000000000002 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
         D60000000000000000000003 /* OfflineWalletProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineWalletProtocolTests.swift; sourceTree = "<group>"; };
         D60000000000000000000004 /* offline-protocol-v1-fixtures.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = offline-protocol-v1-fixtures.json; path = ../shared/offline-protocol-v1-fixtures.json; sourceTree = "<group>"; };
+        E26000000000000000000002 /* Studio Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "Studio Resources"; path = enV/Resources; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -124,7 +126,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-        222222222222222222222222 = {isa = PBXGroup; children = (C50000000000000000000001,444444444444444444444444,9B0000000000000000000004,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,D40000000000000000000003,D60000000000000000000004,); sourceTree = "<group>"; };
+        222222222222222222222222 = {isa = PBXGroup; children = (E26000000000000000000002 /* Studio Resources */,C50000000000000000000001,444444444444444444444444,9B0000000000000000000004,555555555555555555555555,888888888888888888888888,D9C644EB1332427BA2BD80E4,D40000000000000000000003,D60000000000000000000004,); sourceTree = "<group>"; };
         444444444444444444444444 /* enVTests */ = {isa = PBXGroup; children = (D60000000000000000000003,AAAAAAAAAAAAAAAAAAAAAAAA,A80000000000000000000002,191919111111111111111111,B10000000000000000000006,B10000000000000000000007,B10000000000000000000008,B10000000000000000000009,B1000000000000000000000A,D10000000000000000000002,D20000000000000000000004,); path = enVTests; sourceTree = "<group>"; };
 	555555555555555555555555 /* Products */ = {isa = PBXGroup; children = (666666666666666666666666,777777777777777777777777,9B0000000000000000000002,); name = Products; sourceTree = "<group>"; };
         C50000000000000000000001 /* enV */ = {isa = PBXGroup; children = (D40000000000000000000001,D40000000000000000000002,D40000000000000000000004,111111111111111111111111,121212121212121212121212,E10000000000000000000003,B40000000000000000000006,B40000000000000000000007,B40000000000000000000009,B10000000000000000000001,B10000000000000000000002,B40000000000000000000002,C30000000000000000000001,C30000000000000000000002,B10000000000000000000003,B40000000000000000000001,B40000000000000000000003,B40000000000000000000004,B10000000000000000000004,E1000000000000000000000E,181818111111111111111111,B10000000000000000000005,B40000000000000000000005,B70000000000000000000001,B70000000000000000000002,B70000000000000000000003,B70000000000000000000004,131313131313131313131313,141414141414141414141414,F10000000000000000000001,F10000000000000000000002,B60000000000000000000001,D10000000000000000000001,D20000000000000000000002); path = enV; sourceTree = "<group>"; };
@@ -142,7 +144,7 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-	F00000000000000000000000 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (161616161616161616161616 /* catalog.json in Resources */,76C612C7171249D4BA242035 /* native-icons in Resources */,A30000000000000000000002 /* Assets.xcassets in Resources */,D30000000000000000000003 /* offline-eligible-tools.json in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
+	F00000000000000000000000 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (E26000000000000000000001 /* Studio Resources in Resources */,161616161616161616161616 /* catalog.json in Resources */,76C612C7171249D4BA242035 /* native-icons in Resources */,A30000000000000000000002 /* Assets.xcassets in Resources */,D30000000000000000000003 /* offline-eligible-tools.json in Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 		9B0000000000000000000008 /* enVUITests Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
         D60000000000000000000005 /* enVTests Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (D60000000000000000000002 /* offline-protocol-v1-fixtures.json in Test Resources */,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */

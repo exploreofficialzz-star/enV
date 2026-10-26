@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "source": "Iconify collections; original upstream license applies to each collection",
+  "collections": {
+    "carbon": {
+      "name": "Carbon",
+      "author": {
+        "name": "IBM",
+        "url": "https://github.com/carbon-design-system/carbon/tree/main/packages/icons"
+      },
+      "license": {
+        "title": "Apache 2.0",
+        "spdx": "Apache-2.0"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/carbon.json"
+    },
+    "fa6-solid": {
+      "name": "Font Awesome 6 Solid",
+      "author": {
+        "name": "Dave Gandy",
+        "url": "https://github.com/FortAwesome/Font-Awesome"
+      },
+      "license": {
+        "title": "CC BY 4.0",
+        "spdx": "CC-BY-4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/fa6-solid.json"
+    },
+    "fluent": {
+      "name": "Fluent UI System Icons",
+      "author": {
+        "name": "Microsoft Corporation",
+        "url": "https://github.com/microsoft/fluentui-system-icons"
+      },
+      "license": {
+        "title": "MIT",
+        "spdx": "MIT",
+        "url": "https://github.com/microsoft/fluentui-system-icons/blob/main/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/fluent.json"
+    },
+    "heroicons": {
+      "name": "HeroIcons",
+      "author": {
+        "name": "Refactoring UI Inc",
+        "url": "https://github.com/tailwindlabs/heroicons"
+      },
+      "license": {
+        "title": "MIT",
+        "spdx": "MIT",
+        "url": "https://github.com/tailwindlabs/heroicons/blob/master/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/heroicons.json"
+    },
+    "iconamoon": {
+      "name": "IconaMoon",
+      "author": {
+        "name": "Dariush Habibpour",
+        "url": "https://github.com/dariushhpg1/IconaMoon"
+      },
+      "license": {
+        "title": "CC BY 4.0",
+        "spdx": "CC-BY-4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/iconamoon.json"
+    },
+    "lucide": {
+      "name": "Lucide",
+      "author": {
+        "name": "Lucide Contributors",
+        "url": "https://github.com/lucide-icons/lucide"
+      },
+      "license": {
+        "title": "ISC",
+        "spdx": "ISC",
+        "url": "https://github.com/lucide-icons/lucide/blob/main/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/lucide.json"
+    },
+    "material-symbols": {
+      "name": "Material Symbols",
+      "author": {
+        "name": "Google",
+        "url": "https://github.com/google/material-design-icons"
+      },
+      "license": {
+        "title": "Apache 2.0",
+        "spdx": "Apache-2.0",
+        "url": "https://github.com/google/material-design-icons/blob/master/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/material-symbols.json"
+    },
+    "mdi": {
+      "name": "Material Design Icons",
+      "author": {
+        "name": "Pictogrammers",
+        "url": "https://github.com/Templarian/MaterialDesign"
+      },
+      "license": {
+        "title": "Apache 2.0",
+        "spdx": "Apache-2.0",
+        "url": "https://github.com/Templarian/MaterialDesign/blob/master/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/mdi.json"
+    },
+    "mingcute": {
+      "name": "MingCute Icon",
+      "author": {
+        "name": "MingCute Design",
+        "url": "https://github.com/Richard9394/MingCute"
+      },
+      "license": {
+        "title": "Apache 2.0",
+        "spdx": "Apache-2.0",
+        "url": "https://github.com/Richard9394/MingCute/blob/main/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/mingcute.json"
+    },
+    "ph": {
+      "name": "Phosphor",
+      "author": {
+        "name": "Phosphor Icons",
+        "url": "https://github.com/phosphor-icons/core"
+      },
+      "license": {
+        "title": "MIT",
+        "spdx": "MIT",
+        "url": "https://github.com/phosphor-icons/core/blob/main/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/ph.json"
+    },
+    "solar": {
+      "name": "Solar",
+      "author": {
+        "name": "480 Design",
+        "url": "https://www.figma.com/community/file/1166831539721848736"
+      },
+      "license": {
+        "title": "CC BY 4.0",
+        "spdx": "CC-BY-4.0",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/solar.json"
+    },
+    "tabler": {
+      "name": "Tabler Icons",
+      "author": {
+        "name": "Pawe\u0142 Kuna",
+        "url": "https://github.com/tabler/tabler-icons"
+      },
+      "license": {
+        "title": "MIT",
+        "spdx": "MIT",
+        "url": "https://github.com/tabler/tabler-icons/blob/master/LICENSE"
+      },
+      "source": "https://raw.githubusercontent.com/iconify/icon-sets/master/json/tabler.json"
+    }
+  },
+  "unavailable": [
+    "lucide:basketball",
+    "lucide:bicycle",
+    "lucide:clap",
+    "lucide:fitness",
+    "lucide:football",
+    "lucide:frames",
+    "lucide:map-off",
+    "lucide:running",
+    "lucide:stopwatch",
+    "lucide:tennis",
+    "lucide:wheelchair",
+    "material-symbols:laptop-rounded",
+    "material-symbols:smartphone-rounded"
+  ],
+  "additionalIcons": [
+    "lucide:a-arrow-down",
+    "lucide:a-arrow-up",
+    "lucide:a-large-small",
+    "lucide:align-center",
+    "lucide:align-end-horizontal",
+    "lucide:align-end-vertical",
+    "lucide:align-start-horizontal",
+    "lucide:align-start-vertical",
+    "lucide:align-horizontal-distribute-center",
+    "lucide:align-vertical-distribute-center",
+    "lucide:app-window",
+    "lucide:arrow-down-left",
+    "lucide:arrow-up-right",
+    "lucide:baseline",
+    "lucide:book-a",
+    "lucide:box",
+    "lucide:circle-dashed",
+    "lucide:circle-dot-dashed",
+    "lucide:columns-2",
+    "lucide:crop",
+    "lucide:focus",
+    "lucide:frame",
+    "lucide:grid-2x2",
+    "lucide:grid-3x3",
+    "lucide:grip-horizontal",
+    "lucide:hand",
+    "lucide:helping-hand",
+    "lucide:image-plus",
+    "lucide:indent-decrease",
+    "lucide:indent-increase",
+    "lucide:letter-text",
+    "lucide:ligature",
+    "lucide:list-filter",
+    "lucide:move-diagonal",
+    "lucide:move-horizontal",
+    "lucide:move-vertical",
+    "lucide:panel-bottom-open",
+    "lucide:panel-left-open",
+    "lucide:panel-right-open",
+    "lucide:panel-top-open",
+    "lucide:pilcrow",
+    "lucide:rectangle-ellipsis",
+    "lucide:rotate-ccw",
+    "lucide:rotate-cw",
+    "lucide:rows-2",
+    "lucide:scan-text",
+    "lucide:scaling",
+    "lucide:separator-horizontal",
+    "lucide:separator-vertical",
+    "lucide:space",
+    "lucide:text-cursor",
+    "lucide:text-cursor-input",
+    "lucide:text-select",
+    "lucide:type-outline",
+    "lucide:wrap-text"
+  ]
+}

@@ -1,5 +1,7 @@
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
 import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
+import { ToolkitPreview } from "./ux-ui-toolkit-preview";
+import { FontPreview, StudioIconPreview, getStudioIcon, getBundledStudioIconNames, BUNDLED_STUDIO_FONTS, loadStudioFont, loadSystemStudioFont } from "./ux-ui-studio-assets";
 import { Logo } from "@/components/brand/logo";
 import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
@@ -130,6 +132,21 @@ const ICON_BROWSE_CATEGORIES: Array<{name:string;description:string;icons:string
   {name:"Productivity & work",description:"Tasks, planning, notes and team productivity",icons:["lucide:calendar","lucide:calendar-days","lucide:calendar-check","lucide:calendar-clock","lucide:clock","lucide:alarm-clock","lucide:timer","lucide:check-square","lucide:list-checks","lucide:clipboard-check","lucide:clipboard-list","lucide:notebook","lucide:notebook-pen","lucide:sticky-note","lucide:pin","lucide:pin-off","lucide:inbox","lucide:archive","lucide:folder","lucide:folder-open","lucide:file-check","lucide:file-plus","lucide:file-search","lucide:files","lucide:copy","lucide:clipboard-copy","lucide:list-todo","lucide:kanban","lucide:layout-dashboard","lucide:panel-left","lucide:panel-right","lucide:columns-3","lucide:workflow"]},
 ];
 const SWATCHES = ["#111827", "#374151", "#6B7280", "#F9FAFB", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2777", "#059669", "#D97706", "#DC2626", "#0F766E"];
+type StudioEffectPreset = { id: string; name: string; description: string; patch: Partial<DesignLayer> };
+const STUDIO_EFFECTS: StudioEffectPreset[] = [
+  { id: "flat", name: "Flat", description: "Clean surface without a shadow or outline", patch: { shadow: false, borderWidth: 0, opacity: 1, radius: 0 } },
+  { id: "elevated", name: "Soft elevation", description: "A soft drop shadow lifts the layer", patch: { shadow: true, opacity: 1, radius: 16 } },
+  { id: "outlined", name: "Outline", description: "A crisp, two-pixel accent border", patch: { shadow: false, borderWidth: 2, borderColor: "#2563EB", opacity: 1 } },
+  { id: "subtle", name: "Subtle border", description: "A quiet border separates surfaces", patch: { shadow: false, borderWidth: 1, borderColor: "#CBD5E1", opacity: 1, radius: 12 } },
+  { id: "rounded", name: "Rounded", description: "Soft corners for cards and controls", patch: { radius: 24, opacity: 1 } },
+  { id: "capsule", name: "Capsule", description: "Fully rounded corners for pills", patch: { radius: 300, opacity: 1 } },
+  { id: "ghost", name: "Ghost", description: "Transparent fill with a visible outline", patch: { background: "transparent", borderWidth: 2, borderColor: "#2563EB", color: "#2563EB", shadow: false, opacity: 1 } },
+  { id: "muted", name: "Muted", description: "Reduced opacity to soften a layer", patch: { opacity: 0.5, shadow: false } },
+  { id: "tint", name: "Tinted surface", description: "A light accent surface and border", patch: { background: "#DBEAFE", color: "#1D4ED8", borderWidth: 1, borderColor: "#93C5FD", radius: 16, opacity: 1 } },
+  { id: "dark", name: "Dark surface", description: "A deep surface with light content", patch: { background: "#111827", color: "#FFFFFF", borderWidth: 1, borderColor: "#475569", radius: 16, opacity: 1 } },
+  { id: "accent", name: "Accent surface", description: "A vivid surface for primary actions", patch: { background: "#2563EB", color: "#FFFFFF", shadow: true, borderWidth: 0, radius: 12, opacity: 1 } },
+  { id: "contrast", name: "High contrast", description: "A bold border with dark, readable content", patch: { background: "#FFFFFF", color: "#111827", borderWidth: 3, borderColor: "#111827", radius: 8, shadow: false, opacity: 1 } },
+];
 type StudioToolkit = { id: string; name: string; description: string; tab: PanelTab; icon: string; outcome: string };
 const STUDIO_TOOLKITS: StudioToolkit[] = [
   {
@@ -721,7 +738,9 @@ function downloadText(filename: string, content: string, mime = "text/plain;char
 
 function svgToPng(svg: SVGSVGElement, scale = 3, target: DeviceTarget = "mobile"): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const source = new XMLSerializer().serializeToString(svg);
+    const clean = svg.cloneNode(true) as SVGSVGElement;
+    clean.querySelectorAll("[data-editor-only]").forEach((node) => node.remove());
+    const source = new XMLSerializer().serializeToString(clean);
     const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const image = new Image();
@@ -855,24 +874,6 @@ function fieldClass() {
   return "mt-1 w-full min-w-0 rounded-lg border border-border bg-surface px-2.5 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 }
 
-function ToolkitGlyph({ name }: { name: string }) {
-  switch (name) {
-    case "Palette": return <Palette size={21} strokeWidth={1.8} />;
-    case "Shapes": return <Shapes size={21} strokeWidth={1.8} />;
-    case "ImagePlus": return <ImagePlus size={21} strokeWidth={1.8} />;
-    case "FileOutput": return <FileOutput size={21} strokeWidth={1.8} />;
-    case "Search": return <Search size={21} strokeWidth={1.8} />;
-    case "Check": return <Check size={21} strokeWidth={1.8} />;
-    case "Type": return <Type size={21} strokeWidth={1.8} />;
-    case "Smartphone": return <Smartphone size={21} strokeWidth={1.8} />;
-    case "Tablet": return <Tablet size={21} strokeWidth={1.8} />;
-    case "Monitor": return <Monitor size={21} strokeWidth={1.8} />;
-    case "Grid2X2": return <Grid2X2 size={21} strokeWidth={1.8} />;
-    case "Layers": return <Layers size={21} strokeWidth={1.8} />;
-    default: return <LayoutTemplate size={21} strokeWidth={1.8} />;
-  }
-}
-
 function ElementVisual({ kind }: { kind: LayerKind }) {
   if (["rect", "ellipse", "triangle", "diamond", "hexagon", "star", "line", "divider", "pill"].includes(kind)) {
     return <span className="uxui-element-preview" aria-hidden="true"><span className={"uxui-element-shape uxui-element-shape-" + kind} /></span>;
@@ -957,6 +958,10 @@ export function UxUiStudioEngine() {
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
   const [leftTab, setLeftTab] = useState<PanelTab>("components");
   const [activeToolkitId, setActiveToolkitId] = useState("icons");
+  const [toolkitPage, setToolkitPage] = useState(false);
+  const [canvasSelected, setCanvasSelected] = useState(false);
+  const [bundledIconNames, setBundledIconNames] = useState<string[]>([]);
+  const [fontVisibleCount, setFontVisibleCount] = useState(24);
   const [qaReport, setQaReport] = useState<string[]>([]);
   const [showQaReport, setShowQaReport] = useState(false);
   const [toolkitSearch, setToolkitSearch] = useState("");
@@ -970,6 +975,8 @@ export function UxUiStudioEngine() {
   const [iconBrowseCategory, setIconBrowseCategory] = useState("Navigation");
   const [iconPrefix, setIconPrefix] = useState("all");
   const [fontQuery, setFontQuery] = useState("");
+  const [fontPreviewText, setFontPreviewText] = useState("Design systems that scale 012345");
+  const [animateFontPreviews, setAnimateFontPreviews] = useState(true);
   const [fontCategory, setFontCategory] = useState("All");
   const [remoteFonts, setRemoteFonts] = useState<FontLibraryItem[]>([]);
   const [fontCatalogLoading, setFontCatalogLoading] = useState(false);
@@ -990,12 +997,15 @@ export function UxUiStudioEngine() {
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
   const artboardRef = useRef<SVGSVGElement | null>(null);
+  const toolkitContentRef = useRef<HTMLDivElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const studioRootRef = useRef<HTMLElement | null>(null);
   const quickImageInputRef = useRef<HTMLInputElement | null>(null);
   const elementImportInputRef = useRef<HTMLInputElement | null>(null);
   const presetImportInputRef = useRef<HTMLInputElement | null>(null);
   const iconImportInputRef = useRef<HTMLInputElement | null>(null);
+  const customFontRequests = useRef(new Map<string, Promise<FontFace>>());
+  const resizeRef = useRef<{ id: string; x: number; y: number; width: number; height: number; pointerX: number; pointerY: number; rotation: number } | null>(null);
   const dragRef = useRef<{ id: string; pointerX: number; pointerY: number; startX: number; startY: number; groupStarts?: Array<{ id: string; x: number; y: number }> } | null>(null);
 
   useEffect(() => {
@@ -1017,11 +1027,20 @@ export function UxUiStudioEngine() {
 
   useEffect(() => {
     if (!showToolsPanel) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const modal = studioRootRef.current?.querySelector<HTMLElement>(".uxui-tools-drawer");
+    const focusable = () => Array.from(modal?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]') || []).filter((node) => node.getClientRects().length);
+    const frame = window.requestAnimationFrame(() => focusable()[0]?.focus());
     const dismissOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowToolsPanel(false);
+      if (event.key === "Escape") { event.preventDefault(); setShowToolsPanel(false); }
+      if (event.key === "Tab") {
+        const items = focusable(); const first = items[0]; const last = items[items.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !modal?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || !modal?.contains(document.activeElement))) { event.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", dismissOnEscape);
-    return () => window.removeEventListener("keydown", dismissOnEscape);
+    return () => { window.cancelAnimationFrame(frame); window.removeEventListener("keydown", dismissOnEscape); if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
   }, [showToolsPanel]);
 
   useEffect(() => {
@@ -1063,7 +1082,7 @@ export function UxUiStudioEngine() {
     };
   }, [onboarding, isExpanded]);
 
-  const board = customArtboard ? { width: customWidth, height: customHeight } : boardSize(target);
+  const board = useMemo(() => customArtboard ? { width: customWidth, height: customHeight } : boardSize(target), [customArtboard, customWidth, customHeight, target]);
   const requestedDeviceWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
@@ -1112,11 +1131,10 @@ export function UxUiStudioEngine() {
       byFamily.set(font.family.toLowerCase(), { ...font, id });
     }
     for (const font of remoteFonts) byFamily.set(font.family.toLowerCase(), font);
-    return Array.from(byFamily.values()).sort((a,b) => a.family.localeCompare(b.family));
+    return Array.from(byFamily.values()).sort((a,b) => Number(Boolean(BUNDLED_STUDIO_FONTS[b.family])) - Number(Boolean(BUNDLED_STUDIO_FONTS[a.family])) || a.family.localeCompare(b.family));
   }, [remoteFonts]);
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
-  const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board.width, board.height, elements, tokens, reusableComponents, screens, activeScreenId]);
-  const activeScreen = screens.find((screen) => screen.id === activeScreenId) || screens[0];
+  const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board, elements, tokens, reusableComponents, screens, activeScreenId]);
   const hasPrototypeLinks = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId));
 
   useEffect(() => {
@@ -1130,12 +1148,18 @@ export function UxUiStudioEngine() {
     });
   }, [activeScreenId, elements, target, background, customArtboard, customWidth, customHeight]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
-  const quickIconResults = (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons)
+  const quickIconResults = (iconBrowseCategory === "All bundled" ? bundledIconNames : (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons))
+    .filter((name) => !bundledIconNames.length || bundledIconNames.includes(name))
     .filter((name)=>iconPrefix==="all" || name.startsWith(iconPrefix+":"))
     .filter((name)=>!iconQuery.trim() || name.toLowerCase().includes(iconQuery.trim().toLowerCase()));
-  const visibleIconResults = iconQuery.trim().length >= 2 ? iconResults : quickIconResults;
+  const localIconResults = bundledIconNames.filter((name) => (iconPrefix === "all" || name.startsWith(iconPrefix + ":")) && name.toLowerCase().includes(iconQuery.trim().toLowerCase()));
+  const visibleIconResults = Array.from(new Set(iconQuery.trim().length >= 2 ? [...localIconResults, ...iconResults] : quickIconResults));
+  const filteredFonts = fontChoices.filter((font) => font.family.toLowerCase().includes(fontQuery.toLowerCase()) && (fontCategory === "All" || font.category === fontCategory) && (!toolkitSearch.trim() || font.family.toLowerCase().includes(toolkitSearch.trim().toLowerCase())));
+
+  useEffect(() => { void getBundledStudioIconNames().then(setBundledIconNames).catch(() => undefined); }, []);
+  useEffect(() => { setFontVisibleCount(24); }, [fontQuery, fontCategory, toolkitSearch]);
   const fontsInUse = useMemo(()=>Array.from(new Set(elements.map((layer)=>layer.fontFamily).filter((family)=>FONT_LIBRARY.some((font)=>font.family===family&&font.provider==="google")))),[elements]);
-  const customFontSignature = useMemo(()=>elements.filter((layer)=>layer.fontDataUrl).map((layer)=>layer.fontFamily+"|"+layer.fontDataUrl.length+"|"+layer.fontDataUrl.slice(0,48)).join("\n"),[elements]);
+  const customFonts = useMemo(() => elements.filter((layer) => layer.fontDataUrl && layer.fontFamily), [elements]);
 
   useEffect(() => {
     try {
@@ -1210,7 +1234,7 @@ export function UxUiStudioEngine() {
   }, []);
 
   useEffect(() => {
-    if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design" && screens.length <= 1)) return;
+    if (!draftLoaded || onboarding || (!project.elements.length && project.name.trim() === "Untitled design" && screens.length <= 1 && project.background === "#FFFFFF" && project.viewport.width === boardSize(project.target).width && project.viewport.height === boardSize(project.target).height)) return;
     try {
       const nextId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
       const saved = {
@@ -1230,10 +1254,10 @@ export function UxUiStudioEngine() {
       setSavedProject(saved); setDrafts(nextDrafts);
       if (!activeDraftId) setActiveDraftId(nextId);
     } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
-  }, [project, onboarding, draftLoaded, activeDraftId]);
+  }, [project, onboarding, draftLoaded, activeDraftId, savedProject?.category, savedProject?.description, savedProject?.isFavorite, screens.length]);
 
   useEffect(() => {
-    if (leftTab !== "fonts" || fontCatalogRequested.current) return;
+    if (!showToolsPanel || leftTab !== "fonts" || fontCatalogRequested.current) return;
     fontCatalogRequested.current = true;
     const controller = new AbortController();
     setFontCatalogLoading(true);
@@ -1257,8 +1281,8 @@ export function UxUiStudioEngine() {
         if (!controller.signal.aborted) setFontCatalogError(error instanceof Error ? error.message : "Could not load the font catalogue.");
       })
       .finally(() => { if (!controller.signal.aborted) setFontCatalogLoading(false); });
-    return () => controller.abort();
-  }, [leftTab, fontCatalogReload]);
+    return () => { controller.abort(); fontCatalogRequested.current = false; };
+  }, [leftTab, fontCatalogReload, showToolsPanel]);
 
   useEffect(() => {
     if (leftTab !== "icons" || iconQuery.trim().length < 2) return;
@@ -1285,28 +1309,24 @@ export function UxUiStudioEngine() {
   }, [leftTab, iconQuery, iconStart, iconPrefix]);
 
   useEffect(() => {
-    for (const family of fontsInUse) {
-      const id = "env-ux-font-" + family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      if (document.getElementById(id)) continue;
-      const link = document.createElement("link");
-      link.id = id; link.rel = "stylesheet";
-      link.href = "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(family).replace(/%20/g, "+") + ":wght@300;400;500;600;700;800;900&display=swap";
-      document.head.appendChild(link);
-    }
-  }, [fontsInUse.join("|")]);
+    for (const family of fontsInUse) void loadStudioFont(family).catch(() => undefined);
+  }, [fontsInUse]);
 
   useEffect(() => {
-    const assets = elements.filter((layer)=>layer.fontDataUrl && layer.fontFamily);
     let cancelled = false;
-    for (const layer of assets) {
-      if (document.fonts.check('16px "' + layer.fontFamily.replace(/"/g,"") + '"')) continue;
-      try {
-        const face = new FontFace(layer.fontFamily, "url(" + JSON.stringify(layer.fontDataUrl) + ")");
-        void face.load().then((loaded)=>{ if (!cancelled) document.fonts.add(loaded); }).catch(()=>{ if (!cancelled) setNotice("A custom font could not be loaded. Re-import a valid TTF, OTF, WOFF or WOFF2 file."); });
-      } catch { setNotice("A custom font could not be loaded. Check the imported font file."); }
+    for (const layer of customFonts) {
+      const key = layer.fontFamily + "|" + layer.fontDataUrl;
+      let request = customFontRequests.current.get(key);
+      if (!request) {
+        try {
+          request = new FontFace(layer.fontFamily, "url(" + JSON.stringify(layer.fontDataUrl) + ")").load().then((loaded) => { document.fonts.add(loaded); return loaded; });
+          customFontRequests.current.set(key, request);
+        } catch { if (!cancelled) setNotice("A custom font could not be loaded. Check the imported font file."); }
+      }
+      if (request) void request.catch(() => { if (!cancelled) setNotice("A custom font could not be loaded. Re-import a valid TTF, OTF, WOFF or WOFF2 file."); });
     }
     return () => { cancelled = true; };
-  }, [customFontSignature]);
+  }, [customFonts]);
 
   function chooseStartingTarget(nextTarget: DeviceTarget) {
     const size = boardSize(nextTarget);
@@ -1597,6 +1617,7 @@ export function UxUiStudioEngine() {
   }
 
   function selectLayer(id: string, multi = false) {
+    setCanvasSelected(false);
     setSelectedId(id);
     setSelectedIds((previous) => multi ? (previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]) : [id]);
   }
@@ -1692,7 +1713,10 @@ export function UxUiStudioEngine() {
   function openToolkit(id: string) {
     const toolkit = STUDIO_TOOLKITS.find((item) => item.id === id);
     if (!toolkit) return;
+    toolkitContentRef.current?.scrollTo({ top: 0 });
     setActiveToolkitId(id);
+    setToolkitPage(true);
+    setToolkitSearch("");
     setLeftTab(toolkit.tab);
     if (["media", "illustrations", "assets", "inspiration"].includes(id)) setNotice("Use the import actions to bring a supported image or SVG into the project.");
     if (id === "device" || id === "platform") setNotice("Choose Mobile, Tablet or Desktop using the viewport selector above the mockup.");
@@ -1726,7 +1750,7 @@ export function UxUiStudioEngine() {
     const layer = { ...makeLayer(kind, Math.max(8, Math.round(board.width * 0.08)), Math.max(24, Math.round(board.height * 0.16) + elements.length * 74), board.width, board.height), name, text: copy, width: Math.min(kind === "text" ? board.width - 24 : 240, board.width - 24) };
     checkpoint();
     setElements((previous) => [...previous, layer]);
-    setSelectedId(layer.id);
+    selectLayer(layer.id); setShowToolsPanel(false);
     setInspectorTab("design");
     setNotice(name + " added to the artboard.");
   }
@@ -1735,7 +1759,7 @@ export function UxUiStudioEngine() {
     const layer = makeLayer(kind, x, Math.max(24, Math.round(board.height * 0.28)), board.width, board.height);
     checkpoint();
     setElements((previous) => [...previous, layer]);
-    setSelectedId(layer.id);
+    selectLayer(layer.id); setShowToolsPanel(false);
     setInspectorTab("design");
     setNotice(layer.name + " added to the artboard.");
   }
@@ -1776,6 +1800,18 @@ export function UxUiStudioEngine() {
   }
 
   function movePointer(event: ReactPointerEvent<SVGSVGElement>) {
+    const resizing = resizeRef.current;
+    if (resizing && artboardRef.current) {
+      const rect = artboardRef.current.getBoundingClientRect();
+      const dx = (event.clientX - resizing.pointerX) * board.width / Math.max(1, rect.width);
+      const dy = (event.clientY - resizing.pointerY) * board.height / Math.max(1, rect.height);
+      const angle = resizing.rotation * Math.PI / 180;
+      updateLayer(resizing.id, {
+        width: Math.max(12, Math.min(board.width - resizing.x, Math.round(resizing.width + dx * Math.cos(angle) + dy * Math.sin(angle)))),
+        height: Math.max(12, Math.min(board.height - resizing.y, Math.round(resizing.height - dx * Math.sin(angle) + dy * Math.cos(angle)))),
+      }, false);
+      return;
+    }
     const drag = dragRef.current;
     if (!drag || !artboardRef.current) return;
     const rect = artboardRef.current.getBoundingClientRect();
@@ -1805,7 +1841,7 @@ export function UxUiStudioEngine() {
       else setNotice("This element has no valid screen destination. Exit preview to assign one in Prototype Studio.");
       return;
     }
-    if (!id) { setSelectedId(""); return; }
+    if (!id) { selectCanvas(); return; }
     const found = elements.find((item) => item.id === id);
     if (!found) return;
     selectLayer(id, event.shiftKey);
@@ -1819,6 +1855,12 @@ export function UxUiStudioEngine() {
       startX: found.x, startY: found.y, groupStarts,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function selectCanvas() {
+    if (prototypePreview) return;
+    setSelectedId(""); setSelectedIds([]); setCanvasSelected(true); dragRef.current = null;
+    setShowTextEditor(false); setShowContextColors(false);
   }
 
   function toggleExpandedPreview() {
@@ -1947,10 +1989,7 @@ export function UxUiStudioEngine() {
     if (split.length !== 2) return;
     setIconLoading(true);
     try {
-      const url = "https://api.iconify.design/" + split[0] + "/" + split[1] + ".svg";
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("This icon could not be loaded.");
-      const parsed = sanitizeIconMarkup(await response.text());
+      const parsed = await getStudioIcon(iconName);
       const collection = iconCollections[split[0]];
       const metadata = {
         iconName, iconSvg: parsed.body, iconViewBox: parsed.viewBox,
@@ -1973,12 +2012,39 @@ export function UxUiStudioEngine() {
     } finally { setIconLoading(false); }
   }
 
+  async function chooseFont(font: FontLibraryItem) {
+    try {
+      await (font.provider === "system" ? loadSystemStudioFont(font.family) : loadStudioFont(font.family));
+      let fontDataUrl = "";
+      if (BUNDLED_STUDIO_FONTS[font.family]) {
+        const response = await fetch(BUNDLED_STUDIO_FONTS[font.family]);
+        if (!response.ok) throw new Error("This font is unavailable. Please try another one.");
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        fontDataUrl = "data:font/ttf;base64," + btoa(binary);
+      }
+      if (selected && selectedHasText) updateLayer(selected.id, { fontFamily: font.family, fontDataUrl });
+      else {
+        checkpoint();
+        const layer = { ...makeLayer("text", 24, 120, board.width, board.height), fontFamily: font.family, fontDataUrl };
+        setElements((previous) => [...previous, layer]); selectLayer(layer.id);
+      }
+      setShowToolsPanel(false);
+      setNotice(font.family + " is ready. Drag your text to place it.");
+    } catch {
+      setNotice("Connect to preview this font, or choose one marked Ready offline.");
+    }
+  }
+
   async function downloadAndEmbedFont(font: FontLibraryItem) {
     if (!selected || font.provider !== "google") return;
     const fontId = font.id || font.family.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     setFontDownloadId(fontId);
     setNotice("Downloading " + font.family + " for this project…");
     try {
+      let assetUrl = BUNDLED_STUDIO_FONTS[font.family];
+      if (!assetUrl) {
       const metaResponse = await fetch("https://api.fontsource.org/v1/fonts/" + encodeURIComponent(fontId));
       if (!metaResponse.ok) throw new Error("Font metadata could not be retrieved for " + font.family + ".");
       const metadata = await metaResponse.json() as { variants?: unknown };
@@ -1997,7 +2063,8 @@ export function UxUiStudioEngine() {
         for (const [key, child] of Object.entries(object)) visit(child, [...path, key]);
       };
       visit(metadata.variants, []);
-      const assetUrl = candidates.sort((a,b)=>b.score-a.score)[0]?.url;
+      assetUrl = candidates.sort((a,b)=>b.score-a.score)[0]?.url;
+      }
       if (!assetUrl) throw new Error("No TTF asset was listed for " + font.family + ".");
       const response = await fetch(assetUrl);
       if (!response.ok) throw new Error("The font file download failed.");
@@ -2173,28 +2240,46 @@ export function UxUiStudioEngine() {
               { id: "fonts", label: "Fonts", icon: <Type size={18} strokeWidth={1.8} /> },
               { id: "presets", label: "Presets", icon: <Smartphone size={18} strokeWidth={1.8} /> },
               { id: "tokens", label: "Tokens", icon: <Palette size={18} strokeWidth={1.8} /> },
-            ] as Array<{id:PanelTab;label:string;icon:ReactNode}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => setLeftTab(tab.id)} className={leftTab === tab.id ? "is-active" : ""}><span className="uxui-toolkit-tab-icon">{tab.icon}</span><span className="uxui-toolkit-tab-label">{tab.label}</span></button>)}
+            ] as Array<{id:PanelTab;label:string;icon:ReactNode}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => { setLeftTab(tab.id); setToolkitPage(false); setToolkitSearch(""); toolkitContentRef.current?.scrollTo({ top: 0 }); }} className={leftTab === tab.id ? "is-active" : ""}><span className="uxui-toolkit-tab-icon">{tab.icon}</span><span className="uxui-toolkit-tab-label">{tab.label}</span></button>)}
           </div>
-          <div className="uxui-toolkit-content">
+          <div ref={toolkitContentRef} className="uxui-toolkit-content">
 
-          {leftTab === "toolkits" && <div className="mt-3 space-y-3">
+          {leftTab === "toolkits" && !toolkitPage && <div className="mt-3 space-y-3">
             <div className="rounded-xl border border-border bg-surface-2 p-3">
               <strong className="text-sm text-fg">26 design tools</strong>
               <p className="mt-1 text-xs leading-5 text-muted">Every tool connects to editable layers, project settings, assets, or export actions.</p>
               <div className="uxui-toolkit-tiles">
-                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => openToolkit(toolkit.id)} className={"uxui-toolkit-tile " + (activeToolkitId === toolkit.id ? "is-active" : "")} aria-pressed={activeToolkitId === toolkit.id} title={toolkit.description}><span className="uxui-toolkit-tile-art"><ToolkitGlyph name={toolkit.icon} /></span><span className="uxui-toolkit-tile-label">{toolkit.name}</span></button>)}
+                {STUDIO_TOOLKITS.filter((toolkit) => !toolkitSearch.trim() || (toolkit.name + " " + toolkit.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((toolkit) => <button key={toolkit.id} type="button" onClick={() => openToolkit(toolkit.id)} className={"uxui-toolkit-tile " + (activeToolkitId === toolkit.id ? "is-active" : "")} aria-pressed={activeToolkitId === toolkit.id} title={toolkit.description}><ToolkitPreview id={toolkit.id} /><span className="uxui-toolkit-tile-label">{toolkit.name}</span><span className="uxui-toolkit-tile-description">{toolkit.description}</span></button>)}
               </div>
             </div>
+          </div>}
+          {toolkitPage && <div className="mt-3 space-y-3">
+            <button type="button" className="uxui-toolkit-back" onClick={() => { setToolkitPage(false); setLeftTab("toolkits"); toolkitContentRef.current?.scrollTo({ top: 0 }); }}><ArrowLeft size={16} /> All 26 tools</button>
             {(() => { const toolkit = STUDIO_TOOLKITS.find((item) => item.id === activeToolkitId) || STUDIO_TOOLKITS[0]; return <section className="uxui-toolkit-selection rounded-xl border border-border p-3" aria-label={toolkit.name + " controls"}>
+              <ToolkitPreview id={toolkit.id} />
               <h3 className="text-sm font-extrabold text-fg">{toolkit.name}</h3><p className="mt-1 text-xs leading-5 text-muted">{toolkit.outcome}</p>
-              {toolkit.tab !== "toolkits" && <button type="button" onClick={() => setLeftTab(toolkit.tab)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-3 text-xs font-bold text-white">Open connected controls <ArrowRight size={14} /></button>}
+
+              {toolkit.id === "effects" && <div className="uxui-effects-library">
+                <p className="text-xs text-muted">{selected ? "Apply a look to “" + selected.name + "”, then fine-tune it below the controllers." : "Explore each sample. Tap a look to add a styled sample card."}</p>
+                <div className="uxui-effect-grid">{STUDIO_EFFECTS.map((effect) => {
+                  const preview = { background: "#FFFFFF", color: "#2563EB", borderWidth: 0, borderColor: "#CBD5E1", radius: 10, opacity: 1, shadow: false, ...effect.patch };
+                  return <button type="button" key={effect.id} className="uxui-effect-card" aria-label={(selected ? "Apply " : "Add sample: ") + effect.name + " effect"} onClick={() => {
+                    if (selected) updateLayer(selected.id, effect.patch);
+                    else { const sample = { ...makeLayer("card", 24, 120, board.width, board.height), name: effect.name + " sample", text: effect.name + "\nMake this look your own", width: Math.min(300, board.width - 48), height: 132, ...effect.patch }; checkpoint(); setElements((old) => [...old, sample]); selectLayer(sample.id); }
+                    setShowToolsPanel(false);
+                    setNotice(effect.name + " applied. Styling controls are below the controllers.");
+                  }}><span className="uxui-effect-stage"><span style={{ background: preview.background, color: preview.color, border: preview.borderWidth + "px solid " + preview.borderColor, borderRadius: Math.min(30, preview.radius), opacity: preview.opacity, boxShadow: preview.shadow ? "0 3px 10px #0F172A24" : "none" }}>Aa</span></span><strong>{effect.name}</strong><small>{effect.description}</small></button>;
+                })}</div>
+              </div>}
               {["effects","motion"].includes(toolkit.id) && <div className="mt-3 space-y-2">{selected ? <><label className="block text-[11px] font-semibold text-muted">Opacity · {Math.round(selected.opacity*100)}%<input type="range" min="0" max="1" step=".05" value={selected.opacity} onChange={(event)=>updateLayer(selected.id,{opacity:Number(event.target.value)})} className="mt-1 w-full"/></label><label className="block text-[11px] font-semibold text-muted">Rotation · {selected.rotation || 0}°<input type="range" min="-180" max="180" step="5" value={selected.rotation || 0} onChange={(event)=>updateLayer(selected.id,{rotation:Number(event.target.value)})} className="mt-1 w-full"/></label><label className="flex items-center justify-between gap-2 text-xs text-fg">Shadow <input type="checkbox" checked={selected.shadow} onChange={(event)=>updateLayer(selected.id,{shadow:event.target.checked})}/></label><label className="block text-[11px] font-semibold text-muted">Transition · {selected.transitionDuration ?? 180} ms<input type="range" min="0" max="2000" step="25" value={selected.transitionDuration ?? 180} onChange={(event)=>updateLayer(selected.id,{transitionDuration:Number(event.target.value)})} className="mt-1 w-full"/></label></> : <p className="text-xs text-muted">Select an element on the mockup first.</p>}</div>}
               {toolkit.id === "content" && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>addSample("text","Heading","Your heading")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add heading</button><button type="button" onClick={()=>addSample("text","Paragraph","Your paragraph")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add paragraph</button><button type="button" onClick={()=>addSample("button","Button","Continue")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add button</button><button type="button" onClick={()=>addSample("avatar","Avatar","A")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add avatar</button></div>}
+              {["accessibility","qa"].includes(toolkit.id) && showQaReport && <section className="uxui-qa-report mt-3 rounded-lg border border-border p-3" aria-label="Design QA results"><h4 className="text-xs font-bold text-fg" role="status">{qaReport.length ? qaReport.length + " potential findings" : "No issues found by these checks"}</h4><p className="mt-1 text-xs leading-5 text-muted">Review each finding in context. Decorative overlaps and small non-interactive details can be intentional.</p>{qaReport.length > 0 && <ol className="mt-2 list-decimal space-y-2 pl-4 text-xs leading-5 text-fg">{qaReport.map((finding,index) => <li key={index}>{finding}</li>)}</ol>}<button type="button" className="uxui-toolkit-back mt-2" onClick={() => setShowQaReport(false)}>Dismiss report</button></section>}
               {["accessibility","qa"].includes(toolkit.id) && <div className="mt-3"><button type="button" onClick={runDesignAudit} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">{toolkit.id === "qa" ? "Run design QA" : "Run accessibility & structure review"}</button></div>}
               {toolkit.id === "patterns" && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>setShowGrid(true)} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Show canvas grid</button><button type="button" onClick={()=>addSample("star","Decorative star","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add star shape</button><button type="button" onClick={()=>addSample("hexagon","Geometric shape","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add hexagon</button><button type="button" onClick={()=>addSample("line","Decorative line","")} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Add line</button></div>}
-              {toolkit.id === "layers" && <div className="mt-3"><button type="button" onClick={()=>setShowMoreLayers(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Show all layers</button>{selected && <button type="button" onClick={duplicateSelected} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Duplicate selected</button>}</div>}
+              {toolkit.id === "layers" && <div className="mt-3"><button type="button" onClick={()=>{ setShowMoreLayers(true); setShowInspector(true); setShowToolsPanel(false); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Show all layers</button>{selected && <button type="button" onClick={duplicateSelected} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Duplicate selected</button>}</div>}
               {["device","platform"].includes(toolkit.id) && <div className="mt-3 flex flex-wrap gap-2">{(["mobile","tablet","desktop"] as DeviceTarget[]).map((device)=><button key={device} type="button" onClick={()=>changeTarget(device)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold capitalize text-fg">{device}</button>)}</div>}
-              {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>setCustomArtboard(true)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
+              {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>{ setCustomArtboard(true); selectCanvas(); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
+              {toolkit.id === "responsive" && <div className="uxui-inline-fields"><Field label="Canvas width"><input type="number" min="160" max="4096" value={board.width} className={fieldClass()} onChange={(event) => { setCustomArtboard(true); setCustomWidth(Math.max(160, Math.min(4096, Number(event.target.value) || 160))); setCustomHeight(board.height); }} /></Field><Field label="Canvas height"><input type="number" min="240" max="4096" value={board.height} className={fieldClass()} onChange={(event) => { setCustomArtboard(true); setCustomHeight(Math.max(240, Math.min(4096, Number(event.target.value) || 240))); setCustomWidth(board.width); }} /></Field></div>}
               {toolkit.id === "device" && <div className="mt-3 space-y-2">
                 <p className="text-xs leading-5 text-muted">Switch the preview frame without compressing or changing the artboard's proportions.</p>
                 <div className="grid grid-cols-3 gap-2">
@@ -2220,7 +2305,7 @@ export function UxUiStudioEngine() {
                   </div>
                 </> : <p className="text-xs leading-5 text-muted">Select a layer on the artboard to control whether it appears on mobile, tablet and desktop.</p>}
               </div>}
-              {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>setShowExportPanel(true)} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
+              {toolkit.id === "handoff" && <div className="mt-3"><button type="button" onClick={()=>{ setShowToolsPanel(false); setShowExportPanel(true); }} className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white">Open export menu</button></div>}
               {toolkit.id === "transform" && <div className="mt-3 grid grid-cols-2 gap-2">{selected ? <><button type="button" onClick={() => updateLayer(selected.id, { x: Math.max(0, Math.round((board.width - selected.width) / 2)) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Center horizontally</button><button type="button" onClick={() => updateLayer(selected.id, { y: Math.max(0, Math.round((board.height - selected.height) / 2)) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Center vertically</button><button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) - 15 + 360) % 360) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Rotate −15°</button><button type="button" onClick={() => updateLayer(selected.id, { rotation: (((selected.rotation || 0) + 15) % 360) })} className="rounded-lg border border-border p-2 text-xs font-semibold text-fg">Rotate +15°</button></> : <p className="col-span-2 text-xs text-muted">Select an artboard layer to use positioning and rotation actions.</p>}</div>}
               {toolkit.id === "flows" && <div className="mt-3 space-y-3 rounded-lg border border-border bg-surface-2 p-3">
                 <p className="text-xs leading-5 text-muted">Assign a selected layer to another screen. During preview, tapping that layer opens its destination; Back follows the interaction history.</p>
@@ -2235,7 +2320,7 @@ export function UxUiStudioEngine() {
               </div>}
               {toolkit.id === "inspiration" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import reference image</button><p className="mt-1 text-[10px] text-muted">Keep reference source and licensing notes with the project before redistribution.</p></div>}
               {toolkit.id === "background" && <div className="mt-3"><label className="block text-xs font-semibold text-fg">Canvas background<input type="color" aria-label="Toolkit canvas background" value={background.startsWith("#") ? background : "#FFFFFF"} onChange={(event)=>setBackground(event.target.value)} className="mt-2 block h-10 w-full"/></label><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="mt-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import background image as layer</button></div>}
-              {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
+              {toolkit.id === "projects" && <div className="mt-3"><button type="button" onClick={()=>{setShowInspector(true);setShowMoreLayers(true);setShowToolsPanel(false);}} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Open screen manager</button><button type="button" onClick={()=>presetImportInputRef.current?.click()} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import project JSON</button></div>}
               {toolkit.id === "assets" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import assets</button></div>}
               {toolkit.id === "data-viz" && <div className="mt-3"><button type="button" onClick={() => addLayer("chart")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Add editable chart</button></div>}
               {toolkit.id === "illustrations" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import illustration (SVG/image)</button></div>}
@@ -2288,19 +2373,19 @@ export function UxUiStudioEngine() {
 
           {leftTab === "icons" && <div className="mt-3">
             <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold text-fg">Icon library</h3><button type="button" onClick={() => iconImportInputRef.current?.click()} className="uxui-import-button">Import SVG</button></div>
-            <p className="mt-1 text-[11px] leading-4 text-muted">Browse immediate examples by interface category and visual style, or search the online Iconify catalogue. Selected SVGs and collection identifiers are stored in the project.</p>
+            <p className="mt-1 text-[11px] leading-4 text-muted">Browse bundled, verified SVGs by category and style, or search for more online. Bundled icons work offline. Selected SVGs and collection identifiers are stored in the project.</p>
             <div className="mt-3 relative"><Search size={15} className="absolute left-2.5 top-2.5 text-muted" /><input value={iconQuery} aria-label="Search icons" onChange={(event)=>{setIconQuery(event.target.value);setIconStart(0);setIconResults([]);}} placeholder="Search icons: home, charts, payment…" className="w-full rounded-lg border border-border bg-surface pl-8 pr-2 py-2 text-sm text-fg outline-none focus:border-accent" /></div>
             <label className="mt-2 block text-[10px] font-medium text-muted">Visual style / icon family
               <select value={iconPrefix} onChange={(event)=>{setIconPrefix(event.target.value);setIconStart(0);setIconResults([]);}} className={fieldClass()}>{ICON_SET_OPTIONS.map((set)=><option key={set.prefix} value={set.prefix}>{set.label}</option>)}</select>
             </label>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {ICON_BROWSE_CATEGORIES.map((category)=><button key={category.name} type="button" onClick={()=>{setIconBrowseCategory(category.name);setIconQuery("");setIconStart(0);setIconResults([]);}} aria-pressed={iconBrowseCategory===category.name} className={"rounded-full border px-2.5 py-1.5 text-[10px] font-semibold "+(iconBrowseCategory===category.name?"border-accent bg-accent text-white":"border-border text-fg hover:bg-surface-2")}>{category.name}</button>)}
+              {[{ name: "All bundled", description: "Verified bundled vectors", icons: [] }, ...ICON_BROWSE_CATEGORIES].map((category)=><button key={category.name} type="button" onClick={()=>{setIconBrowseCategory(category.name);setIconQuery("");setIconStart(0);setIconResults([]);}} aria-pressed={iconBrowseCategory===category.name} className={"rounded-full border px-2.5 py-1.5 text-[10px] font-semibold "+(iconBrowseCategory===category.name?"border-accent bg-accent text-white":"border-border text-fg hover:bg-surface-2")}>{category.name}</button>)}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{iconQuery.trim().length>=2?(iconLoading?"Searching…":iconTotal.toLocaleString()+" matching online icons"):iconBrowseCategory+" · curated examples by style"}</span><span>Iconify · SVG</span></div>
+            <div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{iconQuery.trim().length>=2?(iconLoading?"Searching…":visibleIconResults.length.toLocaleString()+" matching icons"):iconBrowseCategory+" · curated examples by style"}</span><span>Iconify · SVG</span></div>
             {iconError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600">{iconError}</p>}
             <div className="mt-2 grid grid-cols-4 gap-1.5">
               {visibleIconResults.filter((name) => !toolkitSearch.trim() || name.toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((name)=><button key={name} type="button" onClick={()=>void chooseIcon(name)} title={"Add icon "+name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 "+(selected?.iconName===name?"border-accent bg-accent/10":"")}>
-                <img loading="lazy" alt="" src={"https://api.iconify.design/"+name.replace(":","/")+".svg"} className="mx-auto size-7" />
+                <StudioIconPreview name={name} className="mx-auto size-7" size={28} />
                 <span className="mt-1 block truncate text-[9px] text-muted">{name}</span>
               </button>)}
             </div>
@@ -2310,18 +2395,22 @@ export function UxUiStudioEngine() {
           </div>}
 
           {leftTab === "fonts" && <div className="mt-3">
-            <h3 className="text-xs font-semibold text-fg">Font library · full catalogue</h3>
-            <p className="mt-1 text-[11px] leading-4 text-muted">Browse the online Fontsource catalogue, preview families, and download a selected TTF into the layer for portable native code and JSON exports.</p>
+            <h3 className="text-xs font-semibold text-fg">Find your font</h3>
+            <p className="mt-1 text-[11px] leading-4 text-muted">See your words in each font. Tap a card to use it in your design.</p>
             <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted">
-              <span>{fontCatalogLoading ? "Loading catalogue…" : remoteFonts.length ? remoteFonts.length.toLocaleString() + " online font families" : "Curated fonts available"}</span>
+              <span>{fontCatalogLoading ? "Finding fonts…" : remoteFonts.length ? remoteFonts.length.toLocaleString() + " fonts to explore" : "Fonts ready to preview"}</span>
               {fontCatalogError && <button type="button" onClick={() => { fontCatalogRequested.current = false; setFontCatalogReload((value) => value + 1); }} className="font-semibold text-accent">Retry</button>}
             </div>
-            {fontCatalogError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-[10px] text-red-600">{fontCatalogError} The curated list remains available.</p>}
+            {fontCatalogError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-[10px] text-red-600">Showing ready-to-use fonts. Connect to see more choices.</p>}
             <input aria-label="Search fonts" value={fontQuery} onChange={(event)=>setFontQuery(event.target.value)} placeholder="Search font families…" className={fieldClass()} />
+            <div className="uxui-font-preview-controls">
+              <Field label="Try your words"><input aria-label="Font preview text" maxLength={80} value={fontPreviewText} onChange={(event) => setFontPreviewText(event.target.value)} placeholder="Type a few words…" className={fieldClass()} /></Field>
+              <button type="button" aria-pressed={animateFontPreviews} onClick={() => setAnimateFontPreviews((value) => !value)}>{animateFontPreviews ? "Pause previews" : "Play previews"}</button>
+            </div>
             <div className="mt-2 flex flex-wrap gap-1">
               {["All","Sans serif","Serif","Monospace","Display","Handwriting","System"].map((category)=><button key={category} type="button" onClick={()=>setFontCategory(category)} aria-pressed={fontCategory===category} className={"rounded-full border px-2 py-1 text-[10px] font-medium "+(fontCategory===category?"border-accent bg-accent text-white":"border-border text-fg")}>{category}</button>)}
             </div>
-            {selected && <div className="mt-3 rounded-lg border border-border p-2">
+            {selected && <details className="uxui-font-more mt-3 rounded-lg border border-border p-2"><summary>More font options</summary><div>
               <div className="text-[10px] text-muted">Selected layer</div>
               <div className="mt-1 truncate text-sm font-semibold text-fg" style={{fontFamily:selected.fontFamily}}>{selected.fontFamily}</div>
               <div className="mt-1 text-xs text-muted" style={{fontFamily:selected.fontFamily}}>Aa Bb Cc 123 — The quick brown fox.</div>
@@ -2329,21 +2418,22 @@ export function UxUiStudioEngine() {
               <label className="mt-3 block text-[10px] font-medium text-muted">Import local font (TTF, OTF, WOFF, WOFF2 · up to 4 MB)
                 <input type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" className="mt-1 block w-full text-[10px] text-muted" onChange={(event)=>{const file=event.target.files?.[0];if(!file)return;if(file.size>4*1024*1024){setNotice("Font files must be 4 MB or smaller.");event.target.value="";return;}const reader=new FileReader();reader.onload=()=>{if(typeof reader.result!=="string")return;const family=(file.name.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9 -]/g,"").trim()||"Imported Font")+" (local)";updateLayer(selected.id,{fontFamily:family,fontDataUrl:reader.result});setNotice("Imported "+file.name+" into this design. The font bytes are preserved in project JSON.");};reader.onerror=()=>setNotice("Could not read the font file.");reader.readAsDataURL(file);event.target.value="";}} />
               </label>
-            </div>}
+            </div></details>}
             <div className="mt-3 space-y-1.5">
-              {fontChoices.filter((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)&&(!toolkitSearch.trim()||font.family.toLowerCase().includes(toolkitSearch.trim().toLowerCase()))).map((font)=>{
+              {filteredFonts.slice(0, fontVisibleCount).map((font)=>{
                 const fontId=font.id || font.family.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
                 const weights=font.weights?.length ? font.weights.join(" · ") : "300–900 where supplied";
                 return <div key={font.family} className={"rounded-lg border p-2.5 "+(selected?.fontFamily===font.family?"border-accent bg-accent/10":"border-border")}>
-                  <button type="button" disabled={!selected} onClick={()=>{if(selected)updateLayer(selected.id,{fontFamily:font.family,fontDataUrl:""});setNotice("Applied "+font.family+". Use Download & embed for offline native asset portability.");}} className="block w-full text-left disabled:opacity-40">
-                    <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{font.family}</span><span className="text-[9px] text-muted">{font.provider==="google"?"Google Fonts":"System"}</span></div>
-                    <div className="mt-1 truncate text-lg text-fg" style={{fontFamily:font.family}}>Design systems that scale 012345</div>
-                    <div className="mt-1 text-[9px] text-muted">{font.category} · weights {weights}{font.variable?" · variable":""}</div>
+                  <button type="button" onClick={() => void chooseFont(font)} className="block w-full text-left disabled:opacity-40">
+                    <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-fg">{font.family}</span><span className="text-[9px] text-muted">{BUNDLED_STUDIO_FONTS[font.family] ? "Ready offline" : font.provider==="google"?"Google Fonts":"System"}</span></div>
+                    <FontPreview family={font.family} provider={font.provider} className="mt-1 text-lg text-fg" sample={fontPreviewText || "Design systems that scale 012345"} animated={animateFontPreviews} />
+                    <div title={"Available weights: " + weights} className="mt-1 text-[10px] text-muted">{font.category} · Tap to use</div>
                   </button>
-                  {font.provider==="google" && <button type="button" disabled={!selected||fontDownloadId===fontId} onClick={()=>void downloadAndEmbedFont(font)} className="mt-2 rounded-md border border-border px-2 py-1.5 text-[10px] font-semibold text-fg hover:bg-surface-2 disabled:opacity-40">{fontDownloadId===fontId?"Downloading…":"Download & embed TTF"}</button>}
+                  {font.provider==="google" && <button type="button" disabled={!selected||fontDownloadId===fontId} onClick={()=>void downloadAndEmbedFont(font)} className="mt-2 rounded-md border border-border px-2 py-1.5 text-[10px] font-semibold text-fg hover:bg-surface-2 disabled:opacity-40">{fontDownloadId===fontId?"Downloading…":"Use this font offline"}</button>}
                 </div>;
               })}
-              {!fontChoices.some((font)=>font.family.toLowerCase().includes(fontQuery.toLowerCase())&&(fontCategory==="All"||font.category===fontCategory)) && <p className="mt-3 text-xs text-muted">No font matched this filter.</p>}
+              {filteredFonts.length > fontVisibleCount && <button type="button" onClick={() => setFontVisibleCount((count) => count + 24)} className="uxui-toolkit-back">Show 24 more fonts · {filteredFonts.length.toLocaleString()} families</button>}
+              {!filteredFonts.length && <p className="mt-3 text-xs text-muted">No font matched this filter.</p>}
             </div>
             <p className="mt-3 text-[10px] leading-4 text-muted">Font binaries are fetched when selected instead of shipping the entire multi-gigabyte font archive inside enV. Check each font licence before redistribution.</p>
           </div>}
@@ -2397,6 +2487,7 @@ export function UxUiStudioEngine() {
               <div
                 className={"uxui-device-shell uxui-device-" + target}
                 data-target={target}
+                onPointerDown={(event) => { if (event.target === event.currentTarget) selectCanvas(); }}
                 style={{
                   "--uxui-device-scale": deviceFrameScale,
                   "--uxui-device-display-width": deviceDisplayWidth + "px",
@@ -2411,8 +2502,8 @@ export function UxUiStudioEngine() {
               >
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
-                style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
-                <rect width={board.width} height={board.height} fill={background} />
+                style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="img" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; resizeRef.current = null; }} onPointerCancel={() => { dragRef.current = null; resizeRef.current = null; }}>
+                <rect width={board.width} height={board.height} fill={background} role="button" tabIndex={prototypePreview ? -1 : 0} aria-label="Select canvas background" onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectCanvas(); } }} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
                 {[...elements].filter((layer) => !layer.hidden && layer.display !== "none" && (!layer.visibleOn || layer.visibleOn.includes(target))).sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)).map((layer) => {
@@ -2468,7 +2559,13 @@ export function UxUiStudioEngine() {
                     {layer.kind === "image" ? layer.imageDataUrl ? <image href={layer.imageDataUrl} x={layer.x} y={layer.y} width={layer.width} height={layer.height} preserveAspectRatio="xMidYMid slice" /> : <><path d={"M " + (layer.x + layer.width * 0.18) + " " + (layer.y + layer.height * 0.76) + " l " + (layer.width * 0.2 * -1) + " 0 l " + (layer.width * 0.2) + " -" + (layer.height * 0.27) + " l " + (layer.width * 0.16) + " " + (layer.height * 0.16) + " l " + (layer.width * 0.16 * -1) + " " + (layer.height * 0.11) + " l " + (layer.width * 0.22) + " -" + (layer.height * 0.33) + " l " + (layer.width * 0.18) + " " + (layer.height * 0.33)} fill="none" stroke="#94A3B8" strokeWidth="2" /><text x={layer.x + layer.width / 2} y={layer.y + layer.height - 10} fontSize="11" fill="#64748B" textAnchor="middle">{layer.text}</text></> : null}
                     {layer.kind === "icon" ? <svg x={layer.x + 2} y={layer.y + 2} width={layer.width - 4} height={layer.height - 4} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
                     {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
-                    {selectedId === layer.id && <rect x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="#2563EB" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
+                    {selectedId === layer.id && <rect data-editor-only="true" x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
+                    {selectedId === layer.id && !prototypePreview && !layer.locked && <g data-editor-only="true" role="button" tabIndex={0} aria-label="Drag to resize selected element" className="uxui-resize-handle"
+                      onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); checkpoint(); dragRef.current = null; resizeRef.current = { id: layer.id, x: layer.x, y: layer.y, width: layer.width, height: layer.height, pointerX: event.clientX, pointerY: event.clientY, rotation: layer.rotation || 0 }; artboardRef.current?.setPointerCapture(event.pointerId); }}
+                      onKeyDown={(event) => { if (["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); updateLayer(layer.id, { width: Math.max(12, layer.width + (event.key === "ArrowRight" ? 4 : event.key === "ArrowLeft" ? -4 : 0)), height: Math.max(12, layer.height + (event.key === "ArrowDown" ? 4 : event.key === "ArrowUp" ? -4 : 0)) }); } }}>
+                      <circle cx={layer.x + layer.width} cy={layer.y + layer.height} r={22 * board.width / Math.max(1, deviceDisplayWidth)} fill="transparent" />
+                      <circle cx={layer.x + layer.width} cy={layer.y + layer.height} r={7 * board.width / Math.max(1, deviceDisplayWidth)} fill="white" stroke="black" strokeWidth={1.5 * board.width / Math.max(1, deviceDisplayWidth)} />
+                    </g>}
                   </g>;
                 })}
               </svg>
@@ -2505,21 +2602,16 @@ export function UxUiStudioEngine() {
               <button type="button" className="uxui-pad-down" aria-label="Decrease element size 10 percent" onClick={() => updateLayer(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)) })}><ZoomOut size={18} /></button>
             </div>
           </div>}
-          {selected && !isExpanded && <div className="uxui-context-controls">
+          {selected && !prototypePreview && <div className="uxui-context-controls">
             <div className="uxui-context-toolbar" role="toolbar" aria-label={selected.kind + " editing actions"}>
               <span className="uxui-context-selection" aria-live="polite">{selected.name || selected.kind + " selected"}</span>
               {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => setShowTextEditor((value) => !value)} aria-expanded={showTextEditor}><Type size={21} /><span>{showTextEditor ? "Done" : "Text"}</span></button>}
-              {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => { setLeftTab("fonts"); setToolkitSearch(""); setShowToolsPanel(true); }}><Type size={21} /><span>Fonts</span></button>}
+              {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => { openToolkit("typography"); setShowToolsPanel(true); }}><Type size={21} /><span>Fonts</span></button>}
               {selected.kind === "image" && <button type="button" className="uxui-context-action" onClick={() => { setShowInspector(true); setInspectorTab("design"); }}><ImagePlus size={21} /><span>Replace</span></button>}
-              {selected.kind === "icon" && <button type="button" className="uxui-context-action" onClick={() => { setLeftTab("icons"); setToolkitSearch(""); setShowToolsPanel(true); }}><Shapes size={21} /><span>Icons</span></button>}
+              {selected.kind === "icon" && <button type="button" className="uxui-context-action" onClick={() => { openToolkit("icons"); setShowToolsPanel(true); }}><Shapes size={21} /><span>Icons</span></button>}
               <button type="button" className="uxui-context-action" onClick={() => setShowContextColors((value) => !value)} aria-expanded={showContextColors}><Palette size={21} /><span>Color</span></button>
-              <button type="button" className="uxui-context-action" onClick={() => { setActiveToolkitId("motion"); setLeftTab("toolkits"); setShowToolsPanel(true); }}><RotateCw size={21} /><span>Motion</span></button>
-              {selectedIds.length > 1 && <button type="button" className="uxui-context-action" onClick={groupSelectedLayers}><Layers size={21} /><span>Group</span></button>}
-              {selectedIds.length === 1 && selected.groupId && <button type="button" className="uxui-context-action" onClick={ungroupSelectedLayers}><Layers size={21} /><span>Ungroup</span></button>}
-              <button type="button" className="uxui-context-action" onClick={duplicateSelected}><Copy size={21} /><span>Duplicate</span></button>
+              <button type="button" className="uxui-context-action" onClick={() => { openToolkit("effects"); setShowToolsPanel(true); }}><Palette size={21} /><span>Effects</span></button>
               <button type="button" className="uxui-context-action" onClick={() => { setShowInspector(true); setInspectorTab("design"); }}><LayoutTemplate size={21} /><span>Adjust</span></button>
-              <button type="button" className="uxui-context-action" onClick={() => updateLayer(selected.id, { hidden: !selected.hidden })}><Check size={21} /><span>{selected.hidden ? "Show" : "Hide"}</span></button>
-              <button type="button" className="uxui-context-action is-danger" onClick={deleteSelected}><Trash2 size={21} /><span>Delete</span></button>
             </div>
             {showTextEditor && selectedHasText && <div className="uxui-context-editor"><label htmlFor="uxui-selected-text">Edit text</label><textarea id="uxui-selected-text" value={selected.text} onFocus={() => checkpoint()} onChange={(event) => updateLayer(selected.id, { text: event.target.value }, false)} rows={2} /></div>}
             {showContextColors && <div className="uxui-context-color-picker">
@@ -2527,6 +2619,30 @@ export function UxUiStudioEngine() {
               <div className="uxui-context-swatches">{["#111827", "#FFFFFF", "#2563EB", "#7C3AED", "#DB2775", "#DC2626", "#D97706", "#059669", "#0F766E", "#64748B", "#E5E7EB", "#DBEAFE"].map((color) => <button key={color} type="button" style={{ background: color }} onClick={() => updateLayer(selected.id, paletteMode === "text" ? { color } : { background: color })} aria-label={"Apply " + color} title={color} />)}</div>
             </div>}
           </div>}
+
+          {!prototypePreview && (selected || canvasSelected) && <section className="uxui-style-dock" aria-label={selected ? "Selected element styling" : "Canvas styling"}>
+            <div className="uxui-style-dock-heading"><strong>{selected ? selected.name + " · Style" : "Canvas · Style"}</strong><button type="button" onClick={() => { setShowInspector(true); setInspectorTab("design"); }} aria-label="Open all styling properties">More <ArrowRight size={14} /></button></div>
+            {selected ? <>
+              <p className="uxui-drag-hint">Drag to move · Pull the corner to resize</p>
+              <div className="uxui-inline-fields uxui-visual-controls">
+                <Field label="Fill"><input type="color" aria-label="Selected fill color" value={/^#[0-9a-f]{6}$/i.test(selected.background) ? selected.background : "#FFFFFF"} onChange={(event) => updateLayer(selected.id, { background: event.target.value })} /></Field>
+                <Field label={selected.kind === "icon" ? "Icon color" : "Text color"}><input type="color" aria-label="Selected content color" value={/^#[0-9a-f]{6}$/i.test(selected.color) ? selected.color : "#111827"} onChange={(event) => updateLayer(selected.id, { color: event.target.value })} /></Field>
+                <Field label="Size"><input type="range" aria-label="Selected size" min="12" max={Math.max(12, board.width - selected.x)} value={selected.width} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => { const width = Number(event.target.value); updateLayer(selected.id, { width, height: Math.max(12, Math.round(selected.height * width / Math.max(1, selected.width))) }, false); }} /></Field>
+                <Field label="Turn"><input type="range" aria-label="Selected rotation" min="-180" max="180" value={((selected.rotation || 0) + 540) % 360 - 180} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { rotation: Number(event.target.value) }, false)} /></Field>
+                <Field label="Roundness"><input type="range" aria-label="Selected corner radius" min="0" max={Math.max(selected.radius, Math.ceil(Math.min(selected.width, selected.height) / 2))} value={selected.radius} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { radius: Number(event.target.value) }, false)} /></Field>
+                <Field label="Border"><input type="range" aria-label="Selected border width" min="0" max="20" value={selected.borderWidth} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { borderWidth: Number(event.target.value) }, false)} /></Field>
+                <Field label="See-through"><input type="range" aria-label="Selected opacity" min="0" max="1" step=".05" value={selected.opacity} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { opacity: Number(event.target.value) }, false)} /></Field>
+                {selectedHasText && <Field label="Text size"><input type="range" aria-label="Selected font size" min="8" max={Math.max(160, selected.fontSize)} value={selected.fontSize} onPointerDown={checkpoint} onKeyDown={checkpoint} onChange={(event) => updateLayer(selected.id, { fontSize: Number(event.target.value) }, false)} /></Field>}
+              </div>
+              {selectedHasText && <div className="uxui-inline-fields uxui-inline-text-fields"><Field label={selected.kind === "chart" ? "Chart title and values" : "Your words"}><textarea aria-label="Selected text content" rows={selected.kind === "chart" ? 4 : 2} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field><button type="button" onClick={() => { openToolkit("typography"); setShowToolsPanel(true); }}>Choose font</button></div>}
+              <details className="uxui-exact-options"><summary>More options</summary><div className="uxui-inline-fields"><Field label="Width"><input type="number" aria-label="Selected width" min="1" value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Height"><input type="number" aria-label="Selected height" min="1" value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Border color"><input type="color" aria-label="Selected border color" value={/^#[0-9a-f]{6}$/i.test(selected.borderColor) ? selected.borderColor : "#CCCCCC"} onChange={(event) => updateLayer(selected.id, { borderColor: event.target.value })} /></Field></div></details>
+              <div className="uxui-inline-actions"><label><input type="checkbox" aria-label="Selected drop shadow" checked={selected.shadow} onChange={(event) => updateLayer(selected.id, { shadow: event.target.checked })} /> Soft shadow</label><button type="button" onClick={() => updateLayer(selected.id, { background: "transparent" })}>No fill</button><button type="button" onClick={() => { openToolkit("motion"); setShowToolsPanel(true); }}>Motion</button><button type="button" onClick={duplicateSelected}>Duplicate</button><button type="button" onClick={() => updateLayer(selected.id, { hidden: !selected.hidden })}>{selected.hidden ? "Show" : "Hide"}</button><button type="button" onClick={deleteSelected}>Delete</button>{selectedIds.length > 1 && <button type="button" onClick={groupSelectedLayers}>Group selection</button>}{selected.groupId && <button type="button" onClick={ungroupSelectedLayers}>Ungroup</button>}</div>
+            </> : <>
+              <div className="uxui-inline-fields"><Field label="Background"><input type="color" aria-label="Canvas background color" value={/^#[0-9a-f]{6}$/i.test(background) ? background : "#FFFFFF"} onChange={(event) => setBackground(event.target.value)} /></Field><Field label="Canvas width"><input type="number" aria-label="Canvas width" min="160" max="4096" value={board.width} onChange={(event) => { setCustomWidth(Math.min(4096, Math.max(160, Number(event.target.value) || 160))); setCustomHeight(board.height); setCustomArtboard(true); }} /></Field><Field label="Canvas height"><input type="number" aria-label="Canvas height" min="240" max="4096" value={board.height} onChange={(event) => { setCustomHeight(Math.min(4096, Math.max(240, Number(event.target.value) || 240))); setCustomWidth(board.width); setCustomArtboard(true); }} /></Field><label className="uxui-inline-toggle"><input type="checkbox" checked={showGrid} onChange={(event) => setShowGrid(event.target.checked)} /> Alignment grid</label></div>
+              <div className="uxui-context-swatches">{SWATCHES.map((color) => <button type="button" key={color} aria-label={"Set canvas background " + color} style={{ background: color }} onClick={() => setBackground(color)} />)}</div>
+              <div className="uxui-inline-actions"><button type="button" onClick={() => quickImageInputRef.current?.click()}>Add background image layer</button><button type="button" onClick={() => { setCustomArtboard(false); }}>Use device dimensions</button></div>
+            </>}
+          </section>}
 
           <input ref={elementImportInputRef} type="file" accept=".json,application/json,image/png,image/jpeg,image/webp,image/gif,.svg,image/svg+xml" className="sr-only" aria-label="Import elements" onChange={(event) => { const file = event.target.files?.[0]; if (file) importElementsFile(file); event.target.value = ""; }} />
           <input ref={presetImportInputRef} type="file" accept=".json,application/json" className="sr-only" aria-label="Import preset" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPresetFile(file); event.target.value = ""; }} />
@@ -2644,7 +2760,7 @@ export function UxUiStudioEngine() {
             <Field label="Layer name"><input className={fieldClass()} value={selected.name} onChange={(event) => updateLayer(selected.id, { name: event.target.value })} /></Field>
             {["text", "button", "card", "input", "image", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(selected.kind) && <Field label={selected.kind === "chart" ? "Chart data (title, then Label: value)" : "Text content"}><textarea rows={selected.kind === "chart" ? 7 : selected.kind === "card" || selected.kind === "row" ? 3 : 2} spellCheck={selected.kind !== "chart"} className={fieldClass()} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field>}
             {selected.kind === "image" && <Field label="Replace image"><input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" className="mt-2 block w-full text-[11px] text-muted file:mr-2 file:rounded-md file:border-0 file:bg-surface-2 file:px-2 file:py-1.5 file:text-xs file:font-semibold" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 4 * 1024 * 1024) { setNotice("Image assets must be 4 MB or smaller for a portable design project."); event.target.value = ""; return; } if (!file.type.startsWith("image/")) { setNotice("Choose a supported image file."); event.target.value = ""; return; } const reader = new FileReader(); reader.onload = () => { if (typeof reader.result === "string") updateLayer(selected.id, { imageDataUrl: reader.result }); }; reader.onerror = () => setNotice("Could not read the selected image."); reader.readAsDataURL(file); }} /></Field>}
-            {selected.kind === "icon" && <div className="rounded-lg border border-border p-2"><p className="break-all text-xs font-semibold text-fg">{selected.iconName || "Built-in home icon"}</p><p className="mt-1 text-[10px] leading-4 text-muted">{selected.iconAuthor || "Built-in icon"} · {selected.iconLicense || "No external license metadata"}</p><button type="button" onClick={() => setLeftTab("icons")} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-accent"><Search size={12} /> Replace icon</button></div>}
+            {selected.kind === "icon" && <div className="rounded-lg border border-border p-2"><p className="break-all text-xs font-semibold text-fg">{selected.iconName || "Built-in home icon"}</p><p className="mt-1 text-[10px] leading-4 text-muted">{selected.iconAuthor || "Built-in icon"} · {selected.iconLicense || "No external license metadata"}</p><button type="button" onClick={() => { openToolkit("icons"); setShowToolsPanel(true); }} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-accent"><Search size={12} /> Replace icon</button></div>}
             <div className="grid grid-cols-2 gap-2">
               <Field label="X position (px)"><input type="number" className={fieldClass()} value={selected.x} onChange={(event) => updateLayer(selected.id, { x: Number(event.target.value) || 0 })} /></Field>
               <Field label="Y position (px)"><input type="number" className={fieldClass()} value={selected.y} onChange={(event) => updateLayer(selected.id, { y: Number(event.target.value) || 0 })} /></Field>

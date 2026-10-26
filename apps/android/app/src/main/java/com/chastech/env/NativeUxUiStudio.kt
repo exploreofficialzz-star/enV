@@ -1,5 +1,10 @@
 package com.chastech.env
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import android.graphics.Paint
 import android.graphics.BitmapFactory
 import android.graphics.RectF
@@ -12,6 +17,7 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -31,14 +37,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import com.caverock.androidsvg.SVG
 import androidx.core.graphics.PathParser
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -88,38 +102,111 @@ private data class UxUiNativeLayer(
     val minWidth: Int = 0, val maxWidth: Int = 0, val visibleOn: String = "mobile,tablet,desktop",
     val referenceWidth: Int = 390, val referenceHeight: Int = 844, val componentKey: String = "",
     val iconViewBox: String = "0 0 24 24", val rotation: Float = 0f,
-    val prototypeTargetScreenId: String = ""
+    val prototypeTargetScreenId: String = "", val opacity: Float = 1f, val shadow: Boolean = false
 )
 
 private data class UxNativeToolkit(val id: String, val name: String, val description: String, val panel: String, val status: String)
 private val uxNativeToolkits = listOf(
-    UxNativeToolkit("icons", "Icon Studio", "Discover, style, import and reuse icons.", "Icons", "Connected"),
-    UxNativeToolkit("typography", "Typography Studio", "Font discovery, typography and embedded font assets.", "Fonts", "Connected"),
-    UxNativeToolkit("color", "Color Studio", "Palette, semantic colors and design tokens.", "Tokens", "Connected"),
-    UxNativeToolkit("background", "Gradient & Background Studio", "Canvas background, image backgrounds and decorative surfaces.", "Tokens", "Connected foundation"),
-    UxNativeToolkit("effects", "Effects Studio", "Border, radius, opacity, shadow and visual depth.", "Style", "Connected foundation"),
-    UxNativeToolkit("illustrations", "Illustration Studio", "Import and position SVG or image illustrations.", "Elements", "Import"),
-    UxNativeToolkit("media", "Image & Media Studio", "Import photos, screenshots and media previews.", "Elements", "Import"),
-    UxNativeToolkit("brand", "Brand Studio", "Brand colors, fonts and reusable component templates.", "Tokens", "Connected foundation"),
-    UxNativeToolkit("motion", "Motion Studio", "Rotation and visual transition values.", "Style", "Connected foundation"),
-    UxNativeToolkit("components", "UI Components, Kits & Patterns", "Reusable controls, cards, forms and navigation elements.", "Elements", "Connected"),
-    UxNativeToolkit("device", "Device Mockup Studio", "Preview the screen in device frames.", "Device", "Connected"),
-    UxNativeToolkit("responsive", "Responsive Design, Layout & Canvas", "Viewport size, anchors, grid and responsive visibility.", "Canvas", "Connected"),
-    UxNativeToolkit("projects", "Screen & Project Manager", "Projects, drafts, presets and import.", "Presets", "Connected"),
-    UxNativeToolkit("layers", "Layers & Object Manager", "Select and reorder objects, duplicate and delete layers.", "Layers", "Connected"),
-    UxNativeToolkit("prototype", "Prototype Studio", "Assign tap destinations and preview connected screens.", "Prototype", "Partial: screen links"),
-    UxNativeToolkit("design-system", "Design System Studio", "Reusable color and spacing tokens.", "Tokens", "Connected foundation"),
-    UxNativeToolkit("accessibility", "Accessibility Studio", "Structure and touch-target review.", "QA", "Advisory checks"),
-    UxNativeToolkit("content", "Content & Placeholder Studio", "Sample text, buttons and placeholder elements.", "Content", "Starter actions"),
-    UxNativeToolkit("data-viz", "Data Visualization Studio", "Edit saved numeric data and preview bar charts.", "Chart", "Editable bar charts"),
-    UxNativeToolkit("patterns", "Patterns & Textures Studio", "Grid, vector shapes and decorative patterns.", "Pattern", "Starter actions"),
-    UxNativeToolkit("3d", "3D Studio", "3D models, camera and lighting.", "3D", "Not complete"),
-    UxNativeToolkit("platform", "Platform Design Kits", "Mobile, tablet and desktop conventions.", "Device", "Connected foundation"),
-    UxNativeToolkit("assets", "Asset Manager", "Import supported assets and replace artwork.", "Elements", "Import"),
-    UxNativeToolkit("handoff", "Export & Design Handoff Studio", "Export PDF, JSON and source handoff.", "Handoff", "Connected"),
-    UxNativeToolkit("inspiration", "Inspiration & Reference Studio", "Import visual references for comparison.", "Elements", "Import"),
-    UxNativeToolkit("qa", "Design QA Studio", "Review overlaps, bounds, labels and touch targets.", "QA", "Advisory checks")
+    UxNativeToolkit("icons", "Icons", "Discover, style, import and reuse icons.", "Icons", "Connected"),
+    UxNativeToolkit("typography", "Typography", "Font discovery, typography and embedded font assets.", "Fonts", "Connected"),
+    UxNativeToolkit("color", "Colors", "Palette, semantic colors and design tokens.", "Tokens", "Connected"),
+    UxNativeToolkit("background", "Gradients & backgrounds", "Canvas background, image backgrounds and decorative surfaces.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("effects", "Effects", "Border, radius, opacity, shadow and visual depth.", "Style", "Connected foundation"),
+    UxNativeToolkit("illustrations", "Illustrations", "Import and position SVG or image illustrations.", "Elements", "Import"),
+    UxNativeToolkit("media", "Images & media", "Import photos, screenshots and media previews.", "Elements", "Import"),
+    UxNativeToolkit("brand", "Brand", "Brand colors, fonts and reusable component templates.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("motion", "Motion & rotation", "Rotation and visual transition values.", "Style", "Connected foundation"),
+    UxNativeToolkit("components", "Components & patterns", "Reusable controls, cards, forms and navigation elements.", "Elements", "Connected"),
+    UxNativeToolkit("device", "Device mockups", "Preview the screen in device frames.", "Device", "Connected"),
+    UxNativeToolkit("responsive", "Responsive layout", "Viewport size, anchors, grid and responsive visibility.", "Canvas", "Connected"),
+    UxNativeToolkit("projects", "Screens & projects", "Projects, drafts, presets and import.", "Presets", "Connected"),
+    UxNativeToolkit("layers", "Layers & objects", "Select and reorder objects, duplicate and delete layers.", "Layers", "Connected"),
+    UxNativeToolkit("flows", "Interactive flows", "Assign tap destinations and preview connected screens.", "Prototype", "Partial: screen links"),
+    UxNativeToolkit("design-system", "Design system", "Reusable color and spacing tokens.", "Tokens", "Connected foundation"),
+    UxNativeToolkit("accessibility", "Accessibility", "Structure and touch-target review.", "QA", "Advisory checks"),
+    UxNativeToolkit("content", "Content", "Sample text, buttons and placeholder elements.", "Content", "Starter actions"),
+    UxNativeToolkit("data-viz", "Data visualization", "Edit saved numeric data and preview bar charts.", "Chart", "Editable bar charts"),
+    UxNativeToolkit("patterns", "Patterns & textures", "Grid, vector shapes and decorative patterns.", "Pattern", "Starter actions"),
+    UxNativeToolkit("transform", "Transform", "Rotate, resize and align layers with live previews.", "Transform", "Connected"),
+    UxNativeToolkit("platform", "Platform kits", "Mobile, tablet and desktop conventions.", "Device", "Connected foundation"),
+    UxNativeToolkit("assets", "Assets", "Import supported assets and replace artwork.", "Elements", "Import"),
+    UxNativeToolkit("handoff", "Export & handoff", "Export PDF, JSON and source handoff.", "Handoff", "Connected"),
+    UxNativeToolkit("inspiration", "Inspiration", "Import visual references for comparison.", "Elements", "Import"),
+    UxNativeToolkit("qa", "Design QA", "Review overlaps, bounds, labels and touch targets.", "QA", "Advisory checks")
 )
+
+@Composable
+private fun UxNativeAnimatedFontSpecimen(family:String, words:String, animated:Boolean = true) {
+    val context = LocalContext.current
+    val reduceMotion = remember { android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }
+    val phase = if (animated && !reduceMotion) {
+        val transition = rememberInfiniteTransition(label="Font specimen")
+        val value by transition.animateFloat(initialValue=0f,targetValue=1f,animationSpec=infiniteRepeatable(tween(2400),RepeatMode.Reverse),label="Preview motion")
+        value
+    } else 1f
+    Text(words.ifBlank { "Make something beautiful" },fontFamily=FontFamily(uxNativeTypeface(context,UxUiNativeLayer("font-sample","text",family,0,0,300,60,"",fontFamily=family))),fontSize=25.sp,maxLines=2,
+        modifier=Modifier.fillMaxWidth().heightIn(min=68.dp).graphicsLayer { alpha=.72f+phase*.28f; translationX=phase*3f; scaleX=.98f+phase*.02f; scaleY=.98f+phase*.02f })
+}
+
+@Composable
+private fun UxNativeVisualSlider(label:String,value:Float,range:ClosedFloatingPointRange<Float>,begin:()->Unit,change:(Float)->Unit) {
+    var editing by remember { mutableStateOf(false) }
+    Text(label,style=MaterialTheme.typography.labelLarge)
+    Slider(value=value.coerceIn(range.start,range.endInclusive),valueRange=range,
+        onValueChange={ if(!editing){begin();editing=true};change(it) },onValueChangeFinished={editing=false})
+}
+
+@Composable
+private fun UxNativeToolkitSample(id: String) {
+    val ink = MaterialTheme.colorScheme.onSurface
+    val muted = MaterialTheme.colorScheme.primaryContainer
+    val surface = MaterialTheme.colorScheme.surface
+    if (id == "icons") {
+        Row(Modifier.fillMaxWidth().height(76.dp).background(muted, RoundedCornerShape(12.dp)), horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
+            listOf("lucide:house", "lucide:heart", "lucide:palette", "lucide:star").forEach { UxNativeIconThumbnail(it) }
+        }
+    } else if (id == "typography") {
+        val context=LocalContext.current
+        Text("Aa · Design with type",fontSize=26.sp,fontFamily=FontFamily(uxNativeTypeface(context,UxUiNativeLayer("sample","text","",0,0,200,60,"",fontFamily="Lora"))),modifier=Modifier.fillMaxWidth().height(76.dp).background(muted,RoundedCornerShape(12.dp)).padding(14.dp))
+    } else Canvas(Modifier.fillMaxWidth().height(76.dp).background(muted,RoundedCornerShape(12.dp))) {
+        val w=size.width;val h=size.height
+        fun block(x:Float,y:Float,bw:Float,bh:Float,color:Color=ink,r:Float=6f)=drawRoundRect(color,androidx.compose.ui.geometry.Offset(x,y),androidx.compose.ui.geometry.Size(bw,bh),androidx.compose.ui.geometry.CornerRadius(r,r))
+        when(id){
+            "color","brand","design-system" -> listOf(ink,ink.copy(alpha=.8f),ink.copy(alpha=.6f),ink.copy(alpha=.4f),ink.copy(alpha=.2f)).forEachIndexed{i,c->block(w*.08f+i*w*.17f,h*.2f,w*.13f,h*.6f,c,12f)}
+            "background" -> drawRect(Brush.linearGradient(listOf(ink.copy(alpha=.95f),ink.copy(alpha=.2f))),androidx.compose.ui.geometry.Offset(w*.1f,h*.15f),androidx.compose.ui.geometry.Size(w*.8f,h*.7f))
+            "effects" -> {block(w*.28f+8,h*.24f+8,w*.44f,h*.5f,ink.copy(alpha=.2f),12f);block(w*.28f,h*.24f,w*.44f,h*.5f,surface,12f)}
+            "device","platform","responsive" -> {block(w*.17f,h*.15f,w*.13f,h*.75f);block(w*.36f,h*.12f,w*.21f,h*.77f);block(w*.64f,h*.2f,w*.27f,h*.57f);block(w*.19f,h*.2f,w*.09f,h*.61f,surface,3f);block(w*.38f,h*.18f,w*.17f,h*.64f,surface,3f);block(w*.66f,h*.25f,w*.23f,h*.46f,surface,2f)}
+            "patterns" -> for(x in 0..11)for(y in 0..3)drawCircle(ink.copy(alpha=.55f),3f,androidx.compose.ui.geometry.Offset(w*.08f+x*w*.076f,h*.2f+y*h*.2f))
+            "data-viz" -> (1..6).forEach{i->block(w*.13f+i*w*.1f,h*(.8f-i*.09f),w*.065f,h*i*.09f)}
+            "layers","projects" -> {block(w*.2f+22,h*.15f,w*.55f,h*.55f,ink.copy(alpha=.25f));block(w*.2f+11,h*.23f,w*.55f,h*.55f,ink.copy(alpha=.5f));block(w*.2f,h*.31f,w*.55f,h*.55f)}
+            "flows","motion" -> {block(w*.15f,h*.27f,w*.22f,h*.46f);block(w*.64f,h*.27f,w*.22f,h*.46f);drawLine(ink,androidx.compose.ui.geometry.Offset(w*.4f,h*.5f),androidx.compose.ui.geometry.Offset(w*.6f,h*.5f),4f);drawLine(ink,androidx.compose.ui.geometry.Offset(w*.55f,h*.4f),androidx.compose.ui.geometry.Offset(w*.6f,h*.5f),4f)}
+            "transform" -> {drawContext.canvas.save();drawContext.canvas.translate(w*.5f,h*.5f);drawContext.canvas.rotate(18f);block(-w*.2f,-h*.28f,w*.4f,h*.56f);drawContext.canvas.restore()}
+            "accessibility","qa" -> {drawCircle(ink,24f,androidx.compose.ui.geometry.Offset(w*.3f,h*.5f));drawLine(surface,androidx.compose.ui.geometry.Offset(w*.3f-12,h*.5f),androidx.compose.ui.geometry.Offset(w*.3f-2,h*.5f+10),4f);drawLine(surface,androidx.compose.ui.geometry.Offset(w*.3f-2,h*.5f+10),androidx.compose.ui.geometry.Offset(w*.3f+14,h*.5f-12),4f);block(w*.48f,h*.32f,w*.32f,6f);block(w*.48f,h*.55f,w*.23f,6f)}
+            "handoff" -> {block(w*.22f,h*.18f,w*.28f,h*.65f,surface);block(w*.26f,h*.3f,w*.2f,5f);block(w*.26f,h*.47f,w*.15f,5f);drawLine(ink,androidx.compose.ui.geometry.Offset(w*.64f,h*.25f),androidx.compose.ui.geometry.Offset(w*.64f,h*.65f),5f);drawLine(ink,androidx.compose.ui.geometry.Offset(w*.58f,h*.52f),androidx.compose.ui.geometry.Offset(w*.64f,h*.65f),4f);drawLine(ink,androidx.compose.ui.geometry.Offset(w*.7f,h*.52f),androidx.compose.ui.geometry.Offset(w*.64f,h*.65f),4f)}
+            "media","illustrations","inspiration","assets" -> {block(w*.18f,h*.15f,w*.64f,h*.7f,surface);drawCircle(ink,9f,androidx.compose.ui.geometry.Offset(w*.66f,h*.32f));val path=androidx.compose.ui.graphics.Path().apply{moveTo(w*.23f,h*.73f);lineTo(w*.4f,h*.33f);lineTo(w*.55f,h*.65f);lineTo(w*.67f,h*.48f);lineTo(w*.77f,h*.73f);close()};drawPath(path,ink)}
+            "content" -> {block(w*.17f,h*.25f,w*.47f,9f);block(w*.17f,h*.5f,w*.67f,5f);block(w*.17f,h*.68f,w*.55f,5f)}
+            else -> {block(w*.15f,h*.18f,w*.7f,h*.2f,surface);block(w*.15f,h*.5f,w*.3f,h*.32f);block(w*.5f,h*.5f,w*.35f,h*.32f,ink.copy(alpha=.45f))}
+        }
+    }
+}
+
+@Composable
+private fun UxNativeElementSample(kind:String,label:String){
+    val accent=MaterialTheme.colorScheme.primary
+    Box(Modifier.fillMaxWidth().height(58.dp).background(MaterialTheme.colorScheme.surfaceVariant,RoundedCornerShape(10.dp)),contentAlignment=Alignment.Center){
+        when(kind){
+            "icon"->UxNativeIconThumbnail("lucide:star")
+            "ellipse","circle","avatar"->Box(Modifier.size(34.dp).background(accent,CircleShape))
+            "triangle","diamond","hexagon","star","pill","rect"->Box(Modifier.size(55.dp,34.dp).background(accent,uxNativeComposeShape(kind,10)))
+            "progress","slider","divider","line"->Box(Modifier.width(80.dp).height(if(kind=="divider"||kind=="line")2.dp else 7.dp).background(accent,RoundedCornerShape(5.dp)))
+            "switch","toggle"->Box(Modifier.size(42.dp,24.dp).background(accent,CircleShape).padding(3.dp)){Box(Modifier.size(18.dp).align(Alignment.CenterEnd).background(MaterialTheme.colorScheme.onPrimary,CircleShape))}
+            "input","dropdown","search","textarea"->Box(Modifier.fillMaxWidth(.8f).height(32.dp).border(1.dp,accent,RoundedCornerShape(6.dp)).padding(6.dp)){Text(if(kind=="search")"Search…" else "Your text",fontSize=10.sp)}
+            "button","badge"->Box(Modifier.background(accent,RoundedCornerShape(if(kind=="badge")20.dp else 8.dp)).padding(horizontal=12.dp,vertical=6.dp)){Text(if(kind=="badge")"Active" else "Continue",color=MaterialTheme.colorScheme.onPrimary,fontSize=11.sp)}
+            "chart"->Row(Modifier.height(36.dp),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf(12,23,18,32,28).forEach{v->Box(Modifier.width(10.dp).height(v.dp).background(accent,RoundedCornerShape(2.dp)))}}
+            else->Text(if(kind=="text")"Aa · Your heading" else label,fontSize=if(kind=="text")18.sp else 12.sp,fontWeight=FontWeight.SemiBold,color=accent)
+        }
+    }
+}
 
 private data class UxUiNativeScreen(
     val id: String, val name: String, val target: String, val background: String,
@@ -147,42 +234,53 @@ private fun uxNativeLayerHeight(layer: UxUiNativeLayer, boardHeight: Int): Int =
 private fun uxNativeColor(hex: String, fallback: Int = android.graphics.Color.WHITE): Color =
     Color(runCatching { android.graphics.Color.parseColor(hex) }.getOrDefault(fallback))
 
-@Composable
-private fun UxNativeIconThumbnail(iconName: String) {
-    var svg by remember(iconName) { mutableStateOf("") }
-    LaunchedEffect(iconName) {
-        val parts = iconName.split(":", limit = 2)
-        if (parts.size == 2 && Regex("^[A-Za-z0-9-]+$").matches(parts[0]) && Regex("^[A-Za-z0-9-]+$").matches(parts[1])) {
-            svg = runCatching {
-                withContext(Dispatchers.IO) {
-                    URL("https://api.iconify.design/" + parts[0] + "/" + parts[1] + ".svg").readText()
-                }
-            }.map { uxNativeCleanIconSvg(it) }.getOrDefault("")
-        } else {
-            svg = ""
-        }
+private object UxNativeArtworkLibrary {
+    private var bundled: JSONObject? = null
+    private val remote = android.util.LruCache<String, String>(160)
+    @Synchronized fun icon(context: Context, name: String): String? {
+        if (bundled == null) bundled = runCatching { context.assets.open("uxui-icons.json").bufferedReader().use { JSONObject(it.readText()) } }.getOrDefault(JSONObject())
+        return bundled?.optString(name)?.takeIf { it.isNotBlank() } ?: remote.get(name)
     }
-    Canvas(modifier = Modifier.size(28.dp)) {
-        if (svg.isNotBlank()) {
-            val layer = UxUiNativeLayer(
-                id = "icon-thumb", kind = "icon", name = iconName, x = 0, y = 0,
-                width = size.width.roundToInt().coerceAtLeast(1),
-                height = size.height.roundToInt().coerceAtLeast(1),
-                text = "", color = "#475569", iconName = iconName, iconSvg = svg
-            )
-            drawIntoCanvas { canvas -> uxNativeDrawSvgIcon(canvas.nativeCanvas, layer) }
-        }
+    fun names(context: Context): List<String> { icon(context,"lucide:house"); return bundled?.keys()?.asSequence()?.toList().orEmpty().sorted() }
+    fun fetchIcon(context: Context, name: String): String {
+        icon(context, name)?.let { return it }
+        require(Regex("^[a-z0-9-]+:[a-z0-9-]+$").matches(name)) { "Choose a valid icon." }
+        val connection = URL("https://api.iconify.design/" + name.replace(":", "/") + ".svg").openConnection().apply { connectTimeout = 8000; readTimeout = 8000 }
+        val svg = connection.getInputStream().bufferedReader().use { it.readText().also { value -> require(value.length <= 256000) { "Icon artwork is too large." } } }
+        require(svg.contains("<svg")) { "Icon artwork could not be loaded." }
+        return uxNativeCleanIconSvg(svg).also { remote.put(name, it) }
     }
 }
 
-private val uxNativeFontFamilies = listOf(
-    "Inter","Roboto","Open Sans","Lato","Montserrat","Poppins","Nunito","Source Sans 3","Work Sans","DM Sans",
-    "Manrope","Plus Jakarta Sans","Urbanist","Outfit","IBM Plex Sans","Noto Sans","Ubuntu","Rubik","Mulish",
-    "Quicksand","Barlow","Karla","Cabin","Raleway","Merriweather","Playfair Display","Lora","PT Serif",
-    "Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","JetBrains Mono","Fira Code",
-    "IBM Plex Mono","Source Code Pro","Space Mono","Inconsolata","Oswald","Bebas Neue","Space Grotesk",
-    "Caveat","Pacifico","system-ui","sans-serif","serif","monospace"
-)
+@Composable
+private fun UxNativeIconThumbnail(iconName: String) {
+    val context = LocalContext.current
+    var svg by remember(iconName) { mutableStateOf(UxNativeArtworkLibrary.icon(context, iconName).orEmpty()) }
+    var failed by remember(iconName) { mutableStateOf(false) }
+    var retry by remember(iconName) { mutableIntStateOf(0) }
+    LaunchedEffect(iconName, retry) {
+        failed = false
+        runCatching { withContext(Dispatchers.IO) { UxNativeArtworkLibrary.fetchIcon(context, iconName) } }
+            .onSuccess { svg = it }.onFailure { failed = true }
+    }
+    val thumbnailColor=MaterialTheme.colorScheme.onSurface
+    if (svg.isNotBlank()) {
+        Canvas(modifier = Modifier.size(30.dp)) {
+            val layer = UxUiNativeLayer("icon-thumb", "icon", iconName, 0, 0, size.width.roundToInt(), size.height.roundToInt(), "", color = String.format("#%06X",thumbnailColor.toArgb() and 0xFFFFFF), iconName = iconName, iconSvg = svg)
+            drawIntoCanvas { canvas -> uxNativeDrawSvgIcon(canvas.nativeCanvas, layer) }
+        }
+    } else if (failed) {
+        TextButton(onClick = { retry++ }, contentPadding = PaddingValues(0.dp), modifier = Modifier.sizeIn(minWidth = 44.dp, minHeight = 44.dp)) { Text("Retry", fontSize = 10.sp) }
+    } else CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+}
+
+private val uxNativeBundledFonts = mapOf("Inter" to "inter.ttf", "Lora" to "lora.ttf", "JetBrains Mono" to "jetbrains-mono.ttf", "Bebas Neue" to "bebas-neue.ttf", "Caveat" to "caveat.ttf")
+private val uxNativeFontFamilies = listOf("Inter", "Lora", "JetBrains Mono", "Bebas Neue", "Caveat", "sans-serif", "serif", "monospace")
+private val uxNativeTypefaceCache = android.util.LruCache<String, Typeface>(40)
+private val uxNativeFontDataCache = mutableMapOf<String,String>()
+private fun uxNativeBundledFontData(context:Context,family:String):String = uxNativeFontDataCache.getOrPut(family){
+    uxNativeBundledFonts[family]?.let{file->runCatching{context.assets.open("fonts/"+file).use{input->"data:font/ttf;base64,"+Base64.encodeToString(input.readBytes(),Base64.NO_WRAP)}}.getOrDefault("")}.orEmpty()
+}
 private val uxNativeIconStyles = listOf(
     "all" to "All styles","lucide" to "Lucide · line","tabler" to "Tabler · outline",
     "material-symbols" to "Material Symbols","mdi" to "Material Design","ph" to "Phosphor",
@@ -203,7 +301,7 @@ private val uxNativeIconCategories = linkedMapOf(
 )
 
 private fun uxNativeFontFamilyCategory(family: String): String = when {
-    family in setOf("Merriweather","Playfair Display","Lora","PT Serif","Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","Crimson Text","Bitter") -> "Serif"
+    family in setOf("serif","Merriweather","Playfair Display","Lora","PT Serif","Libre Baskerville","Roboto Slab","Fraunces","Cormorant Garamond","Crimson Text","Bitter") -> "Serif"
     family in setOf("JetBrains Mono","Fira Code","IBM Plex Mono","Source Code Pro","Space Mono","Inconsolata","monospace","Menlo") -> "Monospace"
     family in setOf("Oswald","Bebas Neue","Archivo Black","Anton","Space Grotesk","Syne") -> "Display"
     family in setOf("Caveat","Pacifico","Dancing Script","Satisfy") -> "Handwriting"
@@ -261,6 +359,12 @@ private fun uxNativeShapePath(kind: String, rect: RectF): android.graphics.Path?
 }
 
 private fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface {
+    val cacheKey = layer.fontFamily + ":" + layer.fontWeight + ":" + layer.fontData.hashCode()
+    uxNativeTypefaceCache.get(cacheKey)?.let { return it }
+    uxNativeBundledFonts[layer.fontFamily]?.let { file ->
+        runCatching { Typeface.create(Typeface.createFromAsset(context.assets, "fonts/" + file), if (layer.fontWeight >= 600) Typeface.BOLD else Typeface.NORMAL) }
+            .getOrNull()?.let { uxNativeTypefaceCache.put(cacheKey, it); return it }
+    }
     val data = layer.fontData
     if (data.startsWith("data:font/") && data.contains(",")) {
         runCatching {
@@ -271,7 +375,7 @@ private fun uxNativeTypeface(context: Context, layer: UxUiNativeLayer): Typeface
             val extension=if(mime.contains("otf")||mime.contains("opentype"))"otf" else "ttf"
             val target=File(context.cacheDir,"uxui-font-"+data.hashCode()+"."+extension)
             if(!target.exists()||target.length()!=bytes.size.toLong())target.writeBytes(bytes)
-            return Typeface.create(Typeface.createFromFile(target),if(layer.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL)
+            return Typeface.create(Typeface.createFromFile(target),if(layer.fontWeight>=600)Typeface.BOLD else Typeface.NORMAL).also{uxNativeTypefaceCache.put(cacheKey,it)}
         }
     }
     val family=when {
@@ -294,51 +398,16 @@ private fun uxNativeSvgAttribute(source: String, name: String): String? =
 
 private fun uxNativeDrawSvgIcon(canvas: android.graphics.Canvas, element: UxUiNativeLayer) {
     if (element.iconSvg.isBlank()) return
-    val root=Regex("(?is)<svg\\b[^>]*>").find(element.iconSvg)?.value.orEmpty()
-    val vb=uxNativeSvgAttribute(root,"viewBox")?.trim()?.split(Regex("\\s+"))?.mapNotNull{it.toFloatOrNull()}
-    val vx=vb?.getOrNull(0)?:0f;val vy=vb?.getOrNull(1)?:0f
-    val vw=(vb?.getOrNull(2)?:24f).takeIf{it>0f}?:24f
-    val vh=(vb?.getOrNull(3)?:24f).takeIf{it>0f}?:24f
-    val rootFill=uxNativeSvgAttribute(root,"fill")?:"black"
-    val rootStroke=uxNativeSvgAttribute(root,"stroke")
-    val rootStrokeWidth=uxNativeSvgAttribute(root,"stroke-width")?.toFloatOrNull()?:1.5f
-    val tags=Regex("(?is)<path\\b([^>]*)>").findAll(element.iconSvg)
-    canvas.save()
-    canvas.translate(element.x.toFloat(),element.y.toFloat())
-    canvas.scale(element.width.toFloat()/vw,element.height.toFloat()/vh)
-    canvas.translate(-vx,-vy)
-    tags.forEach{match->
-        val attrs=match.groupValues.getOrElse(1){""}
-        val d=uxNativeSvgAttribute(attrs,"d")?:return@forEach
-        val path=runCatching{PathParser.createPathFromPathData(d)}.getOrNull()?:return@forEach
-        val rawFill=uxNativeSvgAttribute(attrs,"fill")?:rootFill
-        if(!rawFill.equals("none",true)){
-            val fill=if(rawFill.equals("currentColor",true))element.color else rawFill
-            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{
-                style=Paint.Style.FILL
-                color=runCatching{android.graphics.Color.parseColor(fill)}.getOrDefault(runCatching{android.graphics.Color.parseColor(element.color)}.getOrDefault(android.graphics.Color.BLACK))
-            }
-            canvas.drawPath(path,paint)
-        }
-        val rawStroke=uxNativeSvgAttribute(attrs,"stroke")?:rootStroke
-        if(rawStroke!=null&&!rawStroke.equals("none",true)){
-            val stroke=if(rawStroke.equals("currentColor",true))element.color else rawStroke
-            val width=uxNativeSvgAttribute(attrs,"stroke-width")?.toFloatOrNull()?:rootStrokeWidth
-            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{
-                style=Paint.Style.STROKE
-                strokeWidth=width
-                strokeCap=when(uxNativeSvgAttribute(attrs,"stroke-linecap")){"round"->Paint.Cap.ROUND;"square"->Paint.Cap.SQUARE;else->Paint.Cap.BUTT}
-                strokeJoin=when(uxNativeSvgAttribute(attrs,"stroke-linejoin")){"round"->Paint.Join.ROUND;"bevel"->Paint.Join.BEVEL;else->Paint.Join.MITER}
-                color=runCatching{android.graphics.Color.parseColor(stroke)}.getOrDefault(runCatching{android.graphics.Color.parseColor(element.color)}.getOrDefault(android.graphics.Color.BLACK))
-            }
-            canvas.drawPath(path,paint)
-        }
+    runCatching {
+        val svg = SVG.getFromString(uxNativeCleanIconSvg(element.iconSvg).replace("currentColor", element.color))
+        svg.setDocumentWidth("100%")
+        svg.setDocumentHeight("100%")
+        svg.renderToCanvas(canvas, RectF(element.x.toFloat(), element.y.toFloat(), (element.x + element.width).toFloat(), (element.y + element.height).toFloat()))
     }
-    canvas.restore()
 }
 
 @Composable
-private fun UxUiNativeArtworkPreview(element: UxUiNativeLayer, modifier: Modifier = Modifier) {
+private fun UxUiNativeArtworkPreview(element: UxUiNativeLayer, modifier: Modifier = Modifier, monochrome: Boolean = false) {
     val bitmap=remember(element.imageData) {
         if(element.kind!="image"||!element.imageData.startsWith("data:image/")) null
         else runCatching {
@@ -355,24 +424,55 @@ private fun UxUiNativeArtworkPreview(element: UxUiNativeLayer, modifier: Modifie
             if(element.kind=="icon"&&element.iconSvg.isNotBlank()){
                 uxNativeDrawSvgIcon(nativeCanvas,element.copy(x=0,y=0,width=pixelWidth,height=pixelHeight))
             } else if(bitmap!=null){
-                nativeCanvas.drawBitmap(bitmap,null,Rect(0,0,pixelWidth,pixelHeight),Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                if (monochrome) paint.colorFilter = android.graphics.ColorMatrixColorFilter(android.graphics.ColorMatrix().apply { setSaturation(0f) })
+                nativeCanvas.drawBitmap(bitmap,null,Rect(0,0,pixelWidth,pixelHeight),paint)
             }
         }
     }
+}
+
+private fun uxNativeRasterIconData(layer:UxUiNativeLayer):String {
+    val scale=minOf(1f,512f/maxOf(layer.width,layer.height))
+    val w=(layer.width*scale).roundToInt().coerceAtLeast(1);val h=(layer.height*scale).roundToInt().coerceAtLeast(1)
+    val bitmap=android.graphics.Bitmap.createBitmap(w,h,android.graphics.Bitmap.Config.ARGB_8888)
+    uxNativeDrawSvgIcon(android.graphics.Canvas(bitmap),layer.copy(x=0,y=0,width=w,height=h))
+    val bytes=ByteArrayOutputStream().use{out->bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);out.toByteArray()};bitmap.recycle()
+    return "data:image/png;base64,"+Base64.encodeToString(bytes,Base64.NO_WRAP)
+}
+
+private fun uxNativeBackgroundArtwork(name:String,width:Int,height:Int):String {
+    val scale=minOf(1f,1024f/maxOf(width,height))
+    val w=(width*scale).roundToInt().coerceAtLeast(1);val h=(height*scale).roundToInt().coerceAtLeast(1)
+    val bitmap=android.graphics.Bitmap.createBitmap(w,h,android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas=android.graphics.Canvas(bitmap)
+    val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+    val colors=when(name){"Sunset"->intArrayOf(0xFFFB7185.toInt(),0xFF7C3AED.toInt());"Forest"->intArrayOf(0xFF059669.toInt(),0xFF164E63.toInt());else->intArrayOf(0xFF2563EB.toInt(),0xFF7C3AED.toInt())}
+    if(name in setOf("Dots","Grid","Stripes","Checkerboard")){
+        canvas.drawColor(0xFFF8FAFC.toInt());paint.color=0xFFCBD5E1.toInt();paint.strokeWidth=1f
+        val gap=(w/16f).coerceAtLeast(8f)
+        var x=0f;while(x<=w){var y=0f;while(y<=h){when(name){"Dots"->canvas.drawCircle(x,y,2f,paint);"Checkerboard"->if(((x/gap).roundToInt()+(y/gap).roundToInt())%2==0)canvas.drawRect(x,y,x+gap,y+gap,paint);else->{}};y+=gap};if(name=="Grid")canvas.drawLine(x,0f,x,h.toFloat(),paint);if(name=="Stripes")canvas.drawLine(x,0f,x,h.toFloat(),paint.apply{strokeWidth=gap/3});x+=gap}
+        if(name=="Grid"){var y=0f;while(y<=h){canvas.drawLine(0f,y,w.toFloat(),y,paint);y+=gap}}
+    }else{
+        paint.shader=if(name=="Radial glow")android.graphics.RadialGradient(w*.5f,h*.4f,maxOf(w,h)*.7f,colors,null,android.graphics.Shader.TileMode.CLAMP)else android.graphics.LinearGradient(0f,0f,w.toFloat(),h.toFloat(),colors,null,android.graphics.Shader.TileMode.CLAMP)
+        canvas.drawRect(0f,0f,w.toFloat(),h.toFloat(),paint)
+    }
+    val bytes=ByteArrayOutputStream().use{out->bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);out.toByteArray()};bitmap.recycle()
+    return "data:image/png;base64,"+Base64.encodeToString(bytes,Base64.NO_WRAP)
 }
 
 private fun uxNativeJson(elements: List<UxUiNativeLayer>): JSONArray = JSONArray().apply {
     elements.forEach { element -> put(JSONObject().apply {
         put("id", element.id); put("kind", element.kind); put("name", element.name)
         put("x", element.x); put("y", element.y); put("width", element.width); put("height", element.height)
-        put("text", element.text); put("color", element.color); put("fill", element.fill); put("iconName", element.iconName); put("iconSvg", element.iconSvg); put("imageData", element.imageData); put("fontData", element.fontData)
+        put("text", element.text); put("color", element.color); put("background",element.fill); put("imageDataUrl",element.imageData); put("fontDataUrl",element.fontData); put("fill", element.fill); put("iconName", element.iconName); put("iconSvg", element.iconSvg); put("imageData", element.imageData); put("fontData", element.fontData)
         put("fontFamily", element.fontFamily); put("fontSize", element.fontSize); put("fontWeight", element.fontWeight)
         put("radius", element.radius); put("borderColor", element.borderColor); put("borderWidth", element.borderWidth); put("padding", element.padding)
         put("marginTop", element.marginTop); put("marginRight", element.marginRight); put("marginBottom", element.marginBottom); put("marginLeft", element.marginLeft)
         put("horizontalConstraint", element.horizontalConstraint); put("verticalConstraint", element.verticalConstraint)
         put("minWidth", element.minWidth); put("maxWidth", element.maxWidth); put("visibleOn", element.visibleOn)
         put("referenceWidth", element.referenceWidth); put("referenceHeight", element.referenceHeight); put("componentKey", element.componentKey)
-        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation); put("prototypeTargetScreenId", element.prototypeTargetScreenId)
+        put("iconViewBox", element.iconViewBox); put("rotation", element.rotation); put("prototypeTargetScreenId", element.prototypeTargetScreenId); put("opacity", element.opacity); put("shadow", element.shadow)
     }) }
 }
 
@@ -389,7 +489,7 @@ private fun uxNativeReadJson(elements: JSONArray): List<UxUiNativeLayer> = build
             horizontalConstraint=item.optString("horizontalConstraint","left"),verticalConstraint=item.optString("verticalConstraint","top"),
             minWidth=item.optInt("minWidth"),maxWidth=item.optInt("maxWidth"),visibleOn=item.optString("visibleOn","mobile,tablet,desktop"),
             referenceWidth=item.optInt("referenceWidth",390),referenceHeight=item.optInt("referenceHeight",844),componentKey=item.optString("componentKey"),
-            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat(),prototypeTargetScreenId=item.optString("prototypeTargetScreenId","")
+            iconViewBox=item.optString("iconViewBox","0 0 24 24"),rotation=item.optDouble("rotation",0.0).toFloat(),prototypeTargetScreenId=item.optString("prototypeTargetScreenId",""),opacity=item.optDouble("opacity",1.0).toFloat().coerceIn(0f,1f),shadow=item.optBoolean("shadow",false)
         ))
     }
 }
@@ -512,10 +612,16 @@ private object UxUiNativePdf {
                 )
                 val rect = RectF(layer.x.toFloat(), layer.y.toFloat(),
                     (layer.x + layer.width).toFloat(), (layer.y + layer.height).toFloat())
+                val layerSave = canvas.saveLayerAlpha(null, (layer.opacity.coerceIn(0f,1f)*255).roundToInt())
+                canvas.rotate(layer.rotation,rect.centerX(),rect.centerY())
                 val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = runCatching { android.graphics.Color.parseColor(layer.fill) }
                         .getOrDefault(android.graphics.Color.TRANSPARENT)
                     style = Paint.Style.FILL
+                }
+                if(layer.shadow){
+                    val shadowPaint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0x26000000;setShadowLayer(12f,0f,6f,0x33000000)}
+                    canvas.drawRoundRect(rect,layer.radius.toFloat(),layer.radius.toFloat(),shadowPaint)
                 }
                 val vectorShape = uxNativeShapePath(layer.kind, rect)
                 if (layer.kind == "line") {
@@ -586,6 +692,7 @@ private object UxUiNativePdf {
                         canvas.restoreToCount(save)
                     }
                 }
+                canvas.restoreToCount(layerSave)
             }
             footerPaint.color = android.graphics.Color.rgb(100, 116, 139)
             canvas.drawText("enV UX/UI Studio · " + safeWidth + " × " + safeHeight + " px · " + elements.size + " layers",
@@ -603,6 +710,8 @@ private object UxUiNativePdf {
                     element.remove("iconSvg")
                     element.remove("imageData")
                     element.remove("imageDataUrl")
+                    element.remove("fontData")
+                    element.remove("fontDataUrl")
                 }
             }
             removeRawAssets(root.optJSONArray("elements"))
@@ -714,7 +823,7 @@ private fun uxNativeGenerateHtml(name:String,target:String,background:String,ele
         val vy=when(e.verticalConstraint){"bottom"->"bottom:"+ (rh-e.y-e.height).coerceAtLeast(0)+"px";"center"->"top:calc("+e.y+"px + (100cqh - "+rh+"px)/2)";else->"top:"+e.y+"px"}
         val vw=if(e.horizontalConstraint=="stretch")"width:calc("+e.width+"px + (100cqw - "+rw+"px))" else "width:"+e.width+"px"
         val vh=if(e.verticalConstraint=="stretch")"height:calc("+e.height+"px + (100cqh - "+rh+"px))" else "height:"+e.height+"px"
-        val css="position:absolute;"+hx+";"+vy+";"+vw+";"+vh+";box-sizing:border-box;padding:"+e.padding+"px;color:"+e.color+";background:"+(if(e.fill=="transparent")"transparent" else e.fill)+";border:"+e.borderWidth+"px solid "+(if(e.borderWidth>0)e.borderColor else "transparent")+";border-radius:"+e.radius+"px;font-family:"+e.fontFamily+";font-size:"+e.fontSize+"px;font-weight:"+e.fontWeight+";line-height:1.35;white-space:pre-wrap;overflow:hidden;"+(if(e.minWidth>0)"min-width:"+e.minWidth+"px;" else "")+(if(e.maxWidth>0)"max-width:"+e.maxWidth+"px;" else "")
+        val css="position:absolute;opacity:"+e.opacity+";transform:rotate("+e.rotation+"deg);"+(if(e.shadow)"box-shadow:0 6px 12px #00000026;" else "")+hx+";"+vy+";"+vw+";"+vh+";box-sizing:border-box;padding:"+e.padding+"px;color:"+e.color+";background:"+(if(e.fill=="transparent")"transparent" else e.fill)+";border:"+e.borderWidth+"px solid "+(if(e.borderWidth>0)e.borderColor else "transparent")+";border-radius:"+e.radius+"px;font-family:"+e.fontFamily+";font-size:"+e.fontSize+"px;font-weight:"+e.fontWeight+";line-height:1.35;white-space:pre-wrap;overflow:hidden;"+(if(e.minWidth>0)"min-width:"+e.minWidth+"px;" else "")+(if(e.maxWidth>0)"max-width:"+e.maxWidth+"px;" else "")
         val common="class='env-layer' data-visible-on='"+e.visibleOn+"' style='"+css+"'"
         when(e.kind) {
             "icon" -> "<div "+common+" aria-label='"+e.name+"'>"+(if(e.iconSvg.isNotBlank())e.iconSvg else e.iconName)+"</div>"
@@ -724,13 +833,20 @@ private fun uxNativeGenerateHtml(name:String,target:String,background:String,ele
             else -> "<div "+common+">"+e.text+"</div>"
         }
     }
+    val fontFaces=elements.filter{it.fontData.isNotBlank()}.distinctBy{it.fontFamily}.joinToString(""){e->"@font-face{font-family:"+JSONObject.quote(e.fontFamily)+";src:url("+JSONObject.quote(e.fontData)+")} "}
     val mobile=breakpoints.optInt("mobile",480);val desktop=breakpoints.optInt("desktop",1024)
-    return "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>"+name+"</title><style>*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}.env-artboard{position:relative;container-type:size;width:min(100%,"+width+"px);aspect-ratio:"+width+"/"+height+";margin:0 auto;background:"+background+";overflow:hidden}@media(max-width:"+mobile+"px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}@media(min-width:"+(mobile+1)+"px) and (max-width:"+(desktop-1)+"px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}@media(min-width:"+desktop+"px){.env-layer:not([data-visible-on~='desktop']){display:none!important}}</style></head><body><main class='env-artboard' aria-label='"+name+" design'>"+body+"</main></body></html>"
+    return "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>"+name+"</title><style>"+fontFaces+"*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}.env-artboard{position:relative;container-type:size;width:min(100%,"+width+"px);aspect-ratio:"+width+"/"+height+";margin:0 auto;background:"+background+";overflow:hidden}@media(max-width:"+mobile+"px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}@media(min-width:"+(mobile+1)+"px) and (max-width:"+(desktop-1)+"px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}@media(min-width:"+desktop+"px){.env-layer:not([data-visible-on~='desktop']){display:none!important}}</style></head><body><main class='env-artboard' aria-label='"+name+" design'>"+body+"</main></body></html>"
 }
 
+private fun uxNativeKotlinDataLiteral(value:String):String = value.chunked(12000).joinToString(prefix="listOf(",postfix=").joinToString(\"\")"){JSONObject.quote(it)}
+
 private fun uxNativeGenerateKotlin(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,width:Int,height:Int):String = buildString {
-    appendLine("// Generated by enV UX/UI Studio. Uses native Compose, vector paths and embedded raster assets.")
+    appendLine("// Generated by enV UX/UI Studio. Uses native Compose and embedded raster artwork. Original SVGs remain in project JSON.")
     appendLine("import android.graphics.Paint")
+    appendLine("import android.graphics.Typeface")
+    appendLine("import androidx.compose.ui.platform.LocalContext")
+    appendLine("import androidx.compose.ui.text.font.FontFamily")
+    appendLine("import java.io.File")
     appendLine("import android.graphics.BitmapFactory")
     appendLine("import android.util.Base64")
     appendLine("import androidx.compose.foundation.Canvas")
@@ -742,6 +858,8 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
     appendLine("import androidx.compose.runtime.*")
     appendLine("import androidx.compose.ui.Modifier")
     appendLine("import androidx.compose.ui.graphics.Color")
+    appendLine("import androidx.compose.ui.graphics.graphicsLayer")
+    appendLine("import androidx.compose.ui.draw.shadow")
     appendLine("import androidx.compose.ui.graphics.asImageBitmap")
     appendLine("import androidx.compose.ui.graphics.drawscope.drawIntoCanvas")
     appendLine("import androidx.compose.ui.graphics.nativeCanvas")
@@ -752,6 +870,7 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
     appendLine("import androidx.core.graphics.PathParser")
     appendLine()
     appendLine("@Composable fun "+uxNativeSafeIdentifier(name)+"Design(target: String = "+JSONObject.quote(target)+") {")
+    appendLine("  val context = LocalContext.current")
     appendLine("  BoxWithConstraints(Modifier.fillMaxWidth().height("+height+".dp)) {")
     appendLine("    val widthDelta = maxWidth.value - "+width+".f")
     appendLine("    val heightDelta = maxHeight.value - "+height+".f")
@@ -764,45 +883,18 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
         val h=if(e.verticalConstraint=="stretch")"("+e.height+".f + heightDelta).coerceAtLeast(1f)" else e.height.toString()+".f"
         val fill=if(e.fill=="transparent")background else e.fill
         appendLine("      // "+e.name.replace("\n"," ")+"; "+e.kind+"; anchors "+e.horizontalConstraint+"/"+e.verticalConstraint)
-        appendLine("      if (listOf("+e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}+").contains(target)) Box(Modifier.offset(x=("+x+").dp,y=("+y+").dp).size(width=("+w+").dp,height=("+h+").dp).background(Color(android.graphics.Color.parseColor("+JSONObject.quote(fill)+")),RoundedCornerShape("+e.radius+".dp)).padding("+e.padding+".dp)) {")
-        if(e.kind=="icon"&&e.iconSvg.isNotBlank()){
-            val root=Regex("(?is)<svg\\b[^>]*>").find(e.iconSvg)?.value.orEmpty()
-            val vb=uxNativeSvgAttribute(root,"viewBox")?.trim()?.split(Regex("\\s+"))?.mapNotNull{it.toFloatOrNull()}
-            val vx=vb?.getOrNull(0)?:0f;val vy=vb?.getOrNull(1)?:0f
-            val vw=(vb?.getOrNull(2)?:24f).takeIf{it>0f}?:24f
-            val vh=(vb?.getOrNull(3)?:24f).takeIf{it>0f}?:24f
-            val rootFill=uxNativeSvgAttribute(root,"fill")?:"black"
-            val rootStroke=uxNativeSvgAttribute(root,"stroke")
-            val rootStrokeWidth=uxNativeSvgAttribute(root,"stroke-width")?.toFloatOrNull()?:1.5f
-            appendLine("        Canvas(Modifier.fillMaxSize()) {")
-            appendLine("          drawIntoCanvas { drawingCanvas ->")
-            appendLine("            val native = drawingCanvas.nativeCanvas; native.save(); native.scale(size.width/"+vw+"f,size.height/"+vh+"f); native.translate("+(-vx)+"f,"+(-vy)+"f)")
-            Regex("(?is)<path\\b([^>]*)>").findAll(e.iconSvg).forEachIndexed { pathIndex,match->
-                val attrs=match.groupValues.getOrElse(1){""}
-                val d=uxNativeSvgAttribute(attrs,"d")?:return@forEachIndexed
-                val rawFill=uxNativeSvgAttribute(attrs,"fill")?:rootFill
-                val rawStroke=uxNativeSvgAttribute(attrs,"stroke")?:rootStroke
-                if(!rawFill.equals("none",true)){
-                    val fillColor=if(rawFill.equals("currentColor",true))e.color else rawFill
-                    appendLine("            val fillPaint"+layerIndex+"_"+pathIndex+" = Paint(Paint.ANTI_ALIAS_FLAG).apply { style=Paint.Style.FILL; color=android.graphics.Color.parseColor("+JSONObject.quote(fillColor)+") }")
-                    appendLine("            PathParser.createPathFromPathData("+JSONObject.quote(d)+")?.let { native.drawPath(it,fillPaint"+layerIndex+"_"+pathIndex+") }")
-                }
-                if(rawStroke!=null&&!rawStroke.equals("none",true)){
-                    val strokeColor=if(rawStroke.equals("currentColor",true))e.color else rawStroke
-                    val sw=uxNativeSvgAttribute(attrs,"stroke-width")?.toFloatOrNull()?:rootStrokeWidth
-                    appendLine("            val strokePaint"+layerIndex+"_"+pathIndex+" = Paint(Paint.ANTI_ALIAS_FLAG).apply { style=Paint.Style.STROKE; strokeWidth="+sw+"f; color=android.graphics.Color.parseColor("+JSONObject.quote(strokeColor)+") }")
-                    appendLine("            PathParser.createPathFromPathData("+JSONObject.quote(d)+")?.let { native.drawPath(it,strokePaint"+layerIndex+"_"+pathIndex+") }")
-                }
-            }
-            appendLine("            native.restore()")
-            appendLine("          }")
-            appendLine("        }")
-        } else if(e.kind=="image"&&e.imageData.isNotBlank()) {
-            val payload=e.imageData.substringAfter(",", "")
-            appendLine("        val studioImage"+layerIndex+" = remember { Base64.decode("+JSONObject.quote(payload)+",Base64.DEFAULT).let { bytes -> BitmapFactory.decodeByteArray(bytes,0,bytes.size)?.asImageBitmap() } }")
+        appendLine("      if (listOf("+e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}+").contains(target)) Box(Modifier.offset(x=("+x+").dp,y=("+y+").dp).size(width=("+w+").dp,height=("+h+").dp).graphicsLayer(rotationZ="+e.rotation+"f,alpha="+e.opacity+"f).shadow("+(if(e.shadow)12 else 0)+".dp,RoundedCornerShape("+e.radius+".dp)).background(Color(android.graphics.Color.parseColor("+JSONObject.quote(fill)+")),RoundedCornerShape("+e.radius+".dp)).padding("+e.padding+".dp)) {")
+        if((e.kind=="icon"&&e.iconSvg.isNotBlank())||(e.kind=="image"&&e.imageData.isNotBlank())) {
+            val payload=(if(e.kind=="icon")uxNativeRasterIconData(e)else e.imageData).substringAfter(",", "")
+            appendLine("        val studioImage"+layerIndex+" = remember { Base64.decode("+uxNativeKotlinDataLiteral(payload)+",Base64.DEFAULT).let { bytes -> BitmapFactory.decodeByteArray(bytes,0,bytes.size)?.asImageBitmap() } }")
             appendLine("        if(studioImage"+layerIndex+" != null) Image(bitmap=studioImage"+layerIndex+"!!,contentDescription="+JSONObject.quote(e.name)+",contentScale=ContentScale.Crop,modifier=Modifier.fillMaxSize())")
         } else {
-            appendLine("        Text("+JSONObject.quote(e.text)+",color=Color(android.graphics.Color.parseColor("+JSONObject.quote(e.color)+")),fontSize="+e.fontSize+".sp,fontWeight=FontWeight("+e.fontWeight+"),modifier=Modifier.fillMaxSize())")
+            val fontCode=if(e.fontData.isNotBlank()){
+                val payload=e.fontData.substringAfter(",", "")
+                appendLine("        val studioFont"+layerIndex+" = remember { val file=File(context.cacheDir,\"studio-font-"+layerIndex+".ttf\");file.writeBytes(Base64.decode("+uxNativeKotlinDataLiteral(payload)+",Base64.DEFAULT));FontFamily(Typeface.createFromFile(file)) }")
+                "studioFont"+layerIndex
+            }else when(e.fontFamily){"monospace"->"FontFamily.Monospace";"serif"->"FontFamily.Serif";else->"FontFamily.SansSerif"}
+            appendLine("        Text("+JSONObject.quote(e.text)+",color=Color(android.graphics.Color.parseColor("+JSONObject.quote(e.color)+")),fontSize="+e.fontSize+".sp,fontWeight=FontWeight("+e.fontWeight+"),fontFamily="+fontCode+",modifier=Modifier.fillMaxSize())")
         }
         appendLine("      }")
     }
@@ -812,9 +904,11 @@ private fun uxNativeGenerateKotlin(name:String,target:String,background:String,e
 }
 
 private fun uxNativeGenerateSwift(name:String,target:String,background:String,elements:List<UxUiNativeLayer>,width:Int,height:Int):String = buildString {
-    appendLine("// Generated by enV UX/UI Studio. Native SwiftUI output with embedded raster assets and vector paths.")
+    appendLine("// Generated by enV UX/UI Studio. Native SwiftUI output with embedded raster artwork. Original SVGs remain in project JSON.")
     appendLine("import SwiftUI")
     appendLine("import UIKit")
+    appendLine("import CoreText")
+    appendLine("private func studioEmbeddedFont(_ encoded:String,size:CGFloat)->Font { guard let data=Data(base64Encoded:encoded),let provider=CGDataProvider(data:data as CFData),let font=CGFont(provider),let name=font.postScriptName else{return .system(size:size)};CTFontManagerRegisterGraphicsFont(font,nil);return .custom(name as String,size:size) }")
     appendLine("struct "+uxNativeSafeIdentifier(name)+"DesignView: View {")
     appendLine("  let target: String = "+JSONObject.quote(target))
     appendLine("  var body: some View { GeometryReader { proxy in")
@@ -831,27 +925,20 @@ private fun uxNativeGenerateSwift(name:String,target:String,background:String,el
         val visible=e.visibleOn.split(",").filter{it.isNotBlank()}.joinToString(","){JSONObject.quote(it)}
         val child=when {
             e.kind=="icon"&&e.iconSvg.isNotBlank() -> {
-                val root=Regex("(?is)<svg\\b[^>]*>").find(e.iconSvg)?.value.orEmpty()
-                val vb=uxNativeSvgAttribute(root,"viewBox")?.trim()?.split(Regex("\\s+"))?.mapNotNull{it.toFloatOrNull()}
-                val vx=vb?.getOrNull(0)?:0f;val vy=vb?.getOrNull(1)?:0f
-                val vw=(vb?.getOrNull(2)?:24f).takeIf{it>0f}?:24f
-                val vh=(vb?.getOrNull(3)?:24f).takeIf{it>0f}?:24f
-                val rootFill=uxNativeSvgAttribute(root,"fill")?:"black"
-                val rootStroke=uxNativeSvgAttribute(root,"stroke")
-                val strokeMode=(rootStroke!=null&&!rootStroke.equals("none",true))||rootFill.equals("none",true)
-                val sw=uxNativeSvgAttribute(root,"stroke-width")?.toFloatOrNull()?:2f
-                val paths=Regex("(?is)<path\\b([^>]*)>").findAll(e.iconSvg).mapNotNull{uxNativeSvgAttribute(it.groupValues.getOrElse(1){""},"d")}.toList()
-                val pathCode=paths.joinToString(","){JSONObject.quote(it)}
-                "EnVStudioNativeSVGIcon(paths:["+pathCode+"],viewBox:CGRect(x:"+vx+",y:"+vy+",width:"+vw+",height:"+vh+"),tint:Color(hex:"+JSONObject.quote(e.color)+"),stroked:"+strokeMode+",strokeWidth:"+sw+")"
+                val payload=uxNativeRasterIconData(e).substringAfter(",", "")
+                "Group { if let data = Data(base64Encoded:"+JSONObject.quote(payload)+"), let image = UIImage(data:data) { Image(uiImage:image).resizable().scaledToFit() } }"
             }
             e.kind=="image"&&e.imageData.isNotBlank() -> {
                 val payload=e.imageData.substringAfter(",", "")
                 "Group { if let data = Data(base64Encoded:"+JSONObject.quote(payload)+"), let image = UIImage(data:data) { Image(uiImage:image).resizable().scaledToFill() } else { Text("+JSONObject.quote(e.name+" image unavailable")+") } }"
             }
-            else -> "Text("+JSONObject.quote(e.text)+").font(.custom("+JSONObject.quote(e.fontFamily)+",size:"+e.fontSize+")).foregroundStyle(Color(hex:"+JSONObject.quote(e.color)+"))"
+            else -> {
+                val face=if(e.fontData.isNotBlank())"studioEmbeddedFont("+JSONObject.quote(e.fontData.substringAfter(",", ""))+",size:"+e.fontSize+")" else ".custom("+JSONObject.quote(e.fontFamily)+",size:"+e.fontSize+")"
+                "Text("+JSONObject.quote(e.text)+").font("+face+").foregroundStyle(Color(hex:"+JSONObject.quote(e.color)+"))"
+            }
         }
         appendLine("      if ["+visible+"].contains(target) {")
-        appendLine("        "+child+".frame(width:"+w+",height:"+h+",alignment:.topLeading).background(Color(hex:"+JSONObject.quote(fill)+")).clipShape(RoundedRectangle(cornerRadius:"+e.radius+")).position(x:CGFloat("+e.x+")+"+dx+"+("+w+")/2,y:CGFloat("+e.y+")+"+dy+"+("+h+")/2)")
+        appendLine("        "+child+".frame(width:"+w+",height:"+h+",alignment:.topLeading).background(Color(hex:"+JSONObject.quote(fill)+")).clipShape(RoundedRectangle(cornerRadius:"+e.radius+")).shadow(color:Color.black.opacity("+(if(e.shadow)"0.15" else "0")+"),radius:12,x:0,y:6).opacity("+e.opacity+").rotationEffect(.degrees("+e.rotation+")).position(x:CGFloat("+e.x+")+"+dx+"+("+w+")/2,y:CGFloat("+e.y+")+"+dy+"+("+h+")/2)")
         appendLine("      }")
     }
     appendLine("    }")
@@ -982,6 +1069,30 @@ private fun uxNativeGenerateSwift(name:String,target:String,background:String,el
 
 @Composable
 fun NativeUxUiStudioForm() {
+    // Inherit the effective user theme, including an explicit app override.
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val ink = if (dark) Color.White else Color.Black
+    val surface = if (dark) Color(0xFF111111) else Color.White
+    val muted = if (dark) Color(0xFFBBBBBB) else Color(0xFF555555)
+    val soft = if (dark) Color(0xFF252525) else Color(0xFFF0F0F0)
+    val outline = if (dark) Color(0xFF555555) else Color(0xFFCCCCCC)
+    val scheme = MaterialTheme.colorScheme.copy(
+        primary=ink, onPrimary=surface, primaryContainer=soft, onPrimaryContainer=ink,
+        secondary=ink, onSecondary=surface, secondaryContainer=soft, onSecondaryContainer=ink,
+        tertiary=ink, onTertiary=surface, tertiaryContainer=soft, onTertiaryContainer=ink,
+        inversePrimary=surface, inverseSurface=ink, inverseOnSurface=surface,
+        background=surface, onBackground=ink, surface=surface, onSurface=ink,
+        surfaceVariant=soft, onSurfaceVariant=muted, surfaceTint=ink,
+        surfaceDim=soft, surfaceBright=surface, surfaceContainerLowest=surface,
+        surfaceContainerLow=surface, surfaceContainer=soft, surfaceContainerHigh=soft,
+        surfaceContainerHighest=soft, outline=outline, outlineVariant=outline,
+        error=ink, onError=surface, errorContainer=soft, onErrorContainer=ink,
+    )
+    MaterialTheme(colorScheme=scheme) { NativeUxUiStudioContent() }
+}
+
+@Composable
+private fun NativeUxUiStudioContent() {
     val context=LocalContext.current;val prefs=remember{context.getSharedPreferences("env.ux-ui-studio",android.content.Context.MODE_PRIVATE)}
     val scope=rememberCoroutineScope()
     var onboarding by remember{mutableStateOf(true)};var target by remember{mutableStateOf("mobile")}
@@ -999,7 +1110,10 @@ fun NativeUxUiStudioForm() {
     var prototypeStartScreenId by remember{mutableStateOf("screen-home")}
     var showScreenManager by remember{mutableStateOf(false)}
     val undoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()};val redoHistory=remember{mutableStateListOf<List<UxUiNativeLayer>>()}
-    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("Elements")};var toolkitSearch by remember{mutableStateOf("")};var activeToolkitId by remember{mutableStateOf("icons")};var qaReport by remember{mutableStateOf(emptyList<String>())};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
+    var notice by remember{mutableStateOf("")};var showElementTray by remember{mutableStateOf(false)};var toolkitTab by remember{mutableStateOf("All 26")};var toolkitSearch by remember{mutableStateOf("")};var activeToolkitId by remember{mutableStateOf("icons")};var qaReport by remember{mutableStateOf(emptyList<String>())};var showAllLayers by remember{mutableStateOf(false)};var showAdvancedControls by remember{mutableStateOf(false)};var showCanvasSettings by remember{mutableStateOf(false)};var iconQuery by remember{mutableStateOf("")};var iconResults by remember{mutableStateOf(emptyList<String>())};var iconStart by remember{mutableIntStateOf(0)};var iconTotal by remember{mutableIntStateOf(0)};var iconLoadedQuery by remember{mutableStateOf("")};var iconCategory by remember{mutableStateOf("Navigation")};var iconPrefix by remember{mutableStateOf("all")};var fontTargetId by remember{mutableStateOf("")};var fontPreviewWords by remember{mutableStateOf("Make something beautiful")};var animateFontPreviews by remember{mutableStateOf(true)}
+    var fontQuery by remember{mutableStateOf("")};var fontCategory by remember{mutableStateOf("All")}
+    var iconBrowseLimit by remember{mutableIntStateOf(36)};
+    val bundledIconNames=remember{UxNativeArtworkLibrary.names(context)}
     var iconBusy by remember{mutableStateOf(false)};var ready by remember{mutableStateOf(false)};var hasSavedDraft by remember{mutableStateOf(false)}
     var pdfBytes by remember{mutableStateOf<ByteArray?>(null)};var jsonText by remember{mutableStateOf("")}
     var sourceText by remember{mutableStateOf("")};var sourceExtension by remember{mutableStateOf("html")}
@@ -1009,7 +1123,7 @@ fun NativeUxUiStudioForm() {
     val presetHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
     val bw=if(customArtboard)customWidth else presetWidth;val bh=if(customArtboard)customHeight else presetHeight
     val tokenJson=remember(colorTokens.toList(),spacingTokens.toList()){JSONObject().put("colors",JSONArray().apply{colorTokens.forEach{(name,value)->put(JSONObject().put("name",name).put("value",value))}}).put("spacing",JSONArray().apply{spacingTokens.forEach{put(it)}}).put("typography",JSONArray().apply{put(JSONObject().put("name","heading").put("fontFamily","sans-serif").put("fontSize",24).put("fontWeight",700).put("lineHeight",1.2));put(JSONObject().put("name","body").put("fontFamily","sans-serif").put("fontSize",16).put("fontWeight",400).put("lineHeight",1.5))})}
-    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.rotation+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
+    val signature=elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.rotation+":"+it.opacity+":"+it.shadow+":"+it.text+":"+it.color+":"+it.fill+":"+it.iconName+":"+it.iconSvg.hashCode()+":"+it.imageData.hashCode()+":"+it.fontData.hashCode()+":"+it.horizontalConstraint+":"+it.verticalConstraint+":"+it.visibleOn+":"+it.minWidth+":"+it.maxWidth+":"+it.componentKey}
     val tokenSignature=colorTokens.joinToString("|"){it.first+":"+it.second}+"|"+spacingTokens.joinToString(",")
     val reusableSignature=reusable.joinToString("|"){it.id+":"+it.componentKey+":"+it.name+":"+it.imageData.hashCode()+":"+it.iconSvg.hashCode()+":"+it.fontData.hashCode()}
     val screensSignature=screens.joinToString("||"){screen->screen.id+":"+screen.name+":"+screen.target+":"+screen.background+":"+screen.elements.joinToString("|"){it.id+":"+it.x+":"+it.y+":"+it.width+":"+it.height+":"+it.text+":"+it.fill}}
@@ -1047,7 +1161,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         }
     }
     LaunchedEffect(projectName,target,background,signature,tokenSignature,reusableSignature,screensSignature,activeScreenId,bw,bh,customArtboard,ready,onboarding){
-        if(ready&&!onboarding&&(elements.isNotEmpty()||screens.size>1))runCatching{
+        if(ready&&!onboarding&&(elements.isNotEmpty()||screens.size>1||background!="#FFFFFF"||customArtboard))runCatching{
             prefs.edit().putString("draft",uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId)).apply()
         }.onSuccess{hasSavedDraft=true}.onFailure{notice="Could not save locally; export a JSON backup."}
     }
@@ -1078,6 +1192,9 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         if(from<0||to !in elements.indices)return
         checkpoint()
         val moving=elements.removeAt(from);elements.add(to,moving)
+    }
+    fun visualEdit(id:String,change:(UxUiNativeLayer)->UxUiNativeLayer) {
+        val index=elements.indexOfFirst{it.id==id};if(index>=0)elements[index]=change(elements[index])
     }
     fun edit(id:String,change:(UxUiNativeLayer)->UxUiNativeLayer){
         val idx=elements.indexOfFirst{it.id==id}
@@ -1123,7 +1240,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
             "spacer"->UxUiNativeLayer(id,kind,"Layout spacer",24,540,80,24,"",fill="transparent",radius=0,padding=0)
             else->UxUiNativeLayer(id,"rect","Rectangle",24,540,140,90,"",fill="#DBEAFE")
         }
-        checkpoint();elements.add(e);selectedId=id;notice=e.name+" added."
+        checkpoint();elements.add(if(e.kind=="icon")e.copy(iconSvg=UxNativeArtworkLibrary.icon(context,e.iconName).orEmpty(),padding=0)else e);selectedId=id;notice=e.name+" added."
     }
 
     fun searchIcons(loadMore:Boolean=false){
@@ -1173,6 +1290,10 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         }
     }
 
+    var fontExportBytes by remember{mutableStateOf<ByteArray?>(null)}
+    val fontExportLauncher=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("font/ttf")){uri:Uri?->
+        if(uri!=null)runCatching{val bytes=fontExportBytes?:error("Choose a font first.");context.contentResolver.openOutputStream(uri)?.use{it.write(bytes)}?:error("Choose a writable destination.")}.onSuccess{notice="Font saved. Bundled font licences are included with the app."}.onFailure{notice=it.message?:"Could not save font."}
+    }
     val fontLauncher=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri:Uri?->
         if(uri!=null){
             val layerId=fontTargetId
@@ -1291,7 +1412,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         persistActiveScreen()
         val hasValidLink=elements.any{layer->layer.prototypeTargetScreenId.isNotBlank()&&screens.any{screen->screen.id==layer.prototypeTargetScreenId}}
         if(!hasValidLink){
-            activeToolkitId="prototype";showElementTray=true
+            activeToolkitId="flows";showElementTray=true
             notice="Select a layer and assign a destination screen in Prototype Studio before previewing."
             return
         }
@@ -1355,11 +1476,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         scope.launch {
             iconBusy=true
             runCatching {
-                withContext(Dispatchers.IO) {
-                    val svg=URL("https://api.iconify.design/"+icon.replace(":", "/")+".svg").readText()
-                    require(svg.contains("<svg")) { "The icon source returned invalid artwork." }
-                    svg
-                }
+                withContext(Dispatchers.IO) { UxNativeArtworkLibrary.fetchIcon(context,icon) }
             }.onSuccess { svg ->
                 edit(layerId){it.copy(iconName=icon,name=icon,iconSvg=uxNativeCleanIconSvg(svg))}
                 notice="Loaded actual SVG artwork for "+icon+". Check its source licence before shipping."
@@ -1400,45 +1517,17 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                     TextButton(onClick={onboarding=true;showElementTray=false;showCanvasSettings=false;showAdvancedControls=false;showAllLayers=false;selectedId=""}) { Text("← Projects") }
                     Spacer(Modifier.weight(1f))
                 }
-                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     FilterChip(selected=target=="mobile",onClick={target="mobile";customArtboard=false;customWidth=390;customHeight=844},label={Text("Mobile")},enabled=!prototypePreview)
                     FilterChip(selected=target=="tablet",onClick={target="tablet";customArtboard=false;customWidth=768;customHeight=1024},label={Text("Tablet")},enabled=!prototypePreview)
                     FilterChip(selected=target=="desktop",onClick={target="desktop";customArtboard=false;customWidth=1440;customHeight=900},label={Text("Desktop")},enabled=!prototypePreview)
                     if(prototypePreview){
                         OutlinedButton(onClick={backPrototypePreview()},enabled=prototypeHistory.isNotEmpty()){Text("Back")}
-                        Button(onClick={ { stopPrototypePreview() } }){Text("Exit preview")}
+                        Button(onClick={ stopPrototypePreview() }){Text("Exit preview")}
                     }else{
-                        OutlinedButton(onClick={ { startPrototypePreview() } },enabled=hasActivePrototypeLinks){Text("Preview prototype")}
-                        OutlinedButton(onClick={showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
+                        OutlinedButton(onClick={ startPrototypePreview() },enabled=hasActivePrototypeLinks){Text("Preview prototype")}
+                        OutlinedButton(onClick={selectedId="";showCanvasSettings=!showCanvasSettings}){Text(if(showCanvasSettings)"Hide setup" else "Fine-tune")}
                     }
-                }
-                if(showCanvasSettings){
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically){
-                    OutlinedButton(onClick={undo()},enabled=undoHistory.isNotEmpty()){Text("Undo")}
-                    OutlinedButton(onClick={redo()},enabled=redoHistory.isNotEmpty()){Text("Redo")}
-                    Text("Drag layers to reposition.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text("ARTBOARD · "+bw+" × "+bh+" px · "+elements.size+" layers",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
-                    Checkbox(checked=customArtboard,onCheckedChange={customArtboard=it},modifier=Modifier.size(28.dp))
-                    Text("Custom",style=MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(customWidth.toString(),{v->v.toIntOrNull()?.let{customWidth=it.coerceIn(160,4096)}},label={Text("Width px")},enabled=customArtboard,modifier=Modifier.weight(1f),singleLine=true)
-                    OutlinedTextField(customHeight.toString(),{v->v.toIntOrNull()?.let{customHeight=it.coerceIn(240,4096)}},label={Text("Height px")},enabled=customArtboard,modifier=Modifier.weight(1f),singleLine=true)
-                }
-                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    listOf("mobile-dashboard" to "Mobile dashboard","mobile-login" to "Mobile login","tablet-dashboard" to "Tablet dashboard","tablet-settings" to "Tablet settings","desktop-landing" to "Website landing","desktop-dashboard" to "Desktop dashboard","desktop-settings" to "Desktop settings").forEach{(id,label)->
-                        OutlinedButton(onClick={
-                            checkpoint()
-                            target=when{ id.startsWith("mobile")->"mobile";id.startsWith("tablet")->"tablet";else->"desktop"}
-                            customArtboard=false
-                            customWidth=if(target=="mobile")390 else if(target=="tablet")768 else 1440
-                            customHeight=if(target=="mobile")844 else if(target=="tablet")1024 else 900
-                            elements.clear()
-                            elements.addAll(uxNativePreset(target,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)})
-                            selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."
-                        }){Text(label,maxLines=1)}
-                    }
-                }
                 }
                 Card{Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
                     Text(if(target=="mobile")"Phone mockup" else if(target=="tablet")"Tablet mockup" else "Desktop mockup",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
@@ -1447,18 +1536,20 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         val width=(maxWidth.value-bezel*2).coerceAtLeast(140f).coerceAtMost(if(target=="mobile")390f else if(target=="tablet")768f else 1040f)
                         val scale=width/bw.toFloat()
                         Column(horizontalAlignment=Alignment.CenterHorizontally){
-                            Box(Modifier.width((width+bezel*2).dp).clip(RoundedCornerShape(if(target=="mobile")46.dp else if(target=="tablet")25.dp else 10.dp)).background(Color(0xFF0B0C0E)).padding(bezel.dp)){
-                                Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(if(target=="mobile")38.dp else if(target=="tablet")16.dp else 2.dp)).background(uxNativeColor(background))){
+                            Box(Modifier.width((width+bezel*2).dp).clip(RoundedCornerShape(if(target=="mobile")46.dp else if(target=="tablet")25.dp else 10.dp)).background(Color(0xFF0B0C0E)).clickable(enabled=!prototypePreview){selectedId="";showCanvasSettings=true;showElementTray=false}.padding(bezel.dp)){
+                                Box(Modifier.width(width.dp).height((bh*scale).dp).clip(RoundedCornerShape(if(target=="mobile")38.dp else if(target=="tablet")16.dp else 2.dp)).background(uxNativeColor(background)).clickable(enabled=!prototypePreview){selectedId="";showCanvasSettings=true;showElementTray=false}){
                             Box(Modifier.size(bw.dp,bh.dp).graphicsLayer(scaleX=scale,scaleY=scale,transformOrigin=TransformOrigin(0f,0f))){
                                 val dragDensity=androidx.compose.ui.platform.LocalDensity.current.density
                         elements.filter{it.visibleOn.split(",").map(String::trim).contains(target)}.forEach{e->
                                     val shape=uxNativeComposeShape(e.kind,e.radius)
-                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape).padding(e.padding.dp).pointerInput(e.id,scale,dragDensity,prototypePreview){
+                                    Box(Modifier.offset(uxNativeLayerX(e,bw).dp,uxNativeLayerY(e,bh).dp).size(uxNativeLayerWidth(e,bw).dp,uxNativeLayerHeight(e,bh).dp).graphicsLayer(rotationZ=e.rotation,alpha=e.opacity).shadow(if(e.shadow)12.dp else 0.dp,shape).clip(shape).background(uxNativeColor(e.fill,android.graphics.Color.TRANSPARENT)).then(if(selectedId==e.id||e.borderWidth>0)Modifier.border(if(selectedId==e.id)2.dp else e.borderWidth.dp,if(selectedId==e.id)MaterialTheme.colorScheme.primary else uxNativeColor(e.borderColor,android.graphics.Color.LTGRAY),shape)else Modifier).padding(e.padding.dp).clickable(enabled=!prototypePreview){if(e.name=="Background artwork"){selectedId="";showCanvasSettings=true}else{selectedId=e.id;showCanvasSettings=false};showElementTray=false}.pointerInput(e.id,scale,dragDensity,prototypePreview){
                                         if(prototypePreview){
                                             detectTapGestures(onTap={navigatePrototype(e.prototypeTargetScreenId)})
+                                        }else if(e.name=="Background artwork"){
+                                            detectTapGestures(onTap={selectedId="";showCanvasSettings=true;showElementTray=false})
                                         }else{
                                             val density=dragDensity
-                                            detectDragGestures(onDragStart={selectedId=e.id;checkpoint()}){change,dragAmount->
+                                            detectDragGestures(onDragStart={selectedId=e.id;showCanvasSettings=false;showElementTray=false;checkpoint()}){change,dragAmount->
                                                 change.consume()
                                                 val index=elements.indexOfFirst{it.id==e.id}
                                                 if(index>=0){val current=elements[index];elements[index]=current.copy(x=(current.x+(dragAmount.x/(density*scale)).roundToInt()).coerceAtLeast(0),y=(current.y+(dragAmount.y/(density*scale)).roundToInt()).coerceAtLeast(0))}
@@ -1534,8 +1625,8 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                                 Column(Modifier.fillMaxWidth().padding(9.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                                     OutlinedTextField(value=screen.name,onValueChange={renameAppScreen(screen.id,it)},label={Text("Screen name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                                     Text(screen.target+" · "+screen.elements.size+" layers · "+screen.customWidth+"×"+screen.customHeight,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Row(horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically){
-                                        Button(onClick={activateScreen(screen.id)},enabled=screen.id!=activeScreenId,modifier=Modifier.weight(1f)){Text(if(screen.id==activeScreenId)"Editing" else "Open")}
+                                    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically){
+                                        Button(onClick={activateScreen(screen.id)},enabled=screen.id!=activeScreenId){Text(if(screen.id==activeScreenId)"Editing" else "Open")}
                                         OutlinedButton(onClick={reorderAppScreen(screen.id,-1)},enabled=screenIndex>0,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↑")}
                                         OutlinedButton(onClick={reorderAppScreen(screen.id,1)},enabled=screenIndex<screens.lastIndex,contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("↓")}
                                         OutlinedButton(onClick={duplicateAppScreen(screen.id)},contentPadding=PaddingValues(horizontal=8.dp,vertical=6.dp)){Text("Duplicate")}
@@ -1602,118 +1693,28 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         OutlinedButton(onClick={checkpoint();elements.removeAll{it.id==selectedElement.id};selectedId="";showAdvancedControls=false}){Text("Delete")}
                     }
                 }
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    Text("Studio toolkit",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick={showElementTray=!showElementTray}){Text(if(showElementTray)"Close" else "+ Add")}
-                }
-                if(showElementTray){
-                    Card { Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                            listOf("All 26","Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
-                        }
-                        when(toolkitTab){
-                            "All 26" -> {
-                                Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                                Text("Choose a toolkit to open its native controls. Where a dedicated engine is not ready, the status below says so instead of reporting a mock implementation as complete.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                uxNativeToolkits.filter{toolkit->toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
-                                    Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
-                                        Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
-                                        Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                                            Text(toolkit.status,style=MaterialTheme.typography.labelSmall,color=if(toolkit.status=="Not complete")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,modifier=Modifier.weight(1f))
-                                            OutlinedButton(onClick={
-                                                activeToolkitId=toolkit.id
-                                                when(toolkit.id){
-                                                    "icons"->{toolkitTab="Icons"}
-                                                    "typography"->{toolkitTab="Fonts"}
-                                                    "color","brand","design-system"->{toolkitTab="Tokens"}
-                                                    "background"->{toolkitTab="Tokens";showCanvasSettings=true}
-                                                    "effects"->{showAdvancedControls=true;notice="Use the selected-layer Style and Fine-tune design controls."}
-                                                    "illustrations","media","components","assets","inspiration"->{toolkitTab="Elements"}
-                                                    "motion"->{showAdvancedControls=true;notice="Use rotation, opacity and style controls for the selected layer."}
-                                                    "device","platform"->{toolkitTab="All 26";notice="The native canvas target selector supports mobile, tablet and desktop previews."}
-                                                    "responsive"->{showCanvasSettings=true;toolkitTab="All 26"}
-                                                    "projects"->{toolkitTab="Presets"}
-                                                    "layers"->{showAllLayers=true;toolkitTab="All 26"}
-                                                    "prototype"->{toolkitTab="All 26";showAdvancedControls=true;notice="Assign tap destinations to layers, then preview the connected screen flow. Overlay interactions are not yet supported."}
-                                                    "content"->{toolkitTab="All 26";add("text");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Welcome heading",text="Welcome back")}}}
-                                                    "data-viz"->{toolkitTab="All 26";add("chart");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Sample chart",text="Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67")}}}
-                                                    "patterns"->{toolkitTab="All 26";showCanvasSettings=true;add("star");elements.lastOrNull()?.id?.let{id->edit(id){it.copy(name="Decorative star")}}}
-                                                    "3d"->{toolkitTab="All 26";notice="Live GLB/GLTF rendering, camera and lighting are not implemented in this editor. Import a rendered preview instead."}
-                                                    "accessibility","qa"->{
-                                                        val findings=mutableListOf<String>()
-                                                        if(elements.isEmpty())findings.add("No layers have been added yet.")
-                                                        elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
-                                                        val decorativeKinds=setOf("image","icon","rect","ellipse","divider","spacer","triangle","diamond","hexagon","star","line")
-                                                        elements.filter{it.kind !in decorativeKinds && it.text.isNotBlank()}.forEach{e->
-                                                            val rawFill=e.fill.trim()
-                                                            val surface=if(rawFill.isEmpty()||rawFill.equals("transparent",true)||rawFill.equals("none",true))background else rawFill
-                                                            val ratio=NativeAccessibilityEngine.contrastRatio(e.color,surface)
-                                                            if(ratio==null)findings.add(e.name+" text contrast could not be calculated for these colors; manually review contrast.")
-                                                            else{
-                                                                val large=e.fontSize>=24||(e.fontSize>=19&&e.fontWeight>=700)
-                                                                val threshold=if(large)3.0 else 4.5
-                                                                if(ratio+1e-9<threshold)findings.add(e.name+" text contrast is "+((ratio*100).roundToInt()/100.0)+":1; WCAG AA "+(if(large)"large-text" else "normal-text")+" requires at least "+threshold+":1 for this solid-color pair.")
-                                                            }
-                                                        }
-                                                        for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
-                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
-                                                    }
-                                                    "handoff"->{toolkitTab="All 26";notice="Use Design handoff below to export the native PDF, project JSON and source handoff."}
-                                                }
-                                            },contentPadding=PaddingValues(horizontal=10.dp,vertical=6.dp)){Text("Open")}
-                                        }
-                                    }}
-                                }
-                                if(qaReport.isNotEmpty()||activeToolkitId=="qa"||activeToolkitId=="accessibility"){
-                                    Text("Review results · ${qaReport.size}",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
-                                    if(qaReport.isEmpty())Text("No findings in the limited checks run.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                    qaReport.take(80).forEach{finding->Text("• "+finding,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-                                }
-                            }
-                            "Icons" -> {
-                                OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                                OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
-                                val iconLayer=selectedElement?.takeIf{it.kind=="icon"}
-                                if(iconLayer!=null && iconResults.isNotEmpty())Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){iconResults.filter{it.contains(toolkitSearch,true)||it.contains(iconQuery,true)}.take(24).forEach{icon->OutlinedButton(onClick={chooseIcon(iconLayer.id,icon)}){Text(icon.substringAfter(":"))}}}
-                                Text("Add an icon element first, then choose its artwork here.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            "Elements" -> {
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                                    listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").filter{(kind,label)->label.contains(toolkitSearch,true)||kind.contains(toolkitSearch,true)}.forEach{(kind,label)->OutlinedButton(onClick={add(kind)}){Text(label)}}
-                                }
-                            }
-                            "Presets" -> {
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                                    listOf("mobile-dashboard" to "Mobile app","mobile-login" to "Login screen","tablet-dashboard" to "Tablet app","desktop-landing" to "Website").filter{(id,label)->label.contains(toolkitSearch,true)||id.contains(toolkitSearch,true)}.forEach{(id,label)->OutlinedButton(onClick={checkpoint();val newTarget=when{ id.startsWith("tablet")->"tablet";id.startsWith("desktop")->"desktop";else->"mobile"};target=newTarget;customArtboard=false;customWidth=if(newTarget=="mobile")390 else if(newTarget=="tablet")768 else 1440;customHeight=if(newTarget=="mobile")844 else if(newTarget=="tablet")1024 else 900;elements.clear();elements.addAll(uxNativePreset(newTarget,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)});selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label)}}
-                                }
-                                OutlinedButton(onClick={presetImportLauncher.launch(arrayOf("application/json"))},modifier=Modifier.fillMaxWidth()){Text("Import preset / project JSON")}
-                                Text("Presets can be loaded into this project and customised.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            "Fonts" -> {
-                                Text("Choose a text layer, then browse or import a font.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Search font families")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("All","Sans serif","Serif","Monospace","Display","Handwriting").forEach{category->FilterChip(selected=fontCategory==category,onClick={fontCategory=category},label={Text(category)})}}
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)&&it.contains(toolkitSearch,true)}.take(28).forEach{family->OutlinedButton(onClick={val fontLayer=selectedElement;fontLayer?.let{item->edit(item.id){it.copy(fontFamily=family,fontData="")}}}){Text(family)}}}
-                                if(selectedElement!=null)OutlinedButton(onClick={fontTargetId=selectedElement.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text("Import font (TTF / OTF)")}
-                            }
-                            "Tokens" -> {
-                                Text("Tap a colour to apply it to the selected element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){colorTokens.filter{it.first.contains(toolkitSearch,true)||it.second.contains(toolkitSearch,true)}.forEach{(name,value)->OutlinedButton(onClick={val colorLayer=selectedElement;if(colorLayer!=null)edit(colorLayer.id){it.copy(fill=value)}else background=value}){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}}
-                            }
-                        }
-                    }}
-                }
-                Text(if(elements.isEmpty())"Layers" else "Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-                elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id},label={Text(e.name,maxLines=1)})}
-                if(elements.isEmpty())Text("No layers yet. Tap + to add your first element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-                if(elements.size>6)OutlinedButton(onClick={showAllLayers=!showAllLayers}){Text(if(showAllLayers)"see less" else "see more")}
                 selected?.let{e->
                     Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                         val shortEdge=minOf(e.width,e.height).coerceAtLeast(1)
-                        Text("Style",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        Text("Style · "+e.name,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        Text("Drag to move. Use these sliders to change the look.",style=MaterialTheme.typography.bodySmall)
+                        UxNativeVisualSlider("Size",e.width.toFloat(),12f..(bw-e.x).coerceAtLeast(13).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(width=v.roundToInt(),height=(it.height*v/it.width.coerceAtLeast(1)).roundToInt().coerceAtLeast(12))}}
+                        UxNativeVisualSlider("Turn",e.rotation,-180f..180f,{checkpoint()}){v->visualEdit(e.id){it.copy(rotation=v)}}
+                        UxNativeVisualSlider("Roundness",e.radius.toFloat(),0f..maxOf(1,e.radius,shortEdge/2).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(radius=v.roundToInt())}}
+                        UxNativeVisualSlider("Border",e.borderWidth.toFloat(),0f..20f,{checkpoint()}){v->visualEdit(e.id){it.copy(borderWidth=v.roundToInt())}}
+                        if(e.kind !in setOf("image","icon","rect","ellipse","divider","line")){
+                            UxNativeVisualSlider("Text size",e.fontSize.toFloat(),8f..maxOf(160,e.fontSize).toFloat(),{checkpoint()}){v->visualEdit(e.id){it.copy(fontSize=v.roundToInt())}}
+                            OutlinedButton(onClick={toolkitTab="Fonts";showElementTray=true},modifier=Modifier.fillMaxWidth()){Text("Choose a font")}
+                        }
+                        Text("Text or icon color",style=MaterialTheme.typography.labelLarge)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            colorTokens.forEach{(name,value)->OutlinedButton(onClick={edit(e.id){it.copy(color=value)}}){Box(Modifier.size(26.dp).background(uxNativeColor(value),CircleShape));Text(name)}}
+                        }
+                        if(e.kind=="image")OutlinedButton(onClick={imageTargetId=e.id;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text("Replace image")}
+                        if(e.kind=="icon")OutlinedButton(onClick={toolkitTab="Icons";activeToolkitId="icons";showElementTray=true},modifier=Modifier.fillMaxWidth()){Text("Choose icon artwork")}
+                        Text("Opacity · "+(e.opacity*100).roundToInt()+"%",style=MaterialTheme.typography.labelLarge)
+                        Slider(value=e.opacity,onValueChange={v->edit(e.id){it.copy(opacity=v)}},valueRange=0f..1f)
+                        Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=e.shadow,onCheckedChange={v->edit(e.id){it.copy(shadow=v)}});Text("Drop shadow")}
                         Text("Prototype destination",style=MaterialTheme.typography.labelLarge)
                         val prototypeDestinations=screens.filter{it.id!=activeScreenId}
                         if(prototypeDestinations.isEmpty())Text("Add another screen to connect this layer.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1721,7 +1722,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             FilterChip(selected=e.prototypeTargetScreenId.isBlank(),onClick={edit(e.id){it.copy(prototypeTargetScreenId="")}},label={Text("None")})
                             prototypeDestinations.forEach{screen->FilterChip(selected=e.prototypeTargetScreenId==screen.id,onClick={edit(e.id){it.copy(prototypeTargetScreenId=screen.id)}},label={Text(screen.name,maxLines=1)})}
                         }
-                        if(hasActivePrototypeLinks)OutlinedButton(onClick={ { startPrototypePreview() } },modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
+                        if(hasActivePrototypeLinks)OutlinedButton(onClick={ startPrototypePreview() },modifier=Modifier.fillMaxWidth()){Text("Preview prototype")}
                         if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text(if(e.kind=="chart")"Chart data (title, then Label: value)" else "Text on canvas")},modifier=Modifier.fillMaxWidth(),maxLines=if(e.kind=="chart")8 else 3)
                         Text("Corner style",style=MaterialTheme.typography.labelLarge)
                         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
@@ -1733,9 +1734,12 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){
                             colorTokens.forEach{(name,value)->OutlinedButton(onClick={edit(e.id){it.copy(fill=value)}}){Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){Box(Modifier.size(16.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}
                         }
-                        OutlinedButton(onClick={showAdvancedControls=!showAdvancedControls},modifier=Modifier.fillMaxWidth()){Text(if(showAdvancedControls)"Hide fine-tune design" else "Fine-tune design")}
+                        OutlinedButton(onClick={showAdvancedControls=!showAdvancedControls},modifier=Modifier.fillMaxWidth()){Text(if(showAdvancedControls)"Hide more options" else "More options")}
                         if(showAdvancedControls){
-                        Text("Detailed measurements",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        Text("More options",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        OutlinedTextField(e.color,{v->edit(e.id){it.copy(color=v)}},label={Text("Text / icon color")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        OutlinedTextField(e.fill,{v->edit(e.id){it.copy(fill=v)}},label={Text("Fill color / transparent")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+
                         OutlinedTextField(e.name,{v->edit(e.id){it.copy(name=v)}},label={Text("Layer name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                         if(e.kind !in setOf("icon","ellipse","rect","divider"))OutlinedTextField(e.text,{v->edit(e.id){it.copy(text=v)}},label={Text("Text content")},modifier=Modifier.fillMaxWidth(),maxLines=4)
                         Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
@@ -1759,7 +1763,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         }
                         Column(Modifier.fillMaxWidth().heightIn(max=230.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
                             uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)}.forEach{family->
-                                OutlinedButton(onClick={edit(e.id){it.copy(fontFamily=family,fontData="")}},modifier=Modifier.fillMaxWidth()){
+                                OutlinedButton(onClick={edit(e.id){it.copy(fontFamily=family,fontData=uxNativeBundledFontData(context,family))}},modifier=Modifier.fillMaxWidth()){
                                     Column(Modifier.fillMaxWidth()){
                                         Text(family)
                                         Text("Aa Bb Cc 0123",fontFamily=FontFamily(uxNativeTypeface(context,e.copy(fontFamily=family,fontData=""))),fontSize=13.sp)
@@ -1810,7 +1814,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         if(e.kind=="icon"){
                             Text("Browse icons by category and visual style",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                                uxNativeIconCategories.keys.forEach{category->FilterChip(selected=iconCategory==category,onClick={iconCategory=category},label={Text(category)})}
+                                (listOf("All bundled")+uxNativeIconCategories.keys).forEach{category->FilterChip(selected=iconCategory==category,onClick={iconCategory=category;iconBrowseLimit=36},label={Text(category)})}
                             }
                             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
                                 uxNativeIconStyles.forEach{(prefix,label)->FilterChip(selected=iconPrefix==prefix,onClick={iconPrefix=prefix;iconStart=0;iconResults=emptyList();iconTotal=0},label={Text(label)})}
@@ -1836,7 +1840,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                             if(iconQuery.isNotBlank()&&iconResults.size<iconTotal)OutlinedButton(onClick={searchIcons(true)},enabled=!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Loading…" else "Load more icons · "+iconResults.size+" / "+iconTotal)}
                             Text("The category browser shows curated icon variants immediately. Search pages the online Iconify catalog; selected SVG artwork is embedded in the project. Check each icon set's licence.",style=MaterialTheme.typography.bodySmall)
                         }
-                        Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){
+                        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){
                             OutlinedButton(onClick={val copy=e.copy(id="layer-"+System.nanoTime(),name=e.name+" copy",x=e.x+16,y=e.y+16);checkpoint();elements.add(copy);selectedId=copy.id},modifier=Modifier.weight(1f)){Text("Duplicate")}
                             OutlinedButton(onClick={moveLayer(e.id,-1)},modifier=Modifier.weight(1f)){Text("Move up")}
                             OutlinedButton(onClick={moveLayer(e.id,1)},modifier=Modifier.weight(1f)){Text("Move down")}
@@ -1847,6 +1851,235 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         }
                     }}
                 }
+                if(selected==null && showCanvasSettings && !prototypePreview){
+                    Card{Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                        Text("Canvas styling",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                        Text("Tap an object to style it, or tap the screen background to return here.",style=MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(background,{background=it},label={Text("Background color · hex")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            listOf("#FFFFFF","#F8FAFC","#DBEAFE","#111827","#000000","#FDF2F8").forEach{value->OutlinedButton(onClick={background=value},contentPadding=PaddingValues(8.dp)){Box(Modifier.size(32.dp).background(uxNativeColor(value),RoundedCornerShape(6.dp)).border(1.dp,MaterialTheme.colorScheme.outline,RoundedCornerShape(6.dp)))}}
+                        }
+                        Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=customArtboard,onCheckedChange={customArtboard=it});Text("Custom artboard size")}
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            OutlinedTextField(customWidth.toString(),{it.toIntOrNull()?.let{n->customWidth=n.coerceIn(160,4096)}},label={Text("Width px")},enabled=customArtboard,modifier=Modifier.weight(1f),singleLine=true)
+                            OutlinedTextField(customHeight.toString(),{it.toIntOrNull()?.let{n->customHeight=n.coerceIn(240,4096)}},label={Text("Height px")},enabled=customArtboard,modifier=Modifier.weight(1f),singleLine=true)
+                        }
+                        Text("Current size: $bw × $bh px",style=MaterialTheme.typography.labelMedium)
+                        OutlinedButton(onClick={activeToolkitId="background";toolkitTab="Details";showElementTray=true},modifier=Modifier.fillMaxWidth()){Text("Gradients & background artwork")}
+                        if(elements.any{it.name=="Background artwork"})OutlinedButton(onClick={checkpoint();elements.removeAll{it.name=="Background artwork"}},modifier=Modifier.fillMaxWidth()){Text("Remove background artwork")}
+
+                    }}
+                }
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text("Studio toolkit",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick={showElementTray=!showElementTray}){Text(if(showElementTray)"Close" else "+ Add")}
+                }
+                if(showElementTray){
+                    Dialog(onDismissRequest={showElementTray=false},properties=DialogProperties(usePlatformDefaultWidth=false)){
+                    Card(Modifier.fillMaxWidth().padding(horizontal=12.dp).heightIn(max=LocalConfiguration.current.screenHeightDp.dp*.84f)) { Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Studio toolkit",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={showElementTray=false}){Text("Done")}}
+
+                        OutlinedTextField(toolkitSearch,{toolkitSearch=it},label={Text("Search tools, fonts and icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                        Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            listOf("All 26","Icons","Elements","Presets","Fonts","Tokens").forEach{tab->FilterChip(selected=toolkitTab==tab,onClick={toolkitTab=tab},label={Text(tab)})}
+                        }
+                        when(toolkitTab){
+                            "All 26" -> {
+                                Text("All 26 Studio toolkits",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                                Text("Browse visual samples, then open a tool. Changes apply to the selected layer; canvas tools style the screen background.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                uxNativeToolkits.filter{toolkit->toolkitSearch.isBlank()||toolkit.name.contains(toolkitSearch,true)||toolkit.description.contains(toolkitSearch,true)||toolkit.id.contains(toolkitSearch,true)}.forEach{toolkit->
+                                    Card { Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                                        UxNativeToolkitSample(toolkit.id)
+                                        Text(toolkit.name,style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                        Text(toolkit.description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                            Text(toolkit.status,style=MaterialTheme.typography.labelSmall,color=if(toolkit.status=="Not complete")MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,modifier=Modifier.weight(1f))
+                                            OutlinedButton(onClick={
+                                                activeToolkitId=toolkit.id
+                                                when(toolkit.id){
+                                                    "icons"->{toolkitTab="Icons"}
+                                                    "typography"->{toolkitTab="Fonts"}
+                                                    "color","brand","design-system"->{toolkitTab="Tokens"}
+                                                    "illustrations","media","components","assets","inspiration"->{toolkitTab="Elements"}
+                                                    "projects"->{toolkitTab="Presets"}
+                                                    "accessibility","qa"->{
+                                                        val findings=mutableListOf<String>()
+                                                        if(elements.isEmpty())findings.add("No layers have been added yet.")
+                                                        elements.forEach{e->if(e.x<0||e.y<0||e.x+e.width>bw||e.y+e.height>bh)findings.add(e.name+" extends beyond the artboard.");if(e.width<44||e.height<44)findings.add(e.name+" may be smaller than a comfortable touch target.");if(e.name.isBlank())findings.add("An unnamed layer exists.");if(e.kind=="icon"&&e.iconSvg.isBlank())findings.add(e.name+" has no embedded icon SVG.")}
+                                                        val decorativeKinds=setOf("image","icon","rect","ellipse","divider","spacer","triangle","diamond","hexagon","star","line")
+                                                        elements.filter{it.kind !in decorativeKinds && it.text.isNotBlank()}.forEach{e->
+                                                            val rawFill=e.fill.trim()
+                                                            val surface=if(rawFill.isEmpty()||rawFill.equals("transparent",true)||rawFill.equals("none",true))background else rawFill
+                                                            val ratio=NativeAccessibilityEngine.contrastRatio(e.color,surface)
+                                                            if(ratio==null)findings.add(e.name+" text contrast could not be calculated for these colors; manually review contrast.")
+                                                            else{
+                                                                val large=e.fontSize>=24||(e.fontSize>=19&&e.fontWeight>=700)
+                                                                val threshold=if(large)3.0 else 4.5
+                                                                if(ratio+1e-9<threshold)findings.add(e.name+" text contrast is "+((ratio*100).roundToInt()/100.0)+":1; WCAG AA "+(if(large)"large-text" else "normal-text")+" requires at least "+threshold+":1 for this solid-color pair.")
+                                                            }
+                                                        }
+                                                        for(i in elements.indices)for(j in i+1 until elements.size){val a=elements[i];val b=elements[j];if(minOf(a.x+a.width,b.x+b.width)>maxOf(a.x,b.x)&&minOf(a.y+a.height,b.y+b.height)>maxOf(a.y,b.y))findings.add(a.name+" overlaps "+b.name+".")}
+                                                        qaReport=findings;toolkitTab="All 26";notice="Studio check completed: "+findings.size+" potential finding(s). Solid-color text contrast is included; gradients and images need manual review. This is advisory, not a WCAG certification."
+                                                    }
+                                                    else->{toolkitTab="Details"}
+                                                }
+                                            },contentPadding=PaddingValues(horizontal=10.dp,vertical=6.dp)){Text("Open")}
+                                        }
+                                    }}
+                                }
+                                if(qaReport.isNotEmpty()||activeToolkitId=="qa"||activeToolkitId=="accessibility"){
+                                    Text("Review results · ${qaReport.size}",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
+                                    if(qaReport.isEmpty())Text("No findings in the limited checks run.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                    qaReport.take(80).forEach{finding->Text("• "+finding,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                                }
+                            }
+                            "Details" -> {
+                                val tool=uxNativeToolkits.firstOrNull{it.id==activeToolkitId}
+                                Text(tool?.name.orEmpty(),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                                UxNativeToolkitSample(activeToolkitId)
+                                Text(tool?.description.orEmpty(),style=MaterialTheme.typography.bodySmall)
+                                when(activeToolkitId){
+                                    "effects"->{
+                                        Text("Apply an effect to the selected layer. Add a surface to try the samples.",style=MaterialTheme.typography.bodySmall)
+                                        if(selectedElement==null)Button(onClick={add("card")},modifier=Modifier.fillMaxWidth()){Text("Add a surface to style")}
+                                        listOf("None","Soft shadow","Translucent","Outline","Rounded","Pill","Tilt left","Tilt right").chunked(2).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                                            row.forEach{effect->OutlinedButton(enabled=selectedElement!=null,onClick={selectedElement?.let{layer->edit(layer.id){item->when(effect){"None"->item.copy(opacity=1f,shadow=false,borderWidth=0,rotation=0f);"Soft shadow"->item.copy(shadow=true);"Translucent"->item.copy(opacity=.5f);"Outline"->item.copy(borderWidth=2,borderColor="#2563EB");"Rounded"->item.copy(radius=18);"Pill"->item.copy(radius=minOf(item.width,item.height)/2);"Tilt left"->item.copy(rotation=-12f);else->item.copy(rotation=12f)}}}},modifier=Modifier.weight(1f),shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(12.dp)){
+                                                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
+                                                    val shape=RoundedCornerShape(if(effect=="Pill")30.dp else if(effect=="Rounded")14.dp else 6.dp)
+                                                    Box(Modifier.size(62.dp,38.dp).graphicsLayer(alpha=if(effect=="Translucent").5f else 1f,rotationZ=if(effect=="Tilt left")-12f else if(effect=="Tilt right")12f else 0f).shadow(if(effect=="Soft shadow")8.dp else 0.dp,shape).background(MaterialTheme.colorScheme.primaryContainer,shape).then(if(effect=="Outline")Modifier.border(2.dp,MaterialTheme.colorScheme.primary,shape)else Modifier))
+                                                    Text(effect,fontSize=12.sp,maxLines=2)
+                                                }
+                                            }}
+                                        }}
+                                    }
+                                    "background","patterns"->{
+                                        Text("Portable background artwork is embedded in the project and exports.",style=MaterialTheme.typography.bodySmall)
+                                        val samples=if(activeToolkitId=="patterns")listOf("Dots","Grid","Stripes","Checkerboard") else listOf("Ocean","Sunset","Forest","Radial glow")
+                                        samples.forEach{sample->OutlinedButton(onClick={
+                                            checkpoint()
+                                            val artwork=UxUiNativeLayer("background-"+System.nanoTime(),"image","Background artwork",0,0,bw,bh,"",padding=0,radius=0,imageData=uxNativeBackgroundArtwork(sample,bw,bh),referenceWidth=bw,referenceHeight=bh)
+                                            elements.removeAll{it.name=="Background artwork"};elements.add(0,artwork);selectedId="";showCanvasSettings=true;notice=sample+" background applied."
+                                        },modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp)){
+                                            val preview=remember(sample){uxNativeBackgroundArtwork(sample,280,68)}
+                                            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(5.dp)){UxUiNativeArtworkPreview(UxUiNativeLayer("sample","image",sample,0,0,280,68,"",imageData=preview),Modifier.fillMaxWidth().height(68.dp),monochrome=true);Text(sample)}
+                                        }}
+                                        OutlinedButton(onClick={checkpoint();elements.removeAll{it.name=="Background artwork"}},modifier=Modifier.fillMaxWidth()){Text("Remove background artwork")}
+                                        OutlinedButton(onClick={selectedId="";showCanvasSettings=true;showElementTray=false},modifier=Modifier.fillMaxWidth()){Text("Canvas color & size")}
+                                    }
+                                    "motion","transform"->{
+                                        if(selectedElement==null)Text("Select a layer in the canvas or add a shape to transform.")
+                                        else{
+                                            Text("Rotation · "+selectedElement.rotation.roundToInt()+"°")
+                                            Slider(selectedElement.rotation.coerceIn(-180f,180f),{angle->edit(selectedElement.id){it.copy(rotation=angle)}},valueRange=-180f..180f)
+                                            OutlinedButton(onClick={edit(selectedElement.id){it.copy(x=((bw-it.width)/2).coerceAtLeast(0),y=((bh-it.height)/2).coerceAtLeast(0))}},modifier=Modifier.fillMaxWidth()){Text("Center on canvas")}
+                                            OutlinedButton(onClick={edit(selectedElement.id){it.copy(rotation=0f)}},modifier=Modifier.fillMaxWidth()){Text("Reset rotation")}
+                                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*1.1f).roundToInt(),height=(it.height*1.1f).roundToInt())}},modifier=Modifier.weight(1f)){Text("Size +")};OutlinedButton(onClick={edit(selectedElement.id){it.copy(width=(it.width*.9f).roundToInt().coerceAtLeast(1),height=(it.height*.9f).roundToInt().coerceAtLeast(1))}},modifier=Modifier.weight(1f)){Text("Size −")}}
+                                        }
+                                        OutlinedButton(onClick={add("rect")},modifier=Modifier.fillMaxWidth()){Text("Add a shape")}
+                                        Text("Rotation edits the saved design. Animated timelines are not part of this editor.",style=MaterialTheme.typography.bodySmall)
+                                    }
+                                    "device","platform"->{
+                                        listOf("mobile" to "Phone · 390 × 844","tablet" to "Tablet · 768 × 1024","desktop" to "Desktop · 1440 × 900").forEach{(mode,label)->OutlinedButton(onClick={target=mode;customArtboard=false;customWidth=if(mode=="mobile")390 else if(mode=="tablet")768 else 1440;customHeight=if(mode=="mobile")844 else if(mode=="tablet")1024 else 900},modifier=Modifier.fillMaxWidth()){Text(if(target==mode)"✓ "+label else label)}}
+                                        selectedElement?.let{layer->Text("Show selected layer on",style=MaterialTheme.typography.labelLarge);listOf("mobile","tablet","desktop").forEach{mode->Row(verticalAlignment=Alignment.CenterVertically){val visible=layer.visibleOn.split(",");Checkbox(checked=mode in visible,onCheckedChange={checked->val next=if(checked)visible+mode else visible-mode;if(next.isNotEmpty())edit(layer.id){it.copy(visibleOn=next.distinct().joinToString(","))}});Text(mode)}}}
+                                    }
+                                    "responsive"->{
+                                        OutlinedButton(onClick={selectedId="";showCanvasSettings=true;showElementTray=false},modifier=Modifier.fillMaxWidth()){Text("Edit canvas dimensions")}
+                                        selectedElement?.let{layer->Text("Horizontal constraint");listOf("left","center","right","stretch").forEach{anchor->FilterChip(selected=layer.horizontalConstraint==anchor,onClick={edit(layer.id){it.copy(horizontalConstraint=anchor,referenceWidth=bw,referenceHeight=bh)}},label={Text(anchor)})};Text("Vertical constraint");listOf("top","center","bottom","stretch").forEach{anchor->FilterChip(selected=layer.verticalConstraint==anchor,onClick={edit(layer.id){it.copy(verticalConstraint=anchor,referenceWidth=bw,referenceHeight=bh)}},label={Text(anchor)})}}
+                                    }
+                                    "layers"->{
+                                        if(elements.isEmpty())Text("Your layers will appear here after you add an element.")
+                                        elements.reversed().forEach{layer->OutlinedButton(onClick={selectedId=layer.id;showElementTray=false;showCanvasSettings=false},modifier=Modifier.fillMaxWidth()){Text(layer.name+" · "+layer.kind)}}
+                                    }
+                                    "flows"->{
+                                        if(screens.size<2)Text("Add another screen, then select a layer and choose its tap destination.")
+                                        OutlinedButton(onClick={addAppScreen()},modifier=Modifier.fillMaxWidth()){Text("Add screen")}
+                                        selectedElement?.let{layer->Text("When ${layer.name} is tapped:");screens.filter{it.id!=activeScreenId}.forEach{screen->OutlinedButton(onClick={edit(layer.id){it.copy(prototypeTargetScreenId=screen.id)}},modifier=Modifier.fillMaxWidth()){Text(if(layer.prototypeTargetScreenId==screen.id)"✓ "+screen.name else screen.name)}}}
+                                        Button(onClick={startPrototypePreview()},enabled=hasActivePrototypeLinks,modifier=Modifier.fillMaxWidth()){Text("Preview connected screens")}
+                                    }
+                                    "content"->{
+                                        listOf("Heading" to "Your next idea starts here","Paragraph" to "Tell your story with clear, thoughtful content.","Button" to "Get started").forEach{(label,text)->OutlinedButton(onClick={add(if(label=="Button")"button" else "text");val layer=elements.last();edit(layer.id){it.copy(name=label,text=text,fontSize=if(label=="Heading")26 else 16)}},modifier=Modifier.fillMaxWidth()){Column(Modifier.fillMaxWidth()){Text(text,fontSize=if(label=="Heading")22.sp else 14.sp);Text("Add "+label,style=MaterialTheme.typography.labelSmall)}}}
+                                    }
+                                    "data-viz"->{
+                                        OutlinedButton(onClick={add("chart")},modifier=Modifier.fillMaxWidth()){Text("Add editable bar chart")}
+                                        selectedElement?.takeIf{it.kind=="chart"}?.let{layer->OutlinedTextField(layer.text,{v->edit(layer.id){it.copy(text=v)}},label={Text("Title, then Label: value on each line")},modifier=Modifier.fillMaxWidth(),minLines=5)}
+                                    }
+                                    "handoff"->{
+                                        Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId);jsonLauncher.launch("design-project.json")},modifier=Modifier.fillMaxWidth()){Text("Save portable project JSON")}
+                                        Button(onClick={pdfBytes=UxUiNativePdf.build(context,projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson),bw,bh);pdfLauncher.launch("design-preview.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF")}
+                                        Text("HTML, Kotlin and SwiftUI source exports are also available in Export and handoff below.",style=MaterialTheme.typography.bodySmall)
+                                    }
+                                    else->Text("Choose an item in this toolkit to edit the design.")
+                                }
+                                OutlinedButton(onClick={toolkitTab="All 26"},modifier=Modifier.fillMaxWidth()){Text("Back to all 26 tools")}
+                            }
+                            "Icons" -> {
+                                OutlinedTextField(iconQuery,{iconQuery=it;iconStart=0},label={Text("Search icons")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){uxNativeIconCategories.keys.forEach{category->FilterChip(selected=iconCategory==category,onClick={iconCategory=category},label={Text(category)})}}
+                                val browseIcons=(if(iconQuery.isBlank()){if(iconCategory=="All bundled")bundledIconNames else uxNativeIconCategories[iconCategory].orEmpty().filter{it in bundledIconNames}}else bundledIconNames.filter{it.contains(iconQuery,true)}+iconResults).distinct().filter{it.contains(toolkitSearch,true)}
+                                browseIcons.take(iconBrowseLimit).chunked(3).forEach{row->
+                                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                                        row.forEach{icon->OutlinedButton(onClick={val id=selectedElement?.takeIf{it.kind=="icon"}?.id?:run{add("icon");selectedId};chooseIcon(id,icon)},modifier=Modifier.weight(1f),shape=RoundedCornerShape(12.dp),contentPadding=PaddingValues(8.dp)){
+                                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                                UxNativeIconThumbnail(icon)
+                                                Text(icon.substringAfter(":"),fontSize=10.sp,maxLines=2,overflow=TextOverflow.Ellipsis)
+                                            }
+                                        }}
+                                        repeat(3-row.size){Spacer(Modifier.weight(1f))}
+                                    }
+                                }
+                                if(browseIcons.size>iconBrowseLimit)OutlinedButton(onClick={iconBrowseLimit+=36},modifier=Modifier.fillMaxWidth()){Text("Show more icons · $iconBrowseLimit / ${browseIcons.size}")}
+                                if(browseIcons.isEmpty())Text("No matching icons. Try another search or browse a category.")
+                                Button(onClick={searchIcons(false)},enabled=iconQuery.isNotBlank()&&!iconBusy,modifier=Modifier.fillMaxWidth()){Text(if(iconBusy)"Searching…" else "Search online catalog")}
+                                OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG icon")}
+                                Text("Bundled icons work offline. Tap an icon to add or replace it. Online results show Retry if artwork is unavailable.",style=MaterialTheme.typography.bodySmall)
+                            }
+                            "Elements" -> {
+                                if(activeToolkitId in setOf("illustrations","media","assets","inspiration")){
+                                    Text("Import artwork and preview it directly on the canvas.",style=MaterialTheme.typography.bodySmall)
+                                    OutlinedButton(onClick={add("image");imageTargetId=selectedId;imageLauncher.launch("image/*")},modifier=Modifier.fillMaxWidth()){Text("Import image / visual reference")}
+                                    OutlinedButton(onClick={svgIconImportLauncher.launch(arrayOf("image/svg+xml","text/xml"))},modifier=Modifier.fillMaxWidth()){Text("Import SVG illustration")}
+                                }
+                                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                                    listOf("text" to "Text","button" to "Button","card" to "Card","input" to "Input","icon" to "Icon","image" to "Image","triangle" to "Triangle","diamond" to "Diamond","hexagon" to "Hexagon","star" to "Star","line" to "Line","pill" to "Pill","navbar" to "Navbar","tabbar" to "Tab bar","tabs" to "Tabs","row" to "Row","avatar" to "Avatar","badge" to "Badge","switch" to "Switch","progress" to "Progress","slider" to "Slider","radio" to "Radio","dropdown" to "Dropdown","search" to "Search","textarea" to "Text area","table" to "Table","chart" to "Chart","modal" to "Modal","breadcrumb" to "Breadcrumb","tooltip" to "Tooltip","list" to "List","video" to "Video","logo" to "Logo","menu" to "Menu","spacer" to "Spacer","rect" to "Rectangle","circle" to "Circle","divider" to "Divider").filter{(kind,label)->label.contains(toolkitSearch,true)||kind.contains(toolkitSearch,true)}.chunked(2).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){row.forEach{(kind,label)->OutlinedButton(onClick={add(if(kind=="circle")"ellipse" else kind);if(kind=="image"){imageTargetId=selectedId;imageLauncher.launch("image/*")}},modifier=Modifier.weight(1f),contentPadding=PaddingValues(9.dp),shape=RoundedCornerShape(12.dp)){Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(7.dp)){UxNativeElementSample(kind,label);Text(label,fontSize=12.sp)}}};repeat(2-row.size){Spacer(Modifier.weight(1f))}}}
+                                }
+                            }
+                            "Presets" -> {
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                    listOf("mobile-dashboard" to "Mobile app","mobile-login" to "Login screen","tablet-dashboard" to "Tablet app","desktop-landing" to "Website").filter{(id,label)->label.contains(toolkitSearch,true)||id.contains(toolkitSearch,true)}.forEach{(id,label)->OutlinedButton(onClick={checkpoint();val newTarget=when{ id.startsWith("tablet")->"tablet";id.startsWith("desktop")->"desktop";else->"mobile"};target=newTarget;customArtboard=false;customWidth=if(newTarget=="mobile")390 else if(newTarget=="tablet")768 else 1440;customHeight=if(newTarget=="mobile")844 else if(newTarget=="tablet")1024 else 900;elements.clear();elements.addAll(uxNativePreset(newTarget,id).map{it.copy(referenceWidth=customWidth,referenceHeight=customHeight)});selectedId=elements.firstOrNull()?.id.orEmpty();projectName=label;notice=label+" loaded."}){Text(label)}}
+                                }
+                                OutlinedButton(onClick={presetImportLauncher.launch(arrayOf("application/json"))},modifier=Modifier.fillMaxWidth()){Text("Import preset / project JSON")}
+                                Text("Presets can be loaded into this project and customised.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            "Fonts" -> {
+                                Text("Preview real font faces before applying. Tap a sample to style text or add a text layer.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Search font families")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                OutlinedTextField(fontPreviewWords,{fontPreviewWords=it.take(80)},label={Text("Try your words")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                                Row(verticalAlignment=Alignment.CenterVertically){Switch(checked=animateFontPreviews,onCheckedChange={animateFontPreviews=it});Text("Play font previews")}
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){listOf("All","Sans serif","Serif","Monospace","Display","Handwriting").forEach{category->FilterChip(selected=fontCategory==category,onClick={fontCategory=category},label={Text(category)})}}
+                                uxNativeFontFamilies.filter{it.contains(fontQuery,true)&&(fontCategory=="All"||uxNativeFontFamilyCategory(it)==fontCategory)&&it.contains(toolkitSearch,true)}.forEach{family->
+                                    OutlinedButton(onClick={val fontLayer=selectedElement?.takeUnless{it.kind in setOf("icon","image","rect","ellipse","divider","line","triangle","diamond","hexagon","star") }?:run{add("text");elements.last()};edit(fontLayer.id){it.copy(fontFamily=family,fontData=uxNativeBundledFontData(context,family))};showElementTray=false},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp)){
+                                        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                            Text(family,style=MaterialTheme.typography.labelLarge)
+                                            UxNativeAnimatedFontSpecimen(family,fontPreviewWords,animateFontPreviews)
+                                            Text(if(family in uxNativeBundledFonts)"Bundled font · available offline" else "Android system font",style=MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                    uxNativeBundledFonts[family]?.let{file->OutlinedButton(onClick={fontExportBytes=context.assets.open("fonts/"+file).use{it.readBytes()};fontExportLauncher.launch(file)},modifier=Modifier.fillMaxWidth()){Text("Save "+family+" font · TTF")}}
+                                }
+                                if(selectedElement!=null)OutlinedButton(onClick={fontTargetId=selectedElement.id;fontLauncher.launch(arrayOf("*/*"))},modifier=Modifier.fillMaxWidth()){Text("Import font (TTF / OTF)")}
+                            }
+                            "Tokens" -> {
+                                Text("Tap a colour to apply it to the selected element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(5.dp)){colorTokens.filter{it.first.contains(toolkitSearch,true)||it.second.contains(toolkitSearch,true)}.forEach{(name,value)->OutlinedButton(onClick={val colorLayer=selectedElement;if(colorLayer!=null)edit(colorLayer.id){it.copy(fill=value)}else background=value}){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(uxNativeColor(value)));Text(name)}}}}
+                            }
+                        }
+                    }}}
+                }
+                Text(if(elements.isEmpty())"Layers" else "Layers · "+elements.size,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+                elements.take(if(showAllLayers) elements.size else 6).forEach{e->FilterChip(selected=selectedId==e.id,onClick={selectedId=e.id;showCanvasSettings=false;showElementTray=false},label={Text(e.name,maxLines=1)})}
+                if(elements.isEmpty())Text("No layers yet. Tap + to add your first element.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                if(elements.size>6)OutlinedButton(onClick={showAllLayers=!showAllLayers}){Text(if(showAllLayers)"see less" else "see more")}
                 Card{Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                     Text("Export and handoff",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
                     OutlinedTextField(background,{background=it},label={Text("Canvas background hex")},modifier=Modifier.fillMaxWidth(),singleLine=true)
@@ -1867,8 +2100,8 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                         OutlinedTextField(spacingDraft,{spacingDraft=it},label={Text("New spacing px")},modifier=Modifier.weight(1f),singleLine=true)
                         Button(onClick={val value=spacingDraft.toIntOrNull();if(value!=null&&value in 1..256&&value !in spacingTokens){spacingTokens.add(value);spacingTokens.sort()}},enabled=spacingDraft.toIntOrNull() in 1..256){Text("Add spacing")}
                     }
-                    Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}});jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export JSON + generated code + AI prompt")}
-                    Button(onClick={pdfBytes=UxUiNativePdf.build(context,projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}}),bw,bh);pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
+                    Button(onClick={jsonText=uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId);jsonLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.json")},modifier=Modifier.fillMaxWidth()){Text("Export JSON + generated code + AI prompt")}
+                    Button(onClick={pdfBytes=UxUiNativePdf.build(context,projectName,target,background,elements,uxNativeProjectJson(projectName,target,background,elements,bw,bh,tokenJson,JSONArray().apply{reusable.forEach{put(uxNativeJson(listOf(it)).optJSONObject(0))}},screens.toList(),activeScreenId),bw,bh);pdfLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+"-design-spec.pdf")},modifier=Modifier.fillMaxWidth()){Text("Export visual PDF + specifications")}
                     Button(onClick={sourceText=uxNativeGenerateHtml(projectName,target,background,elements,bw,bh,tokenJson,JSONObject().put("mobile",480).put("tablet",768).put("desktop",1024));sourceLauncher.launch(projectName.lowercase().replace(Regex("[^a-z0-9]+"),"-")+".html")},modifier=Modifier.fillMaxWidth()){Text("Export Web HTML")}
                     Button(onClick={sourceText=uxNativeGenerateKotlin(projectName,target,background,elements,bw,bh);sourceLauncher.launch(uxNativeSafeIdentifier(projectName)+".kt")},modifier=Modifier.fillMaxWidth()){Text("Export Android Kotlin")}
                     Button(onClick={sourceText=uxNativeGenerateSwift(projectName,target,background,elements,bw,bh);sourceLauncher.launch(uxNativeSafeIdentifier(projectName)+"View.swift")},modifier=Modifier.fillMaxWidth()){Text("Export iOS SwiftUI")}

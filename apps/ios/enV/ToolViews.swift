@@ -8609,6 +8609,22 @@ private struct NativeIOSTrackRow: View {
 
 
 
+// Studio chrome inherits the app's effective light/dark appearance. Artwork
+// retains its authored colors; the controls and catalogue specimens are monochrome.
+private extension Color {
+    static func uxUiTone(_ light: CGFloat, _ dark: CGFloat) -> Color {
+        Color(UIColor { traits in
+            UIColor(white: traits.userInterfaceStyle == .dark ? dark : light, alpha: 1)
+        })
+    }
+    static let uxUiInk = uxUiTone(0, 1)
+    static let uxUiSurface = uxUiTone(0.98, 0.03)
+    static let uxUiCard = uxUiTone(1, 0.07)
+    static let uxUiSurface2 = uxUiTone(0.94, 0.14)
+    static let uxUiMuted = uxUiTone(0.32, 0.73)
+    static let uxUiBorder = uxUiTone(0.83, 0.27)
+}
+
 struct UxUiStudioChartPoint: Equatable {
     let label: String
     let value: Double
@@ -8639,6 +8655,27 @@ func uxUiParseChartData(_ source: String) -> UxUiStudioChartSpec {
         points.append(UxUiStudioChartPoint(label: label, value: value))
     }
     return UxUiStudioChartSpec(title: title, points: points, invalidRows: invalidRows)
+}
+
+private struct UxUiAnimatedFontPreview: View {
+    let family: String
+    let words: String
+    var animated: Bool = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase = false
+    var body: some View {
+        let play = animated && !reduceMotion
+        Text(words.isEmpty ? "Make something beautiful" : words)
+            .font(uxUiSampleFont(family, size: 25)).lineLimit(2)
+            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            .opacity(play ? (phase ? 1 : 0.72) : 1)
+            .scaleEffect(play && !phase ? 0.98 : 1, anchor: .leading)
+            .offset(x: play && phase ? 3 : 0)
+            .animation(play ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) : nil, value: phase)
+            .onAppear { phase = play }
+            .onChange(of: animated) { phase = $0 && !reduceMotion }
+            .onChange(of: reduceMotion) { phase = animated && !$0 }
+    }
 }
 
 private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
@@ -8678,6 +8715,8 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
     var componentKey: String = ""
     var iconViewBox: String = "0 0 24 24"
     var rotation: Double = 0
+    var opacity: Double = 1
+    var shadow: Bool = false
     var prototypeTargetScreenID: String = ""
 
     init(
@@ -8694,7 +8733,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         visibleOn: [String] = ["mobile", "tablet", "desktop"],
         referenceWidth: Int = 390, referenceHeight: Int = 844,
         componentKey: String = "", iconViewBox: String = "0 0 24 24", rotation: Double = 0,
-        prototypeTargetScreenID: String = ""
+        opacity: Double = 1, shadow: Bool = false, prototypeTargetScreenID: String = ""
     ) {
         self.id = id
         self.kind = kind
@@ -8732,6 +8771,8 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         self.componentKey = componentKey
         self.iconViewBox = iconViewBox
         self.rotation = rotation
+        self.opacity = opacity
+        self.shadow = shadow
         self.prototypeTargetScreenID = prototypeTargetScreenID
     }
 
@@ -8741,7 +8782,7 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         case marginTop, marginRight, marginBottom, marginLeft
         case fontFamily, fontSize, fontWeight, lineHeight
         case horizontalConstraint, verticalConstraint, minWidth, maxWidth, visibleOn
-        case referenceWidth, referenceHeight, componentKey, iconViewBox, rotation
+        case referenceWidth, referenceHeight, componentKey, iconViewBox, rotation, opacity, shadow
         case prototypeTargetScreenID = "prototypeTargetScreenId"
     }
 
@@ -8783,6 +8824,8 @@ private struct UxUiNativeLayer: Codable, Identifiable, Equatable {
         componentKey = try c.decodeIfPresent(String.self, forKey: .componentKey) ?? ""
         iconViewBox = try c.decodeIfPresent(String.self, forKey: .iconViewBox) ?? "0 0 24 24"
         rotation = try c.decodeIfPresent(Double.self, forKey: .rotation) ?? 0
+        opacity = min(1, max(0, try c.decodeIfPresent(Double.self, forKey: .opacity) ?? 1))
+        shadow = try c.decodeIfPresent(Bool.self, forKey: .shadow) ?? false
         prototypeTargetScreenID = try c.decodeIfPresent(String.self, forKey: .prototypeTargetScreenID) ?? ""
     }
 }
@@ -8803,7 +8846,8 @@ private let uxUiFontFamilies: [(String, String)] = [
     ("Oswald","Display"),("Bebas Neue","Display"),("Archivo Black","Display"),("Anton","Display"),
     ("Space Grotesk","Display"),("Syne","Display"),("Caveat","Handwriting"),("Pacifico","Handwriting"),
     ("Dancing Script","Handwriting"),("Satisfy","Handwriting"),("System","System"),("Georgia","System"),
-    ("Times New Roman","System"),("Menlo","System"),("Avenir Next","System")
+    ("Times New Roman","System"),("Menlo","System"),("Avenir Next","System"),
+    ("Helvetica Neue","System"),("Arial","System"),("Palatino","System"),("Courier New","System"),("SF Pro Rounded","System")
 ]
 private let uxUiIconSets: [(String, String)] = [
     ("all","All styles"),("lucide","Lucide · line"),("tabler","Tabler · outline"),
@@ -8812,19 +8856,36 @@ private let uxUiIconSets: [(String, String)] = [
     ("fluent","Fluent"),("iconamoon","Iconamoon"),("mingcute","MingCute")
 ]
 private let uxUiIconCategories: [(String, [String])] = [
-    ("Navigation",["lucide:house","tabler:home","material-symbols:home-rounded","mdi:home","ph:house","solar:home-linear","lucide:menu","tabler:menu-2","mdi:menu","ph:list","lucide:arrow-left","tabler:arrow-left","lucide:chevron-down","tabler:chevron-down"]),
-    ("Actions",["lucide:plus","tabler:plus","material-symbols:add-rounded","mdi:plus","ph:plus-bold","lucide:check","tabler:check","mdi:check-bold","lucide:x","tabler:x","lucide:pencil","tabler:edit","lucide:trash-2","tabler:trash","lucide:copy","tabler:copy"]),
-    ("Forms",["lucide:mail","tabler:mail","mdi:email-outline","ph:envelope","lucide:lock","tabler:lock","lucide:eye","tabler:eye","lucide:calendar","tabler:calendar","lucide:clock","tabler:clock","lucide:sliders-horizontal","tabler:adjustments"]),
-    ("Communication",["lucide:message-circle","tabler:message-circle","mdi:message-outline","lucide:bell","tabler:bell","mdi:bell-outline","lucide:phone","tabler:phone","lucide:send","tabler:send","lucide:users","tabler:users"]),
-    ("Media",["lucide:image","tabler:photo","mdi:image-outline","lucide:camera","tabler:camera","lucide:video","tabler:video","lucide:music","tabler:music","lucide:mic","tabler:microphone","lucide:play","tabler:player-play"]),
-    ("Commerce",["lucide:shopping-cart","tabler:shopping-cart","mdi:cart-outline","lucide:credit-card","tabler:credit-card","mdi:credit-card-outline","lucide:wallet","tabler:wallet","lucide:package","tabler:package","lucide:tag","tabler:tag"]),
-    ("Data",["lucide:chart-column","tabler:chart-bar","mdi:chart-bar","lucide:chart-line","tabler:chart-line","lucide:pie-chart","tabler:chart-pie","lucide:database","tabler:database","lucide:table","tabler:table","lucide:activity"]),
-    ("Devices",["lucide:smartphone","tabler:device-mobile","mdi:cellphone","lucide:tablet","tabler:device-tablet","mdi:tablet","lucide:laptop","tabler:device-laptop","lucide:monitor","tabler:device-desktop","lucide:wifi","tabler:wifi"]),
-    ("Files",["lucide:file-text","tabler:file-text","mdi:file-document-outline","lucide:folder","tabler:folder","lucide:cloud","tabler:cloud","lucide:code","tabler:code","lucide:terminal","tabler:terminal-2"]),
-    ("Shapes",["lucide:circle","tabler:circle","mdi:circle-outline","lucide:square","tabler:square","lucide:triangle","tabler:triangle","lucide:star","tabler:star","lucide:heart","tabler:heart","lucide:hexagon","tabler:hexagon","lucide:diamond","tabler:diamond"])
+    ("Navigation",["lucide:house","tabler:home","material-symbols:home-rounded","mdi:home","ph:house","solar:home-linear","carbon:home","fa6-solid:house","heroicons:home","fluent:home-24-regular","iconamoon:home-light","mingcute:home-4-line","lucide:menu","tabler:menu-2","mdi:menu","ph:list","lucide:arrow-left","tabler:arrow-left","material-symbols:arrow-back-rounded","solar:alt-arrow-right-linear","lucide:chevron-down","tabler:chevron-down","mdi:chevron-down","ph:caret-down","lucide:layout-grid","tabler:apps","material-symbols:dashboard-rounded","solar:widget-2-linear"]),
+    ("Actions",["lucide:plus","tabler:plus","material-symbols:add-rounded","mdi:plus","ph:plus-bold","solar:add-square-linear","lucide:check","tabler:check","material-symbols:check-rounded","mdi:check-bold","ph:check-bold","lucide:x","tabler:x","material-symbols:close-rounded","mdi:close","lucide:pencil","tabler:edit","material-symbols:edit-rounded","mdi:pencil","ph:pencil-simple","lucide:trash-2","tabler:trash","material-symbols:delete-rounded","mdi:delete","lucide:copy","tabler:copy","material-symbols:content-copy-rounded","lucide:download","tabler:download","material-symbols:download-rounded"]),
+    ("Forms",["lucide:mail","tabler:mail","material-symbols:mail-rounded","mdi:email-outline","ph:envelope","lucide:lock","tabler:lock","material-symbols:lock-rounded","mdi:lock-outline","ph:lock-key","lucide:eye","tabler:eye","material-symbols:visibility-rounded","mdi:eye-outline","lucide:eye-off","tabler:eye-off","material-symbols:visibility-off-rounded","mdi:eye-off-outline","lucide:calendar","tabler:calendar","material-symbols:calendar-month-rounded","mdi:calendar-month","lucide:clock","tabler:clock","material-symbols:schedule-rounded","mdi:clock-outline","lucide:sliders-horizontal","tabler:adjustments","material-symbols:tune-rounded","mdi:tune-variant"]),
+    ("Communication",["lucide:message-circle","tabler:message-circle","material-symbols:chat-bubble-rounded","mdi:message-outline","ph:chat-circle","lucide:bell","tabler:bell","material-symbols:notifications-rounded","mdi:bell-outline","lucide:phone","tabler:phone","material-symbols:call-rounded","mdi:phone-outline","lucide:send","tabler:send","material-symbols:send-rounded","mdi:send","lucide:users","tabler:users","material-symbols:group-rounded","mdi:account-group-outline","lucide:at-sign","tabler:at","material-symbols:alternate-email-rounded","mdi:at"]),
+    ("Media",["lucide:image","tabler:photo","material-symbols:image-rounded","mdi:image-outline","ph:image","lucide:camera","tabler:camera","material-symbols:photo-camera-rounded","mdi:camera-outline","lucide:video","tabler:video","material-symbols:videocam-rounded","mdi:video-outline","lucide:music","tabler:music","material-symbols:music-note-rounded","mdi:music-note","lucide:mic","tabler:microphone","material-symbols:mic-rounded","mdi:microphone-outline","lucide:play","tabler:player-play","material-symbols:play-arrow-rounded","mdi:play"]),
+    ("Commerce",["lucide:shopping-cart","tabler:shopping-cart","material-symbols:shopping-cart-rounded","mdi:cart-outline","ph:shopping-cart","lucide:credit-card","tabler:credit-card","material-symbols:credit-card-rounded","mdi:credit-card-outline","lucide:wallet","tabler:wallet","material-symbols:wallet-rounded","mdi:wallet-outline","lucide:package","tabler:package","material-symbols:inventory-2-rounded","mdi:package-variant","lucide:tag","tabler:tag","material-symbols:sell-rounded","mdi:tag-outline","lucide:truck","tabler:truck","material-symbols:local-shipping-rounded","mdi:truck-outline"]),
+    ("Data",["lucide:chart-column","tabler:chart-bar","material-symbols:bar-chart-rounded","mdi:chart-bar","ph:chart-bar","lucide:chart-line","tabler:chart-line","material-symbols:show-chart-rounded","mdi:chart-line","lucide:pie-chart","tabler:chart-pie","material-symbols:pie-chart-rounded","mdi:chart-pie","lucide:database","tabler:database","material-symbols:database-rounded","mdi:database-outline","lucide:table","tabler:table","material-symbols:table-chart-rounded","mdi:table","lucide:activity","tabler:activity","material-symbols:monitoring-rounded","mdi:chart-areaspline"]),
+    ("Devices",["lucide:smartphone","tabler:device-mobile","material-symbols:smartphone-rounded","mdi:cellphone","lucide:tablet","tabler:device-tablet","material-symbols:tablet-rounded","mdi:tablet","lucide:laptop","tabler:device-laptop","material-symbols:laptop-rounded","mdi:laptop","lucide:monitor","tabler:device-desktop","material-symbols:desktop-windows-rounded","mdi:monitor","lucide:wifi","tabler:wifi","material-symbols:wifi-rounded","mdi:wifi","lucide:bluetooth","tabler:bluetooth","material-symbols:bluetooth-rounded","mdi:bluetooth","lucide:battery","tabler:battery","material-symbols:battery-full-rounded","mdi:battery"]),
+    ("Files",["lucide:file-text","tabler:file-text","material-symbols:description-rounded","mdi:file-document-outline","ph:file-text","lucide:folder","tabler:folder","material-symbols:folder-rounded","mdi:folder-outline","lucide:cloud","tabler:cloud","material-symbols:cloud-rounded","mdi:cloud-outline","lucide:code","tabler:code","material-symbols:code-rounded","mdi:code-tags","lucide:terminal","tabler:terminal-2","material-symbols:terminal-rounded","mdi:console","lucide:database","tabler:database","mdi:database-outline"]),
+    ("Shapes",["lucide:circle","tabler:circle","material-symbols:circle-rounded","mdi:circle-outline","lucide:square","tabler:square","material-symbols:square-rounded","mdi:square-outline","lucide:triangle","tabler:triangle","material-symbols:change-history-rounded","mdi:triangle-outline","lucide:star","tabler:star","material-symbols:star-rounded","mdi:star-outline","lucide:heart","tabler:heart","material-symbols:favorite-rounded","mdi:heart-outline","lucide:hexagon","tabler:hexagon","mdi:hexagon-outline","lucide:diamond","tabler:diamond","mdi:diamond-outline"]),
+    ("Security & identity",["lucide:shield","lucide:shield-check","lucide:shield-alert","lucide:shield-x","lucide:shield-half","lucide:lock-keyhole","lucide:key-round","lucide:fingerprint","lucide:scan-face","lucide:badge-check","lucide:file-lock","lucide:file-key","lucide:id-card","lucide:user-round-check","lucide:user-round-cog","lucide:user-round-x","lucide:qr-code","lucide:scan-line","lucide:unlock","lucide:eye-off","lucide:key","lucide:door-closed","lucide:contact-round","lucide:user-round-pen","lucide:shield-ellipsis","lucide:scan","lucide:scan-search","lucide:lock","lucide:circle-check","lucide:check-check","lucide:shield-plus","lucide:badge-alert"]),
+    ("AI & automation",["lucide:brain-circuit","lucide:bot","lucide:sparkles","lucide:wand-sparkles","lucide:workflow","lucide:network","lucide:cpu","lucide:memory-stick","lucide:circuit-board","lucide:git-branch","lucide:git-pull-request","lucide:terminal","lucide:code","lucide:webhook","lucide:binary","lucide:search-code","lucide:messages-square","lucide:audio-lines","lucide:brain","lucide:server","lucide:database","lucide:cloud-cog","lucide:layers-3","lucide:blocks","lucide:monitor-cog","lucide:rocket","lucide:plug-zap","lucide:zap","lucide:command","lucide:message-square-code","lucide:workflow","lucide:cloud-download"]),
+    ("Travel & maps",["lucide:map","lucide:map-pinned","lucide:map-pin","lucide:compass","lucide:navigation","lucide:navigation-2","lucide:route","lucide:plane","lucide:plane-takeoff","lucide:plane-landing","lucide:car-front","lucide:bus-front","lucide:train-front","lucide:bike","lucide:ship","lucide:luggage","lucide:ticket","lucide:hotel","lucide:bed-double","lucide:signpost","lucide:landmark","lucide:earth","lucide:globe","lucide:locate","lucide:locate-fixed","lucide:fuel","lucide:parking-meter","lucide:mountain","lucide:tent","lucide:bus","lucide:map-plus","lucide:map-off"]),
+    ("Weather & nature",["lucide:sun","lucide:moon","lucide:cloud","lucide:cloud-sun","lucide:cloud-rain","lucide:cloud-snow","lucide:cloud-lightning","lucide:cloud-drizzle","lucide:cloud-fog","lucide:snowflake","lucide:thermometer","lucide:wind","lucide:rainbow","lucide:umbrella","lucide:trees","lucide:leaf","lucide:flower-2","lucide:droplets","lucide:waves","lucide:mountain","lucide:sunrise","lucide:sunset","lucide:tornado","lucide:haze","lucide:cloud-sun-rain","lucide:cloud-moon","lucide:cloud-moon-rain","lucide:thermometer-sun","lucide:thermometer-snowflake","lucide:tree-pine","lucide:sprout","lucide:recycle"]),
+    ("Education & learning",["lucide:book-open","lucide:book-marked","lucide:book-copy","lucide:library","lucide:graduation-cap","lucide:school","lucide:notebook-pen","lucide:notebook-tabs","lucide:pencil-ruler","lucide:ruler","lucide:ruler-dimension-line","lucide:calculator","lucide:flask-conical","lucide:microscope","lucide:atom","lucide:lightbulb","lucide:brain","lucide:trophy","lucide:medal","lucide:award","lucide:clipboard-check","lucide:file-question","lucide:presentation","lucide:scroll","lucide:bookmark","lucide:search","lucide:user-round-check","lucide:pencil","lucide:book-open-check","lucide:book-text","lucide:book","lucide:calendar-check"]),
+    ("Accessibility & wellbeing",["lucide:accessibility","lucide:ear","lucide:ear-off","lucide:eye","lucide:contrast","lucide:person-standing","lucide:hand","lucide:handshake","lucide:wheelchair","lucide:heart-pulse","lucide:heart","lucide:brain","lucide:battery-charging","lucide:alarm-clock","lucide:bell-ring","lucide:volume","lucide:volume-1","lucide:volume-2","lucide:volume-x","lucide:captions","lucide:focus","lucide:scan-eye","lucide:type","lucide:text-cursor-input","lucide:zoom-in","lucide:zoom-out","lucide:audio-lines","lucide:circle-help","lucide:speech","lucide:subtitles","lucide:keyboard","lucide:text","lucide:sliders-horizontal","lucide:circle-dot"]),
+    ("Finance & business",["lucide:banknote","lucide:coins","lucide:wallet-cards","lucide:receipt","lucide:briefcase-business","lucide:building-2","lucide:hand-coins","lucide:piggy-bank","lucide:badge-dollar-sign","lucide:landmark","lucide:calculator","lucide:credit-card","lucide:circle-dollar-sign","lucide:chart-pie","lucide:chart-column","lucide:trending-up","lucide:trending-down","lucide:receipt-text","lucide:file-spreadsheet","lucide:shopping-bag","lucide:store","lucide:percent","lucide:wallet","lucide:handshake","lucide:badge-check","lucide:scale","lucide:file-text","lucide:chart-line","lucide:dollar-sign","lucide:shopping-cart","lucide:package","lucide:circle-gauge"]),
+    ("Social & community",["lucide:user-round","lucide:users-round","lucide:user-plus","lucide:user-minus","lucide:user-check","lucide:user-x","lucide:contact","lucide:contact-round","lucide:handshake","lucide:heart-handshake","lucide:thumbs-up","lucide:thumbs-down","lucide:message-circle","lucide:messages-square","lucide:share-2","lucide:link","lucide:at-sign","lucide:hash","lucide:megaphone","lucide:badge-help","lucide:circle-help","lucide:party-popper","lucide:smile","lucide:smile-plus","lucide:clap","lucide:hand-heart","lucide:globe","lucide:rss","lucide:podcast","lucide:send","lucide:mail","lucide:heart","lucide:gift","lucide:bell","lucide:message-square-share","lucide:user-round-plus","lucide:user-round-minus"]),
+    ("Food & lifestyle",["lucide:utensils","lucide:coffee","lucide:cup-soda","lucide:pizza","lucide:sandwich","lucide:apple","lucide:carrot","lucide:chef-hat","lucide:cake","lucide:salad","lucide:fish","lucide:banana","lucide:cookie","lucide:beef","lucide:milk","lucide:cooking-pot","lucide:egg","lucide:ice-cream","lucide:grape","lucide:wheat","lucide:sprout","lucide:wine","lucide:citrus","lucide:cherry","lucide:avocado","lucide:drumstick","lucide:croissant","lucide:popcorn","lucide:soup","lucide:dessert","lucide:glass-water","lucide:vegan","lucide:candy","lucide:coffee","lucide:utensils-crossed"]),
+    ("Creative tools",["lucide:pen-tool","lucide:pen-line","lucide:brush","lucide:paintbrush","lucide:palette","lucide:pipette","lucide:crop","lucide:scissors","lucide:layers","lucide:layers-2","lucide:layout-grid","lucide:layout-dashboard","lucide:frames","lucide:frame","lucide:square-pen","lucide:highlighter","lucide:wand-sparkles","lucide:lasso","lucide:lasso-select","lucide:mouse-pointer-2","lucide:move","lucide:rotate-3d","lucide:maximize","lucide:zoom-in","lucide:blend","lucide:shapes","lucide:vector-square","lucide:image-up","lucide:images","lucide:scan","lucide:drafting-compass","lucide:ruler","lucide:pencil","lucide:pencil-line","lucide:sticker","lucide:sliders-horizontal","lucide:layout-template","lucide:panel-top","lucide:panel-bottom","lucide:square-dashed","lucide:rectangle-horizontal","lucide:contrast","lucide:paint-bucket"]),
+    ("Home & workspace",["lucide:house","lucide:lamp","lucide:lamp-desk","lucide:sofa","lucide:bed","lucide:bed-double","lucide:armchair","lucide:door-open","lucide:door-closed","lucide:key-round","lucide:lightbulb","lucide:lightbulb-off","lucide:monitor","lucide:laptop","lucide:printer","lucide:file-cog","lucide:briefcase","lucide:calendar-days","lucide:clock-4","lucide:alarm-clock","lucide:package-open","lucide:archive","lucide:inbox","lucide:mailbox","lucide:notebook","lucide:clipboard-list","lucide:list-checks","lucide:folder-open","lucide:hard-drive","lucide:plug","lucide:power","lucide:thermometer","lucide:fan","lucide:refrigerator","lucide:washing-machine","lucide:battery-charging"]),
+    ("Sports & fitness",["lucide:trophy","lucide:medal","lucide:dumbbell","lucide:bike","lucide:bicycle","lucide:footprints","lucide:activity","lucide:heart-pulse","lucide:timer","lucide:stopwatch","lucide:target","lucide:goal","lucide:flag","lucide:mountain","lucide:waves","lucide:volleyball","lucide:trophy","lucide:circle-gauge","lucide:person-standing","lucide:running","lucide:calendar-check","lucide:flame","lucide:zap","lucide:shield-check","lucide:fitness","lucide:stretch-horizontal","lucide:dribbble","lucide:football","lucide:basketball","lucide:tennis","lucide:sailboat"]),
+    ("Music & entertainment",["lucide:music","lucide:music-2","lucide:music-3","lucide:music-4","lucide:headphones","lucide:headset","lucide:mic","lucide:mic-vocal","lucide:audio-lines","lucide:audio-waveform","lucide:volume","lucide:volume-2","lucide:volume-x","lucide:play","lucide:pause","lucide:skip-forward","lucide:skip-back","lucide:repeat","lucide:shuffle","lucide:radio","lucide:disc-3","lucide:album","lucide:podcast","lucide:film","lucide:clapperboard","lucide:tv","lucide:drama","lucide:ticket","lucide:party-popper","lucide:projector","lucide:guitar","lucide:piano","lucide:drum","lucide:speaker","lucide:ear"]),
+    ("Productivity & work",["lucide:calendar","lucide:calendar-days","lucide:calendar-check","lucide:calendar-clock","lucide:clock","lucide:alarm-clock","lucide:timer","lucide:check-square","lucide:list-checks","lucide:clipboard-check","lucide:clipboard-list","lucide:notebook","lucide:notebook-pen","lucide:sticky-note","lucide:pin","lucide:pin-off","lucide:inbox","lucide:archive","lucide:folder","lucide:folder-open","lucide:file-check","lucide:file-plus","lucide:file-search","lucide:files","lucide:copy","lucide:clipboard-copy","lucide:list-todo","lucide:kanban","lucide:layout-dashboard","lucide:panel-left","lucide:panel-right","lucide:columns-3","lucide:workflow"])
 ]
 
+private let uxUiFontRegistrationCache = NSCache<NSString, NSString>()
 private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> String? {
+    let cacheKey = (family + String(dataURL.hashValue)) as NSString
+    if let cached = uxUiFontRegistrationCache.object(forKey: cacheKey) { return cached as String }
     guard let comma = dataURL.firstIndex(of: ",") else { return nil }
     let header = String(dataURL[..<comma]).lowercased()
     guard header == "data:font/ttf;base64" || header == "data:font/otf;base64" else { return nil }
@@ -8838,8 +8899,11 @@ private func uxUiRegisterImportedFont(_ dataURL: String, family: String) -> Stri
         var error: Unmanaged<CFError>?
         let ok = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
         guard ok || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil else { return nil }
-        // CoreText has registered the font URL above. Return its chosen family name without using unavailable APIs.
-        return family
+        guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
+              let descriptor = descriptors.first else { return nil }
+        let name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String ?? family
+        uxUiFontRegistrationCache.setObject(name as NSString, forKey: cacheKey)
+        return name
     } catch { return nil }
 }
 
@@ -8898,6 +8962,11 @@ private struct UxUiNativeSVGPath {
     let fill: String?
     let stroke: String?
     let strokeWidth: CGFloat
+    var fillOpacity: Double = 1
+    var strokeOpacity: Double = 1
+    var evenOdd: Bool = false
+    var lineCap: CGLineCap = .butt
+    var lineJoin: CGLineJoin = .miter
 }
 
 private func uxUiSvgAttribute(_ name: String, in source: String) -> String? {
@@ -8922,6 +8991,7 @@ private func uxUiSVGViewBox(_ svg: String) -> CGRect {
 }
 
 private func uxUiParseSVGPath(_ data: String) -> Path {
+    guard data.utf8.count <= 262_144 else { return Path() }
     let pattern = #"[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?"#
     let tokens: [String] = (try? NSRegularExpression(pattern: pattern))
         .map { expression in
@@ -8941,12 +9011,12 @@ private func uxUiParseSVGPath(_ data: String) -> Path {
         token.count == 1 && token.first?.isLetter == true
     }
     func nextNumber() -> CGFloat? {
-        guard index < tokens.count, !isCommand(tokens[index]), let number = Double(tokens[index]) else { return nil }
+        guard index < tokens.count, !isCommand(tokens[index]), let number = Double(tokens[index]), number.isFinite else { return nil }
         index += 1
         return CGFloat(number)
     }
     func hasNumber() -> Bool {
-        index < tokens.count && !isCommand(tokens[index]) && Double(tokens[index]) != nil
+        index < tokens.count && !isCommand(tokens[index]) && (Double(tokens[index])?.isFinite ?? false)
     }
     func point(_ x: CGFloat, _ y: CGFloat, relative: Bool) -> CGPoint {
         relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
@@ -9078,12 +9148,12 @@ private func uxUiParseSVGPath(_ data: String) -> Path {
         case "A":
             var consumed = false
             while hasNumber() {
-                guard nextNumber() != nil, nextNumber() != nil, nextNumber() != nil,
-                      nextNumber() != nil, nextNumber() != nil,
+                guard let rx = nextNumber(), let ry = nextNumber(), let angle = nextNumber(),
+                      let large = nextNumber(), let sweep = nextNumber(),
                       let x = nextNumber(), let y = nextNumber() else { break }
                 let end = point(x, y, relative: relative)
-                // Degenerate arcs are uncommon in icon glyphs; preserve the endpoint natively.
-                output.addLine(to: end)
+                uxUiAppendSVGArc(to: &output, from: current, to: end, rx: rx, ry: ry,
+                                 rotation: angle, largeArc: large != 0, sweep: sweep != 0)
                 current = end
                 consumed = true
             }
@@ -9097,45 +9167,243 @@ private func uxUiParseSVGPath(_ data: String) -> Path {
     return output
 }
 
-private func uxUiSVGPaths(_ svg: String, tint: String) -> [UxUiNativeSVGPath] {
-    let root = (try? NSRegularExpression(pattern: #"(?is)<svg\b[^>]*>"#))
-        .flatMap { $0.firstMatch(in: svg, range: NSRange(svg.startIndex..., in: svg)) }
-        .flatMap { Range($0.range, in: svg).map { String(svg[$0]) } } ?? ""
-    let rootFill = uxUiSvgAttribute("fill", in: root) ?? "black"
-    let rootStroke = uxUiSvgAttribute("stroke", in: root)
-    let rootStrokeWidth = CGFloat(Double(uxUiSvgAttribute("stroke-width", in: root) ?? "1.5") ?? 1.5)
-    guard let regex = try? NSRegularExpression(pattern: #"(?is)<path\b[^>]*>"#) else { return [] }
-    return regex.matches(in: svg, range: NSRange(svg.startIndex..., in: svg)).compactMap { match in
-        guard let tagRange = Range(match.range, in: svg) else { return nil }
-        let tag = String(svg[tagRange])
-        guard let d = uxUiSvgAttribute("d", in: tag), !d.isEmpty else { return nil }
-        let path = uxUiParseSVGPath(d)
-        let rawFill = uxUiSvgAttribute("fill", in: tag) ?? rootFill
-        let rawStroke = uxUiSvgAttribute("stroke", in: tag) ?? rootStroke
-        let fill = rawFill.lowercased() == "none" ? nil : (rawFill.lowercased() == "currentcolor" ? tint : rawFill)
-        let stroke = rawStroke.flatMap { $0.lowercased() == "none" ? nil : ($0.lowercased() == "currentcolor" ? tint : $0) }
-        let strokeWidth = CGFloat(Double(uxUiSvgAttribute("stroke-width", in: tag) ?? "") ?? rootStrokeWidth)
-        return UxUiNativeSVGPath(path: path, fill: fill, stroke: stroke, strokeWidth: strokeWidth)
+// SVG endpoint arcs are converted to cubic Bézier segments (SVG 2, implementation notes F.6).
+// This preserves circular corners, rings and curved glyphs instead of joining their endpoints.
+private func uxUiAppendSVGArc(to path: inout Path, from start: CGPoint, to end: CGPoint,
+                              rx rawRX: CGFloat, ry rawRY: CGFloat, rotation: CGFloat,
+                              largeArc: Bool, sweep: Bool) {
+    guard start != end else { return }
+    var rx = abs(Double(rawRX)), ry = abs(Double(rawRY))
+    guard rx > 0, ry > 0 else { path.addLine(to: end); return }
+    let phi = Double(rotation.truncatingRemainder(dividingBy: 360)) * .pi / 180
+    let cp = cos(phi), sp = sin(phi)
+    let dx = Double(start.x - end.x) / 2, dy = Double(start.y - end.y) / 2
+    let xp = cp * dx + sp * dy, yp = -sp * dx + cp * dy
+    let correction = xp * xp / (rx * rx) + yp * yp / (ry * ry)
+    if correction > 1 { let scale = sqrt(correction); rx *= scale; ry *= scale }
+    let denominator = rx * rx * yp * yp + ry * ry * xp * xp
+    let numerator = max(0, rx * rx * ry * ry - denominator)
+    let coefficient = (largeArc == sweep ? -1.0 : 1.0) * sqrt(denominator > 0 ? numerator / denominator : 0)
+    let cxp = coefficient * rx * yp / ry, cyp = -coefficient * ry * xp / rx
+    let cx = cp * cxp - sp * cyp + Double(start.x + end.x) / 2
+    let cy = sp * cxp + cp * cyp + Double(start.y + end.y) / 2
+    let ux = (xp - cxp) / rx, uy = (yp - cyp) / ry
+    let vx = (-xp - cxp) / rx, vy = (-yp - cyp) / ry
+    let firstAngle = atan2(uy, ux)
+    var delta = atan2(ux * vy - uy * vx, ux * vx + uy * vy)
+    if !sweep && delta > 0 { delta -= 2 * .pi }
+    if sweep && delta < 0 { delta += 2 * .pi }
+    guard rx.isFinite, ry.isFinite, cx.isFinite, cy.isFinite, delta.isFinite else { path.addLine(to: end); return }
+    let segments = max(1, Int(ceil(abs(delta) / (.pi / 2))))
+    let step = delta / Double(segments)
+    func location(_ angle: Double) -> CGPoint {
+        CGPoint(x: cx + rx * cp * cos(angle) - ry * sp * sin(angle),
+                y: cy + rx * sp * cos(angle) + ry * cp * sin(angle))
     }
+    func tangent(_ angle: Double) -> CGPoint {
+        CGPoint(x: -rx * cp * sin(angle) - ry * sp * cos(angle),
+                y: -rx * sp * sin(angle) + ry * cp * cos(angle))
+    }
+    for segment in 0..<segments {
+        let a = firstAngle + Double(segment) * step, b = a + step
+        let alpha = CGFloat(4 / 3 * tan(step / 4))
+        let p0 = location(a), p1 = location(b), d0 = tangent(a), d1 = tangent(b)
+        path.addCurve(to: segment == segments - 1 ? end : p1,
+                      control1: CGPoint(x: p0.x + alpha * d0.x, y: p0.y + alpha * d0.y),
+                      control2: CGPoint(x: p1.x - alpha * d1.x, y: p1.y - alpha * d1.y))
+    }
+}
+
+private func uxUiSVGNumbers(_ source: String) -> [CGFloat] {
+    guard let regex = try? NSRegularExpression(pattern: #"[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?"#) else { return [] }
+    return regex.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap {
+        guard let range = Range($0.range, in: source), let value = Double(source[range]), value.isFinite else { return nil }
+        return CGFloat(value)
+    }
+}
+
+// Explicit matrix multiplication avoids ambiguity over SVG's right-to-left transform order.
+private func uxUiSVGCompose(_ parent: CGAffineTransform, _ local: CGAffineTransform) -> CGAffineTransform {
+    CGAffineTransform(a: parent.a * local.a + parent.c * local.b,
+                      b: parent.b * local.a + parent.d * local.b,
+                      c: parent.a * local.c + parent.c * local.d,
+                      d: parent.b * local.c + parent.d * local.d,
+                      tx: parent.a * local.tx + parent.c * local.ty + parent.tx,
+                      ty: parent.b * local.tx + parent.d * local.ty + parent.ty)
+}
+
+private func uxUiSVGTransform(_ source: String) -> CGAffineTransform {
+    guard let regex = try? NSRegularExpression(pattern: #"([A-Za-z]+)\s*\(([^)]*)\)"#) else { return .identity }
+    var result = CGAffineTransform.identity
+    for match in regex.matches(in: source, range: NSRange(source.startIndex..., in: source)) {
+        guard let nameRange = Range(match.range(at: 1), in: source), let argsRange = Range(match.range(at: 2), in: source) else { continue }
+        let values = uxUiSVGNumbers(String(source[argsRange]))
+        let local: CGAffineTransform
+        switch source[nameRange].lowercased() {
+        case "matrix" where values.count == 6:
+            local = CGAffineTransform(a: values[0], b: values[1], c: values[2], d: values[3], tx: values[4], ty: values[5])
+        case "translate" where !values.isEmpty:
+            local = CGAffineTransform(translationX: values[0], y: values.count > 1 ? values[1] : 0)
+        case "scale" where !values.isEmpty:
+            local = CGAffineTransform(scaleX: values[0], y: values.count > 1 ? values[1] : values[0])
+        case "rotate" where !values.isEmpty:
+            let rotate = CGAffineTransform(rotationAngle: values[0] * .pi / 180)
+            if values.count >= 3 {
+                local = uxUiSVGCompose(uxUiSVGCompose(CGAffineTransform(translationX: values[1], y: values[2]), rotate),
+                                       CGAffineTransform(translationX: -values[1], y: -values[2]))
+            } else { local = rotate }
+        case "skewx" where !values.isEmpty:
+            local = CGAffineTransform(a: 1, b: 0, c: tan(values[0] * .pi / 180), d: 1, tx: 0, ty: 0)
+        case "skewy" where !values.isEmpty:
+            local = CGAffineTransform(a: 1, b: tan(values[0] * .pi / 180), c: 0, d: 1, tx: 0, ty: 0)
+        default: continue
+        }
+        result = uxUiSVGCompose(result, local)
+    }
+    return result
+}
+
+private struct UxUiSVGStyle {
+    var fill = "black"
+    var stroke: String? = nil
+    var strokeWidth: CGFloat = 1
+    var opacity: Double = 1
+    var fillOpacity: Double = 1
+    var strokeOpacity: Double = 1
+    var evenOdd = false
+    var lineCap: CGLineCap = .butt
+    var lineJoin: CGLineJoin = .miter
+    var transform = CGAffineTransform.identity
+    var hidden = false
+}
+
+// XMLParser handles nesting and inherited presentation attributes without executing SVG content.
+// Only basic vector geometry is accepted; defs, scripts and external resources never render.
+private final class UxUiSVGDecoder: NSObject, XMLParserDelegate {
+    let tint: String
+    var paths: [UxUiNativeSVGPath] = []
+    private var styles: [UxUiSVGStyle] = [UxUiSVGStyle()]
+    init(tint: String) { self.tint = tint }
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?,
+                qualifiedName qName: String?, attributes attributes: [String: String] = [:]) {
+        guard styles.count < 128, paths.count < 4096 else { parser.abortParsing(); return }
+        let name = elementName.lowercased()
+        var attributes = attributes
+        for declaration in (attributes["style"] ?? "").split(separator: ";") {
+            let pair = declaration.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if pair.count == 2 { attributes[pair[0]] = pair[1] }
+        }
+        var style = styles.last ?? UxUiSVGStyle()
+        if let fill = attributes["fill"], fill != "inherit" { style.fill = fill }
+        if let stroke = attributes["stroke"], stroke != "inherit" { style.stroke = stroke }
+        if let width = attributes["stroke-width"].flatMap(Double.init), width.isFinite { style.strokeWidth = max(0, CGFloat(width)) }
+        if let opacity = attributes["opacity"].flatMap(Double.init), opacity.isFinite { style.opacity *= min(1, max(0, opacity)) }
+        if let opacity = attributes["fill-opacity"].flatMap(Double.init), opacity.isFinite { style.fillOpacity = min(1, max(0, opacity)) }
+        if let opacity = attributes["stroke-opacity"].flatMap(Double.init), opacity.isFinite { style.strokeOpacity = min(1, max(0, opacity)) }
+        if let rule = attributes["fill-rule"] { style.evenOdd = rule == "evenodd" }
+        if let cap = attributes["stroke-linecap"] { style.lineCap = cap == "round" ? .round : cap == "square" ? .square : .butt }
+        if let join = attributes["stroke-linejoin"] { style.lineJoin = join == "round" ? .round : join == "bevel" ? .bevel : .miter }
+        if let transform = attributes["transform"] { style.transform = uxUiSVGCompose(style.transform, uxUiSVGTransform(transform)) }
+        style.hidden = style.hidden || ["defs", "clippath", "mask", "symbol", "script", "foreignobject", "pattern"].contains(name)
+            || attributes["display"] == "none" || attributes["visibility"] == "hidden"
+        styles.append(style)
+        guard !style.hidden else { return }
+        func number(_ key: String, fallback: CGFloat = 0) -> CGFloat {
+            guard let raw = attributes[key], let value = Double(raw), value.isFinite else { return fallback }
+            return CGFloat(value)
+        }
+        var path = Path()
+        switch name {
+        case "path": path = uxUiParseSVGPath(attributes["d"] ?? "")
+        case "circle", "ellipse":
+            let rx = number(name == "circle" ? "r" : "rx"), ry = number(name == "circle" ? "r" : "ry")
+            guard rx > 0, ry > 0 else { return }
+            path.addEllipse(in: CGRect(x: number("cx") - rx, y: number("cy") - ry, width: rx * 2, height: ry * 2))
+        case "rect":
+            let width = number("width"), height = number("height")
+            guard width > 0, height > 0 else { return }
+            let rect = CGRect(x: number("x"), y: number("y"), width: width, height: height)
+            let rx = max(0, min(width / 2, number("rx", fallback: number("ry"))))
+            let ry = max(0, min(height / 2, number("ry", fallback: rx)))
+            path.addRoundedRect(in: rect, cornerSize: CGSize(width: rx, height: ry))
+        case "line":
+            path.move(to: CGPoint(x: number("x1"), y: number("y1")))
+            path.addLine(to: CGPoint(x: number("x2"), y: number("y2")))
+        case "polyline", "polygon":
+            let points = uxUiSVGNumbers(attributes["points"] ?? "")
+            guard points.count >= 4 else { return }
+            path.move(to: CGPoint(x: points[0], y: points[1]))
+            for i in stride(from: 2, to: points.count - 1, by: 2) { path.addLine(to: CGPoint(x: points[i], y: points[i + 1])) }
+            if name == "polygon" { path.closeSubpath() }
+        default: return
+        }
+        guard !path.isEmpty else { return }
+        func paint(_ raw: String?) -> String? {
+            guard let raw = raw, raw.lowercased() != "none", !raw.lowercased().hasPrefix("url(") else { return nil }
+            return raw.lowercased() == "currentcolor" ? tint : raw
+        }
+        let scale = sqrt(abs(style.transform.a * style.transform.d - style.transform.b * style.transform.c))
+        guard scale.isFinite else { return }
+        paths.append(UxUiNativeSVGPath(path: path.applying(style.transform), fill: paint(style.fill),
+                                      stroke: paint(style.stroke), strokeWidth: style.strokeWidth * scale,
+                                      fillOpacity: style.opacity * style.fillOpacity,
+                                      strokeOpacity: style.opacity * style.strokeOpacity, evenOdd: style.evenOdd,
+                                      lineCap: style.lineCap, lineJoin: style.lineJoin))
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        if styles.count > 1 { styles.removeLast() }
+    }
+}
+
+private final class UxUiSVGDecodedPaths: NSObject {
+    let value: [UxUiNativeSVGPath]
+    init(_ value: [UxUiNativeSVGPath]) { self.value = value }
+}
+private let uxUiSVGPathCache: NSCache<NSString, UxUiSVGDecodedPaths> = {
+    let cache = NSCache<NSString, UxUiSVGDecodedPaths>()
+    cache.countLimit = 256
+    cache.totalCostLimit = 8 * 1024 * 1024
+    return cache
+}()
+
+private func uxUiSVGPaths(_ svg: String, tint: String) -> [UxUiNativeSVGPath] {
+    guard svg.utf8.count <= 1_048_576, !svg.localizedCaseInsensitiveContains("<!DOCTYPE"),
+          !svg.localizedCaseInsensitiveContains("<!ENTITY"), let data = svg.data(using: .utf8) else { return [] }
+    let key = (tint + "\n" + svg) as NSString
+    if let cached = uxUiSVGPathCache.object(forKey: key) { return cached.value }
+    let decoder = UxUiSVGDecoder(tint: tint)
+    let parser = XMLParser(data: data)
+    parser.shouldResolveExternalEntities = false
+    parser.delegate = decoder
+    guard parser.parse() else { return [] }
+    uxUiSVGPathCache.setObject(UxUiSVGDecodedPaths(decoder.paths), forKey: key, cost: data.count * 6)
+    return decoder.paths
 }
 
 private func uxUiDrawSVG(_ svg: String, tint: String, in context: CGContext, rect: CGRect) {
     let viewBox = uxUiSVGViewBox(svg)
     guard viewBox.width > 0, viewBox.height > 0 else { return }
+    let scale = min(rect.width / viewBox.width, rect.height / viewBox.height)
     context.saveGState()
-    context.translateBy(x: rect.minX - viewBox.minX * rect.width / viewBox.width,
-                        y: rect.minY - viewBox.minY * rect.height / viewBox.height)
-    context.scaleBy(x: rect.width / viewBox.width, y: rect.height / viewBox.height)
+    context.translateBy(x: rect.midX - viewBox.width * scale / 2 - viewBox.minX * scale,
+                        y: rect.midY - viewBox.height * scale / 2 - viewBox.minY * scale)
+    context.scaleBy(x: scale, y: scale)
     for drawable in uxUiSVGPaths(svg, tint: tint) {
-        context.addPath(drawable.path.cgPath)
         if let fill = drawable.fill {
+            context.addPath(drawable.path.cgPath)
+            context.setAlpha(CGFloat(drawable.fillOpacity))
             context.setFillColor(uxUiPlatformColor(fill).cgColor)
-            context.drawPath(using: .fill)
+            context.drawPath(using: drawable.evenOdd ? .eoFill : .fill)
         }
         if let stroke = drawable.stroke {
             context.addPath(drawable.path.cgPath)
+            context.setAlpha(CGFloat(drawable.strokeOpacity))
             context.setStrokeColor(uxUiPlatformColor(stroke).cgColor)
             context.setLineWidth(drawable.strokeWidth)
+            context.setLineCap(drawable.lineCap)
+            context.setLineJoin(drawable.lineJoin)
             context.drawPath(using: .stroke)
         }
     }
@@ -9143,38 +9411,79 @@ private func uxUiDrawSVG(_ svg: String, tint: String, in context: CGContext, rec
 }
 
 
+private let uxUiBundledIcons: [String: String] = {
+    guard let url = Bundle.main.url(forResource: "uxui-icons", withExtension: "json", subdirectory: "Resources"),
+          let data = try? Data(contentsOf: url) else { return [:] }
+    return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]
+}()
+
+private actor UxUiIconArtworkCache {
+    static let shared = UxUiIconArtworkCache()
+    private var artwork: [String: String] = [:]
+    func load(_ identifier: String) async throws -> String {
+        if let cached = uxUiBundledIcons[identifier] ?? artwork[identifier] { return cached }
+        let parts = identifier.split(separator: ":", maxSplits: 1).map(String.init)
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty && $0.unicodeScalars.allSatisfy(allowed.contains) }),
+              let url = URL(string: "https://api.iconify.design/\(parts[0])/\(parts[1]).svg") else { throw URLError(.badURL) }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 1_000_000,
+              let source = String(data: data, encoding: .utf8), source.contains("<svg") else { throw URLError(.cannotDecodeContentData) }
+        let cleaned = uxUiCleanIconSVG(source)
+        artwork[identifier] = cleaned
+        return cleaned
+    }
+}
+
 private struct UxUiIconifyThumbnail: View {
+    @Environment(\.colorScheme) private var colorScheme
     let iconName: String
     @State private var svg = ""
-
+    @State private var failed = false
+    @State private var retry = 0
     var body: some View {
         Group {
-            if svg.isEmpty {
-                Image(systemName: "square.grid.2x2")
-                    .foregroundStyle(Color.envMuted)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let source = uxUiBundledIcons[iconName] ?? (svg.isEmpty ? nil : svg) {
+                UxUiNativeSVGIcon(svg: source, tint: colorScheme == .dark ? "#FFFFFF" : "#000000").saturation(0)
+            } else if failed {
+                Button { failed = false; retry += 1 } label: {
+                    Image(systemName: "arrow.clockwise").foregroundStyle(Color.uxUiMuted)
+                }.accessibilityLabel("Retry loading \(iconName)")
             } else {
-                UxUiNativeSVGIcon(svg: svg, tint: "#475569")
+                ProgressView().controlSize(.small)
             }
         }
-        .task(id: iconName) {
-            let parts = iconName.split(separator: ":", maxSplits: 1).map(String.init)
-            guard parts.count == 2 else { svg = ""; return }
-            let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-            let prefix = parts[0].addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
-            let name = parts[1].addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
-            guard let url = URL(string: "https://api.iconify.design/\(prefix)/\(name).svg") else { svg = ""; return }
-            do {
-                let (data, response) = try await URLSession.shared.data(from: url)
-                guard (response as? HTTPURLResponse)?.statusCode == 200,
-                      let source = String(data: data, encoding: .utf8),
-                      source.contains("<svg") else { svg = ""; return }
-                svg = uxUiCleanIconSVG(source)
-            } catch {
-                svg = ""
-            }
+        .accessibilityLabel(iconName)
+        .task(id: iconName + String(retry)) {
+            guard uxUiBundledIcons[iconName] == nil else { return }
+            do { svg = try await UxUiIconArtworkCache.shared.load(iconName); failed = false }
+            catch { if !Task.isCancelled { failed = true } }
         }
     }
+}
+
+private let uxUiBundledFontFiles = ["Inter": "inter", "Lora": "lora", "JetBrains Mono": "jetbrains-mono", "Bebas Neue": "bebas-neue", "Caveat": "caveat"]
+private let uxUiBundledFontAssets: [String: (name: String, dataURL: String?)] = {
+    var assets: [String: (name: String, dataURL: String?)] = [:]
+    for (family, filename) in uxUiBundledFontFiles {
+        guard let url = Bundle.main.url(forResource: filename, withExtension: "ttf", subdirectory: "Resources/fonts"),
+              let data = try? Data(contentsOf: url) else { continue }
+        let dataURL = "data:font/ttf;base64," + data.base64EncodedString()
+        if let name = uxUiRegisterImportedFont(dataURL, family: family) { assets[family] = (name, dataURL) }
+    }
+    return assets
+}()
+private func uxUiFontAsset(_ family: String) -> (name: String, dataURL: String?)? {
+    if family == "System" || family == "SF Pro Rounded" { return ("System", nil) }
+    if let asset = uxUiBundledFontAssets[family] { return asset }
+    if let name = UIFont.fontNames(forFamilyName: family).first ?? UIFont(name: family, size: 18)?.fontName { return (name, nil) }
+    return nil
+}
+
+private func uxUiSampleFont(_ family: String, size: CGFloat) -> Font {
+    if family == "SF Pro Rounded" { return .system(size: size, design: .rounded) }
+    guard let asset = uxUiFontAsset(family), asset.name != "System" else { return .system(size: size) }
+    return .custom(asset.name, size: size)
 }
 
 private func uxUiFont(for item: UxUiNativeLayer, scale: CGFloat) -> Font {
@@ -9182,8 +9491,7 @@ private func uxUiFont(for item: UxUiNativeLayer, scale: CGFloat) -> Font {
         return .custom(family, size: max(5, CGFloat(item.fontSize) * scale))
             .weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
     }
-    let family = item.fontFamily == "Inter" || item.fontFamily == "System" ? "System" : item.fontFamily
-    return .custom(family, size: max(5, CGFloat(item.fontSize) * scale))
+    return uxUiSampleFont(item.fontFamily, size: max(5, CGFloat(item.fontSize) * scale))
         .weight(item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
 }
 
@@ -9195,21 +9503,24 @@ private struct UxUiNativeSVGIcon: View {
         Canvas { context, size in
             let viewBox = uxUiSVGViewBox(svg)
             guard viewBox.width > 0, viewBox.height > 0 else { return }
-            let sx = size.width / viewBox.width
-            let sy = size.height / viewBox.height
-            let transform = CGAffineTransform(a: sx, b: 0, c: 0, d: sy,
-                                              tx: -viewBox.minX * sx, ty: -viewBox.minY * sy)
+            let scale = min(size.width / viewBox.width, size.height / viewBox.height)
+            let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
+                                              tx: (size.width - viewBox.width * scale) / 2 - viewBox.minX * scale,
+                                              ty: (size.height - viewBox.height * scale) / 2 - viewBox.minY * scale)
             for drawable in uxUiSVGPaths(svg, tint: tint) {
                 let path = drawable.path.applying(transform)
                 if let fill = drawable.fill {
-                    context.fill(path, with: .color(uxUiUIColor(fill)))
+                    context.fill(path, with: .color(uxUiUIColor(fill).opacity(drawable.fillOpacity)),
+                                 style: FillStyle(eoFill: drawable.evenOdd))
                 }
                 if let stroke = drawable.stroke {
-                    context.stroke(path, with: .color(uxUiUIColor(stroke)),
-                                   lineWidth: drawable.strokeWidth * (sx + sy) / 2)
+                    context.stroke(path, with: .color(uxUiUIColor(stroke).opacity(drawable.strokeOpacity)),
+                                   style: StrokeStyle(lineWidth: drawable.strokeWidth * scale,
+                                                      lineCap: drawable.lineCap, lineJoin: drawable.lineJoin))
                 }
             }
         }
+        .accessibilityHidden(true)
     }
 }
 
@@ -9271,16 +9582,22 @@ private struct UxUiNativeProject: Codable {
 private struct UxUiViewport: Codable { var width: Int; var height: Int }
 
 private func uxUiPlatformColor(_ hex: String, fallback: UIColor = .white) -> UIColor {
-    if hex == "transparent" { return .clear }
+    let named: [String: UIColor] = ["black": .black, "white": .white, "red": .red, "blue": .blue, "green": .green, "transparent": .clear, "none": .clear]
+    if let color = named[hex.lowercased()] { return color }
     var value = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
     if value.count == 3 { value = value.map { "\($0)\($0)" }.joined() }
     guard value.count == 6, let rgb = UInt64(value, radix: 16) else { return fallback }
     return UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255, green: CGFloat((rgb >> 8) & 0xFF) / 255, blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
 }
 private func uxUiUIColor(_ hex: String) -> Color { Color(uiColor: uxUiPlatformColor(hex)) }
+private func uxUiHex(_ color: UIColor) -> String {
+    var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+    guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return "#FFFFFF" }
+    return String(format: "#%02X%02X%02X", Int(red * 255), Int(green * 255), Int(blue * 255))
+}
 
 private struct UxUiStudioExport: FileDocument {
-    static var readableContentTypes: [UTType] { [.pdf, .json, .plainText] }
+    static var readableContentTypes: [UTType] { [.pdf, .json, .plainText, .font] }
     var data: Data
     init(data: Data) { self.data = data }
     init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
@@ -9336,7 +9653,7 @@ private func uxUiGenerateHTML(name: String, target: String, background: String, 
         let y = vertical == "bottom" ? "bottom:\(max(0, rh - layer.y - layer.height))px" : vertical == "center" ? "top:calc(\(layer.y)px + (100cqh - \(rh)px)/2)" : "top:\(layer.y)px"
         let w = horizontal == "stretch" ? "width:calc(\(layer.width)px + (100cqw - \(rw)px))" : "width:\(layer.width)px"
         let h = vertical == "stretch" ? "height:calc(\(layer.height)px + (100cqh - \(rh)px))" : "height:\(layer.height)px"
-        let style = "position:absolute;\(x);\(y);\(w);\(h);box-sizing:border-box;padding:\(layer.padding)px;color:\(layer.color);background:\(layer.fill == "transparent" ? "transparent" : layer.fill);border:\(layer.borderWidth)px solid \(layer.borderWidth > 0 ? layer.borderColor : "transparent");border-radius:\(layer.radius)px;font-family:\(layer.fontFamily);font-size:\(layer.fontSize)px;font-weight:\(layer.fontWeight);line-height:\(layer.lineHeight);letter-spacing:\(0)px;white-space:pre-wrap;overflow:hidden;opacity:1;\(layer.minWidth > 0 ? "min-width:\(layer.minWidth)px;" : "")\(layer.maxWidth > 0 ? "max-width:\(layer.maxWidth)px;" : "")"
+        let style = "position:absolute;\(x);\(y);\(w);\(h);box-sizing:border-box;padding:\(layer.padding)px;color:\(layer.color);background:\(layer.fill == "transparent" ? "transparent" : layer.fill);border:\(layer.borderWidth)px solid \(layer.borderWidth > 0 ? layer.borderColor : "transparent");border-radius:\(layer.radius)px;font-family:\(layer.fontFamily);font-size:\(layer.fontSize)px;font-weight:\(layer.fontWeight);line-height:\(layer.lineHeight);letter-spacing:\(0)px;white-space:pre-wrap;overflow:hidden;opacity:\(layer.opacity);transform:rotate(\(layer.rotation)deg);box-shadow:\(layer.shadow ? "0 6px 12px rgba(0,0,0,.2)" : "none");\(layer.minWidth > 0 ? "min-width:\(layer.minWidth)px;" : "")\(layer.maxWidth > 0 ? "max-width:\(layer.maxWidth)px;" : "")"
         let common = "class='env-layer' data-visible-on='\(layer.visibleOn.joined(separator: " "))' style='\(style)'"
         if layer.kind == "icon" { return "<div \(common) aria-label='\(layer.name)'>\(layer.iconSvg ?? layer.iconName)</div>" }
         if layer.kind == "image" {
@@ -9350,13 +9667,18 @@ private func uxUiGenerateHTML(name: String, target: String, background: String, 
         let tag = layer.kind == "button" ? "button" : "div"
         return "<\(tag) \(common)>\(layer.text)</\(tag)>"
     }.joined(separator: "\n")
+    var embeddedFamilies = Set<String>()
+    let fontFaces = elements.compactMap { layer -> String? in
+        guard let data = layer.fontData, embeddedFamilies.insert(layer.fontFamily).inserted else { return nil }
+        return "@font-face{font-family:\(uxUiSourceString(layer.fontFamily));src:url(\(uxUiSourceString(data)));font-weight:100 900;font-display:swap}"
+    }.joined(separator: "\n")
     let colorVars = tokens.colors.map { "--env-color-\($0.name.replacingOccurrences(of: " ", with: "-")):\($0.value)" }.joined(separator: ";")
     let spaceVars = tokens.spacing.map { "--env-space-\($0):\($0)px" }.joined(separator: ";")
     let typeVars = tokens.typography.map { "--env-type-\($0.name.replacingOccurrences(of: " ", with: "-")):\($0.fontSize)px/\($0.lineHeight) \($0.fontFamily)" }.joined(separator: ";")
     return """
     <!doctype html>
     <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>\(name)</title><style>:root{\(colorVars);\(spaceVars);\(typeVars)}*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}
+    <title>\(name)</title><style>\(fontFaces) :root{\(colorVars);\(spaceVars);\(typeVars)}*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}
     .env-artboard{position:relative;container-type:size;width:min(100%,\(width)px);aspect-ratio:\(width)/\(height);margin:0 auto;background:\(background);overflow:hidden}
     @media(max-width:480px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}
     @media(min-width:481px) and (max-width:1023px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}
@@ -9453,6 +9775,7 @@ private func uxUiGenerateKotlin(name: String, target: String, background: String
         "import androidx.compose.runtime.remember",
         "import androidx.compose.ui.Modifier",
         "import androidx.compose.ui.graphics.Color",
+        "import androidx.compose.ui.graphics.graphicsLayer",
         "import androidx.compose.ui.graphics.Shape",
         "import androidx.compose.ui.graphics.asImageBitmap",
         "import androidx.compose.ui.graphics.drawscope.drawIntoCanvas",
@@ -9472,22 +9795,22 @@ private func uxUiGenerateKotlin(name: String, target: String, background: String
         "fun \(uxUiSourceIdentifier(name))Design(target: String = \(uxUiSourceString(target))) {",
         "  val context = LocalContext.current",
         "  BoxWithConstraints(Modifier.fillMaxWidth().height(\(height).dp)) {",
-        "    val widthDelta = maxWidth.value - \(width).f",
-        "    val heightDelta = maxHeight.value - \(height).f",
+        "    val widthDelta = maxWidth.value - \(width)f",
+        "    val heightDelta = maxHeight.value - \(height)f",
         "    Box(Modifier.fillMaxSize().background(Color(android.graphics.Color.parseColor(\(uxUiSourceString(background)))))) {"
     ]
     for layer in elements {
         let h = layer.horizontalConstraint
         let v = layer.verticalConstraint
-        let x = h == "center" ? "(\(layer.x).f + widthDelta / 2f)" : h == "right" ? "(maxWidth.value - \(max(0, layer.referenceWidth - layer.x - layer.width)).f - \(layer.width).f)" : "\(layer.x).f"
-        let y = v == "center" ? "(\(layer.y).f + heightDelta / 2f)" : v == "bottom" ? "(maxHeight.value - \(max(0, layer.referenceHeight - layer.y - layer.height)).f - \(layer.height).f)" : "\(layer.y).f"
-        var w = h == "stretch" ? "(\(layer.width).f + widthDelta).coerceAtLeast(\(max(1, layer.minWidth)).f)" : "\(layer.width).f"
-        if h == "stretch", layer.maxWidth > 0 { w += ".coerceAtMost(\(layer.maxWidth).f)" }
-        let heightCode = v == "stretch" ? "(\(layer.height).f + heightDelta).coerceAtLeast(1f)" : "\(layer.height).f"
+        let x = h == "center" ? "(\(layer.x)f + widthDelta / 2f)" : h == "right" ? "(maxWidth.value - \(max(0, layer.referenceWidth - layer.x - layer.width))f - \(layer.width)f)" : "\(layer.x)f"
+        let y = v == "center" ? "(\(layer.y)f + heightDelta / 2f)" : v == "bottom" ? "(maxHeight.value - \(max(0, layer.referenceHeight - layer.y - layer.height))f - \(layer.height)f)" : "\(layer.y)f"
+        var w = h == "stretch" ? "(\(layer.width)f + widthDelta).coerceAtLeast(\(max(1, layer.minWidth))f)" : "\(layer.width)f"
+        if h == "stretch", layer.maxWidth > 0 { w += ".coerceAtMost(\(layer.maxWidth)f)" }
+        let heightCode = v == "stretch" ? "(\(layer.height)f + heightDelta).coerceAtLeast(1f)" : "\(layer.height)f"
         let visible = layer.visibleOn.map(uxUiSourceString).joined(separator: ",")
         let fill = layer.fill == "transparent" ? background : layer.fill
         lines.append("      // \(layer.name) (\(layer.kind)); anchors \(h)/\(v); visibleOn \(layer.visibleOn.joined(separator: ","))")
-        lines.append("      if (listOf(\(visible)).contains(target)) Box(Modifier.offset(x=(\(x)).dp,y=(\(y)).dp).size(width=(\(w)).dp,height=(\(heightCode)).dp).background(Color(android.graphics.Color.parseColor(\(uxUiSourceString(fill)))),generatedUxShape(\(uxUiSourceString(layer.kind)),\(layer.radius).dp)).padding(\(layer.padding).dp)) {")
+        lines.append("      if (listOf(\(visible)).contains(target)) Box(Modifier.offset(x=(\(x)).dp,y=(\(y)).dp).size(width=(\(w)).dp,height=(\(heightCode)).dp).graphicsLayer { alpha=\(layer.opacity)f; rotationZ=\(layer.rotation)f; shadowElevation=\(layer.shadow ? 12 : 0)f }.background(Color(android.graphics.Color.parseColor(\(uxUiSourceString(fill)))),generatedUxShape(\(uxUiSourceString(layer.kind)),\(layer.radius).dp)).padding(\(layer.padding).dp)) {")
         if layer.kind == "icon", let svg = layer.iconSvg, !svg.isEmpty {
             let viewBox = uxUiSVGViewBox(svg)
             let drawables = uxUiSVGPaths(svg, tint: layer.color)
@@ -9592,7 +9915,9 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
             let encodedImage = dataURL.components(separatedBy: ",").last ?? ""
             child = "Group { if let data = Data(base64Encoded:\(uxUiSourceString(encodedImage))), let image = UIImage(data:data) { Image(uiImage:image).resizable().scaledToFill() } else { Text(\(uxUiSourceString(layer.name))) } }"
         } else {
-            child = "Text(\(uxUiSourceString(layer.text))).font(.custom(\(uxUiSourceString(layer.fontFamily)),size:\(layer.fontSize)).weight(\(layer.fontWeight >= 700 ? ".bold" : layer.fontWeight >= 600 ? ".semibold" : ".regular"))).foregroundStyle(Color(hex:\(uxUiSourceString(layer.color))))"
+            let encodedFont = layer.fontData?.components(separatedBy: ",").last ?? ""
+            let family = uxUiFontAsset(layer.fontFamily)?.name ?? layer.fontFamily
+            child = "Text(\(uxUiSourceString(layer.text))).font(generatedUxFont(family:\(uxUiSourceString(family)),base64:\(uxUiSourceString(encodedFont)),size:\(layer.fontSize)).weight(\(layer.fontWeight >= 700 ? ".bold" : layer.fontWeight >= 600 ? ".semibold" : ".regular"))).foregroundStyle(Color(hex:\(uxUiSourceString(layer.color))))"
         }
         let visible = layer.visibleOn.map(uxUiSourceString).joined(separator: ",")
         lines.append("      if [\(visible)].contains(target) {")
@@ -9603,7 +9928,7 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
         } else {
             fontRegistration = ""
         }
-        lines.append("        \(child).frame(width:\(w),height:\(heightCode),alignment:.topLeading).background(Color(hex:\(uxUiSourceString(fill)))).clipShape(GeneratedUxShape(kind:\(uxUiSourceString(layer.kind)),radius:CGFloat(\(layer.radius)))).position(x:CGFloat(\(layer.x))+\(dx)+(\(w))/2,y:CGFloat(\(layer.y))+\(dy)+(\(heightCode))/2)" + fontRegistration)
+        lines.append("        \(child).frame(width:\(w),height:\(heightCode),alignment:.topLeading).background(Color(hex:\(uxUiSourceString(fill)))).clipShape(GeneratedUxShape(kind:\(uxUiSourceString(layer.kind)),radius:CGFloat(\(layer.radius)))).opacity(\(layer.opacity)).shadow(color:.black.opacity(\(layer.shadow ? 0.2 : 0)),radius:12,x:0,y:6).rotationEffect(.degrees(\(layer.rotation))).position(x:CGFloat(\(layer.x))+\(dx)+(\(w))/2,y:CGFloat(\(layer.y))+\(dy)+(\(heightCode))/2)" + fontRegistration)
         lines.append("      }")
     }
     lines += [
@@ -9631,14 +9956,24 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
         "  }",
         "}",
         "",
+        "private func generatedUxFont(family: String, base64: String, size: CGFloat) -> Font {",
+        "  let name = base64.isEmpty ? family : (generatedUxRegisterFont(base64:base64,family:family) ?? family)",
+        "  return name == \"System\" ? .system(size:size) : .custom(name,size:size)",
+        "}",
+        "",
+        "private let generatedUxFontCache = NSCache<NSString,NSString>()",
         "private func generatedUxRegisterFont(base64: String, family: String) -> String? {",
+        "  let key = (family + String(base64.hashValue)) as NSString",
+        "  if let cached = generatedUxFontCache.object(forKey:key) { return cached as String }",
         "  guard let data=Data(base64Encoded:base64), data.count <= 4*1024*1024 else { return nil }",
         "  let safe=family.replacingOccurrences(of:\"[^A-Za-z0-9_-]\",with:\"-\",options:.regularExpression)",
         "  let url=FileManager.default.temporaryDirectory.appendingPathComponent(\"env-generated-font-\\(safe).ttf\")",
         "  do { try data.write(to:url,options:.atomic) } catch { return nil }",
         "  var error: Unmanaged<CFError>?",
-        "  guard CTFontManagerRegisterFontsForURL(url as CFURL,.process,&error) else { return nil }",
-        "  return CTFontCopyFamilyName(CTFontCreateWithName(family as CFString,16,nil)) as String",
+        "  _ = CTFontManagerRegisterFontsForURL(url as CFURL,.process,&error)",
+        "  guard let descriptors=CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor], let descriptor=descriptors.first, let name=CTFontDescriptorCopyAttribute(descriptor,kCTFontNameAttribute) as? String else { return nil }",
+        "  generatedUxFontCache.setObject(name as NSString,forKey:key)",
+        "  return name",
         "}",
         "",
         "extension Color { init(hex:String) { let value=UInt64(hex.trimmingCharacters(in:CharacterSet.alphanumerics.inverted),radix:16) ?? 0; self.init(.sRGB,red:Double((value>>16)&255)/255,green:Double((value>>8)&255)/255,blue:Double(value&255)/255,opacity:1) } }"
@@ -9648,32 +9983,32 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
 
 private struct UxUiStudioToolkit: Identifiable { let id: String; let name: String; let description: String; let status: String }
 private let uxUiStudioToolkits: [UxUiStudioToolkit] = [
-    UxUiStudioToolkit(id: "icons", name: "Icon Studio", description: "Discover, style, import and reuse icons.", status: "Connected"),
-    UxUiStudioToolkit(id: "typography", name: "Typography Studio", description: "Font discovery, typography and embedded font assets.", status: "Connected"),
-    UxUiStudioToolkit(id: "color", name: "Color Studio", description: "Palette, semantic colors and design tokens.", status: "Connected"),
-    UxUiStudioToolkit(id: "background", name: "Gradient & Background Studio", description: "Canvas background and imported image backgrounds.", status: "Connected foundation"),
-    UxUiStudioToolkit(id: "effects", name: "Effects Studio", description: "Border, radius, opacity, shadow and visual depth.", status: "Connected foundation"),
-    UxUiStudioToolkit(id: "illustrations", name: "Illustration Studio", description: "Import and position SVG or image illustrations.", status: "Import"),
-    UxUiStudioToolkit(id: "media", name: "Image & Media Studio", description: "Import photos, screenshots and media previews.", status: "Import"),
-    UxUiStudioToolkit(id: "brand", name: "Brand Studio", description: "Brand colors, font tokens and reusable component templates.", status: "Connected foundation"),
-    UxUiStudioToolkit(id: "motion", name: "Motion Studio", description: "Rotation and visual transition settings.", status: "Connected foundation"),
-    UxUiStudioToolkit(id: "components", name: "UI Components, Kits & Patterns", description: "Reusable controls, cards, forms and navigation elements.", status: "Connected"),
-    UxUiStudioToolkit(id: "device", name: "Device Mockup Studio", description: "Preview screen contents in mobile, tablet and desktop frames.", status: "Connected"),
-    UxUiStudioToolkit(id: "responsive", name: "Responsive Design, Layout & Canvas", description: "Viewport size, anchors, grid and responsive visibility.", status: "Connected"),
-    UxUiStudioToolkit(id: "projects", name: "Screen & Project Manager", description: "Projects, drafts, presets and import.", status: "Connected"),
-    UxUiStudioToolkit(id: "layers", name: "Layers & Object Manager", description: "Select, reorder, duplicate and delete layers.", status: "Connected"),
-    UxUiStudioToolkit(id: "prototype", name: "Prototype Studio", description: "Tap-linked screen navigation and history; overlay interactions remain unsupported.", status: "Partial: screen links"),
-    UxUiStudioToolkit(id: "design-system", name: "Design System Studio", description: "Reusable color, typography and spacing tokens.", status: "Connected foundation"),
-    UxUiStudioToolkit(id: "accessibility", name: "Accessibility Studio", description: "Structural, bounds and touch-target review.", status: "Advisory checks"),
-    UxUiStudioToolkit(id: "content", name: "Content & Placeholder Studio", description: "Sample headings, button labels and placeholder elements.", status: "Starter actions"),
-    UxUiStudioToolkit(id: "data-viz", name: "Data Visualization Studio", description: "Edit saved numeric data and preview bar charts.", status: "Editable bar charts"),
-    UxUiStudioToolkit(id: "patterns", name: "Patterns & Textures Studio", description: "Grid and decorative vector patterns.", status: "Starter actions"),
-    UxUiStudioToolkit(id: "3d", name: "3D Studio", description: "Live 3D models, camera and lighting.", status: "Not complete"),
-    UxUiStudioToolkit(id: "platform", name: "Platform Design Kits", description: "Mobile, tablet and desktop conventions.", status: "Connected foundation"),
-    UxUiStudioToolkit(id: "assets", name: "Asset Manager", description: "Import and replace supported assets.", status: "Import"),
-    UxUiStudioToolkit(id: "handoff", name: "Export & Design Handoff Studio", description: "Export PDF, JSON and source handoff.", status: "Connected"),
-    UxUiStudioToolkit(id: "inspiration", name: "Inspiration & Reference Studio", description: "Import visual references for comparison.", status: "Import"),
-    UxUiStudioToolkit(id: "qa", name: "Design QA Studio", description: "Review overlaps, bounds and touch targets.", status: "Advisory checks")
+    UxUiStudioToolkit(id: "icons", name: "Icons", description: "Discover, style, import and reuse icons.", status: "Connected"),
+    UxUiStudioToolkit(id: "typography", name: "Typography", description: "Font discovery, typography and embedded font assets.", status: "Connected"),
+    UxUiStudioToolkit(id: "color", name: "Colors", description: "Palette, semantic colors and design tokens.", status: "Connected"),
+    UxUiStudioToolkit(id: "background", name: "Backgrounds", description: "Canvas background and imported image backgrounds.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "effects", name: "Effects", description: "Border, radius, opacity, shadow and visual depth.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "illustrations", name: "Illustrations", description: "Import and position SVG or image illustrations.", status: "Import"),
+    UxUiStudioToolkit(id: "media", name: "Images & media", description: "Import photos, screenshots and media previews.", status: "Import"),
+    UxUiStudioToolkit(id: "brand", name: "Brand kit", description: "Brand colors, font tokens and reusable component templates.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "motion", name: "Motion", description: "Rotation and visual transition settings.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "components", name: "UI components", description: "Reusable controls, cards, forms and navigation elements.", status: "Connected"),
+    UxUiStudioToolkit(id: "device", name: "Device mockups", description: "Preview screen contents in mobile, tablet and desktop frames.", status: "Connected"),
+    UxUiStudioToolkit(id: "responsive", name: "Responsive layout", description: "Viewport size, anchors, grid and responsive visibility.", status: "Connected"),
+    UxUiStudioToolkit(id: "projects", name: "Projects", description: "Projects, drafts, presets and import.", status: "Connected"),
+    UxUiStudioToolkit(id: "layers", name: "Layers", description: "Select, reorder, duplicate and delete layers.", status: "Connected"),
+    UxUiStudioToolkit(id: "flows", name: "Interactive flows", description: "Tap-linked screen navigation and history; overlay interactions remain unsupported.", status: "Partial: screen links"),
+    UxUiStudioToolkit(id: "design-system", name: "Design system", description: "Reusable color, typography and spacing tokens.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "accessibility", name: "Accessibility", description: "Structural, bounds and touch-target review.", status: "Advisory checks"),
+    UxUiStudioToolkit(id: "content", name: "Content", description: "Sample headings, button labels and placeholder elements.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "data-viz", name: "Data visualization", description: "Edit saved numeric data and preview bar charts.", status: "Editable bar charts"),
+    UxUiStudioToolkit(id: "patterns", name: "Patterns & textures", description: "Grid and decorative vector patterns.", status: "Starter actions"),
+    UxUiStudioToolkit(id: "transform", name: "Transform & alignment", description: "Rotate, resize and position objects with live previews.", status: "Connected"),
+    UxUiStudioToolkit(id: "platform", name: "Platform kits", description: "Mobile, tablet and desktop conventions.", status: "Connected foundation"),
+    UxUiStudioToolkit(id: "assets", name: "Assets", description: "Import and replace supported assets.", status: "Import"),
+    UxUiStudioToolkit(id: "handoff", name: "Export & handoff", description: "Export PDF, JSON and source handoff.", status: "Connected"),
+    UxUiStudioToolkit(id: "inspiration", name: "References", description: "Import visual references for comparison.", status: "Import"),
+    UxUiStudioToolkit(id: "qa", name: "Design QA", description: "Review overlaps, bounds and touch targets.", status: "Advisory checks")
 ]
 
 private struct NativeUxUiStudioView: View {
@@ -9713,13 +10048,17 @@ private struct NativeUxUiStudioView: View {
     @State private var redoHistory: [[UxUiNativeLayer]] = []
     @State private var dragOrigins: [UUID: CGPoint] = [:]
     @State private var selectedID: UUID?
+    @State private var canvasSelected = false
     @State private var notice = ""
     @State private var hasSavedDraft = false
     @State private var iconQuery = ""
-    @State private var iconCategory = "Navigation"
+    @State private var iconCategory = "All icons"
     @State private var iconPrefix = "all"
     @State private var fontQuery = ""
+    @State private var fontPreviewWords = "Make something beautiful"
+    @State private var animateFontPreviews = true
     @State private var fontCategory = "All"
+    @State private var iconBrowseLimit = 48
     @State private var iconResults: [String] = []
     @State private var iconTotal = 0
     @State private var iconLoadedQuery = ""
@@ -9731,6 +10070,9 @@ private struct NativeUxUiStudioView: View {
     @State private var isExportingPDF = false
     @State private var isExportingJSON = false
     @State private var isExportingSource = false
+    @State private var isExportingFont = false
+    @State private var fontFilename = "Font.ttf"
+    @State private var fontDocument = UxUiStudioExport(data: Data())
     @State private var sourceFilename = "UXUIDesign.html"
     @State private var pdfDocument = UxUiStudioExport(data: Data())
     @State private var jsonDocument = UxUiStudioExport(data: Data())
@@ -9806,6 +10148,7 @@ private struct NativeUxUiStudioView: View {
             lines.append("color=" + item.color + "; fill=" + item.fill + "; border=" + item.borderColor + " " + String(item.borderWidth) + "px; radius=" + String(item.radius) + "px")
             lines.append("padding=" + String(item.padding) + "px; margins top/right/bottom/left=" + String(item.marginTop) + "/" + String(item.marginRight) + "/" + String(item.marginBottom) + "/" + String(item.marginLeft) + "px")
             lines.append("font=" + item.fontFamily + "; size=" + String(item.fontSize) + "px; weight=" + String(item.fontWeight) + "; lineHeight=" + String(item.lineHeight))
+            lines.append("opacity=\(item.opacity); shadow=\(item.shadow); rotation=\(item.rotation)")
             lines.append("horizontalConstraint=" + item.horizontalConstraint + "; verticalConstraint=" + item.verticalConstraint + "; minWidth=" + String(item.minWidth) + "; maxWidth=" + String(item.maxWidth))
             lines.append("visibleOn=\(item.visibleOn.joined(separator: ",")); referenceViewport=\(item.referenceWidth)x\(item.referenceHeight); componentKey=\(item.componentKey); iconViewBox=\(item.iconViewBox)")
         }
@@ -9838,10 +10181,10 @@ private struct NativeUxUiStudioView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
-                    Image(systemName: "square.and.pencil").font(.system(size: 23, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    Image(systemName: "square.and.pencil").font(.system(size: 23, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("UX/UI Studio").font(.envScaled(size: 22, weight: .bold)).foregroundStyle(Color.envInk)
-                        Text("Make it by eye. Export a developer-ready design.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                        Text("UX/UI Studio").font(.envScaled(size: 22, weight: .bold)).foregroundStyle(Color.uxUiInk)
+                        Text("Make it by eye. Export a developer-ready design.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                     }
                 }
                 if onboarding {
@@ -9850,56 +10193,56 @@ private struct NativeUxUiStudioView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "plus").font(.system(size: 34, weight: .regular))
                                     .frame(width: 76, height: 76)
-                                    .overlay(Circle().stroke(Color.envInk, lineWidth: 2))
-                                Text("New project").font(.envScaled(size: 18, weight: .bold)).foregroundStyle(Color.envInk)
-                                Text("Start with a blank design").font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.envMuted)
+                                    .overlay(Circle().stroke(Color.uxUiInk, lineWidth: 2))
+                                Text("New project").font(.envScaled(size: 18, weight: .bold)).foregroundStyle(Color.uxUiInk)
+                                Text("Start with a blank design").font(.envScaled(size: 13, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                             }
                             .frame(maxWidth: .infinity).padding(.vertical, 20).contentShape(Rectangle())
-                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, style: StrokeStyle(lineWidth: 1, dash: [6, 4])))
+                            .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.uxUiBorder, style: StrokeStyle(lineWidth: 1, dash: [6, 4])))
                         }.buttonStyle(.plain).accessibilityLabel("New project")
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Drafts").font(.envScaled(size: 18, weight: .bold)).foregroundStyle(Color.envInk)
+                            Text("Drafts").font(.envScaled(size: 18, weight: .bold)).foregroundStyle(Color.uxUiInk)
                             if hasSavedDraft {
                                 Button { restoreDraft() } label: {
                                     HStack(spacing: 12) {
-                                        Image(systemName: "square.and.pencil").font(.system(size: 22)).foregroundStyle(Color.envAccent)
-                                            .frame(width: 46, height: 46).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                                        Image(systemName: "square.and.pencil").font(.system(size: 22)).foregroundStyle(Color.uxUiInk)
+                                            .frame(width: 46, height: 46).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 10))
                                         VStack(alignment: .leading, spacing: 4) {
-                                            Text("Continue saved design").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
-                                            Text("Your latest project").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                                            Text("Continue saved design").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                                            Text("Your latest project").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                                         }
                                         Spacer()
-                                        Image(systemName: "chevron.right").foregroundStyle(Color.envMuted)
-                                    }.padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                                        Image(systemName: "chevron.right").foregroundStyle(Color.uxUiMuted)
+                                    }.padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
                                 }.buttonStyle(.plain)
                             } else {
                                 VStack(spacing: 6) {
-                                    Image(systemName: "square.stack.3d.up").font(.system(size: 22)).foregroundStyle(Color.envMuted)
-                                    Text("No drafts yet").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
-                                    Text("Your designs will appear here as you work.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                                    Image(systemName: "square.stack.3d.up").font(.system(size: 22)).foregroundStyle(Color.uxUiMuted)
+                                    Text("No drafts yet").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                                    Text("Your designs will appear here as you work.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                                 }.frame(maxWidth: .infinity).padding(.vertical, 22)
-                                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                                    .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
                             }
                         }
                     }
                     .padding(16)
-                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                    .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.uxUiBorder, lineWidth: 1))
                 } else {
                     editorContent
                 }
                 if !notice.isEmpty {
-                    Text(notice).font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envAccent)
+                    Text(notice).font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.uxUiInk)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(10)
-                        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+                        .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8))
                 }
             }
             .padding(16)
         }
-        .background(Color.envSurface.ignoresSafeArea())
+        .background(Color.uxUiSurface.ignoresSafeArea())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -9917,6 +10260,11 @@ private struct NativeUxUiStudioView: View {
         .fileExporter(isPresented: $isExportingSource, document: sourceDocument, contentType: .plainText, defaultFilename: sourceFilename) { result in
             switch result { case .success(let url): notice = "Implementation source exported: \(url.lastPathComponent)"; case .failure(let error): notice = error.localizedDescription }
         }
+        .fileExporter(isPresented: $isExportingFont, document: fontDocument, contentType: .font, defaultFilename: fontFilename) { result in
+            switch result { case .success: notice = "Font saved. Its Open Font License is included with the bundled font library."; case .failure(let error): notice = error.localizedDescription }
+        }
+        .tint(Color.uxUiInk)
+        .foregroundStyle(Color.uxUiInk)
         .fileImporter(isPresented: $isImportingImage, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls):
@@ -10130,19 +10478,19 @@ private struct NativeUxUiStudioView: View {
             HStack(spacing: 7) {
                 Button { onboarding = true; showComponentPalette = false; showAdvancedCanvas = false; showAdvancedInspector = false } label: {
                     Image(systemName: "chevron.left").font(.system(size: 14, weight: .semibold))
-                        .frame(width: 36, height: 42).foregroundStyle(Color.envInk)
-                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                        .frame(width: 36, height: 42).foregroundStyle(Color.uxUiInk)
+                        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.uxUiBorder, lineWidth: 1))
                 }.accessibilityLabel("Back to projects")
                 TextField("Project title", text: $projectName)
                     .font(.envScaled(size: 15, weight: .semibold)).padding(10)
-                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.uxUiBorder, lineWidth: 1))
                 Button { exportPDF() } label: {
                     Image(systemName: "square.and.arrow.up").font(.system(size: 17, weight: .semibold))
-                        .frame(width: 42, height: 42).foregroundStyle(Color.envInk)
-                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                        .frame(width: 42, height: 42).foregroundStyle(Color.uxUiInk)
+                        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.uxUiBorder, lineWidth: 1))
                 }.accessibilityLabel("Export design")
             }
             HStack(spacing: 6) {
@@ -10152,13 +10500,12 @@ private struct NativeUxUiStudioView: View {
                 Spacer(minLength: 0)
             }
             Text(elements.isEmpty ? "Add your first element using +" : "Design elements: \(elements.count)")
-                .font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+                .font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.uxUiMuted)
 
             DisclosureGroup("Fine-tune canvas", isExpanded: $showAdvancedCanvas) {
-                HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     Toggle("Custom artboard", isOn: $customArtboard)
-                    inspectorNumber("Width px", value: $customWidth)
-                    inspectorNumber("Height px", value: $customHeight)
+                    HStack(spacing: 8) { inspectorNumber("Width px", value: $customWidth); inspectorNumber("Height px", value: $customHeight) }
                 }
                 .onChange(of: customWidth) { customWidth = min(4096, max(160, $0)) }
                 .onChange(of: customHeight) { customHeight = min(4096, max(240, $0)) }
@@ -10178,88 +10525,14 @@ private struct NativeUxUiStudioView: View {
             artboardPreview
 
             HStack(spacing: 7) {
-                Text("App screens").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("App screens").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Spacer()
                 Button { addAppScreen() } label: {
                     Label("New screen", systemImage: "plus").font(.envScaled(size: 11, weight: .semibold))
                         .padding(.horizontal, 10).padding(.vertical, 8)
-                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 9))
-                        .foregroundStyle(Color.envSurface)
+                        .background(Color.uxUiInk, in: RoundedRectangle(cornerRadius: 9))
+                        .foregroundStyle(Color.uxUiSurface)
                 }.accessibilityLabel("Add app screen")
-            }
-            if showScreenManager {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("\(screens.count) \(screens.count == 1 ? "screen" : "screens") · tap a thumbnail to open it")
-                        .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                        ForEach(screens) { screen in
-                            VStack(alignment: .leading, spacing: 7) {
-                                Button { openAppScreen(screen.id) } label: {
-                                    GeometryReader { proxy in
-                                        let w = screen.customArtboard ? screen.customWidth : (screen.target == "mobile" ? 390 : screen.target == "tablet" ? 768 : 1440)
-                                        let h = screen.customArtboard ? screen.customHeight : (screen.target == "mobile" ? 844 : screen.target == "tablet" ? 1024 : 900)
-                                        let scale = min(proxy.size.width / CGFloat(max(1, w)), proxy.size.height / CGFloat(max(1, h)))
-                                        ZStack(alignment: .topLeading) {
-                                            uxUiUIColor(screen.background)
-                                            ForEach(Array(screen.elements.prefix(10))) { item in
-                                                let rendered = uxUiResolvedLayer(item, boardWidth: w, boardHeight: h)
-                                                layerPreview(rendered, scale: scale)
-                                                    .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
-                                                    .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale,
-                                                              y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
-                                            }
-                                        }
-                                        .frame(width: proxy.size.width, height: proxy.size.height)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
-                                    }
-                                    .frame(height: 124)
-                                    .background(uxUiUIColor(screen.background), in: RoundedRectangle(cornerRadius: 8))
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Open \(screen.name)")
-                                TextField("Screen name", text: Binding(
-                                    get: { screens.first(where: { $0.id == screen.id })?.name ?? screen.name },
-                                    set: { renameAppScreen(screen.id, name: $0) }
-                                ))
-                                .font(.envScaled(size: 11, weight: .semibold))
-                                .padding(6)
-                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
-                                .accessibilityLabel("Screen name \(screen.name)")
-                                Text("\(screen.target.capitalized) · \(screen.elements.count) layers")
-                                    .font(.envScaled(size: 9, weight: .regular)).foregroundStyle(Color.envMuted)
-                                HStack(spacing: 5) {
-                                    Button { openAppScreen(screen.id) } label: {
-                                        Text(screen.id == activeScreenID ? "Editing" : "Open")
-                                            .font(.envScaled(size: 10, weight: .semibold))
-                                            .frame(maxWidth: .infinity).padding(.vertical, 7)
-                                            .background(screen.id == activeScreenID ? Color.envSurface2 : Color.envAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
-                                    }.disabled(screen.id == activeScreenID).buttonStyle(.plain)
-                                    Button { reorderAppScreen(screen.id, by: -1) } label: { Image(systemName: "arrow.up").frame(width: 26, height: 30) }
-                                        .disabled(screens.first?.id == screen.id).accessibilityLabel("Move \(screen.name) earlier")
-                                    Button { reorderAppScreen(screen.id, by: 1) } label: { Image(systemName: "arrow.down").frame(width: 26, height: 30) }
-                                        .disabled(screens.last?.id == screen.id).accessibilityLabel("Move \(screen.name) later")
-                                    Button { duplicateAppScreen(screen.id) } label: { Image(systemName: "plus.square.on.square").frame(width: 26, height: 30) }
-                                        .accessibilityLabel("Duplicate \(screen.name)")
-                                    Button { deleteAppScreen(screen.id) } label: { Image(systemName: "trash").frame(width: 26, height: 30) }
-                                        .disabled(screens.count <= 1).accessibilityLabel("Delete \(screen.name)")
-                                }
-                                .font(.system(size: 10, weight: .semibold))
-                                .buttonStyle(.bordered)
-                                .tint(Color.envInk)
-                            }
-                            .padding(8)
-                            .background(screen.id == activeScreenID ? Color.envAccent.opacity(0.07) : Color.envCard, in: RoundedRectangle(cornerRadius: 11))
-                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: 1))
-                        }
-                    }
-                    Button { showScreenManager = false } label: {
-                        Text("Close screen manager").font(.envScaled(size: 11, weight: .semibold))
-                            .frame(maxWidth: .infinity).padding(8)
-                    }.buttonStyle(.bordered)
-                }
-                .padding(10)
-                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             }
 
             HStack(spacing: 7) {
@@ -10282,35 +10555,29 @@ private struct NativeUxUiStudioView: View {
                 }
                 Button { showScreenManager.toggle() } label: {
                     Image(systemName: "square.grid.2x2").font(.system(size: 17, weight: .semibold))
-                        .frame(width: 38, height: 42).foregroundStyle(Color.envInk)
-                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(showScreenManager ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        .frame(width: 38, height: 42).foregroundStyle(Color.uxUiInk)
+                        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(showScreenManager ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
                 }.accessibilityLabel(showScreenManager ? "Close app screens" : "App screens")
                 Spacer(minLength: 3)
                 Button { showComponentPalette.toggle() } label: {
                     Image(systemName: showComponentPalette ? "xmark" : "plus")
                         .font(.system(size: 25, weight: .regular)).frame(width: 58, height: 58)
-                        .foregroundStyle(Color.envInk).background(Color.envCard, in: Circle())
-                        .overlay(Circle().stroke(Color.envInk, lineWidth: 3))
+                        .foregroundStyle(Color.uxUiInk).background(Color.uxUiCard, in: Circle())
+                        .overlay(Circle().stroke(Color.uxUiInk, lineWidth: 3))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showComponentPalette ? "Close elements" : "Add elements")
-                Spacer(minLength: 3)
-                VStack(spacing: 0) {
-                    Button { showScreenManager.toggle() } label: {
-                        Image(systemName: "square.grid.2x2").font(.system(size: 19, weight: .semibold))
-                            .frame(width: 40, height: 35).foregroundStyle(Color.envInk)
-                    }.accessibilityLabel("App screens").accessibilityValue(showScreenManager ? "Expanded" : "Collapsed")
-                    Text(String(screens.count)).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(Color.envMuted)
-                }
             }
             if showScreenManager { appScreensPanel }
             if let index = selectedIndex {
                 selectedElementToolbar(for: index)
+                inspector(for: index)
+            } else if canvasSelected {
+                canvasStylePanel
             }
             if showComponentPalette { componentPalette }
             if showScreenManager { layerListPanel }
-            if showAdvancedInspector, let index = selectedIndex { inspector(for: index) }
             DisclosureGroup("Design system", isExpanded: $showDesignSystem) {
                 designSystemPanel
             }
@@ -10321,11 +10588,15 @@ private struct NativeUxUiStudioView: View {
 
     private var artboardPreview: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text(target == "mobile" ? "Phone mockup" : target == "tablet" ? "Tablet mockup" : "Desktop mockup").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text(target == "mobile" ? "Phone mockup" : target == "tablet" ? "Tablet mockup" : "Desktop mockup").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 GeometryReader { proxy in
                     let scale = min(CGFloat(1), proxy.size.width / CGFloat(boardWidth))
                     ZStack(alignment: .topLeading) {
                         uxUiUIColor(background)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selectCanvas() }
+                            .accessibilityLabel("Select canvas background")
+                            .accessibilityAddTraits(.isButton)
                         ForEach(elements.filter { $0.visibleOn.contains(target) }) { item in
                             let rendered = uxUiResolvedLayer(item, boardWidth: boardWidth, boardHeight: boardHeight)
                             if prototypePreview {
@@ -10338,11 +10609,13 @@ private struct NativeUxUiStudioView: View {
                                 layerPreview(rendered, scale: scale)
                                     .frame(width: CGFloat(rendered.width) * scale, height: CGFloat(rendered.height) * scale)
                                     .position(x: (CGFloat(rendered.x) + CGFloat(rendered.width) / 2) * scale, y: (CGFloat(rendered.y) + CGFloat(rendered.height) / 2) * scale)
-                                    .onTapGesture { selectedID = item.id }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { selectedID = item.id; canvasSelected = false }
                                     .simultaneousGesture(
                                         DragGesture(minimumDistance: 2)
                                             .onChanged { value in
                                                 selectedID = item.id
+                                                canvasSelected = false
                                                 if dragOrigins[item.id] == nil {
                                                     checkpoint()
                                                     dragOrigins[item.id] = CGPoint(x: CGFloat(item.x), y: CGFloat(item.y))
@@ -10359,16 +10632,20 @@ private struct NativeUxUiStudioView: View {
                     }
                     .frame(width: CGFloat(boardWidth) * scale, height: CGFloat(boardHeight) * scale, alignment: .topLeading)
                     .clipped()
-                    .overlay(Rectangle().stroke(Color.envBorder, lineWidth: 1))
+                    .overlay(Rectangle().stroke(Color.uxUiBorder, lineWidth: 1))
                 }
                 .aspectRatio(CGFloat(boardWidth) / CGFloat(boardHeight), contentMode: .fit)
                 .padding(target == "mobile" ? 8 : target == "tablet" ? 12 : 9)
-                .background(Color.black, in: RoundedRectangle(cornerRadius: target == "mobile" ? 46 : target == "tablet" ? 24 : 10))
+                .background {
+                    RoundedRectangle(cornerRadius: target == "mobile" ? 46 : target == "tablet" ? 24 : 10)
+                        .fill(Color.black).contentShape(Rectangle())
+                        .onTapGesture { selectCanvas() }
+                }
                 .overlay(alignment: .top) {
                     if target == "mobile" {
-                        Capsule().fill(Color.black).frame(width: 108, height: 20).padding(.top, 12)
+                        Capsule().fill(Color.black).frame(width: 108, height: 20).padding(.top, 12).allowsHitTesting(false)
                     } else if target == "tablet" {
-                        Circle().fill(Color.black).frame(width: 6, height: 6).padding(.top, 13)
+                        Circle().fill(Color.black).frame(width: 6, height: 6).padding(.top, 13).allowsHitTesting(false)
                     }
                 }
                 .padding(.bottom, target == "desktop" ? 34 : 0)
@@ -10381,31 +10658,31 @@ private struct NativeUxUiStudioView: View {
                     }
                 }
                 Text(prototypePreview ? "Tap linked elements to navigate. Use Back to retrace the flow." : "Tap or drag to shape your design.")
-                    .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                    .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.uxUiMuted)
             }
-            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            .padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
     }
 
     private var designSystemPanel: some View {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Design system").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("Design system").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Text("Edit named color, typography and spacing tokens. Tokens are saved with the project and included in exports.")
-                    .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
-                Text("Color tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                    .font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.uxUiMuted)
+                Text("Color tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 ForEach(tokens.colors.indices, id: \.self) { index in
-                    HStack(spacing: 6) {
-                        inspectorTextField("Token name", text: $tokens.colors[index].name)
-                        inspectorTextField("Hex value", text: $tokens.colors[index].value)
-                        Button("Text") {
-                            guard let selectedIndex else { return }
-                            checkpoint(); elements[selectedIndex].color = tokens.colors[index].value
-                        }.font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envAccent)
-                        Button("Fill") {
-                            guard let selectedIndex else { return }
-                            checkpoint(); elements[selectedIndex].fill = tokens.colors[index].value
-                        }.font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envAccent)
-                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 8).fill(uxUiUIColor(tokens.colors[index].value)).frame(height: 36)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.uxUiBorder))
+                        HStack(spacing: 8) {
+                            inspectorTextField("Token name", text: $tokens.colors[index].name)
+                            inspectorTextField("Hex value", text: $tokens.colors[index].value)
+                        }
+                        HStack(spacing: 8) {
+                            Button("Apply to text") { guard let selectedIndex else { return }; checkpoint(); elements[selectedIndex].color = tokens.colors[index].value }.buttonStyle(.bordered)
+                            Button("Apply to fill") { guard let selectedIndex else { return }; checkpoint(); elements[selectedIndex].fill = tokens.colors[index].value }.buttonStyle(.bordered)
+                        }.font(.envScaled(size: 11, weight: .semibold))
+                    }.padding(8).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 10))
                 }
                 HStack(spacing: 6) {
                     inspectorTextField("New token name", text: $tokenNameDraft)
@@ -10415,30 +10692,31 @@ private struct NativeUxUiStudioView: View {
                         guard !name.isEmpty, !tokens.colors.contains(where: { $0.name == name }) else { return }
                         tokens.colors.append(UxUiNativeColorToken(name: name, value: tokenValueDraft))
                         tokenNameDraft = "brand"
-                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 }
-                Text("Typography tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("Typography tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 ForEach(tokens.typography) { token in
                     Button {
                         guard let selectedIndex else { return }
                         checkpoint()
                         elements[selectedIndex].fontFamily = token.fontFamily
+                        elements[selectedIndex].fontData = uxUiFontAsset(token.fontFamily)?.dataURL
                         elements[selectedIndex].fontSize = token.fontSize
                         elements[selectedIndex].fontWeight = token.fontWeight
                         elements[selectedIndex].lineHeight = token.lineHeight
                     } label: {
-                        HStack { Text(token.name); Spacer(); Text("\(token.fontSize)px / \(token.fontWeight)").foregroundStyle(Color.envMuted) }
-                            .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
-                            .padding(8).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 7))
+                        HStack { Text(token.name); Spacer(); Text("\(token.fontSize)px / \(token.fontWeight)").foregroundStyle(Color.uxUiMuted) }
+                            .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.uxUiInk)
+                            .padding(8).background(Color.uxUiSurface, in: RoundedRectangle(cornerRadius: 7))
                     }.buttonStyle(.plain)
                 }
-                Text("Spacing tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
-                HStack(spacing: 6) {
+                Text("Spacing tokens").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], spacing: 8) {
                     ForEach(tokens.spacing, id: \.self) { spacing in
                         Button("\(spacing) px") {
                             guard let selectedIndex else { return }
                             checkpoint(); elements[selectedIndex].padding = spacing
-                        }.font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envAccent)
+                        }.font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.uxUiInk)
                     }
                 }
                 HStack(spacing: 6) {
@@ -10446,11 +10724,11 @@ private struct NativeUxUiStudioView: View {
                     Button("Add spacing") {
                         guard let value = Int(spacingDraft), (1...256).contains(value), !tokens.spacing.contains(value) else { return }
                         tokens.spacing.append(value); tokens.spacing.sort()
-                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 }
             }
-            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            .padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
     }
 
     private func runStudioAudit() {
@@ -10492,15 +10770,15 @@ private struct NativeUxUiStudioView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("App screens").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
-                    Text("\(screens.count) screens · tap a thumbnail to edit it").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
+                    Text("App screens").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                    Text("\(screens.count) screens · tap a thumbnail to edit it").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                 }
                 Spacer(minLength: 6)
                 Button { addAppScreen() } label: {
                     Label("New screen", systemImage: "plus").font(.envScaled(size: 11, weight: .semibold))
                         .padding(.horizontal, 9).padding(.vertical, 8)
-                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 9))
-                        .foregroundStyle(Color.envSurface)
+                        .background(Color.uxUiInk, in: RoundedRectangle(cornerRadius: 9))
+                        .foregroundStyle(Color.uxUiSurface)
                 }.buttonStyle(.plain).accessibilityLabel("Add app screen")
             }
             ForEach(screens) { screen in
@@ -10521,19 +10799,19 @@ private struct NativeUxUiStudioView: View {
                             }
                             .frame(width: 48, height: 64)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(screen.id == activeScreenID ? Color.uxUiInk : Color.uxUiBorder, lineWidth: screen.id == activeScreenID ? 2 : 1))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Open \(screen.name)")
                         VStack(alignment: .leading, spacing: 3) {
                             TextField("Screen name", text: Binding(get: { screen.name }, set: { renameAppScreen(screen.id, name: $0) }))
                                 .font(.envScaled(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.envInk)
+                                .foregroundStyle(Color.uxUiInk)
                                 .textFieldStyle(.roundedBorder)
                             Text("\(screen.target.capitalized) · \(screen.elements.count) layers · \(screen.customWidth) × \(screen.customHeight)")
-                                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                             if screen.id == activeScreenID {
-                                Text("Currently editing").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent)
+                                Text("Currently editing").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                             }
                         }
                         Spacer(minLength: 0)
@@ -10553,13 +10831,13 @@ private struct NativeUxUiStudioView: View {
                     }.font(.envScaled(size: 10, weight: .medium))
                 }
                 .padding(9)
-                .background(screen.id == activeScreenID ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(screen.id == activeScreenID ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                .background(screen.id == activeScreenID ? Color.uxUiSurface2 : Color.uxUiCard, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(screen.id == activeScreenID ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
             }
         }
         .padding(12)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
     }
 
     private var componentPalette: some View {
@@ -10573,7 +10851,7 @@ private struct NativeUxUiStudioView: View {
             ("Navbar", "menubar.rectangle", "navbar"), ("Tab bar", "rectangle.bottomthird.inset.filled", "tabbar"),
             ("Tabs", "square.split.2x1", "tabs"), ("Row", "list.bullet", "row"),
             ("Avatar", "person.crop.circle", "avatar"), ("Badge", "seal", "badge"),
-            ("Switch", "switch.2", "switch"), ("Progress", "chart.bar.fill", "progress"),
+            ("Switch", "switch.2", "switch"), ("Toggle", "switch.2", "toggle"), ("Checkbox", "checkmark.square", "checkbox"), ("Progress", "chart.bar.fill", "progress"),
             ("Slider", "slider.horizontal.3", "slider"), ("Radio", "circle.inset.filled", "radio"),
             ("Dropdown", "chevron.down.square", "dropdown"), ("Search", "magnifyingglass", "search"),
             ("Text area", "text.alignleft", "textarea"), ("Table", "tablecells", "table"),
@@ -10586,164 +10864,420 @@ private struct NativeUxUiStudioView: View {
         ]
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Studio toolkit").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("Studio toolkit").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Spacer()
                 Button { showComponentPalette = false } label: {
                     Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.envMuted).frame(width: 30, height: 30)
-                        .background(Color.envSurface2, in: Circle())
+                        .foregroundStyle(Color.uxUiMuted).frame(width: 44, height: 44)
+                        .background(Color.uxUiSurface2, in: Circle())
                 }.accessibilityLabel("Close studio toolkit")
             }
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(Color.envMuted)
-                TextField("Search elements, icons, presets…", text: $toolkitQuery)
+                Image(systemName: "magnifyingglass").foregroundStyle(Color.uxUiMuted)
+                TextField("Search this toolkit…", text: $toolkitQuery)
                     .font(.envScaled(size: 13, weight: .regular))
                     .accessibilityLabel("Search studio toolkit")
             }
-            .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+            .padding(10).background(Color.uxUiSurface, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.uxUiBorder, lineWidth: 1))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 5) {
                     ForEach(["All 26", "Icons", "Elements", "Presets", "Fonts", "Tokens"], id: \.self) { tab in
                         Button { toolkitTab = tab } label: {
                             Text(tab).font(.envScaled(size: 11, weight: .semibold))
                                 .padding(.horizontal, 10).padding(.vertical, 8)
-                                .foregroundStyle(toolkitTab == tab ? Color.envInk : Color.envMuted)
-                                .background(toolkitTab == tab ? Color.envSurface : Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(toolkitTab == tab ? Color.envBorder : .clear, lineWidth: 1))
+                                .foregroundStyle(toolkitTab == tab ? Color.uxUiInk : Color.uxUiMuted)
+                                .background(toolkitTab == tab ? Color.uxUiSurface : Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(toolkitTab == tab ? Color.uxUiBorder : .clear, lineWidth: 1))
                         }.buttonStyle(.plain)
                     }
                 }
             }
             Group {
                 if toolkitTab == "All 26" {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("All 26 Studio toolkits").font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
-                        Text("Choose a toolkit to reach its connected native controls. Systems needing a separate engine are explicitly labelled rather than represented by inactive mock controls.").font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
-                        ForEach(uxUiStudioToolkits.filter { toolkitQuery.isEmpty || $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.description.localizedCaseInsensitiveContains(toolkitQuery) || $0.id.localizedCaseInsensitiveContains(toolkitQuery) }) { toolkit in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Explore all 26 design toolkits").font(.envScaled(size: 16, weight: .semibold))
+                        Text("Preview first, then choose what to add. Your selection's styling stays below the controllers.")
+                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
+                        ForEach(uxUiStudioToolkits.filter { toolkitQuery.isEmpty || $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.description.localizedCaseInsensitiveContains(toolkitQuery) }) { toolkit in
                             Button {
                                 activeToolkitID = toolkit.id
-                                switch toolkit.id {
-                                case "icons": toolkitTab = "Icons"
-                                case "typography": toolkitTab = "Fonts"
-                                case "color", "brand", "design-system": toolkitTab = "Tokens"
-                                case "background": toolkitTab = "Tokens"; showAdvancedCanvas = true
-                                case "effects", "motion": showAdvancedInspector = true; notice = "Use selected-layer controls and Fine-tune design for supported visual properties."
-                                case "illustrations", "media", "assets", "inspiration": toolkitTab = "Elements"; isImportingImage = true
-                                case "components": toolkitTab = "Elements"
-                                case "device", "platform": showAdvancedCanvas = true; notice = "Use the viewport target controls to switch between device previews."
-                                case "responsive": showAdvancedCanvas = true
-                                case "projects": toolkitTab = "Presets"
-                                case "layers": showAllLayers = true
-                                case "prototype": showAdvancedInspector = selectedIndex != nil; notice = "Assign a layer destination with the selected-layer menu, then Preview prototype. Overlay interactions remain unsupported."
-                                case "content": addLayer("text"); if let index = elements.indices.last { elements[index].name = "Welcome heading"; elements[index].text = "Welcome back" }
-                                case "data-viz": addLayer("chart"); if let index = elements.indices.last { elements[index].name = "Sample chart"; elements[index].text = "Monthly activity\nJan: 36\nFeb: 62\nMar: 46\nApr: 82\nMay: 67" }
-                                case "patterns": addLayer("star"); if let index = elements.indices.last { elements[index].name = "Decorative star" }
-                                case "3d": notice = "Live GLB/GLTF rendering, lighting and camera controls are not implemented in this editor. Import a rendered preview instead."
-                                case "accessibility", "qa": runStudioAudit()
-                                case "handoff": showComponentPalette = false; notice = "Use the Design handoff panel for PDF, JSON and source exports."
-                                default: break
-                                }
+                                toolkitTab = toolkit.id == "icons" ? "Icons" : toolkit.id == "typography" ? "Fonts" : "Toolkit"
                             } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack { Text(toolkit.name).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk); Spacer(minLength: 4); Text(toolkit.status).font(.envScaled(size: 9, weight: .medium)).foregroundStyle(toolkit.status == "Not complete" ? Color.red : Color.envAccent) }
-                                    Text(toolkit.description).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
-                                    if activeToolkitID == toolkit.id { Text("Selected toolkit").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envAccent) }
-                                }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
-                                    .background(activeToolkitID == toolkit.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
-                                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(activeToolkitID == toolkit.id ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                                HStack(alignment: .center, spacing: 12) {
+                                    toolkitVisual(toolkit.id).frame(width: 88, height: 82)
+                                        .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 12)).clipped()
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(toolkit.name).font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.uxUiInk).fixedSize(horizontal: false, vertical: true)
+                                        Text(toolkit.description).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.uxUiMuted).fixedSize(horizontal: false, vertical: true)
+                                        Label("Explore", systemImage: "arrow.right").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                }.padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 14))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.uxUiBorder, lineWidth: 1))
                             }.buttonStyle(.plain)
                         }
-                        if activeToolkitID == "qa" || activeToolkitID == "accessibility" || !qaReport.isEmpty {
-                            Text("Review results · \(qaReport.count)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
-                            if qaReport.isEmpty { Text("No findings in the limited checks run.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
-                            ForEach(Array(qaReport.prefix(80).enumerated()), id: \.offset) { entry in Text("• " + entry.element).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted) }
+                        if !uxUiStudioToolkits.contains(where: { toolkitQuery.isEmpty || $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.description.localizedCaseInsensitiveContains(toolkitQuery) }) {
+                            Text("No toolkit matches. Try icons, effects, fonts or layout.").font(.callout).foregroundStyle(Color.uxUiMuted)
                         }
                     }
+                } else if toolkitTab == "Toolkit" {
+                    toolkitDetailPanel
                 } else if toolkitTab == "Elements" {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ForEach(components.indices.filter { components[$0].label.localizedCaseInsensitiveContains(toolkitQuery) || components[$0].kind.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { index in
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 10)], spacing: 10) {
+                        ForEach(components.indices.filter { toolkitQuery.isEmpty || components[$0].label.localizedCaseInsensitiveContains(toolkitQuery) || components[$0].kind.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { index in
                             addButton(components[index].label, icon: components[index].icon, kind: components[index].kind)
                         }
                     }
                 } else if toolkitTab == "Icons" {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Label("Icons", systemImage: "square.grid.2x2").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
-                        Text("Add an Icon element, then select it to browse or import its artwork from Style.")
-                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
-                        Button { addLayer("icon") } label: {
-                            Label("Add icon", systemImage: "plus").font(.envScaled(size: 12, weight: .semibold))
-                                .frame(maxWidth: .infinity).padding(10)
-                                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                        }.buttonStyle(.plain)
-                        Button { isImportingSVGIcon = true } label: {
-                            Label("Import SVG icon", systemImage: "square.and.arrow.down").font(.envScaled(size: 12, weight: .semibold))
-                                .frame(maxWidth: .infinity).padding(10)
-                                .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                        }.buttonStyle(.plain)
-                    }
-                } else if toolkitTab == "Presets" {
-                    VStack(spacing: 7) {
-                        Button { startDesign("mobile", preset: "mobile-dashboard") } label: { Label("Mobile app", systemImage: "iphone").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
-                        Button { startDesign("mobile", preset: "mobile-login") } label: { Label("Login screen", systemImage: "rectangle.portrait").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
-                        Button { startDesign("tablet", preset: "tablet-dashboard") } label: { Label("Tablet app", systemImage: "ipad").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
-                        Button { startDesign("desktop", preset: "desktop-landing") } label: { Label("Website", systemImage: "laptopcomputer").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.bordered)
-                        Button { isImportingProjectJSON = true } label: { Label("Import preset / project JSON", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.borderedProminent)
-                    }
+                    iconLibraryPanel
                 } else if toolkitTab == "Fonts" {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Fonts").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
-                        Text(selectedIndex == nil ? "Add or select a text element before applying a font." : "Choose a font or import your own TTF/OTF.")
-                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
-                        let families = ["Inter", "SF Pro Rounded", "Avenir Next", "Helvetica Neue", "Arial", "Georgia", "Times New Roman", "Menlo", "Courier New", "Palatino"]
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(families.filter { $0.localizedCaseInsensitiveContains(toolkitQuery) }, id: \.self) { family in
-                                    Button(family) {
-                                        guard let index = selectedIndex else { return }
-                                        checkpoint(); elements[index].fontFamily = family; showAdvancedInspector = true
-                                    }.buttonStyle(.bordered)
-                                }
-                            }
-                        }
-                        if let index = selectedIndex {
-                            Button { fontTargetID = elements[index].id; isImportingFont = true } label: {
-                                Label("Import font (TTF / OTF)", systemImage: "textformat")
-                                    .frame(maxWidth: .infinity).padding(9)
-                            }.buttonStyle(.bordered)
-                        }
-                    }
+                    fontLibraryPanel
+                } else if toolkitTab == "Presets" {
+                    presetLibraryPanel
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Colour tokens").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
-                        Text("Pick a colour for the selected element, or set the page background.")
-                            .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 7) {
-                                ForEach(tokens.colors.filter { $0.name.localizedCaseInsensitiveContains(toolkitQuery) || $0.value.localizedCaseInsensitiveContains(toolkitQuery) }) { token in
-                                    Button {
-                                        if let index = selectedIndex { checkpoint(); elements[index].fill = token.value }
-                                        else { background = token.value }
-                                    } label: {
-                                        RoundedRectangle(cornerRadius: 8).fill(uxUiUIColor(token.value)).frame(width: 30, height: 30)
-                                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
-                                    }.buttonStyle(.plain).accessibilityLabel("Apply \(token.name)")
-                                }
-                            }
-                        }
-                    }
+                    designSystemPanel
                 }
             }
         }
-        .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
+    }
+
+    private func selectCanvas() {
+        guard !prototypePreview else { return }
+        selectedID = nil
+        canvasSelected = true
+    }
+
+    private var canvasStylePanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack { Label("Canvas style", systemImage: "paintpalette").font(.headline); Spacer(); Button { canvasSelected = false } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.accessibilityLabel("Close canvas style") }
+            Text("Style the screen background, or choose a pattern below.").font(.callout).foregroundStyle(Color.uxUiMuted)
+            inspectorTextField("Background hex", text: $background)
+            ColorPicker("Background", selection: Binding(get: { uxUiUIColor(background) }, set: { background = uxUiHex(UIColor($0)) }), supportsOpacity: false)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 10)], spacing: 10) {
+                ForEach(["#FFFFFF", "#F8FAFC", "#DBEAFE", "#FCE7F3", "#FEF3C7", "#0F172A", "#000000"], id: \.self) { hex in
+                    Button { background = hex } label: {
+                        RoundedRectangle(cornerRadius: 10).fill(uxUiUIColor(hex)).frame(height: 44)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(background == hex ? Color.uxUiInk : Color.uxUiBorder, lineWidth: background == hex ? 3 : 1))
+                    }.buttonStyle(.plain).accessibilityLabel("Set canvas to \(hex)")
+                }
+            }
+            Toggle("Custom artboard", isOn: $customArtboard)
+            HStack { inspectorNumber("Width px", value: $customWidth); inspectorNumber("Height px", value: $customHeight) }
+                .onChange(of: customWidth) { customWidth = min(4096, max(160, $0)) }
+                .onChange(of: customHeight) { customHeight = min(4096, max(240, $0)) }
+            backgroundSamples
+        }.padding(14).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.uxUiInk, lineWidth: 1))
+    }
+
+    @ViewBuilder private func toolkitVisual(_ id: String) -> some View {
+        switch id {
+        case "icons":
+            HStack(spacing: 9) { ForEach(["lucide:house", "lucide:heart", "lucide:star"], id: \.self) { name in UxUiIconifyThumbnail(iconName: name).frame(width: 19, height: 25) } }.padding(5)
+        case "typography":
+            Text("Aa").font(uxUiSampleFont("Lora", size: 42)).foregroundStyle(Color.uxUiInk)
+        case "color", "brand", "design-system":
+            HStack(spacing: 0) { ForEach([1.0, 0.75, 0.5, 0.25], id: \.self) { alpha in Color.uxUiInk.opacity(alpha) } }.frame(height: 48).clipShape(RoundedRectangle(cornerRadius: 10)).padding(8)
+        case "background", "patterns":
+            Image(uiImage: makeToolkitImage(id == "background" ? "Sunset gradient" : "Dot grid", size: CGSize(width: 96, height: 82))).resizable().scaledToFill().saturation(0)
+        case "effects":
+            RoundedRectangle(cornerRadius: 14).fill(Color.uxUiCard).frame(width: 54, height: 42).shadow(color: Color.uxUiInk.opacity(0.3), radius: 8, x: 0, y: 6)
+        case "data-viz":
+            HStack(alignment: .bottom, spacing: 5) { ForEach([20, 42, 30, 54], id: \.self) { height in RoundedRectangle(cornerRadius: 3).fill(Color.uxUiInk.opacity(Double(height) / 60)).frame(width: 10, height: CGFloat(height)) } }
+        case "layers":
+            ZStack { ForEach(0..<3) { index in RoundedRectangle(cornerRadius: 7).fill(Color.uxUiInk.opacity(Double(index + 1) * 0.22)).frame(width: 48, height: 32).offset(x: CGFloat(index - 1) * 8, y: CGFloat(index - 1) * 10) } }
+        case "device", "platform", "responsive":
+            HStack(alignment: .bottom, spacing: 4) { RoundedRectangle(cornerRadius: 4).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 17, height: 40); RoundedRectangle(cornerRadius: 4).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 27, height: 48); RoundedRectangle(cornerRadius: 3).stroke(Color.uxUiInk, lineWidth: 2).frame(width: 29, height: 28) }
+        case "motion", "transform":
+            RoundedRectangle(cornerRadius: 8).fill(Color.uxUiInk.opacity(0.2)).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.uxUiInk, lineWidth: 2)).frame(width: 42, height: 42).rotationEffect(.degrees(-20))
+        case "illustrations", "media", "inspiration":
+            Image(uiImage: makeToolkitImage("Landscape", size: CGSize(width: 96, height: 82))).resizable().scaledToFill().saturation(0)
+        case "content":
+            VStack(alignment: .leading, spacing: 6) { Text("Hello!").font(.headline); Capsule().fill(Color.uxUiMuted.opacity(0.3)).frame(width: 54, height: 4); Capsule().fill(Color.uxUiMuted.opacity(0.2)).frame(width: 39, height: 4) }
+        case "components":
+            VStack(spacing: 6) { Text("Continue").font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.uxUiCard).padding(7).background(Color.uxUiInk, in: Capsule()); RoundedRectangle(cornerRadius: 5).stroke(Color.uxUiBorder).frame(width: 60, height: 17) }
+        default:
+            let names = ["projects": "square.grid.2x2", "flows": "point.topleft.down.curvedto.point.bottomright.up", "accessibility": "figure.stand", "assets": "photo.stack", "handoff": "square.and.arrow.up", "qa": "checkmark.seal"]
+            Image(systemName: names[id] ?? "rectangle.3.group").font(.system(size: 30)).foregroundStyle(Color.uxUiInk)
+        }
+    }
+
+    @ViewBuilder private var toolkitDetailPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let toolkit = uxUiStudioToolkits.first(where: { $0.id == activeToolkitID }) {
+                Button { toolkitTab = "All 26" } label: { Label("All toolkits", systemImage: "chevron.left") }.buttonStyle(.bordered)
+                toolkitVisual(toolkit.id).frame(maxWidth: .infinity).frame(height: 112).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 14)).clipped()
+                Text(toolkit.name).font(.headline)
+                Text(toolkit.description).font(.callout).foregroundStyle(Color.uxUiMuted)
+            }
+            switch activeToolkitID {
+            case "effects": effectsLibraryPanel
+            case "background", "patterns": backgroundSamples
+            case "color", "brand", "design-system": designSystemPanel
+            case "illustrations":
+                sampleAssetButton("Landscape", label: "Add landscape illustration")
+                sampleAssetButton("Geometric", label: "Add geometric illustration")
+                Button("Import SVG illustration") { isImportingSVGIcon = true }.buttonStyle(.bordered)
+            case "media", "assets", "inspiration":
+                Button("Import image or visual reference") { prepareImageImport() }.buttonStyle(.borderedProminent)
+                ForEach(elements.filter { $0.imageData != nil || $0.iconSvg != nil }) { item in
+                    Button { selectedID = item.id; showComponentPalette = false } label: {
+                        HStack { layerPreview(item, scale: min(1, 44 / CGFloat(max(1, item.height)))).frame(width: 60, height: 44).clipped(); Text(item.name).font(.callout); Spacer(); Image(systemName: "arrow.right") }.padding(8)
+                    }.buttonStyle(.bordered)
+                }
+            case "motion", "transform":
+                if let index = selectedIndex {
+                    Text("Rotation · \(Int(elements[index].rotation))°").font(.callout)
+                    Slider(value: Binding(get: { elements[index].rotation }, set: { checkpoint(); elements[index].rotation = $0 }), in: -180...180)
+                    selectedElementToolbar(for: index)
+                } else { Text("Select an object to rotate, resize or move it.").font(.callout); Button("Add shape") { addLayer("rect") }.buttonStyle(.bordered) }
+            case "components": Button("Browse visual components") { toolkitTab = "Elements" }.buttonStyle(.borderedProminent)
+            case "device", "responsive", "platform":
+                HStack { targetButton("Mobile", icon: "iphone", value: "mobile"); targetButton("Tablet", icon: "ipad", value: "tablet"); targetButton("Web", icon: "laptopcomputer", value: "desktop") }
+                Button("Style canvas and dimensions") { selectCanvas(); showComponentPalette = false }.buttonStyle(.bordered)
+                if activeToolkitID == "platform" { presetLibraryPanel }
+                if activeToolkitID == "responsive", let index = selectedIndex { inspectorResponsiveFields(layerBinding(index)) }
+            case "projects": appScreensPanel; presetLibraryPanel
+            case "layers": layerListPanel
+            case "flows":
+                appScreensPanel
+                if let index = selectedIndex { selectedElementToolbar(for: index) }
+                else { Text("Select a layer to set its destination screen, then preview the flow.").font(.callout) }
+                Button("Preview flow") { showComponentPalette = false; startPrototypePreview() }.buttonStyle(.borderedProminent).disabled(!hasActivePrototypeLinks)
+            case "accessibility", "qa":
+                Button("Review design") { runStudioAudit() }.buttonStyle(.borderedProminent)
+                Text("Checks cover bounds, overlaps, contrast and tap targets. Review findings in context.").font(.caption).foregroundStyle(Color.uxUiMuted)
+                ForEach(Array(qaReport.enumerated()), id: \.offset) { entry in Label(entry.element, systemImage: "checkmark.circle").font(.callout).fixedSize(horizontal: false, vertical: true) }
+            case "content":
+                ForEach(["Welcome back", "Create something great", "Continue", "Search your workspace", "A short description helps people decide what to do next."], id: \.self) { text in
+                    Button { addLayer("text"); if let index = selectedIndex { elements[index].text = text } } label: { Text(text).frame(maxWidth: .infinity, alignment: .leading).padding(8) }.buttonStyle(.bordered)
+                }
+            case "data-viz":
+                Button("Add editable bar chart") { addLayer("chart") }.buttonStyle(.borderedProminent)
+                if let index = selectedIndex, elements[index].kind == "chart" { inspectorTextField("Title, then Label: value per line", text: layerBinding(index).text, multiline: true) }
+            case "handoff": designHandoffPanel
+            default: Button("Browse elements") { toolkitTab = "Elements" }.buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func layerBinding(_ index: Int) -> Binding<UxUiNativeLayer> {
+        Binding(get: { elements[index] }, set: { next in if next != elements[index] { checkpoint(); elements[index] = next } })
+    }
+
+    private var iconLibraryPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preview icons before adding").font(.headline)
+            Text("Bundled icons work offline. Tap an icon to add it or replace your selected icon.").font(.callout).foregroundStyle(Color.uxUiMuted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    Button("All icons") { iconCategory = "All icons"; iconBrowseLimit = 48 }.buttonStyle(.bordered).tint(iconCategory == "All icons" ? Color.uxUiInk : Color.uxUiMuted)
+                    ForEach(uxUiIconCategories, id: \.0) { category in Button(category.0) { iconCategory = category.0; iconBrowseLimit = 48 }.buttonStyle(.bordered).tint(iconCategory == category.0 ? Color.uxUiInk : Color.uxUiMuted) }
+                }
+            }
+            let curated = uxUiIconCategories.first(where: { $0.0 == iconCategory })?.1 ?? []
+            let candidates = iconCategory == "All icons" ? Array(uxUiBundledIcons.keys) : curated.filter { uxUiBundledIcons[$0] != nil }
+            let names = Array(Set(candidates)).sorted { a, b in
+                let ai = curated.firstIndex(of: a) ?? Int.max, bi = curated.firstIndex(of: b) ?? Int.max
+                return ai == bi ? a < b : ai < bi
+            }.filter { toolkitQuery.isEmpty || $0.localizedCaseInsensitiveContains(toolkitQuery) }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 10)], spacing: 10) {
+                ForEach(Array(names.prefix(iconBrowseLimit)), id: \.self) { name in
+                    Button { insertIcon(name) } label: {
+                        VStack(spacing: 8) {
+                            UxUiIconifyThumbnail(iconName: name).frame(width: 30, height: 30)
+                            Text(name.components(separatedBy: ":").last ?? name).font(.system(size: 10)).foregroundStyle(Color.uxUiInk).lineLimit(2).frame(height: 28)
+                        }.frame(maxWidth: .infinity).padding(10).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 12))
+                    }.buttonStyle(.plain).accessibilityLabel("Add \(name)")
+                }
+            }
+            if names.isEmpty { Text("No bundled icons match. Try a broader search or search online below.").font(.callout).foregroundStyle(Color.uxUiMuted) }
+            if names.count > iconBrowseLimit { Button("Show more · \(min(iconBrowseLimit, names.count)) of \(names.count)") { iconBrowseLimit += 48 }.buttonStyle(.bordered) }
+            inspectorTextField("Search online icon collections", text: $iconQuery)
+            Button(isSearchingIcons ? "Searching…" : "Search online") { searchIconLibrary() }.buttonStyle(.bordered).disabled(isSearchingIcons || iconQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            ForEach(iconResults, id: \.self) { name in
+                Button { insertIcon(name) } label: { HStack { UxUiIconifyThumbnail(iconName: name).frame(width: 28, height: 28); Text(name).font(.caption); Spacer(); Image(systemName: "plus") }.padding(8) }.buttonStyle(.bordered)
+            }
+            Button("Import SVG artwork") { isImportingSVGIcon = true }.buttonStyle(.bordered)
+        }
+    }
+
+    private func insertIcon(_ name: String) {
+        if selectedIndex.map({ elements[$0].kind != "icon" }) ?? true { addLayer("icon") }
+        guard let index = selectedIndex else { return }
+        chooseIconArtwork(name, layerID: elements[index].id)
+    }
+
+    private var fontLibraryPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("See the type before you apply it").font(.headline)
+            Text("Watch your words in each font. Tap the one you like to use it.").font(.callout).foregroundStyle(Color.uxUiMuted)
+            TextField("Try your words", text: $fontPreviewWords).textFieldStyle(.roundedBorder)
+            Toggle("Play font previews", isOn: $animateFontPreviews)
+            let available = uxUiFontFamilies.filter { uxUiFontAsset($0.0) != nil && (toolkitQuery.isEmpty || $0.0.localizedCaseInsensitiveContains(toolkitQuery) || $0.1.localizedCaseInsensitiveContains(toolkitQuery)) }
+            ForEach(available, id: \.0) { family, category in
+                Button { applyFontFamily(family) } label: {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack { Text(family).font(.caption.weight(.semibold)); Spacer(); Text(category).font(.caption2).foregroundStyle(Color.uxUiMuted) }
+                        UxUiAnimatedFontPreview(family: family, words: fontPreviewWords, animated: animateFontPreviews)
+                        Text("Aa Bb Cc · 0123456789").font(uxUiSampleFont(family, size: 16)).foregroundStyle(Color.uxUiMuted)
+                    }.foregroundStyle(Color.uxUiInk).frame(maxWidth: .infinity, alignment: .leading).padding(14)
+                        .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 12))
+                }.buttonStyle(.plain).accessibilityLabel("Apply \(family)")
+                if let filename = uxUiBundledFontFiles[family] {
+                    Button("Save \(family) TTF") {
+                        guard let url = Bundle.main.url(forResource: filename, withExtension: "ttf", subdirectory: "Resources/fonts"),
+                              let data = try? Data(contentsOf: url) else { notice = "This font file is unavailable."; return }
+                        fontDocument = UxUiStudioExport(data: data)
+                        fontFilename = filename + ".ttf"
+                        isExportingFont = true
+                    }.buttonStyle(.bordered)
+                }
+            }
+            if available.isEmpty { Text("No available fonts match. Import a TTF or OTF to preview your own family.").font(.callout) }
+            Button("Import TTF / OTF font") {
+                if selectedIndex == nil { addLayer("text") }
+                fontTargetID = selectedID; isImportingFont = true
+            }.buttonStyle(.bordered)
+        }
+    }
+
+    private func applyFontFamily(_ family: String) {
+        guard let asset = uxUiFontAsset(family) else { notice = "Import this font to preview and apply it."; return }
+        if selectedIndex.map({ ["icon", "image", "rect", "ellipse", "divider", "line", "triangle", "diamond", "hexagon", "star"].contains(elements[$0].kind) }) ?? true { addLayer("text") }
+        guard let index = selectedIndex else { return }
+        checkpoint(); elements[index].fontFamily = family; elements[index].fontData = asset.dataURL
+        notice = "Applied \(family). Drag your words to place them."; showComponentPalette = false
+    }
+
+    private var effectsLibraryPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(selectedIndex == nil ? "Choose a sample to add a styled card." : "Tap a sample to style your selection.").font(.callout).foregroundStyle(Color.uxUiMuted)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 115), spacing: 12)], spacing: 12) {
+                ForEach(["Flat", "Raised", "Outline", "Soft corners", "Pill", "Translucent", "Dark", "Translucent outline"], id: \.self) { effect in
+                    Button { applyEffect(effect) } label: {
+                        VStack(spacing: 10) {
+                            effectSample(effect).frame(height: 70).frame(maxWidth: .infinity).background(Color.uxUiInk.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+                            Text(effect).font(.caption.weight(.semibold)).foregroundStyle(Color.uxUiInk)
+                        }.padding(8).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 12))
+                    }.buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func effectSample(_ effect: String) -> some View {
+        Text("Aa").font(.system(size: 19, weight: .semibold)).foregroundStyle(effect == "Dark" ? .white : Color.black)
+            .frame(width: 76, height: 42).background(effect == "Dark" ? Color.black : Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: effect == "Pill" ? 21 : effect == "Flat" || effect == "Outline" ? 0 : 12))
+            .overlay(RoundedRectangle(cornerRadius: effect == "Pill" ? 21 : effect == "Flat" || effect == "Outline" ? 0 : 12).stroke(effect == "Outline" || effect == "Translucent outline" ? Color.black.opacity(0.5) : .clear, lineWidth: 2))
+            .shadow(color: effect == "Raised" ? .black.opacity(0.2) : .clear, radius: 6, x: 0, y: 4)
+            .opacity(effect == "Translucent" ? 0.45 : effect == "Translucent outline" ? 0.75 : 1)
+    }
+
+    private func applyEffect(_ effect: String) {
+        if selectedIndex == nil { addLayer("card") }
+        guard let index = selectedIndex else { return }
+        checkpoint()
+        elements[index].shadow = effect == "Raised"
+        elements[index].opacity = effect == "Translucent" ? 0.45 : effect == "Translucent outline" ? 0.75 : 1
+        elements[index].borderWidth = effect == "Outline" || effect == "Translucent outline" ? 2 : 0
+        elements[index].borderColor = "#60A5FA"
+        elements[index].radius = effect == "Pill" ? min(elements[index].height, elements[index].width) / 2 : effect == "Flat" || effect == "Outline" ? 0 : 12
+        elements[index].fill = effect == "Dark" ? "#0F172A" : "#FFFFFF"
+        elements[index].color = effect == "Dark" ? "#FFFFFF" : "#1E3A73"
+        notice = "Applied \(effect). Adjust its controls below the selection."
+    }
+
+    private var backgroundSamples: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Backgrounds & patterns").font(.headline)
+            Text("Samples are drawn on this device and added behind your content as editable image layers.").font(.caption).foregroundStyle(Color.uxUiMuted)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 12)], spacing: 12) {
+                ForEach(["Ocean gradient", "Sunset gradient", "Dot grid", "Checkerboard", "Stripes", "Grid"], id: \.self) { name in
+                    Button { addSampleAsset(name, canvas: true) } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Image(uiImage: makeToolkitImage(name, size: CGSize(width: 160, height: 100))).resizable().saturation(0).aspectRatio(1.6, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 10))
+                            Text(name).font(.caption.weight(.medium)).foregroundStyle(Color.uxUiInk)
+                        }.padding(6)
+                    }.buttonStyle(.plain)
+                }
+            }
+            Button("Choose solid background") { selectCanvas(); showComponentPalette = false }.buttonStyle(.bordered)
+        }
+    }
+
+    private var presetLibraryPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Start a new design").font(.headline)
+            Text("Choose a starter layout for a new design. Export JSON to keep a separate copy of the current project.").font(.caption).foregroundStyle(Color.uxUiMuted)
+            ForEach([("Mobile dashboard", "mobile", "mobile-dashboard", "iphone"), ("Login screen", "mobile", "mobile-login", "rectangle.portrait"), ("Tablet dashboard", "tablet", "tablet-dashboard", "ipad"), ("Website", "desktop", "desktop-landing", "laptopcomputer")], id: \.0) { title, device, preset, symbol in
+                Button { saveDraft(); startDesign(device, preset: preset) } label: { Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading).padding(8) }.buttonStyle(.bordered)
+            }
+            Button("Import project JSON") { isImportingProjectJSON = true }.buttonStyle(.bordered)
+        }
+    }
+
+    private func prepareImageImport() {
+        if selectedIndex.map({ elements[$0].kind != "image" }) ?? true { addLayer("image") }
+        imageTargetID = selectedID
+        isImportingImage = true
+    }
+
+    private func sampleAssetButton(_ name: String, label: String) -> some View {
+        Button { addSampleAsset(name, canvas: false) } label: {
+            VStack(alignment: .leading, spacing: 8) { Image(uiImage: makeToolkitImage(name, size: CGSize(width: 280, height: 140))).resizable().saturation(0).aspectRatio(2, contentMode: .fit).clipShape(RoundedRectangle(cornerRadius: 12)); Text(label).font(.callout) }
+        }.buttonStyle(.plain)
+    }
+
+    private func addSampleAsset(_ name: String, canvas: Bool) {
+        let w = canvas ? boardWidth : min(300, boardWidth - 48)
+        let h = canvas ? boardHeight : 160
+        let image = makeToolkitImage(name, size: CGSize(width: CGFloat(w), height: CGFloat(h)))
+        guard let data = image.pngData() else { return }
+        checkpoint()
+        let layer = UxUiNativeLayer(kind: "image", name: name, x: canvas ? 0 : 24, y: canvas ? 0 : 100, width: w, height: h, text: "", imageData: "data:image/png;base64," + data.base64EncodedString(), radius: canvas ? 0 : 12, padding: 0, horizontalConstraint: canvas ? "stretch" : "left", verticalConstraint: canvas ? "stretch" : "top", referenceWidth: boardWidth, referenceHeight: boardHeight, componentKey: canvas ? "canvas-background" : "")
+        if canvas {
+            elements.removeAll { $0.componentKey == "canvas-background" }
+            elements.insert(layer, at: 0)
+        } else { elements.append(layer) }
+        selectedID = layer.id
+        notice = "Added \(name). Select it to resize, replace or style it."
+    }
+
+    private func makeToolkitImage(_ name: String, size: CGSize) -> UIImage {
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { renderer in
+            let c = renderer.cgContext, bounds = CGRect(origin: .zero, size: size)
+            UIColor(red: 0.94, green: 0.97, blue: 1, alpha: 1).setFill(); renderer.fill(bounds)
+            if name.contains("gradient") || name == "Landscape" {
+                let colors = name == "Sunset gradient" ? [UIColor.systemPink.cgColor, UIColor.systemOrange.cgColor] : [UIColor.systemBlue.cgColor, UIColor.systemTeal.cgColor]
+                if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: [0, 1]) { c.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: []) }
+            }
+            UIColor(red: 0.37, green: 0.55, blue: 0.83, alpha: 0.4).setFill()
+            UIColor(red: 0.37, green: 0.55, blue: 0.83, alpha: 0.3).setStroke()
+            let step: CGFloat = 20
+            if ["Dot grid", "Checkerboard", "Grid"].contains(name) {
+                for y in stride(from: CGFloat(0), to: size.height, by: step) { for x in stride(from: CGFloat(0), to: size.width, by: step) {
+                    if name == "Dot grid" { c.fillEllipse(in: CGRect(x: x + 8, y: y + 8, width: 3, height: 3)) }
+                    else if name == "Checkerboard", (Int(x / step) + Int(y / step)) % 2 == 0 { c.fill(CGRect(x: x, y: y, width: step, height: step)) }
+                    else if name == "Grid" { c.stroke(CGRect(x: x, y: y, width: step, height: step), width: 0.5) }
+                } }
+            } else if name == "Stripes" {
+                for x in stride(from: -size.height, to: size.width, by: step) { c.move(to: CGPoint(x: x, y: 0)); c.addLine(to: CGPoint(x: x + size.height, y: size.height)) }; c.setLineWidth(6); c.strokePath()
+            } else if name == "Landscape" || name == "Geometric" {
+                UIColor.white.withAlphaComponent(0.8).setFill(); c.fillEllipse(in: CGRect(x: size.width * 0.66, y: size.height * 0.15, width: size.height * 0.24, height: size.height * 0.24))
+                UIColor(red: 0.14, green: 0.33, blue: 0.61, alpha: 1).setFill()
+                c.move(to: CGPoint(x: 0, y: size.height)); c.addLine(to: CGPoint(x: size.width * 0.38, y: size.height * 0.3)); c.addLine(to: CGPoint(x: size.width, y: size.height)); c.closePath(); c.fillPath()
+            }
+        }
     }
 
     private func selectedElementToolbar(for index: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(elements[index].name).font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted).lineLimit(1)
+            Text(elements[index].name).font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted).lineLimit(1)
             Picker("On tap, navigate to", selection: Binding(
                 get: { elements[index].prototypeTargetScreenID },
                 set: { destination in checkpoint(); elements[index].prototypeTargetScreenID = destination }
@@ -10757,30 +11291,30 @@ private struct NativeUxUiStudioView: View {
             .accessibilityLabel("Prototype destination for \(elements[index].name)")
             HStack(alignment: .top, spacing: 12) {
                 VStack(spacing: 4) {
-                    Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
-                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 35, height: 35) }
+                    Text("MOVE").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
+                    Button { checkpoint(); elements[index].y = max(0, elements[index].y - 8) } label: { Image(systemName: "arrow.up").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
                     HStack(spacing: 3) {
-                        Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 35, height: 35) }
-                        Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 35, height: 35) }
-                        Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].x = max(0, elements[index].x - 8) } label: { Image(systemName: "arrow.left").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                        Button { checkpoint(); elements[index].x = max(0, (boardWidth - elements[index].width) / 2); elements[index].y = max(0, (boardHeight - elements[index].height) / 2) } label: { Image(systemName: "dot.circle").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                        Button { checkpoint(); elements[index].x = min(max(0, boardWidth - elements[index].width), elements[index].x + 8) } label: { Image(systemName: "arrow.right").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
                     }
-                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 35, height: 35) }
+                    Button { checkpoint(); elements[index].y = min(max(0, boardHeight - elements[index].height), elements[index].y + 8) } label: { Image(systemName: "arrow.down").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Move selected element")
                 Spacer(minLength: 2)
                 VStack(spacing: 4) {
-                    Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.envMuted)
-                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 35, height: 35) }
+                    Text(elements[index].kind == "icon" ? "ICON" : "ADJUST").font(.envScaled(size: 9, weight: .bold)).foregroundStyle(Color.uxUiMuted)
+                    Button { checkpoint(); elements[index].width = min(max(12, Int(Double(elements[index].width) * 1.1)), max(12, boardWidth - elements[index].x)); elements[index].height = min(max(12, Int(Double(elements[index].height) * 1.1)), max(12, boardHeight - elements[index].y)) } label: { Image(systemName: "plus.magnifyingglass").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
                     HStack(spacing: 3) {
-                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.left").frame(width: 35, height: 35) }
-                        Button { checkpoint(); elements[index].rotation = 0 } label: { Text("0°").font(.envScaled(size: 10, weight: .semibold)).frame(width: 35, height: 35) }
-                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.right").frame(width: 35, height: 35) }
+                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation - 15 + 360).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.left").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                        Button { checkpoint(); elements[index].rotation = 0 } label: { Text("0°").font(.envScaled(size: 10, weight: .semibold)).frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
+                        Button { checkpoint(); elements[index].rotation = (elements[index].rotation + 15).truncatingRemainder(dividingBy: 360) } label: { Image(systemName: "rotate.right").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
                     }
-                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 35, height: 35) }
+                    Button { checkpoint(); elements[index].width = max(12, Int(Double(elements[index].width) * 0.9)); elements[index].height = max(12, Int(Double(elements[index].height) * 0.9)) } label: { Image(systemName: "minus.magnifyingglass").frame(width: 38, height: 40).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 8)) }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Adjust selected element size and rotation")
             }
@@ -10792,74 +11326,74 @@ private struct NativeUxUiStudioView: View {
                     Button { toolkitTab = "Fonts"; showComponentPalette = true } label: { Label("Fonts", systemImage: "textformat") }.buttonStyle(.bordered)
                     Button { showAdvancedInspector = true } label: { Label("Color / style", systemImage: "paintpalette") }.buttonStyle(.bordered)
                     Button { selectedID = nil; showAdvancedInspector = false } label: { Label("Cancel", systemImage: "xmark") }.buttonStyle(.bordered)
-                    Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(.red)
+                    Button { deleteLayer(elements[index]) } label: { Label("Delete", systemImage: "trash") }.buttonStyle(.bordered).tint(Color.uxUiInk)
                 }.padding(.vertical, 3)
             }
         }
         .padding(10)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
     }
 
     private var layerListPanel: some View {
             VStack(alignment: .leading, spacing: 8) {
-                Text(elements.isEmpty ? "Layers" : "Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text(elements.isEmpty ? "Layers" : "Layers · \(elements.count)").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 if elements.isEmpty {
                     VStack(spacing: 6) {
-                        Image(systemName: "square.stack.3d.up").font(.system(size: 20)).foregroundStyle(Color.envMuted)
-                        Text("No layers yet").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.envInk)
-                        Text("Tap + to add an element.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                        Image(systemName: "square.stack.3d.up").font(.system(size: 20)).foregroundStyle(Color.uxUiMuted)
+                        Text("No layers yet").font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                        Text("Tap + to add an element.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                     }.frame(maxWidth: .infinity).padding(.vertical, 18)
                 }
                 ForEach(showAllLayers ? elements : Array(elements.prefix(6))) { item in
                     Button { selectedID = item.id } label: {
                         HStack(spacing: 8) {
                             Image(systemName: item.kind == "text" ? "textformat" : item.kind == "icon" ? "square.grid.2x2" : "rectangle")
-                                .foregroundStyle(Color.envAccent)
+                                .foregroundStyle(Color.uxUiInk)
                             Text(item.name).lineLimit(1).font(.envScaled(size: 13, weight: .medium))
                             Spacer(minLength: 0)
-                            if selectedID == item.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.envAccent) }
+                            if selectedID == item.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.uxUiInk) }
                         }
-                        .foregroundStyle(Color.envInk).padding(10)
-                        .background(selectedID == item.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedID == item.id ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                        .foregroundStyle(Color.uxUiInk).padding(10)
+                        .background(selectedID == item.id ? Color.uxUiSurface2 : Color.uxUiCard, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(selectedID == item.id ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
                     }.buttonStyle(.plain)
                 }
                 if elements.count > 6 {
                     Button(showAllLayers ? "see less" : "see more") { showAllLayers.toggle() }
-                        .font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envMuted)
+                        .font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.uxUiMuted)
                 }
             }
-            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            .padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var designHandoffPanel: some View {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Design handoff").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("Design handoff").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Text("PDF includes the rendered artboard, technical specifications, and an AI implementation prompt. JSON contains the editable project.")
-                    .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                    .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                 Button { exportPDF() } label: { exportButtonLabel("Export visual PDF + specifications", icon: "doc.richtext", primary: true) }.buttonStyle(.plain)
                 Button { exportJSON() } label: { exportButtonLabel("Export JSON + generated code + AI prompt", icon: "curlybraces", primary: false) }.buttonStyle(.plain)
                 Button { exportSource("html") } label: { exportButtonLabel("Export Web HTML", icon: "globe", primary: false) }.buttonStyle(.plain)
                 Button { exportSource("kotlin") } label: { exportButtonLabel("Export Android Kotlin", icon: "chevron.left.forwardslash.chevron.right", primary: false) }.buttonStyle(.plain)
                 Button { exportSource("swift") } label: { exportButtonLabel("Export iOS SwiftUI", icon: "swift", primary: false) }.buttonStyle(.plain)
             }
-            .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+            .padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func labelForChoice(_ title: String, subtitle: String, icon: String) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 22)).frame(width: 48, height: 48).foregroundStyle(Color.envAccent)
-                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+            Image(systemName: icon).font(.system(size: 22)).frame(width: 48, height: 48).foregroundStyle(Color.uxUiInk)
+                .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.envScaled(size: 15, weight: .semibold)).foregroundStyle(Color.envInk)
-                Text(subtitle).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
+                Text(title).font(.envScaled(size: 15, weight: .semibold)).foregroundStyle(Color.uxUiInk)
+                Text(subtitle).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
             }
             Spacer()
-            Image(systemName: "arrow.right").foregroundStyle(Color.envAccent)
+            Image(systemName: "arrow.right").foregroundStyle(Color.uxUiInk)
         }
-        .padding(12).background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .padding(12).background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
     }
 
     private func targetButton(_ label: String, icon: String, value: String) -> some View {
@@ -10872,28 +11406,48 @@ private struct NativeUxUiStudioView: View {
         } label: {
             HStack(spacing: 5) { Image(systemName: icon); Text(label) }
                 .font(.envScaled(size: 12, weight: .semibold)).padding(.horizontal, 11).padding(.vertical, 9)
-                .foregroundStyle(target == value ? Color.white : Color.envInk)
-                .background(target == value ? Color.envAccent : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(target == value ? Color.envAccent : Color.envBorder, lineWidth: 1))
+                .foregroundStyle(target == value ? Color.uxUiCard : Color.uxUiInk)
+                .background(target == value ? Color.uxUiInk : Color.uxUiCard, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(target == value ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
         }.buttonStyle(.plain)
     }
 
     private func presetButton(_ label: String, target nextTarget: String, preset: String) -> some View {
         Button { startDesign(nextTarget, preset: preset) } label: {
             Text(label).font(.envScaled(size: 11, weight: .semibold)).padding(.horizontal, 10).padding(.vertical, 8)
-                .foregroundStyle(Color.envInk).background(Color.envSurface2, in: Capsule())
-                .overlay(Capsule().stroke(Color.envBorder, lineWidth: 1))
+                .foregroundStyle(Color.uxUiInk).background(Color.uxUiSurface2, in: Capsule())
+                .overlay(Capsule().stroke(Color.uxUiBorder, lineWidth: 1))
         }.buttonStyle(.plain)
+    }
+
+    @ViewBuilder private func componentSample(_ kind: String) -> some View {
+        switch kind {
+        case "text", "logo": Text(kind == "text" ? "Aa" : "Brand").font(uxUiSampleFont("Inter", size: 26)).foregroundStyle(Color.uxUiInk)
+        case "button", "badge", "pill": Text(kind == "badge" ? "Active" : "Continue").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiCard).padding(.horizontal, 12).padding(.vertical, 8).background(Color.uxUiInk, in: Capsule())
+        case "icon": UxUiIconifyThumbnail(iconName: "lucide:heart").frame(width: 30, height: 30)
+        case "image", "video": Image(uiImage: makeToolkitImage("Landscape", size: CGSize(width: 100, height: 44))).resizable().scaledToFill().saturation(0).overlay { if kind == "video" { Image(systemName: "play.circle.fill").foregroundStyle(Color.uxUiCard) } }.clipShape(RoundedRectangle(cornerRadius: 6))
+        case "ellipse", "triangle", "diamond", "hexagon", "star", "rect": UxUiNativeShape(kind: kind, radius: 5).fill(Color.uxUiInk.opacity(0.35)).frame(width: 42, height: 34)
+        case "switch", "toggle": Capsule().fill(Color.uxUiInk).frame(width: 44, height: 25).overlay(alignment: .trailing) { Circle().fill(Color.uxUiCard).frame(width: 19, height: 19).padding(3) }
+        case "checkbox": RoundedRectangle(cornerRadius: 5).fill(Color.uxUiInk).frame(width: 24, height: 24).overlay { Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(Color.uxUiCard) }
+        case "radio": Circle().stroke(Color.uxUiInk, lineWidth: 2).frame(width: 24, height: 24).overlay { Circle().fill(Color.uxUiInk).padding(6) }
+        case "progress", "slider": Capsule().fill(Color.uxUiInk.opacity(0.2)).frame(height: 7).overlay(alignment: .leading) { Capsule().fill(Color.uxUiInk).frame(width: 40, height: 7) }.overlay { if kind == "slider" { Circle().fill(Color.uxUiInk).frame(width: 16, height: 16) } }.padding(8)
+        case "input", "search", "dropdown", "textarea": HStack(spacing: 4) { if kind == "search" { Image(systemName: "magnifyingglass") }; Text(kind == "search" ? "Search" : "Your text").font(.system(size: 10)); Spacer(minLength: 0); if kind == "dropdown" { Image(systemName: "chevron.down") } }.foregroundStyle(Color.uxUiMuted).padding(8).overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.uxUiBorder))
+        case "chart": toolkitVisual("data-viz")
+        case "avatar": Text("A").font(.headline).foregroundStyle(Color.uxUiInk).frame(width: 35, height: 35).background(Color.uxUiInk.opacity(0.2), in: Circle())
+        case "divider", "line": Rectangle().fill(Color.uxUiMuted).frame(height: 2).padding(8)
+        case "spacer": Image(systemName: "arrow.left.and.right").foregroundStyle(Color.uxUiMuted)
+        default: VStack(alignment: .leading, spacing: 5) { RoundedRectangle(cornerRadius: 3).fill(Color.uxUiInk.opacity(0.45)).frame(height: 7); RoundedRectangle(cornerRadius: 3).fill(Color.uxUiInk.opacity(0.2)).frame(height: 5); RoundedRectangle(cornerRadius: 3).fill(Color.uxUiInk.opacity(0.15)).frame(height: 5) }.padding(8).overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.uxUiBorder))
+        }
     }
 
     private func addButton(_ label: String, icon: String, kind: String) -> some View {
         Button { addLayer(kind) } label: {
             VStack(spacing: 6) {
-                Image(systemName: icon).font(.system(size: 18)).foregroundStyle(Color.envAccent)
-                Text(label).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
-            }.frame(maxWidth: .infinity).frame(height: 62)
-                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
+                componentSample(kind).frame(height: 40).frame(maxWidth: .infinity).clipped()
+                Text(label).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.uxUiInk)
+            }.frame(maxWidth: .infinity).frame(minHeight: 88).padding(8)
+                .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.uxUiBorder, lineWidth: 1))
         }.buttonStyle(.plain)
     }
 
@@ -10904,11 +11458,11 @@ private struct NativeUxUiStudioView: View {
                 .overlay(UxUiNativeShape(kind: item.kind, radius: CGFloat(item.radius) * scale).stroke(item.kind == "line" ? uxUiUIColor(item.fill) : uxUiUIColor(item.borderColor), lineWidth: item.kind == "line" ? max(1, CGFloat(item.height) * scale) : CGFloat(item.borderWidth) * scale))
             Group {
                 if item.kind == "icon" {
-                    if let svg = item.iconSvg, !svg.isEmpty {
+                    if let svg = item.iconSvg ?? uxUiBundledIcons[item.iconName], !svg.isEmpty {
                         UxUiNativeSVGIcon(svg: svg, tint: item.color)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        Image(systemName: "square.grid.2x2").font(.system(size: max(9, CGFloat(item.fontSize) * scale)))
+                        UxUiIconifyThumbnail(iconName: item.iconName).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 } else if item.kind == "image" {
                     if let dataURL = item.imageData, let image = uxUiNativeImage(fromDataURL: dataURL) {
@@ -10918,6 +11472,31 @@ private struct NativeUxUiStudioView: View {
                         Text(item.text).font(.system(size: max(5, CGFloat(item.fontSize) * scale)))
                             .foregroundStyle(uxUiUIColor(item.color)).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                } else if item.kind == "switch" || item.kind == "toggle" {
+                    HStack { Spacer(minLength: 0); Circle().fill(Color.white).padding(max(1, 3 * scale)).aspectRatio(1, contentMode: .fit) }
+                } else if item.kind == "checkbox" {
+                    Image(systemName: "checkmark").resizable().scaledToFit().padding(max(1, 5 * scale)).foregroundStyle(uxUiUIColor(item.color))
+                } else if item.kind == "radio" {
+                    Circle().fill(uxUiUIColor(item.color)).padding(max(1, 6 * scale))
+                } else if item.kind == "progress" || item.kind == "slider" {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(uxUiUIColor(item.fill)).frame(height: min(6 * scale, geometry.size.height))
+                            Capsule().fill(uxUiUIColor(item.color)).frame(width: geometry.size.width * 0.65, height: min(6 * scale, geometry.size.height))
+                            if item.kind == "slider" { Circle().fill(uxUiUIColor(item.color)).frame(width: 18 * scale, height: 18 * scale).offset(x: geometry.size.width * 0.65 - 9 * scale) }
+                        }.frame(height: geometry.size.height)
+                    }
+                } else if item.kind == "video" {
+                    Image(systemName: "play.circle.fill").resizable().scaledToFit().padding(22 * scale).foregroundStyle(uxUiUIColor(item.color))
+                } else if item.kind == "input" || item.kind == "search" || item.kind == "dropdown" {
+                    HStack(spacing: 6 * scale) {
+                        if item.kind == "search" { Image(systemName: "magnifyingglass") }
+                        Text(item.text).font(uxUiFont(for: item, scale: scale)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        if item.kind == "dropdown" { Image(systemName: "chevron.down") }
+                    }.font(.system(size: max(5, 14 * scale))).frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if item.kind == "avatar" || item.kind == "badge" || item.kind == "button" {
+                    Text(item.text).font(uxUiFont(for: item, scale: scale)).multilineTextAlignment(.center).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if item.kind == "chart" {
                     let chart = uxUiParseChartData(item.text)
                     VStack(alignment: .leading, spacing: 2) {
@@ -10952,12 +11531,13 @@ private struct NativeUxUiStudioView: View {
                 }
             }
             .foregroundStyle(uxUiUIColor(item.color))
-            .padding(item.kind == "image" ? 0 : max(2, CGFloat(item.padding) * scale))
+            .padding(item.kind == "image" ? 0 : CGFloat(item.padding) * scale)
             if selectedID == item.id {
-                RoundedRectangle(cornerRadius: 2).stroke(Color.envAccent, style: StrokeStyle(lineWidth: 1.5, dash: [4, 2]))
+                RoundedRectangle(cornerRadius: 2).stroke(Color.uxUiInk, style: StrokeStyle(lineWidth: 1.5, dash: [4, 2]))
             }
         }
-        .opacity(1)
+        .shadow(color: item.shadow ? Color.black.opacity(0.2) : .clear, radius: 12 * scale, x: 0, y: 6 * scale)
+        .opacity(item.opacity)
         .rotationEffect(.degrees(item.rotation))
     }
 
@@ -10971,14 +11551,14 @@ private struct NativeUxUiStudioView: View {
         )
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Style").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                Text("Style").font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 Spacer()
-                Text(binding.wrappedValue.kind).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envMuted)
+                Text(binding.wrappedValue.kind).font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.uxUiMuted)
             }
             if ["text", "button", "card", "input", "badge", "logo", "navbar", "tabbar", "tabs", "row", "menu", "modal", "tooltip", "breadcrumb", "list", "table", "chart", "video"].contains(binding.wrappedValue.kind) {
                 inspectorTextField(binding.wrappedValue.kind == "chart" ? "Chart data (title, then Label: value)" : "Text on canvas", text: binding.text, multiline: true)
             }
-            Text("Corner style").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+            Text("Corner style").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
             HStack(spacing: 6) {
                 Button("Sharp") { checkpoint(); elements[index].radius = 0 }
                     .buttonStyle(.bordered)
@@ -10987,7 +11567,7 @@ private struct NativeUxUiStudioView: View {
                 Button("Round") { checkpoint(); elements[index].radius = min(elements[index].width, elements[index].height) / 2 }
                     .buttonStyle(.bordered)
             }
-            Text("Fill colour").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+            Text("Fill colour").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(tokens.colors) { token in
@@ -10996,22 +11576,23 @@ private struct NativeUxUiStudioView: View {
                         } label: {
                             RoundedRectangle(cornerRadius: 7).fill(uxUiUIColor(token.value))
                                 .frame(width: 27, height: 27)
-                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.envBorder, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color.uxUiBorder, lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Apply fill \(token.name)")
                     }
                 }
             }
-            DisclosureGroup("Fine-tune design", isExpanded: $showAdvancedInspector) {
+            visualEditingControls(for: index)
+            if binding.wrappedValue.kind == "icon" { inspectorIconFields(binding) }
+            if binding.wrappedValue.kind == "image" { inspectorImageFields(binding) }
+            DisclosureGroup("More options", isExpanded: $showAdvancedInspector) {
                 VStack(alignment: .leading, spacing: 10) {
+                    inspectorVisualFields(binding)
+                    inspectorTypographyFields(binding)
                     inspectorIdentityFields(binding)
                     inspectorGeometryFields(binding)
                     inspectorResponsiveFields(binding)
-                    inspectorTypographyFields(binding)
-                    inspectorVisualFields(binding)
-                    inspectorImageFields(binding)
-                    inspectorIconFields(binding)
                     inspectorSpecification(binding)
                     inspectorFontLibrary(binding)
                 }
@@ -11020,23 +11601,50 @@ private struct NativeUxUiStudioView: View {
             .font(.envScaled(size: 12, weight: .semibold))
         }
         .padding(12)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        .background(Color.uxUiCard, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.uxUiBorder, lineWidth: 1))
+    }
+
+    private func visualEditingControls(for index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Drag your design to move it. Slide to change its look.").font(.caption).foregroundStyle(Color.uxUiMuted)
+            ColorPicker("Fill", selection: Binding(get: { uxUiUIColor(elements[index].fill) }, set: { checkpoint(); elements[index].fill = uxUiHex(UIColor($0)) }), supportsOpacity: false)
+            ColorPicker("Text or icon color", selection: Binding(get: { uxUiUIColor(elements[index].color) }, set: { checkpoint(); elements[index].color = uxUiHex(UIColor($0)) }), supportsOpacity: false)
+            Text("Size").font(.caption)
+            Slider(value: Binding(get: { Double(elements[index].width) }, set: { width in
+                let ratio = Double(elements[index].height) / Double(max(1, elements[index].width))
+                elements[index].width = Int(width); elements[index].height = max(12, Int(width * ratio))
+            }), in: 12...Double(max(13, boardWidth - elements[index].x)), onEditingChanged: { if $0 { checkpoint() } })
+            Text("Turn").font(.caption)
+            Slider(value: Binding(get: { (elements[index].rotation + 540).truncatingRemainder(dividingBy: 360) - 180 }, set: { elements[index].rotation = $0 }), in: -180...180, onEditingChanged: { if $0 { checkpoint() } })
+            Text("Roundness").font(.caption)
+            Slider(value: Binding(get: { Double(elements[index].radius) }, set: { elements[index].radius = Int($0) }), in: 0...Double(max(1, max(elements[index].radius, min(elements[index].width, elements[index].height) / 2))), onEditingChanged: { if $0 { checkpoint() } })
+            Text("Border").font(.caption)
+            Slider(value: Binding(get: { Double(elements[index].borderWidth) }, set: { elements[index].borderWidth = Int($0) }), in: 0...20, onEditingChanged: { if $0 { checkpoint() } })
+            Text("See-through").font(.caption)
+            Slider(value: Binding(get: { elements[index].opacity }, set: { elements[index].opacity = $0 }), in: 0...1, onEditingChanged: { if $0 { checkpoint() } })
+            Toggle("Soft shadow", isOn: Binding(get: { elements[index].shadow }, set: { checkpoint(); elements[index].shadow = $0 }))
+            if !["image", "icon", "rect", "ellipse", "line", "divider"].contains(elements[index].kind) {
+                Text("Text size").font(.caption)
+                Slider(value: Binding(get: { Double(elements[index].fontSize) }, set: { elements[index].fontSize = Int($0) }), in: 8...Double(max(160, elements[index].fontSize)), onEditingChanged: { if $0 { checkpoint() } })
+                Button("Choose a font") { toolkitTab = "Fonts"; showComponentPalette = true }.buttonStyle(.bordered)
+            }
+        }
     }
 
     private func inspectorHeader(_ binding: Binding<UxUiNativeLayer>) -> some View {
         HStack {
             Text("Properties · \(binding.wrappedValue.kind)")
-                .font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.envInk)
+                .font(.envScaled(size: 16, weight: .semibold)).foregroundStyle(Color.uxUiInk)
             Spacer()
             Button { moveLayer(binding.wrappedValue.id, by: -1) } label: {
-                Image(systemName: "arrow.up").foregroundStyle(Color.envAccent)
+                Image(systemName: "arrow.up").foregroundStyle(Color.uxUiInk)
             }
             Button { moveLayer(binding.wrappedValue.id, by: 1) } label: {
-                Image(systemName: "arrow.down").foregroundStyle(Color.envAccent)
+                Image(systemName: "arrow.down").foregroundStyle(Color.uxUiInk)
             }
             Button { duplicateLayer(binding.wrappedValue) } label: {
-                Image(systemName: "plus.square.on.square").foregroundStyle(Color.envAccent)
+                Image(systemName: "plus.square.on.square").foregroundStyle(Color.uxUiInk)
             }
             Button { deleteLayer(binding.wrappedValue) } label: {
                 Image(systemName: "trash").foregroundStyle(.red)
@@ -11067,7 +11675,7 @@ private struct NativeUxUiStudioView: View {
 
     private func inspectorResponsiveFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Responsive constraints").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            Text("Responsive constraints").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
             HStack(spacing: 8) {
                 Picker("Horizontal", selection: binding.horizontalConstraint) {
                     Text("Left").tag("left")
@@ -11090,8 +11698,8 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Reference width", value: binding.referenceWidth)
                 inspectorNumber("Reference height", value: binding.referenceHeight)
             }
-            Text("Visibility").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
-            HStack(spacing: 8) {
+            Text("Visibility").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
+            VStack(alignment: .leading, spacing: 8) {
                 ForEach(["mobile", "tablet", "desktop"], id: \.self) { device in
                     Toggle(device.capitalized, isOn: Binding(
                         get: { binding.wrappedValue.visibleOn.contains(device) },
@@ -11106,7 +11714,7 @@ private struct NativeUxUiStudioView: View {
             }
         }
         .padding(10)
-        .background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.uxUiSurface, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func inspectorTypographyFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
@@ -11116,6 +11724,9 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Font weight", value: binding.fontWeight)
             }
             inspectorTextField("Font family", text: binding.fontFamily)
+            if binding.wrappedValue.fontData == nil && uxUiFontAsset(binding.wrappedValue.fontFamily) == nil {
+                Text("This family is not installed. The canvas uses the system font until you import its TTF/OTF file.").font(.caption).foregroundStyle(Color.uxUiMuted)
+            }
         }
     }
 
@@ -11129,8 +11740,14 @@ private struct NativeUxUiStudioView: View {
                 inspectorNumber("Corner radius (px)", value: binding.radius)
                 inspectorNumber("Border width (px)", value: binding.borderWidth)
             }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Opacity · \(Int(binding.wrappedValue.opacity * 100))%")
+                    .font(.envScaled(size: 12, weight: .medium))
+                Slider(value: binding.opacity, in: 0...1)
+                Toggle("Drop shadow", isOn: binding.shadow)
+            }
             inspectorNumber("Padding (px)", value: binding.padding)
-            Text("Margins (px)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            Text("Margins (px)").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
             HStack(spacing: 8) {
                 inspectorNumber("Top", value: binding.marginTop)
                 inspectorNumber("Right", value: binding.marginRight)
@@ -11143,62 +11760,7 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func inspectorFontLibrary(_ binding: Binding<UxUiNativeLayer>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Font library · \(uxUiFontFamilies.count) families").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
-            inspectorTextField("Search fonts", text: $fontQuery)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(["All","Sans serif","Serif","Monospace","Display","Handwriting","System"], id: \.self) { category in
-                        Button { fontCategory = category } label: {
-                            Text(category).font(.envScaled(size: 10, weight: .medium))
-                                .padding(.horizontal, 8).padding(.vertical, 6)
-                                .foregroundStyle(fontCategory == category ? Color.white : Color.envInk)
-                                .background(fontCategory == category ? Color.envAccent : Color.envSurface2, in: Capsule())
-                        }.buttonStyle(.plain)
-                    }
-                }
-            }
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 6) {
-                    ForEach(uxUiFontFamilies.filter { $0.0.localizedCaseInsensitiveContains(fontQuery) && (fontCategory == "All" || $0.1 == fontCategory) }, id: \.0) { family, category in
-                        Button {
-                            guard let index = elements.firstIndex(where: { $0.id == binding.wrappedValue.id }) else { return }
-                            checkpoint()
-                            elements[index].fontFamily = family
-                            elements[index].fontData = nil
-                            notice = "Applied \(family). Custom fonts can be imported below; system font availability differs by platform."
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(family).font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
-                                    Text("Aa Bb Cc · Interface typography 012345")
-                                        .font(.custom(family == "System" ? "System" : family, size: 13))
-                                        .foregroundStyle(Color.envMuted).lineLimit(1)
-                                }
-                                Spacer(minLength: 8)
-                                Text(category).font(.envScaled(size: 9, weight: .regular)).foregroundStyle(Color.envMuted)
-                            }
-                            .padding(8)
-                            .background(binding.wrappedValue.fontFamily == family ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(binding.wrappedValue.fontFamily == family ? Color.envAccent : Color.envBorder, lineWidth: 1))
-                        }.buttonStyle(.plain)
-                    }
-                }
-            }
-            .frame(maxHeight: 230)
-            Button {
-                fontTargetID = binding.wrappedValue.id
-                isImportingFont = true
-            } label: {
-                Label(binding.wrappedValue.fontData == nil ? "Import licensed TTF / OTF font" : "Replace imported font", systemImage: "textformat")
-                    .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
-            }
-            Text("Custom TTF/OTF files up to 4 MB are embedded in the project and can be used by the visual preview and PDF export.")
-                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
-        }
-        .padding(12)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+        fontLibraryPanel
     }
 
     @ViewBuilder
@@ -11210,10 +11772,10 @@ private struct NativeUxUiStudioView: View {
                     isImportingImage = true
                 } label: {
                     Label(binding.wrappedValue.imageData?.isEmpty == false ? "Replace image" : "Import image", systemImage: "photo")
-                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        .font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 }
                 Text("Imported image assets are embedded in the editable project. Use licensed images and keep source files where your team can maintain them.")
-                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.uxUiMuted)
             }
         }
     }
@@ -11222,45 +11784,45 @@ private struct NativeUxUiStudioView: View {
     private func inspectorIconFields(_ binding: Binding<UxUiNativeLayer>) -> some View {
         if binding.wrappedValue.kind == "icon" {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Browse icon categories").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+                Text("Browse icon categories").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(uxUiIconCategories, id: \.0) { category in
                             Button { iconCategory = category.0 } label: {
                                 Text(category.0).font(.envScaled(size: 10, weight: .semibold))
                                     .padding(.horizontal, 9).padding(.vertical, 7)
-                                    .foregroundStyle(iconCategory == category.0 ? Color.white : Color.envInk)
-                                    .background(iconCategory == category.0 ? Color.envAccent : Color.envSurface2, in: Capsule())
+                                    .foregroundStyle(iconCategory == category.0 ? Color.uxUiCard : Color.uxUiInk)
+                                    .background(iconCategory == category.0 ? Color.uxUiInk : Color.uxUiSurface2, in: Capsule())
                             }.buttonStyle(.plain)
                         }
                     }
                 }
-                Text("Visual style / set").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted)
+                Text("Visual style / set").font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.uxUiMuted)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(uxUiIconSets, id: \.0) { set in
                             Button { iconPrefix = set.0; iconResults = []; iconTotal = 0 } label: {
                                 Text(set.1).font(.envScaled(size: 10, weight: .medium))
                                     .padding(.horizontal, 9).padding(.vertical, 7)
-                                    .foregroundStyle(iconPrefix == set.0 ? Color.white : Color.envInk)
-                                    .background(iconPrefix == set.0 ? Color.envAccent : Color.envSurface2, in: Capsule())
+                                    .foregroundStyle(iconPrefix == set.0 ? Color.uxUiCard : Color.uxUiInk)
+                                    .background(iconPrefix == set.0 ? Color.uxUiInk : Color.uxUiSurface2, in: Capsule())
                             }.buttonStyle(.plain)
                         }
                     }
                 }
                 if iconQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     let quick = (uxUiIconCategories.first(where: { $0.0 == iconCategory })?.1 ?? [])
-                        .filter { iconPrefix == "all" || $0.hasPrefix(iconPrefix + ":") }
+                        .filter { (iconPrefix == "all" || $0.hasPrefix(iconPrefix + ":")) && uxUiBundledIcons[$0] != nil }
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                        ForEach(quick, id: \.self) { iconName in
+                        ForEach(Array(quick.prefix(48)), id: \.self) { iconName in
                             Button { chooseIconArtwork(iconName, layerID: binding.wrappedValue.id) } label: {
                                 HStack(spacing: 7) {
                                     UxUiIconifyThumbnail(iconName: iconName).frame(width: 26, height: 26)
-                                    Text(iconName).font(.envScaled(size: 9, weight: .medium)).lineLimit(1).foregroundStyle(Color.envInk)
+                                    Text(iconName).font(.envScaled(size: 9, weight: .medium)).lineLimit(1).foregroundStyle(Color.uxUiInk)
                                     Spacer(minLength: 0)
                                 }
                                 .padding(7)
-                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                                .background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 7))
                             }.buttonStyle(.plain)
                         }
                     }
@@ -11270,16 +11832,16 @@ private struct NativeUxUiStudioView: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                         Text(isSearchingIcons ? "Searching…" : "Search open-source icons")
-                    }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                    }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                 }.disabled(isSearchingIcons || iconQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ForEach(iconResults, id: \.self) { iconName in
                     Button { chooseIconArtwork(iconName, layerID: binding.wrappedValue.id) } label: {
                         HStack(spacing: 7) {
                             UxUiIconifyThumbnail(iconName: iconName).frame(width: 24, height: 24)
-                            Text(iconName).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
+                            Text(iconName).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.uxUiInk)
                                 .frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
                         }
-                        .padding(8).background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 7))
+                        .padding(8).background(Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 7))
                     }.buttonStyle(.plain)
                 }
                 if iconResults.count < iconTotal {
@@ -11287,51 +11849,54 @@ private struct NativeUxUiStudioView: View {
                         HStack {
                             Image(systemName: "arrow.down.circle")
                             Text(isSearchingIcons ? "Loading icons…" : "Load more icons · \(iconResults.count) / \(iconTotal)")
-                        }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        }.font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
                     }.disabled(isSearchingIcons)
                 }
                 Text("Curated examples are available immediately. Search queries the larger Iconify library, and selected SVG artwork is retained in the project and PDF. Verify each collection's licence.")
-                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.uxUiMuted)
             }
         }
     }
 
     private func inspectorSpecification(_ binding: Binding<UxUiNativeLayer>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+            Text("Selected layer specification").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.uxUiInk)
             let encoded = (try? JSONEncoder().encode(binding.wrappedValue)) ?? Data()
             Text(String(data: encoded, encoding: .utf8) ?? "{}")
                 .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(Color.envMuted)
+                .foregroundStyle(Color.uxUiMuted)
                 .textSelection(.enabled)
         }
     }
 
     private func inspectorTextField(_ label: String, text: Binding<String>, multiline: Bool = false) -> some View {
-        Group {
-            if multiline {
-                TextField(label, text: text, axis: .vertical).lineLimit(2...5)
-            } else {
-                TextField(label, text: text)
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.uxUiMuted)
+            Group {
+                if multiline { TextField(label, text: text, axis: .vertical).lineLimit(2...5) }
+                else { TextField(label, text: text) }
             }
+            .font(.envScaled(size: 13, weight: .regular)).textInputAutocapitalization(.never)
+            .padding(11).background(Color.uxUiSurface, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.uxUiBorder, lineWidth: 1))
         }
-        .font(.envScaled(size: 12, weight: .regular)).textInputAutocapitalization(.never)
-        .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
     }
 
     private func inspectorNumber(_ label: String, value: Binding<Int>) -> some View {
-        TextField(label, value: value, format: .number)
-            .keyboardType(.numbersAndPunctuation).font(.envScaled(size: 12, weight: .regular))
-            .padding(10).background(Color.envSurface, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder, lineWidth: 1))
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.uxUiMuted)
+            TextField(label, value: value, format: .number)
+                .keyboardType(.numbersAndPunctuation).font(.envScaled(size: 13, weight: .regular))
+                .padding(11).background(Color.uxUiSurface, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.uxUiBorder, lineWidth: 1))
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func exportButtonLabel(_ title: String, icon: String, primary: Bool) -> some View {
         HStack(spacing: 8) { Image(systemName: icon); Text(title); Spacer(); Image(systemName: "arrow.down.to.line") }
-            .font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(primary ? Color.white : Color.envInk)
-            .padding(13).background(primary ? Color.envAccent : Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Color.envAccent : Color.envBorder, lineWidth: 1))
+            .font(.envScaled(size: 13, weight: .semibold)).foregroundStyle(primary ? Color.uxUiCard : Color.uxUiInk)
+            .padding(13).background(primary ? Color.uxUiInk : Color.uxUiSurface2, in: RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).stroke(primary ? Color.uxUiInk : Color.uxUiBorder, lineWidth: 1))
     }
 
     private func captureActiveScreen() {
@@ -11365,7 +11930,8 @@ private struct NativeUxUiStudioView: View {
     private func startPrototypePreview() {
         captureActiveScreen()
         guard hasActivePrototypeLinks else {
-            activeToolkitID = "prototype"
+            activeToolkitID = "flows"
+            toolkitTab = "Toolkit"
             showComponentPalette = true
             notice = "Select a layer and assign a destination screen before previewing."
             return
@@ -11590,7 +12156,7 @@ private struct NativeUxUiStudioView: View {
         case "button": newItem = UxUiNativeLayer(kind: kind, name: "Primary button", x: 24, y: 200, width: 180, height: 48, text: "Continue", color: "#FFFFFF", fill: "#2563EB", fontWeight: 600)
         case "card": newItem = UxUiNativeLayer(kind: kind, name: "Content card", x: 24, y: 270, width: 300, height: 132, text: "Card title\nSupporting text", fill: "#FFFFFF", borderWidth: 1, radius: 18, padding: 18)
         case "input": newItem = UxUiNativeLayer(kind: kind, name: "Text input", x: 24, y: 420, width: 300, height: 48, text: "Enter your email", color: "#64748B", fill: "#FFFFFF", borderWidth: 1)
-        case "icon": newItem = UxUiNativeLayer(kind: kind, name: "Icon", x: 24, y: 490, width: 44, height: 44, text: "", iconName: "mdi:home", color: "#2563EB")
+        case "icon": newItem = UxUiNativeLayer(kind: kind, name: "Icon", x: 24, y: 490, width: 44, height: 44, text: "", iconName: "lucide:house", iconSvg: uxUiBundledIcons["lucide:house"], color: "#2563EB", padding: 0)
         case "image": newItem = UxUiNativeLayer(kind: kind, name: "Image", x: 24, y: 330, width: 280, height: 160, text: "Import an image", color: "#64748B", fill: "#E5E7EB", radius: 12)
         case "triangle": newItem = UxUiNativeLayer(kind: kind, name: "Triangle", x: 24, y: 540, width: 96, height: 84, text: "", fill: "#DBEAFE", radius: 0, padding: 0)
         case "diamond": newItem = UxUiNativeLayer(kind: kind, name: "Diamond", x: 24, y: 540, width: 92, height: 92, text: "", fill: "#DBEAFE", radius: 0, padding: 0)
@@ -11603,7 +12169,8 @@ private struct NativeUxUiStudioView: View {
         case "row", "list": newItem = UxUiNativeLayer(kind: kind, name: "List row", x: 24, y: 330, width: 300, height: 64, text: "Account settings\nManage your profile", fill: "#FFFFFF", borderWidth: 1, radius: 10, padding: 14)
         case "avatar": newItem = UxUiNativeLayer(kind: kind, name: "Avatar", x: 24, y: 540, width: 44, height: 44, text: "A", color: "#1D4ED8", fill: "#DBEAFE", radius: 22, fontWeight: 700)
         case "badge": newItem = UxUiNativeLayer(kind: kind, name: "Status badge", x: 24, y: 540, width: 100, height: 28, text: "Active", color: "#1D4ED8", fill: "#DBEAFE", radius: 99, fontSize: 12, fontWeight: 600)
-        case "switch": newItem = UxUiNativeLayer(kind: kind, name: "Toggle switch", x: 24, y: 540, width: 46, height: 26, text: "ON", color: "#FFFFFF", fill: "#2563EB", radius: 13, fontSize: 10)
+        case "checkbox": newItem = UxUiNativeLayer(kind: kind, name: "Checkbox", x: 24, y: 540, width: 24, height: 24, text: "", color: "#FFFFFF", fill: "#2563EB", radius: 5, padding: 0)
+        case "switch", "toggle": newItem = UxUiNativeLayer(kind: kind, name: "Toggle switch", x: 24, y: 540, width: 46, height: 26, text: "ON", color: "#FFFFFF", fill: "#2563EB", radius: 13, padding: 0, fontSize: 10)
         case "progress": newItem = UxUiNativeLayer(kind: kind, name: "Progress bar", x: 24, y: 540, width: 240, height: 10, text: "", color: "#2563EB", fill: "#DBEAFE", radius: 5, padding: 0)
         case "slider": newItem = UxUiNativeLayer(kind: kind, name: "Range slider", x: 24, y: 540, width: 240, height: 24, text: "", color: "#2563EB", fill: "#E5E7EB", radius: 12, padding: 0)
         case "radio": newItem = UxUiNativeLayer(kind: kind, name: "Radio button", x: 24, y: 540, width: 22, height: 22, text: "", color: "#2563EB", fill: "#FFFFFF", borderColor: "#2563EB", borderWidth: 2, radius: 11, padding: 0)
@@ -11624,7 +12191,7 @@ private struct NativeUxUiStudioView: View {
         case "divider": newItem = UxUiNativeLayer(kind: kind, name: "Divider", x: 24, y: 640, width: 300, height: 1, text: "", fill: "#CBD5E1")
         default: newItem = UxUiNativeLayer(kind: "rect", name: "Rectangle", x: 24, y: 540, width: 140, height: 90, text: "", fill: "#DBEAFE")
         }
-        checkpoint(); elements.append(newItem); selectedID = newItem.id; notice = "\(newItem.name) added."
+        checkpoint(); elements.append(newItem); selectedID = newItem.id; canvasSelected = false; notice = "\(newItem.name) added."
     }
 
     private func duplicateLayer(_ element: UxUiNativeLayer) {
@@ -11645,7 +12212,7 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func saveDraft() {
-        guard !onboarding, (!elements.isEmpty || screens.count > 1) else { return }
+        guard !onboarding else { return }
         UserDefaults.standard.set(projectJSON, forKey: storageKey)
         hasSavedDraft = true
     }
@@ -11705,32 +12272,20 @@ private struct NativeUxUiStudioView: View {
     }
 
     private func chooseIconArtwork(_ iconName: String, layerID: UUID) {
-        guard let url = URL(string: "https://api.iconify.design/" + iconName.replacingOccurrences(of: ":", with: "/") + ".svg") else {
-            notice = "Invalid icon identifier."
-            return
-        }
-        isSearchingIcons = true
         Task {
             do {
-                let (data, response) = try await URLSession.shared.data(from: url)
-                guard (response as? HTTPURLResponse)?.statusCode == 200,
-                      let sourceSVG = String(data: data, encoding: .utf8),
-                      sourceSVG.contains("<svg") else { throw URLError(.cannotDecodeContentData) }
+                let sourceSVG = try await UxUiIconArtworkCache.shared.load(iconName)
                 await MainActor.run {
-                    if let index = elements.firstIndex(where: { $0.id == layerID }) {
-                        checkpoint()
-                        elements[index].iconName = iconName
-                        elements[index].name = iconName
-                        elements[index].iconSvg = uxUiCleanIconSVG(sourceSVG)
-                    }
-                    notice = "Loaded actual SVG artwork for \(iconName). Check the source collection licence before shipping."
-                    isSearchingIcons = false
+                    guard let index = elements.firstIndex(where: { $0.id == layerID }) else { return }
+                    checkpoint()
+                    elements[index].iconName = iconName
+                    elements[index].name = iconName
+                    elements[index].iconSvg = sourceSVG
+                    elements[index].padding = 0
+                    notice = "Applied \(iconName). Artwork is saved in your project."
                 }
             } catch {
-                await MainActor.run {
-                    isSearchingIcons = false
-                    notice = "Could not load selected icon artwork. Check your connection and retry."
-                }
+                await MainActor.run { notice = "Icon unavailable. Choose a bundled icon or retry when connected." }
             }
         }
     }
@@ -11786,10 +12341,18 @@ private struct NativeUxUiStudioView: View {
                 let item = uxUiResolvedLayer(original, boardWidth: boardWidth, boardHeight: boardHeight)
                 let rect = CGRect(x: item.x, y: item.y, width: item.width, height: item.height)
                 if let fontData = item.fontData { _ = uxUiRegisterImportedFont(fontData, family: item.fontFamily) }
+                context.cgContext.saveGState()
+                context.cgContext.setAlpha(item.opacity)
+                context.cgContext.translateBy(x: rect.midX, y: rect.midY)
+                context.cgContext.rotate(by: CGFloat(item.rotation * .pi / 180))
+                context.cgContext.translateBy(x: -rect.midX, y: -rect.midY)
+                if item.shadow { context.cgContext.setShadow(offset: CGSize(width: 0, height: 6), blur: 12, color: UIColor.black.withAlphaComponent(0.2).cgColor) }
+                context.cgContext.beginTransparencyLayer(auxiliaryInfo: nil)
                 let path = UIBezierPath(cgPath: UxUiNativeShape(kind: item.kind, radius: CGFloat(item.radius)).path(in: rect).cgPath)
                 if item.fill != "transparent" { uxUiPlatformColor(item.fill).setFill(); path.fill() }
                 if item.borderWidth > 0 { uxUiPlatformColor(item.borderColor).setStroke(); path.lineWidth = CGFloat(item.borderWidth); path.stroke() }
-                let font = UIFont(name: item.fontFamily, size: CGFloat(item.fontSize)) ?? UIFont.systemFont(ofSize: CGFloat(item.fontSize), weight: item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
+                let fontName = item.fontData.flatMap { uxUiRegisterImportedFont($0, family: item.fontFamily) } ?? uxUiFontAsset(item.fontFamily)?.name ?? item.fontFamily
+                let font = UIFont(name: fontName, size: CGFloat(item.fontSize)) ?? UIFont.systemFont(ofSize: CGFloat(item.fontSize), weight: item.fontWeight >= 700 ? .bold : item.fontWeight >= 600 ? .semibold : .regular)
                 let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: uxUiPlatformColor(item.color)]
                 if item.kind == "icon", let svg = item.iconSvg, !svg.isEmpty {
                     uxUiDrawSVG(svg, tint: item.color, in: context.cgContext, rect: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)))
@@ -11800,6 +12363,8 @@ private struct NativeUxUiStudioView: View {
                     let content = item.kind == "icon" ? item.iconName : item.text
                     content.draw(in: rect.insetBy(dx: CGFloat(item.padding), dy: CGFloat(item.padding)), withAttributes: attributes)
                 }
+                context.cgContext.endTransparencyLayer()
+                context.cgContext.restoreGState()
             }
             context.cgContext.restoreGState()
             "Visual interface preview rendered from the design layers.".draw(at: CGPoint(x: 32, y: 817), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: UIColor.secondaryLabel])

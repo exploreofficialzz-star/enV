@@ -2595,3 +2595,139 @@ html[data-env-view-mode="tablet"] .env-app-shell {
     min-height:27px !important;
   }
 }
+
+/* Studio Toolkit: inspect real samples before inserting, with readable phone-sized cards. */
+.ux-ui-studio .uxui-toolkit-tiles { grid-template-columns:repeat(auto-fit,minmax(138px,1fr)); gap:12px; }
+.ux-ui-studio .uxui-toolkit-tile { align-items:stretch; min-height:170px; gap:7px; padding:12px; text-align:left; }
+.ux-ui-studio .uxui-toolkit-preview { display:block; width:100%; height:94px; flex:0 0 auto; border-radius:12px; background:var(--color-accent-soft); }
+.ux-ui-studio .uxui-toolkit-tile-label { font-size:12px; font-weight:800; line-height:1.4; text-align:left; }
+.uxui-toolkit-tile-description { font-size:11px; line-height:1.55; color:var(--color-muted); overflow-wrap:anywhere; }
+.ux-ui-studio .uxui-toolkit-selection > .uxui-toolkit-preview { height:120px; margin-bottom:14px; }
+.uxui-toolkit-back { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:8px 12px; border:1px solid var(--color-border); border-radius:10px; color:var(--color-fg); font-size:12px; font-weight:700; }
+.uxui-effect-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-top:12px; }
+.uxui-effect-card { display:flex; min-width:0; flex-direction:column; gap:8px; border:1px solid var(--color-border); border-radius:12px; padding:10px; text-align:left; }
+.uxui-effect-card:hover, .uxui-effect-card:focus-visible { border-color:var(--color-accent); background:var(--color-accent-soft); }
+.uxui-effect-stage { display:grid; height:92px; place-items:center; border-radius:9px; background:repeating-conic-gradient(#e2e8f0 0% 25%,#f8fafc 0% 50%) 50%/14px 14px; }
+.uxui-effect-stage > span { display:grid; place-items:center; width:77%; height:58px; font-size:22px; font-weight:700; }
+.uxui-effect-card > strong { font-size:12px; color:var(--color-fg); }
+.uxui-effect-card > small { font-size:11px; line-height:1.5; color:var(--color-muted); }
+.uxui-effects-library > p { margin-top:12px; line-height:1.6; }
+.uxui-inline-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin-top:10px; }
+.uxui-inline-fields label { min-width:0; color:var(--color-muted); font-size:11px; }
+.uxui-inline-fields input, .uxui-inline-fields textarea { display:block; width:100%; min-width:0; min-height:40px; margin-top:5px; border:1px solid var(--color-border); border-radius:8px; padding:6px; color:var(--color-fg); background:var(--color-surface); font-size:12px; }
+.uxui-inline-fields input[type=color] { padding:3px; }
+.uxui-inline-fields input[type=range] { padding:0; border:0; accent-color:var(--color-accent); }
+.uxui-inline-fields .uxui-inline-toggle { display:flex; gap:6px; align-items:center; align-self:end; min-height:40px; }
+.uxui-inline-fields .uxui-inline-toggle input { width:18px; min-height:18px; margin:0; }
+.uxui-inline-text-fields { grid-template-columns:minmax(0,1fr) 80px 100px; }
+.uxui-inline-text-fields > button { min-width:0; align-self:end; min-height:42px; border:1px solid var(--color-border); border-radius:8px; font-size:11px; color:var(--color-fg); }
+.uxui-inline-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; color:var(--color-fg); font-size:11px; }
+.uxui-inline-actions > label { display:inline-flex; gap:7px; align-items:center; min-height:40px; }
+.uxui-inline-actions input { width:18px; height:18px; accent-color:var(--color-accent); }
+.uxui-inline-actions button { min-height:40px; border:1px solid var(--color-border); border-radius:8px; padding:6px 10px; }
+.ux-ui-studio .uxui-style-dock { display:block; position:relative; flex:0 0 auto; min-width:0; max-height:min(31dvh,260px); overflow:auto; overscroll-behavior:contain; padding:10px 12px max(10px,env(safe-area-inset-bottom)); border-top:1px solid var(--color-border); background:var(--color-surface); }
+.uxui-style-dock-heading { display:flex; gap:8px; justify-content:space-between; align-items:center; }
+.uxui-style-dock-heading > strong { min-width:0; overflow-wrap:anywhere; font-size:12px; color:var(--color-fg); }
+.uxui-style-dock-heading > button { display:inline-flex; flex:0 0 auto; align-items:center; gap:5px; min-height:34px; font-size:11px; color:var(--color-accent); }
+.ux-ui-studio .uxui-style-dock .uxui-context-swatches { grid-template-columns:repeat(12,minmax(0,1fr)); }
+.ux-ui-studio .uxui-style-dock .uxui-context-swatches button { min-height:28px; aspect-ratio:auto; }
+.ux-ui-studio.is-expanded .uxui-context-controls { flex:0 0 auto !important; max-height:74px !important; overflow-x:hidden !important; overflow-y:auto !important; }
+.ux-ui-studio:not(.is-expanded) .uxui-context-controls { flex:0 0 auto; max-height:74px; overflow:auto; }
+.ux-ui-studio .uxui-tools-drawer :where(button,input,select,textarea):focus-visible { outline:2px solid var(--color-accent); outline-offset:2px; }
+.ux-ui-studio .uxui-tools-drawer input[type=search], .ux-ui-studio .uxui-tools-drawer select { min-height:44px; }
+.ux-ui-studio .uxui-tools-drawer .rounded-full { min-height:36px; font-size:11px; }
+@media (max-width:600px) {
+  .ux-ui-studio .uxui-toolkit-tiles { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .ux-ui-studio .uxui-toolkit-tile { min-height:166px; padding:10px; }
+  .ux-ui-studio .uxui-toolkit-tabs { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .ux-ui-studio .uxui-toolkit-tabs button { min-height:49px; font-size:10px; }
+  .ux-ui-studio .uxui-toolkit-preview { height:80px; }
+  .uxui-inline-fields { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .uxui-inline-text-fields { grid-template-columns:minmax(0,1fr) 64px; }
+  .uxui-inline-text-fields > button { grid-column:1/-1; }
+  .ux-ui-studio .uxui-style-dock { max-height:min(29dvh,230px); padding:7px 8px max(8px,env(safe-area-inset-bottom)); }
+  .ux-ui-studio .uxui-style-dock .uxui-context-swatches { grid-template-columns:repeat(6,minmax(0,1fr)); }
+}
+@media (max-height:550px) {
+  .ux-ui-studio .uxui-style-dock { max-height:32dvh; }
+  .ux-ui-studio.is-expanded .uxui-mobile-controls { min-height:64px !important; max-height:64px !important; }
+}
+/* Let each controller size to its complete grid; fixed heights cropped its labels and bottom row. */
+.ux-ui-studio.is-expanded .uxui-mobile-controls,
+.ux-ui-studio:not(.is-expanded) .uxui-mobile-controls {
+  flex:0 0 auto !important; height:auto !important; min-height:0 !important; max-height:none !important;
+  padding:6px 8px !important; overflow:visible !important; align-items:center !important;
+}
+/* Keep the five relevant shortcuts fully visible; secondary actions live in the style dock. */
+.ux-ui-studio.is-expanded .uxui-context-controls,
+.ux-ui-studio:not(.is-expanded) .uxui-context-controls { max-height:none !important; overflow:visible !important; }
+.ux-ui-studio.is-expanded .uxui-context-toolbar,
+.ux-ui-studio:not(.is-expanded) .uxui-context-toolbar { display:grid !important; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px !important; overflow:visible !important; }
+.ux-ui-studio .uxui-context-toolbar .uxui-context-selection { grid-column:1/-1; max-width:100% !important; padding:1px 3px; }
+:is(.ux-ui-studio.is-expanded,.ux-ui-studio:not(.is-expanded)) .uxui-context-toolbar .uxui-context-action { display:flex; flex-direction:column; min-width:0 !important; min-height:44px !important; gap:3px !important; padding:4px 2px !important; font-size:10px !important; }
+:is(.ux-ui-studio.is-expanded,.ux-ui-studio:not(.is-expanded)) .uxui-context-toolbar .uxui-context-action svg { width:18px !important; height:18px !important; }
+:is(.ux-ui-studio.is-expanded,.ux-ui-studio:not(.is-expanded)) .uxui-context-toolbar .uxui-context-action span { display:block !important; font-size:10px !important; line-height:1.2 !important; }
+
+/* The Studio follows the effective app theme with monochrome interface colors.
+   Authored artwork and real color-picker swatches keep their selected colors. */
+.ux-ui-studio, .uxui-home {
+  --color-bg:#fafafa; --color-fg:#111111; --color-muted:#555555;
+  --color-subtle:#666666; --color-surface:#ffffff; --color-surface-2:#f0f0f0;
+  --color-border:#dddddd; --color-border-strong:#b8b8b8;
+  --color-accent:#111111; --color-accent-fg:#ffffff; --color-accent-soft:#eeeeee;
+  --color-ink:#111111;
+  color-scheme:light;
+}
+.dark .ux-ui-studio, .dark .uxui-home {
+  --color-bg:#080808; --color-fg:#ffffff; --color-muted:#bbbbbb;
+  --color-subtle:#aaaaaa; --color-surface:#111111; --color-surface-2:#222222;
+  --color-border:#383838; --color-border-strong:#666666;
+  --color-accent:#ffffff; --color-accent-fg:#111111; --color-accent-soft:#292929;
+  --color-ink:#ffffff;
+  color-scheme:dark;
+}
+.ux-ui-studio .uxui-toolkit-preview,
+.ux-ui-studio .uxui-effect-stage,
+.ux-ui-studio .uxui-preset-preview,
+.ux-ui-studio button[title^="Add icon "] svg { filter:grayscale(1); }
+.ux-ui-studio .uxui-effect-stage {
+  background:repeating-conic-gradient(var(--color-border) 0% 25%,var(--color-surface) 0% 50%) 50%/14px 14px;
+}
+.ux-ui-studio :is(.bg-accent,.uxui-tools-drawer button.bg-accent) { color:var(--color-accent-fg); }
+.ux-ui-studio .uxui-icon-option { color:var(--color-fg); }
+
+.ux-ui-studio button[class*="text-red"] { color:var(--color-fg); }
+
+.ux-ui-studio .uxui-layer-chip { --layer-tint:var(--color-fg) !important; }
+
+.ux-ui-studio .uxui-tools-drawer [role="status"] {
+  color:var(--color-muted); background:var(--color-surface-2);
+}
+.ux-ui-studio .uxui-tools-drawer [class*="text-emerald"] { color:var(--color-fg); }
+
+.ux-ui-studio .uxui-drawer-heading > span::before { background:var(--color-fg); box-shadow:none; }
+.ux-ui-studio [role="status"] .text-emerald-600 { color:var(--color-fg); }
+.ux-ui-studio button[class*="border-red"] { border-color:var(--color-border); }
+.ux-ui-studio button[class*="text-red"]:hover { background:var(--color-surface-2); }
+
+/* Visual editing first: live type specimens and drag controls; exact values are optional. */
+.uxui-font-preview-controls { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; margin-top:10px; }
+.uxui-font-preview-controls > button { min-height:44px; max-width:100px; padding:7px 10px; border:1px solid var(--color-border); border-radius:9px; color:var(--color-fg); font-size:11px; }
+.uxui-font-animation { display:block; position:relative; min-height:3.2em; overflow:hidden; }
+.uxui-font-animation > span { display:block; padding:4px 2px; animation:uxui-font-first 6s ease-in-out infinite; }
+.uxui-font-animation > span + span { position:absolute; inset:0; opacity:0; animation-name:uxui-font-second; }
+.uxui-font-still { display:block; min-height:3.2em; padding:4px 2px; }
+@keyframes uxui-font-first { 0%,38%,100% { opacity:1; transform:translateY(0); } 48%,88% { opacity:0; transform:translateY(-.4em); } }
+@keyframes uxui-font-second { 0%,38%,100% { opacity:0; transform:translateY(.4em); } 48%,88% { opacity:1; transform:translateY(0); } }
+.uxui-font-more summary, .uxui-exact-options summary { min-height:36px; padding:8px 2px; font-size:11px; color:var(--color-muted); cursor:pointer; }
+.uxui-visual-controls { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.uxui-visual-controls input[type=range] { min-height:36px; cursor:ew-resize; }
+.uxui-drag-hint { margin:2px 0 0; font-size:10px; color:var(--color-muted); }
+.uxui-resize-handle { cursor:nwse-resize; touch-action:none; }
+.uxui-inline-text-fields { grid-template-columns:minmax(0,1fr) auto; }
+.uxui-inline-text-fields > button { padding:6px 10px; }
+@media (max-width:600px) { .uxui-visual-controls { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (prefers-reduced-motion:reduce) {
+  .uxui-font-animation > span { animation:none; opacity:1; transform:none; }
+  .uxui-font-animation > span + span { display:none; }
+}

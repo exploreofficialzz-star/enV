@@ -21,6 +21,14 @@ export type UxCodegenProject = {
   elements: UxCodegenLayer[];
 };
 const safe = (value: unknown) => JSON.stringify(value);
+// Embedded fonts and images can exceed the JVM's 65,535-byte UTF-8 constant
+// limit. Assemble small literals at runtime rather than emitting one huge one.
+function kotlinAssetLiteral(value: string): string {
+  if (value.length <= 16000) return safe(value);
+  const chunks: string[] = [];
+  for (let offset = 0; offset < value.length; offset += 16000) chunks.push(safe(value.slice(offset, offset + 16000)));
+  return "listOf(" + chunks.join(", ") + ").joinToString(\"\")";
+}
 export const sourceName = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("") || "EnVDesign";
 const esc = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const visibility = (layer: UxCodegenLayer) => layer.visibleOn?.length ? layer.visibleOn : ["mobile", "tablet", "desktop"];
@@ -118,7 +126,6 @@ export function generateHtmlProject(project: UxCodegenProject): string {
     ...project.tokens.spacing.map((spacing) => "--env-space-" + spacing + ":" + spacing + "px"),
     ...project.tokens.typography.map((token) => "--env-type-" + token.name.replace(/[^a-z0-9-]/gi, "-") + ":" + token.fontSize + "px/" + token.lineHeight + " " + safe(token.fontFamily)),
   ].join(";\n");
-  const mobileHidden = ".env-layer:not([data-visible-on~='mobile']){}";
   const fontFaces = embeddedFontCss(project);
   const fontLinks = remoteFontFamilies(project).map((family) => '<link rel="stylesheet" href="' + esc(googleFontLink(family)) + '">').join("");
   const interactionRules = project.elements.map((layer) => {
@@ -208,6 +215,42 @@ export function generateReactProject(project: UxCodegenProject): string {
 type UxSvgSegment = { op: "move" | "line" | "cubic" | "quad" | "close"; values: number[] };
 type UxSvgDrawable = { tag: string; attrs: Record<string, string> };
 
+// SVG endpoint arcs must stay curved when exported to SwiftUI Path. Splitting
+// into at most quarter-turn cubic segments follows the SVG implementation notes.
+function svgArcCubics(x: number, y: number, rx: number, ry: number, rotation: number, large: number, sweep: number, endX: number, endY: number): number[][] {
+  rx = Math.abs(rx); ry = Math.abs(ry);
+  if (!rx || !ry || (x === endX && y === endY)) return [];
+  const phi = rotation * Math.PI / 180, cos = Math.cos(phi), sin = Math.sin(phi);
+  const px = cos * (x - endX) / 2 + sin * (y - endY) / 2;
+  const py = -sin * (x - endX) / 2 + cos * (y - endY) / 2;
+  const scale = px * px / (rx * rx) + py * py / (ry * ry);
+  if (scale > 1) { rx *= Math.sqrt(scale); ry *= Math.sqrt(scale); }
+  const denominator = rx * rx * py * py + ry * ry * px * px;
+  const factor = (Boolean(large) === Boolean(sweep) ? -1 : 1) * Math.sqrt(Math.max(0,
+    (rx * rx * ry * ry - denominator) / denominator));
+  const localCX = factor * rx * py / ry, localCY = -factor * ry * px / rx;
+  const cx = cos * localCX - sin * localCY + (x + endX) / 2;
+  const cy = sin * localCX + cos * localCY + (y + endY) / 2;
+  const ux = (px - localCX) / rx, uy = (py - localCY) / ry;
+  const vx = (-px - localCX) / rx, vy = (-py - localCY) / ry;
+  const start = Math.atan2(uy, ux);
+  let delta = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  if (!sweep && delta > 0) delta -= 2 * Math.PI;
+  if (sweep && delta < 0) delta += 2 * Math.PI;
+  const count = Math.ceil(Math.abs(delta) / (Math.PI / 2));
+  const step = delta / count;
+  const map = (a: number, b: number) => [cx + cos * rx * a - sin * ry * b, cy + sin * rx * a + cos * ry * b];
+  const segments: number[][] = [];
+  for (let index = 0; index < count; index++) {
+    const a = start + step * index, b = a + step, alpha = 4 / 3 * Math.tan(step / 4);
+    const p1 = map(Math.cos(a) - alpha * Math.sin(a), Math.sin(a) + alpha * Math.cos(a));
+    const p2 = map(Math.cos(b) + alpha * Math.sin(b), Math.sin(b) - alpha * Math.cos(b));
+    const end = index === count - 1 ? [endX, endY] : map(Math.cos(b), Math.sin(b));
+    segments.push([...p1, ...p2, ...end].map((value) => Math.round(value * 1e6) / 1e6));
+  }
+  return segments;
+}
+
 function parseSvgPathData(data: string): UxSvgSegment[] {
   const tokens = data.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) || [];
   const result: UxSvgSegment[] = [];
@@ -291,9 +334,11 @@ function parseSvgPathData(data: string): UxSvgSegment[] {
     } else if (upper === "A") {
       while (index < tokens.length && !isLetter(tokens[index])) {
         if (!hasNumbers(7)) { index = tokens.length; break; }
-        read(); read(); read(); read(); read();
+        const rx=read(), ry=read(), rotation=read(), large=read(), sweep=read();
         const x0=read(), y0=read(), nx=relative?x+x0:x0, ny=relative?y+y0:y0;
-        emit("line", [nx,ny]); x=nx; y=ny; lastCubic=null; lastQuad=null; previousCommand="A";
+        if (!rx || !ry) emit("line", [nx,ny]);
+        else for (const values of svgArcCubics(x,y,rx,ry,rotation,large,sweep,nx,ny)) emit("cubic", values);
+        x=nx; y=ny; lastCubic=null; lastQuad=null; previousCommand="A";
       }
     } else command = "";
   }
@@ -309,8 +354,22 @@ function parseSvgAttributes(source: string): Record<string, string> {
 
 function extractSvgDrawables(svg: string): UxSvgDrawable[] {
   const tags: UxSvgDrawable[] = [];
-  const expression = /<(path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>/gi;
-  for (const match of svg.matchAll(expression)) tags.push({ tag: match[1].toLowerCase(), attrs: parseSvgAttributes(match[2]) });
+  const inheritedKeys = ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule"];
+  const stack: Array<Record<string, string>> = [{}];
+  const expression = /<(\/)?(svg|g|path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>/gi;
+  for (const match of svg.matchAll(expression)) {
+    const tag = match[2].toLowerCase(), container = tag === "svg" || tag === "g";
+    if (match[1]) { if (container && stack.length > 1) stack.pop(); continue; }
+    const own = parseSvgAttributes(match[3]);
+    for (const declaration of (own.style || "").split(";")) {
+      const colon = declaration.indexOf(":");
+      if (colon > 0) own[declaration.slice(0, colon).trim()] = declaration.slice(colon + 1).trim();
+    }
+    const attrs = { ...stack[stack.length - 1], ...own };
+    if (container) {
+      if (!match[3].trimEnd().endsWith("/")) stack.push(Object.fromEntries(inheritedKeys.filter((key) => attrs[key] !== undefined).map((key) => [key, attrs[key]])));
+    } else tags.push({ tag, attrs });
+  }
   return tags;
 }
 
@@ -479,10 +538,10 @@ export function generateKotlinProject(project: UxCodegenProject): string {
         ? "Canvas(Modifier.fillMaxSize()) {\n  drawIntoCanvas { drawCanvas ->\n    val nativeCanvas = drawCanvas.nativeCanvas\n    nativeCanvas.save()\n    nativeCanvas.scale(size.width / " + viewWidth + "f, size.height / " + viewHeight + "f)\n    nativeCanvas.translate(-" + viewX + "f, -" + viewY + "f)\n" + drawings + "\n    nativeCanvas.restore()\n  }\n}"
         : "Text(" + safe(layer.iconName || layer.name) + ", color = Color(android.graphics.Color.parseColor(" + safe(layer.color) + ")))";
     } else if (layer.kind === "image" && layer.imageDataUrl) {
-      content = "val generatedImageDataUrl = " + safe(layer.imageDataUrl) + "\nval generatedImageBitmap = remember(generatedImageDataUrl) { runCatching { val bytes = Base64.decode(generatedImageDataUrl.substringAfter(\",\", \"\"), Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }\nif (generatedImageBitmap != null) Image(bitmap = generatedImageBitmap.asImageBitmap(), contentDescription = " + safe(layer.name) + ", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) else Text(" + safe(layer.name) + ")";
+      content = "val generatedImageDataUrl = " + kotlinAssetLiteral(layer.imageDataUrl) + "\nval generatedImageBitmap = remember(generatedImageDataUrl) { runCatching { val bytes = Base64.decode(generatedImageDataUrl.substringAfter(\",\", \"\"), Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull() }\nif (generatedImageBitmap != null) Image(bitmap = generatedImageBitmap.asImageBitmap(), contentDescription = " + safe(layer.name) + ", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) else Text(" + safe(layer.name) + ")";
     } else {
       const fontFamily = layer.fontDataUrl
-        ? "generatedUxFontFamily(context, " + safe(layer.fontFamily) + ", " + safe(layer.fontDataUrl) + ", " + layer.fontWeight + ")"
+        ? "generatedUxFontFamily(context, " + safe(layer.fontFamily) + ", " + kotlinAssetLiteral(layer.fontDataUrl) + ", " + layer.fontWeight + ")"
         : "FontFamily(Typeface.create(" + safe(layer.fontFamily) + ", " + (layer.fontWeight >= 600 ? "Typeface.BOLD" : "Typeface.NORMAL") + "))";
       const align = layer.textAlign === "center" ? "TextAlign.Center" : layer.textAlign === "right" ? "TextAlign.End" : "TextAlign.Start";
       content = "Text(" + safe(layer.text) + ", color = Color(android.graphics.Color.parseColor(" + safe(layer.color) + ")), fontSize = " + layer.fontSize + ".sp, fontWeight = FontWeight(" + layer.fontWeight + "), fontFamily = " + fontFamily + ", lineHeight = " + layer.lineHeight + ".sp, letterSpacing = " + layer.letterSpacing + ".sp, textAlign = " + align + ", modifier = Modifier.fillMaxSize())";

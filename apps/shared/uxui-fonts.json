@@ -1,0 +1,32 @@
+[
+  {
+    "family": "Inter",
+    "file": "fonts/inter.ttf",
+    "license": "SIL Open Font License 1.1",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf"
+  },
+  {
+    "family": "Lora",
+    "file": "fonts/lora.ttf",
+    "license": "SIL Open Font License 1.1",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/lora/Lora%5Bwght%5D.ttf"
+  },
+  {
+    "family": "JetBrains Mono",
+    "file": "fonts/jetbrains-mono.ttf",
+    "license": "SIL Open Font License 1.1",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"
+  },
+  {
+    "family": "Bebas Neue",
+    "file": "fonts/bebas-neue.ttf",
+    "license": "SIL Open Font License 1.1",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf"
+  },
+  {
+    "family": "Caveat",
+    "file": "fonts/caveat.ttf",
+    "license": "SIL Open Font License 1.1",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat%5Bwght%5D.ttf"
+  }
+]

@@ -1,0 +1,30 @@
+import type { CSSProperties, ReactNode } from "react";
+
+/** Small, self-contained visual examples used both in the index and each tool page. */
+export function ToolkitPreview({ id }: { id: string }) {
+  let art: ReactNode;
+  const line = (y: number, width = 72) => <rect x="34" y={y} width={width} height="5" rx="2.5" fill="currentColor" opacity=".4" />;
+  const panel = <rect x="29" y="15" width="102" height="70" rx="10" fill="var(--color-surface)" stroke="currentColor" opacity=".8" />;
+  switch (id) {
+    case "icons": art = <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M26 50l16-14 16 14v20H47V56H37v14H26z"/><circle cx="81" cy="53" r="15"/><path d="M81 44v18m-9-9h18m28-14 5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z"/></g>; break;
+    case "typography": art = <><text x="24" y="66" fontSize="51" fontFamily="Georgia,serif" fill="currentColor">Aa</text><text x="96" y="64" fontSize="30" fontFamily="monospace" fill="currentColor" opacity=".55">Bb</text></>; break;
+    case "color": case "brand": case "design-system": art = <>{["#2563eb","#7c3aed","#db2777","#059669"].map((color,i)=><rect key={color} x={25+i*29} y="23" width="25" height="35" rx="7" fill={color}/>)}<text x="26" y="77" fontSize="12" fontWeight="700" fill="currentColor">{id==="brand"?"Your brand":id==="design-system"?"4  ·  8  ·  16  ·  24":"Color your ideas"}</text></>; break;
+    case "background": art = <><rect x="22" y="18" width="116" height="65" rx="10" fill="#111827"/><circle cx="111" cy="43" r="20" fill="#2563eb"/><circle cx="53" cy="75" r="28" fill="#7c3aed"/><rect x="37" y="35" width="53" height="5" rx="2" fill="var(--color-surface)"/>{line(47,37)}</>; break;
+    case "effects": art = <><rect x="37" y="28" width="91" height="55" rx="12" fill="#0f172a" opacity=".14"/><rect x="30" y="19" width="91" height="55" rx="12" fill="var(--color-surface)" stroke="currentColor" strokeWidth="2"/>{line(38,59)}{line(52,41)}</>; break;
+    case "illustrations": case "media": case "assets": case "inspiration": art = <>{panel}<path d="M34 75l29-29 19 19 16-12 27 22z" fill="currentColor" opacity=".6"/><circle cx="106" cy="34" r="8" fill="#f59e0b"/>{id==="assets"&&<rect x="17" y="8" width="35" height="20" rx="5" fill="#2563eb"/>}</>; break;
+    case "motion": art = <g fill="currentColor"><circle cx="35" cy="53" r="11" opacity=".16"/><circle cx="70" cy="53" r="14" opacity=".4"/><circle cx="113" cy="53" r="18"/><path d="M22 24h78v-5l16 8-16 8v-5H22z" opacity=".6"/></g>; break;
+    case "components": art = <><rect x="22" y="20" width="116" height="25" rx="8" fill="var(--color-surface)" stroke="currentColor"/>{line(30,67)}<rect x="22" y="56" width="75" height="24" rx="8" fill="currentColor"/><text x="32" y="72" fill="var(--color-surface)" fontSize="11">Continue</text><rect x="110" y="59" width="28" height="17" rx="9" fill="#059669"/><circle cx="129" cy="67.5" r="6" fill="var(--color-surface)"/></>; break;
+    case "device": case "platform": case "responsive": art = <><rect x="23" y="18" width="100" height="61" rx="6" fill="none" stroke="currentColor" strokeWidth="3"/><path d="M65 79v7h21v-7" stroke="currentColor" strokeWidth="3"/><rect x="103" y="36" width="31" height="52" rx="6" fill="var(--color-surface)" stroke="currentColor" strokeWidth="3"/><rect x="36" y="30" width="47" height="7" rx="3" fill="currentColor" opacity=".4"/><rect x="36" y="46" width="74" height="20" rx="4" fill="currentColor" opacity=".2"/></>; break;
+    case "projects": art = <>{[0,1,2].map(i=><g key={i}><rect x={22+i*41} y={23+i*5} width="34" height="54" rx="6" fill="var(--color-surface)" stroke="currentColor"/><rect x={28+i*41} y={33+i*5} width="22" height="15" rx="3" fill="currentColor" opacity=".3"/></g>)}</>; break;
+    case "layers": art = <g fill="var(--color-surface)" stroke="currentColor" strokeWidth="2"><path d="m27 64 53-22 53 22-53 22z"/><path d="m27 50 53-22 53 22-53 22z"/><path d="m27 36 53-22 53 22-53 22z"/></g>; break;
+    case "flows": art = <><path d="M54 51h46m-8-7 8 7-8 7" fill="none" stroke="currentColor" strokeWidth="3"/><rect x="20" y="24" width="34" height="54" rx="6" fill="var(--color-surface)" stroke="currentColor" strokeWidth="2"/><rect x="105" y="24" width="34" height="54" rx="6" fill="var(--color-surface)" stroke="currentColor" strokeWidth="2"/><rect x="26" y="35" width="22" height="18" rx="3" fill="currentColor" opacity=".25"/><circle cx="122" cy="46" r="9" fill="currentColor"/></>; break;
+    case "accessibility": case "qa": art = <>{panel}<circle cx="52" cy="39" r="12" fill="#059669"/><path d="m46 39 4 4 8-9" fill="none" stroke="var(--color-surface)" strokeWidth="3"/><rect x="76" y="32" width="42" height="6" rx="3" fill="currentColor"/>{line(60,79)}{line(71,55)}</>; break;
+    case "content": art = <><text x="25" y="40" fontSize="20" fontWeight="750" fill="currentColor">Your story.</text>{line(51,93)}{line(62,84)}{line(73,66)}</>; break;
+    case "data-viz": art = <g fill="currentColor"><path d="M24 19v62h114" fill="none" stroke="currentColor" strokeWidth="2"/>{[24,43,32,57,48].map((h,i)=><rect key={i} x={37+i*19} y={79-h} width="12" height={h} rx="3" opacity={.4+i*.14}/>)}</g>; break;
+    case "patterns": art = <>{Array.from({length:28},(_,i)=><circle key={i} cx={27+i%7*18} cy={24+Math.floor(i/7)*18} r="3" fill="currentColor" opacity=".6"/>)}</>; break;
+    case "transform": art = <g fill="none" stroke="currentColor" strokeWidth="2"><rect x="41" y="23" width="78" height="54" strokeDasharray="4 4"/>{[[41,23],[119,23],[41,77],[119,77]].map(([x,y])=><rect key={x+":"+y} x={x-4} y={y-4} width="8" height="8" fill="var(--color-surface)"/>)}<path d="M80 36v29m-15-14h30m-20-10 5-5 5 5m-5 24-5-5m5 5 5-5"/></g>; break;
+    case "handoff": art = <>{panel}<text x="42" y="48" fontSize="18" fontFamily="monospace" fill="currentColor">{`</>`}</text><text x="42" y="70" fontSize="10" fill="currentColor">Web · Kotlin · Swift</text></>; break;
+    default: art = panel;
+  }
+  return <svg className={"uxui-toolkit-preview uxui-toolkit-preview-"+id} viewBox="0 0 160 100" aria-hidden="true" style={{color:"var(--color-fg)"} as CSSProperties}>{art}</svg>;
+}
