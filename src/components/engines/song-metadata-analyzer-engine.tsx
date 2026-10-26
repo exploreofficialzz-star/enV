@@ -779,6 +779,87 @@ export function SongMetadataAnalyzerEngine() {
             </div>
           </div>
 
+          {selectedReport.dataset_analysis ? (
+            <>
+              <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Detailed local DSP findings</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">These results come from local signal processing. Note and chord detection can be confused by overlapping instruments; no hosted model or AI API is involved.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {[
+                    ["Pitch span", selectedReport.dataset_analysis.pitch.lowest_detected_note && selectedReport.dataset_analysis.pitch.highest_detected_note ? `${selectedReport.dataset_analysis.pitch.lowest_detected_note}–${selectedReport.dataset_analysis.pitch.highest_detected_note}` : "Unknown"],
+                    ["Pitch observations", String(selectedReport.dataset_analysis.pitch.points.length)],
+                    ["Chord windows", String(selectedReport.dataset_analysis.tonality.chord_estimates.filter((item) => item.chord).length)],
+                    ["Transient rate", selectedReport.dataset_analysis.rhythm.transient_density_per_second == null ? "—" : `${selectedReport.dataset_analysis.rhythm.transient_density_per_second}/s`],
+                    ["Crest factor", selectedReport.dataset_analysis.technical.crest_factor_db == null ? "—" : `${selectedReport.dataset_analysis.technical.crest_factor_db} dB`],
+                    ["Dynamic range estimate", selectedReport.dataset_analysis.technical.dynamic_range_estimate_db == null ? "—" : `${selectedReport.dataset_analysis.technical.dynamic_range_estimate_db} dB`],
+                    ["Low-band energy", selectedReport.dataset_analysis.timbre.mean_low_frequency_energy_ratio == null ? "—" : `${Math.round(selectedReport.dataset_analysis.timbre.mean_low_frequency_energy_ratio * 100)}%`],
+                    ["Mid-band energy", selectedReport.dataset_analysis.timbre.mean_mid_frequency_energy_ratio == null ? "—" : `${Math.round(selectedReport.dataset_analysis.timbre.mean_mid_frequency_energy_ratio * 100)}%`],
+                    ["High-band energy", selectedReport.dataset_analysis.timbre.mean_high_frequency_energy_ratio == null ? "—" : `${Math.round(selectedReport.dataset_analysis.timbre.mean_high_frequency_energy_ratio * 100)}%`],
+                    ["Stereo side/mid", selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio == null ? "—" : String(selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio)],
+                    ["Feature changes", String(selectedReport.dataset_analysis.structure.change_points.length)],
+                    ["Pitch class / key", selectedReport.dataset_analysis.tonality.key_estimate ?? "Unknown"],
+                  ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-2.5"><span className="block text-[10px] text-muted-foreground">{label}</span><strong className="mt-1 block break-words text-xs">{value}</strong></div>)}
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">CHORD ESTIMATES</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedReport.dataset_analysis.tonality.chord_estimates.slice(0, 40).map((item) => <span key={`${item.start_seconds}-${item.chord}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{Math.floor(item.start_seconds)}–{Math.floor(item.end_seconds)}s: {item.chord ?? "?"} {item.confidence == null ? "" : `· ${Math.round(item.confidence * 100)}%`}</span>)}
+                    {!selectedReport.dataset_analysis.tonality.chord_estimates.length && <span className="text-xs text-muted-foreground">No chord windows available.</span>}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">DETECTED PITCHES (FULL MIX ESTIMATE)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedReport.dataset_analysis.pitch.points.slice(0, 32).map((item) => <span key={`${item.time_seconds}-${item.note}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{item.time_seconds}s · {item.note} · {item.frequency_hz} Hz</span>)}
+                    {!selectedReport.dataset_analysis.pitch.points.length && <span className="text-xs text-muted-foreground">No stable dominant pitch was detected.</span>}
+                  </div>
+                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.pitch.note}</p>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">AUTOMATIC SECTION BOUNDARIES</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedReport.dataset_analysis.structure.sections.slice(0, 30).map((section) => <span key={section.label} className="rounded-md border border-border px-2 py-1 text-[11px]">{section.label}: {durationLabel(section.start_seconds)}–{durationLabel(section.end_seconds)}</span>)}
+                  </div>
+                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.structure.note}</p>
+                </div>
+                <details className="rounded-lg border border-border p-2.5">
+                  <summary className="cursor-pointer text-xs font-medium">Time-aligned signal timeline ({selectedReport.dataset_analysis.timeline.length} frames)</summary>
+                  <div className="mt-2 max-h-72 overflow-auto">
+                    <table className="w-full min-w-[620px] text-left text-[11px]">
+                      <thead><tr className="border-b border-border text-muted-foreground"><th className="p-2">Time</th><th className="p-2">RMS dBFS</th><th className="p-2">Centroid Hz</th><th className="p-2">Low</th><th className="p-2">Mid</th><th className="p-2">High</th><th className="p-2">Flux</th></tr></thead>
+                      <tbody>{selectedReport.dataset_analysis.timeline.slice(0, 48).map((frame) => <tr key={frame.start_seconds} className="border-b border-border/60"><td className="p-2">{frame.start_seconds}–{frame.end_seconds}s</td><td className="p-2">{frame.rms_dbfs ?? "—"}</td><td className="p-2">{frame.spectral_centroid_hz ?? "—"}</td><td className="p-2">{frame.low_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.mid_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.high_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.spectral_flux ?? "—"}</td></tr>)}</tbody>
+                    </table>
+                    {selectedReport.dataset_analysis.timeline.length > 48 && <p className="p-2 text-[10px] text-muted-foreground">Showing the first 48 frames here. JSON export contains the complete timeline.</p>}
+                  </div>
+                </details>
+                <details className="rounded-lg border border-border p-2.5">
+                  <summary className="cursor-pointer text-xs font-medium">Method notes and limitations</summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
+                  {selectedReport.dataset_analysis.style_cues.map((cue) => <p key={cue.tag} className="mt-2 text-[11px] leading-4"><strong>{cue.tag.replace(/-/g, " ")}</strong> — {cue.evidence}</p>)}
+                </details>
+              </section>
+
+              <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Human-reviewed training labels</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Add semantic tags by listening and reviewing the audio. These labels are exported alongside measured features; the analyzer does not guess genres, language, instruments, or vocal types.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {DATASET_ANNOTATION_FIELDS.map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs outline-none focus:border-primary" value={selectedReport.dataset_analysis!.annotations[field.key].join(", ")} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
+                </div>
+                <label className="block"><span className="mb-1.5 block text-[11px] font-semibold">Annotation notes</span><textarea className="min-h-16 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs outline-none focus:border-primary" value={selectedReport.dataset_analysis.annotations.notes} maxLength={4000} placeholder="Describe which parts should be preserved/replaced, uncertainty, or notes for another reviewer." onChange={(event) => updateSelectedAnnotationText("notes", event.currentTarget.value)} /></label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedReport.dataset_analysis.annotations.reviewed} onChange={(event) => markSelectedReviewed(event.currentTarget.checked)} />Reviewed for training use</label>
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted-foreground">Reviewer <input className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground" value={selectedReport.dataset_analysis.annotations.reviewer ?? ""} maxLength={100} placeholder="Reviewer initials or team ID" onChange={(event) => updateSelectedAnnotationText("reviewer", event.currentTarget.value)} /></label>
+                </div>
+              </section>
+            </>
+          ) : mode === "full" ? (
+            <p className="rounded-xl border border-border p-3 text-xs leading-5 text-muted-foreground">Run Full Analysis to calculate the detailed local pitch, chord, spectral, and section timeline.</p>
+          ) : null}
+
           <details className="rounded-xl border border-border px-3 py-2.5">
             <summary className="cursor-pointer text-sm font-medium">File details</summary>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3">
