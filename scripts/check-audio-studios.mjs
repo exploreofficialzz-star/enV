@@ -130,17 +130,24 @@ for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent
 assert.ok(musicAnalysisRoute.includes("MUSIC_ANALYSIS_MODEL_DISABLED"), "legacy music-analysis route must return an explicit disabled result");
 assert.match(musicAnalysisRoute, /status:\s*410/, "legacy music-analysis route must return HTTP 410");
 assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_ENDPOINT|MUSIC_ANALYSIS_TOKEN|\/api\/ai\/run|fetch\(/, "Music Analyzer route must not forward audio to hosted inference");
-for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2"]) {
+for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2", "metric_scope_seconds", "analysis_scope_seconds", "spectral_scope_seconds", "zero_crossing_scope_seconds"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer v2 measurement contract missing: ${marker}`);
 }
 for (const [platform, processor] of [["Android", androidNativeAudioProcessor], ["iOS", iosNativeAudioViews]]) {
   assert.ok(processor.includes('"env.music-analysis.v2"'), `${platform} Music Analyzer must emit schema v2`);
   assert.ok(processor.includes('"rms_loudness_proxy_db"'), `${platform} Music Analyzer must use the honest RMS proxy field`);
   assert.ok(!processor.includes('"estimated_loudness_lufs"'), `${platform} Music Analyzer must not emit the legacy misleading LUFS field`);
+  for (const scopeField of ["metric_scope_seconds", "analysis_scope_seconds", "spectral_scope_seconds", "zero_crossing_scope_seconds"]) {
+    assert.ok(processor.includes(scopeField), `${platform} Music Analyzer is missing scope field ${scopeField}`);
+  }
 }
 assert.ok(iosNativeAudioTests.includes('"env.music-analysis.v2"'), "iOS contract tests must assert schema v2");
 assert.ok(iosNativeAudioTests.includes('"rms_loudness_proxy_db"'), "iOS contract tests must assert the renamed loudness proxy");
+assert.ok(iosNativeAudioTests.includes('"metric_scope_seconds"'), "iOS contract tests must assert whole-track scope");
+assert.ok(iosNativeAudioTests.includes('"spectral_scope_seconds"'), "iOS contract tests must assert spectral excerpt scope");
 assert.ok(androidNativeAudioTests.includes("env.music-analysis.v2") || androidNativeAudioTests.includes("rms_loudness_proxy_db"), "Android native tests must verify the v2 contract");
+assert.ok(androidNativeAudioTests.includes('"metric_scope_seconds"'), "Android contract tests must assert whole-track scope");
+assert.ok(androidNativeAudioTests.includes('"spectral_scope_seconds"'), "Android contract tests must assert spectral excerpt scope");
 const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
 const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
 const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
