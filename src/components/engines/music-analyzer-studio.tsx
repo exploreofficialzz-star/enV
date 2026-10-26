@@ -70,18 +70,25 @@ type AnnotationListKey = Exclude<keyof MusicDatasetAnnotations, "notes" | "revie
 const ANNOTATION_FIELDS: Array<{ key: AnnotationListKey; label: string; placeholder: string }> = [
   { key: "genre", label: "Genre", placeholder: "Afrobeats, R&B" },
   { key: "sub_style", label: "Sub-style", placeholder: "Afro-pop, Amapiano" },
+  { key: "style_influences", label: "Style influences", placeholder: "Highlife, dancehall, soul" },
   { key: "language", label: "Language", placeholder: "Nigerian Pidgin, Yoruba" },
+  { key: "energy", label: "Energy", placeholder: "Low, medium, high" },
   { key: "mood", label: "Mood", placeholder: "Celebratory, soulful" },
+  { key: "source_role", label: "Audio part / stem role", placeholder: "Full mix, vocals, drums, bass, melody" },
   { key: "vocals", label: "Vocal content", placeholder: "Lead vocal, backing vocals, ad-libs" },
   { key: "vocal_delivery", label: "Vocal delivery", placeholder: "Melodic singing, rap, chant" },
-  { key: "vocal_register", label: "Vocal pitch / register", placeholder: "High pitch, low pitch, alto (only if reviewed)" },
+  { key: "vocal_register", label: "Vocal pitch / register", placeholder: "High pitch, low pitch, soprano, alto, tenor, baritone" },
+  { key: "vocal_harmony", label: "Vocal harmony", placeholder: "Doubles, thirds, call-and-response" },
+  { key: "performance_technique", label: "Performance techniques", placeholder: "Vibrato, falsetto, melisma, breathy" },
   { key: "instruments", label: "Instruments", placeholder: "Log drum, shakers, synth bass" },
   { key: "themes", label: "Themes", placeholder: "Love, celebration" },
   { key: "listening_scene", label: "Listening scene", placeholder: "Club, road trip" },
+  { key: "production_traits", label: "Production traits", placeholder: "Reverb, sidechain, saturation" },
+  { key: "arrangement", label: "Arrangement", placeholder: "Intro build, drum drop, instrumental break" },
 ];
 
 function blankAnnotations(): MusicDatasetAnnotations {
-  return { genre: [], sub_style: [], language: [], mood: [], vocals: [], vocal_delivery: [], vocal_register: [], instruments: [], themes: [], listening_scene: [], notes: "", reviewed: false, reviewer: null };
+  return { genre: [], sub_style: [], style_influences: [], language: [], energy: [], mood: [], source_role: [], vocals: [], vocal_delivery: [], vocal_register: [], vocal_harmony: [], performance_technique: [], instruments: [], themes: [], listening_scene: [], production_traits: [], arrangement: [], notes: "", reviewed: false, reviewer: null };
 }
 
 function layerExportLimitSeconds(): number {
