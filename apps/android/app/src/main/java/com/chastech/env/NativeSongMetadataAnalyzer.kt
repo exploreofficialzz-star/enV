@@ -399,9 +399,9 @@ fun NativeSongMetadataAnalyzerScreen() {
                         NativeSongDatasetDetails(dataset)
                         NativeSongDatasetAnnotationEditor(
                             dataset = dataset,
-                            onTagChange = { key, value -> updateDatasetTag(selected.id, key, value) },
-                            onTextChange = { key, value -> updateDatasetAnnotationText(selected.id, key, value) },
-                            onReviewedChange = { reviewed -> markDatasetReviewed(selected.id, reviewed) },
+                            onTagChange = { key, value -> selected?.id?.let { updateDatasetTag(it, key, value) } },
+                            onTextChange = { key, value -> selected?.id?.let { updateDatasetAnnotationText(it, key, value) } },
+                            onReviewedChange = { reviewed -> selected?.id?.let { markDatasetReviewed(it, reviewed) } },
                         )
                     }
                     if (itemWarnings(report).isNotEmpty()) {
@@ -445,7 +445,7 @@ private fun NativeSongDatasetDetails(dataset: JSONObject) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Local DSP findings", fontWeight = FontWeight.SemiBold)
         Text("Pitch span: ${pitch.optString("lowest_detected_note", "unknown")}–${pitch.optString("highest_detected_note", "unknown")} · Chords: ${tonality.optJSONArray("chord_estimates")?.length() ?: 0} · Transient rate: ${rhythm.opt("transient_density_per_second") ?: "—"}/s", style = MaterialTheme.typography.bodySmall)
-        Text("Mean spectral centroid: ${technical.opt("mean_spectral_centroid_hz") ?: "—"} Hz · Feature changes: ${structure.optJSONArray("change_points")?.length() ?: 0}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Mean spectral centroid: ${timbre.opt("mean_spectral_centroid_hz") ?: "—"} Hz · Feature changes: ${structure.optJSONArray("change_points")?.length() ?: 0}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val cueArray = dataset.optJSONArray("style_cues") ?: JSONArray()
         for (index in 0 until min(cueArray.length(), 8)) {
             val cue = cueArray.optJSONObject(index) ?: continue
@@ -986,53 +986,6 @@ private suspend fun decodeNativeSong(file: File, metadataDuration: Double): Nati
     }
 }
 
-private fun buildNativeSongExcerpt(samples: FloatArray): Pair<ByteArray, Double>? {
-    if (samples.size < SONG_ANALYSIS_RATE * 3) return null
-    val sectionSamples = min(20 * SONG_ANALYSIS_RATE, samples.size / 3)
-    if (sectionSamples < SONG_ANALYSIS_RATE) return null
-    val starts = listOf(0, max(0, samples.size / 2 - sectionSamples / 2), max(0, samples.size - sectionSamples))
-    val gapSamples = SONG_ANALYSIS_RATE / 4
-    val outputSamples = sectionSamples * 3 + gapSamples * 2
-    val data = ByteArray(44 + outputSamples * 2)
-    fun text(offset: Int, value: String) { value.forEachIndexed { index, char -> data[offset + index] = char.code.toByte() } }
-    fun putInt(offset: Int, value: Int) { for (i in 0..3) data[offset + i] = (value ushr (i * 8)).toByte() }
-    fun putShort(offset: Int, value: Int) { data[offset] = value.toByte(); data[offset + 1] = (value ushr 8).toByte() }
-    text(0, "RIFF"); putInt(4, data.size - 8); text(8, "WAVE"); text(12, "fmt "); putInt(16, 16)
-    putShort(20, 1); putShort(22, 1); putInt(24, SONG_ANALYSIS_RATE); putInt(28, SONG_ANALYSIS_RATE * 2)
-    putShort(32, 2); putShort(34, 16); text(36, "data"); putInt(40, outputSamples * 2)
-    var out = 44
-    for ((sectionIndex, start) in starts.withIndex()) {
-        for (i in start until start + sectionSamples) {
-            val sample = samples[i].coerceIn(-1f, 1f)
-            val pcm = (if (sample < 0) sample * 32768f else sample * 32767f).roundToInt()
-            data[out++] = pcm.toByte(); data[out++] = (pcm shr 8).toByte()
-        }
-        if (sectionIndex < starts.lastIndex) out += gapSamples * 2
-    }
-    return data to (outputSamples.toDouble() / SONG_ANALYSIS_RATE)
-}
-
-private fun mergeNativeSemanticResult(report: JSONObject, ai: JSONObject) {
-    val scalarFields = listOf("genre", "sub_style", "energy", "lyric_evidence")
-    scalarFields.forEach { field ->
-        val value = ai.opt(field)
-        if (value != null && value != JSONObject.NULL && value.toString().isNotBlank()) report.put(field, value)
-    }
-    val arrayFields = listOf("language", "mood", "theme", "setting", "vocals", "instruments", "descriptions")
-    arrayFields.forEach { field ->
-        val values = ai.optJSONArray(field) ?: return@forEach
-        val copy = JSONArray()
-        for (i in 0 until values.length()) {
-            val value = values.optString(i).trim()
-            if (value.isNotEmpty()) copy.put(value)
-        }
-        report.put(field, copy)
-    }
-    val warnings = report.optJSONArray("warnings") ?: JSONArray().also { report.put("warnings", it) }
-    ai.optJSONArray("warnings")?.let { values -> for (i in 0 until values.length()) warnings.put(values.optString(i)) }
-    report.optJSONObject("analysis")?.put("status", "full")?.put("semantic_analysis", "completed")
-}
-
 private fun nativeTempoBand(bpm: Int): String = when {
     bpm < 80 -> "slow"; bpm < 110 -> "mid"; bpm < 130 -> "upbeat"; else -> "fast"
 }
@@ -1065,7 +1018,7 @@ private suspend fun exportNative(context: Context, uri: Uri, tracks: List<Native
     val reports = tracks.filter { it.report != null }.map { it.report!! }
     val outBytes = withContext(Dispatchers.IO) {
         when (kind) {
-            "json" -> JSONObject().put("schema_version", "1.0").put("tracks", JSONArray().also { array -> reports.forEach(array::put) }).toString(2).toByteArray()
+            "json" -> JSONObject().put("schema_version", "env.song-analysis-export.v2").put("tracks", JSONArray().also { array -> reports.forEach(array::put) }).toString(2).toByteArray()
             "csv" -> nativeReportsCsv(reports).toByteArray(Charsets.UTF_8)
             else -> {
                 val buffer = ByteArrayOutputStream()
