@@ -192,6 +192,122 @@ function fft(real: Float64Array, imag: Float64Array): void {
   }
 }
 
+function median3(a: number, b: number, c: number): number {
+  return a + b + c - Math.min(a, b, c) - Math.max(a, b, c);
+}
+
+function harmonicPercussiveCandidates(samples: Float32Array, sampleRate: number): { harmonic: Float32Array; percussive: Float32Array } {
+  const size = 1024;
+  const hop = 512;
+  const bins = size / 2 + 1;
+  if (samples.length / sampleRate > 60) {
+    throw new Error("Local harmonic/percussive layer export is limited to 60 seconds per excerpt.");
+  }
+  const frameCount = Math.ceil(samples.length / hop) + 1;
+  const cellCount = frameCount * bins;
+  const realSpec = new Float32Array(cellCount);
+  const imagSpec = new Float32Array(cellCount);
+  const magnitudes = new Float32Array(cellCount);
+  const real = new Float64Array(size);
+  const imag = new Float64Array(size);
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    real.fill(0); imag.fill(0);
+    const offset = frame * hop;
+    for (let i = 0; i < size; i += 1) {
+      const sample = samples[offset + i] ?? 0;
+      real[i] = sample * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1)));
+    }
+    fft(real, imag);
+    const base = frame * bins;
+    for (let bin = 0; bin < bins; bin += 1) {
+      const index = base + bin;
+      realSpec[index] = real[bin] ?? 0;
+      imagSpec[index] = imag[bin] ?? 0;
+      magnitudes[index] = Math.hypot(real[bin] ?? 0, imag[bin] ?? 0);
+    }
+  }
+
+  const harmonic = new Float32Array(samples.length + size);
+  const percussive = new Float32Array(samples.length + size);
+  const normalization = new Float32Array(samples.length + size);
+  const window = new Float64Array(size);
+  for (let i = 0; i < size; i += 1) window[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const base = frame * bins;
+    for (let bin = 0; bin < bins; bin += 1) {
+      const at = base + bin;
+      const hm = median3(
+        magnitudes[Math.max(0, frame - 1) * bins + bin] ?? 0,
+        magnitudes[at] ?? 0,
+        magnitudes[Math.min(frameCount - 1, frame + 1) * bins + bin] ?? 0,
+      );
+      const pm = median3(
+        magnitudes[base + Math.max(0, bin - 1)] ?? 0,
+        magnitudes[at] ?? 0,
+        magnitudes[base + Math.min(bins - 1, bin + 1)] ?? 0,
+      );
+      const h2 = hm * hm, p2 = pm * pm;
+      const hMask = h2 / Math.max(1e-12, h2 + p2);
+      const pMask = 1 - hMask;
+      real[bin] = (realSpec[at] ?? 0) * hMask;
+      imag[bin] = (imagSpec[at] ?? 0) * hMask;
+      if (bin > 0 && bin < size / 2) {
+        real[size - bin] = real[bin] ?? 0;
+        imag[size - bin] = -(imag[bin] ?? 0);
+      }
+    }
+    // Inverse transform is the conjugate-forward-conjugate form of the FFT.
+    for (let i = 0; i < size; i += 1) imag[i] = -(imag[i] ?? 0);
+    fft(real, imag);
+    for (let i = 0; i < size; i += 1) {
+      const outIndex = frame * hop + i;
+      if (outIndex < harmonic.length) harmonic[outIndex] += ((real[i] ?? 0) / size) * window[i]!;
+    }
+
+    for (let bin = 0; bin < bins; bin += 1) {
+      const at = base + bin;
+      const hm = median3(
+        magnitudes[Math.max(0, frame - 1) * bins + bin] ?? 0,
+        magnitudes[at] ?? 0,
+        magnitudes[Math.min(frameCount - 1, frame + 1) * bins + bin] ?? 0,
+      );
+      const pm = median3(
+        magnitudes[base + Math.max(0, bin - 1)] ?? 0,
+        magnitudes[at] ?? 0,
+        magnitudes[base + Math.min(bins - 1, bin + 1)] ?? 0,
+      );
+      const h2 = hm * hm, p2 = pm * pm;
+      const pMask = p2 / Math.max(1e-12, h2 + p2);
+      real[bin] = (realSpec[at] ?? 0) * pMask;
+      imag[bin] = (imagSpec[at] ?? 0) * pMask;
+      if (bin > 0 && bin < size / 2) {
+        real[size - bin] = real[bin] ?? 0;
+        imag[size - bin] = -(imag[bin] ?? 0);
+      }
+    }
+    for (let i = 0; i < size; i += 1) imag[i] = -(imag[i] ?? 0);
+    fft(real, imag);
+    for (let i = 0; i < size; i += 1) {
+      const outIndex = frame * hop + i;
+      if (outIndex < percussive.length) percussive[outIndex] += ((real[i] ?? 0) / size) * window[i]!;
+      if (outIndex < normalization.length) normalization[outIndex] += window[i]! * window[i]!;
+    }
+    // Restore scratch space to the positive-frequency half for the next pass.
+    for (let bin = 1; bin < size / 2; bin += 1) {
+      real[size - bin] = 0;
+      imag[size - bin] = 0;
+    }
+  }
+  const harmonicTrimmed = new Float32Array(samples.length);
+  const percussiveTrimmed = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i += 1) {
+    const norm = normalization[i] ?? 0;
+    harmonicTrimmed[i] = norm > 1e-6 ? (harmonic[i] ?? 0) / norm : 0;
+    percussiveTrimmed[i] = norm > 1e-6 ? (percussive[i] ?? 0) / norm : 0;
+  }
+  return { harmonic: harmonicTrimmed, percussive: percussiveTrimmed };
+}
+
 function spectrumAt(samples: Float32Array, start: number, sampleRate: number): {
   magnitudes: Float64Array;
   centroid: number | null;
@@ -546,7 +662,7 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
     separation: {
       status: "not_performed",
       reason: "Clean vocal/drum/bass source separation cannot be inferred by ordinary FFT/tempo/key analysis alone. This local-only mode does not download or run a pretrained separator.",
-      supported_local_layers: ["low_frequency", "mid_frequency", "high_frequency", "stereo_center", "stereo_side"],
+      supported_local_layers: ["harmonic_candidate", "percussive_candidate", "low_frequency", "mid_frequency", "high_frequency", "stereo_center", "stereo_side"],
       note: "These are frequency/spatial layers, not isolated vocal, drum, bass or instrument stems. Review them before using them as training targets.",
     },
     annotations: emptyAnnotations(),
@@ -578,8 +694,11 @@ export function createLocalSignalLayers(channels: readonly Float32Array[], sampl
     mid[i] = broadLowState - lowState;
     high[i] = sample - broadLowState;
   }
+  const separated = harmonicPercussiveCandidates(mono, sampleRate);
   const layers: LocalSignalLayer[] = [
     { id: "mono_mix", label: "Mono mix", samples: mono, channels: 1, meaning: "Downmixed reference signal." },
+    { id: "harmonic_candidate", label: "Harmonic candidate (HPSS approximation)", samples: separated.harmonic, channels: 1, meaning: "Sustained/tonal-biased layer; contains both vocals and pitched instruments and is not vocal-only." },
+    { id: "percussive_candidate", label: "Percussive candidate (HPSS approximation)", samples: separated.percussive, channels: 1, meaning: "Transient-biased layer; contains percussion plus other transients and is not drum-only." },
     { id: "low_frequency", label: "Low-frequency band (< approx. 160 Hz)", samples: low, channels: 1, meaning: "Frequency band; bass/kick are possible contributors but are not isolated." },
     { id: "mid_frequency", label: "Mid-frequency band (approx. 160 Hz–2 kHz)", samples: mid, channels: 1, meaning: "Frequency band containing overlapping vocals and instruments; not a vocal stem." },
     { id: "high_frequency", label: "High-frequency band (> approx. 2 kHz)", samples: high, channels: 1, meaning: "Frequency band containing transients, sibilance and instrument harmonics; not a drum stem." },
