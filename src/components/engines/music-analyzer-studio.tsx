@@ -123,14 +123,14 @@ export function MusicAnalyzerStudio() {
   const metricCards = useMemo(() => {
     if (!analysis) return [];
     return [
-      { label: "Tempo", value: displayNumber(analysis.rhythm.tempo_bpm, " BPM"), hint: "Approximate beat estimate" },
-      { label: "Key", value: analysis.tonality.key ?? "Not available", hint: "Approximate tonal center" },
+      { label: "Tempo", value: displayNumber(analysis.rhythm.tempo_bpm, " BPM"), hint: "Estimate from first 90 seconds max" },
+      { label: "Key", value: analysis.tonality.key ?? "Not available", hint: "Estimate from first 30 seconds max" },
       { label: "Duration", value: formatDuration(analysis.audio.duration_seconds), hint: "Decoded audio length" },
-      { label: "Loudness proxy", value: displayNumber(analysis.audio.rms_loudness_proxy_db, " dB proxy"), hint: "RMS-derived estimate; not standards-compliant LUFS" },
-      { label: "Peak", value: displayNumber(analysis.audio.peak_dbfs, " dBFS"), hint: "Highest decoded sample" },
-      { label: "RMS", value: displayNumber(analysis.audio.rms_dbfs, " dBFS"), hint: "Mean signal energy" },
-      { label: "Silence", value: displayNumber(analysis.audio.silence_percent, "%"), hint: "100 ms windows below −60 dBFS" },
-      { label: "Clipping", value: displayNumber(analysis.audio.clipped_sample_percent, "%"), hint: "Samples at or above 0.999 magnitude" },
+      { label: "Loudness proxy", value: displayNumber(analysis.audio.rms_loudness_proxy_db, " dB proxy"), hint: "RMS proxy across full track; not standard LUFS" },
+      { label: "Peak", value: displayNumber(analysis.audio.peak_dbfs, " dBFS"), hint: "Highest decoded sample across full track" },
+      { label: "RMS", value: displayNumber(analysis.audio.rms_dbfs, " dBFS"), hint: "Mean signal energy across full track" },
+      { label: "Silence", value: displayNumber(analysis.audio.silence_percent, "%"), hint: "100 ms windows under −60 dBFS across full track" },
+      { label: "Clipping", value: displayNumber(analysis.audio.clipped_sample_percent, "%"), hint: "Samples at/above 0.999 magnitude across full track" },
     ];
   }, [analysis]);
 
