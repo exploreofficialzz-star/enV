@@ -1041,7 +1041,16 @@ private suspend fun exportNative(context: Context, uri: Uri, tracks: List<Native
 }
 
 private fun nativeReportsCsv(reports: List<JSONObject>): String {
-    val columns = listOf("filename", "title", "artist", "album", "genre", "sub_style", "language", "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting", "vocals", "instruments", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels", "analysis_status", "warnings")
+    val columns = listOf(
+        "filename", "title", "artist", "album", "genre", "sub_style", "style_influences", "language",
+        "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting", "source_role",
+        "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments",
+        "production_traits", "arrangement", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels",
+        "pitch_lowest_note", "pitch_highest_note", "pitch_range_semitones", "transient_density_per_second",
+        "spectral_centroid_mean_hz", "low_energy_ratio_mean", "mid_energy_ratio_mean", "high_energy_ratio_mean",
+        "chord_estimates", "section_boundaries", "labels_reviewed", "reviewer", "annotation_notes",
+        "uses_remote_api", "uses_hosted_model", "analysis_status", "warnings"
+    )
     fun cell(value: Any?): String {
         var text = when (value) {
             null, JSONObject.NULL -> ""
@@ -1056,6 +1065,26 @@ private fun nativeReportsCsv(reports: List<JSONObject>): String {
         val identity = report.optJSONObject("identity") ?: JSONObject()
         val technical = report.optJSONObject("technical") ?: JSONObject()
         val analysis = report.optJSONObject("analysis") ?: JSONObject()
+        val dataset = report.optJSONObject("dataset_analysis") ?: JSONObject()
+        val annotations = dataset.optJSONObject("annotations") ?: JSONObject()
+        val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
+        val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
+        val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
+        val timbre = dataset.optJSONObject("timbre") ?: JSONObject()
+        val structure = dataset.optJSONObject("structure") ?: JSONObject()
+        val chordText = (tonality.optJSONArray("chord_estimates") ?: JSONArray()).let { values ->
+            (0 until values.length()).joinToString(" | ") { index ->
+                val item = values.optJSONObject(index) ?: JSONObject()
+                "${item.opt("start_seconds") ?: "?"}-${item.opt("end_seconds") ?: "?"}s:${item.opt("chord")?.takeUnless { it == JSONObject.NULL } ?: "unknown"}"
+            }
+        }
+        val sectionText = (structure.optJSONArray("change_points") ?: JSONArray()).let { values ->
+            (0 until values.length()).joinToString(" | ") { index ->
+                val item = values.optJSONObject(index) ?: JSONObject()
+                "${item.opt("time_seconds") ?: "?"}s(${item.opt("change_score") ?: "?"})"
+            }
+        }
+        val processing = dataset.optJSONObject("processing") ?: JSONObject()
         val row = JSONObject()
             .put("filename", report.optString("filename"))
             .put("title", identity.opt("title"))
@@ -1063,21 +1092,44 @@ private fun nativeReportsCsv(reports: List<JSONObject>): String {
             .put("album", identity.opt("album"))
             .put("genre", report.opt("genre"))
             .put("sub_style", report.opt("sub_style"))
+            .put("style_influences", annotations.optJSONArray("style_influences"))
             .put("language", report.optJSONArray("language"))
             .put("tempo_bpm", report.opt("tempo_bpm"))
             .put("tempo_band", report.optString("tempo_band"))
             .put("key", report.opt("key"))
-            .put("energy", report.optString("energy"))
+            .put("energy", annotations.optJSONArray("energy") ?: report.opt("energy"))
             .put("mood", report.optJSONArray("mood"))
             .put("theme", report.optJSONArray("theme"))
             .put("setting", report.optJSONArray("setting"))
+            .put("source_role", annotations.optJSONArray("source_role"))
             .put("vocals", report.optJSONArray("vocals"))
+            .put("vocal_delivery", annotations.optJSONArray("vocal_delivery"))
+            .put("vocal_register", annotations.optJSONArray("vocal_register"))
+            .put("vocal_harmony", annotations.optJSONArray("vocal_harmony"))
+            .put("performance_technique", annotations.optJSONArray("performance_technique"))
             .put("instruments", report.optJSONArray("instruments"))
+            .put("production_traits", annotations.optJSONArray("production_traits"))
+            .put("arrangement", annotations.optJSONArray("arrangement"))
             .put("duration_seconds", technical.opt("duration_seconds"))
             .put("file_size_bytes", technical.opt("file_size_bytes"))
             .put("codec", technical.opt("codec"))
             .put("sample_rate_hz", technical.opt("sample_rate_hz"))
             .put("channels", technical.opt("channels"))
+            .put("pitch_lowest_note", pitch.opt("lowest_detected_note"))
+            .put("pitch_highest_note", pitch.opt("highest_detected_note"))
+            .put("pitch_range_semitones", pitch.opt("pitch_range_semitones"))
+            .put("transient_density_per_second", rhythm.opt("transient_density_per_second"))
+            .put("spectral_centroid_mean_hz", timbre.opt("mean_spectral_centroid_hz"))
+            .put("low_energy_ratio_mean", timbre.opt("mean_low_frequency_energy_ratio"))
+            .put("mid_energy_ratio_mean", timbre.opt("mean_mid_frequency_energy_ratio"))
+            .put("high_energy_ratio_mean", timbre.opt("mean_high_frequency_energy_ratio"))
+            .put("chord_estimates", chordText)
+            .put("section_boundaries", sectionText)
+            .put("labels_reviewed", annotations.optBoolean("reviewed", false))
+            .put("reviewer", annotations.opt("reviewer"))
+            .put("annotation_notes", annotations.optString("notes"))
+            .put("uses_remote_api", processing.optBoolean("uses_remote_api", false))
+            .put("uses_hosted_model", processing.optBoolean("uses_hosted_model", false))
             .put("analysis_status", analysis.optString("status"))
             .put("warnings", report.optJSONArray("warnings"))
         columns.joinToString(",") { column -> cell(row.opt(column)) }
