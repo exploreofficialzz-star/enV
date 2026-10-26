@@ -814,7 +814,14 @@ function svgToPng(svg: SVGSVGElement, scale = 3, target: DeviceTarget = "mobile"
 }
 
 function pdfSafe(value: string): string {
-  return value.replace(/[^\x20-\x7E]/g, (character) => "\\u" + character.charCodeAt(0).toString(16).padStart(4, "0")).replace(/[\t\r]/g, " ");
+  return value
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u2022/g, "*")
+    .replace(/[\u00A0\t\r]/g, " ")
+    .replace(/[^\x20-\x7E]/g, (character) => "\\u" + character.charCodeAt(0).toString(16).padStart(4, "0"));
 }
 
 function wrapPdfLine(value: string, width: number): string[] {
@@ -2091,12 +2098,7 @@ export function UxUiStudioEngine() {
   }
 
   function exportProject() {
-    const content = JSON.stringify({ ...project, aiPrompt, generatedCode: {
-      html: generateHtmlProject(project),
-      react: generateReactProject(project),
-      kotlin: generateKotlinProject(project),
-      swift: generateSwiftProject(project),
-    } }, null, 2);
+    const content = JSON.stringify({ ...project, aiPrompt }, null, 2);
     downloadText((projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "env-design") + ".json", content, "application/json;charset=utf-8");
     setNotice("Project JSON downloaded with the full design specification and AI prompt.");
   }
@@ -2493,7 +2495,7 @@ export function UxUiStudioEngine() {
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
           <div className="uxui-export-menu-title">Export your design</div>
           <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
-          <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Layers, spacing, fonts, colors and generated code</small></span></button>
+          <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Editable layers, fonts, colors and AI prompt</small></span></button>
           <button type="button" aria-label="React TSX" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "DesignView.swift", generateSwiftProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Tablet size={15} /><span><strong>SwiftUI</strong><small>iOS implementation</small></span></button>

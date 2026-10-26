@@ -10242,17 +10242,12 @@ private struct NativeUxUiStudioView: View {
     }
 
     private var projectJSON: Data {
-        let generated = [
-            "html": uxUiGenerateHTML(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens),
-            "kotlin": uxUiGenerateKotlin(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens),
-            "swift": uxUiGenerateSwift(name: projectName, target: target, background: background, elements: elements, width: boardWidth, height: boardHeight, tokens: tokens)
-        ]
         let project = UxUiNativeProject(
             name: projectName, target: target, background: background,
             viewport: UxUiViewport(width: boardWidth, height: boardHeight),
             breakpoints: ["mobile": 480, "tablet": 768, "desktop": 1024],
             tokens: tokens, reusableComponents: reusableComponents,
-            elements: elements, aiPrompt: aiPrompt, generatedCode: generated,
+            elements: elements, aiPrompt: aiPrompt, generatedCode: nil,
             updatedAt: ISO8601DateFormatter().string(from: Date()),
             screens: screens, activeScreenID: activeScreenID
         )
@@ -11530,7 +11525,7 @@ private struct NativeUxUiStudioView: View {
                 Text("PDF includes the rendered artboard, technical specifications, and an AI implementation prompt. JSON contains the editable project.")
                     .font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                 Button { exportPDF() } label: { exportButtonLabel("Export visual PDF + specifications", icon: "doc.richtext", primary: true) }.buttonStyle(.plain)
-                Button { exportJSON() } label: { exportButtonLabel("Export JSON + generated code + AI prompt", icon: "curlybraces", primary: false) }.buttonStyle(.plain)
+                Button { exportJSON() } label: { exportButtonLabel("Export editable JSON + AI prompt", icon: "curlybraces", primary: false) }.buttonStyle(.plain)
                 Button { exportSource("html") } label: { exportButtonLabel("Export Web HTML", icon: "globe", primary: false) }.buttonStyle(.plain)
                 Button { exportSource("kotlin") } label: { exportButtonLabel("Export Android Kotlin", icon: "chevron.left.forwardslash.chevron.right", primary: false) }.buttonStyle(.plain)
                 Button { exportSource("swift") } label: { exportButtonLabel("Export iOS SwiftUI", icon: "swift", primary: false) }.buttonStyle(.plain)

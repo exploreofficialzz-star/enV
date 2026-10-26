@@ -34,15 +34,32 @@ try{
  await text('2 of 3 tasks done',44,461,286,25,13,'#555555');
  await text('A little progress is still progress.',24,562,342,50,16,'#555555');
  await add('Button');await words('Plan tomorrow');await geometry(24,666,342,56);await colors('#111111','#ffffff');await action('Shape');await page.getByRole('button',{name:'Round',exact:true}).click();
- await text('MY DAY       PROJECTS       SETTINGS',32,785,326,24,11,'#555555');
+ await text('MY DAY',32,785,90,24,11,'#555555');
+ await text('PROJECTS',152,785,108,24,11,'#555555');
+ await text('SETTINGS',276,785,90,24,11,'#555555');
  await action('Look closer');await page.locator('.uxui-layer-finder button').filter({has:page.locator('svg')}).first().click();
  await page.screenshot({path:resolve(output,'focus-studio-mobile.png'),animations:'disabled'});
  await page.getByRole('button',{name:'Export',exact:true}).click();let waiting=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:/^PDF handoff/}).click();const pdfDownload=await waiting;const pdfPath=resolve(output,'focus-daily-planner-handoff.pdf');await pdfDownload.saveAs(pdfPath);
  const pdf=await PDFDocument.load(await readFile(pdfPath));assert.ok(pdf.getPageCount()>=3&&pdf.getPageCount()<40);
  await page.getByRole('button',{name:'Export',exact:true}).click();waiting=page.waitForEvent('download');await page.getByRole('button',{name:/^Project JSON/}).click();const jsonDownload=await waiting;const jsonPath=resolve(output,'focus-daily-planner-project.json');await jsonDownload.saveAs(jsonPath);const project=JSON.parse(await readFile(jsonPath,'utf8'));
- assert.equal(project.elements.length,11);assert.ok(project.elements.some(layer=>layer.fontDataUrl?.startsWith('data:font/ttf;base64,')));assert.ok(project.aiPrompt.includes('Plan tomorrow'));
+ assert.equal(project.elements.length,13);assert.ok(project.elements.some(layer=>layer.fontDataUrl?.startsWith('data:font/ttf;base64,')));assert.ok(project.aiPrompt.includes('Plan tomorrow'));
+ assert.equal(project.generatedCode,undefined,'Editable JSON avoids duplicating assets in generated source');
+ assert.ok((await readFile(jsonPath)).length<=8*1024*1024,'Export fits the project importer');
+ // Import the real download in a clean browser through the Studio file control.
+ const importContext=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+ try{
+  const importedPage=await importContext.newPage();importedPage.on('pageerror',error=>runtimeErrors.push(error.message));
+  await importedPage.goto(base+'/tools/developer/ux-ui-studio',{waitUntil:'domcontentloaded',timeout:120000});
+  await importedPage.waitForFunction(()=>document.documentElement.dataset.envToolHydrated==='ux-ui-studio',null,{timeout:60000});
+  await importedPage.getByRole('button',{name:'Add project',exact:true}).click();
+  await importedPage.getByLabel('Import preset',{exact:true}).setInputFiles(jsonPath);
+  await importedPage.waitForFunction(()=>{const raw=localStorage.getItem('env-ux-ui-studio-project-v1');if(!raw)return false;const saved=JSON.parse(raw);return saved.name==='Focus — Daily Planner'&&saved.elements?.length===13});
+  const restored=await importedPage.evaluate(()=>JSON.parse(localStorage.getItem('env-ux-ui-studio-project-v1')));
+  assert.equal(restored.elements.find(layer=>layer.fontDataUrl)?.fontDataUrl,project.elements.find(layer=>layer.fontDataUrl)?.fontDataUrl);
+  assert.ok(restored.elements.some(layer=>layer.kind==='icon'&&layer.iconSvg));
+ }finally{await importContext.close()}
  await writeFile(resolve(output,'focus-ai-handoff-prompt.txt'),project.aiPrompt+'\n');assert.deepEqual(runtimeErrors,[]);
- const report={baseUrl:base,createdAt:new Date().toISOString(),workflow:'Created with visible Studio tools; no project-state injection',layers:project.elements.length,pdfPages:pdf.getPageCount(),runtimeErrors,pdf:pdfPath,json:jsonPath};await writeFile(resolve(output,'demo-report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
+ const report={baseUrl:base,createdAt:new Date().toISOString(),workflow:'Created with visible Studio tools; no project-state injection',layers:project.elements.length,pdfPages:pdf.getPageCount(),jsonImportRoundTrip:'passed',runtimeErrors,pdf:pdfPath,json:jsonPath};await writeFile(resolve(output,'demo-report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
 }catch(error){
  await page.screenshot({path:resolve(output,'demo-error.png'),animations:'disabled'}).catch(()=>{});
  const draft=await page.evaluate(()=>localStorage.getItem('env-ux-ui-studio-project-v1')).catch(()=>null);

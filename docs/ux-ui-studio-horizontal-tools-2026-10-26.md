@@ -10,6 +10,8 @@ Image actions run on-device: replace, visual resize, pixel-size reduction, adjus
 
 Web PDF handoff includes the rendered artboard, AI implementation prompt, a readable specification and the complete project JSON as a PDF attachment. Large font/image data is retained in the attachment instead of printed across hundreds of pages. Embedded typefaces accompany the rasterized SVG. Native PDFs keep their readable appendix and separate editable JSON exports.
 
+Editable JSON retains the design, assets and AI prompt without duplicating embedded fonts/images inside generated source strings. HTML, React, Kotlin and Swift source downloads remain separate. This keeps the sample export within the importer limit and lets it round-trip back into Studio. PDF text normalizes typographic punctuation for the built-in document font.
+
 ## Verification
 
 - Expanded browser regression checks all 26 toolkits and 18 screen/theme configurations, including narrow phones, landscape and keyboard-sized screens.
@@ -18,7 +20,7 @@ Web PDF handoff includes the rendered artboard, AI implementation prompt, a read
 - PDF download is parsed to check its page count and recover the actual font and SVG from its complete JSON attachment.
 - Developer Studios integration retains export/prototype, privacy, overflow and axe checks.
 - Kotlin unit tests, lint, APK packaging and Swift grammar checks run locally; authoritative CI runs Android release/emulator and Xcode simulator/signing/tests.
-- `scripts/create-ux-ui-studio-demo.mjs` builds a eleven-layer Focus daily planner entirely through the visible Studio tools, then downloads the PDF, editable JSON and AI prompt. Set `EN_V_BROWSER_AUDIT_BASE_URL` and `ENV_STUDIO_DEMO_DIR` to choose the deployment and output directory.
+- `scripts/create-ux-ui-studio-demo.mjs` builds a thirteen-layer Focus daily planner entirely through the visible Studio tools, then downloads the PDF, editable JSON and AI prompt and imports the real JSON into a clean browser. Set `EN_V_BROWSER_AUDIT_BASE_URL` and `ENV_STUDIO_DEMO_DIR` to choose the deployment and output directory.
 
 ## Interaction references
 

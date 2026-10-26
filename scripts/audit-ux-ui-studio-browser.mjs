@@ -321,7 +321,9 @@ try {
       const project = JSON.parse(await readFile(await download.path(), "utf8"));
       assert.equal(project.background.toLowerCase(), "#111827");
       assert.ok(project.elements.some((layer) => layer.kind === "icon" && layer.iconSvg.length > 20));
-      entry.checks.push("JSON download retains background and embedded icon");
+      assert.equal(project.generatedCode, undefined, "Editable JSON avoids duplicating assets in generated source");
+      assert.ok((await readFile(await download.path())).length <= 8 * 1024 * 1024, "Exported fixture fits the project importer");
+      entry.checks.push("JSON download retains background and embedded icon within the importer size limit");
       if (viewport.width === 390 && theme === "light") {
         await page.getByRole("button",{name:"Export",exact:true}).click();
         const waitingPdf=page.waitForEvent("download",{timeout:120000});
