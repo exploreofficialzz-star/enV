@@ -137,7 +137,7 @@ export const DEVELOPER_STUDIOS: DeveloperStudioDefinition[] = [
   },
   {
     id: "ux-ui-studio", slug: "ux-ui-studio", name: "UX/UI Studio",
-    description: "Design mobile apps and websites with exact pixel geometry, typography, spacing, component layers, color tokens, searchable icons, and visual plus machine-readable design handoff.",
+    description: "Design mobile apps and websites, then export a handoff prompt for your builder or AI agent.",
     sourceId: "javascript-formatter", icon: "PanelsTopLeft",
     keywords: ["ux", "ui", "design", "wireframe", "interface", "website", "mobile app", "desktop", "components", "icon library", "typography", "spacing", "color tokens", "margin", "pixel", "PDF", "design system", "AI prompt", "figma", "sketch", "accessibility"],
     modes: [
