@@ -116,6 +116,11 @@ test("Music Analyzer returns reproducible signal metrics and leaves semantic lab
   });
   assert.equal(result.schema_version, "env.music-analysis.v2");
   assert.equal(result.audio.duration_seconds, 4);
+  assert.equal(result.audio.metric_scope_seconds, 4, "whole-track audio metrics must report their full-track scope");
+  assert.equal(result.rhythm.analysis_scope_seconds, 4);
+  assert.equal(result.tonality.analysis_scope_seconds, 4);
+  assert.equal(result.timbre.spectral_scope_seconds, 4);
+  assert.equal(result.timbre.zero_crossing_scope_seconds, 4);
   assert.equal(result.audio.channels, 2);
   assert.ok(result.audio.rms_dbfs !== null && result.audio.rms_dbfs < -5 && result.audio.rms_dbfs > -15);
   assert.ok(result.audio.rms_loudness_proxy_db !== null);
