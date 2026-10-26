@@ -209,8 +209,7 @@ fun NativeSongMetadataAnalyzerScreen() {
                 report.put("dataset_analysis", dataset)
                 report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}")
                     .put("status", if (reviewed) "full_local_reviewed" else "full_local_needs_review"))
-                val hasWarnings = (report.optJSONArray("warnings")?.length() ?: 0) > 0
-                item.copy(report = report, status = if (reviewed && !hasWarnings) "Done" else "Partial")
+                item.copy(report = report, status = if (reviewed) "Done" else "Partial")
             }
         }
     }
