@@ -18,7 +18,7 @@ type Mode = "quick" | "full";
 type RowStatus = "queued" | "scanning" | "analyzing" | "done" | "partial" | "failed" | "cancelled";
 
 type SongAnalysisReport = {
-  schema_version: "1.0";
+  schema_version: "1.1";
   filename: string;
   genre: string | null;
   sub_style: string | null;
@@ -553,7 +553,7 @@ export function SongMetadataAnalyzerEngine() {
   function exportJson() {
     const reports = tracks.flatMap((track) => track.report ? [track.report] : []);
     if (!reports.length) return;
-    downloadBlob(new Blob([JSON.stringify({ schema_version: "1.0", tracks: reports }, null, 2)], { type: "application/json;charset=utf-8" }), "song-analysis.json");
+    downloadBlob(new Blob([JSON.stringify({ schema_version: "env.song-analysis-export.v2", tracks: reports }, null, 2)], { type: "application/json;charset=utf-8" }), "song-analysis.json");
   }
   function exportCsv() {
     const reports = tracks.flatMap((track) => track.report ? [outputCsvRow(track.report)] : []);
@@ -705,7 +705,7 @@ export function SongMetadataAnalyzerEngine() {
 
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-              {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <Sparkles size={16} /> : <Activity size={16} />}
+              {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <FileJson size={16} /> : <Activity size={16} />}
               {busy ? "Analyzing locally…" : mode === "full" ? "Run detailed local analysis" : "Scan songs"}
             </button>
             {busy
@@ -798,7 +798,7 @@ export function SongMetadataAnalyzerEngine() {
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">DESCRIPTIONS</p>
                 {selectedReport.descriptions.length
                   ? <div className="space-y-2">{selectedReport.descriptions.map((description, index) => <p key={index} className="rounded-lg bg-surface-2 p-3 text-sm leading-5">{description}</p>)}</div>
-                  : <p className="text-sm text-muted-foreground">Run Full Analysis to generate song descriptions.</p>}
+                  : <p className="text-sm text-muted-foreground">Run Full Analysis for local signal descriptions.</p>}
               </div>
               {selectedReport.lyric_evidence && <div><p className="mb-1.5 text-xs font-semibold text-muted-foreground">LYRIC NOTES</p><p className="text-sm leading-5">{selectedReport.lyric_evidence}</p></div>}
             </div>
