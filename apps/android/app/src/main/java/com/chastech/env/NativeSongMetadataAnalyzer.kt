@@ -92,6 +92,8 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.exp
+import kotlin.math.log10
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.log2
@@ -317,7 +319,6 @@ fun NativeSongMetadataAnalyzerScreen() {
                                     busy = false; currentJob = null
                                 }
                             }
-                        }
                     },
                     enabled = tracks.isNotEmpty() && !busy,
                     modifier = Modifier.fillMaxWidth(),
@@ -438,6 +439,7 @@ private val nativeDatasetAnnotationFields = listOf(
 @Composable
 private fun NativeSongDatasetDetails(dataset: JSONObject) {
     val technical = dataset.optJSONObject("technical") ?: JSONObject()
+    val timbre = dataset.optJSONObject("timbre") ?: JSONObject()
     val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
     val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
     val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
