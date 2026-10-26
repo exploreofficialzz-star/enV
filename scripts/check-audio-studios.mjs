@@ -121,7 +121,7 @@ for (const marker of ["env.music-dataset-analysis.v1", "uses_remote_api: false",
 for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
   assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
 }
-for (const marker of ["env.music-profile.v1", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
+for (const marker of ["env.music-profile.v2", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
   assert.ok(musicAnalysisProfile.includes(marker), `Music Analyzer profile export contract missing: ${marker}`);
 }
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
@@ -133,6 +133,14 @@ assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_ENDPOINT|MUSIC_ANALYSIS_
 for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer v2 measurement contract missing: ${marker}`);
 }
+for (const [platform, processor] of [["Android", androidNativeAudioProcessor], ["iOS", iosNativeAudioViews]]) {
+  assert.ok(processor.includes('"env.music-analysis.v2"'), `${platform} Music Analyzer must emit schema v2`);
+  assert.ok(processor.includes('"rms_loudness_proxy_db"'), `${platform} Music Analyzer must use the honest RMS proxy field`);
+  assert.ok(!processor.includes('"estimated_loudness_lufs"'), `${platform} Music Analyzer must not emit the legacy misleading LUFS field`);
+}
+assert.ok(iosNativeAudioTests.includes('"env.music-analysis.v2"'), "iOS contract tests must assert schema v2");
+assert.ok(iosNativeAudioTests.includes('"rms_loudness_proxy_db"'), "iOS contract tests must assert the renamed loudness proxy");
+assert.ok(androidNativeAudioTests.includes("env.music-analysis.v2") || androidNativeAudioTests.includes("rms_loudness_proxy_db"), "Android native tests must verify the v2 contract");
 const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
 const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
 const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
