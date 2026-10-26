@@ -111,3 +111,17 @@ test("transient-only music download recovery is implemented natively and on Web"
   assert.match(ios, /nativeMusicDownloadWithRetry/);
   assert.match(client, /urlMediaFailure/);
 });
+
+test("all three clients use a shared multi-engine processor with Internet Archive and aria2c", async () => {
+  const processor = await source("../scripts/url-media-processor.mjs");
+  const archive = await source("../scripts/media/archive-org.mjs");
+  const alternative = await source("../scripts/media/transfer-alternatives.mjs");
+  const android = await source("../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt");
+  const ios = await source("../apps/ios/enV/ToolViews.swift");
+  assert.match(processor, /inspectArchiveItem/);
+  assert.match(processor, /aria2YtdlpArgs/);
+  assert.match(archive, /parseArchiveAudioItem/);
+  assert.match(alternative, /shouldTryAria2Transfer/);
+  assert.match(android, /\/api\/backend\/url-media\/info/);
+  assert.match(ios, /nativeMusicResolve/);
+});

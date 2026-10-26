@@ -38,3 +38,15 @@ An Audiomack album page being publicly playable proves neither export authorizat
 ## Transient failures and partial ZIPs
 
 The Web, Android and iOS download clients now retry an individual eligible song **once** after a transient timeout, provider metadata parse failure, or temporary HTTP 502/503/504 error. They do not automatically retry authentication failures, rate limits, anti-bot challenges, DRM restrictions, missing formats, or a missing song. A collection's track-list preview is not a download success promise. The Web client offers a retry of only the failed entries; Web and Android ZIPs include `failed-downloads.txt` whenever a collection is incomplete. All platforms retain partial successful files and report unavailable entries. The per-track and aggregate size limits remain in force. Real provider-specific end-to-end media downloads require authorized test fixtures and live acceptance in addition to CI.
+
+## Multi-engine backend (October 2026)
+
+The shared Render URL-media processor now uses different engines based on what the source actually exposes:
+
+- `yt-dlp` is the main public-page metadata and media extractor.
+- A dedicated **Internet Archive metadata API** adapter lists publicly exposed audio files (max 50 tracks, max 50 MB each) without requiring the yt-dlp extractor. Its track URLs are then sent to the hardened direct HTTPS downloader; collection URLs themselves never download as single tracks.
+- The shared HTTP downloader validates DNS at each redirect, MIME type and byte limits. Artist-provided public download links use this path after explicit HTML download-link discovery and response probing.
+- `aria2c` is installed as an alternative HTTP/HTTPS transfer engine for **transient failures during yt-dlp downloads only**. This is an alternative transfer mechanism, not a separate provider metadata resolver; source denials, rate limits, CAPTCHA, authentication or unsupported formats never trigger it. When used, it is still subject to the same output verification, size and duration checks.
+- FFmpeg and FFprobe continue handling post-processing and verification. Web, Android and iOS consume the same backend contracts; this change does not modify their native tool designs.
+
+This does not guarantee every streaming page can be exported. In particular an Audiomack album's song listing is not proof that its songs are offered for standalone file downloads. A production release requires successful live provider/permission acceptance tests.
