@@ -30,15 +30,71 @@ async function storedProject(page) {
 }
 
 async function checkEmbeddedLogo(page, viewport, entry) {
+  async function checkLogo(size, mode) {
+    const logo = page.locator(".ux-ui-studio .uxui-fullscreen-logo img:visible");
+    await logo.scrollIntoViewIfNeeded();
+    const box = await logo.boundingBox();
+    assert.ok(box && box.width <= 64 && box.height <= 30, mode + " Studio keeps a compact brand logo");
+    await checkBounds(logo, mode + " brand logo", size);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), mode + " header has no document overflow");
+  }
+  await checkLogo(viewport, "Full-screen");
   await page.getByRole("button", {name:"Exit full-screen studio",exact:true}).click();
-  const logo = page.locator(".ux-ui-studio .uxui-fullscreen-logo img:visible");
-  await logo.scrollIntoViewIfNeeded();
-  const box = await logo.boundingBox();
-  assert.ok(box && box.width <= 64 && box.height <= 30, "Embedded Studio keeps a compact brand logo");
-  await checkBounds(logo, "Embedded brand logo", viewport);
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), "Embedded header has no document overflow");
+  const devices = page.getByRole("group", {name:"Preview device",exact:true});
+  const originalDevice = await devices.locator('[aria-pressed="true"]').getAttribute("aria-label");
+  for (const device of ["Mobile", "Tablet", "Desktop"]) {
+    await devices.getByRole("button", {name:device,exact:true}).click();
+    await checkLogo(viewport, "Embedded " + device);
+  }
+  if (viewport.width === 390 && viewport.height === 844) {
+    for (const size of [{width:320,height:568}, {width:768,height:1024}, {width:1440,height:1000}, viewport]) {
+      await page.setViewportSize(size);
+      await checkLogo(size, "Resized embedded");
+    }
+  }
+  await devices.getByRole("button", {name:originalDevice,exact:true}).click();
   await page.getByRole("button", {name:"Expand studio to full screen",exact:true}).click();
-  entry.checks.push("Embedded and full-screen brand lockups keep a bounded size");
+  await checkLogo(viewport, "Restored full-screen");
+  entry.checks.push("Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews");
+}
+
+async function checkFaderTouchGestures(page, context, styling) {
+  const strip = styling.locator(".uxui-visual-controls");
+  const sliders = styling.getByRole("slider");
+  const before = await storedProject(page);
+  const client = await context.newCDPSession(page);
+  await client.send("Emulation.setTouchEmulationEnabled", {enabled:true});
+  async function drag(x, y, dx, dy) {
+    await client.send("Input.dispatchTouchEvent", {type:"touchStart",touchPoints:[{x,y}]});
+    for (let i=1;i<=6;i++) await client.send("Input.dispatchTouchEvent", {type:"touchMove",touchPoints:[{x:x+dx*i/6,y:y+dy*i/6}]});
+    await client.send("Input.dispatchTouchEvent", {type:"touchEnd",touchPoints:[]});
+    await page.waitForTimeout(180);
+  }
+  try {
+    for (const slider of await sliders.all()) {
+      const name = await slider.getAttribute("aria-label");
+      assert.equal(await slider.getAttribute("aria-orientation"), "vertical", name);
+      await slider.scrollIntoViewIfNeeded();
+      const box = await slider.boundingBox();
+      const scroll = await strip.evaluate(node => ({left:node.scrollLeft,max:node.scrollWidth-node.clientWidth}));
+      const dx = scroll.max-scroll.left > 40 ? -60 : 60;
+      await drag(box.x+box.width/2, box.y+box.height/2, dx, 6);
+      assert.ok(Math.abs(await strip.evaluate(node => node.scrollLeft)-scroll.left)>20, name + ": a sideways swipe browses the strip");
+      assert.deepEqual((await storedProject(page)).elements, before.elements, name + ": browsing preserves every style value");
+
+      await slider.scrollIntoViewIfNeeded();
+      const target = await slider.boundingBox();
+      const value = Number(await slider.getAttribute("aria-valuenow"));
+      const min = Number(await slider.getAttribute("aria-valuemin"));
+      const max = Number(await slider.getAttribute("aria-valuemax"));
+      const dy = value > (min+max)/2 ? 24 : -24;
+      await drag(target.x+target.width/2, target.y+target.height/2, 0, dy);
+      await page.waitForFunction(({label,previous}) => Number(document.querySelector('[aria-label="'+label+'"]')?.getAttribute("aria-valuenow")) !== previous, {label:name,previous:value});
+      await waitForStored(page, project => JSON.stringify(project.elements) !== JSON.stringify(before.elements), name + ": vertical touch adjustment");
+      await page.getByRole("button", {name:"Undo",exact:true}).last().click();
+      await waitForStored(page, project => JSON.stringify(project.elements) === JSON.stringify(before.elements), name + ": one-step Undo");
+    }
+  } finally { await client.detach(); }
 }
 
 async function waitForStored(page, predicate, description) {
@@ -183,22 +239,8 @@ try {
         await waitForStored(page, project => project.elements.find(item => item.id === previous.id).fontSize === previous.fontSize, "undoing the text-size edit");
         const slider = styling.getByLabel("Selected box width", { exact: true });
         assert.equal(await slider.getAttribute("aria-orientation"), "vertical");
-        // Real touch pan starting on a fader must browse the strip without editing.
-        const turn = styling.getByLabel("Selected rotation", {exact:true});
-        await turn.scrollIntoViewIfNeeded();
-        const touchBox = await turn.boundingBox();
-        const strip = styling.locator(".uxui-visual-controls");
-        await strip.evaluate(node => { node.scrollLeft = 0; });
-        const client = await context.newCDPSession(page);
-        await client.send("Emulation.setTouchEmulationEnabled", {enabled:true});
-        const touch = {x:touchBox.x+touchBox.width/2,y:touchBox.y+touchBox.height/2};
-        await client.send("Input.dispatchTouchEvent", {type:"touchStart",touchPoints:[touch]});
-        for(let i=1;i<=6;i++) await client.send("Input.dispatchTouchEvent", {type:"touchMove",touchPoints:[{x:touch.x-i*12,y:touch.y}]});
-        await client.send("Input.dispatchTouchEvent", {type:"touchEnd",touchPoints:[]});
-        await page.waitForTimeout(180);
-        assert.ok(await strip.evaluate(node => node.scrollLeft)>20, "A sideways swipe over a fader scrolls the strip");
-        assert.deepEqual((await storedProject(page)).elements, beforeSlider.elements, "Sideways scrolling never changes a style value");
-        await client.detach();
+        // Check actual touch browsing, adjustment and Undo on every numeric style.
+        await checkFaderTouchGestures(page, context, styling);
         await slider.scrollIntoViewIfNeeded();
         const box = await slider.boundingBox();
         await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.75);
@@ -208,7 +250,7 @@ try {
         await waitForStored(page, (project) => project.elements.find((item) => item.id === previous.id).width !== previous.width, "a visual size-slider drag");
         await page.getByRole("button", { name: "Undo", exact: true }).last().click();
         await waitForStored(page, project => project.elements.find(item => item.id === previous.id).width === previous.width, "one undo for a vertical fader gesture");
-        entry.checks.push("Sideways touch pans over faders scroll without editing; vertical drags adjust with one-step Undo");
+        entry.checks.push("All numeric styling faders preserve styles during sideways touch browsing and adjust vertically with one-step Undo");
         const beforeResize = await storedProject(page);
         const size = beforeResize.elements.find((item) => item.id === previous.id);
         const handle = page.locator(".uxui-resize-handle");

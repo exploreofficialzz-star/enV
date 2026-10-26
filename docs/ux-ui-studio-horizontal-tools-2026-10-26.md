@@ -31,3 +31,20 @@ Editable JSON retains the design, assets and AI prompt without duplicating embed
 [Video.Guru's official listing](https://play.google.com/store/apps/details?id=videoeditor.videomaker.videoeditorforyoutube) describes its layered photo, audio, text and effect workflow. [InShot's official tools page](https://inshotapp.com/download/) provides related examples of grouped editing tools. The single sideways action row and replacement controller panel follow the requested interaction and supplied screenshot.
 
 Local result: 18 passing screen/theme configurations after retrying the initial preview-listener startup race; the original error is retained in the [browser report](ux-ui-studio-horizontal-browser-report-2026-10-26.json). The real pointer/image/PDF checks pass, the four-route Developer audit has zero errors or serious/critical axe findings, and the web test suite, release build, TypeScript and ESLint (zero errors) pass. Android unit tests/lint/APK packaging and a forced clean Kotlin compilation pass. Xcode verification runs in authoritative CI.
+
+## Resumed touch and logo verification
+
+The continuation resumed from `e7e8cd99`, which already implements vertical, direction-aware faders and a bounded 62 × 28 px Studio logo. The same behavior was verified on [the live Studio](https://envtools.store/tools/developer/ux-ui-studio).
+
+The browser audit now starts real touch swipes on each numeric styling control: Text size, Box width, Turn, Roundness, Border and Visibility. Sideways gestures must move the strip while preserving every saved layer property. Vertical touch drags must change a saved value, and one Undo must restore all layer properties. Mouse adjustment and keyboard text-size checks remain covered.
+
+Logo checks measure both fullscreen states and all three embedded device previews. The 390 px phone run also resizes the embedded editor through 320, 768 and 1440 px widths before returning to fullscreen.
+
+Results on 26 October 2026:
+
+- Local browser audit: 18 viewport/theme configurations passed, including short phones, landscape and a keyboard-sized viewport; zero runtime exceptions.
+- Live browser audit: 390 × 844 and 390 × 430, each in light and dark themes, passed; zero runtime exceptions.
+- Studio responsive/code-generation checks, TypeScript, production build and ESLint for the changed audit script passed.
+- This continuation verified the browser application. Android/iOS builds and device execution were not run.
+
+Evidence: [local report](ux-ui-studio-horizontal-browser-report-2026-10-26.json), [live report](ux-ui-studio-touch-logo-live-report-2026-10-26.json), [vertical controls](../screenshots/ux-ui-studio-selected-styling-light.png), and [embedded logo](../screenshots/ux-ui-studio-embedded-brand-light.png).
