@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { downloadBlob, formatFileSize, slugify } from "@/lib/utils";
 import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
 import { downloadUrlMedia, inspectUrlMedia, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
+import { downloadMusicWithSingleRetry } from "@/lib/media/music-download-retry";
 import {
   MUSIC_AUDIO_EXTENSIONS,
   isLikelyMusicCollectionUrl,
@@ -73,7 +74,7 @@ function mimeForExtension(extension: string): string {
   return types[extension] || "application/octet-stream";
 }
 
-function buildArchive(title: string, tracks: DownloadResult[]): Uint8Array {
+function buildArchive(title: string, tracks: DownloadResult[], failures: string[] = []): Uint8Array {
   const files: Record<string, Uint8Array> = {};
   const used = new Set<string>();
   const playlist = ["#EXTM3U"];
@@ -93,6 +94,7 @@ function buildArchive(title: string, tracks: DownloadResult[]): Uint8Array {
     }
     metadataTracks.push({ file: path, source: track.source, ...tags, artworkFile: artworkPath });
   });
+  if (failures.length) files["failed-downloads.txt"] = strToU8("These tracks were not included in this partial ZIP:\n\n" + failures.join("\n") + "\n");
   files["enV-playlist.m3u"] = strToU8(playlist.join("\n") + "\n");
   files["track-metadata.json"] = strToU8(JSON.stringify({ collection: title, tracks: metadataTracks }, null, 2) + "\n");
   files["README.txt"] = strToU8(
@@ -293,7 +295,7 @@ export function MusicDownloaderEngine() {
     }
   }
 
-  async function downloadPreview(trackIndex?: number) {
+  async function downloadPreview(trackIndex?: number, failedOnly = false) {
     if (!preview || busy) return;
     setError("");
     setResult("");
@@ -308,7 +310,9 @@ export function MusicDownloaderEngine() {
     const collected: DownloadResult[] = [];
     const failures: string[] = [];
     let totalBytes = 0;
-    const indices = trackIndex === undefined ? preview.tracks.map((_, i) => i) : [trackIndex];
+    const indices = trackIndex === undefined
+      ? preview.tracks.map((_, i) => i).filter((i) => !failedOnly || trackStates[i] === "Unavailable")
+      : [trackIndex];
     try {
       for (const index of indices) {
         const item = preview.tracks[index];
@@ -316,7 +320,11 @@ export function MusicDownloaderEngine() {
         setTrackStates((previous) => ({ ...previous, [index]: "Downloading…" }));
         setProgress("Downloading " + (indices.indexOf(index) + 1) + " of " + indices.length + ": " + item.title);
         try {
-          const track = await downloadMusicTrack(item.url, item.source, item.metadata, item.title, controller.signal, setProgress);
+          const track = await downloadMusicWithSingleRetry(
+            () => downloadMusicTrack(item.url, item.source, item.metadata, item.title, controller.signal, setProgress),
+            controller.signal,
+            () => { setTrackStates((previous) => ({ ...previous, [index]: "Retrying…" })); setProgress("Temporary source failure. Retrying " + item.title + " once…"); },
+          );
           if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) {
             throw new Error("Batch size exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
           }
@@ -335,7 +343,7 @@ export function MusicDownloaderEngine() {
       }
       if (trackIndex === undefined && collected.length) {
         const title = safeName(preview.title || inferredCollectionTitle(collected), "My music");
-        const archive = buildArchive(title, collected);
+        const archive = buildArchive(title, collected, failures);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
       if (collected.length) {
@@ -459,6 +467,11 @@ export function MusicDownloaderEngine() {
               ) : null}
               {preview.warnings.length ? <p role="status" className="whitespace-pre-wrap text-xs text-muted">{preview.warnings.length} link(s) could not be fully inspected. {preview.warnings.slice(0, 2).join(" ")}</p> : null}
               <Button type="button" onClick={() => void downloadPreview()} disabled={busy} className="w-full">{busy ? "Preparing ZIP…" : "Download ZIP (" + preview.tracks.length + " tracks)"}</Button>
+              {Object.values(trackStates).some((state) => state === "Unavailable") ? (
+                <Button type="button" variant="outline" onClick={() => void downloadPreview(undefined, true)} disabled={busy} className="w-full">
+                  Retry unavailable tracks as ZIP ({Object.values(trackStates).filter((state) => state === "Unavailable").length})
+                </Button>
+              ) : null}
             </section>
           ) : null}
         </div>

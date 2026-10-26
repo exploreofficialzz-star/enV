@@ -97,3 +97,17 @@ test("collection downloads first preview ten tracks with an expandable list on a
   assert.match(ios, /NativeMusicArchive\.create\(files: saved, at: archive\)/);
   assert.match(ios, /ShareLink\(item: zipExportURL\)/);
 });
+
+test("transient-only music download recovery is implemented natively and on Web", async () => {
+  const web = await source("../src/components/engines/music-downloader-engine.tsx");
+  const android = await source("../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt");
+  const ios = await source("../apps/ios/enV/ToolViews.swift");
+  const client = await source("../src/lib/media/url-media.ts");
+  assert.match(web, /downloadMusicWithSingleRetry/);
+  assert.match(web, /Retry unavailable tracks as ZIP/);
+  assert.match(web, /failed-downloads\.txt/);
+  assert.match(android, /downloadProviderMusicTrackWithRetry/);
+  assert.match(android, /failed-downloads\.txt/);
+  assert.match(ios, /nativeMusicDownloadWithRetry/);
+  assert.match(client, /urlMediaFailure/);
+});

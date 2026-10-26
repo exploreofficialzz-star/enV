@@ -34,3 +34,7 @@ The shared processor now distinguishes a genuine authentication requirement from
 ### Audiomack live acceptance boundary
 
 An Audiomack album page being publicly playable proves neither export authorization nor the availability of standalone audio file URLs. The supplied *Promise Land* album (16 tracks) must be validated against its actual public HTML and, for every eligible track, a successful response with verified audio MIME and nonempty audio bytes. A green unit test or hosted preview does not meet that acceptance criterion. Where the site exposes only app-managed offline listening, enV must not claim to offer a portable download.
+
+## Transient failures and partial ZIPs
+
+The Web, Android and iOS download clients now retry an individual eligible song **once** after a transient timeout, provider metadata parse failure, or temporary HTTP 502/503/504 error. They do not automatically retry authentication failures, rate limits, anti-bot challenges, DRM restrictions, missing formats, or a missing song. A collection's track-list preview is not a download success promise. The Web client offers a retry of only the failed entries; Web and Android ZIPs include `failed-downloads.txt` whenever a collection is incomplete. All platforms retain partial successful files and report unavailable entries. The per-track and aggregate size limits remain in force. Real provider-specific end-to-end media downloads require authorized test fixtures and live acceptance in addition to CI.

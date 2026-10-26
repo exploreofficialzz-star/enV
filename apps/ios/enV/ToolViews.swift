@@ -5333,6 +5333,23 @@ private func nativeMusicDownload(_ track: NativeMusicSourceTrack, maxBytes: Int6
     return (temporary, bytes, ext)
 }
 
+private func nativeMusicDownloadRetryable(_ error: Error) -> Bool {
+    let message = error.localizedDescription.lowercased()
+    return ["took too long to respond", "did not respond reliably", "returned an empty or invalid json",
+            "returned an invalid metadata response", "track resolver returned a server error or empty response",
+            "media api could not be reached", "http 502", "http 503", "http 504"].contains { message.contains($0) }
+}
+
+private func nativeMusicDownloadWithRetry(_ track: NativeMusicSourceTrack, maxBytes: Int64) async throws -> (temporary: URL, bytes: Int64, ext: String) {
+    do {
+        return try await nativeMusicDownload(track, maxBytes: maxBytes)
+    } catch {
+        guard !Task.isCancelled && nativeMusicDownloadRetryable(error) else { throw error }
+        try await Task.sleep(nanoseconds: 700_000_000)
+        return try await nativeMusicDownload(track, maxBytes: maxBytes)
+    }
+}
+
 private enum NativeMusicArchive {
     private static func u16(_ value: UInt16, _ data: inout Data) {
         data.append(contentsOf: [UInt8(value & 0xff), UInt8((value >> 8) & 0xff)])
@@ -5703,7 +5720,7 @@ private struct NativeMusicDownloaderView: View {
                         try Task.checkCancellation()
                         do {
                             let remaining = batchLimit - totalBytes
-                            let downloaded = try await nativeMusicDownload(track, maxBytes: min(trackLimit, remaining))
+                            let downloaded = try await nativeMusicDownloadWithRetry(track, maxBytes: min(trackLimit, remaining))
                             guard totalBytes + downloaded.bytes <= batchLimit else {
                                 try? FileManager.default.removeItem(at: downloaded.temporary)
                                 throw NSError(domain: "enVMusicDownloader", code: 12, userInfo: [NSLocalizedDescriptionKey: "Collection exceeds 200 MB."])

@@ -10,6 +10,7 @@ import {
 } from "./music-downloader-policy.ts";
 import { extractMusicMetadata } from "./music-metadata.ts";
 import { getUrlMediaConfig, inspectUrlMedia, downloadUrlMedia } from "./url-media.ts";
+import { downloadMusicWithSingleRetry, shouldRetryMusicDownload } from "./music-download-retry.ts";
 
 test("accepts direct HTTPS audio files and preserves query strings", () => {
   const result = validateDirectMusicUrl("https://cdn.example.org/artist/track.MP3?download=1");
@@ -192,3 +193,40 @@ test("unreachable preview media API shows an actionable error instead of Failed 
   }
 });
 
+
+test("music retry only targets transient source failures, not access restrictions", () => {
+  assert.equal(shouldRetryMusicDownload(Object.assign(new Error("Audiomack returned an empty or invalid JSON response"), { code: "SOURCE_UNAVAILABLE" })), true);
+  assert.equal(shouldRetryMusicDownload(Object.assign(new Error("The source took too long to respond"), { code: "NETWORK_TIMEOUT" })), true);
+  assert.equal(shouldRetryMusicDownload(Object.assign(new Error("HTTP 503"), { code: "PROVIDER_ERROR" })), true);
+  assert.equal(shouldRetryMusicDownload(Object.assign(new Error("Please retry later"), { code: "RATE_LIMITED" })), false);
+  assert.equal(shouldRetryMusicDownload(Object.assign(new Error("content is restricted"), { code: "DOWNLOAD_NOT_PERMITTED" })), false);
+  assert.equal(shouldRetryMusicDownload(Object.assign(new Error("Track not found"), { code: "SOURCE_UNAVAILABLE" })), false);
+});
+
+test("music retry makes at most two attempts and honors abort", async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  let notices = 0;
+  const downloaded = await downloadMusicWithSingleRetry(async () => {
+    calls += 1;
+    if (calls === 1) throw Object.assign(new Error("The source took too long to respond"), { code: "NETWORK_TIMEOUT" });
+    return "verified audio";
+  }, controller.signal, () => { notices += 1; }, async () => {});
+  assert.equal(downloaded, "verified audio");
+  assert.equal(calls, 2);
+  assert.equal(notices, 1);
+  calls = 0;
+  await assert.rejects(downloadMusicWithSingleRetry(async () => {
+    calls += 1;
+    throw Object.assign(new Error("The source took too long to respond"), { code: "NETWORK_TIMEOUT" });
+  }, controller.signal, () => {}, async () => {}), /took too long/);
+  assert.equal(calls, 2);
+  const aborted = new AbortController();
+  aborted.abort();
+  calls = 0;
+  await assert.rejects(downloadMusicWithSingleRetry(async () => {
+    calls += 1;
+    throw Object.assign(new Error("The source took too long to respond"), { code: "NETWORK_TIMEOUT" });
+  }, aborted.signal, () => {}, async () => {}));
+  assert.equal(calls, 1);
+});
