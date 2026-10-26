@@ -510,11 +510,26 @@ function findRepeatedPassages(frames: readonly FeatureFrame[], duration: number,
     clamp(frame.zero_crossing_rate ?? 0, 0, 1),
   ]);
 
+  const temporalVariation = (start: number): number => {
+    let difference = 0;
+    let count = 0;
+    for (let offset = 1; offset < windowFrames; offset += 1) {
+      const previous = vectors[start + offset - 1]!;
+      const current = vectors[start + offset]!;
+      for (let dimension = 0; dimension < previous.length; dimension += 1) {
+        difference += Math.abs(current[dimension]! - previous[dimension]!);
+        count += 1;
+      }
+    }
+    return count ? difference / count : 0;
+  };
+
   const windowStarts: number[] = [];
   for (let start = 0; start + windowFrames <= frames.length; start += stepFrames) {
-    const rms = mean(frames.slice(start, start + windowFrames).map((frame) => frame.rms_dbfs ?? -120)) ?? -120;
-    // Exclude near-silence so identical silent gaps do not masquerade as musical repetition.
-    if (rms > -58) windowStarts.push(start);
+    const window = frames.slice(start, start + windowFrames);
+    const rms = mean(window.map((frame) => frame.rms_dbfs ?? -120)) ?? -120;
+    // Exclude near-silence and almost-flat feature sequences; neither is useful evidence of a repeated passage.
+    if (rms > -58 && temporalVariation(start) >= 0.012) windowStarts.push(start);
   }
 
   const comparisons: RepetitionWindow[] = [];
