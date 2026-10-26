@@ -2644,6 +2644,13 @@ private struct NativeSongAnalysisDocument: FileDocument {
     }
 }
 
+private struct NativeSongAnnotationField: Identifiable {
+    let key: String
+    let label: String
+    let placeholder: String
+    var id: String { key }
+}
+
 private struct NativeSongMetadataAnalyzerView: View {
     let title: String
     @State private var tracks: [NativeSongAnalysisTrack] = []
@@ -2662,6 +2669,26 @@ private struct NativeSongMetadataAnalyzerView: View {
     private let maxTracks = 50
     private let maxTrackBytes = 20 * 1024 * 1024
     private let maxBatchBytes = 60 * 1024 * 1024
+
+    private let datasetAnnotationFields: [NativeSongAnnotationField] = [
+        .init(key: "genre", label: "Genre", placeholder: "Afrobeats, R&B"),
+        .init(key: "sub_style", label: "Sub-style", placeholder: "Afro-pop, Amapiano"),
+        .init(key: "style_influences", label: "Style influences", placeholder: "Highlife, dancehall, soul"),
+        .init(key: "language", label: "Language", placeholder: "Nigerian Pidgin, Yoruba"),
+        .init(key: "energy", label: "Energy", placeholder: "Low, medium, high"),
+        .init(key: "mood", label: "Mood", placeholder: "Celebratory, soulful"),
+        .init(key: "source_role", label: "Audio part / stem role", placeholder: "Full mix, vocals, drums, bass"),
+        .init(key: "vocals", label: "Vocal content", placeholder: "Lead vocal, backing vocals, ad-libs"),
+        .init(key: "vocal_delivery", label: "Vocal delivery", placeholder: "Melodic singing, rap, chant"),
+        .init(key: "vocal_register", label: "Vocal pitch / register", placeholder: "High/low pitch, soprano, alto, tenor"),
+        .init(key: "vocal_harmony", label: "Vocal harmony", placeholder: "Doubles, thirds, call-and-response"),
+        .init(key: "performance_technique", label: "Performance techniques", placeholder: "Vibrato, falsetto, melisma"),
+        .init(key: "instruments", label: "Instruments", placeholder: "Log drum, shakers, synth bass"),
+        .init(key: "themes", label: "Themes", placeholder: "Love, celebration"),
+        .init(key: "listening_scene", label: "Listening scene", placeholder: "Club, road trip"),
+        .init(key: "production_traits", label: "Production traits", placeholder: "Reverb, saturation, sidechain"),
+        .init(key: "arrangement", label: "Arrangement", placeholder: "Intro build, drum drop, break")
+    ]
 
     private var analyzedCount: Int { tracks.filter { $0.report != nil }.count }
     private var selectedTrack: NativeSongAnalysisTrack? {
@@ -2812,6 +2839,57 @@ private struct NativeSongMetadataAnalyzerView: View {
                     nativeSongTags("VOCALS", nativeSongStrings(report["vocals"]))
                     nativeSongTags("INSTRUMENTS", nativeSongStrings(report["instruments"]))
                     nativeSongTags("DESCRIPTIONS", nativeSongStrings(report["descriptions"]))
+                    if let dataset = report["dataset_analysis"] as? [String: Any] {
+                        let pitch = dataset["pitch"] as? [String: Any] ?? [:]
+                        let tonality = dataset["tonality"] as? [String: Any] ?? [:]
+                        let rhythm = dataset["rhythm"] as? [String: Any] ?? [:]
+                        let timbre = dataset["timbre"] as? [String: Any] ?? [:]
+                        let structure = dataset["structure"] as? [String: Any] ?? [:]
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Local DSP findings").font(.subheadline.weight(.semibold))
+                            Text("Pitch span: \(nativeSongString(pitch["lowest_detected_note"], fallback: "—"))–\(nativeSongString(pitch["highest_detected_note"], fallback: "—"))")
+                                .font(.caption)
+                            Text("Tempo estimate: \(nativeSongString(rhythm["tempo_bpm"], fallback: "—")) BPM · Chord windows: \((tonality["chord_estimates"] as? [[String: Any]] ?? []).count)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("Mean spectral centroid: \(nativeSongString(timbre["mean_spectral_centroid_hz"], fallback: "—")) Hz · Feature changes: \((structure["change_points"] as? [[String: Any]] ?? []).count)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text("These are estimates from the full mix, not verified vocal-only notes. Generic section cuts are not confirmed verse/chorus labels.")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("Human-reviewed training labels").font(.subheadline.weight(.semibold))
+                            Text("Add tags by listening and reviewing the recording. These are annotations, not automatic genre or language classifications.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(datasetAnnotationFields) { field in
+                                TextField(field.label, text: Binding(
+                                    get: { selectedDatasetAnnotationText(key: field.key) },
+                                    set: { updateSelectedDatasetAnnotation(key: field.key, value: $0) }
+                                ), prompt: Text(field.placeholder))
+                                .textFieldStyle(.roundedBorder)
+                            }
+                            TextField("Annotation notes", text: Binding(
+                                get: { selectedDatasetAnnotationText(key: "notes") },
+                                set: { updateSelectedDatasetAnnotation(key: "notes", value: $0) }
+                            ), prompt: Text("Parts to preserve, uncertainty, review notes"))
+                            .textFieldStyle(.roundedBorder)
+                            TextField("Reviewer initials / team ID", text: Binding(
+                                get: { selectedDatasetAnnotationText(key: "reviewer") },
+                                set: { updateSelectedDatasetAnnotation(key: "reviewer", value: $0) }
+                            ), prompt: Text("Who reviewed the tags"))
+                            .textFieldStyle(.roundedBorder)
+                            Toggle("Reviewed for training use", isOn: Binding(
+                                get: { selectedDatasetAnnotationsReviewed() },
+                                set: { setSelectedDatasetReviewed($0) }
+                            ))
+                            .font(.caption)
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+                    }
                     let warnings = nativeSongStrings(report["warnings"])
                     if !warnings.isEmpty {
                         VStack(alignment: .leading, spacing: 5) {
@@ -2838,6 +2916,70 @@ private struct NativeSongMetadataAnalyzerView: View {
             if case .failure(let failure) = result { error = failure.localizedDescription }
         }
 
+    }
+
+    private func selectedDatasetAnnotationText(key: String) -> String {
+        guard let report = selectedTrack?.report,
+              let dataset = report["dataset_analysis"] as? [String: Any],
+              let annotations = dataset["annotations"] as? [String: Any] else { return "" }
+        if let values = annotations[key] as? [String] { return values.joined(separator: ", ") }
+        return nativeSongString(annotations[key])
+    }
+
+    private func selectedDatasetAnnotationsReviewed() -> Bool {
+        guard let report = selectedTrack?.report,
+              let dataset = report["dataset_analysis"] as? [String: Any],
+              let annotations = dataset["annotations"] as? [String: Any] else { return false }
+        return annotations["reviewed"] as? Bool == true
+    }
+
+    private func updateSelectedDatasetAnnotation(key: String, value: String) {
+        guard let selectedID,
+              let index = tracks.firstIndex(where: { $0.id == selectedID }),
+              var report = tracks[index].report,
+              var dataset = report["dataset_analysis"] as? [String: Any],
+              var annotations = dataset["annotations"] as? [String: Any] else { return }
+        if key == "notes" {
+            annotations[key] = String(value.prefix(4_000))
+        } else if key == "reviewer" {
+            annotations[key] = String(value.prefix(100))
+        } else {
+            let tags = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(80)
+            let list = Array(tags)
+            annotations[key] = list
+            switch key {
+            case "genre": report["genre"] = list.first ?? NSNull() as Any
+            case "sub_style": report["sub_style"] = list.first ?? NSNull() as Any
+            case "language", "mood", "vocals", "instruments": report[key] = list
+            case "themes": report["theme"] = list
+            case "listening_scene": report["setting"] = list
+            default: break
+            }
+        }
+        annotations["reviewed"] = false
+        dataset["annotations"] = annotations
+        report["dataset_analysis"] = dataset
+        var analysis = report["analysis"] as? [String: Any] ?? [:]
+        analysis["status"] = "full_local_needs_review"
+        report["analysis"] = analysis
+        tracks[index].report = report
+        tracks[index].status = "Partial"
+    }
+
+    private func setSelectedDatasetReviewed(_ reviewed: Bool) {
+        guard let selectedID,
+              let index = tracks.firstIndex(where: { $0.id == selectedID }),
+              var report = tracks[index].report,
+              var dataset = report["dataset_analysis"] as? [String: Any],
+              var annotations = dataset["annotations"] as? [String: Any] else { return }
+        annotations["reviewed"] = reviewed
+        dataset["annotations"] = annotations
+        report["dataset_analysis"] = dataset
+        var analysis = report["analysis"] as? [String: Any] ?? [:]
+        analysis["status"] = reviewed ? "full_local_reviewed" : "full_local_needs_review"
+        report["analysis"] = analysis
+        tracks[index].report = report
+        tracks[index].status = reviewed && nativeSongStrings(report["warnings"]).isEmpty ? "Done" : "Partial"
     }
 
     private func modeChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -3547,14 +3689,14 @@ private enum NativeSongSignal {
         return [
             "start_seconds": start,
             "end_seconds": end,
-            "chord": bestName ?? NSNull() as Any,
+            "chord": bestName as Any? ?? NSNull(),
             "confidence": confidence,
             "method": "spectral-chroma-triad-template"
         ]
     }
 
     static func analyzeDataset(_ samples: [Float], sampleRate: Double) -> [String: Any] {
-        let safeRate = max(8_000, sampleRate)
+        let safeRate = max(8_000.0, sampleRate)
         let duration = Double(samples.count) / safeRate
         let fftSize = 2_048
         let binCount = fftSize / 2
@@ -3615,7 +3757,7 @@ private enum NativeSongSignal {
                 if frequency < 160 { lowPower += power }
                 else if frequency < 2_000 { midPower += power }
                 else { highPower += power }
-                if frequency >= 45 && frequency <= min(5_000, safeRate / 2) {
+                if frequency >= 45 && frequency <= min(5_000.0, safeRate / 2) {
                     let midi = Int((69 + 12 * log2(frequency / 440)).rounded())
                     chroma[(midi % 12 + 12) % 12] += magnitude
                 }
