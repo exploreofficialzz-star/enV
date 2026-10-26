@@ -37,15 +37,20 @@ export type MusicAnalysisResult = {
     clipped_sample_percent: number;
     silence_percent: number;
     windowed_rms_spread_db: number | null;
+    /** Peak/RMS/clipping/silence/dynamics are measured across the full decoded track. */
     metric_scope_seconds: number;
   };
-  rhythm: { tempo_bpm: number | null; method: string; status: "estimated" | "unavailable" };
-  tonality: { key: string | null; method: string; status: "estimated" | "unavailable" };
+  rhythm: { tempo_bpm: number | null; method: string; status: "estimated" | "unavailable"; analysis_scope_seconds: number };
+  tonality: { key: string | null; method: string; status: "estimated" | "unavailable"; analysis_scope_seconds: number };
   timbre: {
     spectral_centroid_hz: number | null;
     spectral_rolloff_85_hz: number | null;
     spectral_flatness: number | null;
     zero_crossing_rate: number | null;
+    /** Spectral descriptors use at most the first 30 seconds. */
+    spectral_scope_seconds: number;
+    /** Zero-crossing rate uses the first channel across the full decoded track. */
+    zero_crossing_scope_seconds: number;
     interpretation: string;
   };
   classification: {
@@ -242,16 +247,18 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
       clipped_sample_percent: totalSamples ? Number((clippedSamples / totalSamples * 100).toFixed(4)) : 0,
       silence_percent: totalWindows ? Number((silenceWindows / totalWindows * 100).toFixed(2)) : 0,
       windowed_rms_spread_db: spread,
-      metric_scope_seconds: Number(Math.min(durationSeconds, 30).toFixed(2)),
+      metric_scope_seconds: Number(durationSeconds.toFixed(3)),
     },
-    rhythm: { tempo_bpm: tempo, method: "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate", status: tempo === null ? "unavailable" : "estimated" },
-    tonality: { key, method: "chroma-template correlation; best-effort estimate", status: key === null ? "unavailable" : "estimated" },
+    rhythm: { tempo_bpm: tempo, method: "RMS-energy novelty autocorrelation with an approximately 10 ms hop over at most 90 seconds; best-effort estimate", status: tempo === null ? "unavailable" : "estimated", analysis_scope_seconds: Number((tempoSamples.length / input.sampleRate).toFixed(3)) },
+    tonality: { key, method: "chroma-template correlation over at most 30 seconds; best-effort estimate", status: key === null ? "unavailable" : "estimated", analysis_scope_seconds: Number((keySamples.length / input.sampleRate).toFixed(3)) },
     timbre: {
       spectral_centroid_hz: spectrum.centroid,
       spectral_rolloff_85_hz: spectrum.rolloff85,
       spectral_flatness: spectrum.flatness,
       zero_crossing_rate: zcr === null ? null : Number(zcr.toFixed(5)),
-      interpretation: "These describe signal shape; they do not independently identify genre, instruments, mood or language.",
+      spectral_scope_seconds: Number(Math.min(durationSeconds, 30).toFixed(3)),
+      zero_crossing_scope_seconds: Number(durationSeconds.toFixed(3)),
+      interpretation: "Spectral descriptors use at most the first 30 seconds; zero-crossing rate uses the first channel across the full track. These describe signal shape and do not independently identify genre, instruments, mood or language.",
     },
     classification: {
       genre: null,
