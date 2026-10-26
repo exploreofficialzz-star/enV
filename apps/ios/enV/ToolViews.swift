@@ -3321,12 +3321,23 @@ private func nativeSongAudioExcerpt(_ samples: [Float]) -> (data: Data, seconds:
 }
 
 private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
-    let columns = ["filename","title","artist","album","genre","sub_style","language","tempo_bpm","tempo_band","key","energy","mood","theme","setting","vocals","instruments","duration_seconds","file_size_bytes","codec","sample_rate_hz","channels","analysis_status","warnings"]
+    let columns = [
+        "filename","title","artist","album","genre","sub_style","style_influences","language",
+        "tempo_bpm","tempo_band","key","energy","mood","theme","setting","source_role",
+        "vocals","vocal_delivery","vocal_register","vocal_harmony","performance_technique","instruments",
+        "production_traits","arrangement","duration_seconds","file_size_bytes","codec","sample_rate_hz","channels",
+        "pitch_lowest_note","pitch_highest_note","pitch_range_semitones","transient_density_per_second",
+        "spectral_centroid_mean_hz","low_energy_ratio_mean","mid_energy_ratio_mean","high_energy_ratio_mean",
+        "chord_estimates","section_boundaries","labels_reviewed","reviewer","annotation_notes",
+        "uses_remote_api","uses_hosted_model","analysis_status","warnings"
+    ]
     func cell(_ value: Any?) -> String {
         var text: String
         if value == nil || value is NSNull { text = "" }
         else if let values = value as? [String] { text = values.joined(separator: "; ") }
-        else if let object = value as? [String: Any], let bytes = try? JSONSerialization.data(withJSONObject: object), let json = String(data: bytes, encoding: .utf8) { text = json }
+        else if let jsonValue = value, JSONSerialization.isValidJSONObject(jsonValue),
+                let bytes = try? JSONSerialization.data(withJSONObject: jsonValue, options: [.sortedKeys]),
+                let json = String(data: bytes, encoding: .utf8) { text = json }
         else { text = String(describing: value!) }
         let trim = text.trimmingCharacters(in: .whitespaces)
         if trim.hasPrefix("=") || trim.hasPrefix("+") || trim.hasPrefix("@") || trim.range(of: #"^-[0-9]"#, options: .regularExpression) != nil { text = "'" + text }
@@ -3336,14 +3347,42 @@ private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
         let identity = report["identity"] as? [String: Any] ?? [:]
         let technical = report["technical"] as? [String: Any] ?? [:]
         let analysis = report["analysis"] as? [String: Any] ?? [:]
+        let dataset = report["dataset_analysis"] as? [String: Any] ?? [:]
+        let annotations = dataset["annotations"] as? [String: Any] ?? [:]
+        let pitch = dataset["pitch"] as? [String: Any] ?? [:]
+        let rhythm = dataset["rhythm"] as? [String: Any] ?? [:]
+        let tonality = dataset["tonality"] as? [String: Any] ?? [:]
+        let timbre = dataset["timbre"] as? [String: Any] ?? [:]
+        let structure = dataset["structure"] as? [String: Any] ?? [:]
+        let chordText = (tonality["chord_estimates"] as? [[String: Any]] ?? []).map { item in
+            "\(item["start_seconds"] ?? "?")-\(item["end_seconds"] ?? "?")s:\(item["chord"] ?? "unknown")"
+        }.joined(separator: " | ")
+        let sectionText = (structure["change_points"] as? [[String: Any]] ?? []).map { item in
+            "\(item["time_seconds"] ?? "?")s(\(item["change_score"] ?? "?"))"
+        }.joined(separator: " | ")
         let fields: [String: Any] = [
             "filename": report["filename"] ?? "", "title": identity["title"] ?? "", "artist": identity["artist"] ?? "", "album": identity["album"] ?? "",
-            "genre": report["genre"] ?? "", "sub_style": report["sub_style"] ?? "", "language": report["language"] ?? [],
-            "tempo_bpm": report["tempo_bpm"] ?? "", "tempo_band": report["tempo_band"] ?? "", "key": report["key"] ?? "",
-            "energy": report["energy"] ?? "", "mood": report["mood"] ?? [], "theme": report["theme"] ?? [], "setting": report["setting"] ?? [],
-            "vocals": report["vocals"] ?? [], "instruments": report["instruments"] ?? [],
+            "genre": report["genre"] ?? "", "sub_style": report["sub_style"] ?? "", "style_influences": annotations["style_influences"] ?? [],
+            "language": report["language"] ?? [], "tempo_bpm": report["tempo_bpm"] ?? "", "tempo_band": report["tempo_band"] ?? "",
+            "key": report["key"] ?? "", "energy": annotations["energy"] ?? report["energy"] ?? "",
+            "mood": report["mood"] ?? [], "theme": report["theme"] ?? [], "setting": report["setting"] ?? [],
+            "source_role": annotations["source_role"] ?? [], "vocals": report["vocals"] ?? [],
+            "vocal_delivery": annotations["vocal_delivery"] ?? [], "vocal_register": annotations["vocal_register"] ?? [],
+            "vocal_harmony": annotations["vocal_harmony"] ?? [], "performance_technique": annotations["performance_technique"] ?? [],
+            "instruments": report["instruments"] ?? [], "production_traits": annotations["production_traits"] ?? [],
+            "arrangement": annotations["arrangement"] ?? [],
             "duration_seconds": technical["duration_seconds"] ?? "", "file_size_bytes": technical["file_size_bytes"] ?? "",
             "codec": technical["codec"] ?? "", "sample_rate_hz": technical["sample_rate_hz"] ?? "", "channels": technical["channels"] ?? "",
+            "pitch_lowest_note": pitch["lowest_detected_note"] ?? "", "pitch_highest_note": pitch["highest_detected_note"] ?? "",
+            "pitch_range_semitones": pitch["pitch_range_semitones"] ?? "", "transient_density_per_second": rhythm["transient_density_per_second"] ?? "",
+            "spectral_centroid_mean_hz": timbre["mean_spectral_centroid_hz"] ?? "",
+            "low_energy_ratio_mean": timbre["mean_low_frequency_energy_ratio"] ?? "",
+            "mid_energy_ratio_mean": timbre["mean_mid_frequency_energy_ratio"] ?? "",
+            "high_energy_ratio_mean": timbre["mean_high_frequency_energy_ratio"] ?? "",
+            "chord_estimates": chordText, "section_boundaries": sectionText, "labels_reviewed": annotations["reviewed"] ?? false,
+            "reviewer": annotations["reviewer"] ?? "", "annotation_notes": annotations["notes"] ?? "",
+            "uses_remote_api": dataset["processing"].flatMap { ($0 as? [String: Any])?["uses_remote_api"] as? Bool } ?? false,
+            "uses_hosted_model": dataset["processing"].flatMap { ($0 as? [String: Any])?["uses_hosted_model"] as? Bool } ?? false,
             "analysis_status": analysis["status"] ?? "", "warnings": report["warnings"] ?? []
         ]
         return columns.map { cell(fields[$0]) }.joined(separator: ",")
