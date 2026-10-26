@@ -1054,6 +1054,283 @@ private object NativeSongSignalAnalysis {
         return bestKey.takeIf { bestScore >= 0.06 }
     }
 
+    private data class LocalFeatureFrame(
+        val start: Double,
+        val end: Double,
+        val rmsDb: Double?,
+        val peakDb: Double?,
+        val centroid: Double?,
+        val flatness: Double?,
+        val lowRatio: Double?,
+        val midRatio: Double?,
+        val highRatio: Double?,
+        val flux: Double,
+        val zcr: Double,
+        val chroma: DoubleArray,
+    )
+
+    private fun noteName(midi: Int): String = "${keyNames[((midi % 12) + 12) % 12]}${midi / 12 - 1}"
+
+    private fun localDb(value: Double): Double =
+        if (!value.isFinite() || value <= 1e-12) -120.0 else (20.0 * log10(value)).coerceAtLeast(-120.0)
+
+    private fun meanValue(values: List<Double>): Double? =
+        values.filter { it.isFinite() }.takeIf { it.isNotEmpty() }?.average()
+
+    private fun localPitch(samples: FloatArray, sampleRate: Int, start: Int, time: Double): JSONObject? {
+        val length = min(2048, samples.size - start)
+        if (length < 512 || sampleRate <= 0) return null
+        val decimation = max(1, ceil(sampleRate / 8000.0).toInt())
+        val rate = sampleRate.toDouble() / decimation
+        val reduced = ArrayList<Double>((length + decimation - 1) / decimation)
+        var cursor = 0
+        while (cursor < length) {
+            val window = 0.5 - 0.5 * cos(2.0 * PI * cursor / max(1, length - 1))
+            reduced += samples[start + cursor].toDouble() * window
+            cursor += decimation
+        }
+        val minLag = max(2, (rate / 1000.0).toInt())
+        val maxLag = min((rate / 55.0).toInt(), reduced.size / 2)
+        if (maxLag <= minLag) return null
+        var bestLag = 0
+        var bestScore = 0.0
+        for (lag in minLag..maxLag) {
+            var dot = 0.0; var left = 0.0; var right = 0.0
+            for (index in 0 until reduced.size - lag) {
+                val a = reduced[index]; val b = reduced[index + lag]
+                dot += a * b; left += a * a; right += b * b
+            }
+            val score = dot / sqrt(max(left * right, 1e-12))
+            if (score > bestScore) { bestScore = score; bestLag = lag }
+        }
+        if (bestLag == 0 || bestScore < 0.55) return null
+        val hz = rate / bestLag
+        if (!hz.isFinite() || hz !in 55.0..1000.0) return null
+        val midi = (69 + 12 * log2(hz / 440.0)).roundToInt()
+        return JSONObject().put("time_seconds", time).put("frequency_hz", (hz * 100.0).roundToInt() / 100.0)
+            .put("midi_note", midi).put("note", noteName(midi)).put("confidence", bestScore.coerceIn(0.0, 1.0))
+    }
+
+    private fun localChord(chroma: DoubleArray, start: Double, end: Double): JSONObject {
+        val total = chroma.sum()
+        if (total <= 1e-9) return JSONObject().put("start_seconds", start).put("end_seconds", end)
+            .put("chord", JSONObject.NULL).put("confidence", JSONObject.NULL).put("method", "spectral-chroma-triad-template")
+        val values = DoubleArray(12) { chroma[it] / total }
+        var bestName: String? = null
+        var bestScore = Double.NEGATIVE_INFINITY
+        var secondScore = Double.NEGATIVE_INFINITY
+        for (root in 0 until 12) for (minor in listOf(false, true)) {
+            val third = (root + if (minor) 3 else 4) % 12
+            val fifth = (root + 7) % 12
+            var score = values[root] + 0.8 * values[third] + 0.6 * values[fifth]
+            for (note in 0 until 12) if (note != root && note != third && note != fifth) score -= values[note] * 0.15
+            if (score > bestScore) { secondScore = bestScore; bestScore = score; bestName = keyNames[root] + if (minor) "m" else "" }
+            else if (score > secondScore) secondScore = score
+        }
+        val confidence = ((bestScore - max(0.0, secondScore)) / max(bestScore, 1e-9) * 3 + 0.3).coerceIn(0.0, 0.99)
+        return JSONObject().put("start_seconds", start).put("end_seconds", end).put("chord", bestName)
+            .put("confidence", confidence).put("method", "spectral-chroma-triad-template")
+    }
+
+    fun analyzeDataset(samples: FloatArray, sampleRate: Int): JSONObject {
+        require(sampleRate in 8_000..192_000) { "Analysis sample rate must be between 8 kHz and 192 kHz." }
+        require(samples.isNotEmpty()) { "No decoded audio samples were supplied." }
+        require(samples.all { it.isFinite() }) { "Audio contains non-finite samples." }
+        val duration = samples.size.toDouble() / sampleRate
+        require(duration <= 15 * 60) { "Detailed local analysis is limited to 15 minutes per track." }
+
+        val fftSize = 2048
+        val hop = max(1, sampleRate / 2)
+        val bins = fftSize / 2
+        val real = DoubleArray(fftSize)
+        val imag = DoubleArray(fftSize)
+        val previousMagnitudes = DoubleArray(bins)
+        val frames = ArrayList<LocalFeatureFrame>()
+        val timeline = JSONArray()
+        val pitchPoints = JSONArray()
+        val blockChroma = linkedMapOf<Int, DoubleArray>()
+        val fluxValues = ArrayList<Double>()
+        var transientCount = 0
+        var previousRmsDb: Double? = null
+        var totalSquares = 0.0
+        var globalPeak = 0.0
+        var dcSum = 0.0
+        var clipped = 0L
+        for (sample in samples) {
+            val value = sample.toDouble()
+            totalSquares += value * value
+            globalPeak = max(globalPeak, abs(value))
+            dcSum += value
+            if (abs(value) >= 0.999f) clipped += 1
+        }
+
+        var frameIndex = 0
+        var frameStart = 0
+        while (frameStart < samples.size) {
+            val frameEnd = min(samples.size, frameStart + hop)
+            val length = frameEnd - frameStart
+            var sum = 0.0; var peak = 0.0; var crossings = 0
+            var previous = samples[frameStart]
+            for (index in frameStart until frameEnd) {
+                val value = samples[index]
+                sum += value * value
+                peak = max(peak, abs(value.toDouble()))
+                if (index > frameStart && ((value >= 0 && previous < 0) || (value < 0 && previous >= 0))) crossings += 1
+                previous = value
+            }
+            val rms = sqrt(sum / max(1, length))
+            val rmsDb = localDb(rms)
+            real.fill(0.0); imag.fill(0.0)
+            val spectralStart = min(frameStart, max(0, samples.size - fftSize))
+            for (index in 0 until fftSize) {
+                val sampleIndex = spectralStart + index
+                val value = if (sampleIndex < samples.size) samples[sampleIndex].toDouble() else 0.0
+                real[index] = value * (0.5 - 0.5 * cos(2.0 * PI * index / (fftSize - 1)))
+            }
+            fft(real, imag)
+            val chroma = DoubleArray(12)
+            var magnitudeSum = 0.0; var weightedFrequency = 0.0; var logSum = 0.0
+            var lowPower = 0.0; var midPower = 0.0; var highPower = 0.0; var powerSum = 0.0; var fluxNumerator = 0.0
+            val magnitudes = DoubleArray(bins)
+            for (bin in 1 until bins) {
+                val magnitude = hypot(real[bin], imag[bin])
+                magnitudes[bin] = magnitude
+                val frequency = bin.toDouble() * sampleRate / fftSize
+                val power = magnitude * magnitude
+                magnitudeSum += magnitude; weightedFrequency += magnitude * frequency; logSum += ln(max(magnitude, 1e-12)); powerSum += power
+                if (frequency < 160) lowPower += power else if (frequency < 2000) midPower += power else highPower += power
+                if (frequency in 45.0..min(5000.0, sampleRate / 2.0)) {
+                    val midi = (69 + 12 * log2(frequency / 440.0)).roundToInt()
+                    chroma[(midi % 12 + 12) % 12] += magnitude
+                }
+                fluxNumerator += max(0.0, magnitude - previousMagnitudes[bin])
+            }
+            val totalMagnitude = magnitudeSum
+            val flux = if (totalMagnitude > 1e-9) fluxNumerator / totalMagnitude else 0.0
+            for (bin in 0 until bins) previousMagnitudes[bin] = magnitudes[bin]
+            if (previousRmsDb != null && rmsDb - previousRmsDb!! >= 3.0) transientCount += 1
+            if (flux > 0.22) transientCount += 1
+            previousRmsDb = rmsDb
+            fluxValues += flux
+            val lowRatio = if (powerSum > 1e-12) lowPower / powerSum else 0.0
+            val midRatio = if (powerSum > 1e-12) midPower / powerSum else 0.0
+            val highRatio = if (powerSum > 1e-12) highPower / powerSum else 0.0
+            val centroid = if (magnitudeSum > 1e-9) weightedFrequency / magnitudeSum else null
+            val flatness = if (magnitudeSum > 1e-9) exp(logSum / max(1, bins - 1)) / (magnitudeSum / max(1, bins - 1)) else null
+            val startSeconds = frameStart.toDouble() / sampleRate
+            val endSeconds = frameEnd.toDouble() / sampleRate
+            val frame = LocalFeatureFrame(startSeconds, endSeconds, rmsDb, localDb(peak), centroid, flatness, lowRatio, midRatio, highRatio, flux, crossings.toDouble() / max(1, length - 1), chroma)
+            frames += frame
+            timeline.put(JSONObject().put("start_seconds", startSeconds).put("end_seconds", endSeconds)
+                .put("rms_dbfs", rmsDb).put("peak_dbfs", localDb(peak))
+                .put("spectral_centroid_hz", centroid ?: JSONObject.NULL).put("spectral_flatness", flatness ?: JSONObject.NULL)
+                .put("low_frequency_energy_ratio", lowRatio).put("mid_frequency_energy_ratio", midRatio)
+                .put("high_frequency_energy_ratio", highRatio).put("spectral_flux", flux)
+                .put("zero_crossing_rate", frame.zcr))
+            val block = (startSeconds / 2.0).toInt()
+            val blockValues = blockChroma.getOrPut(block) { DoubleArray(12) }
+            for (note in 0 until 12) blockValues[note] += chroma[note]
+            if (frameIndex % 2 == 0) localPitch(samples, sampleRate, frameStart, startSeconds)?.let { pitchPoints.put(it) }
+            frameIndex++
+            frameStart += hop
+        }
+
+        val allChroma = DoubleArray(12)
+        blockChroma.values.forEach { block -> for (index in 0 until 12) allChroma[index] += block[index] }
+        val chromaTotal = allChroma.sum()
+        val normalizedChroma = DoubleArray(12) { if (chromaTotal > 1e-9) allChroma[it] / chromaTotal else 0.0 }
+        val chords = JSONArray()
+        blockChroma.forEach { (block, chroma) -> chords.put(localChord(chroma, block * 2.0, min(duration, (block + 1) * 2.0))) }
+        val pitches = (0 until pitchPoints.length()).mapNotNull { pitchPoints.optJSONObject(it)?.optInt("midi_note") }
+        val transientRate = max(transientCount, fluxValues.count { it >= max(0.15, (fluxValues.averageOrZero()) * 1.4) }) / max(duration, 1e-9)
+        val changes = JSONArray()
+        var lastBoundary = 0.0
+        for (index in 1 until frames.size) {
+            val prior = frames[index - 1]; val current = frames[index]
+            val rmsChange = abs((current.rmsDb ?: -120.0) - (prior.rmsDb ?: -120.0)) / 24.0
+            val centroidChange = abs((current.centroid ?: 0.0) - (prior.centroid ?: 0.0)) / max(1000.0, prior.centroid ?: 1000.0)
+            val lowChange = abs((current.lowRatio ?: 0.0) - (prior.lowRatio ?: 0.0))
+            val score = (rmsChange * 0.45 + centroidChange * 0.25 + lowChange * 0.2 + current.flux * 0.1).coerceIn(0.0, 1.0)
+            if (score >= 0.27 && current.start - lastBoundary >= 4.0 && duration - current.start >= 3.0) {
+                changes.put(JSONObject().put("time_seconds", current.start).put("change_score", score)
+                    .put("reason", "Measured level, brightness, frequency balance or spectral flux changed; not a verified verse/chorus label."))
+                lastBoundary = current.start
+            }
+        }
+        val boundaries = mutableListOf(0.0)
+        for (index in 0 until changes.length()) boundaries += changes.getJSONObject(index).getDouble("time_seconds")
+        boundaries += duration
+        val sections = JSONArray()
+        for (index in 0 until boundaries.size - 1) {
+            if (boundaries[index + 1] - boundaries[index] >= 1.0) {
+                sections.put(JSONObject().put("start_seconds", boundaries[index]).put("end_seconds", boundaries[index + 1])
+                    .put("label", "section_${sections.length() + 1}").put("label_source", "automatic_feature_change").put("semantic_section", JSONObject.NULL))
+            }
+        }
+        val descriptors = JSONArray()
+        val meanLow = meanValue(frames.mapNotNull { it.lowRatio }) ?: 0.0
+        val meanMid = meanValue(frames.mapNotNull { it.midRatio }) ?: 0.0
+        val meanHigh = meanValue(frames.mapNotNull { it.highRatio }) ?: 0.0
+        val meanCentroid = meanValue(frames.mapNotNull { it.centroid }) ?: 0.0
+        if (meanLow >= 0.35) descriptors.put(JSONObject().put("tag", "low-frequency-prominent").put("evidence", "Low band carries ${(meanLow * 100).roundToInt()}% of average spectral energy."))
+        if (meanHigh >= 0.30) descriptors.put(JSONObject().put("tag", "high-frequency-prominent").put("evidence", "High band carries ${(meanHigh * 100).roundToInt()}% of average spectral energy."))
+        if (transientRate >= 3) descriptors.put(JSONObject().put("tag", "transient-dense").put("evidence", "Approximately ${(transientRate * 100).roundToInt() / 100.0} onset-like changes per second."))
+        if (meanCentroid >= 3000) descriptors.put(JSONObject().put("tag", "spectrally-bright").put("evidence", "Mean spectral centroid is ${meanCentroid.roundToInt()} Hz."))
+        if (descriptors.length() == 0) descriptors.put(JSONObject().put("tag", "no-dominant-rule-cue").put("evidence", "No conservative measurable rule was triggered."))
+        val pitchLow = pitches.minOrNull()
+        val pitchHigh = pitches.maxOrNull()
+        val sortedLevels = frames.mapNotNull { it.rmsDb }.sorted()
+        val dynamicRange = if (sortedLevels.size > 1) sortedLevels[(sortedLevels.size - 1) * 95 / 100] - sortedLevels[(sortedLevels.size - 1) * 10 / 100] else JSONObject.NULL
+        val rms = sqrt(totalSquares / samples.size)
+        val peak = globalPeak
+        val annotations = JSONObject()
+        listOf("genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement").forEach { annotations.put(it, JSONArray()) }
+        annotations.put("notes", "").put("reviewed", false).put("reviewer", JSONObject.NULL)
+
+        val warnings = JSONArray()
+            .put("No hosted model or AI API was used. Genre, language, mood, instrument identity and vocal type require human annotation.")
+            .put("Pitch/chord estimates are made from the mono mix and may follow instruments rather than a singer.")
+            .put("Section boundaries are generic measured feature changes, not confirmed verse/chorus labels.")
+        if (pitchPoints.length() == 0) warnings.put("No stable dominant pitch was detected with sufficient confidence.")
+        val keyEstimate = estimateKey(samples, sampleRate)
+        val globalPeakDb = localDb(peak)
+        val globalRmsDb = localDb(rms)
+        return JSONObject()
+            .put("schema_version", "env.music-dataset-analysis.v1")
+            .put("source", JSONObject().put("sample_rate_hz", sampleRate).put("channels", 1).put("frame_count", samples.size).put("duration_seconds", duration))
+            .put("processing", JSONObject().put("method", "local-digital-signal-processing").put("uses_remote_api", false).put("uses_hosted_model", false).put("model_inference", false))
+            .put("technical", JSONObject().put("duration_seconds", duration).put("sample_rate_hz", sampleRate).put("channels", 1)
+                .put("peak_dbfs", globalPeakDb).put("rms_dbfs", globalRmsDb)
+                .put("crest_factor_db", if (rms > 1e-12) globalPeakDb - globalRmsDb else JSONObject.NULL)
+                .put("dynamic_range_estimate_db", dynamicRange)
+                .put("clipped_sample_percent", clipped.toDouble() / samples.size * 100.0).put("dc_offset_by_channel", JSONArray().put(dcSum / samples.size)))
+            .put("rhythm", JSONObject().put("tempo_bpm", estimateBpm(samples, sampleRate) ?: JSONObject.NULL)
+                .put("tempo_method", "Local onset-envelope autocorrelation estimate").put("transient_density_per_second", transientRate)
+                .put("transient_event_count", max(transientCount, fluxValues.count { it >= max(0.15, (fluxValues.averageOrZero()) * 1.4) }))
+                .put("interpretation", "Transient estimates are not verified drum-hit counts; tempo may be half/double-time."))
+            .put("tonality", JSONObject().put("key_estimate", keyEstimate ?: JSONObject.NULL).put("key_method", "Local chroma template estimate")
+                .put("pitch_class_profile", JSONArray().also { list -> keyNames.forEachIndexed { index, name -> list.put(JSONObject().put("note", name).put("energy", normalizedChroma[index])) } })
+                .put("chord_estimates", chords).put("interpretation", "Chords are template-based estimates from the mixed signal."))
+            .put("pitch", JSONObject().put("source", "full_mix_dominant_pitch_estimate").put("points", pitchPoints)
+                .put("lowest_detected_note", pitchLow?.let(::noteName) ?: JSONObject.NULL).put("highest_detected_note", pitchHigh?.let(::noteName) ?: JSONObject.NULL)
+                .put("pitch_range_semitones", if (pitchLow != null && pitchHigh != null) pitchHigh - pitchLow else JSONObject.NULL)
+                .put("note", "Dominant pitch of the full mix; not a vocal-only contour or definitive voice type."))
+            .put("timbre", JSONObject().put("mean_spectral_centroid_hz", meanCentroid).put("mean_spectral_flatness", meanValue(frames.mapNotNull { it.flatness }) ?: JSONObject.NULL)
+                .put("mean_low_frequency_energy_ratio", meanLow).put("mean_mid_frequency_energy_ratio", meanMid).put("mean_high_frequency_energy_ratio", meanHigh)
+                .put("mean_zero_crossing_rate", meanValue(frames.map { it.zcr }) ?: JSONObject.NULL).put("descriptors", descriptors))
+            .put("timeline", timeline)
+            .put("structure", JSONObject().put("change_points", changes).put("sections", sections)
+                .put("note", "Automatic boundaries are not verified verse/chorus labels."))
+            .put("style_cues", descriptors)
+            .put("separation", JSONObject().put("status", "not_performed")
+                .put("reason", "Native local mode does not claim true vocal/drum/bass source separation.")
+                .put("supported_local_layers", JSONArray()).put("note", "A future native local-layer export must use explicitly labeled signal candidates, never imply clean source isolation."))
+            .put("annotations", annotations)
+            .put("warnings", warnings)
+    }
+
+    private fun List<Double>.averageOrZero(): Double = if (isEmpty()) 0.0 else average()
+
     private fun fft(real: DoubleArray, imag: DoubleArray) {
         val n = real.size
         var j = 0
