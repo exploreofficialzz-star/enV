@@ -238,6 +238,10 @@ test("Music Analyzer song profile exports the requested top-level metadata field
   assert.equal(profile.metadata.embedded_genre, "Legacy file tag");
   assert.equal(profile.analysis_status.genre, "unknown");
   assert.equal(profile.analysis_status.language, "unknown");
+  assert.equal(profile.analysis_status.sub_style, "unknown");
+  assert.equal(profile.analysis_status.mood, "unknown");
+  assert.equal(profile.analysis_status.instruments, "unknown");
+  assert.equal(profile.analysis_status.vocal_style, "unknown");
   assert.equal(profile.analysis_status.tempo_bpm, "signal_estimate");
   assert.equal(profile.analysis_status.classification, "model_completed");
   assert.equal(profile.genre_candidates[0]?.score, 0.86);
