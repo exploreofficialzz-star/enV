@@ -1976,24 +1976,28 @@ enum NativeAudioWavProcessor {
                 "clipped_sample_percent": totalSamples > 0 ? Double(clipped) * 100 / Double(totalSamples) : 0,
                 "silence_percent": totalWindows > 0 ? Double(silentWindows) * 100 / Double(totalWindows) : 0,
                 "windowed_rms_spread_db": nullable(spread),
-                "metric_scope_seconds": min(duration, 30)
+                "metric_scope_seconds": duration
             ],
             "rhythm": [
                 "tempo_bpm": tempo.map { $0 as Any } ?? NSNull(),
-                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate",
-                "status": tempo == nil ? "unavailable" : "estimated"
+                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop over at most 90 seconds; best-effort estimate",
+                "status": tempo == nil ? "unavailable" : "estimated",
+                "analysis_scope_seconds": min(duration, 90)
             ],
             "tonality": [
                 "key": key.map { $0 as Any } ?? NSNull(),
-                "method": "4096-point chroma-template correlation; best-effort estimate",
-                "status": key == nil ? "unavailable" : "estimated"
+                "method": "4096-point chroma-template correlation over at most 30 seconds; best-effort estimate",
+                "status": key == nil ? "unavailable" : "estimated",
+                "analysis_scope_seconds": min(duration, 30)
             ],
             "timbre": [
                 "spectral_centroid_hz": nullable(spectrum.centroidHz),
                 "spectral_rolloff_85_hz": nullable(spectrum.rolloff85Hz),
                 "spectral_flatness": nullable(spectrum.flatness),
                 "zero_crossing_rate": nullable(zcr),
-                "interpretation": "Signal features do not independently identify genre, instruments, mood or language."
+                "spectral_scope_seconds": min(duration, 30),
+                "zero_crossing_scope_seconds": duration,
+                "interpretation": "Spectral descriptors use at most the first 30 seconds; zero-crossing rate uses the first channel across the full track. Signal features do not independently identify genre, instruments, mood or language."
             ],
             "classification": [
                 "genre": NSNull(), "sub_style": NSNull(), "language": [String](),
