@@ -1705,6 +1705,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
     }
     @Composable fun CompactLibrary(){
         if(toolkitTab !in setOf("Icons","Fonts")){ToolkitContent();return}
+        val previewInk="#%06X".format(MaterialTheme.colorScheme.onSurface.toArgb() and 0xFFFFFF)
         Card { Column(Modifier.fillMaxWidth().height(220.dp).padding(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(toolkitTab,modifier=Modifier.weight(1f));TextButton(onClick={inlineToolkit=false;editTool="move"}){Text("Done")}}
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
@@ -1712,7 +1713,7 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
                 else {OutlinedTextField(fontQuery,{fontQuery=it},label={Text("Find font")},modifier=Modifier.width(140.dp),singleLine=true);OutlinedTextField(fontPreviewWords,{fontPreviewWords=it.take(80)},label={Text("Try your words")},modifier=Modifier.width(180.dp),singleLine=true);TextButton(onClick={animateFontPreviews=!animateFontPreviews}){Text(if(animateFontPreviews)"Pause" else "Play")}}
             }
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                if(toolkitTab=="Icons")bundledIconNames.filter{iconQuery.isBlank()||it.contains(iconQuery,true)}.take(iconBrowseLimit).forEach{name->OutlinedButton(onClick={val id=selected?.takeIf{it.kind=="icon"}?.id?:run{add("icon");selectedId};chooseIcon(id,name)}){Column(Modifier.width(70.dp),horizontalAlignment=Alignment.CenterHorizontally){UxUiNativeArtworkPreview(UxUiNativeLayer("preview","icon",name,0,0,44,44,"",iconSvg=UxNativeArtworkLibrary.icon(context,name).orEmpty()),Modifier.size(44.dp));Text(name.substringAfter(':'),maxLines=1,fontSize=10.sp)}}}
+                if(toolkitTab=="Icons")bundledIconNames.filter{iconQuery.isBlank()||it.contains(iconQuery,true)}.take(iconBrowseLimit).forEach{name->OutlinedButton(onClick={val id=selected?.takeIf{it.kind=="icon"}?.id?:run{add("icon");selectedId};chooseIcon(id,name)}){Column(Modifier.width(70.dp),horizontalAlignment=Alignment.CenterHorizontally){UxUiNativeArtworkPreview(UxUiNativeLayer("preview","icon",name,0,0,44,44,"",color=previewInk,iconSvg=UxNativeArtworkLibrary.icon(context,name).orEmpty()),Modifier.size(44.dp));Text(name.substringAfter(':'),maxLines=1,fontSize=10.sp)}}}
                 else uxNativeFontFamilies.filter{it.contains(fontQuery,true)}.forEach{family->OutlinedButton(onClick={val layer=selected?.takeUnless{it.kind in setOf("icon","image","rect","ellipse","divider") }?:run{add("text");elements.last()};edit(layer.id){it.copy(fontFamily=family,fontData=uxNativeBundledFontData(context,family))};inlineToolkit=false;editTool="move"}){Column(Modifier.width(190.dp)){Text(family,fontSize=11.sp);UxNativeAnimatedFontSpecimen(family,fontPreviewWords,animateFontPreviews)}}}
             }
         }}

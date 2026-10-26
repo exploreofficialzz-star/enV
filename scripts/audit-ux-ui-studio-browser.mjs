@@ -224,6 +224,8 @@ try {
         return !!first?.querySelector("svg path,svg circle,svg rect,svg polygon,svg polyline,svg line,svg ellipse") && !first?.querySelector('[aria-label="Loading icon preview"],[aria-label="Icon preview unavailable"]');
       });
       await icon.click();
+      await drawer.waitFor({state:"hidden"});
+      entry.checks.push("Choosing an icon closes its picker and returns to editing");
       await waitForStored(page, (project) => project.elements.some((layer) => layer.kind === "icon" && layer.iconSvg.length > 20), "an offline icon vector");
       const brokenImages = await drawer.locator("img").evaluateAll((images) => images.filter((image) => image.complete && image.naturalWidth === 0).length);
       assert.equal(brokenImages, 0, "Icon picker has no broken images while CDN requests fail");

@@ -1987,7 +1987,7 @@ export function UxUiStudioEngine() {
         const details = { iconName: "custom:" + name, iconSvg: parsed.body, iconViewBox: parsed.viewBox, iconLicense: "User supplied", iconAuthor: "Imported by user", name };
         if (selected?.kind === "icon") updateLayer(selected.id, details);
         else { const icon = { ...makeLayer("icon", Math.round(board.width / 2 - 20), Math.round(board.height / 3), board.width, board.height), ...details }; checkpoint(); setElements((previous) => [...previous, icon]); setSelectedId(icon.id); }
-        setNotice("SVG icon imported.");
+        closeToolkit(); setNotice("SVG icon imported.");
       } catch (error) { setNotice(error instanceof Error ? error.message : "That SVG could not be imported."); }
     };
     reader.onerror = () => setNotice("Could not read that SVG.");
@@ -2017,6 +2017,7 @@ export function UxUiStudioEngine() {
         setInspectorTab("design");
         setNotice("Added " + iconName + " with source details recorded.");
       }
+      setIconError(""); closeToolkit();
     } catch (error) {
       setIconError(error instanceof Error ? error.message : "Could not load this icon.");
     } finally { setIconLoading(false); }
