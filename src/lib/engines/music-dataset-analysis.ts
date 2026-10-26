@@ -39,14 +39,21 @@ export type ChordEstimate = {
 export type MusicDatasetAnnotations = {
   genre: string[];
   sub_style: string[];
+  style_influences: string[];
   language: string[];
+  energy: string[];
   mood: string[];
+  source_role: string[];
   vocals: string[];
   vocal_delivery: string[];
   vocal_register: string[];
+  vocal_harmony: string[];
+  performance_technique: string[];
   instruments: string[];
   themes: string[];
   listening_scene: string[];
+  production_traits: string[];
+  arrangement: string[];
   notes: string;
   reviewed: boolean;
   reviewer: string | null;
@@ -317,7 +324,7 @@ function estimateChord(chroma: readonly number[], start: number, end: number): C
 }
 
 function emptyAnnotations(): MusicDatasetAnnotations {
-  return { genre: [], sub_style: [], language: [], mood: [], vocals: [], vocal_delivery: [], vocal_register: [], instruments: [], themes: [], listening_scene: [], notes: "", reviewed: false, reviewer: null };
+  return { genre: [], sub_style: [], style_influences: [], language: [], energy: [], mood: [], source_role: [], vocals: [], vocal_delivery: [], vocal_register: [], vocal_harmony: [], performance_technique: [], instruments: [], themes: [], listening_scene: [], production_traits: [], arrangement: [], notes: "", reviewed: false, reviewer: null };
 }
 
 function createSections(frames: FeatureFrame[], duration: number) {
