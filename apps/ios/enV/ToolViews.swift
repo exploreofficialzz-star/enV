@@ -2630,7 +2630,6 @@ struct NativeSongAnalysisTrack: Identifiable {
 
 private struct NativeSongAnalysisScan {
     var report: [String: Any]
-    let monoSamples16k: [Float]
 }
 
 private struct NativeSongAnalysisDocument: FileDocument {
@@ -2979,7 +2978,7 @@ private struct NativeSongMetadataAnalyzerView: View {
         analysis["status"] = reviewed ? "full_local_reviewed" : "full_local_needs_review"
         report["analysis"] = analysis
         tracks[index].report = report
-        tracks[index].status = reviewed && nativeSongStrings(report["warnings"]).isEmpty ? "Done" : "Partial"
+        tracks[index].status = reviewed ? "Done" : "Partial"
     }
 
     private func modeChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -3205,7 +3204,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     var warnings = [String]()
     if bpm == nil { warnings.append("Tempo could not be estimated reliably.") }
     if key == nil { warnings.append("Key could not be estimated reliably.") }
-    if tag("genre") == nil { warnings.append("Genre is not embedded; use Full Analysis for an audio-based estimate.") }
+    if tag("genre") == nil { warnings.append("Genre is not embedded; add a human-reviewed label in Full Analysis.") }
     let bitrateEstimate = duration > 0 ? Double(fileSize * 8) / duration : 0
     var report: [String: Any] = [
         "schema_version": "1.1", "filename": filename,
@@ -3242,7 +3241,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
         warnings.append("Genre, language, mood, vocal type and instrument identity require human review; no hosted model was used.")
         report["warnings"] = Array(Set(warnings))
     }
-    return NativeSongAnalysisScan(report: report, monoSamples16k: mono)
+    return NativeSongAnalysisScan(report: report)
 }
 
 private func nativeSongCodec(_ ext: String) -> String {
@@ -3272,54 +3271,6 @@ private func nativeSongString(_ value: Any?, fallback: String = "") -> String {
     return text == "unknown" || text == "null" ? fallback : text
 }
 private func nativeSongStrings(_ value: Any?) -> [String] { value as? [String] ?? [] }
-private func nativeSongAppendWarning(_ report: inout [String: Any], _ warning: String) {
-    var warnings = report["warnings"] as? [String] ?? []
-    warnings.append(warning)
-    report["warnings"] = Array(Set(warnings))
-}
-private func nativeSongMerge(_ report: inout [String: Any], semantic: [String: Any], extraWarnings: [String]) {
-    for key in ["genre", "sub_style", "energy", "lyric_evidence"] {
-        if let value = semantic[key], !(value is NSNull) { report[key] = value }
-    }
-    for key in ["language", "mood", "theme", "setting", "vocals", "instruments", "descriptions"] {
-        if let value = semantic[key] as? [String] { report[key] = value }
-    }
-    var warnings = report["warnings"] as? [String] ?? []
-    warnings.append(contentsOf: semantic["warnings"] as? [String] ?? [])
-    warnings.append(contentsOf: extraWarnings)
-    report["warnings"] = Array(Set(warnings))
-    if var analysis = report["analysis"] as? [String: Any] {
-        analysis["status"] = "full"
-        analysis["semantic_analysis"] = "completed"
-        report["analysis"] = analysis
-    }
-}
-
-private func nativeSongAudioExcerpt(_ samples: [Float]) -> (data: Data, seconds: Double)? {
-    let rate = 16_000
-    guard samples.count >= rate * 3 else { return nil }
-    let section = min(rate * 20, samples.count / 3)
-    guard section >= rate else { return nil }
-    let starts = [0, max(0, samples.count / 2 - section / 2), max(0, samples.count - section)]
-    let gap = rate / 4
-    let sampleCount = section * 3 + gap * 2
-    var data = Data()
-    data.reserveCapacity(44 + sampleCount * 2)
-    data.append(contentsOf: Array("RIFF".utf8)); data.appendNativeLE(UInt32(36 + sampleCount * 2))
-    data.append(contentsOf: Array("WAVEfmt ".utf8)); data.appendNativeLE(UInt32(16))
-    data.appendNativeLE(UInt16(1)); data.appendNativeLE(UInt16(1))
-    data.appendNativeLE(UInt32(rate)); data.appendNativeLE(UInt32(rate * 2)); data.appendNativeLE(UInt16(2)); data.appendNativeLE(UInt16(16))
-    data.append(contentsOf: Array("data".utf8)); data.appendNativeLE(UInt32(sampleCount * 2))
-    for (index, start) in starts.enumerated() {
-        for sample in samples[start..<(start + section)] {
-            let clipped = max(-1, min(1, sample))
-            data.appendNativeLE(Int16((clipped < 0 ? clipped * 32768 : clipped * 32767).rounded()))
-        }
-        if index < starts.count - 1 { data.append(Data(repeating: 0, count: gap * 2)) }
-    }
-    return (data, Double(sampleCount) / Double(rate))
-}
-
 private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
     let columns = [
         "filename","title","artist","album","genre","sub_style","style_influences","language",
