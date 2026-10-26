@@ -5,6 +5,7 @@ import com.chastech.env.data.ToolRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
 
 class NativeAudioEngineTest {
     @Test
@@ -53,6 +54,25 @@ class NativeAudioEngineTest {
         )
         assertEquals("file:analyze", NativeAudioEngine.operationFor(analyzer))
         assertTrue(NativeAudioEngine.supports(analyzer))
+    }
+
+    @Test
+    fun musicAnalyzerEmitsV2RmsProxyWithoutClaimingStandardLufs() {
+        val sampleRate = 8_000
+        val tone = FloatArray(sampleRate * 4) { index ->
+            (0.5 * kotlin.math.sin(2.0 * Math.PI * 440.0 * index / sampleRate)).toFloat()
+        }
+        val wav = NativeAudioWavProcessor.encodePcm16(sampleRate, listOf(tone))
+        val result = NativeAudioWavProcessor.process(wav, operation = "analyze", fileName = "tone.wav")
+        val root = JSONObject(result.report)
+        assertEquals("env.music-analysis.v2", root.getString("schema_version"))
+        val audio = root.getJSONObject("audio")
+        assertEquals(4.0, audio.getDouble("duration_seconds"), 0.001)
+        assertTrue(audio.has("rms_loudness_proxy_db"))
+        assertTrue(!audio.has("estimated_loudness_lufs"))
+        val rms = audio.getDouble("rms_dbfs")
+        val proxy = audio.getDouble("rms_loudness_proxy_db")
+        assertTrue(kotlin.math.abs(proxy - (rms - 0.691)) < 0.02)
     }
 
     @Test
