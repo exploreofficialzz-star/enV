@@ -110,18 +110,19 @@ for (const marker of ["Analyze on this device", "Song profile JSON", "Training m
   assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
 }
 assert.ok(!musicAnalyzer.includes("allowModelUpload"), "Music Analyzer must not send audio to a hosted classifier");
+assert.ok(musicAnalyzer.includes("exactFileSha256") && musicAnalyzer.includes("sourceSha256"), "Web Analyzer must compute SHA-256 from original bytes and pass it to result contracts");
 assert.ok(!musicAnalyzer.includes("/api/music-analysis"), "Music Analyzer local processing must not call its legacy remote-classification route");
 assert.ok(songMetadataAnalyzer.includes("analyzeMusicDatasetAudio"), "Song Metadata Analyzer must use the local DSP dataset engine");
 assert.ok(!songMetadataAnalyzer.includes("runAiTask") && !songMetadataAnalyzer.includes("fetchAiAvailability"), "Song Metadata Analyzer must not call a hosted AI service");
 assert.ok(songMetadataAnalyzer.includes("Human-reviewed training labels") && songMetadataAnalyzer.includes("dataset_analysis"), "Song Metadata Analyzer must expose label review and detailed analysis data");
 const localDatasetEngine = fs.readFileSync(new URL("../src/lib/engines/music-dataset-analysis.ts", import.meta.url), "utf8");
-for (const marker of ["env.music-dataset-analysis.v2", "uses_remote_api: false", "uses_hosted_model: false", "model_inference: false", "chord_estimates", "change_points", "repetition_candidates", "normalized-feature-sequence", "createLocalSignalLayers", "encodeMonoPcm16Wav", "reviewed: false"]) {
+for (const marker of ["env.music-dataset-analysis.v2", "fingerprint", "file_sha256", "uses_remote_api: false", "uses_hosted_model: false", "model_inference: false", "chord_estimates", "change_points", "repetition_candidates", "normalized-feature-sequence", "createLocalSignalLayers", "encodeMonoPcm16Wav", "reviewed: false"]) {
   assert.ok(localDatasetEngine.includes(marker), `Local music dataset analysis contract missing: ${marker}`);
 }
 for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
   assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
 }
-for (const marker of ["env.music-profile.v2", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
+for (const marker of ["env.music-profile.v2", "fingerprint", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
   assert.ok(musicAnalysisProfile.includes(marker), `Music Analyzer profile export contract missing: ${marker}`);
 }
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
@@ -130,13 +131,15 @@ for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent
 assert.ok(musicAnalysisRoute.includes("MUSIC_ANALYSIS_MODEL_DISABLED"), "legacy music-analysis route must return an explicit disabled result");
 assert.match(musicAnalysisRoute, /status:\s*410/, "legacy music-analysis route must return HTTP 410");
 assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_ENDPOINT|MUSIC_ANALYSIS_TOKEN|\/api\/ai\/run|fetch\(/, "Music Analyzer route must not forward audio to hosted inference");
-for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2", "metric_scope_seconds", "analysis_scope_seconds", "spectral_scope_seconds", "zero_crossing_scope_seconds"]) {
+for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2", "fingerprint", "file_sha256", "sha-256-exact-file-bytes", "metric_scope_seconds", "analysis_scope_seconds", "spectral_scope_seconds", "zero_crossing_scope_seconds"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer v2 measurement contract missing: ${marker}`);
 }
 for (const [platform, processor] of [["Android", androidNativeAudioProcessor], ["iOS", iosNativeAudioViews]]) {
   assert.ok(processor.includes('"env.music-analysis.v2"'), `${platform} Music Analyzer must emit schema v2`);
   assert.ok(processor.includes('"rms_loudness_proxy_db"'), `${platform} Music Analyzer must use the honest RMS proxy field`);
   assert.ok(!processor.includes('"estimated_loudness_lufs"'), `${platform} Music Analyzer must not emit the legacy misleading LUFS field`);
+  assert.ok(processor.includes('"file_sha256"'), `${platform} Music Analyzer must emit exact-file SHA-256 provenance`);
+  assert.ok(processor.includes('"sha-256-exact-file-bytes"'), `${platform} Music Analyzer must name its exact-file matching method`);
   for (const scopeField of ["metric_scope_seconds", "analysis_scope_seconds", "spectral_scope_seconds", "zero_crossing_scope_seconds"]) {
     assert.ok(processor.includes(scopeField), `${platform} Music Analyzer is missing scope field ${scopeField}`);
   }
@@ -145,9 +148,11 @@ assert.ok(iosNativeAudioTests.includes('"env.music-analysis.v2"'), "iOS contract
 assert.ok(iosNativeAudioTests.includes('"rms_loudness_proxy_db"'), "iOS contract tests must assert the renamed loudness proxy");
 assert.ok(iosNativeAudioTests.includes('"metric_scope_seconds"'), "iOS contract tests must assert whole-track scope");
 assert.ok(iosNativeAudioTests.includes('"spectral_scope_seconds"'), "iOS contract tests must assert spectral excerpt scope");
+assert.ok(iosNativeAudioTests.includes('"file_sha256"'), "iOS contract tests must verify exact-file hashing");
 assert.ok(androidNativeAudioTests.includes("env.music-analysis.v2") || androidNativeAudioTests.includes("rms_loudness_proxy_db"), "Android native tests must verify the v2 contract");
 assert.ok(androidNativeAudioTests.includes('"metric_scope_seconds"'), "Android contract tests must assert whole-track scope");
 assert.ok(androidNativeAudioTests.includes('"spectral_scope_seconds"'), "Android contract tests must assert spectral excerpt scope");
+assert.ok(androidNativeAudioTests.includes('"file_sha256"'), "Android contract tests must verify exact-file hashing");
 const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
 const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
 const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
