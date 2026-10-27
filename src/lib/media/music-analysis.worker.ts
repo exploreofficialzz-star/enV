@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
-import { analyzeMusicAudio, type MusicAnalysisInput, type MusicAnalysisResult } from "../engines/music-analysis.ts";
-import { analyzeMusicDatasetAudio, type MusicDatasetAnalysis } from "../engines/music-dataset-analysis.ts";
+import type { MusicAnalysisInput, MusicAnalysisResult } from "../engines/music-analysis.ts";
+import type { MusicDatasetAnalysis } from "../engines/music-dataset-analysis.ts";
+import { runMusicAnalysisWorkerCore } from "./music-analysis-worker-core.ts";
 
 type AnalyzeRequest = {
   type: "analyze";
@@ -23,17 +24,11 @@ workerScope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   try {
     const channels = request.input.channels.map((buffer) => new Float32Array(buffer));
     const input = { ...request.input, channels };
-    const analysis = analyzeMusicAudio(input);
-    const datasetAnalysis = await analyzeMusicDatasetAudio(
-      {
-        channels,
-        sampleRate: input.sampleRate,
-        fileName: input.fileName,
-        sourceSha256: input.sourceSha256,
-      },
-      { onProgress: (fraction) => send({ type: "progress", requestId: request.requestId, fraction }) },
+    const result = await runMusicAnalysisWorkerCore(
+      input,
+      (fraction) => send({ type: "progress", requestId: request.requestId, fraction }),
     );
-    send({ type: "result", requestId: request.requestId, analysis, datasetAnalysis });
+    send({ type: "result", requestId: request.requestId, ...result });
   } catch (error) {
     send({
       type: "error",
