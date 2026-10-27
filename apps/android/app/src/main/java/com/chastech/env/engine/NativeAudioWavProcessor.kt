@@ -2,6 +2,7 @@ package com.chastech.env.engine
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.abs
@@ -208,7 +209,7 @@ object NativeAudioWavProcessor {
         val rms = if (input.frames == 0) 0.0 else sqrt(input.channels.sumOf { channel -> channel.sumOf { it.toDouble() * it } } / (input.frames.toDouble() * input.channels.size))
         val dc = if (input.frames == 0) 0.0 else input.channels.sumOf { channel -> channel.sumOf { it.toDouble() } } / (input.frames.toDouble() * input.channels.size)
         when (operation) {
-            "analyze" -> return NativeAudioWavResult(musicAnalysisReport(input, fileName, bytes.size, peak, rms), durationSeconds = duration)
+            "analyze" -> return NativeAudioWavResult(musicAnalysisReport(input, fileName, bytes.size, peak, rms, sha256Hex(bytes)), durationSeconds = duration)
             "inspector" -> return NativeAudioWavResult("WAV inspector\nDuration: ${fmt(duration)} s\nSample rate: ${input.sampleRateHz} Hz\nChannels: ${input.channels.size}\nFrames per channel: ${input.frames}\nSource encoding: ${input.sourceBits}-bit ${if (input.sourceEncoding == 3) "IEEE float" else "PCM"}\nSource size: ${bytes.size} bytes", durationSeconds = duration)
             "duration" -> return NativeAudioWavResult("Duration: ${fmt(duration)} seconds\nSample rate: ${input.sampleRateHz} Hz", durationSeconds = duration)
             "peak" -> return NativeAudioWavResult("Peak amplitude: ${fmt(peak)}\nPeak level: ${fmt(NativeAudioDsp.amplitudeDbfs(peak))} dBFS\nSource channels: ${input.channels.size}", durationSeconds = duration)
@@ -298,7 +299,7 @@ object NativeAudioWavProcessor {
 
     private data class NativeSpectrum(val centroidHz: Double?, val rolloff85Hz: Double?, val flatness: Double?)
 
-    private fun musicAnalysisReport(input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double): String {
+    private fun musicAnalysisReport(input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double, fileSha256: String): String {
         val frames = input.frames
         val rate = input.sampleRateHz
         val duration = input.durationSeconds
@@ -348,6 +349,10 @@ object NativeAudioWavProcessor {
         val spectrum = calculateSpectrum(representative, rate)
         val json = JSONObject()
             .put("schema_version", "env.music-analysis.v2")
+            .put("fingerprint", JSONObject()
+                .put("file_sha256", fileSha256)
+                .put("exact_match_method", "sha-256-exact-file-bytes")
+                .put("note", "SHA-256 identifies byte-identical files only; acoustic similarity is a separate fingerprinting task."))
             .put("source", JSONObject()
                 .put("file_name", fileName.ifBlank { "audio.wav" })
                 .put("mime_type", "audio/wav")
@@ -394,6 +399,9 @@ object NativeAudioWavProcessor {
                 .put("note", "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."))
         return json.toString(2)
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun jsonNumberOrNull(value: Double): Any = if (value.isFinite()) value else JSONObject.NULL
 
