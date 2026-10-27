@@ -43,6 +43,25 @@ function deviceMarkup(markup: string, target: string): string {
   return markup.slice(start, end < 0 ? undefined : end);
 }
 
+test("web exports preserve canvas text bounds and icon insets instead of inherited control padding", () => {
+  const project = fixture();
+  delete project.responsiveDesign;
+  project.elements = [
+    { ...project.elements[0], id: "heading", kind: "text", text: "A friendly heading", padding: 12, height: 20, textAlign: "center" },
+    { ...project.elements[0], id: "mark", kind: "icon", iconSvg: '<path d="M0 0h24v24H0z"/>', iconViewBox: "0 0 24 24", padding: 12 },
+    { ...project.elements[0], id: "merged", kind: "icon", componentKey: "merged-vector", iconSvg: '<path d="M0 0h24v24H0z"/>', iconViewBox: "0 0 24 24", padding: 12 },
+  ];
+  for (const markup of [generateHtmlProject(project), renderReactSource(generateReactProject(project))]) {
+    const style = (id: string) => new RegExp('class="[^"]*env-layer-' + id + '"[^>]*style="([^"]*)"').exec(markup)?.[1] || "";
+    assert.match(style("heading"), /padding:0(?:px)?;/);
+    assert.match(style("heading"), /display:block;/);
+    assert.match(style("heading"), /overflow:visible/);
+    assert.match(style("mark"), /padding:2px;/);
+    assert.match(style("mark"), /border-radius:0(?:px)?(?:;|$)/);
+    assert.match(style("merged"), /padding:0(?:px)?;/);
+  }
+});
+
 test("HTML handoff includes shared content, per-device fixes and device-only elements", () => {
   const html = generateHtmlProject(fixture());
   assert.match(deviceMarkup(html, "mobile"), /Search all products/);

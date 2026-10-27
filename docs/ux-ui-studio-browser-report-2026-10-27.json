@@ -1,0 +1,394 @@
+{
+  "runAt": "2026-10-27T04:21:54.316Z",
+  "baseUrl": "http://127.0.0.1:8081",
+  "cdnsBlocked": true,
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "widths": [
+    {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 740
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 375,
+        "height": 667
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "All numeric styling faders preserve styles during sideways touch browsing and adjust vertically with one-step Undo",
+        "Dragging visual sliders and the canvas resize handle changes saved geometry; one undo restores the resize",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Animated font specimens support custom words, pause/play and reduced-motion preferences",
+        "Choosing a preview creates visible text with the real font embedded and returns to the canvas",
+        "Hold moves continuously, release stops, and one undo restores the gesture",
+        "Imported images resize, cut out locally and become real recolorable vector silhouettes; lookup magnifies small artwork",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "PDF includes the rendered mockup, AI prompt, readable specification and complete attached asset JSON",
+        "Live system-theme changes update controls while preserving artwork",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "All numeric styling faders preserve styles during sideways touch browsing and adjust vertically with one-step Undo",
+        "Dragging visual sliders and the canvas resize handle changes saved geometry; one undo restores the resize",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Animated font specimens support custom words, pause/play and reduced-motion preferences",
+        "Choosing a preview creates visible text with the real font embedded and returns to the canvas",
+        "Hold moves continuously, release stops, and one undo restores the gesture",
+        "Imported images resize, cut out locally and become real recolorable vector silhouettes; lookup magnifies small artwork",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "checks": [
+        "Monochrome studio chrome follows the effective light theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "dark",
+      "checks": [
+        "Monochrome studio chrome follows the effective dark theme",
+        "Horizontal actions and active panels replace controllers without stacking",
+        "Selected fill editing changes persisted project data",
+        "Visible effect sample applies and persists",
+        "Toolkit chrome and visual specimens pass a rendered monochrome check",
+        "Each of 26 toolkit pages has a visible sample and usable controls",
+        "Choosing an icon closes its picker and returns to editing",
+        "Bundled icon preview and insertion work with asset CDNs blocked",
+        "Five bundled font families render genuine samples before download",
+        "Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo",
+        "Canvas selection exposes working background controls",
+        "No document overflow or browser runtime exceptions",
+        "JSON download retains background and embedded icon within the importer size limit",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "compactScreens": [
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "errors": []
+}

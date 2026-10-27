@@ -5,6 +5,7 @@ import { StudioImageRepair } from "./ux-ui-studio-image-repair";
 import { StudioScreenshotImport, type StudioScreenshotImportResult } from "./ux-ui-studio-screenshot-import";
 import { StudioShapeStyle } from "./ux-ui-studio-shape-style";
 import { studioFontWeightRange } from "@/lib/engines/studio-font-metadata";
+import { packStudioProjectAssets, unpackStudioProjectAssets } from "@/lib/engines/ux-ui-studio-storage";
 import { StudioTextStyle } from "./ux-ui-studio-text-style";
 import { roundedRectanglePath, shapeStrokeDasharray, type CornerRadii, type ShapeBorderStyle } from "@/lib/engines/ux-ui-studio-shape-style";
 import { createResponsiveDesign, responsiveElements, commitResponsiveElements, resetResponsiveDevice, hasResponsiveOverrides, restoreResponsiveDesign, cloneResponsiveDesign, remapResponsiveScreenLinks, type ResponsiveDesign, type ResponsiveEditMode } from "@/lib/engines/ux-ui-studio-responsive";
@@ -1317,13 +1318,13 @@ export function UxUiStudioEngine() {
   useEffect(() => {
     try {
       const listRaw = localStorage.getItem(DRAFTS_STORAGE_KEY);
-      const listParsed = listRaw ? JSON.parse(listRaw) as unknown : [];
+      const listParsed = listRaw ? (JSON.parse(listRaw) as unknown) : [];
       const storedDrafts = Array.isArray(listParsed) ? listParsed.filter((item): item is SavedProject =>
         Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2 &&
-          Array.isArray((item as SavedProject).elements) && (item as SavedProject).viewport?.width)) : [];
+          Array.isArray((item as SavedProject).elements) && (item as SavedProject).viewport?.width)).map(unpackStudioProjectAssets) : [];
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as Omit<SavedProject, "schemaVersion"> & { schemaVersion: number };
+        const parsed = unpackStudioProjectAssets(JSON.parse(stored)) as Omit<SavedProject, "schemaVersion"> & { schemaVersion: number };
         if ((parsed.schemaVersion === 1 || parsed.schemaVersion === 2) && Array.isArray(parsed.elements) && parsed.viewport?.width) {
           const normalized = {
             ...parsed, id: parsed.id || "draft-" + Date.now().toString(36), schemaVersion: 2 as const,
@@ -1373,7 +1374,7 @@ export function UxUiStudioEngine() {
           };
           const merged = [hydrated, ...storedDrafts.filter((item) => item.id !== hydrated.id)]
             .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
-          localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged));
+          localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged.map(packStudioProjectAssets)));
           setSavedProject(hydrated); setDrafts(merged); setProjectName(hydrated.name); setProjectBrief(hydrated.description || "");
           setScreens(restoredScreens); setActiveScreenId(initialScreen.id);
           setTarget(initialScreen.target); setBackground(initialScreen.background); setCustomArtboard(initialScreen.customArtboard);
@@ -1396,14 +1397,14 @@ export function UxUiStudioEngine() {
         category: savedProject?.category || "Uncategorized",
         isFavorite: savedProject?.isFavorite || false,
       } as SavedProject;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(packStudioProjectAssets(saved)));
       const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) as unknown : [];
       const existing = Array.isArray(parsed) ? parsed.filter((item): item is SavedProject =>
-        Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2)) : [];
+        Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2)).map(unpackStudioProjectAssets) : [];
       const nextDrafts = [saved, ...existing.filter((item) => item.id !== nextId)]
         .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts.map(packStudioProjectAssets)));
       setSavedProject(saved); setDrafts(nextDrafts);
       if (!activeDraftId) setActiveDraftId(nextId);
     } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
@@ -1548,7 +1549,7 @@ export function UxUiStudioEngine() {
   function commitDraftList(nextDrafts: SavedProject[]) {
     const sorted = [...nextDrafts].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 100);
     setDrafts(sorted);
-    try { localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(sorted)); }
+    try { localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(sorted.map(packStudioProjectAssets))); }
     catch { setNotice("Project changes could not be saved in this browser. Export project JSON as a backup."); }
   }
 
@@ -2192,7 +2193,7 @@ export function UxUiStudioEngine() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(String(reader.result)) as Partial<SavedProject>;
+        const parsed = unpackStudioProjectAssets(JSON.parse(String(reader.result))) as Partial<SavedProject>;
         if (!Array.isArray(parsed.elements)) throw new Error("Choose an enV UX/UI Studio project or preset JSON file.");
         const nextTarget: DeviceTarget = parsed.target === "tablet" || parsed.target === "desktop" ? parsed.target : "mobile";
         const width = Number.isFinite(parsed.viewport?.width) ? Number(parsed.viewport?.width) : boardSize(nextTarget).width;

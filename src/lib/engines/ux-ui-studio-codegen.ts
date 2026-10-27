@@ -64,6 +64,7 @@ const shapeCss = (layer: UxCodegenLayer): string => {
   if (layer.kind === "hexagon") return "clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);border-radius:0";
   if (layer.kind === "star") return "clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);border-radius:0";
   if (layer.kind === "line") return "border-radius:999px;padding:0";
+  if (layer.kind === "icon") return "border-radius:0";
   if (layer.kind === "pill") return "border-radius:999px";
   if (layer.kind === "ellipse" || layer.kind === "avatar") return "border-radius:50%";
   return "";
@@ -78,19 +79,22 @@ const embeddedFontCss = (project: UxCodegenProject): string => {
     return "@font-face{font-family:" + safe(layer.fontFamily) + ";src:url(" + safe(layer.fontDataUrl!) + ")" + (format === "unknown" ? "" : " format('" + format + "')") + ";font-style:normal;font-weight:" + studioFontWeightRange(layer.fontDataUrl!) + ";font-display:swap}";
   }).join("\n");
 };
-const remoteFontFamilies = (project: UxCodegenProject): string[] => Array.from(new Set(project.elements
-  .filter((layer) => !layer.fontDataUrl && layer.fontFamily && !systemFonts.has(layer.fontFamily))
-  .map((layer) => layer.fontFamily)));
+const remoteFontFamilies = (project: UxCodegenProject): string[] => {
+  const embedded = new Set(project.elements.filter(layer => layer.fontDataUrl).map(layer => layer.fontFamily));
+  return Array.from(new Set(project.elements
+    .filter(layer => !embedded.has(layer.fontFamily) && layer.fontFamily && !systemFonts.has(layer.fontFamily))
+    .map(layer => layer.fontFamily)));
+};
 const googleFontLink = (family: string): string => "https://fonts.googleapis.com/css2?family=" + encodeURIComponent(family).replace(/%20/g, "+") + "&display=swap";
 
 const layerStyle = (l: UxCodegenLayer) => [
-  "box-sizing:border-box","padding:" + l.padding + "px","color:" + l.color,
-  "display:" + (l.display || "flex"),"cursor:" + (l.cursor || "default"),"z-index:" + (l.zIndex ?? 1),"transition:background-color " + (l.transitionDuration ?? 180) + "ms ease,opacity " + (l.transitionDuration ?? 180) + "ms ease",
+  "box-sizing:border-box","padding:" + (l.kind === "text" ? 0 : l.kind === "icon" ? (l.componentKey === "merged-vector" ? 0 : 2) : l.padding) + "px","color:" + l.color,
+  "display:" + (l.display === "none" ? "none" : l.kind === "text" ? "block" : l.display || "flex"),"cursor:" + (l.cursor || "default"),"z-index:" + (l.zIndex ?? 1),"transition:background-color " + (l.transitionDuration ?? 180) + "ms ease,opacity " + (l.transitionDuration ?? 180) + "ms ease",
   "background:" + (l.background === "transparent" ? "transparent" : l.background),
   "border:" + l.borderWidth + "px " + (l.borderStyle || "solid") + " " + (l.borderWidth > 0 ? l.borderColor : "transparent"),
   "border-radius:" + shapeCornerCss(l),"opacity:" + l.opacity,"font-family:" + safe(l.fontFamily),
   "font-size:" + l.fontSize + "px","font-weight:" + l.fontWeight,"line-height:" + l.lineHeight,
-  "letter-spacing:" + l.letterSpacing + "px","text-align:" + l.textAlign,"white-space:pre-wrap","overflow:hidden",
+  "letter-spacing:" + l.letterSpacing + "px","text-align:" + l.textAlign,"white-space:pre-wrap","overflow:" + (l.kind === "text" ? "visible" : "hidden"),
   "align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
   "justify-content:" + (l.textAlign === "center" ? "center" : l.textAlign === "right" ? "flex-end" : "flex-start"),
   l.shadow ? "box-shadow:0 3px 10px #0f172a24" : "",
@@ -235,6 +239,8 @@ export function generateReactProject(project: UxCodegenProject): string {
     '    {artboards.map(artboard => <div key={artboard.target} className=' + safe("env-artboard" + (project.responsiveDesign ? " env-device-artboard" : "")) + ' data-device={artboard.target} style={{position:"relative",containerType:"size",width:"min(100%, " + artboard.viewport.width + "px)",aspectRatio:artboard.viewport.width + "/" + artboard.viewport.height,overflow:"hidden",margin:"0 auto",background:' + safe(project.background) + '}}>',
     '    {artboard.elements.filter((item) => !item.visibleOn || item.visibleOn.includes(artboard.target)).map((item) => {',
     '      const style: React.CSSProperties = {position:"absolute",boxSizing:"border-box",...positionX(item),...positionY(item),padding:item.padding,color:item.color,background:item.background === "transparent" ? "transparent" : item.background,border:item.borderWidth + "px " + (item.borderStyle || "solid") + " " + (item.borderWidth ? item.borderColor : "transparent"),borderRadius:["ellipse","avatar"].includes(item.kind)?"50%":["pill","line"].includes(item.kind)?"999px":item.cornerCss,clipPath:item.clipPath,opacity:item.opacity,fontFamily:item.fontFamily,fontSize:item.fontSize,fontWeight:item.fontWeight,lineHeight:item.lineHeight,letterSpacing:item.letterSpacing,textAlign:item.textAlign,whiteSpace:"pre-wrap",overflow:"hidden",display:item.display || "flex",cursor:item.cursor,zIndex:item.zIndex,transform:item.rotation?"rotate(" + item.rotation + "deg)":undefined,alignItems:item.textAlign==="center"?"center":"flex-start",justifyContent:item.textAlign==="center"?"center":item.textAlign==="right"?"flex-end":"flex-start",...(item.shadow?{boxShadow:"0 3px 10px #0f172a24"}:{})};',
+    '      if (item.kind === "text") { style.padding = 0; style.overflow = "visible"; if (item.display !== "none") style.display = "block"; }',
+    '      if (item.kind === "icon") { style.padding = item.componentKey === "merged-vector" ? 0 : 2; style.borderRadius = 0; }',
     "      if (item.minWidth && item.minWidth > 0) style.minWidth = item.minWidth; if (item.maxWidth && item.maxWidth > 0) style.maxWidth = item.maxWidth;",
     '      if (item.kind === "chart") {',
     '        const chart = chartData[artboard.target + ":" + item.id] || { title: item.name, points: [], invalidRows: 0 };',

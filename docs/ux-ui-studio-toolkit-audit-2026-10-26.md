@@ -120,3 +120,15 @@ Corel's [bitmap tracing documentation](https://product.corel.com/help/CorelDRAW/
 ### Remaining full-toolkit gaps
 
 The new work does not turn the Studio into a complete Figma/Corel replacement. The audit's larger gaps still include constraint-driven flex/grid auto layout, live component-instance inheritance, Boolean path operations, node-level vector editing, richer masks/gradients/effects, collaborative editing/version history and full native UI parity for these new browser workflows. These should remain explicit roadmap items rather than claims hidden behind toolkit names.
+
+### Executed verification, 27 October 2026
+
+- 73 focused tests pass, covering responsive overrides and prototype-link cloning, vector/native export geometry, fonts, text-safe screenshot reconstruction, color masking, shape styling, embedded asset storage and canvas-consistent web text/icon insets. TypeScript and the production build pass. Targeted ESLint has no errors; six existing mixed-export Fast Refresh warnings remain in the asset component module.
+- The production browser audit passed all 18 configurations: six browser widths in light/dark themes plus three short/landscape sizes in both themes. It exercises all 26 toolkit pages, bundled icons/fonts with asset CDNs blocked, touch fader direction/Undo, image cutout/resize/silhouette, JSON/PDF downloads, theme changes and compact logos. See `ux-ui-studio-browser-report-2026-10-27.json`.
+- The merged narrow-landscape toolbar was separately rechecked in both themes. See `ux-ui-studio-landscape-report-2026-10-27.json`.
+- Screenshot import was exercised with real local OCR and every external origin blocked. Five text lines, two shapes and two artwork crops were reconstructed; the recognized heading was edited and saved. Worker/core/model requests were local GETs. See `ux-ui-studio-reconstruction-report-2026-10-27.json`.
+- The larger-asset check exposed repeated font/image bytes across linked views. Local drafts now retain one inline copy and resolve duplicate references before editing/export. A real 876,576-byte Inter font project exceeds 5 MiB when duplicated in the old representation; both active/draft-list copies now fit below 3 MiB before other project content. The browser check reopens the actual font-and-image design and verifies full restored bytes in its exported shared source.
+- The final production toolkit run passed four phone/desktop configurations and 16 workflow checks, including real three-device PDF images, primary Text placement, the circular icon-only insertion control, typography, image repair, merged icons, shared/device overrides and embedded-asset persistence. See `ux-ui-studio-toolkit-report-2026-10-27.json`.
+- Export review found text/icon layers incorrectly inheriting control padding in HTML/React. Web exports now use the canvas's text bounds and vector insets; plain text remains top aligned without clipping larger type to the old box height. Embedded font families no longer request duplicate remote font stylesheets.
+
+These checks validate the browser Studio workflows described above. They do not establish a native app build or complete professional-tool parity.

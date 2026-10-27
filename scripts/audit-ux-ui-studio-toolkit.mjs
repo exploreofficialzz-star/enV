@@ -79,6 +79,26 @@ async function allDevicePdf(page,entry) {
   assert.deepEqual(after.responsiveDesign,before.responsiveDesign,"PDF rendering does not change device designs");
   entry.checks.push("All-device PDF exports three real artboard images and a handoff, preserving the active view and responsive model");
 }
+async function embeddedAssetPersistence(page,id,entry) {
+  await action(page,"Look closer");
+  await page.locator(".uxui-layer-finder button").filter({has:page.locator("strong").getByText("Text",{exact:true})}).click();
+  await action(page,"Fonts");
+  const library=page.getByRole("region",{name:"Studio toolkit",exact:true});
+  await library.getByLabel("Search fonts",{exact:true}).fill("Inter");
+  await library.getByRole("button",{name:/^Inter\s/}).first().click();
+  await library.waitFor({state:"hidden"});
+  const before=await stored(page,p=>currentLayer(p,id)?.fontDataUrl?.startsWith("data:font/ttf;base64,"),"embedded Inter font");
+  const bytes=currentLayer(before,id).fontDataUrl;
+  const usage=await page.evaluate(()=>["env-ux-ui-studio-project-v1","env-ux-ui-studio-drafts-v1"].map(key=>localStorage.getItem(key)?.length||0));
+  assert.ok(usage.reduce((sum,size)=>sum+size,0)<5*1024*1024,"Both draft copies fit the browser quota with the actual font and image");
+  await page.reload({waitUntil:"domcontentloaded"});
+  await page.waitForFunction(()=>document.documentElement.dataset.envToolHydrated==="ux-ui-studio");
+  await page.locator(".uxui-draft-card").first().getByRole("button").first().click();
+  const exported=await exportJson(page);
+  assert.equal(currentLayer(exported,id).fontDataUrl,bytes);
+  assert.equal(exported.responsiveDesign.baseElements.find(item=>item.id===id).fontDataUrl,bytes,"Shared source restores font bytes before editing/export");
+  entry.checks.push("A real bundled Inter font and image save within browser storage, reopen and export with every shared asset restored");
+}
 async function target(page,name) {
   await page.getByRole("group",{name:"Preview device",exact:true}).getByRole("button",{name,exact:true}).click();
   await stored(page,p=>p.target===name.toLowerCase(),name+" preview");
@@ -279,7 +299,7 @@ try {
       await shapesAndEdges(page,entry);
       await page.screenshot({path:resolve(output,`shapes-${viewport.width}-${theme}.png`),animations:"disabled"});
       if(full) { await mergeVectors(page,entry);await imageTools(page,entry); }
-      if(full && theme==="light") await allDevicePdf(page,entry);
+      if(full && theme==="light") { await embeddedAssetPersistence(page,textId,entry); await allDevicePdf(page,entry); }
       assert.deepEqual(entry.runtimeErrors,[],"No browser runtime exceptions");
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),"No horizontal document overflow");
       await page.screenshot({path:resolve(output,`complete-${viewport.width}-${theme}.png`),animations:"disabled"});
