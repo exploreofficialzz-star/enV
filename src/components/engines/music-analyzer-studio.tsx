@@ -833,7 +833,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function runStandardsLoudnessMeasurement() {
-    if (!file || loudnessBusy) return;
+    if (!file || loudnessBusy || busy || batchBusy || batchCloudBusy) return;
     if (!loudnessUploadConsent) {
       setLoudnessError("Confirm the separate source-audio upload permission before starting this measurement.");
       return;
@@ -1468,7 +1468,7 @@ export function MusicAnalyzerStudio() {
         ) : null}
         {busy ? <div className="mt-4" role="status" aria-live="polite"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Local analysis</span><span>{Math.round(analysisProgress * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(analysisProgress * 100)}%` }} /></div></div> : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={!file || busy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
+          <Button type="button" disabled={!file || busy || loudnessBusy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
           {busy ? <Button type="button" variant="outline" onClick={() => analysisControllerRef.current?.abort()}>Cancel analysis</Button> : null}
           <Button type="button" variant="outline" disabled={!analysis || !datasetAnalysis} onClick={exportSongProfile}><FileJson size={16} className="mr-2" />Song profile JSON</Button>
           <Button type="button" variant="ghost" disabled={!analysis || !datasetAnalysis} onClick={exportJson}><FileJson size={16} className="mr-2" />Training metadata JSON</Button>
@@ -1497,7 +1497,7 @@ export function MusicAnalyzerStudio() {
           </label>
           <p className="mt-2 text-[11px] leading-4 text-muted-foreground">The processor limit is 15 minutes and its configured upload-size limit applies; the default same-origin gateway is limited to 4 MiB. Processing uses temporary per-request files and attempts cleanup. The verified server hash identifies the bytes received by that processor. Do not use this mode for audio you are not authorized to upload.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={!file || !loudnessUploadConsent || loudnessBusy} onClick={() => void runStandardsLoudnessMeasurement()}>
+            <Button type="button" variant="outline" disabled={!file || !loudnessUploadConsent || loudnessBusy || busy || batchBusy || batchCloudBusy} onClick={() => void runStandardsLoudnessMeasurement()}>
               {loudnessBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Measuring…</> : "Measure with FFmpeg ebur128"}
             </Button>
             {loudnessBusy ? <Button type="button" variant="ghost" onClick={() => loudnessControllerRef.current?.abort()}>Cancel meter</Button> : null}
