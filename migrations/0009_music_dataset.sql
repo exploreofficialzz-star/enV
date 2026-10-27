@@ -133,3 +133,13 @@ create table if not exists music_collection_tracks (
 );
 
 create index if not exists music_collection_tracks_track_idx on music_collection_tracks (user_id, track_id);
+
+-- Database-backed rate windows survive serverless cold starts and are shared by app instances.
+create table if not exists music_dataset_api_limits (
+  user_id text not null references "user" ("id") on delete cascade,
+  operation text not null check (operation in ('read','write','delete')),
+  window_started_at timestamptz not null default now(),
+  request_count integer not null default 0 check (request_count >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, operation)
+);
