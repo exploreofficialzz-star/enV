@@ -195,6 +195,11 @@ export function MusicAnalyzerStudio() {
   const [localBatch, setLocalBatch] = useState<LocalMusicBatch | null>(null);
   const [batchHistory, setBatchHistory] = useState<LocalMusicBatch[]>([]);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [batchCloudBusy, setBatchCloudBusy] = useState(false);
+  const [batchCloudProgress, setBatchCloudProgress] = useState(0);
+  const [batchCloudMessage, setBatchCloudMessage] = useState("");
+  const [batchCloudError, setBatchCloudError] = useState("");
+  const [batchRightsStatus, setBatchRightsStatus] = useState("unknown");
   const [batchMessage, setBatchMessage] = useState("");
   const [expandedBatchItemId, setExpandedBatchItemId] = useState<string | null>(null);
   const [batchError, setBatchError] = useState("");
@@ -391,6 +396,115 @@ export function MusicAnalyzerStudio() {
       }
     } else {
       setBatchMessage("Cancel requested. The active local track is stopping; completed results will remain available.");
+    }
+  }
+
+  async function saveCompletedBatchToCloud() {
+    if (!localBatch || batchBusy || batchCloudBusy) return;
+    const pending = localBatch.items.filter((item) => item.status === "completed" && item.result && !item.cloudSavedTrackId);
+    if (!pending.length) {
+      setBatchCloudMessage("All completed results in this batch are already saved to your private dataset.");
+      setBatchCloudError("");
+      return;
+    }
+    setBatchCloudBusy(true);
+    setBatchCloudProgress(0);
+    setBatchCloudMessage("");
+    setBatchCloudError("");
+    let working = localBatch;
+    let savedCount = 0;
+    let failedCount = 0;
+    let stopReason = "";
+    let lastTrackError = "";
+
+    const persistCloudState = async (next: LocalMusicBatch) => {
+      await saveLocalMusicBatch(next);
+      working = next;
+      setLocalBatch(next);
+      setBatchHistory((current) => [next, ...current.filter((entry) => entry.id !== next.id)].slice(0, 10));
+    };
+
+    try {
+      for (let index = 0; index < pending.length; index += 1) {
+        const pendingItem = pending[index]!;
+        const item = working.items.find((candidate) => candidate.id === pendingItem.id);
+        if (!item || item.status !== "completed" || !item.result || item.cloudSavedTrackId) {
+          setBatchCloudProgress((index + 1) / pending.length);
+          continue;
+        }
+
+        // Persist the idempotency key before the request. If the response is lost,
+        // a retry replays the same key rather than creating another cloud record.
+        let idempotencyKey = item.cloudSaveIdempotencyKey;
+        if (!idempotencyKey) {
+          idempotencyKey = crypto.randomUUID();
+          working = updateLocalMusicBatchItem(working, item.id, { cloudSaveIdempotencyKey: idempotencyKey });
+          await persistCloudState(working);
+        }
+
+        const analysis = item.result.analysis;
+        const datasetAnalysis = { ...item.result.datasetAnalysis, annotations: item.result.annotations };
+        let response: Response;
+        let body: { ok?: boolean; data?: { track_id?: string; already_saved?: boolean }; message?: string; error?: string } | null;
+        try {
+          response = await fetch("/api/music-dataset/tracks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              file: {
+                name: item.name,
+                size_bytes: item.sizeBytes,
+                mime_type: item.mimeType || analysis.source.mime_type || "application/octet-stream",
+                source_sha256: item.sourceSha256,
+                source_metadata: analysis.metadata,
+                normalized_metadata: analysis.metadata,
+                rights_status: batchRightsStatus,
+              },
+              analysis,
+              dataset_analysis: datasetAnalysis,
+              idempotency_key: idempotencyKey,
+            }),
+          });
+          body = await response.json().catch(() => null) as typeof body;
+        } catch (cause) {
+          failedCount += 1;
+          lastTrackError = `${item.name}: ${cause instanceof Error ? cause.message : "Network request failed"}`;
+          setBatchCloudProgress((index + 1) / pending.length);
+          continue;
+        }
+
+        if (!response.ok || !body?.ok || !body.data?.track_id) {
+          failedCount += 1;
+          lastTrackError = `${item.name}: ${body?.message || body?.error || `HTTP ${response.status}`}`;
+          setBatchCloudProgress((index + 1) / pending.length);
+          if ([401, 403, 429, 503].includes(response.status)) {
+            stopReason = body?.message || (
+              response.status === 401 ? "Sign in to save results to your private dataset." :
+              response.status === 429 ? "The private dataset rate limit was reached. Retry after the current window." :
+              "The private dataset service is unavailable or not configured."
+            );
+            break;
+          }
+          continue;
+        }
+
+        working = updateLocalMusicBatchItem(working, item.id, { cloudSavedTrackId: body.data.track_id });
+        await persistCloudState(working);
+        savedCount += 1;
+        setBatchCloudProgress((index + 1) / pending.length);
+      }
+
+      const remainingUnsaved = working.items.filter((item) => item.status === "completed" && item.result && !item.cloudSavedTrackId).length;
+      setBatchCloudMessage(
+        `Private dataset save: ${savedCount} saved in this pass, ${remainingUnsaved} still unsaved. The original audio was not uploaded.`
+      );
+      if (stopReason) setBatchCloudError(stopReason);
+      else if (lastTrackError && failedCount > 0) setBatchCloudError(`${failedCount} result(s) could not be saved. ${lastTrackError} Retry the unsaved results; already saved records are protected by idempotency keys.`);
+      if (savedCount > 0 && libraryOpen) void refreshCloudLibrary(1, "");
+    } catch (cause) {
+      setBatchCloudError(cause instanceof Error ? cause.message : "The private dataset save could not be completed. Completed local results remain available.");
+    } finally {
+      setBatchCloudBusy(false);
     }
   }
 
@@ -1125,6 +1239,7 @@ export function MusicAnalyzerStudio() {
         </div>
         {localBatch ? (() => {
           const counts = countLocalMusicBatchItems(localBatch);
+          const cloudPending = localBatch.items.filter((item) => item.status === "completed" && item.result && !item.cloudSavedTrackId).length;
           return <div className="mt-4 space-y-3">
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
               {[["Total", counts.total], ["Queued", counts.queued], ["Running", counts.running], ["Complete", counts.completed], ["Failed", counts.failed], ["Need files", counts.waitingForFile]].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-border bg-background p-2"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-base font-semibold tabular-nums">{value}</p></div>)}
@@ -1133,12 +1248,30 @@ export function MusicAnalyzerStudio() {
               <Button type="button" size="sm" variant="outline" onClick={() => exportLocalBatch("zip")}>Export ZIP + manifest</Button>
               <Button type="button" size="sm" variant="outline" onClick={() => exportLocalBatch("jsonl")}>Export JSONL</Button>
               <Button type="button" size="sm" variant="outline" onClick={() => exportLocalBatch("csv")}>Export CSV summary</Button>
+              <Button type="button" size="sm" variant="outline" disabled={batchBusy || batchCloudBusy || cloudPending === 0} onClick={() => void saveCompletedBatchToCloud()}>{batchCloudBusy ? `Saving dataset results ${Math.round(batchCloudProgress * 100)}%…` : `Save ${cloudPending} results to private dataset`}</Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => void retryLocalBatchItems(false)}>Retry failed / canceled</Button>
               <Button type="button" size="sm" variant="ghost" disabled={batchBusy} onClick={() => {
                 const prior = batchHistory.find((entry) => entry.id !== localBatch.id);
                 if (prior) { setLocalBatch(prior); setBatchError(""); setBatchMessage("Viewing a previous local batch. Re-select its source files to resume incomplete items."); }
               }}>Open previous batch</Button>
               <Button type="button" size="sm" variant="ghost" disabled={batchBusy} onClick={() => void deleteCurrentLocalBatch()}>Delete local batch data</Button>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-3">
+              <label className="flex flex-col gap-1.5 text-xs text-muted-foreground sm:max-w-sm">
+                Rights declaration for cloud result records
+                <select className="min-h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground" value={batchRightsStatus} onChange={(event) => setBatchRightsStatus(event.currentTarget.value)}>
+                  <option value="unknown">Not specified</option>
+                  <option value="user_owned">I own these recordings</option>
+                  <option value="permission_granted">Permission granted</option>
+                  <option value="licensed">Licensed for this use</option>
+                  <option value="public_domain">Public domain</option>
+                  <option value="restricted">Restricted / do not redistribute</option>
+                  <option value="not_applicable">Not applicable</option>
+                </select>
+              </label>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">Saving sends structured reports and metadata only. It does not upload audio or verify ownership. Each result is saved independently; failures do not remove local or already-saved results.</p>
+              {batchCloudMessage ? <p className="mt-2 text-xs" role="status" aria-live="polite">{batchCloudMessage}</p> : null}
+              {batchCloudError ? <p className="mt-2 text-xs text-destructive" role="alert">{batchCloudError}</p> : null}
             </div>
             <p className="text-xs leading-5 text-muted-foreground">Progress reflects stages, not a promised completion time. Completed results remain available after cancellation. Local batch history is browser storage, not a cloud backup.</p>
             <div className="space-y-2">
