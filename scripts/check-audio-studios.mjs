@@ -174,6 +174,7 @@ for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "
 }
 
 const musicDatasetApi = fs.readFileSync(new URL("../src/lib/media/music-dataset-api.server.ts", import.meta.url), "utf8");
+const musicDatasetValidation = fs.readFileSync(new URL("../src/lib/media/music-dataset-validation.ts", import.meta.url), "utf8");
 const musicDatasetMigration = fs.readFileSync(new URL("../migrations/0009_music_dataset.sql", import.meta.url), "utf8");
 const musicAnalysisMigrations = fs.readFileSync(new URL("../src/lib/media/music-analysis-migration.ts", import.meta.url), "utf8");
 const musicDatasetTest = fs.readFileSync(new URL("../src/lib/engines/audio-studio.test.ts", import.meta.url), "utf8");
@@ -199,6 +200,19 @@ for (const marker of [
   "getMusicAnalysisRun", "deleteMusicDatasetTrack",
 ]) {
   assert.ok(musicDatasetApi.includes(marker), `Private dataset API missing ${marker}`);
+}
+for (const marker of [
+  "validateMusicDatasetSaveBody", "MusicDatasetInputError", "env.music-analysis.v2",
+  "env.music-dataset-analysis.v2", "MAX_FEATURE_FRAMES", "MAX_EVENTS",
+  "idempotency_key", "different source hashes", "sha256",
+]) {
+  assert.ok(musicDatasetValidation.includes(marker), `Music dataset payload validation missing ${marker}`);
+}
+for (const marker of [
+  "validMusicDatasetSavePayload", "Save validator builds bounded",
+  "inconsistent hashes", "oversized feature/event arrays",
+]) {
+  assert.ok(musicDatasetTest.includes(marker), `Music dataset validation regression coverage missing ${marker}`);
 }
 assert.ok(!musicDatasetApi.includes("request.formData()"), "Dataset save endpoint must not accept or store raw source audio");
 for (const marker of [
