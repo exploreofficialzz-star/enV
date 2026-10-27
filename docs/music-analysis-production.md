@@ -23,6 +23,7 @@ The detailed signal contract is `env.music-analysis.v2`. The compact profile con
 - `peak_dbfs` is the maximum decoded sample peak; it is not true peak in dBTP.
 - `rms_dbfs` is the RMS level in dBFS for the reported analysis scope.
 - `rms_loudness_proxy_db` is a fixed-offset, RMS-derived decibel proxy. It is **not** integrated LUFS and does not implement standards-compliant EBU R 128 / ITU-R BS.1770 K-weighting and gating.
+- `fingerprint.file_sha256` is SHA-256 of the exact original file bytes and supports byte-identical duplicate detection only. It is not an acoustic fingerprint. Old v1 exports cannot reconstruct this hash and migrate with `file_sha256: null` and `exact_match_method: "not-computed"`.
 - `silence_percent` is based on 100 ms windows below the current threshold; it is not a perceptual silence judgment.
 - Scope fields are per section: `audio.metric_scope_seconds` describes full-track audio-quality statistics; `rhythm.analysis_scope_seconds` is capped at 90 seconds; `tonality.analysis_scope_seconds` and `timbre.spectral_scope_seconds` are capped at 30 seconds; `timbre.zero_crossing_scope_seconds` spans the full first channel. The associated method text states these excerpt limits.
 - Tempo, key, chords, dominant pitch, spectral descriptors and feature-change sections are estimates/candidates. Full-mix dominant pitch is not a vocal melody or vocal register.
