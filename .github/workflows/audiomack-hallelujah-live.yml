@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "scripts/media/audiomack-hallelujah-smoke.mjs"
+      - "scripts/media/vendor/audiomack.py"
+      - "processor/Dockerfile"
       - ".github/workflows/audiomack-hallelujah-live.yml"
   workflow_dispatch:
 
@@ -24,4 +26,16 @@ jobs:
         env:
           MUSIC_ACCEPTANCE_API: https://env-q3mq.onrender.com/api/backend/url-media
           MUSIC_ACCEPTANCE_SONG: https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535
-        run: node scripts/media/audiomack-hallelujah-smoke.mjs
+        run: |
+          set -euo pipefail
+          # Deployment and CI start simultaneously. Retry only this isolated
+          # acceptance check as Render changes its container image.
+          for n in 1 2 3 4 5; do
+            if node scripts/media/audiomack-hallelujah-smoke.mjs; then
+              exit 0
+            fi
+            if test "$n" -eq 5; then
+              exit 1
+            fi
+            sleep 35
+          done

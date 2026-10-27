@@ -7,10 +7,11 @@ ENV NODE_ENV=production \
     PYTHONDONTWRITEBYTECODE=1 \
     AUDIOMACK_YTDLP_BIN=/opt/env-audiomack/bin/yt-dlp
 
-# yt-dlp recommends the nightly channel for frequently changing site extractors.
+# Pin the tested upstream core; vendor the independently verified Audiomack
+# extractor fix rather than relying on an obsolete built-in API resolver.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg aria2 python3 python3-pip python3-venv ca-certificates \
-  && python3 -m pip install --break-system-packages --no-cache-dir --pre "yt-dlp[default,curl-cffi]" \
+  && python3 -m pip install --break-system-packages --no-cache-dir "yt-dlp[default,curl-cffi]==2026.10.21" \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -24,6 +25,10 @@ RUN python3 -m venv /opt/env-audiomack \
   && /opt/env-audiomack/bin/yt-dlp --version
 
 WORKDIR /app
+COPY scripts/media/vendor/audiomack.py ./scripts/media/vendor/audiomack.py
+RUN python3 -c 'import shutil; import yt_dlp.extractor.audiomack as module; shutil.copyfile("scripts/media/vendor/audiomack.py", module.__file__)' \
+  && python3 -c 'import yt_dlp.extractor.audiomack as module; assert hasattr(module, "AudiomackIE") and hasattr(module, "AudiomackAlbumIE")' \
+  && python3 -m py_compile scripts/media/vendor/audiomack.py
 COPY backend/request-body.mjs ./backend/request-body.mjs
 COPY processor/server.mjs ./processor/server.mjs
 COPY processor/url-media-route.mjs ./processor/url-media-route.mjs

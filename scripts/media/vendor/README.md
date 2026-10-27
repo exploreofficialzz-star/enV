@@ -1,7 +1,7 @@
-# Pinned Audiomack extractor
+# Pinned Audiomack extractor adapter
 
-This `audiomack.py` comes from the **Unlicense**-licensed `yt-dlp` fork `0xvd/yt-dlp-exp` at commit `f1ba0a4de633b545ce688338d9527ad7ef1c7659`, proposed upstream as https://github.com/yt-dlp/yt-dlp/pull/17258.
+This file is a vendored, isolated Audiomack extractor revision from [0xvd/yt-dlp-exp at f1ba0a4de633b545ce688338d9527ad7ef1c7659](https://github.com/0xvd/yt-dlp-exp/blob/f1ba0a4de633b545ce688338d9527ad7ef1c7659/yt_dlp/extractor/audiomack.py), upstream yt-dlp PR [#17258](https://github.com/yt-dlp/yt-dlp/pull/17258).
 
-The unmerged extractor is isolated in its own Python virtual environment, using `yt-dlp==2026.10.21` (validated against the user-owned track `https://audiomack.com/chas-d/song/hallelujah`). The rest of the media providers retain the separately installed primary `yt-dlp` build.
+It replaces ONLY yt-dlp's built-in Audiomack extractor in the shared Render processor image. All other providers continue through the pinned, tested official yt-dlp base. The upstream author has stated in the PR that their contribution is available under Unlicense/public-domain terms. The patch is vendored, not pulled from an unreviewed branch at runtime. Re-review upstream updates before changing this file.
 
-It is **not an official Audiomack API or a guaranteed permanent contract**. The extractor uses Audiomack's current public web-player retrieval mechanism and may break if the public site changes. This requires ongoing real-file acceptance testing and should not be used to circumvent authentication, DRM, or user permission requirements. Source attribution and original licensing are retained. Do not log signed media URLs or include user cookies in tests.
+This change is tested against the creator-provided public example `https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535`: the isolated upstream extractor downloaded an audio sample and FFprobe reported 175.2 seconds. Production must pass a separate Render-backed end-to-end media acceptance test before being marked download-ready. This does not authorize extracting protected, private or third-party copyrighted material.

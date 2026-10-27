@@ -58,3 +58,9 @@ User provided `https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614
 To avoid cross-provider regressions, Render now runs the pinned reworked Audiomack extractor in `/opt/env-audiomack` only when `provider === "audiomack"`; all other providers retain the existing yt-dlp executable. The source, license and pinned version are documented in `scripts/media/vendor/README.md`.
 
 **Do not claim overall Audiomack readiness solely from the isolated success.** Verify the latest Render deployment live with `scripts/audiomack-live-smoke.mjs` (real bytes and verified audio header), and monitor upstream API drift. Signed playback URLs must never be logged. Nothing here grants download rights to anyone other than the media owner or other authorized users.
+
+## Audiomack legacy extractor replacement acceptance (27 October 2026)
+
+The isolated pinned upstream Audiomack extractor rework `0xvd/yt-dlp-exp@f1ba0a4de633b545ce688338d9527ad7ef1c7659`, together with official `yt-dlp==2026.10.21`, successfully processed the creator-provided `chas-d/song/hallelujah` URL as an actual audio download on a GitHub Actions Linux runner. The runner retrieved an approximately 5.38 MiB audio file, converted to MP3, and verified 175.203 seconds with FFprobe.
+
+The Render Docker image now contains this vetted, vendored Audiomack extractor module in place of the obsolete `/api/music/url/song` module. Web/Android/iOS use the shared processor, without changing interfaces or native app libraries. Keep this external, as-yet-unmerged patch pinned and test it for regression before updating the upstream yt-dlp package. The separate live acceptance workflow checks `/info`, retrieves `/download`, and ffprobes the actual audio; it must pass on the deployed Render image to claim success. Only use on public, unprotected media the user is authorized to download; no DRM, private collection, access or paywall workaround is supported.
