@@ -94,6 +94,35 @@ function runFfmpeg(args, duration, signal) {
   });
 }
 
+let ebur128SupportPromise;
+
+function hasEbur128Filter() {
+  if (ebur128SupportPromise) return ebur128SupportPromise;
+  ebur128SupportPromise = new Promise((resolve) => {
+    const child = spawn(FFMPEG_BIN, ["-hide_banner", "-filters"], { stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve(false);
+    }, 5_000);
+    timeout.unref?.();
+    const append = (chunk) => {
+      output = (output + chunk.toString()).slice(-512 * 1024);
+    };
+    child.stdout.on("data", append);
+    child.stderr.on("data", append);
+    child.once("error", () => {
+      clearTimeout(timeout);
+      resolve(false);
+    });
+    child.once("close", (code) => {
+      clearTimeout(timeout);
+      resolve(code === 0 && /\\bebur128\\b/i.test(output));
+    });
+  }).catch(() => false);
+  return ebur128SupportPromise;
+}
+
 function runFfmpegLoudnessMeter(inputPath, duration, signal) {
   return new Promise((resolve, reject) => {
     const args = [
@@ -148,7 +177,7 @@ function parseEbur128Number(log, section, label, unit) {
   const start = log.lastIndexOf(section);
   if (start < 0) return { sectionFound: false, value: null };
   const excerpt = log.slice(start, start + 1_600);
-  const pattern = new RegExp("\\\\b" + label + ":\\\\s*([+-]?(?:\\\\d+(?:\\\\.\\\\d+)?|inf|nan))\\\\s*" + unit, "i");
+  const pattern = new RegExp("\\b" + label + ":\\s*([+-]?(?:\\d+(?:\\.\\d+)?|inf|nan))\\s*" + unit, "i");
   const match = excerpt.match(pattern);
   if (!match) return { sectionFound: true, value: null };
   const value = Number(match[1]);
@@ -296,12 +325,13 @@ async function handleMedia(req, res) {
       const inputPath = path.join(jobDir, safeName(media.name || names[index], fallback));
       const uploadedBytes = Buffer.from(await media.arrayBuffer());
       await fs.writeFile(inputPath, uploadedBytes);
-      sourceHashes.push(createHash("sha256").update(uploadedBytes).digest("hex"));
+      sourceHashes.push(spec.analysis === "ebu-r128" ? createHash("sha256").update(uploadedBytes).digest("hex") : null);
       inputPaths.push(inputPath);
     }
     const durations = spec.multi ? await Promise.all(inputPaths.map(probeDuration)) : [await probeDuration(inputPaths[0])];
     const duration = durations.reduce((a, b) => a + b, 0);
     if (spec.analysis === "ebu-r128") {
+      if (!(await hasEbur128Filter())) return json(res, 503, { ok: false, error: "EBUR128_UNAVAILABLE", message: "The configured FFmpeg build does not expose the ebur128 standards meter." });
       if (mediaFiles.length !== 1) return json(res, 400, { ok: false, error: "LOUDNESS_REPORT_SINGLE_FILE_ONLY", message: "Submit one audio file per standards-based loudness measurement." });
       if (!Number.isFinite(duration) || duration <= 0) return json(res, 422, { ok: false, error: "AUDIO_DURATION_UNAVAILABLE", message: "The processor could not safely determine the audio duration." });
       if (duration > MAX_LOUDNESS_REPORT_DURATION_SECONDS) return json(res, 413, { ok: false, error: "AUDIO_DURATION_LIMIT", message: "Standards-based loudness measurement is limited to 15 minutes per request." });
@@ -357,7 +387,17 @@ async function handleMedia(req, res) {
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": ALLOWED_ORIGIN, "access-control-allow-methods": "POST,GET,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
-  if (req.method === "GET" && req.url === "/health") return json(res, 200, { ok: true, service: "enV FFmpeg media processor", ffmpeg: FFMPEG_BIN, operations: Object.keys(OPERATIONS), capacity: { activeJobs: MEDIA_ADMISSION.activeJobs, maxConcurrentJobs: MEDIA_ADMISSION.maxConcurrentJobs, scope: "per-process; use a shared queue for distributed capacity control" } });
+  if (req.method === "GET" && req.url === "/health") {
+    const ebur128Available = await hasEbur128Filter();
+    return json(res, 200, {
+      ok: true,
+      service: "enV FFmpeg media processor",
+      ffmpeg: FFMPEG_BIN,
+      operations: Object.keys(OPERATIONS),
+      capabilities: { ebur128_loudness_meter: ebur128Available },
+      capacity: { activeJobs: MEDIA_ADMISSION.activeJobs, maxConcurrentJobs: MEDIA_ADMISSION.maxConcurrentJobs, scope: "per-process; use a shared queue for distributed capacity control" },
+    });
+  }
   if (req.method === "POST" && req.url === "/media") {
     const release = MEDIA_ADMISSION.tryEnter();
     if (!release) {
