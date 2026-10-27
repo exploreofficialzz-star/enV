@@ -217,7 +217,7 @@
     {
       "id": "explicit-consent-remote-meter",
       "status": "implemented_pending_ci",
-      "scope": "The UI has a separate opt-in for the non-AI remote FFmpeg loudness report. Consent is unchecked by default, the action requires explicit consent in UI and handler, upload starts only after the user activates the meter, and file-change/unmount/cancel aborts the request.",
+      "scope": "The Web UI has a separate unchecked-by-default consent checkbox, its handler refuses to start without consent, and it sends an explicit per-request flag. The media processor independently rejects the ebur128 operation with HTTP 403 before creating temp files when that flag is absent or false. File change/unmount/cancel aborts the request.",
       "code_files": [
         "src/components/engines/music-analyzer-studio.tsx",
         "src/lib/media/media-backends.ts",
@@ -225,14 +225,15 @@
       ],
       "test_files": [
         "scripts/check-audio-studios.mjs",
-        "src/lib/media/music-loudness-report.test.ts",
-        "scripts/media-processor.test.mjs"
+        "scripts/media-processor.test.mjs",
+        "src/lib/media/music-loudness-report.test.ts"
       ],
       "limitations": [
-        "This consent and explicit user action protects the web UI entry point; production deployment URL/authentication configuration and service/operator retention still require deployment/security review.",
-        "Processor inputs are written to temporary per-request files and removed by the processor's cleanup path. No durable private source-audio object storage or authenticated durable DSP-job lifecycle is included."
+        "The flag is evidence that the explicit UI flow was selected, not cryptographic proof of the user's legal rights.",
+        "Production endpoint authentication/origin configuration and service/operator retention still require deployment security review.",
+        "Processor input is written to temporary per-request files and removed by the cleanup path. This does not add durable private source-audio object storage or authenticated durable DSP-job lifecycle."
       ],
-      "next_action": "Verify the deployed endpoint is correctly secured and configured; test consent cancellation/upload behavior in a live browser, including 4 MiB gateway and unavailable-processor paths."
+      "next_action": "Run current-head CI, exercise checkbox/cancel and HTTP 403 behavior in a live browser, and verify the deployed endpoint is secured, configured and exposes ebur128. Then complete official reference-sequence loudness validation."
     }
   ]
 }
