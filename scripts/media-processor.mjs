@@ -117,7 +117,7 @@ function hasEbur128Filter() {
     });
     child.once("close", (code) => {
       clearTimeout(timeout);
-      resolve(code === 0 && /\\bebur128\\b/i.test(output));
+      resolve(code === 0 && /\bebur128\b/i.test(output));
     });
   }).catch(() => false);
   return ebur128SupportPromise;
@@ -273,7 +273,7 @@ function getFfmpegVersion() {
     child.once("close", (code) => {
       clearTimeout(timeout);
       if (code !== 0) return reject(new Error("Could not establish the FFmpeg version."));
-      resolve(output.split(/\\r?\\n/).find((line) => line.startsWith("ffmpeg version")) || "FFmpeg version unknown");
+      resolve(output.split(/\r?\n/).find((line) => line.startsWith("ffmpeg version")) || "FFmpeg version unknown");
     });
   });
 }
