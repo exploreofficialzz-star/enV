@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
-import { parseMusicLoudnessReport, type MusicLoudnessReport } from "./music-loudness-report.ts";
+import { parseMusicLoudnessReport, verifyMusicLoudnessReportChecksum, type MusicLoudnessReport } from "./music-loudness-report.ts";
 
 function report(): MusicLoudnessReport {
   return {
@@ -45,6 +46,17 @@ test("music loudness parser accepts a finite standards-meter report with provena
   assert.equal(parsed.measurement.true_peak_dbtp, -23);
   assert.equal(parsed.source.file_sha256_verified, true);
   assert.equal(parsed.measurement.units.true_peak, "dBTP");
+});
+
+test("music loudness checksum verifies the exact serialized result and rejects tampering", async () => {
+  const value = report();
+  const { result_checksum: _oldChecksum, ...payload } = value;
+  value.result_checksum = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+  const verified = await verifyMusicLoudnessReportChecksum(parseMusicLoudnessReport(value));
+  assert.equal(verified.measurement.integrated_loudness_lufs, -23);
+
+  const tampered = { ...value, measurement: { ...value.measurement, integrated_loudness_lufs: -12 } };
+  await assert.rejects(() => verifyMusicLoudnessReportChecksum(parseMusicLoudnessReport(tampered)), /integrity checksum/);
 });
 
 test("music loudness parser accepts honest unavailable readings with explicit reasons", () => {
