@@ -72,6 +72,11 @@ export type MusicDatasetAnnotations = {
 
 export type MusicDatasetAnalysis = {
   schema_version: typeof MUSIC_DATASET_SCHEMA_VERSION;
+  fingerprint: {
+    file_sha256: string | null;
+    exact_match_method: "sha-256-exact-file-bytes" | "not-computed";
+    note: string;
+  };
   source: { file_name: string; sample_rate_hz: number; channels: number; frame_count: number; duration_seconds: number };
   processing: {
     method: "local-digital-signal-processing";
@@ -148,6 +153,8 @@ export type MusicDatasetAnalysisInput = {
   channels: readonly Float32Array[];
   sampleRate: number;
   fileName?: string;
+  /** SHA-256 over the original file bytes, not over decoded/resampled PCM. */
+  sourceSha256?: string | null;
 };
 
 export type LocalSignalLayer = {
@@ -724,8 +731,16 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
   ];
   if (!durationPitchPoints.length) warnings.push("No stable dominant pitch could be tracked with sufficient autocorrelation confidence.");
   if (channels.length > 2) warnings.push("For stereo-width diagnostics, only the first two channels are treated as left/right.");
+  const sourceSha256 = typeof input.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(input.sourceSha256)
+    ? input.sourceSha256.toLowerCase()
+    : null;
   return {
     schema_version: MUSIC_DATASET_SCHEMA_VERSION,
+    fingerprint: {
+      file_sha256: sourceSha256,
+      exact_match_method: sourceSha256 ? "sha-256-exact-file-bytes" : "not-computed",
+      note: "SHA-256 identifies byte-identical files only; it does not detect acoustically similar recordings.",
+    },
     source: { file_name: input.fileName || "audio", sample_rate_hz: sampleRate, channels: channels.length, frame_count: frameCount, duration_seconds: Number(duration.toFixed(3)) },
     processing: {
       method: "local-digital-signal-processing", uses_remote_api: false, uses_hosted_model: false, model_inference: false,
