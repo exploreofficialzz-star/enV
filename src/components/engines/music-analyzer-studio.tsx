@@ -525,7 +525,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function retryLocalBatchItems(failedOnly = true) {
-    if (!localBatch || batchBusy) return;
+    if (!localBatch || batchBusy || batchCloudBusy) return;
     try {
       let next = localBatch;
       let count = 0;
@@ -545,6 +545,39 @@ export function MusicAnalyzerStudio() {
       setBatchMessage(`${count} track(s) queued for retry. Select the original source files again, then resume.`);
     } catch (cause) {
       setBatchError(cause instanceof Error ? cause.message : "Could not retry batch items.");
+    }
+  }
+
+  async function retryLocalBatchItem(itemId: string) {
+    if (!localBatch || batchBusy || batchCloudBusy) return;
+    const item = localBatch.items.find((candidate) => candidate.id === itemId);
+    if (!item || (item.status !== "failed" && item.status !== "canceled")) return;
+    try {
+      let next = transitionLocalMusicBatchItem(localBatch, itemId, "queued");
+      next = { ...next, status: "paused" };
+      await persistBatch(next);
+      setBatchError("");
+      setBatchMessage(`"${item.name}" is queued for retry. Re-select its original file if needed, then resume.`);
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not retry this track.");
+    }
+  }
+
+  async function prioritizeLocalBatchItem(itemId: string) {
+    if (!localBatch || batchBusy || batchCloudBusy) return;
+    const item = localBatch.items.find((candidate) => candidate.id === itemId);
+    if (!item || (item.status !== "queued" && item.status !== "waiting_for_file")) return;
+    const next: LocalMusicBatch = {
+      ...localBatch,
+      items: [item, ...localBatch.items.filter((candidate) => candidate.id !== itemId)],
+      status: "paused",
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await persistBatch(next);
+      setBatchMessage(`"${item.name}" is now first in the local batch queue.`);
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not prioritize this track.");
     }
   }
 
@@ -1235,7 +1268,7 @@ export function MusicAnalyzerStudio() {
           <Button type="button" disabled={!localBatch || batchBusy || batchCloudBusy || (localBatch.status === "completed" && countLocalMusicBatchItems(localBatch).queued === 0)} onClick={() => void runLocalBatch()}>{batchBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing batch…</> : "Start / resume"}</Button>
           <Button type="button" variant="outline" disabled={!localBatch || batchBusy || batchCloudBusy} onClick={() => void retryLocalBatchItems(true)}>Retry failed</Button>
           {batchBusy ? <Button type="button" variant="outline" onClick={() => void pauseLocalBatchAfterCurrent()}>Pause after track</Button> : null}
-          {localBatch ? <Button type="button" variant="outline" onClick={() => void cancelLocalBatch()}>Cancel batch</Button> : null}
+          {localBatch ? <Button type="button" variant="outline" disabled={batchCloudBusy} onClick={() => void cancelLocalBatch()}>Cancel batch</Button> : null}
         </div>
         {localBatch ? (() => {
           const counts = countLocalMusicBatchItems(localBatch);
@@ -1286,10 +1319,10 @@ export function MusicAnalyzerStudio() {
                     {item.cloudSavedTrackId ? <p className="mt-1 text-xs text-muted-foreground">Saved to private dataset</p> : null}
                   </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                    {(item.status === "queued" || item.status === "waiting_for_file") && !batchBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void prioritizeLocalBatchItem(item.id)}>Run next</Button> : null}
-                    {(item.status === "failed" || item.status === "canceled") && !batchBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void retryLocalBatchItem(item.id)}>Retry</Button> : null}
+                    {(item.status === "queued" || item.status === "waiting_for_file") && !batchBusy && !batchCloudBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void prioritizeLocalBatchItem(item.id)}>Run next</Button> : null}
+                    {(item.status === "failed" || item.status === "canceled") && !batchBusy && !batchCloudBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void retryLocalBatchItem(item.id)}>Retry</Button> : null}
                     {item.status === "completed" && item.result ? <Button type="button" size="sm" variant="ghost" onClick={() => setExpandedBatchItemId((current) => current === item.id ? null : item.id)}>{expandedBatchItemId === item.id ? "Hide report" : "View report"}</Button> : null}
-                    {(item.status === "queued" || item.status === "waiting_for_file" || item.status === "analyzing" || item.status === "decoding" || item.status === "validating") ? <Button type="button" size="sm" variant="ghost" onClick={() => void cancelLocalBatchItem(item.id)}>{activeBatchItemRef.current === item.id ? "Cancel track" : "Skip track"}</Button> : null}
+                    {(item.status === "queued" || item.status === "waiting_for_file" || item.status === "analyzing" || item.status === "decoding" || item.status === "validating") ? <Button type="button" size="sm" variant="ghost" disabled={batchCloudBusy} onClick={() => void cancelLocalBatchItem(item.id)}>{activeBatchItemRef.current === item.id ? "Cancel track" : "Skip track"}</Button> : null}
                   </div>
                 </div>
                 {expandedBatchItemId === item.id && item.status === "completed" && item.result ? <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-3 text-[11px] leading-4">{JSON.stringify({ track_id: item.id, file_name: item.name, source_sha256: item.sourceSha256, analysis: item.result.analysis, dataset_analysis: item.result.datasetAnalysis, annotations: item.result.annotations }, null, 2)}</pre> : null}
