@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.json.JSONObject
+import java.security.MessageDigest
 
 class NativeAudioEngineTest {
     @Test
@@ -66,6 +67,11 @@ class NativeAudioEngineTest {
         val result = NativeAudioWavProcessor.process(wav, operation = "analyze", fileName = "tone.wav")
         val root = JSONObject(result.report)
         assertEquals("env.music-analysis.v2", root.getString("schema_version"))
+        val fingerprint = root.getJSONObject("fingerprint")
+        val expectedHash = MessageDigest.getInstance("SHA-256").digest(wav)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        assertEquals(expectedHash, fingerprint.getString("file_sha256"))
+        assertEquals("sha-256-exact-file-bytes", fingerprint.getString("exact_match_method"))
         val audio = root.getJSONObject("audio")
         assertEquals(4.0, audio.getDouble("duration_seconds"), 0.001)
         assertEquals(4.0, audio.getDouble("metric_scope_seconds"), 0.001)
