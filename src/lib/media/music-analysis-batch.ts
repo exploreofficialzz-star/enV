@@ -203,7 +203,12 @@ export function updateLocalMusicBatchItem(
   const items = batch.items.map((item) => {
     if (item.id !== itemId) return item;
     found = true;
-    const progress = patch.progress === undefined ? item.progress : Math.max(item.progress, Math.max(0, Math.min(1, patch.progress)));
+    // Progress is monotonic within one attempt, but a retry starts a new attempt.
+    const progress = patch.status === "queued"
+      ? 0
+      : patch.progress === undefined
+        ? item.progress
+        : Math.max(item.progress, Math.max(0, Math.min(1, patch.progress)));
     return { ...item, ...patch, progress, updatedAt: now };
   });
   if (!found) throw new Error("The batch item was not found.");
