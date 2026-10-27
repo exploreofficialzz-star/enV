@@ -125,7 +125,7 @@ for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "
 for (const marker of ["env.music-profile.v2", "fingerprint", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
   assert.ok(musicAnalysisProfile.includes(marker), `Music Analyzer profile export contract missing: ${marker}`);
 }
-for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
+for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "human_review_required"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
 }
 assert.ok(musicAnalysisRoute.includes("MUSIC_ANALYSIS_MODEL_DISABLED"), "legacy music-analysis route must return an explicit disabled result");
