@@ -226,9 +226,9 @@ export function transitionLocalMusicBatchItem(
 export function finalizeLocalMusicBatch(batch: LocalMusicBatch, now = new Date().toISOString()): LocalMusicBatch {
   const counts = countLocalMusicBatchItems(batch);
   if (counts.running > 0) return { ...batch, status: "running", updatedAt: now };
+  if (batch.status === "canceled") return { ...batch, status: "canceled", updatedAt: now };
   if (counts.queued > 0 || counts.waitingForFile > 0) return { ...batch, status: "paused", updatedAt: now };
-  if (counts.failed > 0) return { ...batch, status: "completed_with_errors", updatedAt: now };
-  if (counts.canceled === counts.total && counts.total > 0) return { ...batch, status: "canceled", updatedAt: now };
+  if (counts.failed > 0 || counts.canceled > 0) return { ...batch, status: "completed_with_errors", updatedAt: now };
   return { ...batch, status: "completed", updatedAt: now };
 }
 
