@@ -153,7 +153,7 @@ function buildAnnotations(dataset: JsonRecord, userId: string): Array<JsonRecord
   }
   return rows;
 }
-function validateSaveBody(body: JsonRecord) {
+function validateSaveBody(body: JsonRecord, userId: string) {
   const file = object(body.file);
   const analysis = object(body.analysis);
   const dataset = object(body.dataset_analysis);
@@ -199,7 +199,7 @@ function validateSaveBody(body: JsonRecord) {
     return { frame_index: index, start_seconds: start, end_seconds: end, features: row };
   });
   const events = buildEvents(dataset);
-  const annotations = buildAnnotations(dataset, "pending-user");
+  const annotations = buildAnnotations(dataset, userId);
   const sourceMetadata = object(file.source_metadata) ?? object(analysis.metadata) ?? {};
   const normalizedMetadata = object(file.normalized_metadata) ?? sourceMetadata;
   const searchText = [
@@ -258,7 +258,7 @@ export async function saveMusicDatasetTrack(request: Request): Promise<Response>
   const body = await readJsonObject(request, MAX_JSON_BYTES);
   if (!body) return jsonResponse({ ok: false, error: "MUSIC_DATASET_INVALID_JSON", message: "The save request must be valid JSON within the 4 MiB limit." }, 400);
   try {
-    const input = validateSaveBody(body);
+    const input = validateSaveBody(body, auth.userId);
     const sql = await getSql();
     const saved = await sql.transaction(async (tx) => {
       const previous = await tx.query<JsonRecord>(
@@ -287,7 +287,7 @@ export async function saveMusicDatasetTrack(request: Request): Promise<Response>
         await tx.query(
           "insert into music_feature_frames (user_id,analysis_run_id,frame_index,start_seconds,end_seconds,features) " +
           "select $1,$2,(item->>'frame_index')::integer,(item->>'start_seconds')::double precision,(item->>'end_seconds')::double precision,(item->'features' - 'start_seconds' - 'end_seconds') " +
-          "from jsonb_array_elements($3::jsonb) as item",
+          "from jsonb_array_elements($3::jsonb) as rows(item)",
           [auth.userId, input.runId, JSON.stringify(input.frames)],
         );
       }
@@ -300,11 +300,11 @@ export async function saveMusicDatasetTrack(request: Request): Promise<Response>
         );
       }
       if (input.annotations.length) {
-        const annotationRows = input.annotations.map((row) => ({ ...row, reviewer_id: row.reviewer_id === "pending-user" ? null : row.reviewer_id }));
+        const annotationRows = input.annotations;
         await tx.query(
           "insert into music_annotations (id,user_id,track_id,analysis_run_id,field_key,field_value,source,review_state,reviewer_id,evidence,notes) " +
           "select item->>'id',$1,$2,$3,item->>'field_key',item->'field_value',item->>'source',item->>'review_state',nullif(item->>'reviewer_id',''),item->'evidence',item->>'notes' " +
-          "from jsonb_array_elements($4::jsonb) as item",
+          "from jsonb_array_elements($4::jsonb) as rows(item)",
           [auth.userId, input.trackId, input.runId, JSON.stringify(annotationRows)],
         );
       }
