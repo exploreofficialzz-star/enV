@@ -74,12 +74,21 @@ test("music loudness parser accepts honest unavailable readings with explicit re
 });
 
 test("music loudness parser rejects unverified hashes, invalid units and fabricated zero defaults", () => {
-  const unverified = report();
-  unverified.source.file_sha256_verified = false as true;
+  const original = report();
+  const unverified = {
+    ...original,
+    source: { ...original.source, file_sha256_verified: false },
+  };
   assert.throws(() => parseMusicLoudnessReport(unverified), /input identity or audio metadata/);
 
-  const wrongUnits = report();
-  wrongUnits.measurement.units.true_peak = "dBFS" as "dBTP";
+  const originalUnits = report();
+  const wrongUnits = {
+    ...originalUnits,
+    measurement: {
+      ...originalUnits.measurement,
+      units: { ...originalUnits.measurement.units, true_peak: "dBFS" },
+    },
+  };
   assert.throws(() => parseMusicLoudnessReport(wrongUnits), /method, scope, or units/);
 
   const invalidStatus = report();
