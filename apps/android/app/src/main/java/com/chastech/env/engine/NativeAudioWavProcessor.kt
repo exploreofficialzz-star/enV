@@ -2,6 +2,7 @@ package com.chastech.env.engine
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.abs
@@ -208,7 +209,7 @@ object NativeAudioWavProcessor {
         val rms = if (input.frames == 0) 0.0 else sqrt(input.channels.sumOf { channel -> channel.sumOf { it.toDouble() * it } } / (input.frames.toDouble() * input.channels.size))
         val dc = if (input.frames == 0) 0.0 else input.channels.sumOf { channel -> channel.sumOf { it.toDouble() } } / (input.frames.toDouble() * input.channels.size)
         when (operation) {
-            "analyze" -> return NativeAudioWavResult(musicAnalysisReport(input, fileName, bytes.size, peak, rms), durationSeconds = duration)
+            "analyze" -> return NativeAudioWavResult(musicAnalysisReport(input, fileName, bytes.size, peak, rms, sha256Hex(bytes)), durationSeconds = duration)
             "inspector" -> return NativeAudioWavResult("WAV inspector\nDuration: ${fmt(duration)} s\nSample rate: ${input.sampleRateHz} Hz\nChannels: ${input.channels.size}\nFrames per channel: ${input.frames}\nSource encoding: ${input.sourceBits}-bit ${if (input.sourceEncoding == 3) "IEEE float" else "PCM"}\nSource size: ${bytes.size} bytes", durationSeconds = duration)
             "duration" -> return NativeAudioWavResult("Duration: ${fmt(duration)} seconds\nSample rate: ${input.sampleRateHz} Hz", durationSeconds = duration)
             "peak" -> return NativeAudioWavResult("Peak amplitude: ${fmt(peak)}\nPeak level: ${fmt(NativeAudioDsp.amplitudeDbfs(peak))} dBFS\nSource channels: ${input.channels.size}", durationSeconds = duration)
@@ -298,7 +299,7 @@ object NativeAudioWavProcessor {
 
     private data class NativeSpectrum(val centroidHz: Double?, val rolloff85Hz: Double?, val flatness: Double?)
 
-    private fun musicAnalysisReport(input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double): String {
+    private fun musicAnalysisReport(input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double, fileSha256: String): String {
         val frames = input.frames
         val rate = input.sampleRateHz
         val duration = input.durationSeconds
@@ -347,7 +348,11 @@ object NativeAudioWavProcessor {
         val key = estimateMusicalKey(representative.copyOfRange(0, min(representative.size, rate * 30)), rate)
         val spectrum = calculateSpectrum(representative, rate)
         val json = JSONObject()
-            .put("schema_version", "env.music-analysis.v1")
+            .put("schema_version", "env.music-analysis.v2")
+            .put("fingerprint", JSONObject()
+                .put("file_sha256", fileSha256)
+                .put("exact_match_method", "sha-256-exact-file-bytes")
+                .put("note", "SHA-256 identifies byte-identical files only; acoustic similarity is a separate fingerprinting task."))
             .put("source", JSONObject()
                 .put("file_name", fileName.ifBlank { "audio.wav" })
                 .put("mime_type", "audio/wav")
@@ -363,33 +368,40 @@ object NativeAudioWavProcessor {
                 .put("channels", input.channels.size)
                 .put("peak_dbfs", jsonNumberOrNull(if (peak > 0) 20.0 * kotlin.math.log10(peak) else Double.NEGATIVE_INFINITY))
                 .put("rms_dbfs", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) else Double.NEGATIVE_INFINITY))
-                .put("estimated_loudness_lufs", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) - 0.691 else Double.NEGATIVE_INFINITY))
+                .put("rms_loudness_proxy_db", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) - 0.691 else Double.NEGATIVE_INFINITY))
                 .put("clipped_sample_percent", if (totalSamples > 0) clippedSamples.toDouble() * 100.0 / totalSamples else 0.0)
                 .put("silence_percent", if (totalWindows > 0) silentWindows.toDouble() * 100.0 / totalWindows else 0.0)
                 .put("windowed_rms_spread_db", jsonNumberOrNull(spread ?: Double.NaN))
-                .put("metric_scope_seconds", min(duration, 30.0)))
+                .put("metric_scope_seconds", duration))
             .put("rhythm", JSONObject()
                 .put("tempo_bpm", tempo?.let { it } ?: JSONObject.NULL)
-                .put("method", "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate")
-                .put("status", if (tempo != null) "estimated" else "unavailable"))
+                .put("method", "RMS-energy novelty autocorrelation with an approximately 10 ms hop over at most 90 seconds; best-effort estimate")
+                .put("status", if (tempo != null) "estimated" else "unavailable")
+                .put("analysis_scope_seconds", min(duration, 90.0)))
             .put("tonality", JSONObject()
                 .put("key", key ?: JSONObject.NULL)
-                .put("method", "4096-point chroma-template correlation; best-effort estimate")
-                .put("status", if (key != null) "estimated" else "unavailable"))
+                .put("method", "4096-point chroma-template correlation over at most 30 seconds; best-effort estimate")
+                .put("status", if (key != null) "estimated" else "unavailable")
+                .put("analysis_scope_seconds", min(duration, 30.0)))
             .put("timbre", JSONObject()
                 .put("spectral_centroid_hz", jsonNumberOrNull(spectrum.centroidHz ?: Double.NaN))
                 .put("spectral_rolloff_85_hz", jsonNumberOrNull(spectrum.rolloff85Hz ?: Double.NaN))
                 .put("spectral_flatness", jsonNumberOrNull(spectrum.flatness ?: Double.NaN))
                 .put("zero_crossing_rate", jsonNumberOrNull(zcr ?: Double.NaN))
-                .put("interpretation", "Signal features do not independently identify genre, instruments, mood or language."))
+                .put("spectral_scope_seconds", min(duration, 30.0))
+                .put("zero_crossing_scope_seconds", duration)
+                .put("interpretation", "Spectral descriptors use at most the first 30 seconds; zero-crossing rate uses the first channel across the full track. Signal features do not independently identify genre, instruments, mood or language."))
             .put("classification", JSONObject()
                 .put("genre", JSONObject.NULL).put("sub_style", JSONObject.NULL)
                 .put("language", JSONArray()).put("mood", JSONArray()).put("instruments", JSONArray())
                 .put("vocal_style", JSONObject.NULL).put("genre_candidates", JSONArray())
-                .put("status", "requires_model")
-                .put("note", "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."))
+                .put("status", "human_review_required")
+                .put("note", "This Analyzer does not run a semantic model. Genre, sub-style, language, mood, instruments and vocal style remain unknown until supplied and human-reviewed."))
         return json.toString(2)
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun jsonNumberOrNull(value: Double): Any = if (value.isFinite()) value else JSONObject.NULL
 

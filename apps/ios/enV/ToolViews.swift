@@ -9,6 +9,7 @@ import CoreText
 import CoreImage
 import UniformTypeIdentifiers
 import Compression
+import CryptoKit
 
 struct ToolCard: View {
     @EnvironmentObject private var store: CatalogStore
@@ -1843,7 +1844,7 @@ enum NativeAudioWavProcessor {
         let dc = input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) } } / max(1, Double(input.frames * input.channels.count))
         func number(_ value: Double) -> String { value.isFinite ? String(format: "%.3f", value) : "unavailable" }
         switch operation {
-        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms), outputWav: nil, durationSeconds: duration)
+        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms, fileSHA256: sha256Hex(data)), outputWav: nil, durationSeconds: duration)
         case "inspector": return NativeAudioWavResult(report: "WAV inspector\nDuration: \(number(duration)) s\nSample rate: \(input.sampleRateHz) Hz\nChannels: \(input.channels.count)\nFrames per channel: \(input.frames)\nSource encoding: \(input.sourceBits)-bit \(input.sourceEncoding == 3 ? "IEEE float" : "PCM")\nSource size: \(data.count) bytes", outputWav: nil, durationSeconds: duration)
         case "duration": return NativeAudioWavResult(report: "Duration: \(number(duration)) seconds\nSample rate: \(input.sampleRateHz) Hz", outputWav: nil, durationSeconds: duration)
         case "peak": return NativeAudioWavResult(report: "Peak amplitude: \(number(peak))\nPeak level: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nSource channels: \(input.channels.count)", outputWav: nil, durationSeconds: duration)
@@ -1906,7 +1907,11 @@ enum NativeAudioWavProcessor {
         let flatness: Double?
     }
 
-    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double) throws -> String {
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double, fileSHA256: String) throws -> String {
         let frames = input.frames, rate = input.sampleRateHz, duration = input.durationSeconds
         let windowFrames = max(1, rate / 10)
         var windowLevels: [Double] = []
@@ -1955,7 +1960,12 @@ enum NativeAudioWavProcessor {
             return value
         }
         let payload: [String: Any] = [
-            "schema_version": "env.music-analysis.v1",
+            "schema_version": "env.music-analysis.v2",
+            "fingerprint": [
+                "file_sha256": fileSHA256,
+                "exact_match_method": "sha-256-exact-file-bytes",
+                "note": "SHA-256 identifies byte-identical files only; acoustic similarity is a separate fingerprinting task."
+            ],
             "source": [
                 "file_name": fileName.isEmpty ? "audio.wav" : fileName,
                 "mime_type": "audio/wav",
@@ -1972,34 +1982,38 @@ enum NativeAudioWavProcessor {
                 "channels": input.channels.count,
                 "peak_dbfs": nullable(peak > 0 ? 20 * log10(peak) : nil),
                 "rms_dbfs": nullable(rms > 0 ? 20 * log10(rms) : nil),
-                "estimated_loudness_lufs": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
+                "rms_loudness_proxy_db": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
                 "clipped_sample_percent": totalSamples > 0 ? Double(clipped) * 100 / Double(totalSamples) : 0,
                 "silence_percent": totalWindows > 0 ? Double(silentWindows) * 100 / Double(totalWindows) : 0,
                 "windowed_rms_spread_db": nullable(spread),
-                "metric_scope_seconds": min(duration, 30)
+                "metric_scope_seconds": duration
             ],
             "rhythm": [
                 "tempo_bpm": tempo.map { $0 as Any } ?? NSNull(),
-                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate",
-                "status": tempo == nil ? "unavailable" : "estimated"
+                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop over at most 90 seconds; best-effort estimate",
+                "status": tempo == nil ? "unavailable" : "estimated",
+                "analysis_scope_seconds": min(duration, 90)
             ],
             "tonality": [
                 "key": key.map { $0 as Any } ?? NSNull(),
-                "method": "4096-point chroma-template correlation; best-effort estimate",
-                "status": key == nil ? "unavailable" : "estimated"
+                "method": "4096-point chroma-template correlation over at most 30 seconds; best-effort estimate",
+                "status": key == nil ? "unavailable" : "estimated",
+                "analysis_scope_seconds": min(duration, 30)
             ],
             "timbre": [
                 "spectral_centroid_hz": nullable(spectrum.centroidHz),
                 "spectral_rolloff_85_hz": nullable(spectrum.rolloff85Hz),
                 "spectral_flatness": nullable(spectrum.flatness),
                 "zero_crossing_rate": nullable(zcr),
-                "interpretation": "Signal features do not independently identify genre, instruments, mood or language."
+                "spectral_scope_seconds": min(duration, 30),
+                "zero_crossing_scope_seconds": duration,
+                "interpretation": "Spectral descriptors use at most the first 30 seconds; zero-crossing rate uses the first channel across the full track. Signal features do not independently identify genre, instruments, mood or language."
             ],
             "classification": [
                 "genre": NSNull(), "sub_style": NSNull(), "language": [String](),
                 "mood": [String](), "instruments": [String](), "vocal_style": NSNull(),
-                "genre_candidates": [[String: Any]](), "status": "requires_model",
-                "note": "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."
+                "genre_candidates": [[String: Any]](), "status": "human_review_required",
+                "note": "This Analyzer does not run a semantic model. Genre, sub-style, language, mood, instruments and vocal style remain unknown until supplied and human-reviewed."
             ]
         ]
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])

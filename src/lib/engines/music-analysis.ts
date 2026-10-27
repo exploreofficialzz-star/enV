@@ -8,10 +8,17 @@ export type MusicAnalysisInput = {
   fileSizeBytes: number;
   mimeType?: string;
   metadata?: MusicMetadata;
+  /** SHA-256 over the original file bytes; not an acoustic fingerprint. */
+  sourceSha256?: string | null;
 };
 
 export type MusicAnalysisResult = {
-  schema_version: "env.music-analysis.v1";
+  schema_version: "env.music-analysis.v2";
+  fingerprint: {
+    file_sha256: string | null;
+    exact_match_method: "sha-256-exact-file-bytes" | "not-computed";
+    note: string;
+  };
   source: { file_name: string; mime_type: string; file_size_bytes: number };
   metadata: {
     title: string | null;
@@ -32,19 +39,25 @@ export type MusicAnalysisResult = {
     channels: number;
     peak_dbfs: number | null;
     rms_dbfs: number | null;
-    estimated_loudness_lufs: number | null;
+    /** RMS-derived decibel proxy; not EBU R 128 / ITU-R BS.1770 integrated LUFS. */
+    rms_loudness_proxy_db: number | null;
     clipped_sample_percent: number;
     silence_percent: number;
     windowed_rms_spread_db: number | null;
+    /** Peak/RMS/clipping/silence/dynamics are measured across the full decoded track. */
     metric_scope_seconds: number;
   };
-  rhythm: { tempo_bpm: number | null; method: string; status: "estimated" | "unavailable" };
-  tonality: { key: string | null; method: string; status: "estimated" | "unavailable" };
+  rhythm: { tempo_bpm: number | null; method: string; status: "estimated" | "unavailable"; analysis_scope_seconds: number };
+  tonality: { key: string | null; method: string; status: "estimated" | "unavailable"; analysis_scope_seconds: number };
   timbre: {
     spectral_centroid_hz: number | null;
     spectral_rolloff_85_hz: number | null;
     spectral_flatness: number | null;
     zero_crossing_rate: number | null;
+    /** Spectral descriptors use at most the first 30 seconds. */
+    spectral_scope_seconds: number;
+    /** Zero-crossing rate uses the first channel across the full decoded track. */
+    zero_crossing_scope_seconds: number;
     interpretation: string;
   };
   classification: {
@@ -55,7 +68,7 @@ export type MusicAnalysisResult = {
     instruments: string[];
     vocal_style: string | null;
     genre_candidates: Array<{ label: string; score: number | null }>;
-    status: "requires_model" | "model_completed";
+    status: "human_review_required" | "historical_model_result";
     note: string;
   };
 };
@@ -150,8 +163,8 @@ function spectralFeatures(samples: Float32Array, sampleRate: number): {
 
 /**
  * Derives reproducible signal measurements on decoded PCM. Semantic labels such as
- * genre, language, instrument identity and mood are deliberately left unclassified
- * until a configured, trained model returns them.
+ * genre, language, instrument identity and mood remain unknown in this no-model
+ * analyzer; corrections belong in a separately provenance-tracked human annotation.
  */
 export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResult {
   const channels = input.channels;
@@ -201,7 +214,7 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const p95 = quantile(spreadDb, 0.95), p10 = quantile(spreadDb, 0.10);
   const spread = p95 === null || p10 === null ? null : Number(Math.max(0, p95 - p10).toFixed(2));
   const rmsAmplitude = Math.sqrt(sumSquares / Math.max(1, totalSamples));
-  const lufsEstimate = rmsAmplitude > 0 ? 20 * Math.log10(rmsAmplitude) - 0.691 : Number.NEGATIVE_INFINITY;
+  const rmsLoudnessProxy = rmsAmplitude > 0 ? 20 * Math.log10(rmsAmplitude) - 0.691 : Number.NEGATIVE_INFINITY;
   const tempoSamples = representative.subarray(0, Math.min(representative.length, Math.round(input.sampleRate * 90)));
   const keySamples = representative.subarray(0, Math.min(representative.length, Math.round(input.sampleRate * 30)));
   const tempo = estimateBpm(tempoSamples, input.sampleRate);
@@ -212,7 +225,16 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
   const taggedBpm = metadata.bpm ? Number(metadata.bpm) : NaN;
 
   return {
-    schema_version: "env.music-analysis.v1",
+    schema_version: "env.music-analysis.v2",
+    fingerprint: {
+      file_sha256: typeof input.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(input.sourceSha256)
+        ? input.sourceSha256.toLowerCase()
+        : null,
+      exact_match_method: typeof input.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(input.sourceSha256)
+        ? "sha-256-exact-file-bytes"
+        : "not-computed",
+      note: "SHA-256 identifies byte-identical files only; acoustic similarity is a separate fingerprinting task.",
+    },
     source: {
       file_name: input.fileName || "audio",
       mime_type: input.mimeType || "application/octet-stream",
@@ -237,20 +259,22 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
       channels: channels.length,
       peak_dbfs: safeDb(peak),
       rms_dbfs: safeDb(rmsAmplitude),
-      estimated_loudness_lufs: Number.isFinite(lufsEstimate) ? Number(lufsEstimate.toFixed(2)) : null,
+      rms_loudness_proxy_db: Number.isFinite(rmsLoudnessProxy) ? Number(rmsLoudnessProxy.toFixed(2)) : null,
       clipped_sample_percent: totalSamples ? Number((clippedSamples / totalSamples * 100).toFixed(4)) : 0,
       silence_percent: totalWindows ? Number((silenceWindows / totalWindows * 100).toFixed(2)) : 0,
       windowed_rms_spread_db: spread,
-      metric_scope_seconds: Number(Math.min(durationSeconds, 30).toFixed(2)),
+      metric_scope_seconds: Number(durationSeconds.toFixed(3)),
     },
-    rhythm: { tempo_bpm: tempo, method: "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate", status: tempo === null ? "unavailable" : "estimated" },
-    tonality: { key, method: "chroma-template correlation; best-effort estimate", status: key === null ? "unavailable" : "estimated" },
+    rhythm: { tempo_bpm: tempo, method: "RMS-energy novelty autocorrelation with an approximately 10 ms hop over at most 90 seconds; best-effort estimate", status: tempo === null ? "unavailable" : "estimated", analysis_scope_seconds: Number((tempoSamples.length / input.sampleRate).toFixed(3)) },
+    tonality: { key, method: "chroma-template correlation over at most 30 seconds; best-effort estimate", status: key === null ? "unavailable" : "estimated", analysis_scope_seconds: Number((keySamples.length / input.sampleRate).toFixed(3)) },
     timbre: {
       spectral_centroid_hz: spectrum.centroid,
       spectral_rolloff_85_hz: spectrum.rolloff85,
       spectral_flatness: spectrum.flatness,
       zero_crossing_rate: zcr === null ? null : Number(zcr.toFixed(5)),
-      interpretation: "These describe signal shape; they do not independently identify genre, instruments, mood or language.",
+      spectral_scope_seconds: Number(Math.min(durationSeconds, 30).toFixed(3)),
+      zero_crossing_scope_seconds: Number(durationSeconds.toFixed(3)),
+      interpretation: "Spectral descriptors use at most the first 30 seconds; zero-crossing rate uses the first channel across the full track. These describe signal shape and do not independently identify genre, instruments, mood or language.",
     },
     classification: {
       genre: null,
@@ -260,8 +284,8 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
       instruments: [],
       vocal_style: null,
       genre_candidates: [],
-      status: "requires_model",
-      note: "No trained semantic classifier has been run. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed.",
+      status: "human_review_required",
+      note: "This Analyzer does not run a semantic model. Genre, sub-style, language, mood, instruments and vocal style remain unknown until supplied and human-reviewed.",
     },
   };
 }

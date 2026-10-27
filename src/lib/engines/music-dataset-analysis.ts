@@ -1,6 +1,6 @@
 import { estimateBpm, estimateKey } from "./audio-studio.ts";
 
-export const MUSIC_DATASET_SCHEMA_VERSION = "env.music-dataset-analysis.v1" as const;
+export const MUSIC_DATASET_SCHEMA_VERSION = "env.music-dataset-analysis.v2" as const;
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"] as const;
 const FFT_SIZE = 2048;
 const FFT_HOP_SECONDS = 0.5;
@@ -36,6 +36,17 @@ export type ChordEstimate = {
   method: "spectral-chroma-triad-template";
 };
 
+export type RepetitionCandidate = {
+  start_seconds: number;
+  end_seconds: number;
+  match_start_seconds: number;
+  match_end_seconds: number;
+  /** Normalized feature similarity score from 0 to 1; not a probability. */
+  similarity_score: number;
+  method: "normalized-feature-sequence";
+  note: string;
+};
+
 export type MusicDatasetAnnotations = {
   genre: string[];
   sub_style: string[];
@@ -61,6 +72,11 @@ export type MusicDatasetAnnotations = {
 
 export type MusicDatasetAnalysis = {
   schema_version: typeof MUSIC_DATASET_SCHEMA_VERSION;
+  fingerprint: {
+    file_sha256: string | null;
+    exact_match_method: "sha-256-exact-file-bytes" | "not-computed";
+    note: string;
+  };
   source: { file_name: string; sample_rate_hz: number; channels: number; frame_count: number; duration_seconds: number };
   processing: {
     method: "local-digital-signal-processing";
@@ -118,6 +134,8 @@ export type MusicDatasetAnalysis = {
   structure: {
     change_points: Array<{ time_seconds: number; change_score: number; reason: string }>;
     sections: Array<{ start_seconds: number; end_seconds: number; label: string; label_source: "automatic_feature_change"; semantic_section: null }>;
+    repetition_candidates: RepetitionCandidate[];
+    repetition_note: string;
     note: string;
   };
   style_cues: Array<{ tag: string; evidence: string; is_genre_classification: false }>;
@@ -135,6 +153,8 @@ export type MusicDatasetAnalysisInput = {
   channels: readonly Float32Array[];
   sampleRate: number;
   fileName?: string;
+  /** SHA-256 over the original file bytes, not over decoded/resampled PCM. */
+  sourceSha256?: string | null;
 };
 
 export type LocalSignalLayer = {
@@ -471,6 +491,105 @@ function createSections(frames: FeatureFrame[], duration: number) {
   return { change_points: changePoints, sections };
 }
 
+type RepetitionWindow = {
+  startIndex: number;
+  matchIndex: number;
+  similarity: number;
+};
+
+function findRepeatedPassages(frames: readonly FeatureFrame[], duration: number, sampleRate: number): RepetitionCandidate[] {
+  const windowFrames = Math.round(8 / FFT_HOP_SECONDS);
+  const stepFrames = Math.round(4 / FFT_HOP_SECONDS);
+  const windowSeconds = windowFrames * FFT_HOP_SECONDS;
+  if (frames.length < windowFrames * 2 || duration < windowSeconds * 2 + 1) return [];
+
+  const nyquist = Math.max(1, sampleRate / 2);
+  const vectors = frames.map((frame) => [
+    clamp(((frame.rms_dbfs ?? -120) + 60) / 60, 0, 1),
+    clamp(((frame.peak_dbfs ?? -120) + 60) / 60, 0, 1),
+    frame.spectral_centroid_hz === null ? 0 : clamp(Math.log1p(frame.spectral_centroid_hz) / Math.log1p(nyquist), 0, 1),
+    frame.spectral_rolloff_85_hz === null ? 0 : clamp(Math.log1p(frame.spectral_rolloff_85_hz) / Math.log1p(nyquist), 0, 1),
+    clamp(frame.spectral_flatness ?? 0, 0, 1),
+    clamp(frame.low_frequency_energy_ratio ?? 0, 0, 1),
+    clamp(frame.mid_frequency_energy_ratio ?? 0, 0, 1),
+    clamp(frame.high_frequency_energy_ratio ?? 0, 0, 1),
+    clamp(frame.spectral_flux ?? 0, 0, 1),
+    clamp(frame.zero_crossing_rate ?? 0, 0, 1),
+  ]);
+
+  const temporalVariation = (start: number): number => {
+    let difference = 0;
+    let count = 0;
+    for (let offset = 1; offset < windowFrames; offset += 1) {
+      const previous = vectors[start + offset - 1]!;
+      const current = vectors[start + offset]!;
+      for (let dimension = 0; dimension < previous.length; dimension += 1) {
+        difference += Math.abs(current[dimension]! - previous[dimension]!);
+        count += 1;
+      }
+    }
+    return count ? difference / count : 0;
+  };
+
+  const windowStarts: number[] = [];
+  for (let start = 0; start + windowFrames <= frames.length; start += stepFrames) {
+    const window = frames.slice(start, start + windowFrames);
+    const rms = mean(window.map((frame) => frame.rms_dbfs ?? -120)) ?? -120;
+    // Exclude near-silence and almost-flat feature sequences; neither is useful evidence of a repeated passage.
+    if (rms > -58 && temporalVariation(start) >= 0.012) windowStarts.push(start);
+  }
+
+  const comparisons: RepetitionWindow[] = [];
+  for (let a = 0; a < windowStarts.length; a += 1) {
+    const startIndex = windowStarts[a]!;
+    for (let b = a + 1; b < windowStarts.length; b += 1) {
+      const matchIndex = windowStarts[b]!;
+      if (matchIndex - startIndex < windowFrames) continue;
+      let absoluteDifference = 0;
+      let valueCount = 0;
+      for (let offset = 0; offset < windowFrames; offset += 1) {
+        const left = vectors[startIndex + offset]!;
+        const right = vectors[matchIndex + offset]!;
+        for (let dimension = 0; dimension < left.length; dimension += 1) {
+          absoluteDifference += Math.abs(left[dimension]! - right[dimension]!);
+          valueCount += 1;
+        }
+      }
+      const similarity = valueCount ? clamp(1 - absoluteDifference / valueCount, 0, 1) : 0;
+      if (similarity >= 0.84) comparisons.push({ startIndex, matchIndex, similarity });
+    }
+  }
+
+  comparisons.sort((a, b) => b.similarity - a.similarity);
+  const selected: RepetitionWindow[] = [];
+  for (const candidate of comparisons) {
+    const alreadyRepresented = selected.some((other) =>
+      Math.abs(candidate.startIndex - other.startIndex) < windowFrames &&
+      Math.abs(candidate.matchIndex - other.matchIndex) < windowFrames
+    );
+    if (alreadyRepresented) continue;
+    selected.push(candidate);
+    if (selected.length >= 20) break;
+  }
+
+  const note = "Feature-sequence similarity is a candidate match, not proof of identical audio or a semantic verse/chorus label.";
+  return selected.map((candidate) => {
+    const firstFrame = frames[candidate.startIndex]!;
+    const lastFirstFrame = frames[candidate.startIndex + windowFrames - 1]!;
+    const firstMatchFrame = frames[candidate.matchIndex]!;
+    const lastMatchFrame = frames[candidate.matchIndex + windowFrames - 1]!;
+    return {
+      start_seconds: Number(firstFrame.start_seconds.toFixed(3)),
+      end_seconds: Number(lastFirstFrame.end_seconds.toFixed(3)),
+      match_start_seconds: Number(firstMatchFrame.start_seconds.toFixed(3)),
+      match_end_seconds: Number(lastMatchFrame.end_seconds.toFixed(3)),
+      similarity_score: Number(candidate.similarity.toFixed(3)),
+      method: "normalized-feature-sequence" as const,
+      note,
+    };
+  });
+}
+
 export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput, options: { signal?: AbortSignal; onProgress?: (fraction: number) => void } = {}): Promise<MusicDatasetAnalysis> {
   const { channels, sampleRate } = input;
   if (options.signal?.aborted) throw new DOMException("Cancelled", "AbortError");
@@ -594,6 +713,7 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
   const fluxEvents = frameFluxes.filter((value) => value >= fluxThreshold).length;
   const transientDensity = duration > 0 ? Number((Math.max(transientEvents, fluxEvents) / duration).toFixed(3)) : null;
   const structure = createSections(frames, duration);
+  const repetitionCandidates = findRepeatedPassages(frames, duration, sampleRate);
   const styleCues: MusicDatasetAnalysis["style_cues"] = [];
   if ((meanLow ?? 0) >= 0.35) styleCues.push({ tag: "low-frequency-prominent", evidence: `Low band carries ${Math.round((meanLow ?? 0) * 100)}% of measured spectral energy on average.`, is_genre_classification: false });
   if ((meanHigh ?? 0) >= 0.3) styleCues.push({ tag: "high-frequency-prominent", evidence: `High band carries ${Math.round((meanHigh ?? 0) * 100)}% of measured spectral energy on average.`, is_genre_classification: false });
@@ -611,8 +731,16 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
   ];
   if (!durationPitchPoints.length) warnings.push("No stable dominant pitch could be tracked with sufficient autocorrelation confidence.");
   if (channels.length > 2) warnings.push("For stereo-width diagnostics, only the first two channels are treated as left/right.");
+  const sourceSha256 = typeof input.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(input.sourceSha256)
+    ? input.sourceSha256.toLowerCase()
+    : null;
   return {
     schema_version: MUSIC_DATASET_SCHEMA_VERSION,
+    fingerprint: {
+      file_sha256: sourceSha256,
+      exact_match_method: sourceSha256 ? "sha-256-exact-file-bytes" : "not-computed",
+      note: "SHA-256 identifies byte-identical files only; it does not detect acoustically similar recordings.",
+    },
     source: { file_name: input.fileName || "audio", sample_rate_hz: sampleRate, channels: channels.length, frame_count: frameCount, duration_seconds: Number(duration.toFixed(3)) },
     processing: {
       method: "local-digital-signal-processing", uses_remote_api: false, uses_hosted_model: false, model_inference: false,
@@ -657,7 +785,12 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
       descriptors: styleCues.map((cue) => cue.tag),
     },
     timeline: frames,
-    structure: { ...structure, note: "Generic sections are cut at strong measurable feature changes; they are not semantic labels such as verse, chorus, or drop." },
+    structure: {
+      ...structure,
+      repetition_candidates: repetitionCandidates,
+      repetition_note: "Candidate matches compare normalized 8-second feature sequences every 4 seconds. Scores are similarity measures, not probabilities. Near-silence is excluded; exact audio identity and semantic sections are not inferred.",
+      note: "Generic sections are cut at strong measurable feature changes; they are not semantic labels such as verse, chorus, or drop.",
+    },
     style_cues: styleCues,
     separation: {
       status: "not_performed",

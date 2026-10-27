@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import enV
 
 final class NativeAudioEngineTests: XCTestCase {
@@ -58,13 +59,27 @@ final class NativeAudioEngineTests: XCTestCase {
         let wav = try NativeAudioWavProcessor.encodePCM16(sampleRateHz: sampleRate, channels: [tone])
         let result = try NativeAudioWavProcessor.process(wav, operation: "analyze", fileName: "tone.wav")
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.report.utf8)) as? [String: Any])
-        XCTAssertEqual(object["schema_version"] as? String, "env.music-analysis.v1")
+        XCTAssertEqual(object["schema_version"] as? String, "env.music-analysis.v2")
+        let fingerprint = try XCTUnwrap(object["fingerprint"] as? [String: Any])
+        let expectedHash = SHA256.hash(data: wav).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(fingerprint["file_sha256"] as? String, expectedHash)
+        XCTAssertEqual(fingerprint["exact_match_method"] as? String, "sha-256-exact-file-bytes")
         let source = try XCTUnwrap(object["source"] as? [String: Any])
         XCTAssertEqual(source["file_name"] as? String, "tone.wav")
         let audio = try XCTUnwrap(object["audio"] as? [String: Any])
         XCTAssertEqual(audio["duration_seconds"] as? Double, 4)
+        XCTAssertEqual(audio["metric_scope_seconds"] as? Double, 4)
+        let rhythm = try XCTUnwrap(object["rhythm"] as? [String: Any])
+        XCTAssertEqual(rhythm["analysis_scope_seconds"] as? Double, 4)
+        let tonality = try XCTUnwrap(object["tonality"] as? [String: Any])
+        XCTAssertEqual(tonality["analysis_scope_seconds"] as? Double, 4)
+        let timbre = try XCTUnwrap(object["timbre"] as? [String: Any])
+        XCTAssertEqual(timbre["spectral_scope_seconds"] as? Double, 4)
+        XCTAssertEqual(timbre["zero_crossing_scope_seconds"] as? Double, 4)
+        XCTAssertNotNil(audio["rms_loudness_proxy_db"] as? Double)
+        XCTAssertNil(audio["estimated_loudness_lufs"])
         let classification = try XCTUnwrap(object["classification"] as? [String: Any])
-        XCTAssertEqual(classification["status"] as? String, "requires_model")
+        XCTAssertEqual(classification["status"] as? String, "human_review_required")
         XCTAssertNil(classification["genre"] as? String)
     }
 

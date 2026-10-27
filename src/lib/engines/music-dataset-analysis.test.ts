@@ -15,9 +15,12 @@ test("local dataset analysis emits time-aligned DSP features without calling a m
     channels: [samples],
     sampleRate,
     fileName: "sine-test.wav",
+    sourceSha256: "cd".repeat(32),
   });
 
-  assert.equal(result.schema_version, "env.music-dataset-analysis.v1");
+  assert.equal(result.schema_version, "env.music-dataset-analysis.v2");
+  assert.equal(result.fingerprint.file_sha256, "cd".repeat(32));
+  assert.equal(result.fingerprint.exact_match_method, "sha-256-exact-file-bytes");
   assert.equal(result.processing.uses_remote_api, false);
   assert.equal(result.processing.uses_hosted_model, false);
   assert.equal(result.processing.model_inference, false);
@@ -31,6 +34,40 @@ test("local dataset analysis emits time-aligned DSP features without calling a m
   assert.equal(result.separation.status, "not_performed");
   assert.equal(result.annotations.reviewed, false);
   assert.ok(result.warnings.some((warning) => warning.includes("No remote API")));
+});
+
+test("local dataset finds repeated passages as non-semantic feature candidates", async () => {
+  const sampleRate = 8_000;
+  const seconds = 32;
+  const samples = new Float32Array(sampleRate * seconds);
+  for (let index = 0; index < samples.length; index += 1) {
+    const time = index / sampleRate;
+    const segment = Math.floor(time / 8);
+    const localTime = time % 8;
+    const envelope = 0.65 + 0.35 * Math.sin(2 * Math.PI * 1.5 * localTime);
+    const frequencyA = segment === 0 || segment === 2 ? 220 : segment === 1 ? 660 : 330;
+    const frequencyB = segment === 0 || segment === 2 ? 440 : segment === 1 ? 990 : 550;
+    samples[index] = envelope * (0.32 * Math.sin(2 * Math.PI * frequencyA * localTime) + 0.12 * Math.sin(2 * Math.PI * frequencyB * localTime));
+  }
+
+  const result = await analyzeMusicDatasetAudio({
+    channels: [samples],
+    sampleRate,
+    fileName: "repeated-sections-fixture.wav",
+  });
+
+  assert.equal(result.schema_version, "env.music-dataset-analysis.v2");
+  assert.ok(result.structure.repetition_candidates.length > 0, "the repeated feature fixture should yield at least one candidate");
+  const expectedPair = result.structure.repetition_candidates.find((candidate) =>
+    (Math.abs(candidate.start_seconds) < 0.51 && Math.abs(candidate.match_start_seconds - 16) < 0.51) ||
+    (Math.abs(candidate.match_start_seconds) < 0.51 && Math.abs(candidate.start_seconds - 16) < 0.51)
+  );
+  assert.ok(expectedPair, `expected the 0–8s and 16–24s repeated passages; got ${JSON.stringify(result.structure.repetition_candidates)}`);
+  assert.ok(expectedPair.similarity_score >= 0.84 && expectedPair.similarity_score <= 1);
+  assert.equal(expectedPair.method, "normalized-feature-sequence");
+  assert.match(expectedPair.note, /not proof of identical audio/i);
+  assert.ok(result.structure.sections.every((section) => section.semantic_section === null));
+  assert.match(result.structure.repetition_note, /not probabilities/i);
 });
 
 test("stereo channel layers are explicitly named and include spatial meaning", () => {
