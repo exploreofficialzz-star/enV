@@ -120,6 +120,37 @@ type SavedDatasetTrack = {
   latest_run: { id: string; run_number: number; status: string } | null;
 };
 
+type SavedDatasetRun = {
+  id: string;
+  run_number: number;
+  analysis_schema_version: string;
+  dataset_schema_version: string;
+  engine_version: string;
+  processing_route: string;
+  status: string;
+  source_sha256: string | null;
+  warnings: string[];
+  result_checksum: string;
+  created_at: string;
+  completed_at: string | null;
+  analysis_summary: {
+    audio?: { duration_seconds?: number };
+    rhythm?: { tempo_bpm?: number | null };
+    tonality?: { key?: string | null };
+    classification?: { status?: string };
+  };
+  dataset_summary: {
+    technical?: { rms_dbfs?: number | null; peak_dbfs?: number | null };
+    tonality?: { key_estimate?: string | null };
+  };
+};
+type SavedDatasetDetail = {
+  track: { id: string; file_name: string; duration_seconds: number | null; source_sha256: string | null; created_at: string };
+  runs: SavedDatasetRun[];
+  latest_annotation_revisions: Array<{ field_key: string; field_value: unknown; source: string; review_state: string; reviewer_id: string | null; notes: string | null; created_at: string }>;
+  source_audio_available: false;
+};
+
 
 export function MusicAnalyzerStudio() {
   const [file, setFile] = useState<File | null>(null);
@@ -142,6 +173,9 @@ export function MusicAnalyzerStudio() {
   const [libraryQuery, setLibraryQuery] = useState("");
   const [libraryPage, setLibraryPage] = useState(1);
   const [libraryTotal, setLibraryTotal] = useState(0);
+  const [selectedTrackDetail, setSelectedTrackDetail] = useState<SavedDatasetDetail | null>(null);
+  const [trackDetailLoading, setTrackDetailLoading] = useState(false);
+  const [trackDetailError, setTrackDetailError] = useState("");
   const analysisControllerRef = useRef<AbortController | null>(null);
   const saveAttemptRef = useRef<{ signature: string; key: string } | null>(null);
   const lastSavedSignatureRef = useRef<string | null>(null);
@@ -330,6 +364,23 @@ export function MusicAnalyzerStudio() {
     }
   }
 
+  async function loadSavedTrackDetail(trackId: string) {
+    setTrackDetailLoading(true);
+    setTrackDetailError("");
+    try {
+      const response = await fetch("/api/music-dataset/tracks/" + encodeURIComponent(trackId), { headers: { Accept: "application/json" } });
+      const result = await response.json().catch(() => null) as { ok?: boolean; data?: SavedDatasetDetail; message?: string } | null;
+      if (!response.ok || !result?.ok || !result.data) {
+        throw new Error(result?.message || "Could not load this saved track's analysis history.");
+      }
+      setSelectedTrackDetail(result.data);
+    } catch (cause) {
+      setTrackDetailError(cause instanceof Error ? cause.message : "Could not load this saved track's analysis history.");
+    } finally {
+      setTrackDetailLoading(false);
+    }
+  }
+
   async function saveAnalysisToCloud() {
     if (!file || !analysis || !datasetAnalysis || savingCloud) return;
     setCloudSaveError("");
@@ -508,9 +559,14 @@ export function MusicAnalyzerStudio() {
                           {item.source_sha256 ? "Exact-file hash recorded" : "No exact-file hash"} · {new Date(item.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <Button type="button" variant="ghost" onClick={() => void deleteSavedTrack(item.id)} aria-label={`Delete saved track ${item.file_name}`}>
-                        Delete
-                      </Button>
+                      <div className="flex shrink-0 flex-wrap gap-1">
+                        <Button type="button" variant="outline" onClick={() => void loadSavedTrackDetail(item.id)} disabled={trackDetailLoading}>
+                          {trackDetailLoading ? "Loading…" : "View history"}
+                        </Button>
+                        <Button type="button" variant="ghost" onClick={() => void deleteSavedTrack(item.id)} aria-label={`Delete saved track ${item.file_name}`}>
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
@@ -520,6 +576,63 @@ export function MusicAnalyzerStudio() {
                 {libraryLoading ? "Loading your saved tracks…" : "No saved tracks in this result page."}
               </p>
             )}
+            {trackDetailError ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{trackDetailError}</p> : null}
+            {selectedTrackDetail ? (
+              <div className="space-y-3 rounded-xl border border-border bg-background p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="break-words text-sm font-semibold">{selectedTrackDetail.track.file_name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {selectedTrackDetail.runs.length} saved run{selectedTrackDetail.runs.length === 1 ? "" : "s"} · source audio not stored
+                    </p>
+                  </div>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedTrackDetail(null)}>Close</Button>
+                </div>
+                {selectedTrackDetail.runs.length ? (
+                  <div className="space-y-2">
+                    {selectedTrackDetail.runs.map((run) => {
+                      const audio = run.analysis_summary?.audio ?? {};
+                      const rhythm = run.analysis_summary?.rhythm ?? {};
+                      const tonality = run.analysis_summary?.tonality ?? {};
+                      const key = tonality.key ?? run.dataset_summary?.tonality?.key_estimate ?? null;
+                      return (
+                        <div key={run.id} className="rounded-lg border border-border p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium">Run {run.run_number}</p>
+                            <span className="text-xs text-muted-foreground">{run.status} · {new Date(run.created_at).toLocaleString()}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{run.analysis_schema_version} · {run.dataset_schema_version} · {run.processing_route}</p>
+                          <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                            <span>Duration: {audio.duration_seconds ? formatDuration(audio.duration_seconds) : "—"}</span>
+                            <span>Tempo: {rhythm.tempo_bpm == null ? "—" : `${rhythm.tempo_bpm} BPM`}</span>
+                            <span>Key: {key || "—"}</span>
+                            <span>RMS: {displayNumber(run.dataset_summary?.technical?.rms_dbfs ?? null, " dBFS")}</span>
+                          </div>
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs text-muted-foreground">Warnings and checksum</summary>
+                            {run.warnings?.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">{run.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul> : <p className="mt-2 text-xs text-muted-foreground">No warnings saved.</p>}
+                            <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground">SHA-256 result checksum: {run.result_checksum}</p>
+                          </details>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">No analysis runs were returned for this track.</p>}
+                <div>
+                  <h4 className="text-xs font-semibold">Latest annotation revisions</h4>
+                  {selectedTrackDetail.latest_annotation_revisions.length ? (
+                    <div className="mt-2 space-y-1.5">
+                      {selectedTrackDetail.latest_annotation_revisions.map((annotation) => (
+                        <div key={`${annotation.field_key}-${annotation.created_at}`} className="flex flex-col gap-1 rounded-lg border border-border p-2 sm:flex-row sm:items-start sm:justify-between">
+                          <span className="text-xs font-medium">{annotation.field_key}</span>
+                          <span className="break-words text-xs text-muted-foreground">{JSON.stringify(annotation.field_value)} · {annotation.review_state} · {annotation.source}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="mt-1 text-xs text-muted-foreground">No annotation revisions saved.</p>}
+                </div>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">{libraryTotal} saved track{libraryTotal === 1 ? "" : "s"} · page {libraryPage}</p>
               <div className="flex gap-2">
