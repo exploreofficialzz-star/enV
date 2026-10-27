@@ -42,7 +42,7 @@ try {
     const response = await fetch(`http://127.0.0.1:${PORT}/media`, { method: "POST", body: form });
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
-    assert.match(response.headers.get("content-type") || "", /application\\/json/i);
+    assert.match(response.headers.get("content-type") || "", /application\/json/i);
     assert.equal(body.schema_version, "env.music-loudness-report.v1");
     assert.equal(body.measurement.status, "measured");
     assert.ok(Math.abs(body.measurement.integrated_loudness_lufs - (-23)) < 1, `expected a 1 kHz -23 dBFS tone near -23 LUFS, received ${body.measurement.integrated_loudness_lufs}`);
