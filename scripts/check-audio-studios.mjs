@@ -134,6 +134,13 @@ assert.doesNotMatch(musicAnalysisRoute, /MUSIC_ANALYSIS_ENDPOINT|MUSIC_ANALYSIS_
 for (const marker of ["rms_loudness_proxy_db", "env.music-analysis.v2", "fingerprint", "file_sha256", "sha-256-exact-file-bytes", "metric_scope_seconds", "analysis_scope_seconds", "spectral_scope_seconds", "zero_crossing_scope_seconds"]) {
   assert.ok(musicAnalysis.includes(marker), `Music Analyzer v2 measurement contract missing: ${marker}`);
 }
+const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
+const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
+const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
+const androidNativeAudioTests = fs.readFileSync(new URL("../apps/android/app/src/test/java/com/chastech/env/engine/NativeAudioEngineTest.kt", import.meta.url), "utf8");
+const iosNativeAudioViews = fs.readFileSync(new URL("../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
+const iosNativeAudioTests = fs.readFileSync(new URL("../apps/ios/enVTests/NativeAudioEngineTests.swift", import.meta.url), "utf8");
+
 for (const [platform, processor] of [["Android", androidNativeAudioProcessor], ["iOS", iosNativeAudioViews]]) {
   assert.ok(processor.includes('"env.music-analysis.v2"'), `${platform} Music Analyzer must emit schema v2`);
   assert.ok(processor.includes('"rms_loudness_proxy_db"'), `${platform} Music Analyzer must use the honest RMS proxy field`);
@@ -153,12 +160,6 @@ assert.ok(androidNativeAudioTests.includes("env.music-analysis.v2") || androidNa
 assert.ok(androidNativeAudioTests.includes('"metric_scope_seconds"'), "Android contract tests must assert whole-track scope");
 assert.ok(androidNativeAudioTests.includes('"spectral_scope_seconds"'), "Android contract tests must assert spectral excerpt scope");
 assert.ok(androidNativeAudioTests.includes('"file_sha256"'), "Android contract tests must verify exact-file hashing");
-const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
-const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
-const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
-const androidNativeAudioTests = fs.readFileSync(new URL("../apps/android/app/src/test/java/com/chastech/env/engine/NativeAudioEngineTest.kt", import.meta.url), "utf8");
-const iosNativeAudioViews = fs.readFileSync(new URL("../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
-const iosNativeAudioTests = fs.readFileSync(new URL("../apps/ios/enVTests/NativeAudioEngineTests.swift", import.meta.url), "utf8");
 assert.ok(androidNativeAudioEngine.includes('"audio-analyze-studio" to "analyze"'), "Android Music Analyzer must have an explicit native operation mapping");
 assert.ok(androidNativeAudioProcessor.includes('"analyze" -> return NativeAudioWavResult(musicAnalysisReport'), "Android WAV processor must calculate a native analysis report");
 assert.ok(androidNativeAudioForm.includes('fileName = selectedName'), "Android Analyzer must preserve the selected source filename");
@@ -170,6 +171,48 @@ assert.ok(iosNativeAudioTests.includes("testMusicAnalyzerRoutesToNativeWavAndPro
 const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.ts", import.meta.url), "utf8");
 for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "evicted by the user agent"]) {
   assert.ok(storage.toLowerCase().includes(marker.toLowerCase()), `Music Studio persistence contract missing: ${marker}`);
+}
+
+const musicDatasetApi = fs.readFileSync(new URL("../src/lib/media/music-dataset-api.server.ts", import.meta.url), "utf8");
+const musicDatasetMigration = fs.readFileSync(new URL("../migrations/0009_music_dataset.sql", import.meta.url), "utf8");
+const musicAnalysisMigrations = fs.readFileSync(new URL("../src/lib/media/music-analysis-migration.ts", import.meta.url), "utf8");
+const musicDatasetTest = fs.readFileSync(new URL("../src/lib/engines/audio-studio.test.ts", import.meta.url), "utf8");
+const musicDatasetRouteFiles = [
+  "../server/routes/api/music-dataset/tracks.get.ts",
+  "../server/routes/api/music-dataset/tracks.post.ts",
+  "../server/routes/api/music-dataset/tracks/[id].get.ts",
+  "../server/routes/api/music-dataset/tracks/[id].delete.ts",
+  "../server/routes/api/music-dataset/runs/[id].get.ts",
+].map((path) => fs.readFileSync(new URL(path, import.meta.url), "utf8")).join("\n");
+for (const marker of [
+  "music_tracks", "music_analysis_runs", "music_feature_frames", "music_analysis_events",
+  "music_annotations", "music_collections", "music_collection_tracks", "idempotency_key",
+  "search_text", "source_sha256_verified", "references",
+]) {
+  assert.ok(musicDatasetMigration.includes(marker), `Music dataset migration missing ${marker}`);
+}
+for (const marker of [
+  "requireBillingUser", "isSameOriginRequest", "readJsonObject", "MAX_JSON_BYTES",
+  "MAX_FEATURE_FRAMES", "MAX_EVENTS", "sql.transaction", "idempotency_key",
+  "user_id=$2", "source_audio_uploaded: false", "source_sha256_verified=false",
+  "listMusicDatasetTracks", "saveMusicDatasetTrack", "getMusicDatasetTrack",
+  "getMusicAnalysisRun", "deleteMusicDatasetTrack",
+]) {
+  assert.ok(musicDatasetApi.includes(marker), `Private dataset API missing ${marker}`);
+}
+assert.ok(!musicDatasetApi.includes("request.formData()"), "Dataset save endpoint must not accept or store raw source audio");
+for (const marker of [
+  "migrateMusicAnalysisV1ToV2", "migrateMusicProfileV1ToV2",
+  "migrateMusicDatasetAnalysisV1ToV2", "not-computed",
+]) {
+  assert.ok(musicAnalysisMigrations.includes(marker), `Music Analyzer backward migration missing ${marker}`);
+}
+assert.ok(musicDatasetTest.includes("persistent owner-scoped schema"), "Music Analyzer migration must be exercised by a database integration test");
+assert.ok(musicAnalyzer.includes("Save results to private dataset"), "Music Analyzer UI must expose private dataset saving");
+assert.ok(musicAnalyzer.includes("/api/music-dataset/tracks"), "Music Analyzer UI must use the authenticated dataset API");
+assert.ok(musicAnalyzer.includes("original audio file is not attached or stored"), "Cloud-save UI must disclose that source audio is not uploaded");
+for (const marker of ["listMusicDatasetTracks", "saveMusicDatasetTrack", "getMusicDatasetTrack", "getMusicAnalysisRun", "deleteMusicDatasetTrack"]) {
+  assert.ok(musicDatasetRouteFiles.includes(marker), `Private dataset route wiring missing ${marker}`);
 }
 
 const audioCategoryRoute = fs.readFileSync(new URL("../src/routes/tools/$category/index.tsx", import.meta.url), "utf8");
