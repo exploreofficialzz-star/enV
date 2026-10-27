@@ -2902,3 +2902,44 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-edit-tray[data-tool=text] .uxui-inline-text-fields textarea { min-height:56px; }
 .uxui-reconstruct-action { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; width:100%; margin:8px 0; padding:8px 10px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface-2); color:var(--color-fg); font-size:12px; font-weight:650; }
 @media(max-width:400px) { .uxui-responsive-status,.uxui-responsive-scope label > span { display:none; } .uxui-responsive-scope { gap:4px; font-size:10px; } .uxui-responsive-scope label { gap:4px; } .uxui-responsive-scope select { max-width:128px; } }
+
+/* Unified asset search: keep native search chrome inside the pill on mobile. */
+.ux-ui-studio .uxui-toolkit-search { min-width:0; }
+.ux-ui-studio .uxui-toolkit-search > svg { flex:0 0 auto; }
+.ux-ui-studio .uxui-toolkit-search input[type="search"] { appearance:none; -webkit-appearance:none; flex:1 1 0%; width:0; min-width:0; min-height:44px; border:0; border-radius:0; padding:0; outline:none; box-shadow:none; font-size:16px; background:transparent; }
+.ux-ui-studio .uxui-toolkit-search input::-webkit-search-cancel-button { -webkit-appearance:none; }
+.ux-ui-studio .uxui-toolkit-search > button { display:grid; flex:0 0 36px; min-height:44px; place-items:center; }
+.uxui-search-results { display:grid; gap:16px; padding:12px 0; }
+.uxui-search-results h3 { margin-bottom:8px; font-size:14px; font-weight:700; }
+.uxui-search-results p,.uxui-search-results small { font-size:12px; color:var(--color-muted); }
+.uxui-search-icon-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(72px,1fr)); gap:8px; }
+.uxui-search-icon-grid button,.uxui-search-list button,.uxui-search-empty button { min-height:48px; border:1px solid var(--color-border); border-radius:10px; padding:8px; color:var(--color-fg); background:var(--color-surface); }
+.uxui-search-icon-grid button { display:grid; gap:6px; text-align:center; }
+.uxui-search-icon-grid button > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.uxui-search-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; }
+.uxui-search-list button { text-align:left; display:grid; gap:4px; }
+.uxui-search-empty { padding:16px 0; display:grid; gap:8px; }
+.uxui-merge-picker { width:100%; padding:12px; border:1px solid var(--color-border); border-radius:12px; background:var(--color-surface); }
+.uxui-merge-picker p { font-size:12px; color:var(--color-muted); margin:6px 0; }
+.uxui-merge-picker > div { display:flex; flex-wrap:wrap; gap:6px; max-height:190px; overflow:auto; }
+.uxui-merge-picker label { display:flex; align-items:center; gap:8px; padding:8px; min-height:44px; border:1px solid var(--color-border); border-radius:8px; font-size:13px; }
+.uxui-merge-picker input { width:20px; height:20px; accent-color:var(--color-fg); }
+.uxui-merge-picker small { color:var(--color-muted); }
+.uxui-merge-picker > button { min-height:44px; margin:8px 8px 0 0; padding:8px 12px; border:1px solid var(--color-border); border-radius:8px; }
+.uxui-merge-picker button:disabled { opacity:.45; }
+.uxui-chroma-picker { flex:1 1 100%; min-width:0; width:100%; display:grid; gap:8px; }
+.uxui-chroma-picker > canvas { display:block; width:auto; max-width:100%; height:auto; max-height:260px; margin:auto; border:0; outline:1px solid var(--color-border); }
+.uxui-chroma-picker > canvas.is-picking { cursor:pointer; touch-action:none; outline:2px solid var(--color-fg); }
+.uxui-chroma-sample-readout { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-height:112px; font-size:13px; }
+.uxui-chroma-sample-readout > span { width:28px; height:28px; border:1px solid var(--color-border); border-radius:6px; }
+.uxui-chroma-sample-readout canvas { width:112px; height:112px; margin-left:auto; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface-2); image-rendering:pixelated; }
+/* Color sampling needs room for both the source and the loupe on a phone. */
+.ux-ui-studio .uxui-edit-tray[data-tool=chroma] { height:min(320px,45dvh); min-height:min(320px,45dvh); }
+.uxui-edit-tray[data-tool=chroma] .uxui-key-controls { flex-wrap:wrap; align-items:flex-start; overflow-x:hidden; overflow-y:auto; align-content:flex-start; }
+.uxui-edit-tray[data-tool=chroma] .uxui-key-controls p { flex:1 1 100%; max-width:none; }
+.uxui-edit-tray[data-tool=chroma] .uxui-chroma-picker { flex:0 0 100%; grid-template-columns:minmax(0,1fr) 112px; align-items:center; }
+.uxui-chroma-picker > button,.uxui-chroma-picker > p { grid-column:1/-1; }
+.uxui-chroma-picker > canvas { grid-column:1; grid-row:3; max-height:160px; }
+.uxui-chroma-picker > .uxui-chroma-sample-readout { grid-column:2; grid-row:3; font-size:11px; justify-content:center; }
+.uxui-chroma-picker .uxui-chroma-sample-readout canvas { margin-left:0; }
+.uxui-chroma-picker .uxui-chroma-sample-readout > span { width:20px; height:20px; }

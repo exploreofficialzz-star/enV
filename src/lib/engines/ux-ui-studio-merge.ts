@@ -18,6 +18,9 @@ export type MergedStudioVector<T extends StudioVectorLayer = StudioVectorLayer> 
 };
 
 const SUPPORTED_KINDS = new Set(["icon", "rect", "ellipse", "triangle", "diamond", "hexagon", "star", "line", "divider", "pill"]);
+export function isStudioMergeableLayer(layer: { kind: string; shadow?: boolean; hidden?: boolean; display?: string }): boolean {
+  return SUPPORTED_KINDS.has(layer.kind) && !layer.shadow && !layer.hidden && layer.display !== "none";
+}
 const VECTOR_TAGS = new Set(["svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon"]);
 const VECTOR_ATTRIBUTES = new Set([
   "d", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit",
@@ -118,7 +121,8 @@ function shape(layer: StudioVectorLayer): string {
   if (layer.kind === "icon") {
     const inset = layer.componentKey === "merged-vector" ? 0 : 2;
     const color = paint(layer.color);
-    return `<svg x="${inset}" y="${inset}" width="${number(Math.max(1, layer.width - inset * 2))}" height="${number(Math.max(1, layer.height - inset * 2))}" viewBox="${viewBox(layer.iconViewBox)}" preserveAspectRatio="xMidYMid meet" overflow="hidden" fill="${escape(color)}">${vectorMarkup(layer.iconSvg, color)}</svg>`;
+    const source = layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>';
+    return `<svg x="${inset}" y="${inset}" width="${number(Math.max(1, layer.width - inset * 2))}" height="${number(Math.max(1, layer.height - inset * 2))}" viewBox="${viewBox(layer.iconViewBox)}" preserveAspectRatio="xMidYMid meet" overflow="hidden" fill="${escape(color)}">${vectorMarkup(source, color)}</svg>`;
   }
   if (layer.kind === "ellipse") return `<ellipse cx="${number(layer.width / 2)}" cy="${number(layer.height / 2)}" rx="${number(layer.width / 2)}" ry="${number(layer.height / 2)}"${common}/>`;
   if (["triangle", "diamond", "hexagon", "star"].includes(layer.kind)) return `<polygon points="${polygon(layer.kind, layer.width, layer.height)}"${common} stroke-linejoin="round"/>`;

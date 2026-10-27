@@ -46,6 +46,12 @@ test("merging a merged vector adds no new viewport inset and keeps clipping",()=
   assert.equal((combined.iconSvg.match(/stroke="#2563EB"/g)||[]).length,3);
 });
 
+test("the built-in home fallback can merge just as it appears on the artboard",()=>{
+  const merged = mergeStudioVectorLayers([icon("home", {iconSvg:""}), icon("other")]);
+  assert.match(merged.iconSvg, /M12 3l9 8h-3v9/);
+  assert.equal(merged.sourceIds.length, 2);
+});
+
 test("merge refuses unsupported effects and invalid sources instead of deleting their appearance",()=>{
   assert.throws(()=>mergeStudioVectorLayers([icon("one")]),/at least two/);
   for(const patch of [{kind:"text"},{kind:"image"},{shadow:true},{hidden:true},{rotation:NaN},{iconViewBox:"0 0 0 10"},{iconSvg:'<script>alert(1)</script>'},{iconSvg:'<path d="M0 0" onclick="alert(1)"/>'},{iconSvg:'<path fill="url(https://example.test/a)" d="M0 0h1v1z"/>'}]){

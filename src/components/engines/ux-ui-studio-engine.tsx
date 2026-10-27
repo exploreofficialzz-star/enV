@@ -1,5 +1,8 @@
 import { StudioFader } from "./ux-ui-studio-fader";
 import { StudioRepeatButton } from "./ux-ui-studio-repeat-button";
+import { studioSearchTerms, matchesStudioSearch, studioSearchIncludes } from "@/lib/engines/ux-ui-studio-search";
+import { studioImagePixel } from "@/lib/engines/ux-ui-studio-geometry";
+import { StudioChromaPicker } from "./ux-ui-studio-chroma-picker";
 import { editStudioImage } from "./ux-ui-studio-image";
 import { StudioImageRepair } from "./ux-ui-studio-image-repair";
 import { StudioScreenshotImport, type StudioScreenshotImportResult } from "./ux-ui-studio-screenshot-import";
@@ -9,7 +12,7 @@ import { packStudioProjectAssets, unpackStudioProjectAssets } from "@/lib/engine
 import { StudioTextStyle } from "./ux-ui-studio-text-style";
 import { roundedRectanglePath, shapeStrokeDasharray, type CornerRadii, type ShapeBorderStyle } from "@/lib/engines/ux-ui-studio-shape-style";
 import { createResponsiveDesign, responsiveElements, commitResponsiveElements, resetResponsiveDevice, hasResponsiveOverrides, restoreResponsiveDesign, cloneResponsiveDesign, remapResponsiveScreenLinks, type ResponsiveDesign, type ResponsiveEditMode } from "@/lib/engines/ux-ui-studio-responsive";
-import { mergeStudioVectorLayers } from "@/lib/engines/ux-ui-studio-merge";
+import { mergeStudioVectorLayers, isStudioMergeableLayer } from "@/lib/engines/ux-ui-studio-merge";
 import { STUDIO_SHAPE_PRESETS, searchStudioShapes } from "@/lib/engines/ux-ui-studio-shapes";
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
 import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
@@ -1080,6 +1083,8 @@ export function UxUiStudioEngine() {
   const [imageBusy, setImageBusy] = useState(false);
   const [cutoutStrength, setCutoutStrength] = useState(40);
   const [keyColor, setKeyColor] = useState("#00ff00");
+  const [keyPicking, setKeyPicking] = useState(false);
+  const keySampleRequest = useRef(0);
   const [keySoftness, setKeySoftness] = useState(24);
   const [keySpill, setKeySpill] = useState(0.6);
   const [cutoutMode, setCutoutMode] = useState<"edge" | "global">("edge");
@@ -1111,6 +1116,7 @@ export function UxUiStudioEngine() {
   const fontCatalogRequested = useRef(false);
   const [fontDownloadId, setFontDownloadId] = useState("");
   const [iconResults, setIconResults] = useState<string[]>([]);
+  const [iconResultQuery, setIconResultQuery] = useState("");
   const [iconTotal, setIconTotal] = useState(0);
   const [iconStart, setIconStart] = useState(0);
   const [iconCollections, setIconCollections] = useState<Record<string, { name?: string; author?: { name?: string }; license?: { title?: string } }>>({});
@@ -1302,12 +1308,21 @@ export function UxUiStudioEngine() {
     });
   }, [activeScreenId, elements, target, background, customArtboard, customWidth, customHeight, responsiveRevision]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
+  const searchingToolkit = Boolean(toolkitSearch.trim()) && !inlineToolkit;
+  const effectiveIconQuery = studioSearchTerms(searchingToolkit ? toolkitSearch : iconQuery).join(" ");
   const quickIconResults = (iconBrowseCategory === "All bundled" ? bundledIconNames : (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons))
-    .filter((name) => !bundledIconNames.length || bundledIconNames.includes(name))
-    .filter((name)=>iconPrefix==="all" || name.startsWith(iconPrefix+":"))
-    .filter((name)=>!iconQuery.trim() || name.toLowerCase().includes(iconQuery.trim().toLowerCase()));
-  const localIconResults = bundledIconNames.filter((name) => (iconPrefix === "all" || name.startsWith(iconPrefix + ":")) && name.toLowerCase().includes(iconQuery.trim().toLowerCase()));
-  const visibleIconResults = Array.from(new Set(iconQuery.trim().length >= 2 ? [...localIconResults, ...iconResults] : quickIconResults));
+    .filter(name => !bundledIconNames.length || bundledIconNames.includes(name))
+    .filter(name => iconPrefix === "all" || name.startsWith(iconPrefix + ":"));
+  const localIconResults = bundledIconNames.filter(name => (searchingToolkit || iconPrefix === "all" || name.startsWith(iconPrefix + ":")) && matchesStudioSearch(name, effectiveIconQuery));
+  const visibleIconResults = Array.from(new Set(effectiveIconQuery || searchingToolkit ? [...localIconResults, ...(iconResultQuery === effectiveIconQuery ? iconResults : [])] : quickIconResults));
+  const searchComponents = COMPONENTS.filter(item => studioSearchIncludes(toolkitSearch, "elements") && matchesStudioSearch(item.label + " " + item.description, toolkitSearch));
+  const searchShapes = STUDIO_SHAPE_PRESETS.filter(item => studioSearchIncludes(toolkitSearch, "shapes") && matchesStudioSearch(item.label + " " + item.description, toolkitSearch));
+  const searchFonts = fontChoices.filter(item => studioSearchIncludes(toolkitSearch, "fonts") && matchesStudioSearch(item.family + " " + item.category, toolkitSearch));
+  const searchPresets = PRESETS.filter(item => studioSearchIncludes(toolkitSearch, "presets") && matchesStudioSearch(item.label + " " + item.description, toolkitSearch));
+  const searchTools = STUDIO_TOOLKITS.filter(item => studioSearchIncludes(toolkitSearch, "tools") && matchesStudioSearch(item.name + " " + item.description, toolkitSearch));
+  const searchIcons = studioSearchIncludes(toolkitSearch, "icons") ? visibleIconResults : [];
+  const searchColors = tokens.colors.filter(item => studioSearchIncludes(toolkitSearch, "tokens") && matchesStudioSearch(item.name + " " + item.value, toolkitSearch));
+  const searchCount = searchComponents.length + searchShapes.length + searchFonts.length + searchPresets.length + searchTools.length + searchIcons.length + searchColors.length;
   const filteredFonts = fontChoices.filter((font) => font.family.toLowerCase().includes(fontQuery.toLowerCase()) && (fontCategory === "All" || font.category === fontCategory) && (!toolkitSearch.trim() || font.family.toLowerCase().includes(toolkitSearch.trim().toLowerCase())));
 
   useEffect(() => { void getBundledStudioIconNames().then(setBundledIconNames).catch(() => undefined); }, []);
@@ -1410,8 +1425,9 @@ export function UxUiStudioEngine() {
     } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
   }, [project, projectBrief, onboarding, draftLoaded, activeDraftId, savedProject?.category, savedProject?.description, savedProject?.isFavorite, screens.length]);
 
+  const searchFontCatalog = searchingToolkit && studioSearchIncludes(toolkitSearch, "fonts");
   useEffect(() => {
-    if ((!showToolsPanel && !inlineToolkit) || leftTab !== "fonts" || fontCatalogRequested.current) return;
+    if ((!showToolsPanel && !inlineToolkit) || (leftTab !== "fonts" && !searchFontCatalog) || fontCatalogRequested.current) return;
     fontCatalogRequested.current = true;
     const controller = new AbortController();
     setFontCatalogLoading(true);
@@ -1436,20 +1452,23 @@ export function UxUiStudioEngine() {
       })
       .finally(() => { if (!controller.signal.aborted) setFontCatalogLoading(false); });
     return () => { controller.abort(); fontCatalogRequested.current = false; };
-  }, [leftTab, fontCatalogReload, showToolsPanel, inlineToolkit]);
+  }, [leftTab, fontCatalogReload, showToolsPanel, inlineToolkit, searchFontCatalog]);
 
   useEffect(() => {
-    if (leftTab !== "icons" || iconQuery.trim().length < 2) return;
+    setIconLoading(false);
+    if ((!showToolsPanel && !inlineToolkit) || (!searchingToolkit && leftTab !== "icons") || effectiveIconQuery.length < 2 || (searchingToolkit && !studioSearchIncludes(toolkitSearch, "icons"))) return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setIconLoading(true);
       setIconError("");
       try {
-        const url = "https://api.iconify.design/search?query=" + encodeURIComponent(iconQuery.trim()) + "&limit=32&start=" + iconStart + (iconPrefix !== "all" ? "&prefix=" + encodeURIComponent(iconPrefix) : "");
+        const url = "https://api.iconify.design/search?query=" + encodeURIComponent(effectiveIconQuery) + "&limit=32&start=" + iconStart + (!searchingToolkit && iconPrefix !== "all" ? "&prefix=" + encodeURIComponent(iconPrefix) : "");
         const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error("The icon catalogue is temporarily unavailable.");
         const payload = await response.json() as { icons?: string[]; total?: number; collections?: typeof iconCollections };
         const found = payload.icons || [];
+        if (controller.signal.aborted) return;
+        setIconResultQuery(effectiveIconQuery);
         setIconResults((old) => iconStart === 0 ? found : [...old, ...found]);
         setIconTotal(payload.total || 0);
         setIconCollections(payload.collections || {});
@@ -1460,7 +1479,7 @@ export function UxUiStudioEngine() {
       }
     }, 300);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [leftTab, iconQuery, iconStart, iconPrefix]);
+  }, [leftTab, effectiveIconQuery, iconStart, iconPrefix, searchingToolkit, toolkitSearch, showToolsPanel, inlineToolkit]);
 
   useEffect(() => {
     for (const family of fontsInUse) void loadStudioFont(family).catch(() => undefined);
@@ -1812,8 +1831,9 @@ export function UxUiStudioEngine() {
   function mergeSelectedIcons() {
     const sources = elements.filter(item => selectedIds.includes(item.id));
     try {
+      if (sources.some(layer => layer.locked)) throw new Error("Unlock selected layers before merging.");
       const merged = mergeStudioVectorLayers(sources);
-      const layer: DesignLayer = { ...makeLayer("icon", merged.x, merged.y, board.width, board.height), ...merged, id: layerId(), name: "Merged icon", iconName: "Merged custom vectors", background: "transparent", borderWidth: 0, padding: 0, radius: 0, opacity: 1, rotation: 0 };
+      const layer: DesignLayer = { ...makeLayer("icon", merged.x, merged.y, board.width, board.height), ...merged, id: layerId(), name: "Merged icon", iconName: "Merged custom vectors", background: "transparent", borderWidth: 0, padding: 0, radius: 0, opacity: 1, rotation: 0, zIndex: Math.max(...sources.map(source => source.zIndex ?? 1)) };
       checkpoint();
       const lastIndex = Math.max(...elements.map((item, index) => merged.sourceIds.includes(item.id) ? index : -1));
       const next = elements.flatMap((item, index) => merged.sourceIds.includes(item.id) ? index === lastIndex ? [layer] : [] : [item]);
@@ -2053,11 +2073,22 @@ export function UxUiStudioEngine() {
       else setNotice("This element has no valid screen destination. Exit preview to assign one in Prototype Studio.");
       return;
     }
+    if (editTool === "chroma" && keyPicking && selected?.kind === "image") {
+      event.preventDefault(); dragRef.current = null;
+      if (id !== selected.id || !(node instanceof SVGGraphicsElement)) { setNotice("Tap a color inside the selected image, or use the magnified color picker below."); return; }
+      const matrix = node.getScreenCTM();
+      if (matrix) {
+        const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+        void sampleChromaColor(selected, point.x, point.y);
+      }
+      return;
+    }
     if (!id) { selectCanvas(); return; }
     const found = elements.find((item) => item.id === id);
     if (!found) return;
     selectLayer(id, event.shiftKey);
     if (found.locked || found.hidden || found.display === "none") { dragRef.current = null; return; }
+    if (multiSelectMode || event.shiftKey) { dragRef.current = null; return; }
     checkpoint();
     const rect = event.currentTarget.getBoundingClientRect();
     const groupStarts = found.groupId ? elements.filter((item) => item.groupId === found.groupId).map((item) => ({ id: item.id, x: item.x, y: item.y })) : [{ id: found.id, x: found.x, y: found.y }];
@@ -2067,6 +2098,23 @@ export function UxUiStudioEngine() {
       startX: found.x, startY: found.y, groupStarts,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  async function sampleChromaColor(layer: DesignLayer, x: number, y: number) {
+    const request = ++keySampleRequest.current;
+    try {
+      const image = new Image(); image.src = layer.imageOriginalDataUrl || layer.imageDataUrl; await image.decode();
+      if (request !== keySampleRequest.current) return;
+      const pixel = studioImagePixel({ x, y }, layer, { width: image.naturalWidth, height: image.naturalHeight });
+      const canvas = document.createElement("canvas"); canvas.width = 1; canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Color sampling is unavailable.");
+      context.drawImage(image, pixel.x, pixel.y, 1, 1, 0, 0, 1, 1);
+      const color = context.getImageData(0, 0, 1, 1).data;
+      if (color[3] === 0) throw new Error("This pixel is transparent. Choose a visible color.");
+      setKeyColor("#" + Array.from(color.slice(0, 3), value => value.toString(16).padStart(2, "0")).join(""));
+      setKeyPicking(false); setNotice("Color sampled. Choose Apply chroma key to remove it.");
+    } catch (error) { if (request === keySampleRequest.current) setNotice(error instanceof Error ? error.message : "Could not sample this pixel."); }
   }
 
   function selectCanvas() {
@@ -2104,7 +2152,7 @@ export function UxUiStudioEngine() {
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
-  function normalizeImportedLayers(raw: unknown, referenceWidth = board.width, referenceHeight = board.height, preserveIds = false): DesignLayer[] {
+  function normalizeImportedLayers(raw: unknown, referenceWidth = board.width, referenceHeight = board.height, preserveIds = false, preserveGeometry = false): DesignLayer[] {
     if (!Array.isArray(raw)) throw new Error("The file does not contain an element list.");
     if (raw.length > 512) throw new Error("Import up to 512 layers per screen. Split larger designs into separate screens first.");
     const validKinds = new Set<string>([...COMPONENTS.map((item) => item.kind), "ellipse", "spacer", "toggle", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "progress", "slider", "radio", "switch", "triangle", "diamond", "hexagon", "star", "line", "pill"]);
@@ -2121,9 +2169,9 @@ export function UxUiStudioEngine() {
       }
       return [{ ...defaults, ...rawLayer, id: preserveIds && typeof rawLayer.id === "string" && /^[a-zA-Z0-9_-]{1,120}$/.test(rawLayer.id) ? rawLayer.id : layerId(), kind,
         name: typeof rawLayer.name === "string" ? rawLayer.name : defaults.name,
-        x: Math.max(0, Math.min(referenceWidth - 1, x)), y: Math.max(0, Math.min(referenceHeight - 1, y)),
-        width: Math.max(1, Math.min(referenceWidth, Number.isFinite(rawLayer.width) ? Number(rawLayer.width) : defaults.width)),
-        height: Math.max(1, Math.min(referenceHeight, Number.isFinite(rawLayer.height) ? Number(rawLayer.height) : defaults.height)),
+        x: preserveGeometry ? x : Math.max(0, Math.min(referenceWidth - 1, x)), y: preserveGeometry ? y : Math.max(0, Math.min(referenceHeight - 1, y)),
+        width: Math.max(1, Math.min(preserveGeometry ? Infinity : referenceWidth, Number.isFinite(rawLayer.width) ? Number(rawLayer.width) : defaults.width)),
+        height: Math.max(1, Math.min(preserveGeometry ? Infinity : referenceHeight, Number.isFinite(rawLayer.height) ? Number(rawLayer.height) : defaults.height)),
         text: typeof rawLayer.text === "string" ? rawLayer.text : defaults.text,
         iconSvg: safeIcon.body, iconViewBox: safeIcon.viewBox,
         rotation: Number.isFinite(rawLayer.rotation) ? Number(rawLayer.rotation) : 0 } as DesignLayer];
@@ -2132,12 +2180,12 @@ export function UxUiStudioEngine() {
 
   function importedResponsiveDesign(raw: unknown, fallback: DesignLayer[], nextTarget: DeviceTarget, size: { width: number; height: number }) {
     const model = restoreResponsiveDesign(raw, fallback, nextTarget, size);
-    model.baseElements = normalizeImportedLayers(model.baseElements, model.baseViewport.width, model.baseViewport.height, true);
+    model.baseElements = normalizeImportedLayers(model.baseElements, model.baseViewport.width, model.baseViewport.height, true, true);
     for (const device of ["mobile", "tablet", "desktop"] as DeviceTarget[]) {
       const local = model.overrides[device];
       if (!local) continue;
       const dimensions = local.viewport || boardSize(device);
-      local.added = normalizeImportedLayers(local.added, dimensions.width, dimensions.height, true);
+      local.added = normalizeImportedLayers(local.added, dimensions.width, dimensions.height, true, true);
       for (const patch of Object.values(local.patches)) if (typeof patch.values.iconSvg === "string") {
         patch.values.iconSvg = sanitizeIconMarkup("<svg>" + patch.values.iconSvg + "</svg>").body;
       }
@@ -2146,10 +2194,10 @@ export function UxUiStudioEngine() {
   }
 
   function applyScreenshotReconstruction(result: StudioScreenshotImportResult) {
-    const nextTarget: DeviceTarget = result.width <= 600 ? "mobile" : result.width <= 1024 ? "tablet" : "desktop";
+    const nextTarget: DeviceTarget = result.matchMockup ? target : result.width <= 600 ? "mobile" : result.width <= 1024 ? "tablet" : "desktop";
     const size = { width: result.width, height: result.height };
-    const layers = normalizeImportedLayers(result.elements, size.width, size.height);
-    if (result.includeReference) layers.unshift({ ...makeLayer("image", 0, 0, size.width, size.height), name: "Original screenshot · reference", width: size.width, height: size.height, imageDataUrl: result.referenceDataUrl, padding: 0, radius: 0, hidden: true, locked: true });
+    const layers = normalizeImportedLayers(result.elements, size.width, size.height, false, true);
+    if (result.includeReference) layers.unshift({ ...makeLayer("image", 0, 0, size.width, size.height), name: "Original screenshot · reference", ...(result.referenceFrame || { x: 0, y: 0, ...size }), imageDataUrl: result.referenceDataUrl, padding: 0, radius: 0, hidden: true, locked: true });
     const current = activeScreenSnapshot();
     const id = newScreenId();
     const responsiveDesign = createResponsiveDesign(layers, nextTarget, size);
@@ -2157,7 +2205,7 @@ export function UxUiStudioEngine() {
     setScreens(previous => [...previous.map(item => item.id === current.id ? current : item), screen]);
     setActiveScreenId(id); setTarget(nextTarget); setBackground(result.background); setCustomArtboard(true); setCustomWidth(size.width); setCustomHeight(size.height);
     replaceResponsiveDesign(layers, nextTarget, size, responsiveDesign); setResponsiveEditMode("shared");
-    setSelectedId(layers.find(layer => !layer.hidden)?.id || ""); setUndoStack([]); setRedoStack([]); setScreenshotFile(null); closeToolkit();
+    setZoom(100); setSelectedId(layers.find(layer => !layer.hidden)?.id || ""); setUndoStack([]); setRedoStack([]); setScreenshotFile(null); closeToolkit();
     setNotice("Reconstructed " + result.stats.textLines + " text lines, " + result.stats.shapes + " shapes and " + result.stats.imageRegions + " artwork regions in a new editable screen. Review wording, fonts and geometry.");
   }
 
@@ -2198,7 +2246,7 @@ export function UxUiStudioEngine() {
         const nextTarget: DeviceTarget = parsed.target === "tablet" || parsed.target === "desktop" ? parsed.target : "mobile";
         const width = Number.isFinite(parsed.viewport?.width) ? Number(parsed.viewport?.width) : boardSize(nextTarget).width;
         const height = Number.isFinite(parsed.viewport?.height) ? Number(parsed.viewport?.height) : boardSize(nextTarget).height;
-        const imported = normalizeImportedLayers(parsed.elements, width, height, Boolean(parsed.responsiveDesign));
+        const imported = normalizeImportedLayers(parsed.elements, width, height, Boolean(parsed.responsiveDesign), Boolean(parsed.responsiveDesign));
         checkpoint(); setTarget(nextTarget); setCustomArtboard(Boolean(parsed.viewport)); setCustomWidth(width); setCustomHeight(height);
         setProjectName(typeof parsed.name === "string" ? parsed.name : file.name.split(".").slice(0, -1).join("."));
         setProjectBrief(typeof parsed.description === "string" ? parsed.description : "");
@@ -2208,7 +2256,7 @@ export function UxUiStudioEngine() {
         const importedScreens: DesignScreen[] = Array.isArray(parsed.screens) ? parsed.screens.filter(screen => screen && Array.isArray(screen.elements)).map(screen => {
           const device = ["mobile", "tablet", "desktop"].includes(screen.target) ? screen.target : nextTarget;
           const size = screen.customArtboard ? { width: Math.max(160, Math.min(4096, screen.customWidth || boardSize(device).width)), height: Math.max(240, Math.min(4096, screen.customHeight || boardSize(device).height)) } : boardSize(device);
-          const layers = normalizeImportedLayers(screen.elements, size.width, size.height, true);
+          const layers = normalizeImportedLayers(screen.elements, size.width, size.height, true, Boolean(screen.reconstruction));
           const responsiveDesign = importedResponsiveDesign(screen.responsiveDesign, layers, device, size);
           return { ...screen, target: device, elements: responsiveElements(responsiveDesign, device, size), responsiveDesign, customWidth: size.width, customHeight: size.height, updatedAt: new Date().toISOString() };
         }) : [];
@@ -2241,7 +2289,7 @@ export function UxUiStudioEngine() {
     reader.readAsText(file);
   }
 
-  async function chooseIcon(iconName: string) {
+  async function chooseIcon(iconName: string, addNew = false) {
     const split = iconName.split(":");
     if (split.length !== 2) return;
     setIconLoading(true);
@@ -2253,7 +2301,7 @@ export function UxUiStudioEngine() {
         iconLicense: collection?.license?.title || "See the source icon set for its current license",
         iconAuthor: collection?.author?.name || "Iconify collection",
       };
-      if (selected?.kind === "icon") {
+      if (selected?.kind === "icon" && !addNew) {
         updateLayer(selected.id, metadata);
         setNotice("Updated icon: " + iconName);
       } else {
@@ -2465,10 +2513,10 @@ export function UxUiStudioEngine() {
     );
   }
 
-  function closeToolkit() { setShowToolsPanel(false); setInlineToolkit(false); setEditTool("move"); }
+  function closeToolkit() { setKeyPicking(false); keySampleRequest.current++; setShowToolsPanel(false); setInlineToolkit(false); setEditTool("move"); }
   function openToolkitHome() { setEditTool("move"); setInlineToolkit(false); setLeftTab("toolkits"); setToolkitPage(false); setToolkitSearch(""); setShowToolsPanel(true); }
-  function chooseEditTool(tool: string) { setInlineToolkit(false); setEditTool(tool); }
-  function chooseToolkit(id: string) { openToolkit(id); setShowToolsPanel(false); setInlineToolkit(true); setEditTool("library"); }
+  function chooseEditTool(tool: string) { setInlineToolkit(false); setEditTool(tool); setKeyPicking(tool === "chroma"); }
+  function chooseToolkit(id: string) { setToolkitSearch(""); openToolkit(id); setShowToolsPanel(false); setInlineToolkit(true); setEditTool("library"); }
   function holdUpdate(id: string, patch: Partial<DesignLayer>) { updateLayer(id, patch, false); }
   async function processImage(operation: "cutout" | "chroma" | "icon" | "resize", edge = 1024) {
     if (!selected?.imageDataUrl || imageBusy) return;
@@ -2486,7 +2534,7 @@ export function UxUiStudioEngine() {
   }
   function renderToolkit(inline = false) { return (<div className={inline ? "uxui-inline-library" : "uxui-toolkit-overlay"} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeToolkit(); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role={inline ? "region" : "dialog"} aria-modal={inline ? undefined : true} aria-labelledby="uxui-toolkit-title">
           <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">Studio toolkit</span><button type="button" onClick={() => closeToolkit()} aria-label="Cancel studio toolkit"><X size={17} /><span>Cancel</span></button></div>
-          <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search elements, icons, fonts, presets…" /></label>
+          <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => { setToolkitSearch(event.target.value); setIconStart(0); setIconResults([]); setIconError(""); }} enterKeyHint="search" autoComplete="off" placeholder="Search elements, icons, fonts, presets…" />{toolkitSearch && <button type="button" aria-label="Clear toolkit search" onClick={() => { setToolkitSearch(""); setIconResults([]); setIconStart(0); }}><X size={18} /></button>}</label>
           {!inline && <button type="button" className="uxui-reconstruct-action" onClick={() => screenshotInputRef.current?.click()}><ImagePlus size={18} /><span>Screenshot to editable layers</span></button>}
           <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio Toolkit categories">
             {([
@@ -2500,6 +2548,18 @@ export function UxUiStudioEngine() {
             ] as Array<{id:PanelTab;label:string;icon:ReactNode}>).map((tab) => <button key={tab.id} role="tab" aria-selected={leftTab === tab.id} type="button" onClick={() => { setLeftTab(tab.id); setToolkitPage(false); setToolkitSearch(""); toolkitContentRef.current?.scrollTo({ top: 0 }); }} className={leftTab === tab.id ? "is-active" : ""}><span className="uxui-toolkit-tab-icon">{tab.icon}</span><span className="uxui-toolkit-tab-label">{tab.label}</span></button>)}
           </div>
           <div ref={toolkitContentRef} className="uxui-toolkit-content">
+          {searchingToolkit && <section className="uxui-search-results" aria-label="Toolkit search results">
+            <p role="status" aria-live="polite">{searchCount} results for “{toolkitSearch}”{iconLoading ? " · searching more icons…" : ""}</p>
+            {searchIcons.length > 0 && <section aria-label="Matching icons"><h3>Icons · {searchIcons.length}</h3><div className="uxui-search-icon-grid">{searchIcons.slice(0, 48).map(name => <button type="button" key={name} aria-label={"Add icon " + name} onClick={() => void chooseIcon(name, true)}><StudioIconPreview name={name} size={32} /><span>{name.split(":").pop()}</span></button>)}</div>{searchIcons.length > 48 && <button type="button" onClick={() => { setIconQuery(effectiveIconQuery); setToolkitSearch(""); setLeftTab("icons"); }}>Browse all matching icons</button>}</section>}
+            {iconError && studioSearchIncludes(toolkitSearch, "icons") && <p role="status">Showing matching bundled assets. More icons are unavailable online right now.</p>}
+            {searchComponents.length > 0 && <section aria-label="Matching elements"><h3>Elements</h3><div className="uxui-elements-grid">{searchComponents.map(item => <button type="button" className="uxui-element-tile" key={item.kind} aria-label={"Add element " + item.label} onClick={() => addLayer(item.kind)}><ElementVisual kind={item.kind} /><span>{item.label}</span></button>)}</div></section>}
+            {searchShapes.length > 0 && <section aria-label="Matching shapes"><h3>Shapes</h3><div className="uxui-elements-grid">{searchShapes.map(item => <button type="button" className="uxui-element-tile" key={item.id} onClick={() => addShapePreset(item)} aria-label={"Add shape " + item.label}><ElementVisual kind={item.kind as LayerKind} /><span>{item.label}</span></button>)}</div></section>}
+            {searchFonts.length > 0 && <section aria-label="Matching fonts"><h3>Fonts</h3><div className="uxui-search-list">{searchFonts.slice(0, 24).map(font => <button type="button" key={font.family} aria-label={"Use font " + font.family} onClick={() => void chooseFont(font)}><strong>{font.family}</strong><FontPreview family={font.family} provider={font.provider} sample={fontPreviewText} animated={false} /></button>)}</div></section>}
+            {searchPresets.length > 0 && <section aria-label="Matching presets"><h3>Presets</h3><div className="uxui-search-list">{searchPresets.map(item => <button type="button" key={item.id} onClick={() => applyPreset(item.id)}>{item.label}<small>{item.description}</small></button>)}</div></section>}
+            {searchColors.length > 0 && <section aria-label="Matching tokens"><h3>Color tokens</h3><div className="uxui-search-list">{searchColors.map((item, index) => <button type="button" key={index} onClick={() => { if (selected) updateLayer(selected.id, { color: item.value }); else { checkpoint(); setBackground(item.value); } closeToolkit(); }}><span style={{ color: item.value }}>●</span> {item.name} · {item.value}</button>)}</div></section>}
+            {searchTools.length > 0 && <section aria-label="Matching tools"><h3>Tools</h3><div className="uxui-search-list">{searchTools.map(item => <button type="button" key={item.id} onClick={() => chooseToolkit(item.id)}>{item.name}<small>{item.description}</small></button>)}</div></section>}
+            {!searchCount && !iconLoading && <div className="uxui-search-empty"><strong>No matches found</strong><p>Try “home icons”, “search bar”, “Inter” or “mobile presets”.</p><button type="button" onClick={() => setToolkitSearch("")}>Clear search and browse</button></div>}
+          </section>}
           {inline && leftTab === "icons" && <section aria-label="Icons controls" className="uxui-compact-library">
             <div className="uxui-library-options"><input aria-label="Search icons" type="search" value={iconQuery} onChange={event=>setIconQuery(event.target.value)} placeholder="Search icons…"/><select aria-label="Icon category" value={iconBrowseCategory} onChange={event=>setIconBrowseCategory(event.target.value)}>{[{name:"All bundled"},...ICON_BROWSE_CATEGORIES].map(category=><option key={category.name}>{category.name}</option>)}</select><button type="button" onClick={()=>iconImportInputRef.current?.click()}>Import SVG</button></div>
             <div className="uxui-asset-strip">{visibleIconResults.map(name=><button type="button" key={name} title={"Add icon "+name} onClick={()=>void chooseIcon(name)}><StudioIconPreview name={name} size={38}/><span>{name.split(":").pop()}</span></button>)}</div>
@@ -2511,7 +2571,7 @@ export function UxUiStudioEngine() {
           </section>}
 
 
-          {leftTab === "toolkits" && !toolkitPage && <div className="mt-3 space-y-3">
+          {!searchingToolkit && leftTab === "toolkits" && !toolkitPage && <div className="mt-3 space-y-3">
             <div className="rounded-xl border border-border bg-surface-2 p-3">
               <strong className="text-sm text-fg">26 design tools</strong>
               <p className="mt-1 text-xs leading-5 text-muted">Every tool connects to editable layers, project settings, assets, or export actions.</p>
@@ -2520,7 +2580,7 @@ export function UxUiStudioEngine() {
               </div>
             </div>
           </div>}
-          {toolkitPage && !(inline && ["fonts","icons"].includes(leftTab)) && <div className="mt-3 space-y-3">
+          {!searchingToolkit && toolkitPage && !(inline && ["fonts","icons"].includes(leftTab)) && <div className="mt-3 space-y-3">
             <button type="button" className="uxui-toolkit-back" onClick={() => { setToolkitPage(false); setLeftTab("toolkits"); toolkitContentRef.current?.scrollTo({ top: 0 }); }}><ArrowLeft size={16} /> All 26 tools</button>
             {(() => { const toolkit = STUDIO_TOOLKITS.find((item) => item.id === activeToolkitId) || STUDIO_TOOLKITS[0]; return <section className="uxui-toolkit-selection rounded-xl border border-border p-3" aria-label={toolkit.name + " controls"}>
               <ToolkitPreview id={toolkit.id} />
@@ -2594,7 +2654,7 @@ export function UxUiStudioEngine() {
               {toolkit.id === "media" && <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import image</button><button type="button" onClick={() => screenshotInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Screenshot to editable layers</button></div>}
             </section>; })()}
           </div>}
-          {leftTab === "components" && <div className="mt-3">
+          {!searchingToolkit && leftTab === "components" && <div className="mt-3">
             <div className="mb-2 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Elements</h3><span className="text-[10px] text-muted">{COMPONENTS.length} types</span></div>
             <button type="button" onClick={() => elementImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import elements</button>
             <div className="uxui-elements-grid">
@@ -2631,14 +2691,14 @@ export function UxUiStudioEngine() {
             </div>
           </div>}
 
-          {leftTab === "shapes" && <div className="mt-3">
+          {!searchingToolkit && leftTab === "shapes" && <div className="mt-3">
             <div className="uxui-toolkit-section-heading"><div><h3>Shapes &amp; UI controls</h3><p>Search bars, navigation, surfaces and geometry. Each has editable fill, corners and borders.</p></div><span>{STUDIO_SHAPE_PRESETS.length} shapes</span></div>
             <div className="uxui-elements-grid uxui-shapes-grid">
               {searchStudioShapes(toolkitSearch).map(preset => <button key={preset.id} type="button" onClick={() => addShapePreset(preset)} title={preset.description} aria-label={"Add " + preset.label} className="uxui-element-tile">{preset.patch?.iconSvg ? <svg viewBox={String(preset.patch.iconViewBox || "0 0 100 100")} aria-hidden="true" style={{ width: 40, height: 40, fill: "currentColor" }} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + preset.patch.iconSvg + "</svg>").body }} /> : <ElementVisual kind={preset.kind as LayerKind} />}<span className="uxui-element-tile-label">{preset.label}</span></button>)}
             </div>
           </div>}
 
-          {leftTab === "icons" && !inline && <div className="mt-3">
+          {!searchingToolkit && leftTab === "icons" && !inline && <div className="mt-3">
             <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold text-fg">Icon library</h3><button type="button" onClick={() => iconImportInputRef.current?.click()} className="uxui-import-button">Import SVG</button></div>
             <p className="mt-1 text-[11px] leading-4 text-muted">Browse bundled, verified SVGs by category and style, or search for more online. Bundled icons work offline. Selected SVGs and collection identifiers are stored in the project.</p>
             <div className="mt-3 relative"><Search size={15} className="absolute left-2.5 top-2.5 text-muted" /><input value={iconQuery} aria-label="Search icons" onChange={(event)=>{setIconQuery(event.target.value);setIconStart(0);setIconResults([]);}} placeholder="Search icons: home, charts, payment…" className="w-full rounded-lg border border-border bg-surface pl-8 pr-2 py-2 text-sm text-fg outline-none focus:border-accent" /></div>
@@ -2651,7 +2711,7 @@ export function UxUiStudioEngine() {
             <div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{iconQuery.trim().length>=2?(iconLoading?"Searching…":visibleIconResults.length.toLocaleString()+" matching icons"):iconBrowseCategory+" · curated examples by style"}</span><span>Iconify · SVG</span></div>
             {iconError && <p role="status" className="mt-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600">{iconError}</p>}
             <div className="mt-2 grid grid-cols-4 gap-1.5">
-              {visibleIconResults.filter((name) => !toolkitSearch.trim() || name.toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((name)=><button key={name} type="button" onClick={()=>void chooseIcon(name)} title={"Add icon "+name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 "+(selected?.iconName===name?"border-accent bg-accent/10":"")}>
+              {visibleIconResults.map((name)=><button key={name} type="button" onClick={()=>void chooseIcon(name)} title={"Add icon "+name} className={"min-w-0 rounded-lg border border-border p-1.5 text-left hover:border-accent hover:bg-surface-2 "+(selected?.iconName===name?"border-accent bg-accent/10":"")}>
                 <StudioIconPreview name={name} className="mx-auto size-7" size={28} />
                 <span className="mt-1 block truncate text-[9px] text-muted">{name}</span>
               </button>)}
@@ -2661,7 +2721,7 @@ export function UxUiStudioEngine() {
             <p className="mt-3 text-[10px] leading-4 text-muted">The quick picker covers common UI categories and outline, filled, rounded and platform icon sets. The full online catalogue remains searchable. Check each collection’s licence; <a className="underline underline-offset-2" href="https://iconify.design/docs/api/search.html" target="_blank" rel="noreferrer">Iconify supports set filters and paging</a>.</p>
           </div>}
 
-          {leftTab === "fonts" && !inline && <div className="mt-3">
+          {!searchingToolkit && leftTab === "fonts" && !inline && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Find your font</h3>
             <p className="mt-1 text-[11px] leading-4 text-muted">See your words in each font. Tap a card to use it in your design.</p>
             <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted">
@@ -2705,13 +2765,13 @@ export function UxUiStudioEngine() {
             <p className="mt-3 text-[10px] leading-4 text-muted">Font binaries are fetched when selected instead of shipping the entire multi-gigabyte font archive inside enV. Check each font licence before redistribution.</p>
           </div>}
 
-          {leftTab === "presets" && <div className="mt-3">
+          {!searchingToolkit && leftTab === "presets" && <div className="mt-3">
             <h3 className="text-xs font-semibold text-fg">Starter layouts</h3><p className="mt-1 text-[11px] leading-4 text-muted">Curated responsive starting points, then customise every layer.</p>
             <button type="button" onClick={() => presetImportInputRef.current?.click()} className="uxui-import-button mb-3 w-full justify-center"><FileJson size={14} /> Import preset / project JSON</button>
             <div className="uxui-preset-grid">{PRESETS.filter((preset) => !toolkitSearch.trim() || (preset.label + " " + preset.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase())).map((preset) => <button key={preset.id} type="button" onClick={() => applyPreset(preset.id)} className="uxui-preset-card"><span className={"uxui-preset-preview uxui-preset-preview-" + preset.target + " uxui-preset-preview-" + preset.id} aria-hidden="true"><span className="uxui-preset-mockup-top"><i /><i /></span><span className="uxui-preset-mockup-hero" /><span className="uxui-preset-mockup-grid"><i /><i /><i /></span><span className="uxui-preset-mockup-bottom"><i /><i /><i /></span></span><span className="uxui-preset-copy"><strong>{preset.label}</strong><span>{preset.description}</span><span className="uxui-preset-target">{preset.target === "mobile" ? <Smartphone size={11} /> : preset.target === "tablet" ? <Tablet size={11} /> : <Monitor size={11} />}{preset.target} canvas <ArrowRight size={11} /></span></span></button>)}</div>
           </div>}
 
-          {leftTab === "tokens" && <div className="mt-3">
+          {!searchingToolkit && leftTab === "tokens" && <div className="mt-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-fg"><Palette size={14} /> Design tokens</div>
             <p className="mt-1 text-[11px] leading-4 text-muted">Extracted from the current layers and included in the PDF, JSON and AI prompt.</p>
             <Field label="Artboard background"><input type="color" value={background} onChange={(event) => setBackground(event.target.value)} className="mt-2 h-9 w-full rounded border border-border bg-surface p-1" /></Field>
@@ -2833,7 +2893,7 @@ export function UxUiStudioEngine() {
                   const stroke = layer.borderWidth > 0 ? layer.borderColor : "none";
                   const baseBox = (round = layer.radius) => <path d={roundedRectanglePath({ ...layer, radius: round }, layer.x, layer.y)} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} strokeDasharray={shapeStrokeDasharray(layer)} strokeLinecap={layer.borderStyle === "dotted" ? "round" : undefined} />;
                   const shadow = layer.shadow ? "0 3px 10px #0F172A24" : undefined;
-                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: prototypePreview ? (layer.prototypeTargetScreenId && screens.some((screen) => screen.id === layer.prototypeTargetScreenId) ? "pointer" : "not-allowed") : layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
+                  const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: editTool === "chroma" && keyPicking && layer.id === selectedId ? "pointer" : prototypePreview ? (layer.prototypeTargetScreenId && screens.some((screen) => screen.id === layer.prototypeTargetScreenId) ? "pointer" : "not-allowed") : layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
                   return <g key={layer.id} data-layer-id={layer.id} style={style} transform={layer.rotation ? "rotate(" + layer.rotation + " " + (layer.x + layer.width / 2) + " " + (layer.y + layer.height / 2) + ")" : undefined}>
                     <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} fill="transparent" pointerEvents="all" />
                     {layer.kind === "divider" ? <line x1={layer.x} y1={layer.y} x2={layer.x + layer.width} y2={layer.y + layer.height} stroke={layer.background === "transparent" ? "#CBD5E1" : layer.background} strokeWidth={Math.max(1, layer.borderWidth || layer.height)} /> : null}
@@ -2879,10 +2939,10 @@ export function UxUiStudioEngine() {
                       </g>;
                     })() : null}
                     {layer.kind === "image" ? layer.imageDataUrl ? <image href={layer.imageDataUrl} x={layer.x} y={layer.y} width={layer.width} height={layer.height} preserveAspectRatio="xMidYMid slice" /> : <><path d={"M " + (layer.x + layer.width * 0.18) + " " + (layer.y + layer.height * 0.76) + " l " + (layer.width * 0.2 * -1) + " 0 l " + (layer.width * 0.2) + " -" + (layer.height * 0.27) + " l " + (layer.width * 0.16) + " " + (layer.height * 0.16) + " l " + (layer.width * 0.16 * -1) + " " + (layer.height * 0.11) + " l " + (layer.width * 0.22) + " -" + (layer.height * 0.33) + " l " + (layer.width * 0.18) + " " + (layer.height * 0.33)} fill="none" stroke="#94A3B8" strokeWidth="2" /><text x={layer.x + layer.width / 2} y={layer.y + layer.height - 10} fontSize="11" fill="#64748B" textAnchor="middle">{layer.text}</text></> : null}
-                    {layer.kind === "icon" ? <svg x={layer.x + 2} y={layer.y + 2} width={layer.width - 4} height={layer.height - 4} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
+                    {layer.kind === "icon" ? <svg x={layer.x + (layer.componentKey === "merged-vector" ? 0 : 2)} y={layer.y + (layer.componentKey === "merged-vector" ? 0 : 2)} width={Math.max(1, layer.width - (layer.componentKey === "merged-vector" ? 0 : 4))} height={Math.max(1, layer.height - (layer.componentKey === "merged-vector" ? 0 : 4))} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
                     {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
                     {selectedIds.includes(layer.id) && <rect data-editor-only="true" x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
-                    {selectedId === layer.id && !prototypePreview && !layer.locked && <g data-editor-only="true" role="button" tabIndex={0} aria-label="Drag to resize selected element" className="uxui-resize-handle"
+                    {selectedId === layer.id && !prototypePreview && !layer.locked && !(editTool === "chroma" && keyPicking) && <g data-editor-only="true" role="button" tabIndex={0} aria-label="Drag to resize selected element" className="uxui-resize-handle"
                       onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); checkpoint(); dragRef.current = null; resizeRef.current = { id: layer.id, x: layer.x, y: layer.y, width: layer.width, height: layer.height, pointerX: event.clientX, pointerY: event.clientY, rotation: layer.rotation || 0, fontSize: TEXT_LAYER_KINDS.includes(layer.kind) ? layer.fontSize : undefined }; artboardRef.current?.setPointerCapture(event.pointerId); }}
                       onKeyDown={(event) => { if (["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); updateLayer(layer.id, { width: Math.max(12, layer.width + (event.key === "ArrowRight" ? 4 : event.key === "ArrowLeft" ? -4 : 0)), height: Math.max(12, layer.height + (event.key === "ArrowDown" ? 4 : event.key === "ArrowUp" ? -4 : 0)) }); } }}>
                       <circle cx={layer.x + layer.width} cy={layer.y + layer.height} r={22 * board.width / Math.max(1, deviceDisplayWidth)} fill="transparent" />
@@ -2968,6 +3028,7 @@ export function UxUiStudioEngine() {
             </div>}
             {selected?.kind === "image" && ["cutout", "chroma"].includes(editTool) && <div className="uxui-image-actions uxui-key-controls">
               <p>{editTool === "chroma" ? "Remove a chosen color, including green or blue screens." : "Remove solid background colors from the edges."} Each application starts from your original. Use Erase / Restore to repair complex backgrounds.</p>
+              {editTool === "chroma" && <StudioChromaPicker key={selected.id} source={selected.imageOriginalDataUrl || selected.imageDataUrl} color={keyColor} picking={keyPicking} onPicking={setKeyPicking} onColor={color => { keySampleRequest.current++; setKeyColor(color); setKeyPicking(false); }} />}
               {editTool === "chroma" && <label>Key color<input aria-label="Chroma key color" type="color" value={keyColor} onChange={event => setKeyColor(event.target.value)} /></label>}
               <StudioFader label="Tolerance" name="Background tolerance" min={0} max={255} value={cutoutStrength} begin={() => {}} change={setCutoutStrength} />
               <StudioFader label="Softness" name="Background softness" min={0} max={100} value={keySoftness} begin={() => {}} change={setKeySoftness} />
@@ -2979,6 +3040,12 @@ export function UxUiStudioEngine() {
             </div>}
             {inlineToolkit && renderToolkit(true)}
           </div>}
+          {multiSelectMode && !prototypePreview && <section className="uxui-merge-picker" aria-label="Merge layer selection">
+            <strong>{selectedIds.length} layers selected</strong><p>Tap icons or shapes to select them. Merging keeps their colors and positions. Undo restores the separate layers.</p>
+            <div>{elements.filter(layer => !layer.hidden && layer.display !== "none").map(layer => <label key={layer.id}><input type="checkbox" aria-label={"Select for merge: " + layer.name} checked={selectedIds.includes(layer.id)} disabled={!selectedIds.includes(layer.id) && (!isStudioMergeableLayer(layer) || Boolean(layer.locked))} onChange={() => selectLayer(layer.id, true)} /><span>{layer.name}</span>{!isStudioMergeableLayer(layer) && <small>Keep separate</small>}</label>)}</div>
+            <button type="button" disabled={selectedIds.length < 2 || selectedLayers.some(layer => !isStudioMergeableLayer(layer) || layer.locked)} onClick={mergeSelectedIcons}>Merge {selectedIds.length} selected layers</button>
+            <button type="button" onClick={() => setMultiSelectMode(false)}>Finish selecting</button>
+          </section>}
           {selected && !prototypePreview && <div className="uxui-context-controls">
             <div className="uxui-context-toolbar" role="toolbar" aria-label={selected.kind + " editing actions"}>
               <span className="uxui-context-selection" aria-live="polite">{selected.name || selected.kind + " selected"}</span>
@@ -3201,7 +3268,7 @@ export function UxUiStudioEngine() {
         </aside>}
       </div>
       {repairImageId && (() => { const image = elements.find(layer => layer.id === repairImageId); return image?.imageDataUrl ? <StudioImageRepair original={image.imageOriginalDataUrl || image.imageDataUrl} source={image.imageDataUrl} busy={imageBusy} onClose={() => setRepairImageId("")} onApply={data => { updateLayer(image.id, { imageDataUrl: data, imageOriginalDataUrl: image.imageOriginalDataUrl || image.imageDataUrl, background: "transparent" }); setNotice("Image repair applied. Undo restores the previous mask."); }} /> : null; })()}
-      {screenshotFile && <StudioScreenshotImport file={screenshotFile} onClose={() => setScreenshotFile(null)} onApply={applyScreenshotReconstruction} />}
+      {screenshotFile && <StudioScreenshotImport file={screenshotFile} screenSize={board} onClose={() => setScreenshotFile(null)} onApply={applyScreenshotReconstruction} />}
       {notice && <div role="status" className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-5 text-muted"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> <span className="min-w-0 flex-1">{notice}</span><button aria-label="Dismiss notice" type="button" onClick={() => setNotice("")} className="rounded p-0.5 text-muted hover:text-fg"><X size={13} /></button></div>}
 
     </section>

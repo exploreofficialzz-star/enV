@@ -1,0 +1,83 @@
+{
+  "runAt": "2026-10-27T08:45:45.527Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "cases": [
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "Unified search finds home icons, fonts and shapes offline; empty, clear and narrow viewport states work",
+        "Search inserts distinct icons; touch checkboxes merge them at exact bounds; Undo restores both sources",
+        "Touch picker samples an exact custom color, applies real transparency and preserves the subject; artboard picking uses original pixels without dragging",
+        "Real offline OCR fits the current mockup; contain/cover previews, text corrections and comparison overlay work; exact cropped geometry persists after reopening"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "checks": [
+        "Unified search finds home icons, fonts and shapes offline; empty, clear and narrow viewport states work",
+        "Search inserts distinct icons; touch checkboxes merge them at exact bounds; Undo restores both sources"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "checks": [
+        "Unified search finds home icons, fonts and shapes offline; empty, clear and narrow viewport states work",
+        "Search inserts distinct icons; touch checkboxes merge them at exact bounds; Undo restores both sources"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "checks": [
+        "Unified search finds home icons, fonts and shapes offline; empty, clear and narrow viewport states work",
+        "Search inserts distinct icons; touch checkboxes merge them at exact bounds; Undo restores both sources"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "errors": [],
+  "validation": {
+    "focusedTests": {
+      "command": "npm run check:ux-ui-studio",
+      "passed": 79,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "eslintChangedSources": "passed",
+    "productionBuild": "passed",
+    "developerCatalogAndPlatformParity": "passed",
+    "developerPrivacyGuard": "passed",
+    "developerRouteSmoke": {
+      "routes": 474,
+      "executable": 448,
+      "failed": 0
+    },
+    "existingToolkitBrowserAudit": {
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "checks": 12,
+      "failed": 0
+    }
+  },
+  "notes": [
+    "External origins were blocked during the interaction browser audit; bundled assets and local OCR worked without image uploads.",
+    "The short viewport approximates the area available above a mobile keyboard; it does not emulate the native keyboard itself.",
+    "Screenshot reconstruction approximates editable content; original fonts, vectors and source layers cannot be recovered exactly from pixels."
+  ]
+}

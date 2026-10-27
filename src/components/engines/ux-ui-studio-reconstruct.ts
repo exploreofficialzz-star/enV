@@ -1,4 +1,6 @@
 import { reconstructStudioScreenshot as reconstructPixels, type ReconstructedStudioLayer, type StudioScreenshotReconstruction as PixelReconstruction } from "@/lib/engines/ux-ui-studio-reconstruct";
+import { fitStudioScreenshotText } from "@/lib/engines/ux-ui-studio-geometry";
+import { loadStudioFont } from "./ux-ui-studio-assets";
 
 export type { ReconstructedStudioLayer } from "@/lib/engines/ux-ui-studio-reconstruct";
 export const STUDIO_SCREENSHOT_MAX_BYTES = 4 * 1024 * 1024;
@@ -140,6 +142,19 @@ export async function reconstructStudioScreenshot(
     const element = byId.get(region.id); if (element) element.imageDataUrl = crop.toDataURL("image/png");
   }
   const warnings = [...result.warnings];
+  // Measure the actual replacement typeface: a fixed glyph-height multiplier
+  // can make a recognized label overflow or wrap when added to the mockup.
+  try { await loadStudioFont("Inter"); } catch { warnings.push("The preview font could not load. Check text alignment once the font is available."); }
+  checkCanceled(signal);
+  const measure = document.createElement("canvas").getContext("2d");
+  if (measure) for (const layer of result.elements) {
+    if (layer.kind !== "text" || !layer.text) continue;
+    const line = lines.filter(line => line.text.trim() === layer.text).sort((a, b) => Math.abs(a.bbox.x0 - layer.x) + Math.abs(a.bbox.y0 - layer.y) - Math.abs(b.bbox.x0 - layer.x) - Math.abs(b.bbox.y0 - layer.y))[0];
+    if (!line) continue;
+    measure.font = `${layer.fontWeight || 400} 100px Inter, sans-serif`;
+    const metrics = measure.measureText(layer.text);
+    Object.assign(layer, fitStudioScreenshotText({ x: line.bbox.x0, y: line.bbox.y0, width: line.bbox.x1 - line.bbox.x0, height: line.bbox.y1 - line.bbox.y0 }, { width: metrics.width, ascent: metrics.actualBoundingBoxAscent, descent: metrics.actualBoundingBoxDescent, left: metrics.actualBoundingBoxLeft }));
+  }
   if (canvas.width !== originalWidth || canvas.height !== originalHeight) warnings.unshift(`The screenshot was reduced from ${originalWidth} × ${originalHeight} to ${canvas.width} × ${canvas.height} pixels for bounded local processing.`);
   if (result.stats.textLines === 0) warnings.unshift("No confident English text was recognized. Text may be small, decorative, rotated or in another language; inspect the retained artwork and add text manually.");
   else if (result.stats.ocrConfidence < 70) warnings.unshift("Some recognized text has low confidence. Check spelling, spacing and positions before using the design.");
