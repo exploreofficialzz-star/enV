@@ -1,9 +1,14 @@
 import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
+import { responsiveElements, type ResponsiveDesign, type ResponsiveDevice } from "./ux-ui-studio-responsive.ts";
+import { shapeCornerCss, type CornerRadii, type ShapeBorderStyle } from "./ux-ui-studio-shape-style.ts";
+import { studioFontMetadata, studioFontWeightRange } from "./studio-font-metadata.ts";
+import { parseStudioSvgTree, svgTransformMatrix, svgViewportGeometry, inheritedSvgPresentation, type StudioSvgNode, type StudioSvgMatrix } from "./ux-ui-studio-svg.ts";
 
 export type UxCodegenLayer = {
-  id: string; kind: string; name: string; x: number; y: number; width: number; height: number;
-  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl?: string;
+  id: string; kind: string; name: string; x: number; y: number; width: number; height: number; rotation?: number; hidden?: boolean;
+  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl?: string; imageOriginalDataUrl?: string;
   color: string; background: string; borderColor: string; borderWidth: number; radius: number;
+  cornerRadii?: CornerRadii; borderStyle?: ShapeBorderStyle;
   padding: number; marginTop: number; marginRight: number; marginBottom: number; marginLeft: number;
   fontFamily: string; fontSize: number; fontWeight: number; lineHeight: number; letterSpacing: number;
   textAlign: "left" | "center" | "right"; opacity: number; shadow: boolean;
@@ -19,6 +24,7 @@ export type UxCodegenProject = {
   breakpoints: { mobile: number; tablet: number; desktop: number };
   tokens: { colors: Array<{name:string;value:string}>; typography: Array<{name:string;fontFamily:string;fontSize:number;fontWeight:number;lineHeight:number}>; spacing: number[] };
   elements: UxCodegenLayer[];
+  responsiveDesign?: ResponsiveDesign<UxCodegenLayer>;
 };
 const safe = (value: unknown) => JSON.stringify(value);
 // Embedded fonts and images can exceed the JVM's 65,535-byte UTF-8 constant
@@ -67,7 +73,10 @@ const embeddedFontCss = (project: UxCodegenProject): string => {
   return project.elements.filter((layer) => layer.fontDataUrl && layer.fontFamily).filter((layer) => {
     if (seen.has(layer.fontFamily)) return false;
     seen.add(layer.fontFamily); return true;
-  }).map((layer) => "@font-face{font-family:" + safe(layer.fontFamily) + ";src:url(" + safe(layer.fontDataUrl!) + ") format('" + (layer.fontDataUrl!.startsWith("data:font/otf") ? "opentype" : "truetype") + "');font-style:normal;font-weight:100 900;font-display:swap}").join("\\n");
+  }).map((layer) => {
+    const format = studioFontMetadata(layer.fontDataUrl!).format;
+    return "@font-face{font-family:" + safe(layer.fontFamily) + ";src:url(" + safe(layer.fontDataUrl!) + ")" + (format === "unknown" ? "" : " format('" + format + "')") + ";font-style:normal;font-weight:" + studioFontWeightRange(layer.fontDataUrl!) + ";font-display:swap}";
+  }).join("\n");
 };
 const remoteFontFamilies = (project: UxCodegenProject): string[] => Array.from(new Set(project.elements
   .filter((layer) => !layer.fontDataUrl && layer.fontFamily && !systemFonts.has(layer.fontFamily))
@@ -78,13 +87,14 @@ const layerStyle = (l: UxCodegenLayer) => [
   "box-sizing:border-box","padding:" + l.padding + "px","color:" + l.color,
   "display:" + (l.display || "flex"),"cursor:" + (l.cursor || "default"),"z-index:" + (l.zIndex ?? 1),"transition:background-color " + (l.transitionDuration ?? 180) + "ms ease,opacity " + (l.transitionDuration ?? 180) + "ms ease",
   "background:" + (l.background === "transparent" ? "transparent" : l.background),
-  "border:" + l.borderWidth + "px solid " + (l.borderWidth > 0 ? l.borderColor : "transparent"),
-  "border-radius:" + l.radius + "px","opacity:" + l.opacity,"font-family:" + safe(l.fontFamily),
+  "border:" + l.borderWidth + "px " + (l.borderStyle || "solid") + " " + (l.borderWidth > 0 ? l.borderColor : "transparent"),
+  "border-radius:" + shapeCornerCss(l),"opacity:" + l.opacity,"font-family:" + safe(l.fontFamily),
   "font-size:" + l.fontSize + "px","font-weight:" + l.fontWeight,"line-height:" + l.lineHeight,
   "letter-spacing:" + l.letterSpacing + "px","text-align:" + l.textAlign,"white-space:pre-wrap","overflow:hidden",
   "align-items:" + (l.textAlign === "center" ? "center" : "flex-start"),
   "justify-content:" + (l.textAlign === "center" ? "center" : l.textAlign === "right" ? "flex-end" : "flex-start"),
   l.shadow ? "box-shadow:0 3px 10px #0f172a24" : "",
+  l.rotation ? "transform:rotate(" + l.rotation + "deg);transform-origin:center" : "",
   shapeCss(l),
 ].filter(Boolean).join(";");
 const layerHtml = (l: UxCodegenLayer, p: UxCodegenProject) => {
@@ -114,76 +124,120 @@ const layerHtml = (l: UxCodegenLayer, p: UxCodegenProject) => {
   if (l.kind === "image") return '<div ' + common + '>' + (l.imageDataUrl ? '<img alt="' + esc(l.name) + '" src="' + esc(l.imageDataUrl) + '" style="width:100%;height:100%;object-fit:cover" />' : esc(l.text || "Image asset not selected")) + '</div>';
   if (l.kind === "input" || l.kind === "search" || l.kind === "textarea") {
     const tag = l.kind === "textarea" ? "textarea" : "input";
-    return '<div ' + common + '><' + tag + ' aria-label="' + esc(l.name) + '" placeholder="' + esc(l.text) + '" style="width:100%;height:100%;font:inherit;color:inherit;background:transparent;border:0;outline:none;resize:none" /></div>';
+    return '<div ' + common + '><' + tag + (l.kind === "search" ? ' type="search"' : '') + ' aria-label="' + esc(l.name) + '" placeholder="' + esc(l.text) + '" style="width:100%;height:100%;font:inherit;color:inherit;background:transparent;border:0;outline:none;resize:none">' + (tag === "textarea" ? '</textarea>' : '') + '</div>';
   }
   const tag = l.kind === "button" ? "button" : "div";
   return '<' + tag + ' ' + common + (tag === "button" ? ' type="button"' : "") + '>' + esc(l.text) + '</' + tag + '>';
 };
 
+function webArtboards(project: UxCodegenProject): UxCodegenProject[] {
+  if (!project.responsiveDesign) return [{ ...project, elements: project.elements.filter(layer => !layer.hidden) }];
+  const defaults = { mobile: { width: 390, height: 844 }, tablet: { width: 768, height: 1024 }, desktop: { width: 1440, height: 900 } };
+  return (["mobile", "tablet", "desktop"] as ResponsiveDevice[]).map(target => {
+    const model = project.responsiveDesign!;
+    const size = target === project.target ? project.viewport : model.overrides[target]?.viewport || (target === model.baseTarget ? model.baseViewport : defaults[target]);
+    return { ...project, target, viewport: size, elements: responsiveElements(model, target, size).filter(layer => !layer.hidden && visibility(layer).includes(target)), responsiveDesign: undefined };
+  });
+}
+
+function interactionCss(artboards: UxCodegenProject[], responsive: boolean): string {
+  return artboards.flatMap(artboard => artboard.elements.map(layer => {
+    const selector = (responsive ? '.env-artboard[data-device="' + artboard.target + '"] ' : "") + ".env-layer-" + layer.id.replace(/[^a-zA-Z0-9_-]/g, "");
+    return [
+      layer.hoverColor ? selector + ":hover{background:" + layer.hoverColor + "!important}" : "",
+      layer.activeColor ? selector + ":active{background:" + layer.activeColor + "!important}" : "",
+      layer.focusColor ? selector + ":focus-visible{background:" + layer.focusColor + "!important;outline:3px solid " + layer.focusColor + ";outline-offset:2px}" : "",
+    ].filter(Boolean).join("\n");
+  })).filter(Boolean).join("\n");
+}
+
+function deviceArtboardCss(project: UxCodegenProject): string {
+  return '.env-device-artboard{display:none}' +
+    '@media(max-width:' + project.breakpoints.mobile + 'px){.env-device-artboard[data-device="mobile"]{display:block}}' +
+    '@media(min-width:' + (project.breakpoints.mobile + 1) + 'px) and (max-width:' + (project.breakpoints.desktop - 1) + 'px){.env-device-artboard[data-device="tablet"]{display:block}}' +
+    '@media(min-width:' + project.breakpoints.desktop + 'px){.env-device-artboard[data-device="desktop"]{display:block}}';
+}
+
 export function generateHtmlProject(project: UxCodegenProject): string {
+  const artboards = webArtboards(project);
+  const assets = { ...project, elements: artboards.flatMap(artboard => artboard.elements) };
   const tokens = [
     ...project.tokens.colors.map((token) => "--env-color-" + token.name.replace(/[^a-z0-9-]/gi, "-") + ":" + token.value),
     ...project.tokens.spacing.map((spacing) => "--env-space-" + spacing + ":" + spacing + "px"),
     ...project.tokens.typography.map((token) => "--env-type-" + token.name.replace(/[^a-z0-9-]/gi, "-") + ":" + token.fontSize + "px/" + token.lineHeight + " " + safe(token.fontFamily)),
   ].join(";\n");
-  const fontFaces = embeddedFontCss(project);
-  const fontLinks = remoteFontFamilies(project).map((family) => '<link rel="stylesheet" href="' + esc(googleFontLink(family)) + '">').join("");
-  const interactionRules = project.elements.map((layer) => {
-    const selector = ".env-layer-" + layer.id.replace(/[^a-zA-Z0-9_-]/g, "");
-    const rules: string[] = [];
-    if (layer.hoverColor) rules.push(selector + ":hover{background:" + layer.hoverColor + "!important}");
-    if (layer.activeColor) rules.push(selector + ":active{background:" + layer.activeColor + "!important}");
-    if (layer.focusColor) rules.push(selector + ":focus-visible{background:" + layer.focusColor + "!important;outline:3px solid " + layer.focusColor + ";outline-offset:2px}");
-    return rules.join("\\n");
-  }).filter(Boolean).join("\\n");
+  const fontFaces = embeddedFontCss(assets);
+  const fontLinks = remoteFontFamilies(assets).map((family) => '<link rel="stylesheet" href="' + esc(googleFontLink(family)) + '">').join("");
   const rules = [
-    interactionRules,
+    interactionCss(artboards, Boolean(project.responsiveDesign)),
     "@media (max-width:" + project.breakpoints.mobile + "px){.env-layer:not([data-visible-on~='mobile']){display:none!important}}",
     "@media (min-width:" + (project.breakpoints.mobile + 1) + "px) and (max-width:" + (project.breakpoints.desktop - 1) + "px){.env-layer:not([data-visible-on~='tablet']){display:none!important}}",
     "@media (min-width:" + project.breakpoints.desktop + "px){.env-layer:not([data-visible-on~='desktop']){display:none!important}}",
   ].join("\n");
+  if (project.responsiveDesign) {
+    const content = artboards.map(artboard => '<section class="env-artboard env-device-artboard" data-device="' + artboard.target + '" aria-label="' + artboard.target + ' design" style="width:min(100%,' + artboard.viewport.width + 'px);aspect-ratio:' + artboard.viewport.width + '/' + artboard.viewport.height + '">' + artboard.elements.map(layer => layerHtml(layer, artboard)).join("\n") + '</section>').join("\n");
+    return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(project.name) + '</title>' + fontLinks + '<style>' + fontFaces + ':root{' + tokens + '}*{box-sizing:border-box}body{margin:0;padding:0;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}.env-artboard{position:relative;container-type:size;margin:0 auto;background:' + project.background + ';overflow:hidden}.env-layer{min-width:0}' + rules + deviceArtboardCss(project) + '</style></head><body><main aria-label="' + esc(project.name) + ' design">' + content + '</main></body></html>';
+  }
   return '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
     esc(project.name) + '</title>' + fontLinks + '<style>' + fontFaces + ':root{' + tokens + '}*{box-sizing:border-box}body{margin:0;padding:16px;background:#f1f5f9;font-family:Inter,system-ui,sans-serif}.env-artboard{position:relative;container-type:size;width:min(100%,' +
     project.viewport.width + 'px);aspect-ratio:' + project.viewport.width + '/' + project.viewport.height + ';margin:0 auto;background:' + project.background + ';overflow:hidden}.env-layer{min-width:0}' +
     rules + '</style></head><body><main class="env-artboard" role="img" aria-label="' + esc(project.name) + ' design">' +
-    project.elements.map((layer) => layerHtml(layer, project)).join("\n") + '</main></body></html>';
+    artboards[0].elements.map((layer) => layerHtml(layer, project)).join("\n") + '</main></body></html>';
 }
 
 export function generateReactProject(project: UxCodegenProject): string {
   const component = sourceName(project.name) + "Design";
-  const json = JSON.stringify(project).replace(/</g, "\\u003c");
-  const fontCss = JSON.stringify(embeddedFontCss(project));
-  const googleLinks = remoteFontFamilies(project).map((family) => googleFontLink(family));
-  const chartData = Object.fromEntries(project.elements.filter((layer) => layer.kind === "chart").map((layer) => [layer.id, parseUxUiStudioChartData(layer.text)]));
+  const artboards = webArtboards(project);
+  const allLayers = artboards.flatMap(artboard => artboard.elements);
+  const assets = { ...project, elements: allLayers };
+  const fontCss = JSON.stringify(embeddedFontCss(assets));
+  const googleLinks = remoteFontFamilies(assets).map((family) => googleFontLink(family));
+  const imageSources = [...new Set(allLayers.map(layer => layer.imageDataUrl).filter(Boolean))];
+  const polygons: Record<string, string> = { triangle: "polygon(50% 0%,100% 100%,0% 100%)", diamond: "polygon(50% 0%,100% 50%,50% 100%,0% 50%)", hexagon: "polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%)", star: "polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)" };
+  const scenes = artboards.map(artboard => ({ target: artboard.target, viewport: artboard.viewport, elements: artboard.elements.map(layer => {
+    const item: Record<string, unknown> = { ...layer, cornerCss: shapeCornerCss(layer), ...(polygons[layer.kind] ? { clipPath: polygons[layer.kind] } : {}) };
+    delete item.fontDataUrl; delete item.imageOriginalDataUrl;
+    if (layer.imageDataUrl) { item.imageAssetIndex = imageSources.indexOf(layer.imageDataUrl); item.imageDataUrl = ""; }
+    return item;
+  }) }));
+  const json = JSON.stringify(scenes).replace(/</g, "\\u003c");
+  const metadata = JSON.stringify({ target: project.target, viewport: project.viewport });
+  const chartData = Object.fromEntries(artboards.flatMap(artboard => artboard.elements.filter(layer => layer.kind === "chart").map(layer => [artboard.target + ":" + layer.id, parseUxUiStudioChartData(layer.text)])));
+  const rules = interactionCss(artboards, Boolean(project.responsiveDesign)) + (project.responsiveDesign ? deviceArtboardCss(project) : "");
   return [
     'import React from "react";',
     "",
-    "const project = " + json + " as const;",
+    'type Layer = { [key:string]:unknown;id:string;kind:string;name:string;x:number;y:number;width:number;height:number;rotation?:number;text:string;iconSvg:string;iconViewBox:string;imageDataUrl:string;imageAssetIndex?:number;color:string;background:string;borderColor:string;borderWidth:number;borderStyle?:"solid"|"dashed"|"dotted";cornerCss:string;clipPath?:string;radius:number;padding:number;fontFamily:string;fontSize:number;fontWeight:number;lineHeight:number;letterSpacing:number;textAlign:"left"|"center"|"right";opacity:number;shadow:boolean;referenceWidth?:number;referenceHeight?:number;horizontalConstraint?:string;verticalConstraint?:string;minWidth?:number;maxWidth?:number;visibleOn?:string[];display?:string;cursor?:string;zIndex?:number;transitionDuration?:number };',
+    "const artboards: Array<{target:string;viewport:{width:number;height:number};elements:Layer[]}> = " + json + ";",
+    "const project = { ..." + metadata + ", elements: artboards.flatMap(artboard => artboard.elements) };",
+    "const imageSources: string[] = " + JSON.stringify(imageSources).replace(/</g, "\\u003c") + ";",
     "const chartData: Record<string, { title: string; points: Array<{ label: string; value: number }>; invalidRows: number }> = " + JSON.stringify(chartData) + ";",
     "const embeddedFontCss = " + fontCss + ";",
-    "const googleFontLinks = " + JSON.stringify(googleLinks) + ";",
+    "const googleFontLinks: string[] = " + JSON.stringify(googleLinks) + ";",
+    "const designRules = " + JSON.stringify(rules) + ";",
     "",
     "function positionX(layer: (typeof project.elements)[number]): React.CSSProperties {",
     "  const rw = layer.referenceWidth || project.viewport.width;",
-    '  if (layer.horizontalConstraint === "right") return { right: Math.max(0, rw - layer.x - layer.width) };',
-    '  if (layer.horizontalConstraint === "center") return { left: "calc(" + layer.x + "px + (100cqw - " + rw + "px)/2)" };',
+    '  if (layer.horizontalConstraint === "right") return { right: Math.max(0, rw - layer.x - layer.width), width:layer.width };',
+    '  if (layer.horizontalConstraint === "center") return { left: "calc(" + layer.x + "px + (100cqw - " + rw + "px)/2)", width:layer.width };',
     '  return { left: layer.x, width: layer.horizontalConstraint === "stretch" ? "calc(" + layer.width + "px + (100cqw - " + rw + "px))" : layer.width };',
     "}",
     "function positionY(layer: (typeof project.elements)[number]): React.CSSProperties {",
     "  const rh = layer.referenceHeight || project.viewport.height;",
-    '  if (layer.verticalConstraint === "bottom") return { bottom: Math.max(0, rh - layer.y - layer.height) };',
-    '  if (layer.verticalConstraint === "center") return { top: "calc(" + layer.y + "px + (100cqh - " + rh + "px)/2)" };',
+    '  if (layer.verticalConstraint === "bottom") return { bottom: Math.max(0, rh - layer.y - layer.height), height:layer.height };',
+    '  if (layer.verticalConstraint === "center") return { top: "calc(" + layer.y + "px + (100cqh - " + rh + "px)/2)", height:layer.height };',
     '  return { top: layer.y, height: layer.verticalConstraint === "stretch" ? "calc(" + layer.height + "px + (100cqh - " + rh + "px))" : layer.height };',
     "}",
     "export default function " + component + "() {",
-    '  return <div style={{position:"relative",containerType:"size",width:"min(100%, ' + project.viewport.width + 'px)",aspectRatio:"' + project.viewport.width + '/' + project.viewport.height + '",overflow:"hidden",background:project.background}}>',
+    '  return <div aria-label={' + safe(project.name + " design") + '}>',
     "    {googleFontLinks.map((href) => <link key={href} rel=\"stylesheet\" href={href} />)}",
-    "    <style>{embeddedFontCss}</style>",
-    '    {project.elements.filter((item) => !item.visibleOn || item.visibleOn.includes(project.target)).map((item) => {',
-    '      const style: React.CSSProperties = {position:"absolute",boxSizing:"border-box",...positionX(item),...positionY(item),padding:item.padding,color:item.color,background:item.background === "transparent" ? "transparent" : item.background,border:item.borderWidth + "px solid " + (item.borderWidth ? item.borderColor : "transparent"),borderRadius:item.radius,opacity:item.opacity,fontFamily:item.fontFamily,fontSize:item.fontSize,fontWeight:item.fontWeight,lineHeight:item.lineHeight,letterSpacing:item.letterSpacing,textAlign:item.textAlign,whiteSpace:"pre-wrap",overflow:"hidden",display:"flex",alignItems:item.textAlign==="center"?"center":"flex-start",justifyContent:item.textAlign==="center"?"center":item.textAlign==="right"?"flex-end":"flex-start",...(item.shadow?{boxShadow:"0 3px 10px #0f172a24"}:{})};',
-    "      if (item.minWidth > 0) style.minWidth = item.minWidth; if (item.maxWidth > 0) style.maxWidth = item.maxWidth;",
+    "    <style>{embeddedFontCss + designRules}</style>",
+    '    {artboards.map(artboard => <div key={artboard.target} className=' + safe("env-artboard" + (project.responsiveDesign ? " env-device-artboard" : "")) + ' data-device={artboard.target} style={{position:"relative",containerType:"size",width:"min(100%, " + artboard.viewport.width + "px)",aspectRatio:artboard.viewport.width + "/" + artboard.viewport.height,overflow:"hidden",margin:"0 auto",background:' + safe(project.background) + '}}>',
+    '    {artboard.elements.filter((item) => !item.visibleOn || item.visibleOn.includes(artboard.target)).map((item) => {',
+    '      const style: React.CSSProperties = {position:"absolute",boxSizing:"border-box",...positionX(item),...positionY(item),padding:item.padding,color:item.color,background:item.background === "transparent" ? "transparent" : item.background,border:item.borderWidth + "px " + (item.borderStyle || "solid") + " " + (item.borderWidth ? item.borderColor : "transparent"),borderRadius:["ellipse","avatar"].includes(item.kind)?"50%":["pill","line"].includes(item.kind)?"999px":item.cornerCss,clipPath:item.clipPath,opacity:item.opacity,fontFamily:item.fontFamily,fontSize:item.fontSize,fontWeight:item.fontWeight,lineHeight:item.lineHeight,letterSpacing:item.letterSpacing,textAlign:item.textAlign,whiteSpace:"pre-wrap",overflow:"hidden",display:item.display || "flex",cursor:item.cursor,zIndex:item.zIndex,transform:item.rotation?"rotate(" + item.rotation + "deg)":undefined,alignItems:item.textAlign==="center"?"center":"flex-start",justifyContent:item.textAlign==="center"?"center":item.textAlign==="right"?"flex-end":"flex-start",...(item.shadow?{boxShadow:"0 3px 10px #0f172a24"}:{})};',
+    "      if (item.minWidth && item.minWidth > 0) style.minWidth = item.minWidth; if (item.maxWidth && item.maxWidth > 0) style.maxWidth = item.maxWidth;",
     '      if (item.kind === "chart") {',
-    '        const chart = chartData[item.id] || { title: item.name, points: [], invalidRows: 0 };',
+    '        const chart = chartData[artboard.target + ":" + item.id] || { title: item.name, points: [], invalidRows: 0 };',
     '        style.display = "block"; style.padding = 0;',
     '        const plotTop = item.padding + Math.min(22, item.fontSize + 6);',
     '        const plotBottom = item.height - item.padding - 17;',
@@ -193,7 +247,7 @@ export function generateReactProject(project: UxCodegenProject): string {
     '        const slotWidth = plotWidth / Math.max(1, chart.points.length);',
     '        const maxValue = Math.max(1, ...chart.points.map((point) => point.value));',
     '        const labelSize = Math.max(5, Math.min(9, item.fontSize * 0.64));',
-    '        return <div key={item.id} style={style} role="img" aria-label={"Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")}>',
+    '        return <div key={item.id} className={"env-layer-" + item.id} style={style} role="img" aria-label={"Chart: " + chart.title + (chart.points.length ? ". " + chart.points.map((point) => point.label + " " + point.value).join(", ") : ". No valid data rows.")}>',
     '          <div style={{position:"absolute",left:item.padding,top:item.padding,fontSize:Math.min(13,item.fontSize),fontWeight:700}}>{chart.title}</div>',
     '          <svg aria-hidden="true" viewBox={"0 0 " + item.width + " " + item.height} style={{position:"absolute",inset:0,width:"100%",height:"100%"}}>',
     '            {chart.points.length ? <>{[0,1,2,3].map((grid) => <line key={"grid-"+grid} x1={plotLeft} y1={plotTop + plotHeight * grid / 3} x2={plotRight} y2={plotTop + plotHeight * grid / 3} stroke="#E5E7EB" />)}{chart.points.map((point,index) => { const barHeight=plotHeight*point.value/maxValue; const barWidth=Math.max(2,Math.min(26,slotWidth*0.58)); const x=plotLeft+index*slotWidth+(slotWidth-barWidth)/2; const y=plotBottom-barHeight; return <g key={point.label+"-"+index}><rect x={x} y={y} width={barWidth} height={barHeight} rx="3" fill={item.color} opacity={index===chart.points.length-1?1:0.78}/><text x={plotLeft+index*slotWidth+slotWidth/2} y={Math.max(plotTop+7,y-3)} fontSize={labelSize} fill={item.color} textAnchor="middle">{point.value}</text><text x={plotLeft+index*slotWidth+slotWidth/2} y={plotBottom+12} fontSize={labelSize} fill={item.color} textAnchor="middle">{point.label.slice(0,8)}</text></g>;})}</> : <text x={item.width/2} y={plotTop+plotHeight/2} textAnchor="middle" fontSize={labelSize} fill={item.color}>Enter data as Label: value</text>}',
@@ -201,11 +255,14 @@ export function generateReactProject(project: UxCodegenProject): string {
     '          {chart.invalidRows > 0 && <span style={{position:"absolute",right:item.padding,bottom:2,fontSize:8,color:"#B45309"}}>{chart.invalidRows} invalid row(s)</span>}',
     '        </div>;',
     '      }',
-    '      const children = item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} width="100%" height="100%" aria-hidden="true" style={{fill:"currentColor"}} dangerouslySetInnerHTML={{__html:item.iconSvg}} /> : item.kind === "image" ? item.imageDataUrl ? <img alt={item.name} src={item.imageDataUrl} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : item.text : item.text;',
-    '      if (item.kind === "input" || item.kind === "search") return <div key={item.id} style={style}><input aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0}} /></div>;',
-    '      if (item.kind === "textarea") return <div key={item.id} style={style}><textarea aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0,resize:"none"}} /></div>;',
-    '      return <div key={item.id} role={item.kind==="button"?"button":undefined} style={style}>{children}</div>;',
+    '      const imageSource = item.imageAssetIndex === undefined ? item.imageDataUrl : imageSources[item.imageAssetIndex];',
+    '      const children = item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} width="100%" height="100%" aria-hidden="true" style={{fill:"currentColor"}} dangerouslySetInnerHTML={{__html:item.iconSvg}} /> : item.kind === "image" ? imageSource ? <img alt={item.name} src={imageSource} style={{width:"100%",height:"100%",objectFit:"cover"}} /> : item.text : item.text;',
+    '      if (item.kind === "input" || item.kind === "search") return <div key={item.id} className={"env-layer-" + item.id} style={style}><input type={item.kind==="search"?"search":"text"} aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0}} /></div>;',
+    '      if (item.kind === "textarea") return <div key={item.id} className={"env-layer-" + item.id} style={style}><textarea aria-label={item.name} placeholder={item.text} style={{width:"100%",height:"100%",font:"inherit",color:"inherit",background:"transparent",border:0,resize:"none"}} /></div>;',
+    '      if (item.kind === "button") return <button key={item.id} className={"env-layer-" + item.id} type="button" style={style}>{children}</button>;',
+    '      return <div key={item.id} className={"env-layer-" + item.id} style={style}>{children}</div>;',
     "    })}",
+    "    </div>)}",
     "  </div>;",
     "}",
     "",
@@ -345,34 +402,6 @@ function parseSvgPathData(data: string): UxSvgSegment[] {
   return result;
 }
 
-function parseSvgAttributes(source: string): Record<string, string> {
-  const attrs: Record<string, string> = {};
-  const expression = /([A-Za-z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-  for (const match of source.matchAll(expression)) attrs[match[1]] = match[2] ?? match[3] ?? "";
-  return attrs;
-}
-
-function extractSvgDrawables(svg: string): UxSvgDrawable[] {
-  const tags: UxSvgDrawable[] = [];
-  const inheritedKeys = ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule"];
-  const stack: Array<Record<string, string>> = [{}];
-  const expression = /<(\/)?(svg|g|path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>/gi;
-  for (const match of svg.matchAll(expression)) {
-    const tag = match[2].toLowerCase(), container = tag === "svg" || tag === "g";
-    if (match[1]) { if (container && stack.length > 1) stack.pop(); continue; }
-    const own = parseSvgAttributes(match[3]);
-    for (const declaration of (own.style || "").split(";")) {
-      const colon = declaration.indexOf(":");
-      if (colon > 0) own[declaration.slice(0, colon).trim()] = declaration.slice(colon + 1).trim();
-    }
-    const attrs = { ...stack[stack.length - 1], ...own };
-    if (container) {
-      if (!match[3].trimEnd().endsWith("/")) stack.push(Object.fromEntries(inheritedKeys.filter((key) => attrs[key] !== undefined).map((key) => [key, attrs[key]])));
-    } else tags.push({ tag, attrs });
-  }
-  return tags;
-}
-
 function svgViewBox(value: string | undefined): [number, number, number, number] {
   const parts = (value || "0 0 24 24").trim().split(/[,\s]+/).map(Number);
   if (parts.length !== 4 || !parts.every(Number.isFinite) || parts[2] <= 0 || parts[3] <= 0) return [0, 0, 24, 24];
@@ -386,19 +415,24 @@ function normalizeSvgColor(value: string | undefined, fallback: string): string 
   if (normalized === "currentcolor") return fallback;
   if (normalized === "black") return "#000000";
   if (normalized === "white") return "#FFFFFF";
-  if (/^#[0-9a-f]{3}$/i.test(value)) return "#" + value.slice(1).split("").map((part) => part + part).join("");
-  if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)) return value;
+  if (/^#[0-9a-f]{3,4}$/i.test(value)) return "#" + value.slice(1,4).split("").map((part) => part + part).join("");
+  if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(value)) return value.slice(0,7);
   return fallback;
 }
 
-function svgStyle(drawable: UxSvgDrawable, layer: UxCodegenLayer): { fill: string | null; stroke: string | null; strokeWidth: number } {
+function svgStyle(drawable: UxSvgDrawable, layer: UxCodegenLayer): { fill: string | null; stroke: string | null; strokeWidth: number; fillOpacity: number; strokeOpacity: number } {
   const attrs = drawable.attrs;
   const lineShape = drawable.tag === "line" || drawable.tag === "polyline";
   const defaultFill = lineShape ? "none" : layer.color;
   const defaultStroke = lineShape ? layer.color : "none";
   const fill = normalizeSvgColor(attrs.fill ?? defaultFill, layer.color);
   const stroke = normalizeSvgColor(attrs.stroke ?? defaultStroke, layer.color);
-  return { fill, stroke, strokeWidth: Math.max(0.1, Number(attrs["stroke-width"] || "1.5") || 1.5) };
+  const alpha = (value: string | undefined) => Math.min(1,Math.max(0,Number.isFinite(Number(value))?Number(value):1));
+  const paintAlpha = (value: string | undefined) => {
+    const color = !value || value.toLowerCase() === "currentcolor" ? layer.color : value;
+    return /^#[\da-f]{8}$/i.test(color) ? parseInt(color.slice(-2),16)/255 : /^#[\da-f]{4}$/i.test(color) ? parseInt(color.slice(-1).repeat(2),16)/255 : 1;
+  };
+  return { fill, stroke, strokeWidth: Math.max(0, Number(attrs["stroke-width"] ?? "1") || 0), fillOpacity:alpha(attrs["fill-opacity"])*paintAlpha(attrs.fill ?? defaultFill), strokeOpacity:alpha(attrs["stroke-opacity"])*paintAlpha(attrs.stroke ?? defaultStroke) };
 }
 
 function svgNumber(attrs: Record<string, string>, key: string, fallback = 0): number {
@@ -473,9 +507,67 @@ function kotlinDrawableStatements(drawable: UxSvgDrawable, layer: UxCodegenLayer
     pathInit="val "+name+" = android.graphics.Path().apply { "+pointLines.join("; ")+" }";
   }
   const style=svgStyle(drawable,layer), lines=[pathInit];
-  if(style.fill) lines.push(name+"?.let { "+name+"Value -> val "+paint+" = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = android.graphics.Color.parseColor("+safe(style.fill)+") }; nativeCanvas.drawPath("+name+"Value, "+paint+") }");
-  if(style.stroke) lines.push(name+"?.let { "+name+"Value -> val "+paint+" = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; strokeWidth = "+style.strokeWidth+"f; color = android.graphics.Color.parseColor("+safe(style.stroke)+"); strokeCap = "+(a["stroke-linecap"]==="round"?"android.graphics.Paint.Cap.ROUND":a["stroke-linecap"]==="square"?"android.graphics.Paint.Cap.SQUARE":"android.graphics.Paint.Cap.BUTT")+"; strokeJoin = "+(a["stroke-linejoin"]==="round"?"android.graphics.Paint.Join.ROUND":a["stroke-linejoin"]==="bevel"?"android.graphics.Paint.Join.BEVEL":"android.graphics.Paint.Join.MITER")+" }; nativeCanvas.drawPath("+name+"Value, "+paint+") }");
+  if(a["fill-rule"]==="evenodd")lines.push(name+"?.fillType = android.graphics.Path.FillType.EVEN_ODD");
+  if(style.fill) lines.push(name+"?.let { "+name+"Value -> val "+paint+" = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = android.graphics.Color.parseColor("+safe(style.fill)+"); alpha = (alpha * "+style.fillOpacity+"f).toInt() }; nativeCanvas.drawPath("+name+"Value, "+paint+") }");
+  const rawDash=(a["stroke-dasharray"]||"").trim().split(/[,\s]+/).filter(Boolean).map(Number);
+  const dash=rawDash.length%2?[...rawDash,...rawDash]:rawDash;
+  const dashEffect=dash.length&&dash.every(value=>Number.isFinite(value)&&value>=0)&&dash.some(value=>value>0)?"; pathEffect = android.graphics.DashPathEffect(floatArrayOf("+dash.map(value=>value+"f").join(", ")+"), "+svgNumber(a,"stroke-dashoffset")+"f)":"";
+  if(style.stroke) lines.push(name+"?.let { "+name+"Value -> val "+paint+" = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; strokeWidth = "+style.strokeWidth+"f; color = android.graphics.Color.parseColor("+safe(style.stroke)+"); alpha = (alpha * "+style.strokeOpacity+"f).toInt(); strokeCap = "+(a["stroke-linecap"]==="round"?"android.graphics.Paint.Cap.ROUND":a["stroke-linecap"]==="square"?"android.graphics.Paint.Cap.SQUARE":"android.graphics.Paint.Cap.BUTT")+"; strokeJoin = "+(a["stroke-linejoin"]==="round"?"android.graphics.Paint.Join.ROUND":a["stroke-linejoin"]==="bevel"?"android.graphics.Paint.Join.BEVEL":"android.graphics.Paint.Join.MITER")+dashEffect+" }; nativeCanvas.drawPath("+name+"Value, "+paint+") }");
   return lines;
+}
+
+const svgOpacity = (value: string | undefined) => value === undefined || !Number.isFinite(Number(value)) ? 1 : Math.max(0,Math.min(1,Number(value)));
+const svgIdentity = (matrix: StudioSvgMatrix) => matrix.every((value,index)=>value===([1,0,0,1,0,0][index]));
+const swiftMatrix = (matrix: StudioSvgMatrix) => "CGAffineTransform(a: "+matrix[0]+", b: "+matrix[1]+", c: "+matrix[2]+", d: "+matrix[3]+", tx: "+matrix[4]+", ty: "+matrix[5]+")";
+const kotlinMatrix = (matrix: StudioSvgMatrix) => "nativeCanvas.concat(android.graphics.Matrix().apply { setValues(floatArrayOf("+[matrix[0],matrix[2],matrix[4],matrix[1],matrix[3],matrix[5],0,0,1].map(value=>value+"f").join(", ")+")) })";
+
+function kotlinSvgNodes(nodes: StudioSvgNode[], layer: UxCodegenLayer, inherited: Record<string,string> = {}, counter={value:0}): string[] {
+  return nodes.flatMap(node=>{
+    const attrs=inheritedSvgPresentation(inherited,node.attrs), opacity=svgOpacity(node.attrs.opacity);
+    const lines=[opacity<1?"nativeCanvas.saveLayerAlpha(null, "+Math.round(opacity*255)+")":"nativeCanvas.save()"];
+    const transform=svgTransformMatrix(node.attrs.transform);
+    if(!svgIdentity(transform))lines.push(kotlinMatrix(transform));
+    if(node.tag==="svg"){
+      const viewport=svgViewportGeometry(node.attrs);
+      if(viewport.clip){const c=viewport.clip;lines.push("nativeCanvas.clipRect("+c.x+"f, "+c.y+"f, "+(c.x+c.width)+"f, "+(c.y+c.height)+"f)");}
+      if(!svgIdentity(viewport.matrix))lines.push(kotlinMatrix(viewport.matrix));
+    }
+    if(node.tag==="svg"||node.tag==="g")lines.push(...kotlinSvgNodes(node.children,layer,attrs,counter));
+    else lines.push(...kotlinDrawableStatements({tag:node.tag,attrs},layer,counter.value++));
+    lines.push("nativeCanvas.restore()");
+    return lines;
+  });
+}
+
+function swiftSvgNodes(nodes: StudioSvgNode[], layer: UxCodegenLayer, width: number, height: number, inherited: Record<string,string> = {}): string[] {
+  return nodes.map(node=>{
+    const attrs=inheritedSvgPresentation(inherited,node.attrs);
+    let content: string;
+    if(node.tag==="svg"||node.tag==="g"){
+      content="ZStack(alignment: .topLeading) { "+swiftSvgNodes(node.children,layer,width,height,attrs).join(" ")+" }.frame(width: "+width+", height: "+height+", alignment: .topLeading)";
+    }else{
+      const drawable={tag:node.tag,attrs},style=svgStyle(drawable,layer),path="("+swiftPathExpression(drawable)+")";
+      const views:string[]=[];
+      if(style.fill)views.push(path+".fill(Color(hex: "+safe(style.fill)+")"+(attrs["fill-rule"]==="evenodd"?", style: FillStyle(eoFill: true)":"")+")"+(style.fillOpacity<1?".opacity("+style.fillOpacity+")":""));
+      if(style.stroke){
+        const cap=attrs["stroke-linecap"]==="round"?".round":attrs["stroke-linecap"]==="square"?".square":".butt";
+        const join=attrs["stroke-linejoin"]==="round"?".round":attrs["stroke-linejoin"]==="bevel"?".bevel":".miter";
+        const dash=(attrs["stroke-dasharray"]||"").trim().split(/[,\s]+/).filter(Boolean).map(Number).filter(Number.isFinite);
+        views.push(path+".stroke(Color(hex: "+safe(style.stroke)+"), style: StrokeStyle(lineWidth: "+style.strokeWidth+", lineCap: "+cap+", lineJoin: "+join+(dash.length?", dash: ["+dash.join(", ")+"], dashPhase: "+svgNumber(attrs,"stroke-dashoffset"):"")+"))"+(style.strokeOpacity<1?".opacity("+style.strokeOpacity+")":""));
+      }
+      content="ZStack(alignment: .topLeading) { "+views.join(" ")+" }.frame(width: "+width+", height: "+height+", alignment: .topLeading)";
+    }
+    if(node.tag==="svg"){
+      const viewport=svgViewportGeometry(node.attrs);
+      if(!svgIdentity(viewport.matrix))content+=".transformEffect("+swiftMatrix(viewport.matrix)+")";
+      if(viewport.clip){const c=viewport.clip;content+=".clipShape(Path(CGRect(x: "+c.x+", y: "+c.y+", width: "+c.width+", height: "+c.height+")))";}
+    }
+    const transform=svgTransformMatrix(node.attrs.transform);
+    if(!svgIdentity(transform))content+=".transformEffect("+swiftMatrix(transform)+")";
+    const opacity=svgOpacity(node.attrs.opacity);
+    if(opacity<1)content+=".compositingGroup().opacity("+opacity+")";
+    return content;
+  });
 }
 
 export function generateKotlinProject(project: UxCodegenProject): string {
@@ -532,9 +624,9 @@ export function generateKotlinProject(project: UxCodegenProject): string {
       content = "Canvas(Modifier.fillMaxSize()) { drawLine(color = Color(android.graphics.Color.parseColor(" + safe(lineColor) + ")), start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f), strokeWidth = size.height) }";
     } else if (layer.kind === "icon" && layer.iconSvg) {
       const [viewX,viewY,viewWidth,viewHeight] = svgViewBox(layer.iconViewBox);
-      const drawables = extractSvgDrawables(layer.iconSvg);
-      const drawings = drawables.flatMap((drawable,index) => kotlinDrawableStatements(drawable,layer,index)).map((line) => "              " + line).join("\n");
-      content = drawables.length
+      const nodes = parseStudioSvgTree(layer.iconSvg);
+      const drawings = kotlinSvgNodes(nodes,layer).map((line) => "              " + line).join("\n");
+      content = nodes.length
         ? "Canvas(Modifier.fillMaxSize()) {\n  drawIntoCanvas { drawCanvas ->\n    val nativeCanvas = drawCanvas.nativeCanvas\n    nativeCanvas.save()\n    nativeCanvas.scale(size.width / " + viewWidth + "f, size.height / " + viewHeight + "f)\n    nativeCanvas.translate(-" + viewX + "f, -" + viewY + "f)\n" + drawings + "\n    nativeCanvas.restore()\n  }\n}"
         : "Text(" + safe(layer.iconName || layer.name) + ", color = Color(android.graphics.Color.parseColor(" + safe(layer.color) + ")))";
     } else if (layer.kind === "image" && layer.imageDataUrl) {
@@ -640,17 +732,9 @@ export function generateSwiftProject(project: UxCodegenProject): string {
     let child: string;
     if (layer.kind === "icon" && layer.iconSvg) {
       const [vbX,vbY,vbW,vbH] = svgViewBox(layer.iconViewBox);
-      const drawables = extractSvgDrawables(layer.iconSvg);
-      const views = drawables.flatMap((drawable) => {
-        const style = svgStyle(drawable, layer);
-        const shiftedPath = "(" + swiftPathExpression(drawable) + ").applying(CGAffineTransform(translationX: -" + vbX + ", y: -" + vbY + "))";
-        const result: string[] = [];
-        if (style.fill) result.push(shiftedPath + ".fill(Color(hex: " + safe(style.fill) + "))");
-        if (style.stroke) result.push(shiftedPath + ".stroke(Color(hex: " + safe(style.stroke) + "), lineWidth: " + style.strokeWidth + ")");
-        return result;
-      });
+      const views = swiftSvgNodes(parseStudioSvgTree(layer.iconSvg),layer,vbW,vbH);
       child = views.length
-        ? "GeometryReader { geometry in ZStack(alignment: .topLeading) { " + views.join(" ") + " }.frame(width: " + vbW + ", height: " + vbH + ", alignment: .topLeading).scaleEffect(x: geometry.size.width / " + vbW + ", y: geometry.size.height / " + vbH + ", anchor: .topLeading) }"
+        ? "GeometryReader { geometry in ZStack(alignment: .topLeading) { " + views.join(" ") + " }.frame(width: " + vbW + ", height: " + vbH + ", alignment: .topLeading).offset(x: -" + vbX + ", y: -" + vbY + ").scaleEffect(x: geometry.size.width / " + vbW + ", y: geometry.size.height / " + vbH + ", anchor: .topLeading) }"
         : "Text(" + safe(layer.iconName || layer.name) + ").foregroundStyle(Color(hex: " + safe(layer.color) + "))";
     } else if (layer.kind === "chart") {
       const chart = parseUxUiStudioChartData(layer.text);

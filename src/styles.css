@@ -2856,3 +2856,29 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .ux-ui-studio .uxui-fullscreen-brand { display:flex; flex:0 0 62px; width:62px; max-width:62px; min-height:28px; }
 .ux-ui-studio .uxui-fullscreen-logo { display:flex; flex:0 0 62px; width:62px; max-width:62px; height:28px; overflow:hidden; }
 .ux-ui-studio .uxui-fullscreen-logo img,.ux-ui-studio.is-expanded .uxui-fullscreen-logo img { width:62px !important; max-width:62px !important; height:28px !important; max-height:28px !important; object-fit:contain !important; }
+
+/* Shared design and explicit device fixes stay visible beside the preview. */
+.uxui-responsive-scope { display:flex; flex:0 0 auto; align-items:center; gap:8px; min-height:40px; padding:4px 8px; border-bottom:1px solid var(--color-border); background:var(--color-surface); color:var(--color-fg); font-size:11px; }
+.uxui-responsive-scope label { display:flex; min-width:0; align-items:center; gap:6px; }
+.uxui-responsive-scope select { min-width:0; max-width:150px; min-height:32px; padding:3px 5px; border:1px solid var(--color-border); border-radius:7px; background:var(--color-surface); color:var(--color-fg); }
+.uxui-responsive-status { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--color-muted); }
+.uxui-responsive-scope button { margin-left:auto; flex:0 0 auto; min-height:32px; padding:3px 6px; border:1px solid var(--color-border); border-radius:7px; }
+.uxui-responsive-scope button:disabled { opacity:.4; }
+.ux-ui-studio .uxui-responsive-scope .uxui-primary-text { display:inline-flex; flex:0 0 auto; align-items:center; justify-content:center; gap:4px; min-height:44px; padding:4px 8px; margin-left:0; font-size:12px; font-weight:650; }
+.ux-ui-studio .uxui-bottom-toolbar { min-height:52px !important; height:52px !important; }
+.ux-ui-studio.target-mobile .uxui-bottom-toolbar > .uxui-add-button,.ux-ui-studio .uxui-bottom-toolbar > .uxui-add-button { display:flex !important; flex:0 0 46px !important; width:46px !important; min-width:46px; max-width:46px; height:46px !important; min-height:46px; padding:0 !important; border:2px solid var(--color-fg); border-radius:50% !important; }
+.ux-ui-studio .uxui-bottom-toolbar > .uxui-add-button svg { width:25px !important; height:25px !important; }
+.uxui-edit-tray[data-tool=shape] .uxui-visual-controls { display:none !important; }
+.uxui-shape-edge-controls { padding:0 0 8px; }
+.uxui-add-shape { min-height:44px; padding:6px 12px; border:1px solid var(--color-border); border-radius:8px; font-size:12px; }
+.uxui-key-controls { flex-wrap:nowrap; align-items:center; overflow-x:auto; overflow-y:auto; }
+.uxui-key-controls p { flex:0 0 190px; max-width:190px; font-size:11px; line-height:1.5; }
+.uxui-key-controls label { flex:0 0 120px; min-width:0; gap:5px; }
+.uxui-key-controls select { min-height:44px; border:1px solid var(--color-border); border-radius:8px; padding:3px; background:var(--color-surface); color:var(--color-fg); }
+.uxui-key-controls button { flex:0 0 100px; }
+.uxui-project-brief { display:flex; flex-direction:column; gap:6px; margin-top:12px; font-size:11px; color:var(--color-muted); }
+.uxui-project-brief textarea { width:100%; min-height:90px; padding:8px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-fg); font-size:12px; }
+.ux-ui-studio .uxui-edit-tray[data-tool=text] { height:210px; min-height:210px; }
+.uxui-edit-tray[data-tool=text] .uxui-inline-text-fields textarea { min-height:56px; }
+.uxui-reconstruct-action { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; width:100%; margin:8px 0; padding:8px 10px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface-2); color:var(--color-fg); font-size:12px; font-weight:650; }
+@media(max-width:400px) { .uxui-responsive-status,.uxui-responsive-scope label > span { display:none; } .uxui-responsive-scope { gap:4px; font-size:10px; } .uxui-responsive-scope label { gap:4px; } .uxui-responsive-scope select { max-width:128px; } }

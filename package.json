@@ -89,7 +89,7 @@
     "generate:offline-eligibility": "node scripts/generate-offline-eligible-tools.mjs",
     "check:offline-wallet": "node --experimental-strip-types --test src/lib/billing/offline-crypto.test.ts src/lib/billing/offline-recovery-policy.test.ts && node scripts/check-offline-wallet.mjs",
     "check:agent-auth-navigation": "node scripts/check-agent-auth-navigation.mjs",
-    "check:ux-ui-studio": "node scripts/check-ux-ui-studio-responsive.mjs && node --experimental-strip-types --test src/lib/engines/ux-ui-studio-codegen.test.ts",
+    "check:ux-ui-studio": "node scripts/check-ux-ui-studio-responsive.mjs && node --experimental-strip-types --test src/lib/engines/ux-ui-studio-*.test.ts src/lib/engines/studio-image-mask.test.ts src/lib/engines/studio-font-metadata.test.ts",
     "audit:ux-ui-studio:browser": "node scripts/audit-ux-ui-studio-browser.mjs",
     "check:modal-moss": "node scripts/check-modal-moss-music.mjs"
   },
@@ -151,6 +151,8 @@
     "sql-formatter": "15.9.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.3.0",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.7.0",
     "vaul": "^1.1.2",
@@ -160,6 +162,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@types/node": "^22.16.5",
     "@types/pg": "^8.11.10",
     "@types/react": "^19.2.0",

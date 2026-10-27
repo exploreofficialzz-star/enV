@@ -368,7 +368,7 @@ try {
         await page.getByText("Image pixels resized.",{exact:true}).waitFor();
         await page.getByRole("button",{name:"Cutout",exact:true}).click();
         await page.getByRole("button",{name:"Remove background",exact:true}).click();
-        await page.getByText("Plain background removed. Undo restores the original.",{exact:true}).waitFor();
+        await page.getByText(/^Removed \d+% of background pixels\./).waitFor();
         const edited=(await storedProject(page)).elements.find(item=>item.kind==="image");
         const imageResult=await page.evaluate(async data=>{const image=new Image();image.src=data;await image.decode();const c=document.createElement("canvas");c.width=image.width;c.height=image.height;const ctx=c.getContext("2d");ctx.drawImage(image,0,0);return {width:image.width,height:image.height,border:ctx.getImageData(0,0,1,1).data[3],center:ctx.getImageData(image.width/2,image.height/2,1,1).data[3]}},edited.imageDataUrl);
         assert.deepEqual(imageResult,{width:256,height:192,border:0,center:255},"Resize and cutout preserve the subject and remove the background");
@@ -386,7 +386,10 @@ try {
       await page.getByRole("group", { name: "Selected item", exact: true }).waitFor({state:"hidden"});
       assert.deepEqual((await storedProject(page)).elements, beforeFinish, "Done keeps the finished artwork");
       const addButton = page.getByRole("button", { name: "Add elements", exact: true });
-      assert.ok((await addButton.innerText()).includes("Add"), "Main insert action has a visible label");
+      assert.equal((await addButton.innerText()).trim(), "", "Main insert action is icon-only as requested");
+      const addBox = await addButton.boundingBox();
+      assert.ok(Math.abs(addBox.width - addBox.height) < 1 && addBox.width >= 44, "Main plus stays round and touch-sized");
+      assert.equal(await addButton.locator("svg").count(), 1, "Main insert action shows the plus glyph");
       await addButton.click();
       let nextDrawer = page.getByRole("dialog", { name: "Studio toolkit", exact: true });
       const cancel = nextDrawer.getByRole("button", { name: "Cancel studio toolkit", exact: true });
@@ -404,7 +407,7 @@ try {
       await waitForStored(page, project => project.elements.length === beforeFinish.length, "visible Delete action");
       await page.getByRole("button", {name:"Undo",exact:true}).last().click();
       await waitForStored(page, project => project.elements.length === beforeFinish.length + 1, "undoing the deletion");
-      entry.checks.push("Done leaves the selection, labelled Add opens the next item, Cancel preserves artwork, and visible Delete has working Undo");
+      entry.checks.push("Done leaves the selection, round plus opens the next item, Cancel preserves artwork, and visible Delete has working Undo");
 
       const canvas = page.getByRole("button", { name: "Select canvas background", exact: true });
       const canvasBox = await canvas.boundingBox();
