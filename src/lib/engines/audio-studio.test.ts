@@ -4,6 +4,7 @@ import { amplitudeDbfs, approximateLufs, browserSeparationLimitSeconds, estimate
 import { analyzeMusicAudio, type MusicAnalysisResult } from "./music-analysis.ts";
 import { createMusicAnalysisProfile } from "../media/music-analysis-profile.ts";
 import { normalizeMusicModelClassification } from "../media/music-analysis-response.ts";
+import { migrateMusicAnalysisV1ToV2, migrateMusicDatasetAnalysisV1ToV2, migrateMusicProfileV1ToV2 } from "../media/music-analysis-migration.ts";
 
 test("audio analysis uses correct amplitude and RMS dBFS math", () => {
   assert.equal(amplitudeDbfs(1), 0);
@@ -266,4 +267,95 @@ test("Music Analyzer song profile never promotes embedded genre metadata into AI
   assert.equal(profile.analysis_status.language, "unknown");
   assert.equal(profile.analysis_status.classification, "requires_model");
   assert.equal(profile.analysis_status.tempo_bpm, "unavailable");
+});
+
+
+test("Music Analyzer migrates v1 detail exports to v2 without relabeling the RMS proxy as LUFS", () => {
+  const migrated = migrateMusicAnalysisV1ToV2({
+    schema_version: "env.music-analysis.v1",
+    source: { file_name: "long-track.wav" },
+    audio: {
+      duration_seconds: 183.4,
+      estimated_loudness_lufs: -12.75,
+      metric_scope_seconds: 30,
+      rms_dbfs: -12.059,
+    },
+    rhythm: { tempo_bpm: 120 },
+    tonality: { key: "C major" },
+    timbre: { spectral_centroid_hz: 2200 },
+  });
+  const audio = migrated.audio as Record<string, unknown>;
+  const rhythm = migrated.rhythm as Record<string, unknown>;
+  const tonality = migrated.tonality as Record<string, unknown>;
+  const timbre = migrated.timbre as Record<string, unknown>;
+  assert.equal(migrated.schema_version, "env.music-analysis.v2");
+  assert.equal(audio.rms_loudness_proxy_db, -12.75);
+  assert.equal(Object.hasOwn(audio, "estimated_loudness_lufs"), false);
+  assert.equal(audio.metric_scope_seconds, 183.4, "the old analyzer measured full-track technical statistics");
+  assert.equal(rhythm.analysis_scope_seconds, 90);
+  assert.equal(tonality.analysis_scope_seconds, 30);
+  assert.equal(timbre.spectral_scope_seconds, 30);
+  assert.equal(timbre.zero_crossing_scope_seconds, 183.4);
+  assert.deepEqual(migrateMusicAnalysisV1ToV2(migrated), migrated, "migrating a v2 report is idempotent");
+});
+
+test("Music Analyzer profile migration preserves values but removes unverifiable v1 semantic provenance", () => {
+  const migrated = migrateMusicProfileV1ToV2({
+    schema_version: "env.music-profile.v1",
+    genre: "Afrobeats",
+    language: ["Nigerian Pidgin", "Yoruba"],
+    analysis_status: {
+      genre: "model_estimate",
+      sub_style: "model_estimate",
+      language: "model_estimate",
+      mood: "unknown",
+      instruments: "model_estimate",
+      vocal_style: "unknown",
+      tempo_bpm: "signal_estimate",
+      key: "signal_estimate",
+      file_metadata: "embedded_metadata",
+      classification: "model_completed",
+    },
+  });
+  const status = migrated.analysis_status as Record<string, unknown>;
+  assert.equal(migrated.schema_version, "env.music-profile.v2");
+  assert.equal(migrated.genre, "Afrobeats");
+  assert.deepEqual(migrated.language, ["Nigerian Pidgin", "Yoruba"]);
+  assert.equal(status.genre, "unknown");
+  assert.equal(status.sub_style, "unknown");
+  assert.equal(status.language, "unknown");
+  assert.equal(status.instruments, "unknown");
+  assert.equal(status.tempo_bpm, "signal_estimate");
+  assert.equal(status.file_metadata, "embedded_metadata");
+  assert.equal(status.classification, "model_completed", "historical classifier completion is preserved without claiming verified source provenance");
+  assert.deepEqual(migrateMusicProfileV1ToV2(migrated), migrated, "migrating a v2 profile is idempotent");
+});
+
+test("Music dataset migration does not invent historical repeated-passage findings", () => {
+  const migrated = migrateMusicDatasetAnalysisV1ToV2({
+    schema_version: "env.music-dataset-analysis.v1",
+    source: { file_name: "old-track.wav", duration_seconds: 42 },
+    structure: {
+      change_points: [{ time_seconds: 8, change_score: 0.4, reason: "feature change" }],
+      sections: [{ start_seconds: 0, end_seconds: 42, label: "section_1", label_source: "automatic_feature_change", semantic_section: null }],
+      note: "Legacy section report",
+    },
+  });
+  const structure = migrated.structure as Record<string, unknown>;
+  assert.equal(migrated.schema_version, "env.music-dataset-analysis.v2");
+  assert.deepEqual(structure.change_points, [{ time_seconds: 8, change_score: 0.4, reason: "feature change" }]);
+  assert.deepEqual(structure.repetition_candidates, []);
+  assert.match(String(structure.repetition_note), /Not evaluated in this migrated v1 record/);
+  assert.deepEqual(migrateMusicDatasetAnalysisV1ToV2(migrated), migrated, "migrating a v2 dataset report is idempotent");
+});
+
+test("Music Analyzer schema migrations reject unsupported versions and invalid duration", () => {
+  assert.throws(() => migrateMusicAnalysisV1ToV2({ schema_version: "env.music-analysis.v9" }), /Unsupported music-analysis schema/);
+  assert.throws(() => migrateMusicAnalysisV1ToV2({
+    schema_version: "env.music-analysis.v1",
+    audio: { duration_seconds: Number.NaN },
+    rhythm: {}, tonality: {}, timbre: {},
+  }), /duration_seconds must be a positive finite number/);
+  assert.throws(() => migrateMusicProfileV1ToV2({ schema_version: "v0" }), /Unsupported music-profile schema/);
+  assert.throws(() => migrateMusicDatasetAnalysisV1ToV2({ schema_version: "v0" }), /Unsupported music-dataset-analysis schema/);
 });
