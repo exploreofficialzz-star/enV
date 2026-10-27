@@ -19,6 +19,7 @@ import { shouldTryAria2Transfer, aria2YtdlpArgs } from "./media/transfer-alterna
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
 const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
+const AUDIOMACK_YTDLP_BIN = process.env.AUDIOMACK_YTDLP_BIN || YTDLP_BIN;
 const FFPROBE_BIN = process.env.FFPROBE_BIN || "ffprobe";
 const ALLOWED_ORIGIN = process.env.URL_MEDIA_ALLOWED_ORIGIN || "*";
 const MAX_OUTPUT_BYTES = Number(process.env.URL_MEDIA_MAX_OUTPUT_BYTES || 500 * 1024 * 1024);
@@ -39,7 +40,8 @@ function safeName(value, fallback = "download.bin") {
 function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
   return new Promise((resolve, reject) => {
     const playlistMode = includePlaylist ? "--yes-playlist" : "--no-playlist";
-    const child = spawn(YTDLP_BIN, ["--ignore-config", playlistMode, "--restrict-filenames", "--js-runtimes", "node", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "2", "--socket-timeout", "25", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    const extractorBinary = provider === "audiomack" ? AUDIOMACK_YTDLP_BIN : YTDLP_BIN;
+    const child = spawn(extractorBinary, ["--ignore-config", playlistMode, "--restrict-filenames", "--js-runtimes", "node", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "2", "--socket-timeout", "25", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
     const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);

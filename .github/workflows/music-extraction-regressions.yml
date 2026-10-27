@@ -36,6 +36,7 @@ jobs:
           node --check scripts/media/public-download-links.mjs
           node --check scripts/media/audiomack-page-parser.mjs
           node --check scripts/media/audiomack-song-page.mjs
+          python3 -m py_compile scripts/media/vendor/audiomack.py
           node --check scripts/media/extraction-strategy.mjs
           node --check scripts/media/archive-org.mjs
           node --check scripts/media/transfer-alternatives.mjs

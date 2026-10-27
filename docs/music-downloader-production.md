@@ -50,3 +50,11 @@ The shared Render URL-media processor now uses different engines based on what t
 - FFmpeg and FFprobe continue handling post-processing and verification. Web, Android and iOS consume the same backend contracts; this change does not modify their native tool designs.
 
 This does not guarantee every streaming page can be exported. In particular an Audiomack album's song listing is not proof that its songs are offered for standalone file downloads. A production release requires successful live provider/permission acceptance tests.
+
+## User-uploaded Audiomack Hallelujah real-file acceptance (27 October 2026)
+
+User provided `https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535`. The live Render `/info` endpoint returned a correct single-track preview, but the old yt-dlp extractor returned `NO_DOWNLOADABLE_FORMAT` for `/download`. The isolated pinned upstream Audiomack extractor produced a 5.38 MiB M4A and successfully converted it to an MP3 validated with FFprobe in [isolated acceptance](https://github.com/exploreofficialzz-star/enV/actions/runs/40466580289).
+
+To avoid cross-provider regressions, Render now runs the pinned reworked Audiomack extractor in `/opt/env-audiomack` only when `provider === "audiomack"`; all other providers retain the existing yt-dlp executable. The source, license and pinned version are documented in `scripts/media/vendor/README.md`.
+
+**Do not claim overall Audiomack readiness solely from the isolated success.** Verify the latest Render deployment live with `scripts/audiomack-live-smoke.mjs` (real bytes and verified audio header), and monitor upstream API drift. Signed playback URLs must never be logged. Nothing here grants download rights to anyone other than the media owner or other authorized users.

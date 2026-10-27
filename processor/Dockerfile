@@ -4,14 +4,24 @@ ENV NODE_ENV=production \
     npm_config_update_notifier=false \
     npm_config_fund=false \
     npm_config_audit=false \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    AUDIOMACK_YTDLP_BIN=/opt/env-audiomack/bin/yt-dlp
 
 # yt-dlp recommends the nightly channel for frequently changing site extractors.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg aria2 python3 python3-pip ca-certificates \
+  && apt-get install -y --no-install-recommends ffmpeg aria2 python3 python3-pip python3-venv ca-certificates \
   && python3 -m pip install --break-system-packages --no-cache-dir --pre "yt-dlp[default,curl-cffi]" \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
+
+# Keep Audiomack's public-song extractor in an independent, pinned Python
+# environment so provider-specific changes cannot downgrade other sites.
+COPY scripts/media/vendor/audiomack.py /opt/env-audiomack-extractor.py
+RUN python3 -m venv /opt/env-audiomack \
+  && /opt/env-audiomack/bin/python -m pip install --no-cache-dir "yt-dlp==2026.10.21" \
+  && /opt/env-audiomack/bin/python -c 'import shutil, yt_dlp.extractor.audiomack as extractor; shutil.copyfile("/opt/env-audiomack-extractor.py", extractor.__file__)' \
+  && /opt/env-audiomack/bin/python -m py_compile /opt/env-audiomack/lib/python3.11/site-packages/yt_dlp/extractor/audiomack.py \
+  && /opt/env-audiomack/bin/yt-dlp --version
 
 WORKDIR /app
 COPY backend/request-body.mjs ./backend/request-body.mjs
