@@ -187,14 +187,14 @@ const musicDatasetRouteFiles = [
 ].map((path) => fs.readFileSync(new URL(path, import.meta.url), "utf8")).join("\n");
 for (const marker of [
   "music_tracks", "music_analysis_runs", "music_feature_frames", "music_analysis_events",
-  "music_annotations", "music_collections", "music_collection_tracks", "idempotency_key",
+  "music_annotations", "music_collections", "music_collection_tracks", "music_dataset_api_limits", "idempotency_key",
   "search_text", "source_sha256_verified", "references",
 ]) {
   assert.ok(musicDatasetMigration.includes(marker), `Music dataset migration missing ${marker}`);
 }
 for (const marker of [
   "requireBillingUser", "isSameOriginRequest", "readJsonObject", "MAX_JSON_BYTES",
-  "MAX_FEATURE_FRAMES", "MAX_EVENTS", "sql.transaction", "idempotency_key",
+  "MAX_FEATURE_FRAMES", "MAX_EVENTS", "sql.transaction", "consumeDatasetRateLimit", "MUSIC_DATASET_RATE_LIMITED", "idempotency_key",
   "user_id=$2", "source_audio_uploaded: false", "source_sha256_verified=false",
   "listMusicDatasetTracks", "saveMusicDatasetTrack", "getMusicDatasetTrack",
   "getMusicAnalysisRun", "deleteMusicDatasetTrack",
