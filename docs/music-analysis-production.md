@@ -18,7 +18,7 @@ Semantic fields such as genre, sub-style, language, mood, instrument identity, l
 
 ## Measurement contract
 
-The detailed signal contract is `env.music-analysis.v2`. The compact profile contract is `env.music-profile.v2`.
+The detailed signal contract is `env.music-analysis.v2`. The compact profile contract is `env.music-profile.v2`. The time-series dataset contract is `env.music-dataset-analysis.v2`.
 
 - `peak_dbfs` is the maximum decoded sample peak; it is not true peak in dBTP.
 - `rms_dbfs` is the RMS level in dBFS for the reported analysis scope.
@@ -27,6 +27,7 @@ The detailed signal contract is `env.music-analysis.v2`. The compact profile con
 - Scope fields are per section: `audio.metric_scope_seconds` describes full-track audio-quality statistics; `rhythm.analysis_scope_seconds` is capped at 90 seconds; `tonality.analysis_scope_seconds` and `timbre.spectral_scope_seconds` are capped at 30 seconds; `timbre.zero_crossing_scope_seconds` spans the full first channel. The associated method text states these excerpt limits.
 - Tempo, key, chords, dominant pitch, spectral descriptors and feature-change sections are estimates/candidates. Full-mix dominant pitch is not a vocal melody or vocal register.
 - Harmonic/percussive and frequency/spatial outputs are candidate signal layers, not clean source-separated stems.
+- Repetition candidates compare normalized 8-second feature sequences at 4-second steps. Scores are similarity measures, not probabilities or proof of identical audio; near-silence and almost-flat feature windows are excluded.
 - Unknown measurements are null/unavailable; semantic facts are not inferred from tempo, spectrum or other signal metrics.
 
 A schema change that renames the RMS proxy from the misleading `estimated_loudness_lufs` field is versioned as v2. Consumers must not interpret the legacy field as a standards loudness result.
