@@ -9,6 +9,7 @@ import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequest
 import { assertPublicHostname } from "./media/url-security.mjs";
 import { parseYtDlpJson } from "./media/yt-dlp-output.mjs";
 import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
+import { isAudiomackSongUrl, parseAudiomackSongPage } from "./media/audiomack-song-page.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
 import { shouldTryGenericExtractor, genericExtractorArgs } from "./media/extraction-strategy.mjs";
 import { extractExplicitPublicAudioLinks, probeExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
@@ -440,6 +441,26 @@ async function inspectArchiveItem(url, signal) {
   return info;
 }
 
+async function inspectAudiomackSongPage(url, signal) {
+  const { response, url: finalUrl } = await fetchPublic(url.toString(), {
+    method: "GET",
+    headers: { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0 (compatible; enV-Music-Downloader/1.0)" },
+  }, signal);
+  if (!["audiomack.com", "www.audiomack.com"].includes(finalUrl.hostname.toLowerCase()) || !isAudiomackSongUrl(finalUrl.toString())) {
+    throw new Error("SOURCE_UNAVAILABLE: This Audiomack song redirected to an unexpected page.");
+  }
+  if (!response.ok) throw new Error("SOURCE_UNAVAILABLE: Audiomack song page returned HTTP " + response.status + ".");
+  const mime = (response.headers.get("content-type") || "").toLowerCase();
+  if (mime && !mime.includes("text/html") && !mime.includes("application/xhtml+xml")) {
+    if (response.body) await response.body.cancel().catch(() => undefined);
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack did not return an HTML song page.");
+  }
+  const html = await readBoundedText(response, 2 * 1024 * 1024);
+  const metadata = parseAudiomackSongPage(html, finalUrl.toString());
+  if (!metadata) throw new Error("SOURCE_UNAVAILABLE: This Audiomack song page did not contain readable public metadata.");
+  return metadata;
+}
+
 async function inspectAudiomackAlbumPage(url, signal) {
   const { response, url: finalUrl } = await fetchPublic(url.toString(), {
     method: "GET",
@@ -487,6 +508,17 @@ async function handleInfo(req, res) {
     json(res, 200, await inspectArchiveItem(url, controller.signal));
     return;
   }
+  // Individual Audiomack songs are never treated as playlists, including
+  // requests sent by older clients with includePlaylist=true.
+  if (provider === "audiomack" && isAudiomackSongUrl(url.toString())) {
+    try {
+      json(res, 200, await inspectAudiomackSongPage(url, controller.signal));
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      console.warn("[url-media] Audiomack single-song public metadata unavailable; trying configured extractor");
+    }
+  }
   let audiomackPageFallbackFailure = "";
   if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
     try {
@@ -519,14 +551,15 @@ async function handleInfo(req, res) {
 
   const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-url-info-"));
   try {
+    const inspectCollection = Boolean(includePlaylist) && isPublicMediaCollectionPage(url.toString());
     const args = [
       "--dump-single-json", "--skip-download", "--no-warnings",
-      ...(includePlaylist ? ["--flat-playlist", "--playlist-end", "50"] : []),
+      ...(inspectCollection ? ["--flat-playlist", "--playlist-end", "50"] : []),
       url.toString(),
     ];
     let stdout;
     try {
-      ({ stdout } = await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider, Boolean(includePlaylist)));
+      ({ stdout } = await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider, inspectCollection));
     } catch (error) {
       // The provider extractor can be outdated even when an artist offers a
       // direct file on the public song page. Use this safe, opt-in HTML fallback
@@ -633,6 +666,19 @@ async function handleDownload(req, res) {
     throw new Error("INVALID_URL: Preview the Internet Archive audio collection and download its individual public audio files.");
   }
 
+  // Prefer a creator-enabled public download link rather than an obsolete
+  // Audiomack extractor. The link is only used after audio-response validation.
+  if (provider === "audiomack" && isAudiomackSongUrl(url.toString()) && audioOnly) {
+    const publicFile = await discoverExplicitAudioDownload(url, controller.signal).catch((error) => {
+      if (error?.name === "AbortError") throw error;
+      return null;
+    });
+    if (publicFile) {
+      await handleDirectDownload(req, res, publicFile, body, controller.signal);
+      return;
+    }
+  }
+
   const supportedFormats = new Set(["mp4", "webm", "mp3", "m4a", "best"]);
   if (!supportedFormats.has(String(format))) throw new Error("Unsupported output format.");
   if (audioOnly && !["mp3", "m4a", "best"].includes(String(format))) throw new Error("Audio-only mode requires an audio format.");
@@ -664,6 +710,10 @@ async function handleDownload(req, res) {
       let publicDownload = null;
       try { publicDownload = await discoverExplicitAudioDownload(url, controller.signal); }
       catch (fallbackError) { if (fallbackError?.name === "AbortError") throw fallbackError; }
+      if (!publicDownload && provider === "audiomack" && isAudiomackSongUrl(url.toString()) &&
+          /^SOURCE_UNAVAILABLE: Audiomack returned an empty or invalid JSON response/.test(code)) {
+        throw new Error("NO_DOWNLOADABLE_FORMAT: This Audiomack song may be publicly playable, but no artist-enabled standalone audio download was found and the existing extractor uses an obsolete metadata API. Owners can supply their original audio file or a direct permitted download URL.");
+      }
       if (!publicDownload) throw error;
       await handleDirectDownload(req, res, publicDownload, body, controller.signal);
       return;

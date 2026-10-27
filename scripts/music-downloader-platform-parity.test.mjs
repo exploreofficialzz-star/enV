@@ -125,3 +125,11 @@ test("all three clients use a shared multi-engine processor with Internet Archiv
   assert.match(android, /\/api\/backend\/url-media\/info/);
   assert.match(ios, /nativeMusicResolve/);
 });
+
+test("single-track Audiomack HTML metadata is separate from album extraction", async () => {
+  const processor = await source("../scripts/url-media-processor.mjs");
+  const parser = await source("../scripts/media/audiomack-song-page.mjs");
+  assert.match(parser, /isAudiomackSongUrl/);
+  assert.match(processor, /inspectAudiomackSongPage/);
+  assert.match(processor, /inspectCollection = Boolean\(includePlaylist\)/);
+});

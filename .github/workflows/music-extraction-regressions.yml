@@ -35,10 +35,11 @@ jobs:
           node --check scripts/url-media-processor.mjs
           node --check scripts/media/public-download-links.mjs
           node --check scripts/media/audiomack-page-parser.mjs
+          node --check scripts/media/audiomack-song-page.mjs
           node --check scripts/media/extraction-strategy.mjs
           node --check scripts/media/archive-org.mjs
           node --check scripts/media/transfer-alternatives.mjs
       - name: Test multi-provider extraction, API failure modes, and Audiomack public-page parsing
         run: |
-          node --test scripts/media/public-download-links.test.mjs scripts/media/audiomack-page-parser.test.mjs scripts/media/extraction-strategy.test.mjs scripts/media/provider-errors.test.mjs scripts/media/archive-org.test.mjs scripts/media/transfer-alternatives.test.mjs
+          node --test scripts/media/public-download-links.test.mjs scripts/media/audiomack-page-parser.test.mjs scripts/media/audiomack-song-page.test.mjs scripts/media/extraction-strategy.test.mjs scripts/media/provider-errors.test.mjs scripts/media/archive-org.test.mjs scripts/media/transfer-alternatives.test.mjs
           node scripts/url-media-processor.test.mjs

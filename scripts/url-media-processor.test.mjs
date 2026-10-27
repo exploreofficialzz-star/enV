@@ -148,3 +148,8 @@ assert.match(dockerfile, /apt-get install[^\n]*aria2/);
 assert.match(dockerfile, /aria2c --version/);
 assert.match(dockerfile, /COPY scripts\/media\/archive-org\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/transfer-alternatives\.mjs/);
+
+assert.match(source, /inspectAudiomackSongPage/);
+assert.match(source, /isAudiomackSongUrl/);
+assert.match(source, /const inspectCollection = Boolean\(includePlaylist\) && isPublicMediaCollectionPage/);
+assert.match(dockerfile, /COPY scripts\/media\/audiomack-song-page\.mjs/);
