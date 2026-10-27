@@ -753,7 +753,6 @@ export function MusicAnalyzerStudio() {
             controller = new AbortController();
             batchControllerRef.current = controller;
           }
-          if (cancelBatchRequestedRef.current) break;
         }
       }
 
