@@ -10,7 +10,6 @@ import { createMusicAnalysisProfile } from "@/lib/media/music-analysis-profile";
 import {
   createLocalMusicBatch,
   countLocalMusicBatchItems,
-  deleteLocalMusicBatch,
   finalizeLocalMusicBatch,
   listLocalMusicBatches,
   localMusicBatchExport,
@@ -18,7 +17,6 @@ import {
   saveLocalMusicBatch,
   transitionLocalMusicBatchItem,
   type LocalMusicBatch,
-  type LocalMusicBatchItem,
   type LocalMusicFileDescriptor,
 } from "@/lib/media/music-analysis-batch";
 
@@ -196,13 +194,11 @@ export function MusicAnalyzerStudio() {
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchMessage, setBatchMessage] = useState("");
   const [batchError, setBatchError] = useState("");
-  const [batchPauseAfterCurrent, setBatchPauseAfterCurrent] = useState(false);
   const batchControllerRef = useRef<AbortController | null>(null);
   const activeBatchItemRef = useRef<string | null>(null);
   const cancelBatchRequestedRef = useRef(false);
   const cancelOnlyItemRef = useRef<string | null>(null);
   const batchPauseRequestedRef = useRef(false);
-  const batchFolderInputRef = useRef<HTMLInputElement | null>(null);
   const analysisControllerRef = useRef<AbortController | null>(null);
   const saveAttemptRef = useRef<{ signature: string; key: string } | null>(null);
   const lastSavedSignatureRef = useRef<string | null>(null);
@@ -284,7 +280,6 @@ export function MusicAnalyzerStudio() {
       setBatchError("");
       const next = createLocalMusicBatch(batchSelection.map(localBatchDescriptor));
       await persistBatch(next);
-      setBatchPauseAfterCurrent(false);
       batchPauseRequestedRef.current = false;
       setBatchMessage("Batch created locally. Start it to analyze supported tracks one at a time. Failed tracks do not stop other tracks.");
     } catch (cause) {
@@ -425,12 +420,11 @@ export function MusicAnalyzerStudio() {
     setBatchMessage("");
     const selected = new Map(batchSelection.map((item) => [localBatchFileKey(localBatchDescriptor(item)), item]));
     let working = localBatch;
-    const controller = new AbortController();
+    let controller = new AbortController();
     batchControllerRef.current = controller;
     cancelBatchRequestedRef.current = false;
     cancelOnlyItemRef.current = null;
     batchPauseRequestedRef.current = false;
-    setBatchPauseAfterCurrent(false);
     setBatchBusy(true);
 
     const persist = async (next: LocalMusicBatch) => {
@@ -470,6 +464,7 @@ export function MusicAnalyzerStudio() {
         const currentId = item.id;
         activeBatchItemRef.current = currentId;
         cancelOnlyItemRef.current = null;
+        let resumeAfterSingleCancel = false;
         try {
           if (file.size <= 0) throw new Error("The selected file is empty.");
           if (file.size > LOCAL_FILE_LIMIT) throw new Error("This file exceeds the 25 MiB on-device limit.");
@@ -511,6 +506,8 @@ export function MusicAnalyzerStudio() {
           working = transitionLocalMusicBatchItem(working, currentId, "analyzing", { stage: "dsp", progress: 0.2 });
           await persist(working);
           let lastPersistedProgress = 0.2;
+          let progressWriteChain: Promise<void> = Promise.resolve();
+          let progressWriteFailed = false;
           const datasetAnalysis = await analyzeMusicDatasetAudio(
             { channels, sampleRate: buffer.sampleRate, fileName: file.name, sourceSha256 },
             {
@@ -526,13 +523,17 @@ export function MusicAnalyzerStudio() {
                 setLocalBatch(working);
                 if (progress - lastPersistedProgress >= 0.05 || progress >= 0.95) {
                   lastPersistedProgress = progress;
-                  void saveLocalMusicBatch(working).catch(() => {
-                    setBatchError("Local storage stopped accepting progress updates. Cancel the batch and export completed tracks.");
+                  const checkpoint = working;
+                  progressWriteChain = progressWriteChain.then(() => saveLocalMusicBatch(checkpoint)).catch(() => {
+                    progressWriteFailed = true;
+                    setBatchError("Local storage stopped accepting progress updates. Completed tracks are preserved only if their last save succeeded.");
                   });
                 }
               },
             },
           );
+          await progressWriteChain;
+          if (progressWriteFailed) throw new Error("Could not persist batch progress to this browser's local storage.");
           if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
           working = transitionLocalMusicBatchItem(working, currentId, "completed", {
             stage: "complete",
@@ -544,8 +545,10 @@ export function MusicAnalyzerStudio() {
           });
           await persist(finalizeLocalMusicBatch(working));
         } catch (cause) {
+          const wasSingleItemCancellation = cancelOnlyItemRef.current === currentId && !cancelBatchRequestedRef.current;
+          resumeAfterSingleCancel = wasSingleItemCancellation;
           const aborted = cause instanceof Error && cause.name === "AbortError";
-          const canceledByUser = aborted || cancelOnlyItemRef.current === currentId || (cancelBatchRequestedRef.current && stopRequested());
+          const canceledByUser = aborted || wasSingleItemCancellation || (cancelBatchRequestedRef.current && stopRequested());
           const current = working.items.find((candidate) => candidate.id === currentId);
           if (current && current.status !== "completed" && current.status !== "failed" && current.status !== "canceled") {
             working = transitionLocalMusicBatchItem(working, currentId, canceledByUser ? "canceled" : "failed", {
@@ -561,6 +564,10 @@ export function MusicAnalyzerStudio() {
         } finally {
           activeBatchItemRef.current = null;
           if (cancelOnlyItemRef.current === currentId) cancelOnlyItemRef.current = null;
+          if (resumeAfterSingleCancel && !cancelBatchRequestedRef.current) {
+            controller = new AbortController();
+            batchControllerRef.current = controller;
+          }
           if (cancelBatchRequestedRef.current) break;
         }
       }
@@ -599,7 +606,6 @@ export function MusicAnalyzerStudio() {
 
   async function pauseLocalBatchAfterCurrent() {
     batchPauseRequestedRef.current = true;
-    setBatchPauseAfterCurrent(true);
     if (!batchBusy && localBatch) {
       await persistBatch({ ...localBatch, status: "paused", updatedAt: new Date().toISOString() });
       setBatchMessage("Batch paused. Resume when ready.");
@@ -1076,7 +1082,6 @@ export function MusicAnalyzerStudio() {
               type="file"
               multiple
               ref={(node) => {
-                batchFolderInputRef.current = node;
                 if (node) (node as HTMLInputElement & { webkitdirectory?: boolean }).webkitdirectory = true;
               }}
               onChange={(event) => { selectBatchFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }}
