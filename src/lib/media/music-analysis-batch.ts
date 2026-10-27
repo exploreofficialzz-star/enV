@@ -214,7 +214,7 @@ export function transitionLocalMusicBatchItem(
   batch: LocalMusicBatch,
   itemId: string,
   nextStatus: LocalMusicBatchItemStatus,
-  patch: Partial<Pick<LocalMusicBatchItem, "stage" | "progress" | "sourceSha256" | "error" | "warnings" | "result">> = {},
+  patch: Partial<Pick<LocalMusicBatchItem, "stage" | "progress" | "sourceSha256" | "cloudSaveIdempotencyKey" | "cloudSavedTrackId" | "error" | "warnings" | "result">> = {},
   now = new Date().toISOString(),
 ): LocalMusicBatch {
   const item = batch.items.find((candidate) => candidate.id === itemId);
@@ -222,7 +222,7 @@ export function transitionLocalMusicBatchItem(
   if (item.status !== nextStatus && !NEXT_STATES[item.status].includes(nextStatus)) {
     throw new Error("Illegal local batch item transition: " + item.status + " -> " + nextStatus + ".");
   }
-  const statusPatch: Partial<Pick<LocalMusicBatchItem, "stage" | "progress" | "sourceSha256" | "error" | "warnings" | "result">> = { ...patch };
+  const statusPatch: Partial<Pick<LocalMusicBatchItem, "stage" | "progress" | "sourceSha256" | "cloudSaveIdempotencyKey" | "cloudSavedTrackId" | "error" | "warnings" | "result">> = { ...patch };
   if (nextStatus === "completed") {
     statusPatch.stage = "complete";
     statusPatch.progress = 1;
