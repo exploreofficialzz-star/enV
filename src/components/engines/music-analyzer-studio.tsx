@@ -1480,8 +1480,8 @@ export function MusicAnalyzerStudio() {
         <div className="mt-4 rounded-xl border border-border bg-background p-3 sm:p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-semibold">Standards loudness meter (optional)</h3>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Separate from local analysis. This uses the configured enV FFmpeg processor’s ebur128 meter for integrated LUFS, loudness range, sample peak and true peak. It does not use AI. Your selected audio is uploaded only after you give permission below and press Measure.</p>
+              <h3 className="text-sm font-semibold">FFmpeg ebur128 loudness report (optional)</h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Separate from local analysis. This uses the configured enV FFmpeg processor’s ebur128 meter for integrated LUFS, loudness range, sample peak and true peak. No AI model is used. The measurement implementation still needs the full licensed reference-sequence benchmark before it can be treated as broadcast-compliance verification. Your selected audio is uploaded only after you give permission below and press Measure.</p>
             </div>
             <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">Optional upload</span>
           </div>
