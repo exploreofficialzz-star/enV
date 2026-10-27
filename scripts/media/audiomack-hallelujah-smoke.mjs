@@ -72,6 +72,7 @@ try {
     "-v", "error", "-show_entries", "format=duration,size:stream=codec_type",
     "-of", "json", filename,
   ], { encoding: "utf8", timeout: 25000 });
+  if (ff.error) throw new Error("FFprobe could not start: " + String(ff.error.message || ff.error).slice(0, 180));
   if (ff.status !== 0) throw new Error("FFprobe rejected downloaded audio: " + String(ff.stderr || "").slice(0, 160));
   const probe = JSON.parse(ff.stdout);
   const duration = Number(probe.format?.duration);

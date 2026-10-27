@@ -26,6 +26,11 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
+      - name: Install FFmpeg and FFprobe for real audio validation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffprobe -version | head -n 1
       - name: Inspect public song and validate actual downloadable audio
         env:
           MUSIC_ACCEPTANCE_API: https://env-q3mq.onrender.com/api/backend/url-media
