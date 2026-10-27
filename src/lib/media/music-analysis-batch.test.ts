@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  assertLocalDecodedPcmBudget,
   createLocalMusicBatch,
   countLocalMusicBatchItems,
   finalizeLocalMusicBatch,
@@ -15,6 +16,15 @@ import {
 function file(name: string, sizeBytes = 1024, lastModified = 1): LocalMusicFileDescriptor {
   return { name, sizeBytes, lastModified, mimeType: "audio/wav", relativePath: name };
 }
+
+test("decoded PCM budget accepts bounded stereo and rejects large multichannel allocations", () => {
+  const twoMinutes48kStereo = 48_000 * 120 * 2 * Float32Array.BYTES_PER_ELEMENT;
+  assert.equal(assertLocalDecodedPcmBudget(48_000 * 120, 2), twoMinutes48kStereo);
+  assert.throws(() => assertLocalDecodedPcmBudget(96_000 * 120, 2), /64 MiB on-device PCM memory budget/);
+  assert.throws(() => assertLocalDecodedPcmBudget(48_000 * 120, 6), /64 MiB on-device PCM memory budget/);
+  assert.throws(() => assertLocalDecodedPcmBudget(0, 2), /frame count is invalid/);
+  assert.throws(() => assertLocalDecodedPcmBudget(100, 0), /channel count/);
+});
 
 test("local batch preflight enforces file count and combined-byte limits before processing", () => {
   assert.throws(() => createLocalMusicBatch([]), /at least one audio file/);
