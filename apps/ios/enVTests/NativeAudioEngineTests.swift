@@ -79,7 +79,7 @@ final class NativeAudioEngineTests: XCTestCase {
         XCTAssertNotNil(audio["rms_loudness_proxy_db"] as? Double)
         XCTAssertNil(audio["estimated_loudness_lufs"])
         let classification = try XCTUnwrap(object["classification"] as? [String: Any])
-        XCTAssertEqual(classification["status"] as? String, "requires_model")
+        XCTAssertEqual(classification["status"] as? String, "human_review_required")
         XCTAssertNil(classification["genre"] as? String)
     }
 
