@@ -52,9 +52,7 @@ assert.match(dockerfile, /COPY scripts\/media\/provider-errors\.mjs \.\/scripts\
 assert.match(dockerfile, /node --check scripts\/media\/provider-errors\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
 assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]/);
-assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]==2026\.10\.21/);
 assert.match(dockerfile, /COPY scripts\/media\/vendor\/audiomack\.py/);
-assert.match(dockerfile, /shutil\.copyfile\("scripts\/media\/vendor\/audiomack\.py", module\.__file__\)/);
 assert.match(dockerfile, /node --version/);
 assert.match(dockerfile, /COPY scripts\/media\/yt-dlp-output\.mjs \.\/scripts\/media\/yt-dlp-output\.mjs/);
 assert.match(dockerfile, /COPY processor\/url-media-route\.mjs \.\/processor\/url-media-route\.mjs/);

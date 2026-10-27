@@ -1,3 +1,6 @@
+# Vendored Unlicense code. Source: https://github.com/yt-dlp/yt-dlp/pull/17258
+# Pinned upstream commit: https://github.com/0xvd/yt-dlp-exp/commit/f1ba0a4de633b545ce688338d9527ad7ef1c7659
+# Applies ONLY in an isolated Audiomack-specific yt-dlp installation.
 import base64
 import hashlib
 import hmac
