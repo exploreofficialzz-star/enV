@@ -101,6 +101,41 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
   }
 }
 const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
+
+const musicBatchEngine = fs.readFileSync(new URL("../src/lib/media/music-analysis-batch.ts", import.meta.url), "utf8");
+const musicBatchTests = fs.readFileSync(new URL("../src/lib/media/music-analysis-batch.test.ts", import.meta.url), "utf8");
+const musicWorker = fs.readFileSync(new URL("../src/lib/media/music-analysis.worker.ts", import.meta.url), "utf8");
+const musicWorkerClient = fs.readFileSync(new URL("../src/lib/media/music-analysis.worker-client.ts", import.meta.url), "utf8");
+const musicWorkerCore = fs.readFileSync(new URL("../src/lib/media/music-analysis-worker-core.ts", import.meta.url), "utf8");
+const musicWorkerCoreTests = fs.readFileSync(new URL("../src/lib/media/music-analysis-worker-core.test.ts", import.meta.url), "utf8");
+for (const marker of [
+  "Select tracks", "Create batch", "Start / resume", "Save completed batch reports",
+  "Save results to private dataset", "exportLocalBatch(\"zip\")", "exportLocalBatch(\"jsonl\")",
+  "exportLocalBatch(\"csv\")", "assertLocalDecodedPcmBudget", "analyzeMusicInWorker",
+  "saveCompletedBatchToCloud", "cloudSaveIdempotencyKey", "cloudSavedTrackId",
+]) {
+  assert.ok(musicAnalyzer.includes(marker), `Music Analyzer batch integration missing ${marker}`);
+}
+assert.ok(!musicAnalyzer.includes("analyzeMusicAudio(") && !musicAnalyzer.includes("analyzeMusicDatasetAudio("), "The Analyzer UI must execute heavy DSP through the worker adapter, not the main thread.");
+for (const marker of [
+  "env.music-analysis-batch.v1", "MUSIC_LOCAL_BATCH_LIMITS", "maxDecodedPcmBytes",
+  "assertLocalDecodedPcmBudget", "transitionLocalMusicBatchItem", "recoverLocalMusicBatch",
+  "saveLocalMusicBatch", "cloudSaveIdempotencyKey", "localMusicBatchExport",
+]) {
+  assert.ok(musicBatchEngine.includes(marker), `Local Music Analyzer batch engine missing ${marker}`);
+}
+for (const marker of [
+  "decoded PCM budget", "legal durable state transitions", "partial-success state",
+  "reload recovery", "whole-batch cancellation", "cloud dataset idempotency",
+]) {
+  assert.ok(musicBatchTests.toLowerCase().includes(marker.toLowerCase()), `Local Music Analyzer batch regression missing ${marker}`);
+}
+assert.ok(musicWorker.includes("runMusicAnalysisWorkerCore"), "The dedicated audio worker must run the shared DSP core.");
+assert.ok(musicWorkerClient.includes("new Worker(new URL(\"./music-analysis.worker.ts\""), "The Web Analyzer must start a real module Worker.");
+assert.ok(musicWorkerClient.includes("worker.terminate()") && musicWorkerClient.includes("AbortError"), "Worker cancellation must terminate the worker and reject the active request.");
+assert.ok(musicWorkerCore.includes("analyzeMusicAudio") && musicWorkerCore.includes("analyzeMusicDatasetAudio"), "Worker core must run both detailed and time-series DSP.");
+assert.ok(musicWorkerCoreTests.includes("worker DSP pipeline returns schema-valid local reports and real progress"), "Worker DSP integration must have a numeric report/progress regression test.");
+
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
 const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/song-metadata-analyzer-engine.tsx", import.meta.url), "utf8");
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
