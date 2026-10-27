@@ -465,6 +465,8 @@ export function MusicAnalyzerStudio() {
         activeBatchItemRef.current = currentId;
         cancelOnlyItemRef.current = null;
         let resumeAfterSingleCancel = false;
+        let progressWriteChain: Promise<void> = Promise.resolve();
+        let progressWriteFailed = false;
         try {
           if (file.size <= 0) throw new Error("The selected file is empty.");
           if (file.size > LOCAL_FILE_LIMIT) throw new Error("This file exceeds the 25 MiB on-device limit.");
@@ -506,8 +508,6 @@ export function MusicAnalyzerStudio() {
           working = transitionLocalMusicBatchItem(working, currentId, "analyzing", { stage: "dsp", progress: 0.2 });
           await persist(working);
           let lastPersistedProgress = 0.2;
-          let progressWriteChain: Promise<void> = Promise.resolve();
-          let progressWriteFailed = false;
           const datasetAnalysis = await analyzeMusicDatasetAudio(
             { channels, sampleRate: buffer.sampleRate, fileName: file.name, sourceSha256 },
             {
@@ -545,6 +545,7 @@ export function MusicAnalyzerStudio() {
           });
           await persist(finalizeLocalMusicBatch(working));
         } catch (cause) {
+          await progressWriteChain;
           const wasSingleItemCancellation = cancelOnlyItemRef.current === currentId && !cancelBatchRequestedRef.current;
           resumeAfterSingleCancel = wasSingleItemCancellation;
           const aborted = cause instanceof Error && cause.name === "AbortError";
