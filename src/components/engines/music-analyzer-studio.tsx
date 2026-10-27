@@ -439,6 +439,87 @@ export function MusicAnalyzerStudio() {
       </header>
 
       <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">Private dataset library</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Search saved measurements, history, feature timelines and reviewed labels. Sign-in and a configured database are required.</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={libraryLoading}
+            onClick={() => {
+              const open = !libraryOpen;
+              setLibraryOpen(open);
+              if (open) void refreshCloudLibrary(1, "");
+            }}
+          >
+            {libraryOpen ? "Hide library" : "Open library"}
+          </Button>
+        </div>
+        {libraryOpen ? (
+          <div className="mt-4 space-y-3">
+            <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void refreshCloudLibrary(1, libraryQuery); }}>
+              <input
+                aria-label="Search private music dataset"
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm"
+                value={libraryQuery}
+                onChange={(event) => setLibraryQuery(event.currentTarget.value)}
+                placeholder="Search filename, title, artist…"
+                maxLength={100}
+              />
+              <Button type="submit" variant="outline" disabled={libraryLoading}>
+                {libraryLoading ? <><LoaderCircle size={15} className="mr-2 animate-spin" />Loading…</> : "Search"}
+              </Button>
+            </form>
+            {libraryItems.length ? (
+              <div className="divide-y divide-border rounded-lg border border-border">
+                {libraryItems.map((item) => {
+                  const metadata = item.normalized_metadata ?? {};
+                  const title = metadata.title || item.file_name;
+                  const artist = metadata.artist;
+                  return (
+                    <div key={item.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-medium">{title}</p>
+                        {artist ? <p className="mt-0.5 text-xs text-muted-foreground">{artist}</p> : null}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatBytes(Number(item.file_size_bytes))} · {item.duration_seconds ? formatDuration(item.duration_seconds) : "Duration unavailable"} · {Number(item.analysis_run_count)} run{Number(item.analysis_run_count) === 1 ? "" : "s"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {item.source_sha256 ? "Exact-file hash recorded" : "No exact-file hash"} · {new Date(item.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button type="button" variant="ghost" onClick={() => void deleteSavedTrack(item.id)} aria-label={`Delete saved track ${item.file_name}`}>
+                        Delete
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                {libraryLoading ? "Loading your saved tracks…" : "No saved tracks in this result page."}
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{libraryTotal} saved track{libraryTotal === 1 ? "" : "s"} · page {libraryPage}</p>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" disabled={libraryLoading || libraryPage <= 1} onClick={() => void refreshCloudLibrary(libraryPage - 1)}>
+                  Previous
+                </Button>
+                <Button type="button" size="sm" variant="outline" disabled={libraryLoading || libraryPage * 10 >= libraryTotal} onClick={() => void refreshCloudLibrary(libraryPage + 1)}>
+                  Next
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {cloudSaveError ? <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{cloudSaveError}</p> : null}
+        {cloudSaveNotice ? <p className="mt-3 rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground" role="status" aria-live="polite">{cloudSaveNotice}</p> : null}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
         <div className="flex items-center gap-2 text-sm font-semibold"><FileAudio size={18} aria-hidden="true" /> Audio source</div>
         <label className="mt-3 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-accent">
           <Upload size={24} className="mb-2 text-accent" aria-hidden="true" />
@@ -466,7 +547,31 @@ export function MusicAnalyzerStudio() {
           <Button type="button" variant="outline" disabled={!analysis || !datasetAnalysis} onClick={exportSongProfile}><FileJson size={16} className="mr-2" />Song profile JSON</Button>
           <Button type="button" variant="ghost" disabled={!analysis || !datasetAnalysis} onClick={exportJson}><FileJson size={16} className="mr-2" />Training metadata JSON</Button>
           <Button type="button" variant="outline" disabled={!file || !datasetAnalysis || layersBusy} onClick={() => void exportSignalLayers()}>{layersBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Preparing layers…</> : <><FolderArchive size={16} className="mr-2" />Signal layers ZIP ({layerExportLimitSeconds()}s max)</>}</Button>
+          <Button type="button" disabled={!analysis || !datasetAnalysis || savingCloud} onClick={() => void saveAnalysisToCloud()}>
+            {savingCloud ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Saving results…</> : "Save results to private dataset"}
+          </Button>
         </div>
+        {analysis && datasetAnalysis ? (
+          <div className="mt-3 rounded-xl border border-border bg-background p-3">
+            <label className="flex flex-col gap-1.5 text-xs text-muted-foreground sm:max-w-sm">
+              Rights / permission status
+              <select
+                className="min-h-11 rounded-lg border border-border bg-surface px-3 text-sm text-foreground"
+                value={rightsStatus}
+                onChange={(event) => setRightsStatus(event.currentTarget.value)}
+              >
+                <option value="unknown">Not specified</option>
+                <option value="user_owned">I own this recording</option>
+                <option value="permission_granted">Permission granted</option>
+                <option value="licensed">Licensed for this use</option>
+                <option value="public_domain">Public domain</option>
+                <option value="restricted">Restricted / do not redistribute</option>
+                <option value="not_applicable">Not applicable</option>
+              </select>
+            </label>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Only JSON analysis results, metadata, feature frames, and labels are sent for cloud saving. The original audio file is not attached or stored by this save action. This records your rights declaration; it does not verify ownership.</p>
+          </div>
+        ) : null}
         {error ? <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{error}</p> : null}
         {notice ? <p className="mt-3 rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground" role="status" aria-live="polite">{notice}</p> : null}
       </section>
