@@ -869,6 +869,7 @@ export function MusicAnalyzerStudio() {
           fileName: file.name,
           outputName: "env-music-loudness-report.json",
           outputMime: "application/json",
+          explicitAudioUploadConsent: true,
         },
       };
       if (!(await adapter.canHandle(request))) {
