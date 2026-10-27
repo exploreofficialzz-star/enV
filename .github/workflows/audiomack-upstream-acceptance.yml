@@ -1,0 +1,41 @@
+name: Isolated Audiomack upstream extractor acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/audiomack-upstream-acceptance.yml"
+permissions:
+  contents: read
+jobs:
+  validate-unmerged-extractor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Install official yt-dlp and isolated pinned extractor source
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/music-extractor"
+          "$RUNNER_TEMP/music-extractor/bin/pip" install --quiet 'yt-dlp==2026.10.21'
+          EXTRACTOR="$("$RUNNER_TEMP/music-extractor/bin/python" -c 'import yt_dlp.extractor.audiomack as m; print(m.__file__)')"
+          curl --fail --location --show-error --silent \
+            'https://raw.githubusercontent.com/0xvd/yt-dlp-exp/f1ba0a4de633b545ce688338d9527ad7ef1c7659/yt_dlp/extractor/audiomack.py' \
+            --output "$EXTRACTOR"
+          "$RUNNER_TEMP/music-extractor/bin/python" -m py_compile "$EXTRACTOR"
+      - name: Try uploaded Hallelujah single track using isolated extractor
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          mkdir -p "$RUNNER_TEMP/enV-audiomack-test"
+          "$RUNNER_TEMP/music-extractor/bin/yt-dlp" \
+            --ignore-config --no-playlist --no-warnings \
+            --socket-timeout 20 --retries 1 --fragment-retries 1 \
+            --max-filesize 50M --format 'bestaudio/best' \
+            --extract-audio --audio-format mp3 \
+            --output "$RUNNER_TEMP/enV-audiomack-test/track.%(ext)s" \
+            'https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535'
+          AUDIO="$RUNNER_TEMP/enV-audiomack-test/track.mp3"
+          test -s "$AUDIO"
+          ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "$AUDIO"
+          printf 'Alternative extractor produced playable audio; runner cleans its temporary file.\n'

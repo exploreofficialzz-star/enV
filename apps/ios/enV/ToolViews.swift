@@ -5261,7 +5261,7 @@ private func nativeMusicResolve(_ source: NativeMusicSourceTrack) async throws -
     do {
         info = try await nativeMusicPostJSON("info", body: [
             "url": source.url.absoluteString,
-            "includePlaylist": true
+            "includePlaylist": nativeMusicCollectionPage(source.url)
         ])
     } catch {
         // Retry a failed metadata lookup as audio only for an individual song.
@@ -5438,7 +5438,7 @@ private enum NativeMusicArchive {
 
 private struct NativeMusicDownloaderView: View {
     @State private var mode = "Online"
-    @State private var collectionType = "Playlist"
+    @State private var collectionType = "Track"
     @State private var collectionName = "My music"
     @State private var directURLs = ""
     @State private var rightsConfirmed = false
@@ -5526,8 +5526,9 @@ private struct NativeMusicDownloaderView: View {
                         Text("Track availability is checked when downloading. Unavailable tracks are skipped.")
                             .font(.envScaled(size: 11))
                             .foregroundStyle(.secondary)
-                        Button { startOnlineDownloads() } label: {
-                            Label("Download ZIP (\(previewTracks.count) tracks)", systemImage: "doc.zipper")
+                        Button { startOnlineDownloads(only: previewTracks.count == 1 ? previewTracks.first : nil) } label: {
+                            Label(previewTracks.count == 1 ? "Download song" : "Download ZIP (\(previewTracks.count) tracks)",
+                                  systemImage: previewTracks.count == 1 ? "arrow.down" : "doc.zipper")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
@@ -5694,10 +5695,12 @@ private struct NativeMusicDownloaderView: View {
             transferTask = nil
             if outcome.tracks.isEmpty {
                 errorMessage = outcome.warnings.first ?? "No tracks could be previewed."
-            } else if collectionType == "Track" && outcome.tracks.count != 1 {
-                errorMessage = "Choose Album or Playlist to preview multiple tracks."
             } else {
                 previewTracks = outcome.tracks
+                let includesAlbum = sources.contains { source in
+                    source.url.pathComponents.contains { ["album", "albums"].contains($0.lowercased()) }
+                }
+                collectionType = outcome.tracks.count == 1 ? "Track" : (includesAlbum ? "Album" : "Playlist")
                 showAllPreview = false
                 status = "Found \(outcome.tracks.count) songs. Review the list before downloading." +
                     (outcome.warnings.isEmpty ? "" : " \(outcome.warnings.count) link(s) could not be inspected.")

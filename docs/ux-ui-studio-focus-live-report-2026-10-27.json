@@ -1,0 +1,11 @@
+{
+  "baseUrl": "https://envtools.store",
+  "createdAt": "2026-10-27T04:42:59.132Z",
+  "workflow": "Created with visible Studio tools; no project-state injection",
+  "layers": 13,
+  "pdfPages": 24,
+  "jsonImportRoundTrip": "passed",
+  "runtimeErrors": [],
+  "pdf": "/workspace/artifacts/focus-studio-test/focus-daily-planner-handoff.pdf",
+  "json": "/workspace/artifacts/focus-studio-test/focus-daily-planner-project.json"
+}

@@ -346,7 +346,7 @@ fun NativeMusicDownloaderScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf("Online downloads") }
-    var collectionType by remember { mutableStateOf("Playlist") }
+    var collectionType by remember { mutableStateOf("Track") }
     var collectionName by remember { mutableStateOf("My music") }
     var urls by remember { mutableStateOf("") }
     var rightsConfirmed by remember { mutableStateOf(false) }
@@ -582,20 +582,22 @@ fun NativeMusicDownloaderScreen() {
                             val warnings = mutableListOf<String>()
                             for (source in sources) {
                                 try {
-                                    resolved += if (source.isProviderPage) resolveProviderMusicPage(source, true) else listOf(source)
+                                    resolved += if (source.isProviderPage) resolveProviderMusicPage(source, musicPageIsCollection(source.url)) else listOf(source)
                                 } catch (failure: Exception) {
                                     warnings += "${source.title}: ${failure.message ?: "Metadata unavailable."}"
                                 }
                             }
                             require(resolved.isNotEmpty()) { warnings.firstOrNull() ?: "No tracks could be previewed." }
                             require(resolved.size <= 50) { "The collection exceeds 50 tracks. Split it into batches." }
-                            require(collectionType != "Track" || resolved.size == 1) { "Choose Album or Playlist for multiple tracks." }
                             Pair(resolved.distinctBy { it.url }, warnings)
                         }
                     }
                     outcome.onSuccess { (resolved, warnings) ->
                         previewTracks.clear()
                         previewTracks.addAll(resolved)
+                        collectionType = if (resolved.size == 1) "Track" else if (sources.any {
+                            Uri.parse(it.url).pathSegments.any { part -> part.equals("album", ignoreCase = true) || part.equals("albums", ignoreCase = true) }
+                        }) "Album" else "Playlist"
                         showAllPreview = false
                         status = "Found ${resolved.size} song(s). Review before downloading." +
                             if (warnings.isNotEmpty()) " ${warnings.size} link(s) could not be inspected." else ""
@@ -619,8 +621,10 @@ fun NativeMusicDownloaderScreen() {
                             }
                         }
                         Text("Track availability is verified when downloading. Unavailable songs will be skipped.", style = MaterialTheme.typography.bodySmall)
-                        Button(onClick = { downloadSelectedMusic(previewTracks.toList(), true) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (busy) "Preparing ZIP…" else "Download ZIP (${previewTracks.size} tracks)")
+                        Button(onClick = {
+                            downloadSelectedMusic(previewTracks.toList(), previewTracks.size > 1)
+                        }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (busy) "Downloading…" else if (previewTracks.size == 1) "Download song" else "Download ZIP (${previewTracks.size} tracks)")
                         }
                     }
                 }

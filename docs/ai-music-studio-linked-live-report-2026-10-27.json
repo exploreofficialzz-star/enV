@@ -1,0 +1,473 @@
+{
+  "site": "https://envtools.store",
+  "createdAt": "2026-10-27T04:58:52.307Z",
+  "workflow": "Imported the actual live-authored mobile export, authored tablet/desktop overrides using visible Studio controls and downloaded the real All-device PDF handoff. No state injection or external design generator.",
+  "visibleLayers": 44,
+  "totalLayers": 45,
+  "devices": [
+    "mobile",
+    "tablet",
+    "desktop"
+  ],
+  "pdfPages": 12,
+  "pdfSha256": "c89df5d2f47048a0c6217e1ad6732c16b8fdd05395af0f5d86533800aabe53f5",
+  "runtimeErrors": [],
+  "actions": [
+    {
+      "action": "Import actual live Studio export",
+      "file": "ai-music-studio-mobile-project.json"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Navigation surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Brand disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Brand music mark"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Brand name"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Profile disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Profile icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Hero eyebrow"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Hero headline"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Hero introduction"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Create song action"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Tools heading"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Nigerian sounds surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Nigerian sounds icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Nigerian sounds icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Nigerian sounds title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Nigerian sounds description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Your own voice surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Your own voice icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Your own voice icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Your own voice title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Your own voice description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Lyrics in your language surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Lyrics in your language icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Lyrics in your language icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Lyrics in your language title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Lyrics in your language description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Bring your own beat surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Bring your own beat icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Bring your own beat icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Bring your own beat title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Bring your own beat description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Finish that verse surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Finish that verse icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Finish that verse icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Finish that verse title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Finish that verse description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Planned tools heading"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Planned tools details"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Create navigation icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Create navigation label"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Projects navigation icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Projects navigation label"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Library navigation icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "tablet",
+      "layer": "Library navigation label"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Navigation surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Brand disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Brand music mark"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Brand name"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Profile disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Profile icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Hero eyebrow"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Hero headline"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Hero introduction"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Create song action"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Tools heading"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Nigerian sounds surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Nigerian sounds icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Nigerian sounds icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Nigerian sounds title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Nigerian sounds description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Your own voice surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Your own voice icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Your own voice icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Your own voice title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Your own voice description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Lyrics in your language surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Lyrics in your language icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Lyrics in your language icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Lyrics in your language title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Lyrics in your language description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Bring your own beat surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Bring your own beat icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Bring your own beat icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Bring your own beat title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Bring your own beat description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Finish that verse surface"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Finish that verse icon disc"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Finish that verse icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Finish that verse title"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Finish that verse description"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Planned tools heading"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Planned tools details"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Create navigation icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Create navigation label"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Projects navigation icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Projects navigation label"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Library navigation icon"
+    },
+    {
+      "action": "Author device override through Studio",
+      "device": "desktop",
+      "layer": "Library navigation label"
+    },
+    {
+      "action": "Studio Export",
+      "file": "ai-music-studio-handoff.pdf"
+    },
+    {
+      "action": "Studio Export",
+      "file": "ai-music-studio-project.json"
+    },
+    {
+      "action": "Studio Export",
+      "file": "ai-music-studio.html"
+    }
+  ]
+}

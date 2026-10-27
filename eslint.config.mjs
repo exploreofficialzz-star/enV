@@ -14,6 +14,9 @@ export default tseslint.config(
       ".vercel/**",
       ".nitro/**",
       "node_modules/**",
+      // Pinned third-party worker/WASM distributions are verified by the OCR
+      // asset manifest and real browser checks, rather than rewriting vendor code.
+      "public/uxui/ocr/**",
       "src/routeTree.gen.ts",
     ],
   },

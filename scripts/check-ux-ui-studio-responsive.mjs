@@ -18,6 +18,26 @@ assert.ok(deviceFormula.includes("const deviceFrameScale = deviceFitScale"), "Mo
 assert.ok(deviceFormula.includes("deviceDisplayWidth = requestedDeviceWidth * deviceFrameScale"), "The selected device screen and frame share one uniform scale factor");
 assert.ok(!deviceFormula.includes("target === \"mobile\" ? mobileFitScale : isExpanded ? expandedFitScale : 1"), "No tablet/desktop target remains at unscaled native width");
 assert.ok(deviceFormula.includes("stage.scrollLeft = 0") && deviceFormula.includes("stage.scrollTop = 0"), "Fitted preview resets stale canvas pan offsets");
+const fitDeclarationStart = engine.indexOf("const deviceFitScale =");
+const fitDeclarationEnd = engine.indexOf("const deviceFrameScale =", fitDeclarationStart);
+assert.ok(fitDeclarationStart >= 0 && fitDeclarationEnd > fitDeclarationStart, "Device fit calculation is available for numeric checks");
+// Exercise the actual source expression, including frame chrome, at realistic
+// narrow, short, tablet and desktop stage dimensions. Browser audits check the DOM.
+const calculateDeviceFit = new Function("canvasStageSize", "requestedDeviceWidth", "requestedDeviceHeight", "deviceFrameChromeWidth", "deviceFrameChromeHeight", engine.slice(fitDeclarationStart, fitDeclarationEnd) + "; return deviceFitScale;");
+for (const sample of [
+  { stage: { width: 280, height: 460 }, width: 390, height: 844, chrome: 24 },
+  { stage: { width: 360, height: 180 }, width: 430, height: 930, chrome: 24 },
+  { stage: { width: 600, height: 400 }, width: 700, height: 933, chrome: 32 },
+  { stage: { width: 320, height: 180 }, width: 940, height: 653, chrome: 22 },
+  { stage: { width: 1600, height: 1200 }, width: 940, height: 653, chrome: 22 },
+]) {
+  const scale = calculateDeviceFit(sample.stage, sample.width, sample.height, sample.chrome, sample.chrome);
+  assert.ok(Number.isFinite(scale) && scale > 0 && scale <= 1, "Device fit remains a finite uniform scale without enlarging the preview");
+  assert.ok((sample.width + sample.chrome) * scale <= sample.stage.width + 1e-6, "Fitted screen and frame stay inside the available width");
+  assert.ok((sample.height + sample.chrome) * scale <= sample.stage.height + 1e-6, "Fitted screen and frame stay inside the available height");
+}
+assert.equal(calculateDeviceFit({ width: 240, height: 1000 }, 400, 800, 20, 20), 240 / 420, "A narrow stage uses its width limit");
+assert.equal(calculateDeviceFit({ width: 1200, height: 240 }, 400, 800, 20, 20), 240 / 820, "A short stage uses its height limit");
 assert.ok(engine.includes('className="uxui-device-positioner"'), "Device is placed inside a centering wrapper");
 assert.ok(engine.includes('"--uxui-device-radius":') && engine.includes('"--uxui-screen-radius":'), "Phone frame border and screen radius scale proportionally with the display");
 assert.ok(engine.includes('height: "auto"') && engine.includes('width: deviceDisplayWidth + "px"') && engine.includes('"--uxui-device-display-width": deviceDisplayWidth + "px"'), "SVG preserves its intrinsic ratio and exposes the fitted width to full-screen styles");
@@ -40,6 +60,12 @@ assert.ok(engine.includes('selected && editTool === "move"') && engine.includes(
 assert.ok(!engine.includes("Your canvas is ready. Tap + to add your first element."), "Blank-canvas prompt removed");
 assert.ok(!engine.includes("uxui-visual-property-dock"), "Compressed visual-properties dock removed");
 assert.ok(engine.includes("uxui-add-button"), "Main canvas Add button remains available");
+const primaryToolbarStart = engine.indexOf('className="uxui-bottom-toolbar"');
+const primaryActionsStart = engine.indexOf('className="uxui-primary-text"');
+const primaryActions = engine.slice(primaryActionsStart, engine.indexOf('</button>', primaryActionsStart));
+assert.ok(primaryActionsStart >= 0 && primaryActionsStart < primaryToolbarStart, "Text remains a main tool above the canvas, separate from the round plus button");
+assert.ok(primaryActions.includes('aria-label="Add text"'), "Primary Text keeps an accessible name");
+assert.ok(primaryActions.includes('addLayer("text")') && primaryActions.includes('setEditTool("text")'), "Primary Add Text creates and opens an editable text layer");
 assert.ok(!engine.includes("setShowAdvancedContext"), "Removed visual dock has no stale state setter references");
 assert.ok(!engine.includes("Local-first editor · Exact pixel dimensions"), "Redundant Studio footer removed");
 assert.ok(engine.includes('selected.kind === "image"') && engine.includes("<span>Replace</span>"), "Image selection offers connected replace action");
@@ -58,6 +84,17 @@ assert.ok(engine.includes('toolkit.id === "device"') && engine.includes('onClick
 assert.ok(engine.includes('toolkit.id === "platform"') && engine.includes("selected.visibleOn.filter"), "Platform kits edits per-layer viewport visibility");
 assert.match(engine, /\{ kind: "toggle", label: "Toggle"/, "Component library exposes the already-supported toggle layer");
 assert.ok(engine.includes("Keep at least one viewport enabled"), "Platform visibility prevents hiding a layer from every viewport");
+const targetSwitchStart = engine.indexOf("function changeTarget(");
+const targetSwitchEnd = engine.indexOf("function resetDeviceOverrides(", targetSwitchStart);
+assert.ok(targetSwitchStart >= 0 && targetSwitchEnd > targetSwitchStart, "Responsive preview and reset actions exist");
+const targetSwitch = engine.slice(targetSwitchStart, targetSwitchEnd);
+assert.match(targetSwitch, /responsiveElements\(responsiveRef\.current, next, nextBoard\)/, "Device previews materialize the saved shared design and device fixes");
+assert.doesNotMatch(targetSwitch, /scaleX|scaleY|setElements\(\(previous\)/, "Switching devices no longer destructively scales the current layer list");
+assert.ok(engine.includes("commitResponsiveElements(responsiveRef.current, target, board, updated, responsiveEditMode)"), "Element edits use the explicit shared/device scope");
+assert.ok(engine.includes('useState<ResponsiveEditMode>("shared")') && engine.includes('aria-label="Responsive editing scope"'), "New edits default to shared designs and expose their scope");
+assert.ok(engine.includes("responsiveDesign: responsiveRef.current") && engine.includes("screen.responsiveDesign"), "Projects retain linked device designs for each logical screen");
+assert.ok(engine.includes("resetResponsiveDevice(responsiveRef.current, target)"), "A device can return to the shared design");
+assert.ok(engine.includes("restoreHistory(previous)") && engine.includes("responsiveRef.current = snapshot.responsiveDesign"), "Undo restores responsive design state, not only the visible layers");
 const mobileCompositionStart = styles.lastIndexOf("Mobile-only composition: fitted full phone at top, editing controls below.");
 const fullScreenRulesStart = styles.indexOf("Full-screen project editor: keep the complete editing workspace usable.", mobileCompositionStart);
 const mobileComposition = styles.slice(mobileCompositionStart, fullScreenRulesStart > mobileCompositionStart ? fullScreenRulesStart : styles.length);
@@ -66,7 +103,7 @@ assert.ok(mobileComposition.includes("align-items:center !important;") && mobile
 assert.ok(mobileComposition.includes("overflow:hidden !important;") && mobileComposition.includes("height:0 !important;"), "Phone preview is clipped to its fit zone, not independently scrolled");
 assert.ok(mobileComposition.includes("flex:0 0 auto !important;") && mobileComposition.includes(".uxui-bottom-toolbar"), "Add/undo tools stay in a fixed toolbar beneath the preview");
 assert.ok(mobileComposition.includes(".uxui-mobile-controls") && mobileComposition.includes("min-height:88px;"), "Movement/transform controller remains below the preview");
-assert.ok(mobileComposition.includes(".uxui-context-controls") && mobileComposition.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Selected-element editing tools remain below the movement controller");
+assert.ok(mobileComposition.includes(".uxui-context-controls"), "Selected-element editing tools remain below the movement controller");
 assert.ok(!mobileComposition.includes(".ux-ui-studio.target-tablet") && !mobileComposition.includes(".ux-ui-studio.target-desktop"), "This layout pass is limited to the mobile target");
 
 const mobileStageIndex = engine.indexOf('className="uxui-canvas-stage"');
@@ -87,7 +124,12 @@ assert.ok(responsiveRules.includes("isolation:isolate;"), "Studio controls are c
 assert.ok(responsiveRules.includes("position:relative !important; top:auto !important;"), "Studio toolbar stays inside the fitted editor stack instead of using sticky positioning");
 assert.ok(responsiveRules.includes("height:var(--uxui-available-height,calc(100dvh - 160px)) !important"), "Studio workspace is constrained to the visible viewport height");
 assert.ok(responsiveRules.includes("overflow:hidden !important;") && responsiveRules.includes("padding:8px !important;"), "Canvas stage cannot create a vertical scroll area");
-assert.ok(responsiveRules.includes("grid-template-columns:repeat(5,minmax(0,1fr))"), "Phone edit actions wrap into a visible compact grid instead of requiring horizontal scrolling");
+const actionToolbarStart = styles.lastIndexOf(".ux-ui-studio .uxui-context-toolbar {");
+const actionToolbarRules = styles.slice(actionToolbarStart, styles.indexOf("}", actionToolbarStart) + 1);
+assert.ok(actionToolbarStart >= 0 && actionToolbarRules.includes("display:flex !important") && actionToolbarRules.includes("flex-wrap:nowrap !important") && actionToolbarRules.includes("overflow-x:auto !important"), "Phone edit actions remain in one horizontally scrolling row");
+const expandedActionToolbarStart = styles.lastIndexOf(".ux-ui-studio.is-expanded .uxui-context-toolbar {");
+const expandedActionToolbarRules = styles.slice(expandedActionToolbarStart, styles.indexOf("}", expandedActionToolbarStart) + 1);
+assert.ok(expandedActionToolbarStart >= 0 && expandedActionToolbarRules.includes("flex-wrap:nowrap !important") && expandedActionToolbarRules.includes("overflow-x:auto !important"), "Full-screen edit actions retain horizontal browsing");
 assert.ok(responsiveRules.includes("height:0 !important; min-height:0 !important; overflow:hidden !important"), "Workspace flexes into the available editor height");
 const fixedSizeRules = styles.slice(styles.lastIndexOf("Preserve native mockup size: center the canvas view instead of shrinking the device."));
 assert.ok(fixedSizeRules.includes("overflow:auto !important;"), "Only the canvas viewport pans/scrolls when the fixed-size device exceeds the stage");
@@ -104,7 +146,7 @@ assert.ok(responsiveRules.includes("img[src*=\"api.iconify.design\"]") && respon
 assert.ok(responsiveRules.includes("The color grid and token color inputs stay colorful"), "Real design color pickers retain their functional colors");
 const fullScreenRules = styles.slice(styles.lastIndexOf("Full-screen project editor: keep the complete editing workspace usable."));
 assert.ok(fullScreenRules.includes("width:100dvw !important;") && fullScreenRules.includes("height:100dvh !important;"), "Full-screen editor occupies the device viewport with safe-area-aware sizing");
-assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-fullscreen-brand") && fullScreenRules.includes("display:flex !important;"), "enV and UX/UI Studio branding stays visible above the editor");
+assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-fullscreen-brand") && fullScreenRules.includes("display:flex !important;"), "Canonical enV branding stays visible above the editor");
 assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-bottom-toolbar") && fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-context-controls"), "Full-screen mode retains working add and contextual editing controls");
 assert.ok(fullScreenRules.includes(".ux-ui-studio.is-expanded .uxui-mobile-controls") && fullScreenRules.includes("display:flex !important;"), "Full-screen Tablet mode keeps movement controls available");
 assert.ok(fullScreenRules.includes("var(--uxui-device-radius,29px)") && fullScreenRules.includes("var(--uxui-device-radius,12px)"), "Expanded tablet and desktop previews preserve their device frames");
@@ -120,6 +162,14 @@ const toolkitThemeStart = styles.indexOf("/* Monochrome, user-theme-aware Studio
 const toolkitThemeEnd = styles.indexOf("/* Preserve native mockup size:", toolkitThemeStart);
 const toolkitTheme = styles.slice(toolkitThemeStart, toolkitThemeEnd);
 assert.ok(toolkitTheme.includes(".ux-ui-studio .uxui-toolkit-content") && toolkitTheme.includes(".dark .ux-ui-studio"), "Toolkit monochrome samples follow light/dark themes in fullscreen mode too");
+const primaryActionRules = [...styles.matchAll(/\.uxui-primary-text[^{}]*\{([^}]+)\}/g)].at(-1)?.[1] || "";
+assert.ok(primaryActionRules.includes("min-height:44px") && /flex:\s*0\s+0\s+auto/.test(primaryActionRules), "Primary Text retains a 44px touch target without flex compression");
+assert.ok(styles.includes('border-radius:50% !important;') && engine.includes('<Plus size={25} strokeWidth={1.7} aria-hidden="true" /></button>'), "Canvas insertion stays a rounded plus without visible Add text");
+const logoRulesStart = styles.lastIndexOf(".ux-ui-studio .uxui-fullscreen-logo img,");
+const logoRules = styles.slice(logoRulesStart, styles.indexOf("}", logoRulesStart) + 1);
+assert.ok(logoRulesStart >= 0 && logoRules.includes(".ux-ui-studio.is-expanded .uxui-fullscreen-logo img"), "Canonical logo dimensions apply to embedded and full-screen editors");
+assert.ok(logoRules.includes("max-width:62px") && logoRules.includes("max-height:28px") && logoRules.includes("object-fit:contain"), "Brand images remain compact and retain their aspect ratio");
+assert.ok(engine.includes("<StudioTextStyle layer={selected} begin={checkpoint}") && engine.includes('["text", "more"].includes(editTool)'), "Text typography controls are connected to the Text tray and More");
 const compactLandscapeStart = styles.lastIndexOf("Keep the preview device picker tappable in narrow landscape windows.");
 assert.ok(compactLandscapeStart >= 0, "Narrow landscape toolbar has an explicit responsive style block");
 const compactLandscapeRules = styles.slice(compactLandscapeStart);
@@ -127,4 +177,4 @@ assert.ok(compactLandscapeRules.includes("@media (max-height:450px) and (max-wid
 assert.ok(compactLandscapeRules.includes("flex:0 0 34px;") && compactLandscapeRules.includes("min-width:34px;"), "Compact device picker buttons retain distinct hit boxes instead of overlapping");
 assert.ok(compactLandscapeRules.includes(".ux-ui-studio .uxui-target-switch button span { display:none; }"), "Landscape device picker hides labels when space is constrained while retaining accessible button names");
 assert.ok(compactLandscapeRules.includes(".ux-ui-studio .uxui-topbar-actions { min-width:0; flex:1 1 auto; justify-content:flex-end; gap:2px; }"), "Compact toolbar controls allocate remaining landscape width without covering the device picker");
-console.log("UX/UI Studio responsive layout, startup, remembered mode, canonical logo, Toolkit pages and full-screen editor checks: PASS");
+console.log("UX/UI Studio shared/device edits, primary Text, plus-only insertion, canonical logo, toolkit and landscape layout checks: PASS");

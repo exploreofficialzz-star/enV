@@ -38,3 +38,29 @@ An Audiomack album page being publicly playable proves neither export authorizat
 ## Transient failures and partial ZIPs
 
 The Web, Android and iOS download clients now retry an individual eligible song **once** after a transient timeout, provider metadata parse failure, or temporary HTTP 502/503/504 error. They do not automatically retry authentication failures, rate limits, anti-bot challenges, DRM restrictions, missing formats, or a missing song. A collection's track-list preview is not a download success promise. The Web client offers a retry of only the failed entries; Web and Android ZIPs include `failed-downloads.txt` whenever a collection is incomplete. All platforms retain partial successful files and report unavailable entries. The per-track and aggregate size limits remain in force. Real provider-specific end-to-end media downloads require authorized test fixtures and live acceptance in addition to CI.
+
+## Multi-engine backend (October 2026)
+
+The shared Render URL-media processor now uses different engines based on what the source actually exposes:
+
+- `yt-dlp` is the main public-page metadata and media extractor.
+- A dedicated **Internet Archive metadata API** adapter lists publicly exposed audio files (max 50 tracks, max 50 MB each) without requiring the yt-dlp extractor. Its track URLs are then sent to the hardened direct HTTPS downloader; collection URLs themselves never download as single tracks.
+- The shared HTTP downloader validates DNS at each redirect, MIME type and byte limits. Artist-provided public download links use this path after explicit HTML download-link discovery and response probing.
+- `aria2c` is installed as an alternative HTTP/HTTPS transfer engine for **transient failures during yt-dlp downloads only**. This is an alternative transfer mechanism, not a separate provider metadata resolver; source denials, rate limits, CAPTCHA, authentication or unsupported formats never trigger it. When used, it is still subject to the same output verification, size and duration checks.
+- FFmpeg and FFprobe continue handling post-processing and verification. Web, Android and iOS consume the same backend contracts; this change does not modify their native tool designs.
+
+This does not guarantee every streaming page can be exported. In particular an Audiomack album's song listing is not proof that its songs are offered for standalone file downloads. A production release requires successful live provider/permission acceptance tests.
+
+## User-uploaded Audiomack Hallelujah real-file acceptance (27 October 2026)
+
+User provided `https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535`. The live Render `/info` endpoint returned a correct single-track preview, but the old yt-dlp extractor returned `NO_DOWNLOADABLE_FORMAT` for `/download`. The isolated pinned upstream Audiomack extractor produced a 5.38 MiB M4A and successfully converted it to an MP3 validated with FFprobe in [isolated acceptance](https://github.com/exploreofficialzz-star/enV/actions/runs/40466580289).
+
+To avoid cross-provider regressions, Render now runs the pinned reworked Audiomack extractor in `/opt/env-audiomack` only when `provider === "audiomack"`; all other providers retain the existing yt-dlp executable. The source, license and pinned version are documented in `scripts/media/vendor/README.md`.
+
+**Do not claim overall Audiomack readiness solely from the isolated success.** Verify the latest Render deployment live with `scripts/audiomack-live-smoke.mjs` (real bytes and verified audio header), and monitor upstream API drift. Signed playback URLs must never be logged. Nothing here grants download rights to anyone other than the media owner or other authorized users.
+
+## Audiomack legacy extractor replacement acceptance (27 October 2026)
+
+The isolated pinned upstream Audiomack extractor rework `0xvd/yt-dlp-exp@f1ba0a4de633b545ce688338d9527ad7ef1c7659`, together with official `yt-dlp==2026.10.21`, successfully processed the creator-provided `chas-d/song/hallelujah` URL as an actual audio download on a GitHub Actions Linux runner. The runner retrieved an approximately 5.38 MiB audio file, converted to MP3, and verified 175.203 seconds with FFprobe.
+
+The Render Docker image now contains this vetted, vendored Audiomack extractor module in place of the obsolete `/api/music/url/song` module. Web/Android/iOS use the shared processor, without changing interfaces or native app libraries. Keep this external, as-yet-unmerged patch pinned and test it for regression before updating the upstream yt-dlp package. The separate live acceptance workflow checks `/info`, retrieves `/download`, and ffprobes the actual audio; it must pass on the deployed Render image to claim success. Only use on public, unprotected media the user is authorized to download; no DRM, private collection, access or paywall workaround is supported.

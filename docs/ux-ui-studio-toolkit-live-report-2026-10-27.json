@@ -1,0 +1,63 @@
+{
+  "runAt": "2026-10-27T04:58:08.124Z",
+  "baseUrl": "https://envtools.store",
+  "cases": [
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "light",
+      "checks": [
+        "Primary Add text inserts directly; size, bold, tighter spacing and line-height change painted SVG, persist, Undo/Redo and handoff",
+        "Shared edits propagate across all devices; local words/spacing survive switching, reload and JSON round-trip; reset supports Undo",
+        "Shapes offers at least 40 geometry/UI presets including search bars; independent corners and dashed borders persist and render",
+        "Touch-visible multi-selection merges two icons into one SVG, preserving source paths in JSON; one Undo restores both",
+        "Chroma produces transparent PNG including enclosed key colors; original-based reprocessing/no-match protection and Erase/Restore Apply/Cancel/Undo work",
+        "A real bundled Inter font and image save within browser storage, reopen and export with every shared asset restored",
+        "All-device PDF exports three real artboard images and a handoff, preserving the active view and responsive model"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "dark",
+      "checks": [
+        "Primary Add text inserts directly; size, bold, tighter spacing and line-height change painted SVG, persist, Undo/Redo and handoff",
+        "Shared edits propagate across all devices; local words/spacing survive switching, reload and JSON round-trip; reset supports Undo",
+        "Shapes offers at least 40 geometry/UI presets including search bars; independent corners and dashed borders persist and render",
+        "Touch-visible multi-selection merges two icons into one SVG, preserving source paths in JSON; one Undo restores both",
+        "Chroma produces transparent PNG including enclosed key colors; original-based reprocessing/no-match protection and Erase/Restore Apply/Cancel/Undo work"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "theme": "light",
+      "checks": [
+        "Primary Add text inserts directly; size, bold, tighter spacing and line-height change painted SVG, persist, Undo/Redo and handoff",
+        "Shapes offers at least 40 geometry/UI presets including search bars; independent corners and dashed borders persist and render"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "theme": "light",
+      "checks": [
+        "Primary Add text inserts directly; size, bold, tighter spacing and line-height change painted SVG, persist, Undo/Redo and handoff",
+        "Shapes offers at least 40 geometry/UI presets including search bars; independent corners and dashed borders persist and render"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "errors": []
+}

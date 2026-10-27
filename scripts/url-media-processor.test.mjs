@@ -19,6 +19,10 @@ assert.match(source, /parseYtDlpJson\(stdout\)/);
 assert.match(source, /MAX_YTDLP_STDOUT_CHARS/);
 assert.doesNotMatch(source, /stdout = stdout\.slice\(-12000\)/);
 assert.match(source, /--no-playlist/);
+assert.match(source, /provider === "audiomack" \? AUDIOMACK_YTDLP_BIN : YTDLP_BIN/);
+assert.match(dockerfile, /AUDIOMACK_YTDLP_BIN=\/opt\/env-audiomack\/bin\/yt-dlp/);
+assert.match(dockerfile, /yt-dlp==2026\.10\.21/);
+assert.match(dockerfile, /COPY scripts\/media\/vendor\/audiomack\.py/);
 assert.match(source, /--max-filesize/);
 assert.match(source, /duration <=\?/);
 assert.match(source, /verifyDownloadedMedia/);
@@ -48,7 +52,7 @@ assert.match(dockerfile, /COPY scripts\/media\/provider-errors\.mjs \.\/scripts\
 assert.match(dockerfile, /node --check scripts\/media\/provider-errors\.mjs/);
 assert.match(dockerfile, /COPY scripts\/media\/url-security\.mjs \.\/scripts\/media\/url-security\.mjs/);
 assert.match(dockerfile, /yt-dlp\[default,curl-cffi\]/);
-assert.match(dockerfile, /--pre/);
+assert.match(dockerfile, /COPY scripts\/media\/vendor\/audiomack\.py/);
 assert.match(dockerfile, /node --version/);
 assert.match(dockerfile, /COPY scripts\/media\/yt-dlp-output\.mjs \.\/scripts\/media\/yt-dlp-output\.mjs/);
 assert.match(dockerfile, /COPY processor\/url-media-route\.mjs \.\/processor\/url-media-route\.mjs/);
@@ -139,3 +143,17 @@ assert.ok(audiomackAlbumPage.entries.every((entry) => entry.webpageUrl.startsWit
 assert.equal(audiomackAlbumPage.uploader, "Evado");
 assert.throws(() => parseAudiomackAlbumPage("<a href='https://example.com/other/song'>wrong</a>", "https://example.com/album"));
 
+
+assert.match(source, /isArchiveItemPage/);
+assert.match(source, /inspectArchiveItem/);
+assert.match(source, /aria2YtdlpArgs\(args\)/);
+assert.match(source, /shouldTryAria2Transfer/);
+assert.match(dockerfile, /apt-get install[^\n]*aria2/);
+assert.match(dockerfile, /aria2c --version/);
+assert.match(dockerfile, /COPY scripts\/media\/archive-org\.mjs/);
+assert.match(dockerfile, /COPY scripts\/media\/transfer-alternatives\.mjs/);
+
+assert.match(source, /inspectAudiomackSongPage/);
+assert.match(source, /isAudiomackSongUrl/);
+assert.match(source, /const inspectCollection = Boolean\(includePlaylist\) && isPublicMediaCollectionPage/);
+assert.match(dockerfile, /COPY scripts\/media\/audiomack-song-page\.mjs/);

@@ -1,0 +1,39 @@
+{
+  "runAt": "2026-10-27T04:31:12.253Z",
+  "baseUrl": "http://127.0.0.1:8081",
+  "cdnsBlocked": true,
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "widths": [],
+  "compactScreens": [
+    {
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "theme": "light",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    },
+    {
+      "viewport": {
+        "width": 568,
+        "height": 320
+      },
+      "theme": "dark",
+      "checks": [
+        "Touch-sized visual shapes, colors and sliders remain reachable in short, landscape and keyboard-sized viewports",
+        "Toolkit and effect samples fit without overlap",
+        "Brand lockups stay compact in full-screen and embedded Mobile, Tablet and Desktop previews"
+      ],
+      "runtimeErrors": []
+    }
+  ],
+  "errors": []
+}

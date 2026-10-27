@@ -1,0 +1,50 @@
+name: Audiomack Hallelujah live acceptance test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/media/audiomack-hallelujah-smoke.mjs"
+      - "scripts/media/vendor/audiomack.py"
+      - "processor/Dockerfile"
+      - ".github/workflows/audiomack-hallelujah-live.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-song-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+      - name: Install FFmpeg / FFprobe for real media verification
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Install FFmpeg and FFprobe for real audio validation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          ffprobe -version | head -n 1
+      - name: Inspect public song and validate actual downloadable audio
+        env:
+          MUSIC_ACCEPTANCE_API: https://env-q3mq.onrender.com/api/backend/url-media
+          MUSIC_ACCEPTANCE_SONG: https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535
+        run: |
+          set -euo pipefail
+          # Deployment and CI start simultaneously. Retry only this isolated
+          # acceptance check as Render changes its container image.
+          for n in 1 2 3 4 5; do
+            if node scripts/media/audiomack-hallelujah-smoke.mjs; then
+              exit 0
+            fi
+            if test "$n" -eq 5; then
+              exit 1
+            fi
+            sleep 35
+          done

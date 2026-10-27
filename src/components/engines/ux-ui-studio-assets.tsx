@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleHelp, LoaderCircle } from "lucide-react";
+import { studioFontWeightRange } from "@/lib/engines/studio-font-metadata";
 
 export type StudioIcon = { body: string; viewBox: string };
 const iconRequests = new Map<string, Promise<StudioIcon>>();
@@ -158,7 +159,10 @@ export function loadStudioFont(family: string): Promise<void> {
     request = (async () => {
       const bundledUrl = BUNDLED_STUDIO_FONTS[family];
       if (bundledUrl) {
-        const face = await new FontFace(family, `url(${JSON.stringify(bundledUrl)})`).load();
+        const response = await fetch(bundledUrl);
+        if (!response.ok) throw new Error("This bundled font is unavailable.");
+        const bytes = await response.arrayBuffer();
+        const face = await new FontFace(family, bytes, { weight: studioFontWeightRange(bytes) }).load();
         document.fonts.add(face);
         return;
       }
@@ -181,7 +185,7 @@ export function loadStudioFont(family: string): Promise<void> {
   return request;
 }
 
-export function FontPreview({ family, provider, sample = "Design systems that scale 012345", className, animated = true }: { family: string; provider: "google" | "system"; sample?: string; className?: string; animated?: boolean }) {
+export function FontPreview({ family, provider, sample = "Design systems that scale 012345", className, animated = true, weight }: { family: string; provider: "google" | "system"; sample?: string; className?: string; animated?: boolean; weight?: number }) {
   const { ref, visible } = useVisibleAsset();
   const [state, setState] = useState<"waiting" | "ready" | "failed">(genericFontFamilies.has(family) ? "ready" : "waiting");
   useEffect(() => {
@@ -192,7 +196,7 @@ export function FontPreview({ family, provider, sample = "Design systems that sc
     void (provider === "system" ? loadSystemStudioFont(family) : loadStudioFont(family)).then(() => { if (!cancelled) setState("ready"); }).catch(() => { if (!cancelled) setState("failed"); });
     return () => { cancelled = true; };
   }, [family, provider, visible]);
-  return <span ref={ref} className={className} style={{ display: "block", minHeight: "2.5em", overflowWrap: "anywhere", fontFamily: state === "ready" ? (genericFontFamilies.has(family) ? family : JSON.stringify(family)) : undefined }}>
+  return <span ref={ref} className={className} style={{ display: "block", minHeight: "2.5em", overflowWrap: "anywhere", fontWeight: weight, fontSynthesis: "weight style", fontFamily: state === "ready" ? (genericFontFamilies.has(family) ? family : JSON.stringify(family)) : undefined }}>
     {state === "ready" ? <span className={animated ? "uxui-font-animation" : "uxui-font-still"} data-font-ready={family}>
       <span>{sample}</span>
       {animated && <span aria-hidden="true">Aa Bb Cc · 0123456789</span>}

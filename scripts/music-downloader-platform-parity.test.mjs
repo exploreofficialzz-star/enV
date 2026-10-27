@@ -88,7 +88,7 @@ test("collection downloads first preview ten tracks with an expandable list on a
   assert.match(web, /downloadPreview\(index\)/);
   assert.match(web, /See more \(/);
   assert.match(web, /Download ZIP \(/);
-  assert.match(android, /resolveProviderMusicPage\(source, true\)/);
+  assert.match(android, /resolveProviderMusicPage\(source, musicPageIsCollection\(source\.url\)\)/);
   assert.match(android, /previewTracks\.take\(if \(showAllPreview\) previewTracks\.size else 10\)/);
   assert.match(android, /ZipOutputStream\(/);
   assert.match(android, /MediaStore\.Downloads\.EXTERNAL_CONTENT_URI/);
@@ -110,4 +110,39 @@ test("transient-only music download recovery is implemented natively and on Web"
   assert.match(android, /failed-downloads\.txt/);
   assert.match(ios, /nativeMusicDownloadWithRetry/);
   assert.match(client, /urlMediaFailure/);
+});
+
+test("all three clients use a shared multi-engine processor with Internet Archive and aria2c", async () => {
+  const processor = await source("../scripts/url-media-processor.mjs");
+  const archive = await source("../scripts/media/archive-org.mjs");
+  const alternative = await source("../scripts/media/transfer-alternatives.mjs");
+  const android = await source("../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt");
+  const ios = await source("../apps/ios/enV/ToolViews.swift");
+  assert.match(processor, /inspectArchiveItem/);
+  assert.match(processor, /aria2YtdlpArgs/);
+  assert.match(archive, /parseArchiveAudioItem/);
+  assert.match(alternative, /shouldTryAria2Transfer/);
+  assert.match(android, /\/api\/backend\/url-media\/info/);
+  assert.match(ios, /nativeMusicResolve/);
+});
+
+test("single-track Audiomack HTML metadata is separate from album extraction", async () => {
+  const processor = await source("../scripts/url-media-processor.mjs");
+  const parser = await source("../scripts/media/audiomack-song-page.mjs");
+  assert.match(parser, /isAudiomackSongUrl/);
+  assert.match(processor, /inspectAudiomackSongPage/);
+  assert.match(processor, /inspectCollection = Boolean\(includePlaylist\)/);
+});
+
+test("single songs use single-track discovery and direct download across all clients", async () => {
+  const web = await source("../src/components/engines/music-downloader-engine.tsx");
+  const android = await source("../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt");
+  const ios = await source("../apps/ios/enV/ToolViews.swift");
+  assert.match(web, /includePlaylist: isLikelyMusicCollectionUrl\(entry\.url\)/);
+  assert.match(web, /preview\.tracks\.length === 1 \? 0 : undefined/);
+  assert.match(web, /"Download song"/);
+  assert.match(android, /resolveProviderMusicPage\(source, musicPageIsCollection\(source\.url\)\)/);
+  assert.match(android, /downloadSelectedMusic\(previewTracks\.toList\(\), previewTracks\.size > 1\)/);
+  assert.match(ios, /"includePlaylist": nativeMusicCollectionPage\(source\.url\)/);
+  assert.match(ios, /startOnlineDownloads\(only: previewTracks\.count == 1 \? previewTracks\.first : nil\)/);
 });

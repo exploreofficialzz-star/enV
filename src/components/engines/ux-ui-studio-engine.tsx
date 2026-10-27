@@ -1,6 +1,16 @@
 import { StudioFader } from "./ux-ui-studio-fader";
 import { StudioRepeatButton } from "./ux-ui-studio-repeat-button";
 import { editStudioImage } from "./ux-ui-studio-image";
+import { StudioImageRepair } from "./ux-ui-studio-image-repair";
+import { StudioScreenshotImport, type StudioScreenshotImportResult } from "./ux-ui-studio-screenshot-import";
+import { StudioShapeStyle } from "./ux-ui-studio-shape-style";
+import { studioFontWeightRange } from "@/lib/engines/studio-font-metadata";
+import { packStudioProjectAssets, unpackStudioProjectAssets } from "@/lib/engines/ux-ui-studio-storage";
+import { StudioTextStyle } from "./ux-ui-studio-text-style";
+import { roundedRectanglePath, shapeStrokeDasharray, type CornerRadii, type ShapeBorderStyle } from "@/lib/engines/ux-ui-studio-shape-style";
+import { createResponsiveDesign, responsiveElements, commitResponsiveElements, resetResponsiveDevice, hasResponsiveOverrides, restoreResponsiveDesign, cloneResponsiveDesign, remapResponsiveScreenLinks, type ResponsiveDesign, type ResponsiveEditMode } from "@/lib/engines/ux-ui-studio-responsive";
+import { mergeStudioVectorLayers } from "@/lib/engines/ux-ui-studio-merge";
+import { STUDIO_SHAPE_PRESETS, searchStudioShapes } from "@/lib/engines/ux-ui-studio-shapes";
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, sourceName } from "@/lib/engines/ux-ui-studio-codegen";
 import { auditUxUiStudioTextContrast } from "@/lib/engines/ux-ui-studio-qa";
 import { ToolkitPreview } from "./ux-ui-toolkit-preview";
@@ -26,9 +36,10 @@ type DesignTokens = { colors: Array<{ name: string; value: string }>; typography
 
 type DesignLayer = {
   id: string; kind: LayerKind; name: string; x: number; y: number; width: number; height: number; rotation?: number;
-  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; fontDataUrl: string;
+  text: string; iconName: string; iconSvg: string; iconViewBox: string; imageDataUrl: string; imageOriginalDataUrl?: string; imageEditMaxEdge?: number; fontDataUrl: string;
   iconLicense: string; iconAuthor: string;
   color: string; background: string; borderColor: string; borderWidth: number; radius: number;
+  cornerRadii?: CornerRadii; borderStyle?: ShapeBorderStyle;
   padding: number; marginTop: number; marginRight: number; marginBottom: number; marginLeft: number;
   fontFamily: string; fontSize: number; fontWeight: number; lineHeight: number; letterSpacing: number;
   textAlign: Align; opacity: number; shadow: boolean;
@@ -48,13 +59,19 @@ type SavedProject = {
   elements: DesignLayer[]; updatedAt: string;
   screens?: DesignScreen[]; activeScreenId?: string;
   description?: string; category?: string; isFavorite?: boolean;
+  responsiveDesign?: ResponsiveDesign<DesignLayer>;
+  reconstruction?: { sourceName: string; warnings: string[]; stats: { textLines: number; shapes: number; imageRegions: number; ocrConfidence: number } };
 };
 
 type DesignScreen = {
   id: string; name: string; target: DeviceTarget; background: string;
   customArtboard: boolean; customWidth: number; customHeight: number;
   elements: DesignLayer[]; updatedAt: string;
+  responsiveDesign?: ResponsiveDesign<DesignLayer>;
+  reconstruction?: SavedProject["reconstruction"];
 };
+
+type DesignHistory = { elements: DesignLayer[]; responsiveDesign: ResponsiveDesign<DesignLayer>; target: DeviceTarget; customArtboard: boolean; customWidth: number; customHeight: number; background: string };
 
 const TEXT_LAYER_KINDS: string[] = ["text", "button", "card", "input", "navbar", "tabbar", "row", "badge", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "avatar"];
 
@@ -208,7 +225,7 @@ const STUDIO_TOOLKITS: StudioToolkit[] = [
     "description": "Bring screenshots, photos, thumbnails and media assets into the mockup.",
     "tab": "components",
     "icon": "ImagePlus",
-    "outcome": "Import supported image assets, replace them on selected layers and export designs with embedded image data."
+    "outcome": "Reconstruct editable text, flat shapes and cropped artwork from a screenshot, or import and replace original images."
   },
   {
     "id": "brand",
@@ -614,14 +631,14 @@ function createPreset(target: DeviceTarget, presetId?: string): { name: string; 
   };
 }
 
-function wrapDesignText(value: string, maxChars: number): string[] {
+function wrapDesignText(value: string, maxWidth: number, measure: (text: string) => number): string[] {
   const lines: string[] = [];
   for (const paragraph of String(value || "").split("\n")) {
     if (!paragraph) { lines.push(""); continue; }
     let current = "";
     for (const word of paragraph.split(/\s+/)) {
       const candidate = current ? current + " " + word : word;
-      if (candidate.length > maxChars && current) { lines.push(current); current = word; }
+      if (measure(candidate) > maxWidth && current) { lines.push(current); current = word; }
       else current = candidate;
     }
     lines.push(current);
@@ -629,10 +646,14 @@ function wrapDesignText(value: string, maxChars: number): string[] {
   return lines;
 }
 
+let designTextMeasureContext: CanvasRenderingContext2D | null | undefined;
 function layerTextSvg(layer: DesignLayer, x: number, y: number, maxWidth: number) {
   const inset = layer.kind === "text" ? 0 : layer.padding;
   const usableWidth = Math.max(8, maxWidth - inset * 2);
-  const lines = wrapDesignText(layer.text, Math.max(5, Math.floor(usableWidth / Math.max(5, layer.fontSize * 0.56))));
+  if (designTextMeasureContext === undefined && typeof document !== "undefined") designTextMeasureContext = document.createElement("canvas").getContext("2d");
+  const context = designTextMeasureContext;
+  if (context) context.font = `${layer.fontWeight} ${layer.fontSize}px ${JSON.stringify(layer.fontFamily)}, sans-serif`;
+  const lines = wrapDesignText(layer.text, usableWidth, text => (context?.measureText(text).width ?? text.length * layer.fontSize * 0.56) + Math.max(0, text.length - 1) * layer.letterSpacing);
   const anchor = layer.textAlign === "center" ? "middle" : layer.textAlign === "right" ? "end" : "start";
   const textX = layer.textAlign === "center" ? x + layer.width / 2 : layer.textAlign === "right" ? x + layer.width - inset : x + inset;
   const textY = layer.kind === "button" || layer.kind === "input" || layer.kind === "avatar" || layer.kind === "checkbox"
@@ -649,9 +670,9 @@ function sanitizeIconMarkup(source: string): { body: string; viewBox: string } {
   const parsed = new DOMParser().parseFromString(source, "image/svg+xml");
   const root = parsed.documentElement;
   if (root.localName !== "svg" || parsed.querySelector("parsererror")) return { body: "", viewBox: "0 0 24 24" };
-  const tags = new Set(["path", "circle", "rect", "ellipse", "line", "polyline", "polygon", "g"]);
-  const attributes = new Set(["d", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "clip-rule", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "transform", "opacity", "fill-opacity", "stroke-opacity", "vector-effect"]);
-  const inheritedPresentation = ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "clip-rule", "opacity", "fill-opacity", "stroke-opacity", "vector-effect"];
+  const tags = new Set(["svg", "path", "circle", "rect", "ellipse", "line", "polyline", "polygon", "g"]);
+  const attributes = new Set(["d", "fill", "stroke", "color", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "clip-rule", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "transform", "opacity", "fill-opacity", "stroke-opacity", "vector-effect", "viewBox", "preserveAspectRatio", "overflow", "stroke-dasharray"]);
+  const inheritedPresentation = ["fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "clip-rule", "fill-opacity", "stroke-opacity", "vector-effect"];
   if (!root.hasAttribute("fill") && !root.hasAttribute("stroke")) root.setAttribute("fill", "currentColor");
   const clean = (node: Element) => {
     for (const child of Array.from(node.children)) {
@@ -661,7 +682,7 @@ function sanitizeIconMarkup(source: string): { body: string; viewBox: string } {
       }
       for (const attribute of Array.from(child.attributes)) {
         if (!attributes.has(attribute.name) || attribute.name.toLowerCase().startsWith("on")) child.removeAttribute(attribute.name);
-        else if (attribute.name === "fill" || attribute.name === "stroke") {
+        else if (attribute.name === "fill" || attribute.name === "stroke" || attribute.name === "color") {
           if (!/^(currentColor|none|#[0-9a-fA-F]{3,8}|white|black|transparent)$/i.test(attribute.value)) child.setAttribute(attribute.name, "currentColor");
         }
       }
@@ -670,7 +691,9 @@ function sanitizeIconMarkup(source: string): { body: string; viewBox: string } {
   };
   clean(root);
   const viewBox = root.getAttribute("viewBox") || "0 0 " + (root.getAttribute("width") || "24") + " " + (root.getAttribute("height") || "24");
-  return { body: Array.from(root.children).map((node) => new XMLSerializer().serializeToString(node)).join(""), viewBox };
+  const body = Array.from(root.children).map((node) => new XMLSerializer().serializeToString(node)).join("");
+  const rootOpacity = Number(root.getAttribute("opacity"));
+  return { body: root.hasAttribute("opacity") && Number.isFinite(rootOpacity) ? `<g opacity="${Math.max(0, Math.min(1, rootOpacity))}">${body}</g>` : body, viewBox };
 }
 
 function buildProjectSpec(name: string, target: DeviceTarget, background: string, viewport: { width: number; height: number }, elements: DesignLayer[], tokens: DesignTokens, reusableComponents: DesignLayer[]): SavedProject {
@@ -681,6 +704,7 @@ function buildAiPrompt(project: SavedProject): string {
   const lines = [
     "Implement the following interface faithfully. Treat the numeric values and named assets below as the source of truth.",
     "Project: " + project.name,
+    ...(project.description ? ["PRODUCT AND INTERACTION BRIEF", project.description] : []),
     "Target: " + project.target + " interface",
     "Artboard: " + project.viewport.width + " x " + project.viewport.height + " CSS pixels",
     "Responsive breakpoints: mobile <= " + project.breakpoints.mobile + "px; tablet " + (project.breakpoints.mobile + 1) + "–" + (project.breakpoints.desktop - 1) + "px; desktop >= " + project.breakpoints.desktop + "px.",
@@ -714,7 +738,17 @@ function buildAiPrompt(project: SavedProject): string {
       item.iconName ? "   icon=" + item.iconName + "; license=" + (item.iconLicense || "metadata unavailable") + "; author=" + (item.iconAuthor || "metadata unavailable") : "",
     );
   });
-  lines.push("", "Acceptance check: compare the rendered result against the artboard at the exact target viewport. Avoid replacing exact values with approximate spacing or generic icons.");
+  if (project.responsiveDesign) {
+    lines.push("", "LINKED DEVICE VIEWS", "Shared content and styling apply to all devices. Preserve the authored device-specific geometry and property overrides below.");
+    for (const device of ["mobile", "tablet", "desktop"] as DeviceTarget[]) {
+      const size = boardSize(device);
+      lines.push(device.toUpperCase() + " " + size.width + "x" + size.height);
+      for (const layer of responsiveElements(project.responsiveDesign, device, size)) {
+        lines.push("  " + layer.id + " " + layer.name + ": x=" + layer.x + ", y=" + layer.y + ", width=" + layer.width + ", height=" + layer.height + ", font=" + layer.fontSize + "/" + layer.fontWeight + ", tracking=" + layer.letterSpacing + (layer.cornerRadii ? ", corners=" + JSON.stringify(layer.cornerRadii) : ""));
+      }
+    }
+  }
+  lines.push("", "Acceptance check: compare the rendered result against each artboard at its exact target viewport. Avoid replacing exact values with approximate spacing or generic icons.");
   return lines.filter((line) => line !== "").join("\n");
 }
 
@@ -827,48 +861,108 @@ function pdfSafe(value: string): string {
     .replace(/[^\x20-\x7E]/g, (character) => "\\u" + character.charCodeAt(0).toString(16).padStart(4, "0"));
 }
 
-function wrapPdfLine(value: string, width: number): string[] {
+function wrapPdfLine(value: string, width: number, measure: (text: string) => number = text => text.length): string[] {
   const safe = pdfSafe(value);
   const indent = safe.match(/^\s*/)?.[0] || "";
   const body = safe.trimStart();
   const result: string[] = [];
+  const available = Math.max(1, width - measure(indent));
   let current = "";
   for (const word of body.split(/\s+/)) {
     const candidate = current ? current + " " + word : word;
-    if (candidate.length > width - indent.length && current) { result.push(indent + current); current = word; }
+    if (measure(candidate) > available && current) { result.push(indent + current); current = word; }
     else current = candidate;
+    if (measure(current) > available) {
+      let chunk = "";
+      for (const character of current) {
+        if (chunk && measure(chunk + character) > available) { result.push(indent + chunk); chunk = character; }
+        else chunk += character;
+      }
+      current = chunk;
+    }
   }
   result.push(indent + current);
   return result;
 }
 
-async function buildPdf(project: SavedProject, svg: SVGSVGElement, prompt: string, target: DeviceTarget) {
+async function buildPdf(project: SavedProject, svg: SVGSVGElement, prompt: string, target: DeviceTarget, previews?: Array<{ target: DeviceTarget; viewport: { width: number; height: number }; elements: DesignLayer[]; svg: SVGSVGElement }>) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(project.name + " - enV UX/UI Studio");
-  pdf.setSubject("Visual interface and machine-readable design specification");
+  pdf.setSubject("Rendered interface previews, AI builder prompt and complete editable design specification");
   pdf.setCreator("enV UX/UI Studio");
-  const previewPng = await svgToPng(svg, 3, target);
-  const image = await pdf.embedPng(previewPng);
-  const first = pdf.addPage(project.target === "desktop" ? [842, 595] : [595, 842]);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  first.drawText("enV UX/UI STUDIO", { x: 28, y: first.getHeight() - 32, size: 10, font: bold, color: rgb(0.15, 0.32, 0.75) });
-  first.drawText(pdfSafe(project.name), { x: 28, y: first.getHeight() - 56, size: 19, font: bold, color: rgb(0.07, 0.1, 0.16), maxWidth: first.getWidth() - 56 });
-  first.drawText(project.target.toUpperCase() + "  |  " + project.viewport.width + " x " + project.viewport.height + " px  |  " + project.elements.length + " layers", { x: 28, y: first.getHeight() - 75, size: 9, font: regular, color: rgb(0.35, 0.39, 0.46) });
-  const maxWidth = first.getWidth() - 56;
-  const maxHeight = first.getHeight() - 120;
-  const scale = Math.min(maxWidth / image.width, maxHeight / image.height);
-  const width = image.width * scale;
-  const height = image.height * scale;
-  first.drawImage(image, { x: (first.getWidth() - width) / 2, y: Math.max(26, (first.getHeight() - height) / 2 - 24), width, height });
-  first.drawText("Visual preview is rendered directly from the editable artboard.", { x: 28, y: 14, size: 7, font: regular, color: rgb(0.42, 0.45, 0.5) });
+  const deviceOrder: DeviceTarget[] = ["mobile", "tablet", "desktop"];
+  const visualPreviews = previews?.length
+    ? [...previews].sort((a, b) => deviceOrder.indexOf(a.target) - deviceOrder.indexOf(b.target))
+    : [{ target, viewport: project.viewport, elements: project.elements, svg }];
+  for (const preview of visualPreviews) {
+    const previewPng = await svgToPng(preview.svg, 3, preview.target);
+    const image = await pdf.embedPng(previewPng);
+    const page = pdf.addPage(preview.viewport.width > preview.viewport.height ? [842, 595] : [595, 842]);
+    page.drawText("enV UX/UI STUDIO", { x: 28, y: page.getHeight() - 32, size: 10, font: bold, color: rgb(0.15, 0.32, 0.75) });
+    const maxWidth = page.getWidth() - 56;
+    const title = pdfSafe(project.name).slice(0, 100);
+    const titleSize = Math.max(8, Math.min(19, 19 * maxWidth / Math.max(1, bold.widthOfTextAtSize(title, 19))));
+    page.drawText(title, { x: 28, y: page.getHeight() - 56, size: titleSize, font: bold, color: rgb(0.07, 0.1, 0.16) });
+    page.drawText(preview.target.toUpperCase() + "  |  " + preview.viewport.width + " x " + preview.viewport.height + " px  |  " + preview.elements.length + " layers", { x: 28, y: page.getHeight() - 75, size: 9, font: regular, color: rgb(0.35, 0.39, 0.46) });
+    const maxHeight = page.getHeight() - 120;
+    const scale = Math.min(maxWidth / image.width, maxHeight / image.height);
+    const width = image.width * scale, height = image.height * scale;
+    page.drawImage(image, { x: (page.getWidth() - width) / 2, y: Math.max(26, (page.getHeight() - height) / 2 - 24), width, height });
+    page.drawText("Visual preview is rendered directly from the editable " + preview.target + " artboard.", { x: 28, y: 14, size: 7, font: regular, color: rgb(0.42, 0.45, 0.5) });
+  }
 
-  const completeSpec = JSON.stringify(project, null, 2);
-  await pdf.attach(new TextEncoder().encode(completeSpec), "design-spec.json", { mimeType: "application/json", description: "Complete editable design, including embedded fonts and artwork" });
-  const spec = JSON.stringify(project, (key, value) => typeof value === "string" && ((/^(imageDataUrl|fontDataUrl)$/.test(key) && value.startsWith("data:")) || (key === "iconSvg" && value.length > 500)) ? "[Embedded asset retained in attached design-spec.json]" : value, 2);
+  const completeSpec = JSON.stringify({ ...project, aiPrompt: prompt }, null, 2);
+  await pdf.attach(new TextEncoder().encode(completeSpec), "design-spec.json", { mimeType: "application/json", description: "Complete editable design, responsive overrides, original artwork, embedded fonts and AI builder prompt" });
+  const short = (value: string, length = 180) => value.length > length ? value.slice(0, length) + "... [complete value in attachment]" : value;
+  const responsiveSummary = (design: SavedProject["responsiveDesign"]): string[] => {
+    if (!design) return ["Responsive design: this project predates linked device variants."];
+    return [
+      "Shared design: " + design.baseTarget + " " + design.baseViewport.width + "x" + design.baseViewport.height + "px; " + design.baseElements.length + " shared layers.",
+      ...deviceOrder.map(device => {
+        const local = design.overrides[device];
+        return device + " overrides: " + (local ? Object.keys(local.patches).length + " layer patches, " + local.added.length + " local additions, " + local.removed.length + " local removals" : "inherits shared design") + ".";
+      }),
+    ];
+  };
+  const readableSpec = [
+    "Complete machine-readable JSON, all assets and the full AI prompt are embedded in design-spec.json. Open the PDF attachment to import or hand off the editable project.",
+    "Project: " + project.name + "; active device: " + project.target + "; viewport: " + project.viewport.width + "x" + project.viewport.height + "px; background: " + project.background + ".",
+    "Preview devices: " + visualPreviews.map(preview => preview.target + " " + preview.viewport.width + "x" + preview.viewport.height + "px").join("; ") + ".",
+    "Breakpoints: " + JSON.stringify(project.breakpoints),
+    "Color tokens: " + short(project.tokens.colors.map(token => token.name + "=" + token.value).join(", "), 360),
+    "Typography tokens: " + short(project.tokens.typography.map(token => token.name + "=" + token.fontFamily + " " + token.fontSize + "px/" + token.lineHeight + " weight " + token.fontWeight).join("; "), 360),
+    "Spacing tokens: " + project.tokens.spacing.slice(0, 32).join(", ") + "px. Reusable components: " + project.reusableComponents.length + ".",
+    ...responsiveSummary(project.responsiveDesign),
+    "Logical screens: " + (project.screens?.length || 1) + ".",
+    ...(project.screens || []).map(screen => "Screen " + short(screen.name, 60) + " (" + screen.id + "): " + screen.elements.length + " layers; " + screen.target + "; " + (screen.responsiveDesign ? "linked device data included" : "reference viewport included") + "."),
+    "",
+    "ACTIVE ARTBOARD LAYERS (dimensions and spacing in CSS pixels)",
+    ...project.elements.flatMap((layer, index) => [
+      (index + 1) + ". " + short(layer.name, 60) + " [" + layer.kind + "] id=" + layer.id + "; x/y=" + layer.x + "/" + layer.y + "; size=" + layer.width + "x" + layer.height + "; rotation=" + (layer.rotation || 0) + ".",
+      ...(layer.text ? ["Text: " + JSON.stringify(short(layer.text)) + "; type=" + layer.fontFamily + " " + layer.fontSize + "px, weight " + layer.fontWeight + ", line height " + layer.lineHeight + ", tracking " + layer.letterSpacing + ", " + layer.textAlign + "."] : []),
+      "Style: fill=" + layer.background + "; text/icon=" + layer.color + "; border=" + layer.borderWidth + "px " + (layer.borderStyle || "solid") + " " + layer.borderColor + "; corners=" + (layer.cornerRadii ? [layer.cornerRadii.topLeft, layer.cornerRadii.topRight, layer.cornerRadii.bottomRight, layer.cornerRadii.bottomLeft].join("/") : layer.radius) + "; opacity=" + layer.opacity + "; shadow=" + layer.shadow + "; padding=" + layer.padding + "; margins=" + [layer.marginTop, layer.marginRight, layer.marginBottom, layer.marginLeft].join("/") + ".",
+      "Layout: " + layer.horizontalConstraint + "/" + layer.verticalConstraint + "; min/max width=" + layer.minWidth + "/" + layer.maxWidth + "; visible=" + (layer.visibleOn || deviceOrder).join(",") + (layer.hidden ? "; hidden" : "") + (layer.locked ? "; locked" : "") + "." + (layer.iconName ? " Icon: " + short(layer.iconName, 90) + "." : "") + (layer.imageDataUrl ? " Image asset attached." : "") + (layer.fontDataUrl ? " Font asset attached." : ""),
+    ]),
+  ];
+  const textSize = 8;
+  const wrapText = (line: string) => wrapPdfLine(line, 520, text => regular.widthOfTextAtSize(text, textSize));
+  // Flow short property lines together on paper while retaining every prompt value.
+  // The attached aiPrompt keeps the original line breaks for copying into a builder.
+  const promptParagraphs: string[] = [];
+  let properties = "";
+  for (const line of prompt.split("\n")) {
+    if (/^ {3}\S/.test(line)) properties += (properties ? " " : "") + line.trim();
+    else {
+      if (properties) { promptParagraphs.push("   " + properties); properties = ""; }
+      promptParagraphs.push(line);
+    }
+  }
+  if (properties) promptParagraphs.push("   " + properties);
   const pages: Array<{ heading: string; lines: string[] }> = [
-    { heading: "AI IMPLEMENTATION PROMPT", lines: prompt.split("\n").flatMap((line) => wrapPdfLine(line, 100)) },
-    { heading: "MACHINE-READABLE DESIGN SPECIFICATION (JSON)", lines: spec.split("\n").flatMap((line) => wrapPdfLine(line, 100)) },
+    { heading: "AI IMPLEMENTATION PROMPT", lines: promptParagraphs.flatMap(wrapText) },
+    { heading: "READABLE DESIGN SPECIFICATION", lines: readableSpec.flatMap(wrapText) },
   ];
   for (const section of pages) {
     let page = pdf.addPage([595, 842]);
@@ -880,8 +974,8 @@ async function buildPdf(project: SavedProject, svg: SVGSVGElement, prompt: strin
         page = pdf.addPage([595, 842]);
         y = page.getHeight() - 40;
       }
-      if (line) page.drawText(pdfSafe(line), { x: 36, y, size: 7.2, font: regular, color: rgb(0.16, 0.19, 0.24), maxWidth: 520 });
-      y -= 10;
+      if (line) page.drawText(pdfSafe(line), { x: 36, y, size: textSize, font: regular, color: rgb(0.16, 0.19, 0.24) });
+      y -= 11;
     }
   }
   return pdf.save();
@@ -961,6 +1055,7 @@ export function UxUiStudioEngine() {
   const [draftFavoritesOnly, setDraftFavoritesOnly] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState("");
   const [projectName, setProjectName] = useState(initialDesign.name);
+  const [projectBrief, setProjectBrief] = useState("");
   const [background, setBackground] = useState(initialDesign.background);
   const [customArtboard, setCustomArtboard] = useState(false);
   const [customWidth, setCustomWidth] = useState(390);
@@ -969,9 +1064,13 @@ export function UxUiStudioEngine() {
   const [reusableComponents, setReusableComponents] = useState<DesignLayer[]>([]);
   const [tokenNameDraft, setTokenNameDraft] = useState("brand");
   const [tokenValueDraft, setTokenValueDraft] = useState("#2563EB");
-  const [elements, setElements] = useState<DesignLayer[]>(initialDesign.elements);
-  const [undoStack, setUndoStack] = useState<DesignLayer[][]>([]);
-  const [redoStack, setRedoStack] = useState<DesignLayer[][]>([]);
+  const [elements, setElementsState] = useState<DesignLayer[]>(initialDesign.elements);
+  const elementsRef = useRef(initialDesign.elements);
+  const responsiveRef = useRef(createResponsiveDesign(initialDesign.elements, "mobile", { width: 390, height: 844 }));
+  const [responsiveRevision, setResponsiveRevision] = useState(0);
+  const [responsiveEditMode, setResponsiveEditMode] = useState<ResponsiveEditMode>("shared");
+  const [undoStack, setUndoStack] = useState<DesignHistory[]>([]);
+  const [redoStack, setRedoStack] = useState<DesignHistory[]>([]);
   const [selectedId, setSelectedId] = useState(initialDesign.elements[0]?.id || "");
   const [leftTab, setLeftTab] = useState<PanelTab>("toolkits");
   const [activeToolkitId, setActiveToolkitId] = useState("icons");
@@ -980,6 +1079,12 @@ export function UxUiStudioEngine() {
   const [inlineToolkit, setInlineToolkit] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [cutoutStrength, setCutoutStrength] = useState(40);
+  const [keyColor, setKeyColor] = useState("#00ff00");
+  const [keySoftness, setKeySoftness] = useState(24);
+  const [keySpill, setKeySpill] = useState(0.6);
+  const [cutoutMode, setCutoutMode] = useState<"edge" | "global">("edge");
+  const [repairImageId, setRepairImageId] = useState("");
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const imageReplaceId = useRef("");
   const [canvasSelected, setCanvasSelected] = useState(false);
   const [bundledIconNames, setBundledIconNames] = useState<string[]>([]);
@@ -989,6 +1094,7 @@ export function UxUiStudioEngine() {
   const [toolkitSearch, setToolkitSearch] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [clipboardLayers, setClipboardLayers] = useState<DesignLayer[]>([]);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("design");
   const [iconQuery, setIconQuery] = useState("");
@@ -1021,6 +1127,7 @@ export function UxUiStudioEngine() {
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
   const studioRootRef = useRef<HTMLElement | null>(null);
   const quickImageInputRef = useRef<HTMLInputElement | null>(null);
+  const screenshotInputRef = useRef<HTMLInputElement | null>(null);
   const elementImportInputRef = useRef<HTMLInputElement | null>(null);
   const presetImportInputRef = useRef<HTMLInputElement | null>(null);
   const iconImportInputRef = useRef<HTMLInputElement | null>(null);
@@ -1103,6 +1210,24 @@ export function UxUiStudioEngine() {
   }, [onboarding, isExpanded]);
 
   const board = useMemo(() => customArtboard ? { width: customWidth, height: customHeight } : boardSize(target), [customArtboard, customWidth, customHeight, target]);
+  function setElements(next: DesignLayer[] | ((previous: DesignLayer[]) => DesignLayer[])) {
+    const updated = typeof next === "function" ? next(elementsRef.current) : next;
+    responsiveRef.current = commitResponsiveElements(responsiveRef.current, target, board, updated, responsiveEditMode);
+    elementsRef.current = responsiveElements(responsiveRef.current, target, board);
+    setElementsState(elementsRef.current);
+    setResponsiveRevision(value => value + 1);
+  }
+
+  function replaceResponsiveDesign(next: DesignLayer[], nextTarget: DeviceTarget, size: { width: number; height: number }, saved?: unknown) {
+    responsiveRef.current = restoreResponsiveDesign(saved, next, nextTarget, size);
+    elementsRef.current = responsiveElements(responsiveRef.current, nextTarget, size);
+    setElementsState(elementsRef.current);
+    setResponsiveRevision(value => value + 1);
+  }
+  useLayoutEffect(() => {
+    elementsRef.current = responsiveElements(responsiveRef.current, target, board);
+    setElementsState(elementsRef.current);
+  }, [target, board]);
   const requestedDeviceWidth = Math.max(1, Math.min(
     board.width * zoom / 100,
     target === "mobile" ? 430 : target === "tablet" ? 700 : 940,
@@ -1144,6 +1269,13 @@ export function UxUiStudioEngine() {
   const selected = elements.find((item) => item.id === selectedId) || null;
   const selectedLayers = elements.filter((item) => selectedIds.includes(item.id));
   const selectedHasText = Boolean(selected && TEXT_LAYER_KINDS.includes(selected.kind));
+  useEffect(() => {
+    setSelectedIds(previous => {
+      const next = selectedId ? previous.filter(id => elements.some(layer => layer.id === id)) : [];
+      if (selectedId && !next.includes(selectedId)) return [selectedId];
+      return next.length === previous.length && next.every((id, index) => id === previous[index]) ? previous : next;
+    });
+  }, [selectedId, elements]);
   const fontChoices = useMemo(() => {
     const byFamily = new Map<string, FontLibraryItem>();
     for (const font of FONT_LIBRARY) {
@@ -1154,7 +1286,9 @@ export function UxUiStudioEngine() {
     return Array.from(byFamily.values()).sort((a,b) => Number(Boolean(BUNDLED_STUDIO_FONTS[b.family])) - Number(Boolean(BUNDLED_STUDIO_FONTS[a.family])) || a.family.localeCompare(b.family));
   }, [remoteFonts]);
   const uniqueColors = useMemo(() => Array.from(new Set([background, ...elements.flatMap((item) => [item.color, item.background, item.borderColor]), ...tokens.colors.map((token) => token.value)].filter((color) => color && color !== "transparent"))), [background, elements, tokens]);
-  const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), screens, activeScreenId }), [projectName, target, background, board, elements, tokens, reusableComponents, screens, activeScreenId]);
+  // The revision invalidates this serialized snapshot after the editing ref changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const project = useMemo(() => ({ ...buildProjectSpec(projectName, target, background, board, elements, tokens, reusableComponents), description: projectBrief, responsiveDesign: responsiveRef.current, screens: screens.map(screen => screen.id === activeScreenId ? { ...screen, elements, target, background, customArtboard, customWidth, customHeight, responsiveDesign: responsiveRef.current } : screen), activeScreenId }), [projectName, projectBrief, target, background, board, elements, tokens, reusableComponents, screens, activeScreenId, customArtboard, customWidth, customHeight, responsiveRevision]);
   const hasPrototypeLinks = elements.some((layer) => Boolean(layer.prototypeTargetScreenId) && screens.some((screen) => screen.id === layer.prototypeTargetScreenId));
 
   useEffect(() => {
@@ -1162,11 +1296,11 @@ export function UxUiStudioEngine() {
     setScreens((previous) => {
       const current = previous.find((screen) => screen.id === activeScreenId);
       if (!current) return previous;
-      if (current.elements === elements && current.name === (current.name || "Screen 1") && current.target === target && current.background === background && current.customArtboard === customArtboard && current.customWidth === customWidth && current.customHeight === customHeight) return previous;
-      const updated: DesignScreen = { ...current, elements, target, background, customArtboard, customWidth, customHeight, updatedAt: new Date().toISOString() };
+      if (current.elements === elements && current.responsiveDesign === responsiveRef.current && current.target === target && current.background === background && current.customArtboard === customArtboard && current.customWidth === customWidth && current.customHeight === customHeight) return previous;
+      const updated: DesignScreen = { ...current, elements, target, background, customArtboard, customWidth, customHeight, responsiveDesign: responsiveRef.current, updatedAt: new Date().toISOString() };
       return previous.map((screen) => screen.id === activeScreenId ? updated : screen);
     });
-  }, [activeScreenId, elements, target, background, customArtboard, customWidth, customHeight]);
+  }, [activeScreenId, elements, target, background, customArtboard, customWidth, customHeight, responsiveRevision]);
   const aiPrompt = useMemo(() => buildAiPrompt(project), [project]);
   const quickIconResults = (iconBrowseCategory === "All bundled" ? bundledIconNames : (ICON_BROWSE_CATEGORIES.find((category)=>category.name===iconBrowseCategory)?.icons || ICON_BROWSE_CATEGORIES[0].icons))
     .filter((name) => !bundledIconNames.length || bundledIconNames.includes(name))
@@ -1184,13 +1318,13 @@ export function UxUiStudioEngine() {
   useEffect(() => {
     try {
       const listRaw = localStorage.getItem(DRAFTS_STORAGE_KEY);
-      const listParsed = listRaw ? JSON.parse(listRaw) as unknown : [];
+      const listParsed = listRaw ? (JSON.parse(listRaw) as unknown) : [];
       const storedDrafts = Array.isArray(listParsed) ? listParsed.filter((item): item is SavedProject =>
         Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2 &&
-          Array.isArray((item as SavedProject).elements) && (item as SavedProject).viewport?.width)) : [];
+          Array.isArray((item as SavedProject).elements) && (item as SavedProject).viewport?.width)).map(unpackStudioProjectAssets) : [];
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored) as Omit<SavedProject, "schemaVersion"> & { schemaVersion: number };
+        const parsed = unpackStudioProjectAssets(JSON.parse(stored)) as Omit<SavedProject, "schemaVersion"> & { schemaVersion: number };
         if ((parsed.schemaVersion === 1 || parsed.schemaVersion === 2) && Array.isArray(parsed.elements) && parsed.viewport?.width) {
           const normalized = {
             ...parsed, id: parsed.id || "draft-" + Date.now().toString(36), schemaVersion: 2 as const,
@@ -1240,13 +1374,13 @@ export function UxUiStudioEngine() {
           };
           const merged = [hydrated, ...storedDrafts.filter((item) => item.id !== hydrated.id)]
             .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
-          localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged));
-          setSavedProject(hydrated); setDrafts(merged); setProjectName(hydrated.name);
+          localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(merged.map(packStudioProjectAssets)));
+          setSavedProject(hydrated); setDrafts(merged); setProjectName(hydrated.name); setProjectBrief(hydrated.description || "");
           setScreens(restoredScreens); setActiveScreenId(initialScreen.id);
           setTarget(initialScreen.target); setBackground(initialScreen.background); setCustomArtboard(initialScreen.customArtboard);
           setCustomWidth(initialScreen.customWidth); setCustomHeight(initialScreen.customHeight);
           setTokens(hydrated.tokens); setReusableComponents(hydrated.reusableComponents);
-          setElements(initialScreen.elements); setSelectedId(initialScreen.elements[0]?.id || "");
+          replaceResponsiveDesign(initialScreen.elements, initialScreen.target, { width: initialScreen.customArtboard ? initialScreen.customWidth : boardSize(initialScreen.target).width, height: initialScreen.customArtboard ? initialScreen.customHeight : boardSize(initialScreen.target).height }, initialScreen.responsiveDesign || parsed.responsiveDesign); setSelectedId(initialScreen.elements[0]?.id || "");
         } else setDrafts(storedDrafts);
       } else setDrafts(storedDrafts);
     } catch { /* A corrupt local draft does not block the studio. */ }
@@ -1259,22 +1393,22 @@ export function UxUiStudioEngine() {
       const nextId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
       const saved = {
         ...project, id: nextId,
-        description: savedProject?.description || "",
+        description: projectBrief,
         category: savedProject?.category || "Uncategorized",
         isFavorite: savedProject?.isFavorite || false,
       } as SavedProject;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(packStudioProjectAssets(saved)));
       const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) as unknown : [];
       const existing = Array.isArray(parsed) ? parsed.filter((item): item is SavedProject =>
-        Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2)) : [];
+        Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2)).map(unpackStudioProjectAssets) : [];
       const nextDrafts = [saved, ...existing.filter((item) => item.id !== nextId)]
         .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts));
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts.map(packStudioProjectAssets)));
       setSavedProject(saved); setDrafts(nextDrafts);
       if (!activeDraftId) setActiveDraftId(nextId);
     } catch { setNotice("This browser could not save the draft locally. Export the project JSON for a backup."); }
-  }, [project, onboarding, draftLoaded, activeDraftId, savedProject?.category, savedProject?.description, savedProject?.isFavorite, screens.length]);
+  }, [project, projectBrief, onboarding, draftLoaded, activeDraftId, savedProject?.category, savedProject?.description, savedProject?.isFavorite, screens.length]);
 
   useEffect(() => {
     if ((!showToolsPanel && !inlineToolkit) || leftTab !== "fonts" || fontCatalogRequested.current) return;
@@ -1339,7 +1473,7 @@ export function UxUiStudioEngine() {
       let request = customFontRequests.current.get(key);
       if (!request) {
         try {
-          request = new FontFace(layer.fontFamily, "url(" + JSON.stringify(layer.fontDataUrl) + ")").load().then((loaded) => { document.fonts.add(loaded); return loaded; });
+          request = new FontFace(layer.fontFamily, "url(" + JSON.stringify(layer.fontDataUrl) + ")", { weight: studioFontWeightRange(layer.fontDataUrl) }).load().then((loaded) => { document.fonts.add(loaded); return loaded; });
           customFontRequests.current.set(key, request);
         } catch { if (!cancelled) setNotice("A custom font could not be loaded. Check the imported font file."); }
       }
@@ -1367,11 +1501,12 @@ export function UxUiStudioEngine() {
     const size = boardSize(nextTarget);
     setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
     setTarget(nextTarget); setProjectName(created.name); setBackground(created.background);
+    setProjectBrief("");
     setTokens(DEFAULT_TOKENS); setReusableComponents([]);
     const nextScreenId = newScreenId();
     setScreens([{ id: nextScreenId, name: "Screen 1", target: nextTarget, background: created.background, customArtboard: false, customWidth: size.width, customHeight: size.height, elements: created.elements, updatedAt: new Date().toISOString() }]);
     setActiveScreenId(nextScreenId);
-    setElements(created.elements); setSelectedId(created.elements[0]?.id || "");
+    replaceResponsiveDesign(created.elements, nextTarget, size); setResponsiveEditMode("shared"); setSelectedId(created.elements[0]?.id || "");
     setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
     closeToolkit(); setShowExportPanel(false);
     setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
@@ -1390,16 +1525,19 @@ export function UxUiStudioEngine() {
     setScreens(restoredScreens);
     setActiveScreenId(currentScreen.id);
     setProjectName(draft.name); setTarget(currentScreen.target); setBackground(currentScreen.background);
+    setProjectBrief(draft.description || "");
     setCustomArtboard(currentScreen.customArtboard); setCustomWidth(currentScreen.customWidth); setCustomHeight(currentScreen.customHeight);
     setTokens(draft.tokens || DEFAULT_TOKENS); setReusableComponents(draft.reusableComponents || []);
-    setElements(currentScreen.elements.map((layer) => ({
+    const normalizedElements = currentScreen.elements.map((layer) => ({
       ...layer, horizontalConstraint: layer.horizontalConstraint || "left", verticalConstraint: layer.verticalConstraint || "top",
       minWidth: layer.minWidth ?? 0, maxWidth: layer.maxWidth ?? 0,
       visibleOn: layer.visibleOn || ["mobile", "tablet", "desktop"],
       referenceWidth: layer.referenceWidth || draft.viewport.width,
       referenceHeight: layer.referenceHeight || draft.viewport.height,
       componentKey: layer.componentKey || "", rotation: layer.rotation || 0,
-    })));
+    }));
+    replaceResponsiveDesign(normalizedElements, currentScreen.target, { width: currentScreen.customArtboard ? currentScreen.customWidth : boardSize(currentScreen.target).width, height: currentScreen.customArtboard ? currentScreen.customHeight : boardSize(currentScreen.target).height }, currentScreen.responsiveDesign || draft.responsiveDesign);
+    setResponsiveEditMode("shared"); setUndoStack([]); setRedoStack([]);
     setSelectedId(currentScreen.elements[0]?.id || ""); setActiveDraftId(draft.id || "");
     setSavedProject(draft);
     setLeftTab("toolkits"); setToolkitSearch(""); closeToolkit(); setShowExportPanel(false);
@@ -1411,7 +1549,7 @@ export function UxUiStudioEngine() {
   function commitDraftList(nextDrafts: SavedProject[]) {
     const sorted = [...nextDrafts].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 100);
     setDrafts(sorted);
-    try { localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(sorted)); }
+    try { localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(sorted.map(packStudioProjectAssets))); }
     catch { setNotice("Project changes could not be saved in this browser. Export project JSON as a backup."); }
   }
 
@@ -1454,19 +1592,20 @@ export function UxUiStudioEngine() {
       customArtboard: true, customWidth: source.viewport.width, customHeight: source.viewport.height,
       elements: source.elements, updatedAt: source.updatedAt,
     }];
-    const screenCopies = sourceScreens.map((screen) => ({
-      ...screen, id: newScreenId(), name: screen.name + " copy",
-      elements: screen.elements.map((layer) => ({ ...layer, id: layerId(), name: layer.name + " copy" })),
-      updatedAt: new Date().toISOString(),
-    }));
+    const screenIds = new Map(sourceScreens.map(screen => [screen.id, newScreenId()]));
+    const screenCopies = sourceScreens.map((screen) => {
+      const size = screen.customArtboard ? { width: screen.customWidth, height: screen.customHeight } : boardSize(screen.target);
+      const responsiveDesign = remapResponsiveScreenLinks(cloneResponsiveDesign(restoreResponsiveDesign(screen.responsiveDesign || source.responsiveDesign, screen.elements, screen.target, size), layerId), screenIds);
+      return { ...screen, id: screenIds.get(screen.id)!, name: screen.name + " copy", responsiveDesign, elements: responsiveElements(responsiveDesign, screen.target, size), updatedAt: new Date().toISOString() };
+    });
     const idNext = "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
-    const active = screenCopies[0];
+    const active = screenCopies.find(screen => screen.id === screenIds.get(source.activeScreenId || "")) || screenCopies[0];
     const clone: SavedProject = {
       ...source, id: idNext, name: (source.name || "Untitled design") + " copy",
       screens: screenCopies, activeScreenId: active.id, target: active.target, background: active.background,
       viewport: { width: active.customArtboard ? active.customWidth : boardSize(active.target).width,
         height: active.customArtboard ? active.customHeight : boardSize(active.target).height },
-      elements: active.elements, isFavorite: false, updatedAt: new Date().toISOString(),
+      elements: active.elements, responsiveDesign: active.responsiveDesign, isFavorite: false, updatedAt: new Date().toISOString(),
     };
     commitDraftList([clone, ...drafts]);
     setNotice("Duplicated project: " + clone.name + ".");
@@ -1474,7 +1613,7 @@ export function UxUiStudioEngine() {
 
   function activeScreenSnapshot(): DesignScreen {
     const current = screens.find((screen) => screen.id === activeScreenId);
-    return { id: activeScreenId || newScreenId(), name: current?.name || ("Screen " + (screens.length || 1)), target, background, customArtboard, customWidth, customHeight, elements, updatedAt: new Date().toISOString() };
+    return { ...current, id: activeScreenId || newScreenId(), name: current?.name || ("Screen " + (screens.length || 1)), target, background, customArtboard, customWidth, customHeight, elements, responsiveDesign: responsiveRef.current, updatedAt: new Date().toISOString() };
   }
 
   function openScreen(screenId: string) {
@@ -1487,7 +1626,8 @@ export function UxUiStudioEngine() {
     setActiveScreenId(next.id);
     setTarget(next.target); setBackground(next.background);
     setCustomArtboard(next.customArtboard); setCustomWidth(next.customWidth); setCustomHeight(next.customHeight);
-    setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
+    replaceResponsiveDesign(next.elements, next.target, { width: next.customArtboard ? next.customWidth : boardSize(next.target).width, height: next.customArtboard ? next.customHeight : boardSize(next.target).height }, next.responsiveDesign); setSelectedId(next.elements[0]?.id || "");
+    setUndoStack([]); setRedoStack([]);
     setShowInspector(false); setNotice("Opened " + next.name + ".");
   }
 
@@ -1539,9 +1679,9 @@ export function UxUiStudioEngine() {
   function addScreen() {
     const current = activeScreenSnapshot();
     const id = newScreenId();
-    const next: DesignScreen = { ...current, id, name: "Screen " + (screens.length + 1), elements: [], updatedAt: new Date().toISOString() };
+    const next: DesignScreen = { ...current, id, name: "Screen " + (screens.length + 1), elements: [], responsiveDesign: createResponsiveDesign<DesignLayer>([], target, board), updatedAt: new Date().toISOString() };
     setScreens((previous) => [...previous.map((screen) => screen.id === current.id ? current : screen), next]);
-    setActiveScreenId(id); setElements([]); setSelectedId("");
+    setActiveScreenId(id); replaceResponsiveDesign([], target, board, next.responsiveDesign); setSelectedId("");
     setUndoStack([]); setRedoStack([]); setShowInspector(true);
     setNotice(next.name + " added. Add elements to design this screen.");
   }
@@ -1549,12 +1689,15 @@ export function UxUiStudioEngine() {
   function duplicateScreen(screenId: string) {
     const source = screens.find((screen) => screen.id === screenId);
     if (!source) return;
-    const duplicate: DesignScreen = { ...source, id: newScreenId(), name: source.name + " copy", elements: source.elements.map((layer) => ({ ...layer, id: layerId(), name: layer.name + " copy" })), updatedAt: new Date().toISOString() };
+    const sourceSize = source.customArtboard ? { width: source.customWidth, height: source.customHeight } : boardSize(source.target);
+    const responsiveDesign = cloneResponsiveDesign(restoreResponsiveDesign(source.responsiveDesign, source.elements, source.target, sourceSize), layerId);
+    const duplicate: DesignScreen = { ...source, id: newScreenId(), name: source.name + " copy", responsiveDesign, elements: responsiveElements(responsiveDesign, source.target, sourceSize), updatedAt: new Date().toISOString() };
     const current = activeScreenSnapshot();
     setScreens((previous) => [...previous.map((screen) => screen.id === current.id ? current : screen), duplicate]);
     setActiveScreenId(duplicate.id); setTarget(duplicate.target); setBackground(duplicate.background);
     setCustomArtboard(duplicate.customArtboard); setCustomWidth(duplicate.customWidth); setCustomHeight(duplicate.customHeight);
-    setElements(duplicate.elements); setSelectedId(duplicate.elements[0]?.id || "");
+    replaceResponsiveDesign(duplicate.elements, duplicate.target, { width: duplicate.customArtboard ? duplicate.customWidth : boardSize(duplicate.target).width, height: duplicate.customArtboard ? duplicate.customHeight : boardSize(duplicate.target).height }, duplicate.responsiveDesign); setSelectedId(duplicate.elements[0]?.id || "");
+    setUndoStack([]); setRedoStack([]);
     setShowInspector(true); setNotice(duplicate.name + " duplicated.");
   }
 
@@ -1566,6 +1709,7 @@ export function UxUiStudioEngine() {
     if (index < 0) return;
     const remaining = source.filter((screen) => screen.id !== screenId).map((screen) => ({
       ...screen,
+      responsiveDesign: screen.responsiveDesign ? remapResponsiveScreenLinks(screen.responsiveDesign, new Map([[screenId, ""]])) : undefined,
       elements: screen.elements.map((layer) => layer.prototypeTargetScreenId === screenId ? { ...layer, prototypeTargetScreenId: "" } : layer),
     }));
     if (screenId === activeScreenId) {
@@ -1573,11 +1717,12 @@ export function UxUiStudioEngine() {
       if (prototypeStartScreenId === screenId) setPrototypeStartScreenId(next.id);
       setScreens(remaining); setActiveScreenId(next.id);
       setTarget(next.target); setBackground(next.background); setCustomArtboard(next.customArtboard);
-      setCustomWidth(next.customWidth); setCustomHeight(next.customHeight); setElements(next.elements); setSelectedId(next.elements[0]?.id || "");
+      setCustomWidth(next.customWidth); setCustomHeight(next.customHeight); replaceResponsiveDesign(next.elements, next.target, { width: next.customArtboard ? next.customWidth : boardSize(next.target).width, height: next.customArtboard ? next.customHeight : boardSize(next.target).height }, next.responsiveDesign); setSelectedId(next.elements[0]?.id || "");
+      setUndoStack([]); setRedoStack([]);
     } else {
       setScreens(remaining);
       const updatedActive = remaining.find((screen) => screen.id === activeScreenId);
-      if (updatedActive) setElements(updatedActive.elements);
+      if (updatedActive) replaceResponsiveDesign(updatedActive.elements, target, board, updatedActive.responsiveDesign);
       if (screenId === prototypeStartScreenId) setPrototypeStartScreenId(activeScreenId);
     }
     setPrototypeHistory((previous) => previous.filter((id) => id !== screenId));
@@ -1600,27 +1745,42 @@ export function UxUiStudioEngine() {
   }
 
   function checkpoint() {
-    setUndoStack((previous) => [...previous.slice(-39), elements]);
+    const snapshot = historySnapshot();
+    setUndoStack((previous) => [...previous.slice(-39), snapshot]);
     setRedoStack([]);
+  }
+
+  function historySnapshot(): DesignHistory {
+    return { elements: elementsRef.current, responsiveDesign: responsiveRef.current, target, customArtboard, customWidth, customHeight, background };
+  }
+
+  function restoreHistory(snapshot: DesignHistory) {
+    setTarget(snapshot.target); setCustomArtboard(snapshot.customArtboard);
+    setCustomWidth(snapshot.customWidth); setCustomHeight(snapshot.customHeight); setBackground(snapshot.background);
+    responsiveRef.current = snapshot.responsiveDesign;
+    elementsRef.current = snapshot.elements;
+    setElementsState(snapshot.elements); setResponsiveRevision(value => value + 1);
   }
 
   function undoLayout() {
     if (!undoStack.length) return;
     const previous = undoStack[undoStack.length - 1];
-    setRedoStack((stack) => [...stack.slice(-39), elements]);
+    const current = historySnapshot();
+    setRedoStack((stack) => [...stack.slice(-39), current]);
     setUndoStack((stack) => stack.slice(0, -1));
-    setElements(previous);
-    if (!previous.some((item) => item.id === selectedId)) setSelectedId(previous[0]?.id || "");
+    restoreHistory(previous);
+    if (!previous.elements.some((item) => item.id === selectedId)) setSelectedId(previous.elements[0]?.id || "");
     setNotice("Undo complete.");
   }
 
   function redoLayout() {
     if (!redoStack.length) return;
     const next = redoStack[redoStack.length - 1];
-    setUndoStack((stack) => [...stack.slice(-39), elements]);
+    const current = historySnapshot();
+    setUndoStack((stack) => [...stack.slice(-39), current]);
     setRedoStack((stack) => stack.slice(0, -1));
-    setElements(next);
-    if (!next.some((item) => item.id === selectedId)) setSelectedId(next[0]?.id || "");
+    restoreHistory(next);
+    if (!next.elements.some((item) => item.id === selectedId)) setSelectedId(next.elements[0]?.id || "");
     setNotice("Redo complete.");
   }
 
@@ -1638,13 +1798,28 @@ export function UxUiStudioEngine() {
 
   function updateLayer(id: string, patch: Partial<DesignLayer>, recordHistory = true) {
     if (recordHistory) checkpoint();
+    if (Object.hasOwn(patch, "radius") && !Object.hasOwn(patch, "cornerRadii")) patch = { ...patch, cornerRadii: undefined };
     setElements((previous) => previous.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
   function selectLayer(id: string, multi = false) {
     setCanvasSelected(false);
-    setSelectedId(id);
-    setSelectedIds((previous) => multi ? (previous.includes(id) ? previous.filter((value) => value !== id) : [...previous, id]) : [id]);
+    const next = multi || multiSelectMode ? (selectedIds.includes(id) ? selectedIds.filter(value => value !== id) : [...selectedIds, id]) : [id];
+    setSelectedId(next.includes(id) ? id : next[next.length - 1] || "");
+    setSelectedIds(next);
+  }
+
+  function mergeSelectedIcons() {
+    const sources = elements.filter(item => selectedIds.includes(item.id));
+    try {
+      const merged = mergeStudioVectorLayers(sources);
+      const layer: DesignLayer = { ...makeLayer("icon", merged.x, merged.y, board.width, board.height), ...merged, id: layerId(), name: "Merged icon", iconName: "Merged custom vectors", background: "transparent", borderWidth: 0, padding: 0, radius: 0, opacity: 1, rotation: 0 };
+      checkpoint();
+      const lastIndex = Math.max(...elements.map((item, index) => merged.sourceIds.includes(item.id) ? index : -1));
+      const next = elements.flatMap((item, index) => merged.sourceIds.includes(item.id) ? index === lastIndex ? [layer] : [] : [item]);
+      setElements(next); setSelectedId(layer.id); setSelectedIds([layer.id]); setMultiSelectMode(false);
+      setNotice("Merged " + sources.length + " vectors into one icon. Undo restores the separate layers.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Choose at least two icons or simple shapes to merge."); }
   }
 
   function copySelectedLayers() {
@@ -1789,6 +1964,17 @@ export function UxUiStudioEngine() {
     setNotice(layer.name + " added to the artboard.");
   }
 
+  function addShapePreset(preset: typeof STUDIO_SHAPE_PRESETS[number]) {
+    const layer = { ...makeLayer(preset.kind as LayerKind, 24, Math.max(24, Math.round(board.height * 0.24)), board.width, board.height), ...preset.patch };
+    layer.name = preset.label;
+    if (["search", "input", "textarea", "navbar", "tabbar", "tabs", "menu", "modal", "list", "table"].includes(layer.kind)) {
+      layer.width = Math.max(48, board.width - 48); layer.horizontalConstraint = "stretch";
+    }
+    layer.x = Math.max(0, Math.round((board.width - layer.width) / 2));
+    checkpoint(); setElements(previous => [...previous, layer]); selectLayer(layer.id); closeToolkit();
+    setEditTool("shape"); setNotice(preset.label + " added. Style its corners, fill and border below.");
+  }
+
   function applyPreset(presetId: string) {
     const preset = PRESETS.find((item) => item.id === presetId);
     if (!preset) return;
@@ -1799,7 +1985,7 @@ export function UxUiStudioEngine() {
     setTarget(preset.target);
     setProjectName(created.name);
     setBackground(created.background);
-    setElements(created.elements);
+    replaceResponsiveDesign(created.elements, preset.target, size);
     setSelectedId(created.elements[0]?.id || "");
     setZoom(100);
     setNotice(preset.label + " loaded. Your previous canvas was replaced.");
@@ -1809,19 +1995,20 @@ export function UxUiStudioEngine() {
     setPreferredTarget(next);
     if (next === target) return;
     const nextBoard = boardSize(next);
-    const scaleX = nextBoard.width / board.width;
-    const scaleY = nextBoard.height / board.height;
-    checkpoint();
-    setElements((previous) => previous.map((item) => ({
-      ...item,
-      x: Math.round(item.x * scaleX), y: Math.round(item.y * scaleY),
-      width: Math.max(1, Math.round(item.width * scaleX)), height: Math.max(1, Math.round(item.height * scaleY)),
-      referenceWidth: nextBoard.width, referenceHeight: nextBoard.height,
-    })));
+    elementsRef.current = responsiveElements(responsiveRef.current, next, nextBoard);
+    setElementsState(elementsRef.current); setResponsiveRevision(value => value + 1);
     setCustomArtboard(false); setCustomWidth(nextBoard.width); setCustomHeight(nextBoard.height);
     setTarget(next);
     setZoom(100);
-    setNotice("The artboard was resized proportionally. Review spacing at the new viewport.");
+    setNotice(hasResponsiveOverrides(responsiveRef.current, next) ? "Showing " + next + " with its saved device fixes." : "Showing the shared design on " + next + ".");
+  }
+
+  function resetDeviceOverrides() {
+    checkpoint();
+    responsiveRef.current = resetResponsiveDevice(responsiveRef.current, target);
+    elementsRef.current = responsiveElements(responsiveRef.current, target, board);
+    setElementsState(elementsRef.current); setResponsiveRevision(value => value + 1);
+    setNotice("This device now follows the shared design. Undo restores its fixes.");
   }
 
   function movePointer(event: ReactPointerEvent<SVGSVGElement>) {
@@ -1917,10 +2104,11 @@ export function UxUiStudioEngine() {
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
 
-  function normalizeImportedLayers(raw: unknown, referenceWidth = board.width, referenceHeight = board.height): DesignLayer[] {
+  function normalizeImportedLayers(raw: unknown, referenceWidth = board.width, referenceHeight = board.height, preserveIds = false): DesignLayer[] {
     if (!Array.isArray(raw)) throw new Error("The file does not contain an element list.");
+    if (raw.length > 512) throw new Error("Import up to 512 layers per screen. Split larger designs into separate screens first.");
     const validKinds = new Set<string>([...COMPONENTS.map((item) => item.kind), "ellipse", "spacer", "toggle", "dropdown", "search", "textarea", "table", "chart", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu", "progress", "slider", "radio", "switch", "triangle", "diamond", "hexagon", "star", "line", "pill"]);
-    return raw.slice(0, 100).flatMap((value) => {
+    return raw.flatMap((value) => {
       if (!value || typeof value !== "object") return [];
       const rawLayer = value as Partial<DesignLayer>;
       const kind = typeof rawLayer.kind === "string" && validKinds.has(rawLayer.kind) ? rawLayer.kind as LayerKind : "rect";
@@ -1931,7 +2119,7 @@ export function UxUiStudioEngine() {
       if (kind === "icon" && typeof rawLayer.iconSvg === "string" && rawLayer.iconSvg) {
         try { safeIcon = sanitizeIconMarkup('<svg viewBox="' + String(rawLayer.iconViewBox || "0 0 24 24").replace(/["<>]/g, "") + '">' + rawLayer.iconSvg + "</svg>"); } catch { /* Ignore unsafe imported SVG markup. */ }
       }
-      return [{ ...defaults, ...rawLayer, id: layerId(), kind,
+      return [{ ...defaults, ...rawLayer, id: preserveIds && typeof rawLayer.id === "string" && /^[a-zA-Z0-9_-]{1,120}$/.test(rawLayer.id) ? rawLayer.id : layerId(), kind,
         name: typeof rawLayer.name === "string" ? rawLayer.name : defaults.name,
         x: Math.max(0, Math.min(referenceWidth - 1, x)), y: Math.max(0, Math.min(referenceHeight - 1, y)),
         width: Math.max(1, Math.min(referenceWidth, Number.isFinite(rawLayer.width) ? Number(rawLayer.width) : defaults.width)),
@@ -1940,6 +2128,37 @@ export function UxUiStudioEngine() {
         iconSvg: safeIcon.body, iconViewBox: safeIcon.viewBox,
         rotation: Number.isFinite(rawLayer.rotation) ? Number(rawLayer.rotation) : 0 } as DesignLayer];
     });
+  }
+
+  function importedResponsiveDesign(raw: unknown, fallback: DesignLayer[], nextTarget: DeviceTarget, size: { width: number; height: number }) {
+    const model = restoreResponsiveDesign(raw, fallback, nextTarget, size);
+    model.baseElements = normalizeImportedLayers(model.baseElements, model.baseViewport.width, model.baseViewport.height, true);
+    for (const device of ["mobile", "tablet", "desktop"] as DeviceTarget[]) {
+      const local = model.overrides[device];
+      if (!local) continue;
+      const dimensions = local.viewport || boardSize(device);
+      local.added = normalizeImportedLayers(local.added, dimensions.width, dimensions.height, true);
+      for (const patch of Object.values(local.patches)) if (typeof patch.values.iconSvg === "string") {
+        patch.values.iconSvg = sanitizeIconMarkup("<svg>" + patch.values.iconSvg + "</svg>").body;
+      }
+    }
+    return model;
+  }
+
+  function applyScreenshotReconstruction(result: StudioScreenshotImportResult) {
+    const nextTarget: DeviceTarget = result.width <= 600 ? "mobile" : result.width <= 1024 ? "tablet" : "desktop";
+    const size = { width: result.width, height: result.height };
+    const layers = normalizeImportedLayers(result.elements, size.width, size.height);
+    if (result.includeReference) layers.unshift({ ...makeLayer("image", 0, 0, size.width, size.height), name: "Original screenshot · reference", width: size.width, height: size.height, imageDataUrl: result.referenceDataUrl, padding: 0, radius: 0, hidden: true, locked: true });
+    const current = activeScreenSnapshot();
+    const id = newScreenId();
+    const responsiveDesign = createResponsiveDesign(layers, nextTarget, size);
+    const screen: DesignScreen = { id, name: "Screenshot · " + (screenshotFile?.name.replace(/\.[^.]+$/, "") || "reconstructed"), target: nextTarget, background: result.background, customArtboard: true, customWidth: size.width, customHeight: size.height, elements: layers, responsiveDesign, reconstruction: { sourceName: screenshotFile?.name || "Screenshot", stats: result.stats, warnings: result.warnings }, updatedAt: new Date().toISOString() };
+    setScreens(previous => [...previous.map(item => item.id === current.id ? current : item), screen]);
+    setActiveScreenId(id); setTarget(nextTarget); setBackground(result.background); setCustomArtboard(true); setCustomWidth(size.width); setCustomHeight(size.height);
+    replaceResponsiveDesign(layers, nextTarget, size, responsiveDesign); setResponsiveEditMode("shared");
+    setSelectedId(layers.find(layer => !layer.hidden)?.id || ""); setUndoStack([]); setRedoStack([]); setScreenshotFile(null); closeToolkit();
+    setNotice("Reconstructed " + result.stats.textLines + " text lines, " + result.stats.shapes + " shapes and " + result.stats.imageRegions + " artwork regions in a new editable screen. Review wording, fonts and geometry.");
   }
 
   function importElementsFile(file: File) {
@@ -1970,21 +2189,34 @@ export function UxUiStudioEngine() {
   }
 
   function importPresetFile(file: File) {
-    if (file.size > 8 * 1024 * 1024) { setNotice("Preset files must be 8 MB or smaller."); return; }
+    if (file.size > 16 * 1024 * 1024) { setNotice("Project files must be 16 MB or smaller."); return; }
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(String(reader.result)) as Partial<SavedProject>;
+        const parsed = unpackStudioProjectAssets(JSON.parse(String(reader.result))) as Partial<SavedProject>;
         if (!Array.isArray(parsed.elements)) throw new Error("Choose an enV UX/UI Studio project or preset JSON file.");
         const nextTarget: DeviceTarget = parsed.target === "tablet" || parsed.target === "desktop" ? parsed.target : "mobile";
         const width = Number.isFinite(parsed.viewport?.width) ? Number(parsed.viewport?.width) : boardSize(nextTarget).width;
         const height = Number.isFinite(parsed.viewport?.height) ? Number(parsed.viewport?.height) : boardSize(nextTarget).height;
-        const imported = normalizeImportedLayers(parsed.elements, width, height);
+        const imported = normalizeImportedLayers(parsed.elements, width, height, Boolean(parsed.responsiveDesign));
         checkpoint(); setTarget(nextTarget); setCustomArtboard(Boolean(parsed.viewport)); setCustomWidth(width); setCustomHeight(height);
         setProjectName(typeof parsed.name === "string" ? parsed.name : file.name.split(".").slice(0, -1).join("."));
+        setProjectBrief(typeof parsed.description === "string" ? parsed.description : "");
         setBackground(typeof parsed.background === "string" ? parsed.background : "#FFFFFF");
         setTokens(parsed.tokens || DEFAULT_TOKENS); setReusableComponents(parsed.reusableComponents || []);
-        setElements(imported); setSelectedId(imported[0]?.id || ""); closeToolkit(); setActiveDraftId(""); setOnboarding(false);
+        const model = importedResponsiveDesign(parsed.responsiveDesign, imported, nextTarget, { width, height });
+        const importedScreens: DesignScreen[] = Array.isArray(parsed.screens) ? parsed.screens.filter(screen => screen && Array.isArray(screen.elements)).map(screen => {
+          const device = ["mobile", "tablet", "desktop"].includes(screen.target) ? screen.target : nextTarget;
+          const size = screen.customArtboard ? { width: Math.max(160, Math.min(4096, screen.customWidth || boardSize(device).width)), height: Math.max(240, Math.min(4096, screen.customHeight || boardSize(device).height)) } : boardSize(device);
+          const layers = normalizeImportedLayers(screen.elements, size.width, size.height, true);
+          const responsiveDesign = importedResponsiveDesign(screen.responsiveDesign, layers, device, size);
+          return { ...screen, target: device, elements: responsiveElements(responsiveDesign, device, size), responsiveDesign, customWidth: size.width, customHeight: size.height, updatedAt: new Date().toISOString() };
+        }) : [];
+        const active = importedScreens.find(screen => screen.id === parsed.activeScreenId);
+        const id = active?.id || newScreenId();
+        setScreens(importedScreens.length && active ? importedScreens : [{ id, name: "Screen 1", target: nextTarget, background: parsed.background || "#FFFFFF", customArtboard: Boolean(parsed.viewport), customWidth: width, customHeight: height, elements: imported, responsiveDesign: model, updatedAt: new Date().toISOString() }]);
+        setActiveScreenId(id); replaceResponsiveDesign(imported, nextTarget, { width, height }, active?.responsiveDesign || model);
+        setSelectedId(imported[0]?.id || ""); setResponsiveEditMode("shared"); closeToolkit(); setActiveDraftId(""); setOnboarding(false); setUndoStack([]); setRedoStack([]);
         setNotice("Preset imported. You can now customise every element.");
       } catch (error) { setNotice(error instanceof Error ? error.message : "Could not import that preset."); }
     };
@@ -2111,23 +2343,43 @@ export function UxUiStudioEngine() {
     setNotice("Project JSON downloaded with the full design specification and AI prompt.");
   }
 
-  async function exportPdf() {
+  async function exportPdf(allDevices = false) {
     if (!artboardRef.current) return;
     setExporting(true);
     setNotice("");
+    const originalView = { target, customArtboard, customWidth, customHeight, elements: elementsRef.current };
     try {
       await document.fonts.ready;
-      const bytes = await buildPdf(project, artboardRef.current, aiPrompt, project.target);
+      const previews: Array<{ target: DeviceTarget; viewport: { width: number; height: number }; elements: DesignLayer[]; svg: SVGSVGElement }> = [];
+      if (allDevices) {
+        for (const device of ["mobile", "tablet", "desktop"] as DeviceTarget[]) {
+          const size = boardSize(device);
+          const deviceElements = responsiveElements(responsiveRef.current, device, size);
+          setTarget(device); setCustomArtboard(false); setCustomWidth(size.width); setCustomHeight(size.height);
+          elementsRef.current = deviceElements; setElementsState(deviceElements);
+          await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          await document.fonts.ready;
+          if (!artboardRef.current) throw new Error("The device preview could not be rendered.");
+          previews.push({ target: device, viewport: size, elements: deviceElements, svg: artboardRef.current.cloneNode(true) as SVGSVGElement });
+        }
+      }
+      const bytes = await buildPdf(project, previews[0]?.svg || artboardRef.current, aiPrompt, project.target, previews.length ? previews : undefined);
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = (projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "env-design") + "-design-spec.pdf";
+      anchor.href = url; anchor.download = (projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "env-design") + (allDevices ? "-all-devices-handoff.pdf" : "-design-spec.pdf");
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice("PDF exported: rendered artboard, AI implementation prompt and complete JSON specification.");
+      setNotice("PDF exported: " + (allDevices ? "mobile, tablet and desktop artboards" : "rendered artboard") + ", AI implementation prompt and complete JSON specification.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "PDF export failed. Download the JSON spec as a backup.");
-    } finally { setExporting(false); }
+    } finally {
+      if (allDevices) {
+        setTarget(originalView.target); setCustomArtboard(originalView.customArtboard); setCustomWidth(originalView.customWidth); setCustomHeight(originalView.customHeight);
+        elementsRef.current = originalView.elements; setElementsState(originalView.elements);
+      }
+      setExporting(false);
+    }
   }
 
   async function copyPrompt() {
@@ -2159,7 +2411,7 @@ export function UxUiStudioEngine() {
     setSelectedId(""); setSelectedIds([]); setCanvasSelected(false);
     dragRef.current = null;
     closeToolkit();
-    setNotice("Finished editing. Tap + Add for another item, or tap an item to edit it.");
+    setNotice("Finished editing. Tap + for another item, or tap an item to edit it.");
   }
 
   if (onboarding) {
@@ -2218,20 +2470,24 @@ export function UxUiStudioEngine() {
   function chooseEditTool(tool: string) { setInlineToolkit(false); setEditTool(tool); }
   function chooseToolkit(id: string) { openToolkit(id); setShowToolsPanel(false); setInlineToolkit(true); setEditTool("library"); }
   function holdUpdate(id: string, patch: Partial<DesignLayer>) { updateLayer(id, patch, false); }
-  async function processImage(operation: "cutout" | "icon" | "resize", edge = 1024) {
+  async function processImage(operation: "cutout" | "chroma" | "icon" | "resize", edge = 1024) {
     if (!selected?.imageDataUrl || imageBusy) return;
     const id = selected.id; setImageBusy(true);
     try {
-      const result = await editStudioImage(selected.imageDataUrl,operation,cutoutStrength,edge);
-      updateLayer(id,operation === "icon" ? {kind:"icon",iconName:"Custom silhouette",iconSvg:sanitizeIconMarkup(result.data).body,iconViewBox:`0 0 ${result.width} ${result.height}`,background:"transparent",imageDataUrl:"",padding:0} : {imageDataUrl:result.data,...(operation === "cutout" ? {background:"transparent"} : {})});
+      const original = selected.imageOriginalDataUrl || selected.imageDataUrl;
+      const source = operation === "cutout" || operation === "chroma" ? original : selected.imageDataUrl;
+      const limit = operation === "cutout" || operation === "chroma" ? selected.imageEditMaxEdge || edge : edge;
+      const result = await editStudioImage(source, operation, { tolerance: cutoutStrength, softness: keySoftness, mode: cutoutMode, ...(operation === "chroma" ? { keyColor, spill: keySpill } : {}) }, limit);
+      updateLayer(id, operation === "icon" ? {kind:"icon",iconName:"Custom silhouette",iconSvg:sanitizeIconMarkup(result.data).body,iconViewBox:`0 0 ${result.width} ${result.height}`,background:"transparent",imageDataUrl:"",padding:0} : {imageDataUrl:result.data,imageOriginalDataUrl:original,...(operation === "resize" ? { imageEditMaxEdge: Math.max(result.width, result.height) } : {}),...(operation === "cutout" || operation === "chroma" ? {background:"transparent"} : {})});
       if (operation === "icon") closeToolkit();
-      setNotice(operation === "icon" ? "Editable silhouette icon created. Change its color in Color." : operation === "cutout" ? "Plain background removed. Undo restores the original." : "Image pixels resized.");
+      setNotice(operation === "icon" ? "Editable silhouette icon created. Change its color in Color." : operation === "cutout" || operation === "chroma" ? "Removed " + Math.round(result.removedFraction * 100) + "% of background pixels. " + (result.warning || "Reapply from the original, or use Erase / Restore for fine repairs.") : "Image pixels resized.");
     } catch(error) { setNotice(error instanceof Error ? error.message : "Could not edit this image."); }
     finally { setImageBusy(false); }
   }
   function renderToolkit(inline = false) { return (<div className={inline ? "uxui-inline-library" : "uxui-toolkit-overlay"} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeToolkit(); }}><aside className="uxui-tools-drawer min-w-0 rounded-xl border border-border bg-surface p-3" role={inline ? "region" : "dialog"} aria-modal={inline ? undefined : true} aria-labelledby="uxui-toolkit-title">
           <div className="uxui-drawer-heading"><span id="uxui-toolkit-title">Studio toolkit</span><button type="button" onClick={() => closeToolkit()} aria-label="Cancel studio toolkit"><X size={17} /><span>Cancel</span></button></div>
           <label className="uxui-toolkit-search"><Search size={18} aria-hidden="true" /><input aria-label="Search the Studio Toolkit" type="search" value={toolkitSearch} onChange={(event) => setToolkitSearch(event.target.value)} placeholder="Search elements, icons, fonts, presets…" /></label>
+          {!inline && <button type="button" className="uxui-reconstruct-action" onClick={() => screenshotInputRef.current?.click()}><ImagePlus size={18} /><span>Screenshot to editable layers</span></button>}
           <div className="uxui-toolkit-tabs" role="tablist" aria-label="Studio Toolkit categories">
             {([
               { id: "toolkits", label: "All 26", icon: <LayoutTemplate size={18} strokeWidth={1.8} /> },
@@ -2335,7 +2591,7 @@ export function UxUiStudioEngine() {
               {toolkit.id === "assets" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import assets</button></div>}
               {toolkit.id === "data-viz" && <div className="mt-3"><button type="button" onClick={() => addLayer("chart")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Add editable chart</button></div>}
               {toolkit.id === "illustrations" && <div className="mt-3"><button type="button" onClick={()=>elementImportInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import illustration (SVG/image)</button></div>}
-              {toolkit.id === "media" && <div className="mt-3"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import image</button></div>}
+              {toolkit.id === "media" && <div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={()=>quickImageInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Import image</button><button type="button" onClick={() => screenshotInputRef.current?.click()} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Screenshot to editable layers</button></div>}
             </section>; })()}
           </div>}
           {leftTab === "components" && <div className="mt-3">
@@ -2376,9 +2632,9 @@ export function UxUiStudioEngine() {
           </div>}
 
           {leftTab === "shapes" && <div className="mt-3">
-            <div className="uxui-toolkit-section-heading"><div><h3>Shapes &amp; geometry</h3><p>Tap a shape to place it on the mockup.</p></div><span>{COMPONENTS.filter((component) => ["rect","ellipse","triangle","diamond","hexagon","star","line","divider","pill"].includes(component.kind)).length} shapes</span></div>
+            <div className="uxui-toolkit-section-heading"><div><h3>Shapes &amp; UI controls</h3><p>Search bars, navigation, surfaces and geometry. Each has editable fill, corners and borders.</p></div><span>{STUDIO_SHAPE_PRESETS.length} shapes</span></div>
             <div className="uxui-elements-grid uxui-shapes-grid">
-              {COMPONENTS.filter((component) => ["rect","ellipse","triangle","diamond","hexagon","star","line","divider","pill"].includes(component.kind) && (!toolkitSearch.trim() || (component.label + " " + component.description).toLowerCase().includes(toolkitSearch.trim().toLowerCase()))).map((component) => <button key={component.kind} type="button" onClick={() => addLayer(component.kind)} title={component.description} aria-label={"Add " + component.label} className="uxui-element-tile"><ElementVisual kind={component.kind} /><span className="uxui-element-tile-label">{component.label}</span></button>)}
+              {searchStudioShapes(toolkitSearch).map(preset => <button key={preset.id} type="button" onClick={() => addShapePreset(preset)} title={preset.description} aria-label={"Add " + preset.label} className="uxui-element-tile">{preset.patch?.iconSvg ? <svg viewBox={String(preset.patch.iconViewBox || "0 0 100 100")} aria-hidden="true" style={{ width: 40, height: 40, fill: "currentColor" }} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + preset.patch.iconSvg + "</svg>").body }} /> : <ElementVisual kind={preset.kind as LayerKind} />}<span className="uxui-element-tile-label">{preset.label}</span></button>)}
             </div>
           </div>}
 
@@ -2511,6 +2767,7 @@ export function UxUiStudioEngine() {
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
           <div className="uxui-export-menu-title">Export your design</div>
           <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
+          <button type="button" aria-label="All-device PDF handoff" onClick={() => { void exportPdf(true); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>All-device PDF handoff</strong><small>Mobile, tablet and desktop previews in one PDF</small></span></button>
           <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Editable layers, fonts, colors and AI prompt</small></span></button>
           <button type="button" aria-label="React TSX" onClick={() => { downloadText(sourceName(projectName) + "Design.tsx", generateReactProject(project), "text/typescript;charset=utf-8"); setShowExportPanel(false); }}><Type size={15} /><span><strong>React TSX</strong><small>Web implementation</small></span></button>
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + "Design.kt", generateKotlinProject(project), "text/plain;charset=utf-8"); setShowExportPanel(false); }}><Smartphone size={15} /><span><strong>Kotlin</strong><small>Android implementation</small></span></button>
@@ -2518,6 +2775,13 @@ export function UxUiStudioEngine() {
           <button type="button" onClick={() => { downloadText(sourceName(projectName) + ".html", generateHtmlProject(project), "text/html;charset=utf-8"); setShowExportPanel(false); }}><FileOutput size={15} /><span><strong>HTML + CSS</strong><small>Portable browser preview</small></span></button>
         </div>}
       </header>
+
+      {!prototypePreview && <div className="uxui-responsive-scope" role="group" aria-label="Responsive editing scope">
+        <button type="button" className="uxui-primary-text" aria-label="Add text" onClick={() => { addLayer("text"); setEditTool("text"); }}><Type size={18} /><span>Text</span></button>
+        <label><span>Layer edits</span><select aria-label="Apply layer edits to" value={responsiveEditMode} onChange={event => setResponsiveEditMode(event.target.value as ResponsiveEditMode)}><option value="shared">All devices</option><option value="device">This device only</option></select></label>
+        <span className="uxui-responsive-status">{responsiveEditMode === "shared" ? "Shared design" : target + " fixes"}</span>
+        <button type="button" onClick={resetDeviceOverrides} disabled={!hasResponsiveOverrides(responsiveRef.current, target)}>Reset device fixes</button>
+      </div>}
 
       {prototypePreview && <div className="uxui-prototype-toolbar" role="status" aria-live="polite">
         <span>Prototype preview · {screens.find((screen) => screen.id === activeScreenId)?.name || "Current screen"}</span>
@@ -2560,14 +2824,14 @@ export function UxUiStudioEngine() {
               <div className="uxui-device-cutout" aria-hidden="true" />
               <svg ref={artboardRef} xmlns="http://www.w3.org/2000/svg" width={board.width} height={board.height} viewBox={"0 0 " + board.width + " " + board.height}
                 style={{ width: deviceDisplayWidth + "px", maxWidth: "none", maxHeight: "none", height: "auto", display: "block", flex: "0 0 auto", touchAction: "none", background }} role="group" aria-label={projectName + " design artboard"} onPointerDown={onArtboardPointerDown} onPointerMove={movePointer} onPointerUp={() => { dragRef.current = null; resizeRef.current = null; }} onPointerCancel={() => { dragRef.current = null; resizeRef.current = null; }}>
-                {customFonts.length > 0 && <defs><style>{Array.from(new Map(customFonts.filter(layer => layer.fontDataUrl.startsWith("data:")).map(layer => [layer.fontFamily, layer])).values()).map(layer => "@font-face{font-family:" + JSON.stringify(layer.fontFamily) + ";src:url(" + JSON.stringify(layer.fontDataUrl) + ");font-weight:100 900;font-display:block;}").join("\n")}</style></defs>}
+                {customFonts.length > 0 && <defs><style>{Array.from(new Map(customFonts.filter(layer => layer.fontDataUrl.startsWith("data:")).map(layer => [layer.fontFamily, layer])).values()).map(layer => "@font-face{font-family:" + JSON.stringify(layer.fontFamily) + ";src:url(" + JSON.stringify(layer.fontDataUrl) + ");font-weight:" + studioFontWeightRange(layer.fontDataUrl) + ";font-display:block;}").join("\n")}</style></defs>}
                 <rect width={board.width} height={board.height} fill={background} role="button" tabIndex={prototypePreview ? -1 : 0} aria-label="Select canvas background" onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectCanvas(); } }} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
                 {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
                 {[...elements].filter((layer) => !layer.hidden && layer.display !== "none" && (!layer.visibleOn || layer.visibleOn.includes(target))).sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)).map((layer) => {
                   const boxFill = layer.background === "transparent" ? "none" : layer.background;
                   const stroke = layer.borderWidth > 0 ? layer.borderColor : "none";
-                  const baseBox = (round = layer.radius) => <rect x={layer.x} y={layer.y} width={layer.width} height={layer.height} rx={round} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} />;
+                  const baseBox = (round = layer.radius) => <path d={roundedRectanglePath({ ...layer, radius: round }, layer.x, layer.y)} fill={boxFill} stroke={stroke} strokeWidth={layer.borderWidth} strokeDasharray={shapeStrokeDasharray(layer)} strokeLinecap={layer.borderStyle === "dotted" ? "round" : undefined} />;
                   const shadow = layer.shadow ? "0 3px 10px #0F172A24" : undefined;
                   const style: CSSProperties = { filter: shadow ? "drop-shadow(0px 3px 6px #0F172A22)" : undefined, opacity: layer.opacity, cursor: prototypePreview ? (layer.prototypeTargetScreenId && screens.some((screen) => screen.id === layer.prototypeTargetScreenId) ? "pointer" : "not-allowed") : layer.cursor || "default", display: layer.display === "none" ? "none" : undefined };
                   return <g key={layer.id} data-layer-id={layer.id} style={style} transform={layer.rotation ? "rotate(" + layer.rotation + " " + (layer.x + layer.width / 2) + " " + (layer.y + layer.height / 2) + ")" : undefined}>
@@ -2617,7 +2881,7 @@ export function UxUiStudioEngine() {
                     {layer.kind === "image" ? layer.imageDataUrl ? <image href={layer.imageDataUrl} x={layer.x} y={layer.y} width={layer.width} height={layer.height} preserveAspectRatio="xMidYMid slice" /> : <><path d={"M " + (layer.x + layer.width * 0.18) + " " + (layer.y + layer.height * 0.76) + " l " + (layer.width * 0.2 * -1) + " 0 l " + (layer.width * 0.2) + " -" + (layer.height * 0.27) + " l " + (layer.width * 0.16) + " " + (layer.height * 0.16) + " l " + (layer.width * 0.16 * -1) + " " + (layer.height * 0.11) + " l " + (layer.width * 0.22) + " -" + (layer.height * 0.33) + " l " + (layer.width * 0.18) + " " + (layer.height * 0.33)} fill="none" stroke="#94A3B8" strokeWidth="2" /><text x={layer.x + layer.width / 2} y={layer.y + layer.height - 10} fontSize="11" fill="#64748B" textAnchor="middle">{layer.text}</text></> : null}
                     {layer.kind === "icon" ? <svg x={layer.x + 2} y={layer.y + 2} width={layer.width - 4} height={layer.height - 4} viewBox={layer.iconViewBox || "0 0 24 24"} color={layer.color} fill="currentColor" aria-label={layer.iconName || "icon"}><g dangerouslySetInnerHTML={{ __html: layer.iconSvg || '<path d="M12 3l9 8h-3v9h-5v-6h-3v6H5v-9H3z" fill="currentColor"/>' }} /></svg> : null}
                     {["text", "button", "card", "input", "navbar", "tabbar", "row", "avatar", "badge", "dropdown", "search", "textarea", "table", "modal", "breadcrumb", "tooltip", "list", "video", "logo", "tabs", "menu"].includes(layer.kind) ? layerTextSvg(layer, layer.x, layer.y, layer.width) : null}
-                    {selectedId === layer.id && <rect data-editor-only="true" x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
+                    {selectedIds.includes(layer.id) && <rect data-editor-only="true" x={layer.x - 1.5} y={layer.y - 1.5} width={Math.max(1, layer.width + 3)} height={Math.max(1, layer.height + 3)} fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="5 3" pointerEvents="none" />}
                     {selectedId === layer.id && !prototypePreview && !layer.locked && <g data-editor-only="true" role="button" tabIndex={0} aria-label="Drag to resize selected element" className="uxui-resize-handle"
                       onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); checkpoint(); dragRef.current = null; resizeRef.current = { id: layer.id, x: layer.x, y: layer.y, width: layer.width, height: layer.height, pointerX: event.clientX, pointerY: event.clientY, rotation: layer.rotation || 0, fontSize: TEXT_LAYER_KINDS.includes(layer.kind) ? layer.fontSize : undefined }; artboardRef.current?.setPointerCapture(event.pointerId); }}
                       onKeyDown={(event) => { if (["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); updateLayer(layer.id, { width: Math.max(12, layer.width + (event.key === "ArrowRight" ? 4 : event.key === "ArrowLeft" ? -4 : 0)), height: Math.max(12, layer.height + (event.key === "ArrowDown" ? 4 : event.key === "ArrowUp" ? -4 : 0)) }); } }}>
@@ -2636,14 +2900,15 @@ export function UxUiStudioEngine() {
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
-            <button type="button" className="uxui-add-button" onClick={openToolkitHome} aria-expanded={showToolsPanel} aria-label="Add elements"><Plus size={24} strokeWidth={1.6} /><span>Add</span></button>
+            <button type="button" className="uxui-add-button" onClick={openToolkitHome} aria-expanded={showToolsPanel} aria-label="Add elements" title="Add elements"><Plus size={25} strokeWidth={1.7} aria-hidden="true" /></button>
             <div className="uxui-bottom-group">
               <button type="button" onClick={() => { setShowInspector((value) => !value); setShowMoreLayers(true); }} aria-label="App screens and layers" aria-expanded={showInspector} title="App screens" className={showInspector ? "is-active" : ""}><LayoutTemplate size={20} /></button>
               <button type="button" onClick={toggleExpandedPreview} aria-label={isExpanded ? "Exit full-screen studio" : "Expand studio to full screen"} title={isExpanded ? "Exit full screen" : "Full-screen studio"}>{isExpanded ? <Minimize2 size={20} /> : <Maximize2 size={20} />}</button>
             </div>
           </div>
           {selected && !prototypePreview && <div className="uxui-selection-bar" role="group" aria-label="Selected item">
-            <span>{selected.name || "Selected item"}</span>
+            <span>{selectedIds.length > 1 ? selectedIds.length + " selected" : selected.name || "Selected item"}</span>
+            {selectedIds.length > 1 && <button type="button" onClick={mergeSelectedIcons} aria-label="Merge icons">Merge</button>}
             <button type="button" onClick={deleteSelected} aria-label="Delete selected item"><Trash2 size={16} />Delete</button>
             <button type="button" onClick={finishSelection} aria-label="Done editing selected item"><Check size={17} />Done</button>
           </div>}
@@ -2667,7 +2932,7 @@ export function UxUiStudioEngine() {
               <StudioRepeatButton begin={checkpoint} className="uxui-pad-down" aria-label="Decrease element size 10 percent" action={() => holdUpdate(selected.id, { width: Math.max(12, Math.round(selected.width * 0.9)), height: Math.max(12, Math.round(selected.height * 0.9)), ...(selectedHasText ? { fontSize: Math.max(1, Math.round(selected.fontSize * 0.9)) } : {}) })}><ZoomOut size={18} /></StudioRepeatButton>
             </div>
           </div>}
-{!prototypePreview && (selected || canvasSelected) && editTool !== "move" && editTool !== "library" && editTool !== "lookup" && editTool !== "cutout" && <section className="uxui-style-dock" aria-label={selected ? "Selected element styling" : "Canvas styling"}>
+{!prototypePreview && (selected || canvasSelected) && editTool !== "move" && editTool !== "library" && editTool !== "lookup" && editTool !== "cutout" && editTool !== "chroma" && <section className="uxui-style-dock" aria-label={selected ? "Selected element styling" : "Canvas styling"}>
             <div className="uxui-style-dock-heading"><strong>{selected ? selected.name + " · Style" : "Canvas · Style"}</strong><button type="button" onClick={() => { setShowInspector(true); setInspectorTab("design"); }} aria-label="Open all styling properties">More <ArrowRight size={14} /></button></div>
             {selected ? <>
               <p className="uxui-drag-hint">Drag to move · Pull the corner to resize</p><div className="uxui-inline-effect-choices">{[{name:"Flat",patch:{shadow:false,borderWidth:0,opacity:1}},{name:"Shadow",patch:{shadow:true}},{name:"Outline",patch:{borderWidth:2,borderColor:selected.color}},{name:"Faded",patch:{opacity:.5}}].map(effect => <button type="button" key={effect.name} onClick={() => updateLayer(selected.id,effect.patch)}><span style={{border:"2px solid currentColor",borderRadius:8,boxShadow:effect.name === "Shadow"?"3px 4px 0 #888":undefined,opacity:effect.name === "Faded"?.5:1}}/>{effect.name}</button>)}</div>{selected.kind === "image" && <div className="uxui-resample-actions"><span>Image pixels</span>{[256,512,1024].map(size => <button type="button" key={size} disabled={imageBusy} onClick={() => void processImage("resize",size)}>{size}px</button>)}</div>}
@@ -2685,7 +2950,10 @@ export function UxUiStudioEngine() {
                 <StudioFader label="Visibility" name="Selected opacity" min={0} max={1} value={selected.opacity} step={0.05} begin={checkpoint} change={next => updateLayer(selected.id, { opacity: next }, false)} />
 
               </div>
+              {selectedHasText && ["text", "more"].includes(editTool) && <StudioTextStyle layer={selected} begin={checkpoint} change={patch => updateLayer(selected.id, patch, false)} />}
+              {["shape", "more"].includes(editTool) && <><StudioShapeStyle layer={selected} change={patch => updateLayer(selected.id, patch)} /><button type="button" className="uxui-add-shape" onClick={() => { setLeftTab("shapes"); setToolkitSearch(""); setShowToolsPanel(true); }}>Add another shape</button></>}
               {selectedHasText && <div className="uxui-inline-fields uxui-inline-text-fields"><Field label={selected.kind === "chart" ? "Chart title and values" : "Your words"}><textarea aria-label="Selected text content" rows={selected.kind === "chart" ? 4 : 2} value={selected.text} onChange={(event) => updateLayer(selected.id, { text: event.target.value })} /></Field><button type="button" onClick={() => { openToolkit("typography"); setShowToolsPanel(true); }}>Choose font</button></div>}
+              {editTool === "more" && <div className="uxui-inline-fields"><Field label="Name"><input aria-label="Selected layer name" value={selected.name} onChange={event => updateLayer(selected.id, { name: event.target.value })} /></Field><Field label="Padding"><input aria-label="Selected padding" type="number" min="0" value={selected.padding} onChange={event => updateLayer(selected.id, { padding: Math.max(0, Number(event.target.value) || 0) })} /></Field></div>}
               <details className="uxui-exact-options" open={editTool === "more"}><summary>More options</summary><div className="uxui-inline-fields"><Field label="X"><input type="number" aria-label="Selected X" min="0" value={selected.x} onChange={event=>updateLayer(selected.id,{x:Math.max(0,Number(event.target.value)||0)})}/></Field><Field label="Y"><input type="number" aria-label="Selected Y" min="0" value={selected.y} onChange={event=>updateLayer(selected.id,{y:Math.max(0,Number(event.target.value)||0)})}/></Field><Field label="Width"><input type="number" aria-label="Selected width" min="1" value={selected.width} onChange={(event) => updateLayer(selected.id, { width: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Height"><input type="number" aria-label="Selected height" min="1" value={selected.height} onChange={(event) => updateLayer(selected.id, { height: Math.max(1, Number(event.target.value) || 1) })} /></Field><Field label="Border color"><input type="color" aria-label="Selected border color" value={/^#[0-9a-f]{6}$/i.test(selected.borderColor) ? selected.borderColor : "#CCCCCC"} onChange={(event) => updateLayer(selected.id, { borderColor: event.target.value })} /></Field></div></details>
               <div className="uxui-inline-actions"><label><input type="checkbox" aria-label="Selected drop shadow" checked={selected.shadow} onChange={(event) => updateLayer(selected.id, { shadow: event.target.checked })} /> Soft shadow</label><button type="button" onClick={() => updateLayer(selected.id, { background: "transparent" })}>No fill</button><button type="button" onClick={() => { openToolkit("motion"); setShowToolsPanel(true); }}>Motion</button><button type="button" onClick={duplicateSelected}>Duplicate</button><button type="button" onClick={() => updateLayer(selected.id, { hidden: !selected.hidden })}>{selected.hidden ? "Show" : "Hide"}</button><button type="button" onClick={deleteSelected}>Delete</button>{selectedIds.length > 1 && <button type="button" onClick={groupSelectedLayers}>Group selection</button>}{selected.groupId && <button type="button" onClick={ungroupSelectedLayers}>Ungroup</button>}</div>
             </> : <>
@@ -2698,19 +2966,31 @@ export function UxUiStudioEngine() {
               {selected && <div className="uxui-detail-preview" aria-label="Magnified selected item">{selected.kind === "icon" ? <svg viewBox={selected.iconViewBox || "0 0 24 24"} style={{ color: selected.color }} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + selected.iconSvg + "</svg>").body }} /> : selected.imageDataUrl ? <img src={selected.imageDataUrl} alt={selected.name} /> : <span style={{ color: selected.color }}>{selected.text || selected.name}</span>}</div>}
               <div className="uxui-layer-finder">{elements.filter(item => !item.hidden).map(item => <button type="button" key={item.id} aria-pressed={selectedId === item.id} onClick={() => selectLayer(item.id)}><span>{item.kind === "icon" ? <svg viewBox={item.iconViewBox || "0 0 24 24"} dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup("<svg>" + item.iconSvg + "</svg>").body }} /> : item.imageDataUrl ? <img src={item.imageDataUrl} alt="" /> : item.text.slice(0, 3) || "□"}</span><strong>{item.name}</strong></button>)}</div>
             </div>}
-            {selected?.kind === "image" && editTool === "cutout" && <div className="uxui-image-actions"><p>Remove a plain background. Your original stays available with Undo.</p><StudioFader label="Strength" name="Cutout strength" min={5} max={140} value={cutoutStrength} begin={() => {}} change={setCutoutStrength} /><button type="button" disabled={imageBusy} onClick={() => void processImage("cutout")}>{imageBusy ? "Working…" : "Remove background"}</button><button type="button" disabled={imageBusy} onClick={() => void processImage("icon")}>Make silhouette icon</button></div>}
+            {selected?.kind === "image" && ["cutout", "chroma"].includes(editTool) && <div className="uxui-image-actions uxui-key-controls">
+              <p>{editTool === "chroma" ? "Remove a chosen color, including green or blue screens." : "Remove solid background colors from the edges."} Each application starts from your original. Use Erase / Restore to repair complex backgrounds.</p>
+              {editTool === "chroma" && <label>Key color<input aria-label="Chroma key color" type="color" value={keyColor} onChange={event => setKeyColor(event.target.value)} /></label>}
+              <StudioFader label="Tolerance" name="Background tolerance" min={0} max={255} value={cutoutStrength} begin={() => {}} change={setCutoutStrength} />
+              <StudioFader label="Softness" name="Background softness" min={0} max={100} value={keySoftness} begin={() => {}} change={setKeySoftness} />
+              {editTool === "chroma" && <StudioFader label="Spill" name="Chroma spill suppression" min={0} max={1} step={.05} value={keySpill} begin={() => {}} change={setKeySpill} />}
+              <label>Remove<select aria-label="Background matching mode" value={cutoutMode} onChange={event => setCutoutMode(event.target.value as "edge" | "global")}><option value="edge">Connected to edges</option><option value="global">All matching colors</option></select></label>
+              <button type="button" disabled={imageBusy} onClick={() => void processImage(editTool === "chroma" ? "chroma" : "cutout")}>{imageBusy ? "Working…" : editTool === "chroma" ? "Apply chroma key" : "Remove background"}</button>
+              <button type="button" disabled={imageBusy} onClick={() => setRepairImageId(selected.id)}>Erase / Restore</button>
+              <button type="button" disabled={imageBusy || !selected.imageOriginalDataUrl} onClick={() => updateLayer(selected.id, { imageDataUrl: selected.imageOriginalDataUrl })}>Restore original</button>
+            </div>}
             {inlineToolkit && renderToolkit(true)}
           </div>}
           {selected && !prototypePreview && <div className="uxui-context-controls">
             <div className="uxui-context-toolbar" role="toolbar" aria-label={selected.kind + " editing actions"}>
               <span className="uxui-context-selection" aria-live="polite">{selected.name || selected.kind + " selected"}</span>
               <button type="button" className="uxui-context-action" onClick={closeToolkit} aria-pressed={editTool === "move"}><ArrowUp size={21}/><span>Move</span></button>
+              <button type="button" className="uxui-context-action" onClick={() => { setMultiSelectMode(value => !value); if (!multiSelectMode && selected) setSelectedIds([selected.id]); }} aria-pressed={multiSelectMode} aria-label="Select multiple layers"><Layers size={21}/><span>Multi-select</span></button>
+              {multiSelectMode && <button type="button" className="uxui-context-action" aria-label="Merge selected icons" disabled={selectedIds.length < 2} onClick={mergeSelectedIcons}><Shapes size={21}/><span>Merge icons</span></button>}
               {selected.kind === "image" && <button type="button" className="uxui-context-action" onClick={() => { imageReplaceId.current = selected.id; quickImageInputRef.current?.click(); }}><ImagePlus size={21}/><span>Replace</span></button>}
               {selected.kind === "icon" && <button type="button" className="uxui-context-action" onClick={() => chooseToolkit("icons")}><Shapes size={21}/><span>Icons</span></button>}
               {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => chooseEditTool("text")}><Type size={21}/><span>Text</span></button>}
               {selectedHasText && <button type="button" className="uxui-context-action" onClick={() => chooseToolkit("typography")}><Type size={21}/><span>Fonts</span></button>}
               {[{id:"color",label:"Color",icon:<Palette size={21}/>},{id:"shape",label:"Shape",icon:<Shapes size={21}/>},{id:"effects",label:"Effects",icon:<Palette size={21}/>},{id:"adjust",label:"Adjust",icon:<LayoutTemplate size={21}/>}].map(tool => <button type="button" className="uxui-context-action" key={tool.id} onClick={() => chooseEditTool(tool.id)} aria-pressed={editTool === tool.id}>{tool.icon}<span>{tool.label}</span></button>)}
-              {selected.kind === "image" && <><button type="button" className="uxui-context-action" onClick={() => chooseEditTool("cutout")}><Shapes size={21}/><span>Cutout</span></button><button type="button" className="uxui-context-action" disabled={imageBusy} onClick={() => void processImage("icon")}><Shapes size={21}/><span>Make icon</span></button><button type="button" className="uxui-context-action" onClick={() => chooseEditTool("resize")}><ZoomIn size={21}/><span>Resize</span></button></>}
+              {selected.kind === "image" && <><button type="button" className="uxui-context-action" onClick={() => chooseEditTool("cutout")}><Shapes size={21}/><span>Cutout</span></button><button type="button" className="uxui-context-action" onClick={() => { setCutoutMode("global"); chooseEditTool("chroma"); }}><Palette size={21}/><span>Chroma key</span></button><button type="button" className="uxui-context-action" onClick={() => setRepairImageId(selected.id)}><Shapes size={21}/><span>Repair</span></button><button type="button" className="uxui-context-action" disabled={imageBusy} onClick={() => void processImage("icon")}><Shapes size={21}/><span>Make icon</span></button><button type="button" className="uxui-context-action" onClick={() => chooseEditTool("resize")}><ZoomIn size={21}/><span>Resize</span></button></>}
               <button type="button" className="uxui-context-action" onClick={() => chooseEditTool("lookup")}><Search size={21}/><span>Look closer</span></button>
               <button type="button" className="uxui-context-action" onClick={duplicateSelected}><Copy size={21}/><span>Duplicate</span></button>
               <button type="button" className="uxui-context-action" onClick={()=>chooseEditTool("more")}><LayoutTemplate size={21}/><span>More</span></button>
@@ -2719,6 +2999,7 @@ export function UxUiStudioEngine() {
 
 
           <input ref={elementImportInputRef} type="file" accept=".json,application/json,image/png,image/jpeg,image/webp,image/gif,.svg,image/svg+xml" className="sr-only" aria-label="Import elements" onChange={(event) => { const file = event.target.files?.[0]; if (file) importElementsFile(file); event.target.value = ""; }} />
+          <input ref={screenshotInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="Import screenshot as editable layers" onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 4 * 1024 * 1024) { setNotice("Choose a PNG, JPEG or WebP screenshot up to 4 MB."); return; } closeToolkit(); setScreenshotFile(file); }} />
           <input ref={presetImportInputRef} type="file" accept=".json,application/json" className="sr-only" aria-label="Import preset" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPresetFile(file); event.target.value = ""; }} />
           <input ref={iconImportInputRef} type="file" accept=".svg,image/svg+xml" className="sr-only" aria-label="Import SVG icon" onChange={(event) => { const file = event.target.files?.[0]; if (file) importIconFile(file); event.target.value = ""; }} />
           <input ref={quickImageInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" aria-label="Choose an image" onChange={(event) => {
@@ -2736,7 +3017,7 @@ export function UxUiStudioEngine() {
                 const width = Math.max(12,Math.round(decoded.naturalWidth * fit));
                 const height = Math.max(12,Math.round(decoded.naturalHeight * fit));
                 checkpoint();
-                if (replacementId) setElements(previous => previous.map(item => item.id === replacementId ? {...item,imageDataUrl:layer.imageDataUrl} : item));
+                if (replacementId) setElements(previous => previous.map(item => item.id === replacementId ? {...item,imageDataUrl:layer.imageDataUrl,imageOriginalDataUrl:layer.imageDataUrl} : item));
                 else setElements(previous => [...previous,{...layer,x:Math.max(0,Math.round((board.width-width)/2)),width,height,background:"transparent",padding:0}]);
                 selectLayer(replacementId || layer.id); closeToolkit(); setNotice(replacementId ? "Image replaced." : "Image added. Try Cutout, Resize or Make icon.");
               };
@@ -2784,6 +3065,7 @@ export function UxUiStudioEngine() {
           <div className="uxui-project-heading">
             <div className="flex items-start justify-between gap-2"><h2>Project title</h2><button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Project help" title="Project help"><CircleHelp size={19} /></button></div>
             <input aria-label="Project name" value={projectName} onChange={(event) => setProjectName(event.target.value)} className="uxui-project-title-input" maxLength={90} />
+            <label className="uxui-project-brief"><span>Design brief for your builder</span><textarea aria-label="Project design brief" value={projectBrief} onChange={event => setProjectBrief(event.target.value)} rows={4} maxLength={12000} placeholder="Describe the features, flow and requirements to include in the PDF and AI handoff." /></label>
             <p>{elements.length ? elements.length + (elements.length === 1 ? " element" : " elements") : "Add your first element using +"}</p>
           </div>
           {helpOpen && <div className="uxui-help-note" role="status"><strong>Make it by eye.</strong><span>Drag and style your layers on the mockup. enV quietly records exact measurements, type, spacing, colours and icon identity for developer or AI handoff.</span></div>}
@@ -2791,7 +3073,7 @@ export function UxUiStudioEngine() {
           <div className="uxui-layer-list">
             {elements.length ? [...elements].reverse().slice(0, showMoreLayers ? elements.length : 6).map((item, index) => {
               const outlines = ["#8EC8E7", "#D48D91", "#A8CE79", "#D8C87D", "#C8C8C8", "#8FC6B3"];
-              return <button key={item.id} type="button" onClick={() => { setSelectedId(item.id); setInspectorTab("design"); }} aria-pressed={selectedId === item.id} className={"uxui-layer-chip " + (selectedId === item.id ? "is-selected" : "")} style={{ "--layer-tint": outlines[index % outlines.length] } as CSSProperties}>
+              return <button key={item.id} type="button" onClick={event => { selectLayer(item.id, event.shiftKey); setInspectorTab("design"); }} aria-pressed={selectedId === item.id} className={"uxui-layer-chip " + (selectedId === item.id ? "is-selected" : "")} style={{ "--layer-tint": outlines[index % outlines.length] } as CSSProperties}>
                 <span className="uxui-layer-number">{index + 1}.</span><span className="uxui-layer-name">{item.name || item.kind}</span><span className="uxui-layer-kind">{item.kind}</span>
               </button>;
             }) : <div className="uxui-empty-layers"><Layers size={18} /><span>No layers yet</span><small>Add an element to see it here.</small></div>}
@@ -2918,6 +3200,8 @@ export function UxUiStudioEngine() {
           </details>
         </aside>}
       </div>
+      {repairImageId && (() => { const image = elements.find(layer => layer.id === repairImageId); return image?.imageDataUrl ? <StudioImageRepair original={image.imageOriginalDataUrl || image.imageDataUrl} source={image.imageDataUrl} busy={imageBusy} onClose={() => setRepairImageId("")} onApply={data => { updateLayer(image.id, { imageDataUrl: data, imageOriginalDataUrl: image.imageOriginalDataUrl || image.imageDataUrl, background: "transparent" }); setNotice("Image repair applied. Undo restores the previous mask."); }} /> : null; })()}
+      {screenshotFile && <StudioScreenshotImport file={screenshotFile} onClose={() => setScreenshotFile(null)} onApply={applyScreenshotReconstruction} />}
       {notice && <div role="status" className="flex items-start gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-5 text-muted"><Check size={14} className="mt-0.5 shrink-0 text-emerald-600" /> <span className="min-w-0 flex-1">{notice}</span><button aria-label="Dismiss notice" type="button" onClick={() => setNotice("")} className="rounded p-0.5 text-muted hover:text-fg"><X size={13} /></button></div>}
 
     </section>
