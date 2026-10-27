@@ -11,6 +11,10 @@ function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function stringNote(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function objectOrNull(value: unknown): JsonRecord | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as JsonRecord
@@ -49,9 +53,23 @@ export function migrateMusicAnalysisV1ToV2(input: unknown): JsonRecord {
   const rhythm = asRecord(root.rhythm, "rhythm");
   const tonality = asRecord(root.tonality, "tonality");
   const timbre = asRecord(root.timbre, "timbre");
+  const legacyClassification = asRecord(root.classification, "classification");
+  const legacyClassificationStatus = legacyClassification.status;
+  const migratedClassification = {
+    ...legacyClassification,
+    status: legacyClassificationStatus === "model_completed"
+      ? "historical_model_result"
+      : "human_review_required",
+    ...(legacyClassificationStatus === "model_completed" ? {
+      note: [stringNote(legacyClassification.note), "Historical classifier output was imported from a v1 report; provider/model/run provenance cannot be verified from this record."].filter(Boolean).join(" "),
+    } : {
+      note: "No semantic model is run by this Analyzer. Semantic fields remain unknown until supplied and human-reviewed.",
+    }),
+  };
 
   return {
     ...root,
+    classification: migratedClassification,
     schema_version: "env.music-analysis.v2",
     fingerprint: {
       file_sha256: null,
@@ -109,6 +127,11 @@ export function migrateMusicProfileV1ToV2(input: unknown): JsonRecord {
   }
   for (const key of ["genre", "sub_style", "language", "mood", "instruments", "vocal_style"]) {
     if (migratedStatus[key] === "model_estimate") migratedStatus[key] = "unknown";
+  }
+  if (migratedStatus.classification === "model_completed") {
+    migratedStatus.classification = "historical_model_result";
+  } else if (migratedStatus.classification === "requires_model") {
+    migratedStatus.classification = "human_review_required";
   }
 
   return {
