@@ -30,6 +30,8 @@ export type LocalMusicBatchItem = LocalMusicFileDescriptor & {
   createdAt: string;
   updatedAt: string;
   sourceSha256: string | null;
+  cloudSaveIdempotencyKey: string | null;
+  cloudSavedTrackId: string | null;
   error: string | null;
   warnings: string[];
   result: {
@@ -134,6 +136,8 @@ export function createLocalMusicBatch(
       createdAt: now,
       updatedAt: now,
       sourceSha256: null,
+      cloudSaveIdempotencyKey: null,
+      cloudSavedTrackId: null,
       error,
       warnings: [],
       result: null,
@@ -176,7 +180,7 @@ export function countLocalMusicBatchItems(batch: LocalMusicBatch): LocalMusicBat
 export function updateLocalMusicBatchItem(
   batch: LocalMusicBatch,
   itemId: string,
-  patch: Partial<Pick<LocalMusicBatchItem, "status" | "stage" | "progress" | "updatedAt" | "sourceSha256" | "error" | "warnings" | "result">>,
+  patch: Partial<Pick<LocalMusicBatchItem, "status" | "stage" | "progress" | "updatedAt" | "sourceSha256" | "cloudSaveIdempotencyKey" | "cloudSavedTrackId" | "error" | "warnings" | "result">>,
   now = new Date().toISOString(),
 ): LocalMusicBatch {
   let found = false;
@@ -214,6 +218,8 @@ export function transitionLocalMusicBatchItem(
     statusPatch.error = null;
     statusPatch.result = null;
     statusPatch.sourceSha256 = null;
+    statusPatch.cloudSaveIdempotencyKey = null;
+    statusPatch.cloudSavedTrackId = null;
     statusPatch.warnings = [];
   }
   const updated = updateLocalMusicBatchItem(batch, itemId, { ...statusPatch, status: nextStatus }, now);
@@ -271,6 +277,8 @@ export function localMusicBatchExport(batch: LocalMusicBatch, exportedAt = new D
       stage: item.stage,
       progress: item.progress,
       source_sha256: item.sourceSha256,
+      cloud_dataset_track_id: item.cloudSavedTrackId,
+      cloud_save_idempotency_key: item.cloudSaveIdempotencyKey,
       source_sha256_scope: item.sourceSha256 ? "exact-original-file-bytes-local-unverified" : "not-computed",
       error: item.error,
       warnings: item.warnings,
