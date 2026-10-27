@@ -114,7 +114,7 @@ test("reload recovery never claims interrupted work completed and preserves succ
   assert.equal(recovered.items[0]?.progress, 1);
   assert.equal(recovered.items[1]?.status, "waiting_for_file");
   assert.equal(recovered.items[1]?.progress, 0);
-  assert.match(recovered.items[1]?.error ?? "", /select the original file again/);
+  assert.match(recovered.items[1]?.error ?? "", /select the original file again/i);
 });
 
 test("cloud dataset idempotency and saved-record IDs are retained in local manifests", () => {
