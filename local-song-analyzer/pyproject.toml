@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Private, local song decoding, tagging and reviewed-label learning"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "fastapi==0.162.0", "uvicorn==0.54.0", "python-multipart==0.0.32",
+  "fastapi==0.162.0", "starlette==0.46.2", "uvicorn==0.54.0", "python-multipart==0.0.32",
   "numpy==2.2.5", "httpx==0.28.1", "librosa==0.11.0", "soundfile==0.13.1",
 ]
 

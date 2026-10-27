@@ -1,5 +1,7 @@
 """Bounded local decoding and full-track DSP. External media URLs are never accepted."""
 import json
+import os
+import signal
 import subprocess
 import threading
 import time
@@ -26,7 +28,7 @@ def run_process(args: list[str], cancel: threading.Event, timeout: int = 180, en
     # Files, not pipes, keep stdout/stderr bounded in memory. No shell interpolation.
     import tempfile
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
-        process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=out, stderr=err, env=env)
+        process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=out, stderr=err, env=env, start_new_session=os.name == "posix")
         started = time.monotonic()
         try:
             while process.poll() is None:
@@ -42,7 +44,13 @@ def run_process(args: list[str], cancel: threading.Event, timeout: int = 180, en
             return out.read()
         finally:
             if process.poll() is None:
-                process.kill()
+                if os.name == "posix":
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                else:
+                    process.kill()
             process.wait()
 
 
@@ -60,8 +68,10 @@ def probe(path: Path, cancel: threading.Event) -> dict:
     return result
 
 
-def decode(path: Path, work: Path, cancel: threading.Event) -> np.memmap:
-    target = work / "analysis.f32"
+def decode(path: Path, work: Path, cancel: threading.Event, target_name: str = "analysis.f32") -> np.memmap:
+    if Path(target_name).name != target_name or not target_name.endswith(".f32"):
+        raise ValueError("Invalid decoded audio target")
+    target = work / target_name
     run_process([
         "ffmpeg", "-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe", "-max_alloc", "268435456",
         "-i", str(path), "-map", "0:a:0", "-vn", "-t", str(MAX_SECONDS + 1), "-ac", "1",

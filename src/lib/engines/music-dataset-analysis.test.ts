@@ -90,3 +90,18 @@ test("local analysis can be cancelled and yields progress", async () => {
   await assert.rejects(promise, (error: unknown) => error instanceof Error && error.name === "AbortError");
   assert.ok(progressUpdates >= 1);
 });
+
+test("tempo and key use audio after the opening 90 seconds", async () => {
+  const sampleRate = 8_000;
+  const samples = new Float32Array(sampleRate * 96);
+  for (let i = sampleRate * 90; i < samples.length; i++) {
+    const t = i / sampleRate;
+    samples[i] = 0.12 * (Math.sin(2 * Math.PI * 261.63 * t) + Math.sin(2 * Math.PI * 329.63 * t) + Math.sin(2 * Math.PI * 392 * t));
+    if ((i - sampleRate * 90) % (sampleRate / 2) < 40) samples[i] += 0.55;
+  }
+  const result = await analyzeMusicDatasetAudio({ channels: [samples], sampleRate });
+  assert.equal(result.source.duration_seconds, 96);
+  assert.ok(result.rhythm.tempo_bpm !== null, "Tempo must consider the end of the recording");
+  assert.ok(result.tonality.key_estimate !== null, "Key must consider the end of the recording");
+  assert.equal(result.timeline.at(-1)?.end_seconds, 96);
+});

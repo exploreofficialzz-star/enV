@@ -63,3 +63,62 @@ def test_actual_body_limit_cannot_be_bypassed_by_lying_about_length(tmp_path, mo
     with TestClient(create_app(tmp_path, TOKEN), base_url="http://127.0.0.1") as client:
         response = client.post("/v1/jobs", headers={**HEADERS, "Content-Length": "1"}, files={"audio": ("large.wav", b"x" * 100_000)})
         assert response.status_code == 413, response.text
+
+
+@pytest.mark.parametrize("stem_mode,expected_source", [("valid", "vocal_stem"), ("absent", "full_mix"), ("invalid", "full_mix")])
+def test_stem_recognition_and_transcription_use_the_correct_audio(tmp_path, monkeypatch, stem_mode, expected_source):
+    import hashlib
+    import shutil
+    import numpy as np
+    import song_analyzer.server as server
+
+    work = tmp_path / "job"
+    work.mkdir()
+    source = make_wav(work / "track.wav")
+    heard = {}
+
+    def fake_separate(path, directory, cancel):
+        folder = directory / "stems"
+        folder.mkdir()
+        artifacts = []
+        for name in ("bass", "drums", "other", "vocals"):
+            target = folder / f"{name}.wav"
+            if name == "vocals" and stem_mode == "invalid":
+                target.write_bytes(b"not audio")
+            elif name == "vocals":
+                make_wav(target, silent=True)
+            else:
+                shutil.copy(path, target)
+            artifacts.append({"name": str(target.relative_to(directory)), "kind": "stem", "bytes": target.stat().st_size})
+        return artifacts
+
+    def fake_transcribe(samples, model_path, cancel, source):
+        heard["source"] = source
+        heard["energy"] = float(np.mean(np.abs(samples)))
+        return {"status": "candidate_transcript", "language": None, "language_score": None,
+                "segments": [], "source": source, "coverage_seconds": len(samples) / server.SAMPLE_RATE, "truncated": False}
+
+    class FakeTagger:
+        def analyze(self, samples, cancel, progress):
+            progress(1)
+            return [0.5], {"instruments": [{"label": "guitar", "score": 0.5, "source": "clap_similarity"}]}, []
+
+    monkeypatch.setattr(server, "separate", fake_separate)
+    monkeypatch.setattr(server, "transcribe", fake_transcribe)
+    runtime = server.Runtime(tmp_path / "data")
+    runtime.tagger = FakeTagger()
+    monkeypatch.setattr(runtime.store, "predict", lambda *args: {})
+    options = {"stems": stem_mode != "absent", "tagging": True, "transcription": True, "llm": False, "pieces": False}
+    job = server.Job("f" * 32, source, source.name, hashlib.sha256(source.read_bytes()).hexdigest(), options)
+    try:
+        runtime.process(job)
+    finally:
+        runtime.executor.shutdown(wait=True)
+    assert job.state in {"completed", "partial"}, job.error
+    assert heard["source"] == expected_source == job.result["lyrics"]["source"]
+    assert (heard["energy"] < 1e-5) is (expected_source == "vocal_stem")
+    assert len(job.result["stem_analysis"]) == (0 if stem_mode == "absent" else 3)
+    assert all(item["coverage_seconds"] == pytest.approx(2) for item in job.result["stem_analysis"])
+    assert not list(work.glob("*.f32"))
+    if stem_mode == "invalid":
+        assert any("full mix" in warning for warning in job.result["warnings"])

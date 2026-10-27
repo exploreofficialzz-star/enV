@@ -7,6 +7,10 @@ on:
         "local-song-analyzer/**",
         "src/lib/media/**",
         "src/lib/engines/music-dataset-analysis.ts",
+        "src/lib/engines/audio-studio.ts",
+        "src/workers/song-*.ts",
+        "processor/server.mjs",
+        "scripts/processor-gateway.test.mjs",
         "scripts/audit-song-analyzer-browser.mjs",
         "src/components/engines/song-*.tsx",
         ".github/workflows/song-analyzer.yml",
@@ -18,6 +22,10 @@ on:
         "local-song-analyzer/**",
         "src/lib/media/**",
         "src/lib/engines/music-dataset-analysis.ts",
+        "src/lib/engines/audio-studio.ts",
+        "src/workers/song-*.ts",
+        "processor/server.mjs",
+        "scripts/processor-gateway.test.mjs",
         "scripts/audit-song-analyzer-browser.mjs",
         "src/components/engines/song-*.tsx",
         ".github/workflows/song-analyzer.yml",
@@ -43,6 +51,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run test:song-analyzer
+      - run: node --test scripts/processor-gateway.test.mjs
       - name: Install browser
         run: |
           npx playwright install --with-deps chromium

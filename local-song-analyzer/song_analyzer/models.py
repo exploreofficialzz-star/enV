@@ -78,7 +78,7 @@ class AudioTagger:
         return result
 
 
-def transcribe(samples: np.ndarray, model_path: str, cancel: threading.Event):
+def transcribe(samples: np.ndarray, model_path: str, cancel: threading.Event, source: str = "full_mix"):
     from faster_whisper import WhisperModel
     # An explicit downloaded local directory is required; no downloads during analysis.
     if not Path(model_path).is_dir():
@@ -89,14 +89,18 @@ def transcribe(samples: np.ndarray, model_path: str, cancel: threading.Event):
     audio = resample_poly(np.asarray(samples), 1, 3).astype(np.float32)
     segments, info = model.transcribe(audio, beam_size=3, vad_filter=True, word_timestamps=False)
     output = []
+    truncated = False
     for segment in segments:
         check_cancel(cancel)
         if segment.no_speech_prob < 0.6 and segment.avg_logprob > -1.0:
+            if len(output) >= 1500:
+                truncated = True
+                break
             output.append({"start_seconds": segment.start, "end_seconds": segment.end, "text": segment.text.strip()[:4000]})
-        if len(output) >= 1500:
-            break
     return {"status": "candidate_transcript", "language": info.language if output else None,
             "language_score": float(info.language_probability) if output else None, "segments": output,
+            "source": source, "coverage_seconds": output[-1]["end_seconds"] if truncated and output else len(samples) / SAMPLE_RATE,
+            "truncated": truncated,
             "warning": "Speech ASR on singing can omit or invent words. Review lyrics and code-switching before using language or themes as labels."}
 
 
@@ -112,8 +116,8 @@ def separate(source: Path, work: Path, cancel: threading.Event):
             raise ValueError("Demucs checkpoint checksum does not match the pinned model")
     if (repo / "htdemucs.yaml").read_text().strip() != "models: ['955717e8']":
         raise ValueError("Demucs repository does not match the pinned model configuration")
-    run_process([sys.executable, "-m", "demucs", "--repo", str(repo), "-n", "htdemucs", "-d", "cpu", "--shifts", "0", "--jobs", "1",
-                 "--segment", "7", "-o", str(work / "stems"), str(source)], cancel, 1800,
+    # Bounded overlapping windows avoid allocating four full-length waveforms for long songs.
+    run_process([sys.executable, "-m", "song_analyzer.separate_stream", str(source), str(work / "stems" / "htdemucs" / "source"), str(repo)], cancel, 1800,
                 env={**os.environ, "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1"})
     return [{"name": str(path.relative_to(work)), "kind": "stem", "bytes": path.stat().st_size}
             for path in sorted((work / "stems").rglob("*.wav"))]

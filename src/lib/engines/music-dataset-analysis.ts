@@ -580,9 +580,8 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
   const totalChroma = pitchClass.reduce((sum, value) => sum + value, 0);
   const normalizedChroma = totalChroma > 0 ? pitchClass.map((value) => value / totalChroma) : pitchClass;
   const chordEstimates = [...chromaByBlock.entries()].sort(([a], [b]) => a - b).map(([block, chroma]) => estimateChord(chroma, block * 2, Math.min(duration, (block + 1) * 2)));
-  const tempoSamples = mono.subarray(0, Math.min(mono.length, sampleRate * 90));
-  const tempo = estimateBpm(tempoSamples, sampleRate);
-  const key = estimateKey(mono.subarray(0, Math.min(mono.length, sampleRate * 30)), sampleRate);
+  const tempo = estimateBpm(mono, sampleRate);
+  const key = estimateKey(mono, sampleRate);
   const meanCentroid = mean(frames.map((frame) => frame.spectral_centroid_hz ?? 0).filter((v) => v > 0));
   const meanRolloff = mean(frames.map((frame) => frame.spectral_rolloff_85_hz ?? 0).filter((v) => v > 0));
   const meanFlatness = mean(frames.map((frame) => frame.spectral_flatness ?? 0).filter((v) => v > 0));
@@ -628,12 +627,12 @@ export async function analyzeMusicDatasetAudio(input: MusicDatasetAnalysisInput,
       stereo_side_to_mid_ratio: sideToMid,
     },
     rhythm: {
-      tempo_bpm: tempo, tempo_method: "Local onset/energy autocorrelation estimator; estimate only.",
+      tempo_bpm: tempo, tempo_method: "Full-track onset/energy autocorrelation estimator; estimate only.",
       transient_density_per_second: transientDensity, transient_event_count: Math.max(transientEvents, fluxEvents),
       interpretation: "Transient density counts rule-triggered changes, not verified drum hits. Tempo may be half/double-time.",
     },
     tonality: {
-      key_estimate: key, key_method: "Local chroma-template comparison; estimate only.",
+      key_estimate: key, key_method: "Chroma-template comparison with evenly spaced samples across the full track; estimate only.",
       pitch_class_profile: NOTE_NAMES.map((note, index) => ({ note, energy: Number((normalizedChroma[index] ?? 0).toFixed(5)) })),
       chord_estimates: chordEstimates,
       interpretation: "Chroma and triad-template matches are not guaranteed chords; rhythm, bass harmonics and mixed sources can confuse them.",

@@ -1,4 +1,5 @@
 import http from "node:http";
+import https from "node:https";
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { spawn } from "node:child_process";
@@ -9,6 +10,8 @@ const PORT = Number(process.env.PORT || process.env.PROCESSOR_PORT || 10000);
 const SHARED_SECRET = String(process.env.PROCESSOR_SHARED_SECRET || "").trim();
 const ALLOWED_ORIGIN = String(process.env.PROCESSOR_ALLOWED_ORIGIN || "*").trim();
 const APPLICATION_API_ORIGIN = String(process.env.APPLICATION_API_ORIGIN || "https://envtools.store").trim().replace(/\/+$/, "");
+const SONG_PROCESSOR_URL = String(process.env.SONG_PROCESSOR_URL || "").trim().replace(/\/+$/, "");
+const SONG_PROCESSOR_KEY = String(process.env.SONG_PROCESSOR_KEY || "").trim();
 const services = new Map();
 
 if (process.env.NODE_ENV === "production" && !SHARED_SECRET) {
@@ -58,6 +61,29 @@ async function childServiceReadiness() {
 function spawnService(name, script, port, extraEnv = {}) { const child = spawn(process.execPath, [script], { cwd: process.cwd(), env: { ...process.env, ...extraEnv, PORT: String(port), MEDIA_PORT: String(port), URL_MEDIA_PORT: String(port), TRANSCRIBE_PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] }); child.stdout.on("data", (chunk) => process.stdout.write(`[${name}] ${chunk}`)); child.stderr.on("data", (chunk) => process.stderr.write(`[${name}] ${chunk}`)); child.on("exit", (code, signal) => console.error(`[${name}] exited code=${code ?? "null"} signal=${signal ?? "none"}`)); services.set(name, { child, port }); }
 function proxyProcessor(req, res, port, pathname) { const headers = { ...req.headers, host: `127.0.0.1:${port}`, "x-processor-key": "" }; delete headers.connection; const upstream = http.request({ hostname: "127.0.0.1", port, method: req.method, path: pathname, headers }, (upstreamResponse) => { res.writeHead(upstreamResponse.statusCode || 502, responseHeaders(req, { ...upstreamResponse.headers, "cache-control": "no-store" })); upstreamResponse.pipe(res); }); upstream.on("error", (error) => { if (!res.headersSent) failSafely(req, res, 503, "PROCESSOR_UNAVAILABLE", "This processing service is temporarily unavailable. Please try again shortly.", error); else res.destroy(error); }); req.pipe(upstream); }
 
+function proxySongProcessor(req, res, pathname) {
+  const route = pathname.slice("/api/song".length);
+  if (!(route === "/v1/health" || route === "/v1/jobs" || /^\/v1\/jobs\/[a-f0-9]{32}(?:\/cancel|\/tagged-copy|\/artifacts\/[a-zA-Z0-9_./-]+)?$/.test(route)) || route.includes("..") || !["GET", "POST", "DELETE"].includes(req.method)) return json(req, res, 404, { error: "Not found." });
+  if (ALLOWED_ORIGIN !== "*" && req.headers.origin && req.headers.origin !== ALLOWED_ORIGIN) return json(req, res, 403, { error: "Origin is not allowed." });
+  if (!SONG_PROCESSOR_URL || SONG_PROCESSOR_KEY.length < 24) return json(req, res, 503, { error: "Backend song processing is not configured." });
+  let target;
+  try {
+    target = new URL(SONG_PROCESSOR_URL);
+    if (!["http:", "https:"].includes(target.protocol) || target.username || target.password || target.search || target.hash || target.pathname !== "/") throw new Error("Invalid backend URL");
+  } catch { return json(req, res, 503, { error: "Backend song processing is not configured." }); }
+  const headers = { ...req.headers, host: target.host, "x-song-processor-key": SONG_PROCESSOR_KEY };
+  delete headers.connection; delete headers.cookie; delete headers.authorization;
+  const transport = target.protocol === "https:" ? https : http;
+  const upstream = transport.request({ protocol: target.protocol, hostname: target.hostname, port: target.port || undefined, path: route, method: req.method, headers }, (response) => {
+    const forwarded = Object.fromEntries(Object.entries(response.headers).filter(([name]) => !name.toLowerCase().startsWith("access-control-")));
+    res.writeHead(response.statusCode || 502, responseHeaders(req, { ...forwarded, "cache-control": "no-store" }));
+    response.pipe(res);
+  });
+  upstream.on("error", (error) => { if (!res.headersSent) failSafely(req, res, 503, "SONG_PROCESSOR_UNAVAILABLE", "Backend song processing is temporarily unavailable.", error); else res.destroy(error); });
+  req.on("aborted", () => upstream.destroy());
+  req.pipe(upstream);
+}
+
 async function proxyApplication(req, res, pathname, search) {
   try {
     const headers = new Headers();
@@ -97,6 +123,7 @@ const server = http.createServer(async (req, res) => {
   }
   const urlMediaPath = urlMediaProcessorPath(req.method || "GET", pathname);
   if (urlMediaPath && services.has("url-media")) return proxyProcessor(req, res, services.get("url-media").port, urlMediaPath);
+  if (pathname.startsWith("/api/song/")) return proxySongProcessor(req, res, pathname);
   if (pathname.startsWith("/api/")) return proxyApplication(req, res, pathname, search);
   if (!authorized(req)) return json(req, res, 401, { error: "Invalid processor credentials." });
   if (pathname === "/media" && services.has("media")) return proxyProcessor(req, res, services.get("media").port, "/media");

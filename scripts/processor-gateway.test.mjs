@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import net from "node:net";
+import http from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 
 const root = process.cwd();
@@ -45,6 +46,36 @@ test("production gateway refuses to start without its shared secret", async () =
   ]);
   assert.notEqual(code, 0);
   assert.match(stderr, /PROCESSOR_SHARED_SECRET must be configured in production/);
+});
+
+test("song gateway forwards only allowed jobs with its server-side key", async () => {
+  const backend = http.createServer(async (req, res) => {
+    assert.equal(req.headers["x-song-processor-key"], "song-backend-test-key-123456789");
+    assert.equal(req.headers.authorization, undefined);
+    assert.equal(req.headers.cookie, undefined);
+    let body = ""; for await (const chunk of req) body += chunk;
+    res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "http://localhost:8080" });
+    res.end(JSON.stringify({ path: req.url, body }));
+  });
+  backend.listen(0, "127.0.0.1"); await once(backend, "listening");
+  const port = await freePort();
+  const child = spawn(process.execPath, ["processor/server.mjs"], {
+    cwd: root,
+    env: { ...process.env, NODE_ENV: "test", PROCESSOR_HOST: "127.0.0.1", PORT: String(port), PROCESSOR_ALLOWED_ORIGIN: "https://envtools.store", SONG_PROCESSOR_URL: `http://127.0.0.1:${backend.address().port}`, SONG_PROCESSOR_KEY: "song-backend-test-key-123456789" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    await waitForOutput(child, /enV Render API listening on/);
+    const response = await fetch(`http://127.0.0.1:${port}/api/song/v1/jobs`, { method: "POST", headers: { Origin: "https://envtools.store", Authorization: "Bearer user-token", Cookie: "session=user-cookie" }, body: "audio" });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("access-control-allow-origin"), "https://envtools.store");
+    assert.deepEqual(await response.json(), { path: "/v1/jobs", body: "audio" });
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/song/v1/train`, { method: "POST" })).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/song/v1/jobs`, { method: "POST", headers: { Origin: "https://other.test" } })).status, 403);
+  } finally {
+    child.kill("SIGTERM"); await Promise.race([once(child, "exit"), delay(5000)]);
+    await new Promise((resolve) => backend.close(resolve));
+  }
 });
 
 test("gateway hides upstream network details behind a stable public error", async () => {

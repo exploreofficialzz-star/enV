@@ -92,7 +92,7 @@
     "check:ux-ui-studio": "node scripts/check-ux-ui-studio-responsive.mjs && node --experimental-strip-types --test src/lib/engines/ux-ui-studio-*.test.ts src/lib/engines/studio-image-mask.test.ts src/lib/engines/studio-font-metadata.test.ts",
     "audit:ux-ui-studio:browser": "node scripts/audit-ux-ui-studio-browser.mjs",
     "check:modal-moss": "node scripts/check-modal-moss-music.mjs",
-    "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts",
+    "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts src/lib/media/song-backend.test.ts src/lib/media/song-intelligence.test.ts src/lib/media/song-stem-separation.test.ts src/lib/media/spleeter-audio.test.ts src/lib/engines/music-dataset-analysis.test.ts",
     "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs"
   },
   "dependencies": {
@@ -126,6 +126,7 @@
     "@tanstack/react-table": "^8.21.0",
     "@tanstack/router-plugin": "^1.168.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@xenova/transformers": "2.17.2",
     "axe-core": "^4.14.0",
     "better-auth": "~1.6.30",
     "class-variance-authority": "^0.7.1",
@@ -133,6 +134,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.0.0",
     "fflate": "0.8.3",
+    "fft.js": "^4.0.4",
     "jose": "6.2.9",
     "jsbarcode": "^3.12.3",
     "kysely": "^0.28.5",

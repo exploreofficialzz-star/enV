@@ -2625,11 +2625,83 @@ struct NativeSongAnalysisTrack: Identifiable {
     let data: Data
     var status = "Queued"
     var report: [String: Any]?
+    var backendJobID: String?
     var error: String?
 }
 
 private struct NativeSongAnalysisScan {
     var report: [String: Any]
+}
+
+enum NativeSongBackend {
+    struct Result { let id: String; let report: [String: Any] }
+    static var base: URL {
+        let value = (Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let candidate = URL(string: value)
+        let url = candidate.flatMap { $0.host == nil ? nil : $0 } ?? URL(string: "https://env-q3mq.onrender.com")!
+        return ["api", "song"].reduce(url) { $0.appendingPathComponent($1) }
+    }
+    static func endpoint(_ path: String) -> URL {
+        path.split(separator: "/").reduce(base) { $0.appendingPathComponent(String($1)) }
+    }
+    static func validID(_ id: String) -> Bool {
+        id.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil
+    }
+    static func artifactURL(_ id: String, name: String) -> URL? {
+        let parts = name.split(separator: "/", omittingEmptySubsequences: false)
+        guard validID(id), !parts.isEmpty, parts.allSatisfy({ $0 != "." && $0 != ".." && $0.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) != nil }) else { return nil }
+        return endpoint("v1/jobs/\(id)/artifacts/" + name)
+    }
+    static func request(_ path: String, method: String = "GET", body: Data? = nil, contentType: String? = nil) async throws -> [String: Any] {
+        let target = endpoint(path)
+        guard target.scheme == "https" || (target.scheme == "http" && ["localhost", "127.0.0.1"].contains(target.host ?? "")) else { throw NativeNativeError.message("Use a secure song backend address.") }
+        var request = URLRequest(url: target); request.httpMethod = method; request.httpBody = body; request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse else { throw NativeNativeError.message("Backend response was unavailable.") }
+        guard data.count <= 8 * 1024 * 1024 else { throw NativeNativeError.message("Backend response was too large.") }
+        let result = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        guard (200..<300).contains(response.statusCode) else { throw NativeNativeError.message((result["detail"] as? String) ?? (result["error"] as? String) ?? "Backend returned HTTP \(response.statusCode).") }
+        return result
+    }
+    static func available() async -> Bool {
+        guard let health = try? await request("v1/health") else { return false }
+        return health["location"] as? String == "remote_backend" && health["ffmpeg"] as? Bool == true && health["tagger_installed"] as? Bool == true && health["transcription_configured"] as? Bool == true && health["stems_configured"] as? Bool == true
+    }
+    static func analyze(_ audio: Data, separate: Bool, onProgress: @escaping @MainActor (String) -> Void) async throws -> Result {
+        guard !audio.isEmpty && audio.count <= 50 * 1024 * 1024 else { throw NativeNativeError.message("Backend audio must be between 1 byte and 50 MB.") }
+        try Task.checkCancellation()
+        let boundary = "env-song-\(UUID().uuidString)"
+        let options = ["tagging": true, "transcription": true, "stems": separate, "pieces": separate, "llm": false]
+        let json = try JSONSerialization.data(withJSONObject: options)
+        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"options\"\r\n\r\n".utf8)
+        body.append(json)
+        body.append(Data("\r\n--\(boundary)\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"song.audio\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8))
+        body.append(audio); body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        await onProgress("Sending audio to the backend")
+        let created = try await request("v1/jobs", method: "POST", body: body, contentType: "multipart/form-data; boundary=\(boundary)")
+        guard let id = created["id"] as? String, validID(id) else { throw NativeNativeError.message("The backend returned an invalid job.") }
+        do {
+            while true {
+                try Task.checkCancellation()
+                let job = try await request("v1/jobs/\(id)")
+                await onProgress("Backend: \(job["stage"] as? String ?? "Processing") · \(job["progress"] as? Int ?? 0)%")
+                switch job["state"] as? String {
+                case "completed", "partial":
+                    guard let result = job["result"] as? [String: Any], let processing = result["processing"] as? [String: Any], processing["location"] as? String == "remote_backend", processing["hosted_inference"] as? Bool == true else { throw NativeNativeError.message("Backend result has invalid provenance.") }
+                    if separate && (result["artifacts"] as? [[String: Any]] ?? []).filter({ $0["kind"] as? String == "stem" }).count != 4 { throw NativeNativeError.message("The backend could not create all four stems.") }
+                    return Result(id: id, report: result)
+                case "failed", "cancelled": throw NativeNativeError.message(job["error"] as? String ?? "Backend analysis failed.")
+                default: try await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+            }
+        } catch {
+            let cancel = Task.detached { _ = try? await request("v1/jobs/\(id)/cancel", method: "POST", body: Data()) }
+            _ = await cancel.value
+            throw error
+        }
+    }
 }
 
 private struct NativeSongAnalysisDocument: FileDocument {
@@ -2664,6 +2736,8 @@ private struct NativeSongMetadataAnalyzerView: View {
     @State private var notice = ""
     @State private var error: String?
     @State private var currentTask: Task<Void, Never>?
+    @State private var stemPlayer: AVPlayer?
+    @State private var annotationDrafts: [String: String] = [:]
 
     private let maxTracks = 50
     private let maxTrackBytes = 20 * 1024 * 1024
@@ -2732,7 +2806,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }
 
                 if fullAnalysis {
-                    Text("Full Analysis runs local signal processing only. Add and review genre, language, vocal, instrument and production labels below. No audio is sent to an AI service.")
+                    Text("Measurements run on this device. Speech and sound recognition use the backend when available; audio is uploaded for that stage.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
@@ -2740,7 +2814,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                     HStack(spacing: 8) {
                         if busy { ProgressView().tint(.white) }
                         else { Image(systemName: fullAnalysis ? "sparkles" : "waveform") }
-                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Run detailed local analysis" : "Scan songs")
+                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Analyze songs" : "Scan songs")
                     }
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -2760,7 +2834,7 @@ private struct NativeSongMetadataAnalyzerView: View {
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                Text("Local-only processing. No hosted model or external AI request.")
+                Text("Results show where processing happened.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             .padding(15)
@@ -2827,6 +2901,9 @@ private struct NativeSongMetadataAnalyzerView: View {
                         .font(.headline)
                     Text(nativeSongString(identity["artist"], fallback: "Unknown artist"))
                         .font(.caption).foregroundStyle(.secondary)
+                    if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]), let text = String(data: data, encoding: .utf8) { songCopy("track analysis", text) }
+                    Button("Separate sounds") { separateSelected() }.buttonStyle(.bordered).disabled(busy)
+                    if let backend = report["backend_model"] as? [String: Any] { backendDetails(backend, jobID: selectedTrack?.backendJobID) }
                     HStack(spacing: 16) {
                         metric("Tempo", nativeSongString(report["tempo_bpm"], fallback: "—") == "—" ? "—" : "\(nativeSongString(report["tempo_bpm"])) BPM")
                         metric("Key", nativeSongString(report["key"], fallback: "—"))
@@ -2914,10 +2991,12 @@ private struct NativeSongMetadataAnalyzerView: View {
         .fileExporter(isPresented: $showExporter, document: document, contentType: exportType, defaultFilename: exportFilename) { result in
             if case .failure(let failure) = result { error = failure.localizedDescription }
         }
+        .onDisappear { stemPlayer?.pause() }
 
     }
 
     private func selectedDatasetAnnotationText(key: String) -> String {
+        if let selectedID, let draft = annotationDrafts["\(selectedID.uuidString):\(key)"] { return draft }
         guard let report = selectedTrack?.report,
               let dataset = report["dataset_analysis"] as? [String: Any],
               let annotations = dataset["annotations"] as? [String: Any] else { return "" }
@@ -2938,6 +3017,7 @@ private struct NativeSongMetadataAnalyzerView: View {
               var report = tracks[index].report,
               var dataset = report["dataset_analysis"] as? [String: Any],
               var annotations = dataset["annotations"] as? [String: Any] else { return }
+        annotationDrafts["\(selectedID.uuidString):\(key)"] = value
         if key == "notes" {
             annotations[key] = String(value.prefix(4_000))
         } else if key == "reviewer" {
@@ -2995,6 +3075,7 @@ private struct NativeSongMetadataAnalyzerView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label).font(.caption2).foregroundStyle(.secondary)
             Text(value).font(.subheadline.weight(.semibold)).lineLimit(1)
+            songCopy(label.lowercased(), value == "—" ? "" : value)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -3007,10 +3088,59 @@ private struct NativeSongMetadataAnalyzerView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(heading).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                     Text(actual.joined(separator: " · ")).font(.subheadline)
+                    songCopy(heading.lowercased(), actual.joined(separator: ", "))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    private func songCopy(_ label: String, _ value: String) -> some View {
+        Button { UIPasteboard.general.string = value } label: { Label("Copy", systemImage: "doc.on.doc").font(.caption) }
+            .buttonStyle(.borderless).disabled(value.isEmpty).accessibilityLabel("Copy \(label)")
+    }
+
+    @ViewBuilder private func backendDetails(_ result: [String: Any], jobID: String?) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("Backend audio results").font(.subheadline.weight(.semibold))
+            Text("Audio is processed on the server and expires after one hour. Review sound labels and lyrics.").font(.caption).foregroundStyle(.secondary)
+            let candidates = result["candidates"] as? [String: [[String: Any]]] ?? [:]
+            ForEach(["genre", "mood", "instruments", "vocals"], id: \.self) { field in
+                let labels = (candidates[field] ?? []).compactMap { $0["label"] as? String }
+                if !labels.isEmpty {
+                    nativeSongTags(field.uppercased(), labels)
+                    Button("Use \(field) as draft") { updateSelectedDatasetAnnotation(key: field, value: labels.joined(separator: ", ")) }.font(.caption).buttonStyle(.bordered)
+                }
+            }
+            let lyrics = result["lyrics"] as? [String: Any] ?? [:]
+            let segments = lyrics["segments"] as? [[String: Any]] ?? []
+            let transcript = segments.compactMap { $0["text"] as? String }.joined(separator: " ")
+            if lyrics["status"] as? String == "candidate_transcript" {
+                Text("Speech & lyrics").font(.subheadline.weight(.semibold))
+                Text(transcript.isEmpty ? "No transcript produced." : transcript).font(.caption)
+                songCopy("transcript", transcript)
+                Text(lyrics["source"] as? String == "vocal_stem" ? "From the estimated vocal stem." : "From the full mix.").font(.caption2).foregroundStyle(.secondary)
+            }
+            let stems = result["stem_analysis"] as? [[String: Any]] ?? []
+            ForEach(Array(stems.enumerated()), id: \.offset) { _, stem in
+                let groups = stem["candidates"] as? [String: [[String: Any]]] ?? [:]
+                nativeSongTags("\((stem["stem"] as? String ?? "stem").uppercased()) SOUNDS", (groups["instruments"] ?? []).compactMap { $0["label"] as? String })
+            }
+            let artifacts = (result["artifacts"] as? [[String: Any]] ?? []).filter { $0["kind"] as? String == "stem" }
+            if let jobID {
+                ForEach(Array(artifacts.enumerated()), id: \.offset) { _, artifact in
+                    if let name = artifact["name"] as? String, let url = NativeSongBackend.artifactURL(jobID, name: name) {
+                        HStack {
+                            Text(URL(fileURLWithPath: name).lastPathComponent.replacingOccurrences(of: ".wav", with: "")).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
+                            Button("Play") { stemPlayer?.pause(); stemPlayer = AVPlayer(url: url); stemPlayer?.play() }.buttonStyle(.bordered)
+                            Link("WAV", destination: url).font(.caption).buttonStyle(.bordered)
+                        }
+                    }
+                }
+                if stemPlayer != nil { Button("Stop playback") { stemPlayer?.pause(); stemPlayer = nil }.font(.caption) }
+            }
+            ForEach(nativeSongStrings(result["warnings"]), id: \.self) { warning in Text(warning).font(.caption2).foregroundStyle(.secondary) }
+        }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func importFiles(_ urls: [URL]) async {
@@ -3075,8 +3205,32 @@ private struct NativeSongMetadataAnalyzerView: View {
         error = nil
         notice = ""
         progress = 0
+        annotationDrafts = [:]
         let queue = tracks
         currentTask = Task { await runBatch(queue) }
+    }
+
+    private func separateSelected() {
+        guard let track = selectedTrack, !busy else { return }
+        busy = true; error = nil; notice = "Preparing separation…"
+        currentTask = Task {
+            do {
+                guard await NativeSongBackend.available() else { throw NativeNativeError.message("Backend separation is unavailable.") }
+                let result = try await NativeSongBackend.analyze(track.data, separate: true) { notice = $0 }
+                updateTrack(track.id) { current in
+                    var report = current.report ?? nativeSongPartialReport(track.filename, reason: "Local analysis was unavailable.")
+                    report = nativeSongMergeBackend(report, backend: result.report)
+                    var analysis = report["analysis"] as? [String: Any] ?? [:]
+                    analysis["uses_remote_api"] = true; analysis["uses_hosted_model"] = true
+                    report["analysis"] = analysis
+                    current.report = report; current.backendJobID = result.id; current.status = "Partial"
+                }
+                notice = "Separated sounds ready."
+            } catch {
+                if Task.isCancelled { notice = "Stopped." } else { self.error = error.localizedDescription }
+            }
+            busy = false; currentTask = nil
+        }
     }
 
     @MainActor
@@ -3085,27 +3239,38 @@ private struct NativeSongMetadataAnalyzerView: View {
             if Task.isCancelled { break }
             updateTrack(track.id) { $0.status = "Analyzing"; $0.error = nil }
             do {
-                var scan = try await Task.detached(priority: .userInitiated) {
-                    try nativeSongAnalyzeAudio(track.data, filename: track.filename, detailed: fullAnalysis)
-                }.value
-                if Task.isCancelled {
-                    updateTrack(track.id) { $0.status = "Cancelled" }
-                    continue
-                }
-                if Task.isCancelled {
-                    updateTrack(track.id) { $0.status = "Cancelled" }
-                    continue
-                }
-                let annotations = (scan.report["dataset_analysis"] as? [String: Any])?["annotations"] as? [String: Any]
+                let detailed = fullAnalysis
+                let localTask = Task.detached(priority: .userInitiated) { try nativeSongAnalyzeAudio(track.data, filename: track.filename, detailed: detailed) }
+                var scan: NativeSongAnalysisScan?
+                var localFailure = "Local analysis was unavailable."
+                do { scan = try await withTaskCancellationHandler { try await localTask.value } onCancel: { localTask.cancel() } }
+                catch { if Task.isCancelled { throw error }; scan = nil; localFailure = error.localizedDescription }
+                var report = scan?.report ?? nativeSongPartialReport(track.filename, reason: localFailure)
+                var backendID: String?
+                var backendReady = false
+                if detailed { backendReady = await NativeSongBackend.available() }
+                try Task.checkCancellation()
+                if backendReady {
+                    do {
+                        let result = try await NativeSongBackend.analyze(track.data, separate: false) { notice = $0 }
+                        report = nativeSongMergeBackend(report, backend: result.report)
+                        var analysis = report["analysis"] as? [String: Any] ?? [:]
+                        analysis["uses_remote_api"] = true; analysis["uses_hosted_model"] = true; analysis["semantic_analysis"] = "backend_audio_models_unreviewed"
+                        report["analysis"] = analysis; backendID = result.id
+                    } catch { if Task.isCancelled { throw error }; notice = "Backend recognition unavailable; local results were kept." }
+                } else if detailed { notice = "Backend recognition unavailable; local results were kept." }
+                if scan == nil && backendID == nil { throw NativeNativeError.message(localFailure) }
+                let annotations = (report["dataset_analysis"] as? [String: Any])?["annotations"] as? [String: Any]
                 let reviewed = annotations?["reviewed"] as? Bool == true
-                let status = fullAnalysis && !reviewed ? "Partial" : (nativeSongString(scan.report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
+                let status = detailed && !reviewed ? "Partial" : (nativeSongString(report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
                 updateTrack(track.id) {
-                    $0.report = scan.report
+                    $0.report = report
+                    $0.backendJobID = backendID
                     $0.status = status
                 }
-                if status == "Partial" { notice = "Some results need review." }
+                if status == "Partial" && notice.isEmpty { notice = "Some results need review." }
             } catch {
-                updateTrack(track.id) { $0.status = "Failed"; $0.error = error.localizedDescription }
+                updateTrack(track.id) { $0.status = Task.isCancelled ? "Cancelled" : "Failed"; $0.error = Task.isCancelled ? nil : error.localizedDescription }
             }
             progress = Int(Double(index + 1) / Double(max(1, queue.count)) * 100)
         }
@@ -3146,6 +3311,29 @@ private struct NativeSongMetadataAnalyzerView: View {
     }
 }
 
+private func nativeSongPartialReport(_ name: String, reason: String) -> [String: Any] {
+    let fields = ["genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement"]
+    var annotations: [String: Any] = [:]
+    for field in fields { annotations[field] = [String]() }
+    annotations["notes"] = ""; annotations["reviewer"] = NSNull(); annotations["reviewed"] = false
+    return ["schema_version": "1.2", "filename": name, "identity": ["title": name], "analysis": ["local_audio_decoded": false, "status": "partial"], "dataset_analysis": ["annotations": annotations], "warnings": [reason]]
+}
+
+private func nativeSongMergeBackend(_ local: [String: Any], backend: [String: Any]) -> [String: Any] {
+    var report = local
+    report["backend_model"] = backend
+    let signal = backend["signal"] as? [String: Any] ?? [:]
+    if nativeSongString(report["tempo_bpm"]).isEmpty, let tempo = signal["tempo_bpm"], !(tempo is NSNull) { report["tempo_bpm"] = tempo; report["tempo_source"] = "backend_audio_estimate" }
+    if nativeSongString(report["key"]).isEmpty, let key = signal["key"], !(key is NSNull) { report["key"] = key }
+    var technical = report["technical"] as? [String: Any] ?? [:]
+    if technical["duration_seconds"] == nil || technical["duration_seconds"] is NSNull { technical["duration_seconds"] = signal["duration_seconds"] }
+    report["technical"] = technical
+    var embedded = report["embedded_metadata"] as? [String: Any] ?? [:]
+    embedded["backend_ffprobe"] = backend["metadata"] ?? [:]
+    report["embedded_metadata"] = embedded
+    return report
+}
+
 private let nativeSongExtensions: Set<String> = ["mp3", "wav", "flac", "m4a", "aac", "ogg", "oga", "opus", "aif", "aiff", "caf", "3gp", "mp4", "webm"]
 
 private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bool = false) throws -> NativeSongAnalysisScan {
@@ -3157,7 +3345,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     let asset = AVURLAsset(url: temp)
     let duration = CMTimeGetSeconds(asset.duration)
     guard duration.isFinite && duration > 0 else { throw NativeNativeError.message("Could not read the track duration.") }
-    guard duration <= 8 * 60 else { throw NativeNativeError.message("Tracks over 8 minutes are not supported on this device yet.") }
+    guard duration <= 15 * 60 else { throw NativeNativeError.message("Tracks over 15 minutes are not supported for local analysis.") }
     let audioFile = try AVAudioFile(forReading: temp, commonFormat: .pcmFormatFloat32, interleaved: false)
     let format = audioFile.processingFormat
     guard format.sampleRate > 0 && format.channelCount > 0 else { throw NativeNativeError.message("Audio stream details are unavailable.") }
@@ -3184,6 +3372,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
             sourceFrame += 1
         }
     }
+    guard audioFile.framePosition >= audioFile.length && !mono.isEmpty else { throw NativeNativeError.message("The device could not decode the complete audio track.") }
     let bpm = NativeSongSignal.estimateBPM(mono, sampleRate: 16_000)
     let key = NativeSongSignal.estimateKey(mono, sampleRate: 16_000)
     let metadata = asset.commonMetadata
@@ -3238,7 +3427,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     ]
     if detailed {
         report["dataset_analysis"] = NativeSongSignal.analyzeDataset(mono, sampleRate: 16_000)
-        warnings.append("Genre, language, mood, vocal type and instrument identity require human review; no hosted model was used.")
+        warnings.append("Genre, language, mood, vocal type and instrument identity require human review.")
         report["warnings"] = Array(Set(warnings))
     }
     return NativeSongAnalysisScan(report: report)
@@ -3510,7 +3699,7 @@ private extension Data {
     }
 }
 
-private enum NativeSongSignal {
+enum NativeSongSignal {
     private static let keys = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"]
     private static let major = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88]
     private static let minor = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17]
@@ -3556,7 +3745,7 @@ private enum NativeSongSignal {
     static func estimateKey(_ samples: [Float], sampleRate: Double) -> String? {
         let size = 4096
         guard sampleRate > 0 && samples.count >= Int(sampleRate * 3) else { return nil }
-        let hop = max(size, Int(sampleRate * 0.4))
+        let hop = max(size, Int(ceil(Double(samples.count - size) / 179)))
         var chroma = [Double](repeating: 0, count: 12)
         var frame = 0
         var start = 0
@@ -3850,7 +4039,7 @@ private enum NativeSongSignal {
         annotations["reviewed"] = false
         annotations["reviewer"] = NSNull()
         var warnings = [
-            "No hosted model or AI API was used. Genre, language, mood, instrument identity and vocal type require human annotation.",
+            "Local signal measurements do not determine genre, language, mood, instrument identity or vocal type.",
             "Pitch and chord estimates come from the full mix and may follow instruments rather than a singer.",
             "Automatic section boundaries describe measured feature changes, not verified verse/chorus labels."
         ]

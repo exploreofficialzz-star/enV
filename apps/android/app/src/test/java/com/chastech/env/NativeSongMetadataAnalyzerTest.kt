@@ -6,9 +6,28 @@ import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class NativeSongMetadataAnalyzerTest {
+    @Test
+    fun keyAnalysisIncludesAudioNearTheEndOfTheTrack() {
+        val rate = 16_000
+        val samples = FloatArray(rate * 96)
+        for (index in rate * 90 until samples.size) {
+            val time = index.toDouble() / rate
+            samples[index] = (0.2 * kotlin.math.sin(2 * kotlin.math.PI * 261.626 * time) + 0.2 * kotlin.math.sin(2 * kotlin.math.PI * 329.628 * time) + 0.2 * kotlin.math.sin(2 * kotlin.math.PI * 391.995 * time)).toFloat()
+        }
+        assertNotNull(NativeSongSignalAnalysis.estimateKey(samples, rate))
+    }
+
+    @Test
+    fun stemArtifactPathsRejectTraversal() {
+        val id = "1".repeat(32)
+        assertEquals(true, NativeSongBackend.artifactUrl(id, "stems/source/vocals.wav").endsWith("/v1/jobs/$id/artifacts/stems/source/vocals.wav"))
+        assertThrows(IllegalArgumentException::class.java) { NativeSongBackend.artifactUrl(id, "../secret") }
+        assertThrows(IllegalArgumentException::class.java) { NativeSongBackend.artifactUrl("bad", "vocals.wav") }
+    }
     private fun makeZip(entries: List<Pair<String, ByteArray>>): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->

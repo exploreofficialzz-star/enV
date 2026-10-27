@@ -34,11 +34,21 @@ export const localSongResultSchema = z.object({
   candidates: tags,
   learned_tags: tags,
   windows: z.array(clip).max(90),
+  stem_analysis: z.array(z.object({
+    stem: z.enum(["bass", "drums", "other"]),
+    source: z.literal("separated_estimate"),
+    coverage_seconds: z.number().nonnegative().max(900.1),
+    candidates: tags,
+    windows: z.array(clip).max(90),
+  })).max(3).optional(),
   lyrics: z
     .object({
       status: z.string(),
       language: z.string().nullable(),
       language_score: z.number().nullable(),
+      source: z.enum(["full_mix", "vocal_stem"]).optional(),
+      coverage_seconds: z.number().nonnegative().max(900.1).optional(),
+      truncated: z.boolean().optional(),
       segments: z
         .array(
           z.object({
@@ -61,8 +71,8 @@ export const localSongResultSchema = z.object({
     .nullable(),
   model: z.object({ encoder: z.string().nullable(), learning, score_meaning: z.string() }),
   processing: z.object({
-    location: z.literal("local_companion"),
-    hosted_inference: z.literal(false),
+    location: z.enum(["local_companion", "remote_backend"]),
+    hosted_inference: z.boolean(),
     audio_retention_seconds: z.number(),
     tagging_coverage: z.string(),
   }),
@@ -82,7 +92,7 @@ export type LocalSongResult = z.infer<typeof localSongResultSchema>;
 export type LocalConnection = { url: string; token: string };
 export const localHealthSchema = z.object({
   schema_version: z.literal("env.local-song.v1"),
-  location: z.literal("local_companion"),
+  location: z.enum(["local_companion", "remote_backend"]),
   ffmpeg: z.boolean(),
   tagger_installed: z.boolean(),
   tagger_loaded: z.boolean(),

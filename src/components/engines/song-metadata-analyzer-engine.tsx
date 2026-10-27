@@ -8,6 +8,13 @@ import { strToU8, unzipSync, zipSync } from "fflate";
 import { type MusicMetadata } from "@/lib/media/music-metadata";
 import { readSongFileMetadata } from "@/lib/media/song-file-metadata";
 import { type LocalSongResult } from "@/lib/media/local-song-client";
+import { type BrowserSongIntelligence } from "@/lib/media/song-intelligence";
+import { createSongIntelligenceWorker, runSongIntelligence } from "@/lib/media/song-intelligence-client";
+import { currentDevicePrefersBackend, runBackendSong, songBackendAvailable, type BackendSongJob } from "@/lib/media/song-backend";
+import { SongAudioInsights } from "./song-audio-insights";
+import { SongBackendInsights } from "./song-backend-insights";
+import { SongCopyButton } from "./song-copy-button";
+import { SongStemPanel } from "./song-stem-panel";
 import { SongLocalModelPanel } from "./song-local-model-panel";
 import { SongPlayback } from "./song-playback";
 import { MUSIC_AUDIO_EXTENSIONS } from "@/lib/media/music-downloader-policy";
@@ -47,8 +54,11 @@ type SongAnalysisReport = {
   dataset_analysis: MusicDatasetAnalysis | null;
   review_annotations: MusicDatasetAnnotations;
   local_model?: LocalSongResult;
+  backend_model?: LocalSongResult;
+  browser_intelligence?: BrowserSongIntelligence;
+  vocal_intelligence?: BrowserSongIntelligence;
 };
-type SongRow = { id: string; file: File; status: RowStatus; progress: number; report?: SongAnalysisReport; error?: string };
+type SongRow = { id: string; file: File; status: RowStatus; progress: number; report?: SongAnalysisReport; backendJobId?: string; error?: string };
 
 type ClientLimits = {
   maxTrackBytes: number;
@@ -176,8 +186,14 @@ function outputCsvRow(report: SongAnalysisReport): Record<string, unknown> {
     labels_reviewed: annotations?.reviewed ?? false,
     reviewer: annotations?.reviewer ?? "",
     annotation_notes: annotations?.notes ?? "",
-    uses_remote_api: analysis?.processing.uses_remote_api ?? false,
-    uses_hosted_model: analysis?.processing.uses_hosted_model ?? false,
+    recognized_instruments: report.browser_intelligence?.sound.candidates.instruments.length ? report.browser_intelligence.sound.candidates.instruments.map((item) => item.label) : report.backend_model?.candidates.instruments?.map((item) => item.label) ?? [],
+    recognized_genres: report.browser_intelligence?.sound.candidates.genre.length ? report.browser_intelligence.sound.candidates.genre.map((item) => item.label) : report.backend_model?.candidates.genre?.map((item) => item.label) ?? [],
+    recognized_speech: report.browser_intelligence?.speech.text || report.backend_model?.lyrics.segments.map((item) => item.text).join(" ") || "",
+    vocal_transcript: report.vocal_intelligence?.speech.text ?? "",
+    sound_coverage_seconds: report.browser_intelligence?.sound.coverage_seconds ?? null,
+    speech_coverage_seconds: report.browser_intelligence?.speech.coverage_seconds ?? null,
+    uses_remote_api: report.analysis.uses_remote_api ?? analysis?.processing.uses_remote_api ?? false,
+    uses_hosted_model: report.analysis.uses_hosted_model ?? analysis?.processing.uses_hosted_model ?? false,
     analysis_status: report.analysis.status,
     warnings: report.warnings,
   };
@@ -208,9 +224,11 @@ async function analyzeLocal(
   const AudioContextConstructor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   const conservativeBitrate = Math.max(32_000, Math.min(header.encodedBitrateBps ?? 64_000, 128_000));
   const preflightDuration = durationSeconds ?? (file.size * 8 / conservativeBitrate);
-  const preflightSampleRate = header.sourceSampleRateHz ?? 48_000;
+  const preflightSampleRate = Math.max(header.sourceSampleRateHz ?? 48_000, 48_000);
   const preflightChannels = channels ?? 2;
-  const projectedMemoryBytes = preflightDuration * preflightSampleRate * (preflightChannels + 1) * 4;
+  const fullRateBytes = preflightDuration * preflightSampleRate * (preflightChannels + 1) * 4;
+  const analysisRate = fullRateBytes > 180 * 1024 * 1024 ? 16_000 : undefined;
+  const projectedMemoryBytes = preflightDuration * (analysisRate ?? preflightSampleRate) * (preflightChannels + 1) * 4;
   const shouldSkipDecode = !Number.isFinite(projectedMemoryBytes) ||
     preflightDuration > 15 * 60 ||
     projectedMemoryBytes > 180 * 1024 * 1024;
@@ -219,8 +237,12 @@ async function analyzeLocal(
   } else if (!AudioContextConstructor) {
     warnings.push("This browser cannot decode audio for local signal analysis.");
   } else {
-    const context = new AudioContextConstructor();
+    let context: AudioContext | null = null;
     try {
+      context = new AudioContextConstructor(analysisRate ? { sampleRate: analysisRate } : undefined);
+      if (preflightDuration * context.sampleRate * (preflightChannels + 1) * 4 > 180 * 1024 * 1024) {
+        throw new Error("This browser cannot decode the full track within the local memory budget.");
+      }
       if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
       const data = await file.arrayBuffer();
       const decoded = await context.decodeAudioData(data);
@@ -243,13 +265,16 @@ async function analyzeLocal(
           const levels = signalLevels(mono);
           peakDbfs = levels.peakDbfs;
           rmsDbfs = levels.rmsDbfs;
-          tempoBpm = estimateBpm(mono.subarray(0, Math.min(mono.length, decoded.sampleRate * 90)), decoded.sampleRate);
-          key = estimateKey(mono.subarray(0, Math.min(mono.length, decoded.sampleRate * 30)), decoded.sampleRate);
           if (mode === "full") {
             datasetAnalysis = await analyzeMusicDatasetAudio(
               { channels: decodedChannels, sampleRate: decoded.sampleRate, fileName: file.name },
               { signal, onProgress: onDeepProgress },
             );
+            tempoBpm = datasetAnalysis.rhythm.tempo_bpm;
+            key = datasetAnalysis.tonality.key_estimate;
+          } else {
+            tempoBpm = estimateBpm(mono, decoded.sampleRate);
+            key = estimateKey(mono, decoded.sampleRate);
           }
         }
       }
@@ -258,7 +283,7 @@ async function analyzeLocal(
       const message = error instanceof Error ? error.message : "";
       warnings.push(message ? `Audio decode or DSP analysis failed: ${message.slice(0, 180)}` : "Audio decode failed; only embedded tags were read.");
     } finally {
-      await context.close().catch(() => undefined);
+      await context?.close().catch(() => undefined);
     }
   }
 
@@ -391,9 +416,11 @@ export function SongMetadataAnalyzerEngine() {
   const [tracks, setTracks] = useState<SongRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("full");
+  const [recognizeAudio, setRecognizeAudio] = useState(true);
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [annotationDrafts, setAnnotationDrafts] = useState<Record<string, string>>({});
@@ -402,6 +429,27 @@ export function SongMetadataAnalyzerEngine() {
 
   const selected = tracks.find((track) => track.id === selectedId) ?? tracks.find((track) => track.report) ?? tracks[0];
   const readyCount = tracks.filter((track) => track.report).length;
+
+  function saveBackendResult(id: string, job: BackendSongJob) {
+    setTracks((previous) => previous.map((item) => {
+      if (item.id !== id || !item.report) return item;
+      const report = item.report;
+      const tempo = report.tempo_bpm ?? job.result.signal.tempo_bpm;
+      const key = report.key ?? job.result.signal.key;
+      const format = job.result.metadata.format as { tags?: Record<string, unknown> } | undefined;
+      const tags = format?.tags ?? {};
+      return {
+        ...item, status: "partial", progress: 100, backendJobId: job.id,
+        report: {
+          ...report, tempo_bpm: tempo, tempo_band: tempoBandFromBpm(tempo), tempo_source: report.tempo_source ?? (tempo === null ? null : "backend_audio_estimate"), key,
+          identity: { ...report.identity, title: report.identity.title || tags.title || tags.TITLE || null, artist: report.identity.artist || tags.artist || tags.ARTIST || null, album: report.identity.album || tags.album || tags.ALBUM || null },
+          technical: { ...report.technical, duration_seconds: report.technical.duration_seconds ?? job.result.signal.duration_seconds },
+          embedded_metadata: { ...report.embedded_metadata, backend_ffprobe: job.result.metadata },
+          backend_model: job.result, analysis: { ...report.analysis, key_source: report.key ? report.analysis.key_source : key ? "backend_audio_estimate" : "unavailable", semantic_analysis: "backend_audio_models_unreviewed", uses_hosted_model: true, uses_remote_api: true },
+        },
+      };
+    }));
+  }
 
   async function importFiles(items: readonly File[]) {
     if (!items.length || busy || importing) return;
@@ -503,20 +551,81 @@ export function SongMetadataAnalyzerEngine() {
     const controller = new AbortController();
     controllerRef.current = controller;
     let finished = 0;
+    let modelWorker: Worker | null = null;
     const queue = [...tracks];
+    const backendReady = mode === "full" && recognizeAudio ? await songBackendAvailable(controller.signal) : false;
     setTracks((previous) => previous.map((track) => ({ ...track, status: "queued", progress: 0 })));
     for (const track of queue) {
       if (controller.signal.aborted) break;
       setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "scanning", progress: 12, error: undefined } : item));
       try {
+        setStage("Reading tags and measuring the track");
         setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "analyzing", progress: 35 } : item));
         const analysis = await analyzeLocal(track.file, mode, controller.signal, (fraction) => {
-          setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, progress: 35 + Math.round(fraction * 60) } : item));
-          setProgress(Math.round(((finished + fraction) / Math.max(1, queue.length)) * 100));
+          const share = mode === "full" && recognizeAudio ? fraction * 0.5 : fraction;
+          setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, progress: 15 + Math.round(share * 80) } : item));
+          setProgress(Math.round(((finished + share) / Math.max(1, queue.length)) * 100));
         });
         setTracks((previous) => previous.map((item) => item.id === track.id
-          ? { ...item, status: analysis.status, progress: 100, report: analysis.report }
+          ? { ...item, status: mode === "full" && recognizeAudio ? "analyzing" : analysis.status, progress: mode === "full" && recognizeAudio ? 55 : 100, report: analysis.report }
           : item));
+        if (mode === "full" && recognizeAudio) {
+          let backendCompleted = false;
+          const runBackend = async () => {
+            const job = await runBackendSong(track.file, { tagging: true, transcription: true, stems: false, pieces: false, llm: false }, controller.signal, (currentStage, fraction) => {
+              setStage(currentStage);
+              setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, progress: 55 + Math.round(fraction * 44) } : item));
+              setProgress(Math.round(((finished + 0.5 + fraction * 0.5) / Math.max(1, queue.length)) * 100));
+            });
+            saveBackendResult(track.id, job);
+            backendCompleted = job.result.processing.tagging_coverage === "full_track_10_second_windows" && job.result.lyrics.status === "candidate_transcript";
+            if (!backendCompleted) setNotice("Backend processing was partial; trying this device for missing results.");
+          };
+          if (backendReady && currentDevicePrefersBackend()) {
+            try { await runBackend(); }
+            catch (backendError) {
+              if (controller.signal.aborted) throw backendError;
+              setNotice("Backend processing was unavailable; trying this device.");
+            }
+          }
+          if (!backendCompleted) {
+          try {
+            modelWorker ??= createSongIntelligenceWorker();
+            const duration = typeof analysis.report.technical.duration_seconds === "number" ? analysis.report.technical.duration_seconds : null;
+            const modelResult = await runSongIntelligence(modelWorker, track.file, duration, controller.signal, (currentStage, fraction) => {
+              setStage(currentStage);
+              setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, progress: 55 + Math.round(fraction * 44) } : item));
+              setProgress(Math.round(((finished + 0.5 + fraction * 0.5) / Math.max(1, queue.length)) * 100));
+            });
+            setTracks((previous) => previous.map((item) => item.id === track.id && item.report ? {
+              ...item, status: "partial", progress: 100, report: {
+                ...item.report, browser_intelligence: modelResult,
+                warnings: [...new Set([...item.report.warnings, ...modelResult.warnings])],
+                analysis: { ...item.report.analysis, semantic_analysis: "browser_audio_models_unreviewed", uses_browser_audio_models: true },
+              },
+            } : item));
+            if (modelResult.warnings.length) setNotice((current) => current || modelResult.warnings[0]);
+            if (backendReady && (modelResult.sound.status === "unavailable" || modelResult.speech.status === "unavailable")) {
+              try { await runBackend(); }
+              catch (backendError) { if (controller.signal.aborted) throw backendError; setNotice("Some local models and backend processing were unavailable."); }
+            }
+          } catch (modelError) {
+            modelWorker?.terminate();
+            modelWorker = null;
+            if (controller.signal.aborted || (modelError instanceof Error && modelError.name === "AbortError")) throw modelError;
+            if (backendReady) {
+              try { await runBackend(); }
+              catch (backendError) { if (controller.signal.aborted) throw backendError; }
+            }
+            if (backendCompleted) continue;
+            const warning = modelError instanceof Error ? modelError.message : "On-device speech and sound recognition failed.";
+            setTracks((previous) => previous.map((item) => item.id === track.id && item.report ? {
+              ...item, status: "partial", progress: 100, report: { ...item.report, warnings: [...new Set([...item.report.warnings, warning])], analysis: { ...item.report.analysis, semantic_analysis: "browser_audio_models_unavailable" } },
+            } : item));
+            setNotice((current) => current || warning);
+          }
+          }
+        }
         if (analysis.report.warnings.length) {
           setNotice((current) => current || analysis.report.warnings[0] || "");
         }
@@ -534,8 +643,10 @@ export function SongMetadataAnalyzerEngine() {
     if (controller.signal.aborted) {
       setTracks((previous) => previous.map((item) => item.status === "queued" ? { ...item, status: "cancelled" } : item));
     }
+    modelWorker?.terminate();
     controllerRef.current = null;
     setBusy(false);
+    setStage("");
   }
 
   function cancelAnalysis() {
@@ -581,6 +692,7 @@ export function SongMetadataAnalyzerEngine() {
   }
 
   const selectedReport = selected?.report;
+  const styleTags = selectedReport ? [selectedReport.genre, selectedReport.sub_style, ...reportTags(selectedReport.language)].filter((value): value is string => typeof value === "string" && value.length > 0) : [];
   const progressLabel = busy ? `${progress}%` : `${readyCount} of ${tracks.length} analyzed`;
 
   function updateSelectedAnnotationList(key: AnnotationListKey, value: string) {
@@ -677,7 +789,12 @@ export function SongMetadataAnalyzerEngine() {
     } : track));
   }
 
-  function applyLocalSuggestions(tags: Record<string, string[]>) {
+  function attachVocalResult(result: BrowserSongIntelligence) {
+    const id = selected?.id;
+    setTracks((previous) => previous.map((track) => track.id === id && track.report ? { ...track, report: { ...track.report, vocal_intelligence: result } } : track));
+  }
+
+  function applyLocalSuggestions(tags: Record<string, string[]>, source = "local_model") {
     if (busy) return;
     const id = selected?.id;
     setAnnotationDrafts((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))));
@@ -693,14 +810,14 @@ export function SongMetadataAnalyzerEngine() {
         theme: annotations.themes, setting: annotations.listening_scene, energy: annotations.energy[0] ?? "unknown",
         review_annotations: annotations,
         dataset_analysis: dataset ? { ...dataset, annotations } : null,
-        analysis: { ...report.analysis, status: dataset ? "full_local_needs_review" : "tags_needs_review", semantic_analysis: "local_model_unreviewed", ...Object.fromEntries(Object.keys(valid).map((key) => [`${key}_source`, "local_model_suggestion_unreviewed"])) },
+        analysis: { ...report.analysis, status: dataset ? "full_local_needs_review" : "tags_needs_review", semantic_analysis: `${source}_unreviewed`, ...Object.fromEntries(Object.keys(valid).map((key) => [`${key}_source`, `${source}_suggestion_unreviewed`])) },
       } };
     }));
   }
   return (
-    <div className="@container/song mx-auto w-full max-w-6xl space-y-4">
+    <div className="@container/song mx-auto min-w-0 w-full max-w-6xl space-y-4 overflow-x-clip">
       <div className="grid gap-4 @min-[760px]/song:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-        <section className="space-y-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <section className="min-w-0 space-y-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
           <div
             role="button" tabIndex={0} aria-label="Add songs or ZIP" aria-disabled={busy || importing}
             onClick={() => !busy && pickerRef.current?.click()}
@@ -735,7 +852,8 @@ export function SongMetadataAnalyzerEngine() {
 
           {mode === "full" && (
             <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-xs leading-5 text-muted">
-              Full-track measurements and sections. Review tags or connect local AI below.
+              <label className="flex items-center gap-2 text-fg"><input type="checkbox" checked={recognizeAudio} disabled={busy} onChange={(event) => setRecognizeAudio(event.currentTarget.checked)} />Recognize speech, instruments and sounds</label>
+              <p className="mt-1">Uses this device or the backend automatically. Backend processing uploads the audio; local models download on first use.</p>
             </div>
           )}
 
@@ -748,14 +866,15 @@ export function SongMetadataAnalyzerEngine() {
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
               : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" aria-label="Clear batch"><X size={16} /></button>}
           </div>
-          <p className="text-[11px] text-muted">Private by default · browser analysis stays on this device.</p>
+          <p className="text-[11px] text-muted">Results show where each stage was processed.</p>
         </section>
 
-        <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <section className="min-w-0 rounded-2xl border border-border bg-surface p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Batch results</h2>
             <span className="text-xs text-muted">{progressLabel}</span>
           </div>
+          {busy && stage && <p role="status" className="mt-2 break-words text-xs text-muted">{stage}</p>}
           {busy && <div role="progressbar" aria-label="Batch analysis" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progress}%` }} /></div>}
           {error && <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-700 dark:text-red-300"><AlertCircle size={16} className="mt-0.5 shrink-0" />{error}</div>}
           {notice && !error && <div role="status" className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted">{notice}</div>}
@@ -793,18 +912,23 @@ export function SongMetadataAnalyzerEngine() {
       </div>
 
       {selectedReport && (
-        <section className="space-y-4 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-surface p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted">TRACK ANALYSIS</p>
               <h2 className="mt-1 break-words text-base font-semibold">{String(selectedReport.identity.title || selected?.file.name || "Untitled track")}</h2>
               <p className="mt-0.5 truncate text-sm text-muted">{String(selectedReport.identity.artist || "Unknown artist")}{selectedReport.identity.album ? ` · ${String(selectedReport.identity.album)}` : ""}</p>
             </div>
+            <SongCopyButton label="track title" value={String(selectedReport.identity.title || selected?.file.name || "")} />
+            <SongCopyButton label="track analysis" value={() => JSON.stringify(selectedReport, null, 2)} />
             <span className={`rounded-full px-2.5 py-1 text-xs ${statusClass(selected?.status ?? "queued")}`}>{statusLabel(selected?.status ?? "queued")}</span>
           </div>
 
           {selected && <SongPlayback key={selected.id} file={selected.file} sections={selectedReport.dataset_analysis?.structure.sections ?? []} />}
-          {selected && <SongLocalModelPanel key={`local-${selected.id}`} file={selected.file} annotations={selectedReport.review_annotations} result={selectedReport.local_model} onResult={attachLocalResult} onApply={applyLocalSuggestions} disabled={busy} />}
+          {selected && <SongStemPanel key={`stems-${selected.id}`} file={selected.file} duration={typeof selectedReport.technical.duration_seconds === "number" ? selectedReport.technical.duration_seconds : null} vocalResult={selectedReport.vocal_intelligence} onVocalResult={attachVocalResult} onBackendResult={(job) => saveBackendResult(selected.id, job)} disabled={busy} />}
+          {selected && selectedReport.browser_intelligence && <SongAudioInsights result={selectedReport.browser_intelligence} filename={selected.file.name} onApply={(tags) => applyLocalSuggestions(tags, "browser_audio_model")} disabled={busy} />}
+          {selected && selectedReport.backend_model && <SongBackendInsights result={selectedReport.backend_model} jobId={selected.backendJobId} onApply={(tags) => applyLocalSuggestions(tags, "backend_audio_model")} disabled={busy} />}
+          {selected && <SongLocalModelPanel key={`local-${selected.id}`} file={selected.file} annotations={selectedReport.review_annotations} result={selectedReport.local_model} onResult={attachLocalResult} onApply={(tags) => applyLocalSuggestions(tags)} disabled={busy} />}
 
           <div className="grid grid-cols-2 gap-2 @min-[600px]/song:grid-cols-4">
             {[
@@ -812,15 +936,15 @@ export function SongMetadataAnalyzerEngine() {
               { label: selectedReport.analysis.key_source === "audio_estimate" ? "Est. key" : "Key", value: selectedReport.key || "—" },
               { label: "Duration", value: durationLabel(selectedReport.technical.duration_seconds) },
               { label: "Energy", value: selectedReport.energy === "unknown" ? "—" : selectedReport.energy },
-            ].map((item) => <div key={item.label} className="rounded-xl bg-surface-2 p-3"><span className="block text-[11px] text-muted">{item.label}</span><strong className="mt-1 block truncate text-sm capitalize">{item.value}</strong></div>)}
+            ].map((item) => <div key={item.label} className="min-w-0 rounded-xl bg-surface-2 p-3"><div className="flex items-center justify-between gap-1"><span className="text-[11px] text-muted">{item.label}</span><SongCopyButton label={item.label.toLowerCase()} value={item.value} disabled={item.value === "—"} /></div><strong className="mt-1 block break-words text-sm capitalize">{item.value}</strong></div>)}
           </div>
 
           <div className="grid gap-4 @min-[680px]/song:grid-cols-2">
             <div className="space-y-3">
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted">STYLE</p>
+                <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted">STYLE</p><SongCopyButton label="style" value={styleTags.join(", ")} disabled={!styleTags.length} /></div>
                 <div className="flex flex-wrap gap-1.5">
-                  {[selectedReport.genre, selectedReport.sub_style, ...reportTags(selectedReport.language)].filter((v): v is string => typeof v === "string" && v.length > 0).map((tag) => <span key={tag} className="rounded-full border border-border px-2.5 py-1 text-xs">{tag}</span>)}
+                  {styleTags.map((tag) => <span key={tag} className="max-w-full break-words rounded-full border border-border px-2.5 py-1 text-xs">{tag}</span>)}
                   {!selectedReport.genre && !selectedReport.sub_style && reportTags(selectedReport.language).length === 0 && <span className="text-xs text-muted">No reliable style tags yet.</span>}
                 </div>
               </div>
@@ -829,14 +953,14 @@ export function SongMetadataAnalyzerEngine() {
                 ["Vocals", selectedReport.vocals], ["Instruments", selectedReport.instruments],
               ] as Array<[string, unknown]>).map(([label, value]) => {
                 const tags = reportTags(value);
-                return <div key={label}><p className="mb-1.5 text-xs font-semibold text-muted">{label.toUpperCase()}</p><p className="text-sm leading-6">{tags.length ? tags.join(" · ") : "—"}</p></div>;
+                return <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-3"><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted">{label.toUpperCase()}</p><SongCopyButton label={label.toLowerCase()} value={tags.join(", ")} disabled={!tags.length} /></div><p className="mt-1 break-words text-sm leading-6">{tags.length ? tags.join(" · ") : "—"}</p></div>;
               })}
             </div>
             <div className="space-y-3">
               <div>
                 <p className="mb-2 text-xs font-semibold text-muted">DESCRIPTIONS</p>
                 {selectedReport.descriptions.length
-                  ? <div className="space-y-2">{selectedReport.descriptions.map((description, index) => <p key={index} className="rounded-lg bg-surface-2 p-3 text-sm leading-5">{description}</p>)}</div>
+                  ? <div className="space-y-2">{selectedReport.descriptions.map((description, index) => <div key={index} className="flex min-w-0 items-start gap-2 rounded-lg bg-surface-2 p-3"><p className="min-w-0 flex-1 break-words text-sm leading-5">{description}</p><SongCopyButton label={`description ${index + 1}`} value={description} /></div>)}</div>
                   : <p className="text-sm text-muted">Run Full Analysis for local signal descriptions.</p>}
               </div>
               {selectedReport.lyric_evidence && <div><p className="mb-1.5 text-xs font-semibold text-muted">LYRIC NOTES</p><p className="text-sm leading-5">{selectedReport.lyric_evidence}</p></div>}
@@ -864,17 +988,17 @@ export function SongMetadataAnalyzerEngine() {
                     ["Stereo side/mid", selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio == null ? "—" : String(selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio)],
                     ["Feature changes", String(selectedReport.dataset_analysis.structure.change_points.length)],
                     ["Pitch class / key", selectedReport.dataset_analysis.tonality.key_estimate ?? "Unknown"],
-                  ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-2.5"><span className="block text-[10px] text-muted">{label}</span><strong className="mt-1 block break-words text-xs">{value}</strong></div>)}
+                  ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-2.5"><div className="flex items-center justify-between gap-1"><span className="text-[10px] text-muted">{label}</span><SongCopyButton label={label.toLowerCase()} value={value} disabled={value === "—" || value === "Unknown"} /></div><strong className="mt-1 block break-words text-xs">{value}</strong></div>)}
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-muted">CHORD ESTIMATES</p>
+                  <div className="mb-1.5 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted">CHORD ESTIMATES</p><SongCopyButton label="chord estimates" value={selectedReport.dataset_analysis.tonality.chord_estimates.map((item) => `${item.start_seconds}–${item.end_seconds}s: ${item.chord ?? "?"}`).join("\n")} disabled={!selectedReport.dataset_analysis.tonality.chord_estimates.length} /></div>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedReport.dataset_analysis.tonality.chord_estimates.slice(0, 40).map((item) => <span key={`${item.start_seconds}-${item.chord}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{Math.floor(item.start_seconds)}–{Math.floor(item.end_seconds)}s: {item.chord ?? "?"} {item.confidence == null ? "" : `· score ${item.confidence.toFixed(2)}`}</span>)}
                     {!selectedReport.dataset_analysis.tonality.chord_estimates.length && <span className="text-xs text-muted">No chord windows available.</span>}
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-muted">DETECTED PITCHES (FULL MIX ESTIMATE)</p>
+                  <div className="mb-1.5 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted">DETECTED PITCHES (FULL MIX ESTIMATE)</p><SongCopyButton label="detected pitches" value={selectedReport.dataset_analysis.pitch.points.map((item) => `${item.time_seconds}s: ${item.note} (${item.frequency_hz} Hz)`).join("\n")} disabled={!selectedReport.dataset_analysis.pitch.points.length} /></div>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedReport.dataset_analysis.pitch.points.slice(0, 32).map((item) => <span key={`${item.time_seconds}-${item.note}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{item.time_seconds}s · {item.note} · {item.frequency_hz} Hz</span>)}
                     {!selectedReport.dataset_analysis.pitch.points.length && <span className="text-xs text-muted">No stable dominant pitch was detected.</span>}
@@ -882,7 +1006,7 @@ export function SongMetadataAnalyzerEngine() {
                   <p className="mt-1 text-[10px] leading-4 text-muted">{selectedReport.dataset_analysis.pitch.note}</p>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-muted">AUTOMATIC SECTION BOUNDARIES</p>
+                  <div className="mb-1.5 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted">AUTOMATIC SECTION BOUNDARIES</p><SongCopyButton label="section boundaries" value={selectedReport.dataset_analysis.structure.sections.map((section) => `${section.label}: ${durationLabel(section.start_seconds)}–${durationLabel(section.end_seconds)}`).join("\n")} disabled={!selectedReport.dataset_analysis.structure.sections.length} /></div>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedReport.dataset_analysis.structure.sections.slice(0, 30).map((section) => <span key={section.label} className="rounded-md border border-border px-2 py-1 text-[11px]">{section.label}: {durationLabel(section.start_seconds)}–{durationLabel(section.end_seconds)}</span>)}
                   </div>
@@ -890,7 +1014,8 @@ export function SongMetadataAnalyzerEngine() {
                 </div>
                 <details className="rounded-lg border border-border p-2.5">
                   <summary className="cursor-pointer text-xs font-medium">Time-aligned signal timeline ({selectedReport.dataset_analysis.timeline.length} frames)</summary>
-                  <div className="mt-2 max-h-72 overflow-auto">
+                  <div className="mt-2 flex justify-end"><SongCopyButton label="signal timeline" value={() => JSON.stringify(selectedReport.dataset_analysis?.timeline ?? [], null, 2)} /></div>
+                  <div className="mt-2 max-h-72 min-w-0 max-w-full overflow-auto">
                     <table className="w-full min-w-[620px] text-left text-[11px]">
                       <thead><tr className="border-b border-border text-muted"><th className="p-2">Time</th><th className="p-2">RMS dBFS</th><th className="p-2">Centroid Hz</th><th className="p-2">Low</th><th className="p-2">Mid</th><th className="p-2">High</th><th className="p-2">Flux</th></tr></thead>
                       <tbody>{selectedReport.dataset_analysis.timeline.slice(0, 48).map((frame) => <tr key={frame.start_seconds} className="border-b border-border/60"><td className="p-2">{frame.start_seconds}–{frame.end_seconds}s</td><td className="p-2">{frame.rms_dbfs ?? "—"}</td><td className="p-2">{frame.spectral_centroid_hz ?? "—"}</td><td className="p-2">{frame.low_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.mid_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.high_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.spectral_flux ?? "—"}</td></tr>)}</tbody>
@@ -916,25 +1041,25 @@ export function SongMetadataAnalyzerEngine() {
               <h3 className="text-sm font-semibold">Review tags</h3>
                   <p className="mt-1 text-xs text-muted">Comma-separated labels · verify suggestions by listening.</p>
                 </div>
-                <fieldset disabled={busy} className="grid gap-3 @min-[520px]/song:grid-cols-2 @min-[850px]/song:grid-cols-3">
-                  {DATASET_ANNOTATION_FIELDS.filter((field) => ["genre", "sub_style", "language", "energy", "mood", "vocals", "instruments"].includes(field.key)).map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-bg px-2.5 py-2 text-xs outline-none focus:border-accent" value={annotationDrafts[`${selected?.id}:${field.key}`] ?? selectedReport.review_annotations[field.key].join(", ")} maxLength={4000} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
+                <fieldset disabled={busy} className="grid min-w-0 gap-3 @min-[520px]/song:grid-cols-2 @min-[850px]/song:grid-cols-3">
+                  {DATASET_ANNOTATION_FIELDS.filter((field) => ["genre", "sub_style", "language", "energy", "mood", "vocals", "instruments"].includes(field.key)).map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full min-w-0 rounded-lg border border-border bg-bg px-2.5 py-2 text-base outline-none focus:border-accent @min-[520px]/song:text-xs" value={annotationDrafts[`${selected?.id}:${field.key}`] ?? selectedReport.review_annotations[field.key].join(", ")} maxLength={4000} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
                 </fieldset>
                 <details>
                   <summary className="cursor-pointer text-xs font-medium">More tags</summary>
-                  <fieldset disabled={busy} className="mt-3 grid gap-3 @min-[520px]/song:grid-cols-2 @min-[850px]/song:grid-cols-3">
-                    {DATASET_ANNOTATION_FIELDS.filter((field) => !["genre", "sub_style", "language", "energy", "mood", "vocals", "instruments"].includes(field.key)).map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-bg px-2.5 py-2 text-xs outline-none focus:border-accent" value={annotationDrafts[`${selected?.id}:${field.key}`] ?? selectedReport.review_annotations[field.key].join(", ")} maxLength={4000} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
+                  <fieldset disabled={busy} className="mt-3 grid min-w-0 gap-3 @min-[520px]/song:grid-cols-2 @min-[850px]/song:grid-cols-3">
+                    {DATASET_ANNOTATION_FIELDS.filter((field) => !["genre", "sub_style", "language", "energy", "mood", "vocals", "instruments"].includes(field.key)).map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full min-w-0 rounded-lg border border-border bg-bg px-2.5 py-2 text-base outline-none focus:border-accent @min-[520px]/song:text-xs" value={annotationDrafts[`${selected?.id}:${field.key}`] ?? selectedReport.review_annotations[field.key].join(", ")} maxLength={4000} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
                   </fieldset>
                 </details>
-                <label className="block"><span className="mb-1.5 block text-[11px] font-semibold">Annotation notes</span><textarea className="min-h-16 w-full rounded-lg border border-border bg-bg px-2.5 py-2 text-xs outline-none focus:border-accent" value={selectedReport.review_annotations.notes} maxLength={4000} placeholder="Describe which parts should be preserved/replaced, uncertainty, or notes for another reviewer." onChange={(event) => updateSelectedAnnotationText("notes", event.currentTarget.value)} /></label>
+                <label className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">Annotation notes</span><textarea className="min-h-16 w-full min-w-0 rounded-lg border border-border bg-bg px-2.5 py-2 text-base outline-none focus:border-accent @min-[520px]/song:text-xs" value={selectedReport.review_annotations.notes} maxLength={4000} placeholder="Notes for another reviewer" onChange={(event) => updateSelectedAnnotationText("notes", event.currentTarget.value)} /></label>
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={busy} checked={selectedReport.review_annotations.reviewed} onChange={(event) => markSelectedReviewed(event.currentTarget.checked)} />Tags reviewed</label>
-                  <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted">Reviewer <input className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-2.5 py-2 text-xs text-fg" value={selectedReport.review_annotations.reviewer ?? ""} maxLength={100} placeholder="Reviewer initials or team ID" onChange={(event) => updateSelectedAnnotationText("reviewer", event.currentTarget.value)} /></label>
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted">Reviewer <input className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-2.5 py-2 text-base text-fg @min-[520px]/song:text-xs" value={selectedReport.review_annotations.reviewer ?? ""} maxLength={100} placeholder="Name or initials" onChange={(event) => updateSelectedAnnotationText("reviewer", event.currentTarget.value)} /></label>
                 </div>
               </section>
 
           <details className="rounded-xl border border-border px-3 py-2.5">
             <summary className="cursor-pointer text-sm font-medium">Embedded tags</summary>
-            <p className="mt-2 text-xs text-muted">File tags are unverified. Binary artwork is omitted from JSON.</p>
+            <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted">File tags are unverified. Binary artwork is omitted from JSON.</p><SongCopyButton label="embedded tags" value={() => JSON.stringify(selectedReport.embedded_metadata, null, 2)} /></div>
             <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[11px]">{JSON.stringify(selectedReport.embedded_metadata, null, 2)}</pre>
           </details>
           <details className="rounded-xl border border-border px-3 py-2.5">
@@ -950,7 +1075,7 @@ export function SongMetadataAnalyzerEngine() {
                 ["Average bitrate", selectedReport.technical.bitrate_bps ? `${Math.round(Number(selectedReport.technical.bitrate_bps) / 1000)} kbps` : "Unknown"],
                 ["Peak", selectedReport.technical.peak_dbfs != null ? `${selectedReport.technical.peak_dbfs} dBFS` : "—"],
                 ["RMS", selectedReport.technical.rms_dbfs != null ? `${selectedReport.technical.rms_dbfs} dBFS` : "—"],
-              ] as Array<[string, unknown]>).map(([label, value]) => <div key={label}><span className="block text-muted">{label}</span><span className="mt-1 block break-words font-medium">{String(value)}</span></div>)}
+              ] as Array<[string, unknown]>).map(([label, value]) => <div key={label} className="min-w-0"><div className="flex items-center justify-between gap-1"><span className="text-muted">{label}</span><SongCopyButton label={label.toLowerCase()} value={String(value)} disabled={value === "—" || value === "Unknown"} /></div><span className="mt-1 block break-words font-medium">{String(value)}</span></div>)}
             </div>
             {selectedReport.warnings.length > 0 && <div className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200"><p className="font-semibold">Notes</p><ul className="mt-1 list-disc space-y-1 pl-4">{selectedReport.warnings.slice(0, 5).map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
           </details>

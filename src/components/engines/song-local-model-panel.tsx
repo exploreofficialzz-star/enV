@@ -10,6 +10,7 @@ import {
 } from "@/lib/media/local-song-client";
 import type { MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
 import { downloadBlob } from "@/lib/utils";
+import { SongCopyButton } from "./song-copy-button";
 
 export function SongLocalModelPanel({
   file,
@@ -238,7 +239,7 @@ export function SongLocalModelPanel({
       ]),
     );
   return (
-    <details className="rounded-xl border border-border p-3 sm:p-4">
+    <details className="min-w-0 rounded-xl border border-border p-3 sm:p-4">
       <summary className="cursor-pointer text-sm font-semibold">
         Local AI & stems <span className="font-normal text-muted">· optional</span>
       </summary>
@@ -267,7 +268,7 @@ export function SongLocalModelPanel({
                 setUrl(event.target.value);
                 setConnection(null);
               }}
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2"
+              className="w-full min-w-0 rounded-lg border border-border bg-bg px-3 py-2 text-base @min-[620px]/song:text-xs"
             />
           </label>
           <label className="text-xs">
@@ -281,7 +282,7 @@ export function SongLocalModelPanel({
                 setToken(event.target.value);
                 setConnection(null);
               }}
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2"
+              className="w-full min-w-0 rounded-lg border border-border bg-bg px-3 py-2 text-base @min-[620px]/song:text-xs"
             />
           </label>
           <button
@@ -360,7 +361,7 @@ export function SongLocalModelPanel({
             <div className="grid gap-2 @min-[520px]/song:grid-cols-2">
               {Object.entries(result.candidates).map(([field, values]) => (
                 <div key={field} className="rounded-lg bg-surface-2 p-2.5 text-xs">
-                  <span className="font-medium capitalize">{field}</span>
+                  <div className="flex items-center justify-between gap-2"><span className="font-medium capitalize">{field}</span><SongCopyButton label={`local ${field} candidates`} value={values.map((item) => item.label).join(", ")} disabled={!values.length} /></div>
                   <p className="mt-1 text-muted">
                     {values.map((item) => `${item.label} (${item.score.toFixed(3)})`).join(" · ")}
                   </p>
@@ -375,9 +376,7 @@ export function SongLocalModelPanel({
                 <div className="mt-2 max-h-60 space-y-2 overflow-auto">
                   {result.windows.map((window) => (
                     <div key={window.start_seconds} className="rounded-lg bg-surface-2 p-2">
-                      <span className="font-medium">
-                        {window.start_seconds}–{window.end_seconds}s
-                      </span>
+                      <div className="flex items-center justify-between gap-2"><span className="font-medium">{window.start_seconds}–{window.end_seconds}s</span><SongCopyButton label={`local window ${window.start_seconds} seconds`} value={Object.values(window.tags).map((values) => values[0]?.label).filter(Boolean).join(", ")} /></div>
                       <p className="mt-1 text-muted">
                         {Object.values(window.tags)
                           .map((values) => values[0]?.label)
@@ -388,6 +387,18 @@ export function SongLocalModelPanel({
                   ))}
                 </div>
               </details>
+            )}
+            {(result.stem_analysis?.length ?? 0) > 0 && (
+              <div className="grid min-w-0 gap-2 @min-[520px]/song:grid-cols-2">
+                {result.stem_analysis?.map((stem) => {
+                  const instruments = stem.candidates.instruments ?? [];
+                  return <div key={stem.stem} className="min-w-0 rounded-lg bg-surface-2 p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2"><h4 className="font-medium capitalize">{stem.stem} stem sounds</h4><SongCopyButton label={`${stem.stem} stem sounds`} value={instruments.map((item) => item.label).join(", ")} disabled={!instruments.length} /></div>
+                    <p className="mt-1 break-words text-muted">{instruments.map((item) => `${item.label} (${item.score.toFixed(3)})`).join(" · ") || "No audible candidates"}</p>
+                    <p className="mt-1 text-muted">{Math.round(stem.coverage_seconds)}s analyzed · suggestions from an estimated stem</p>
+                  </div>;
+                })}
+              </div>
             )}
             {Object.values(suggestions).some((values) => values.length) && (
               <>
@@ -409,13 +420,11 @@ export function SongLocalModelPanel({
                 <summary className="cursor-pointer font-medium">
                   Candidate lyrics · {result.lyrics.language ?? "unknown language"}
                 </summary>
-                <p className="mt-2 text-muted">Review sung words and language before tagging.</p>
+                <p className="mt-2 text-muted">{result.lyrics.source === "vocal_stem" ? "Recognized from the estimated vocal stem." : "Recognized from the full mix."} {result.lyrics.coverage_seconds !== undefined ? `${Math.round(result.lyrics.coverage_seconds)}s processed.` : ""} Review sung words and language before tagging.</p>
+                <div className="mt-2 flex justify-end"><SongCopyButton label="local transcript" value={result.lyrics.segments.map((segment) => segment.text).join(" ")} /></div>
                 <div className="mt-2 max-h-60 space-y-2 overflow-auto">
                   {result.lyrics.segments.map((segment, index) => (
-                    <p key={index}>
-                      <span className="text-muted">{Math.floor(segment.start_seconds)}s </span>
-                      {segment.text}
-                    </p>
+                    <div key={index} className="flex min-w-0 items-start justify-between gap-2"><p className="min-w-0 break-words"><span className="text-muted">{Math.floor(segment.start_seconds)}s </span>{segment.text}</p><SongCopyButton label={`local transcript segment ${index + 1}`} value={segment.text} /></div>
                   ))}
                 </div>
               </details>

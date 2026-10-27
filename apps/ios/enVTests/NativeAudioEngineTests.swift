@@ -2,6 +2,23 @@ import XCTest
 @testable import enV
 
 final class NativeAudioEngineTests: XCTestCase {
+    func testSongKeyIncludesAudioNearTheEndOfTheTrack() {
+        let rate = 16_000
+        var samples = [Float](repeating: 0, count: rate * 96)
+        for index in (rate * 90)..<samples.count {
+            let time = Double(index) / Double(rate)
+            samples[index] = Float(0.2 * sin(2 * Double.pi * 261.626 * time) + 0.2 * sin(2 * Double.pi * 329.628 * time) + 0.2 * sin(2 * Double.pi * 391.995 * time))
+        }
+        XCTAssertNotNil(NativeSongSignal.estimateKey(samples, sampleRate: Double(rate)))
+    }
+
+    func testSongBackendArtifactRejectsTraversal() {
+        let id = String(repeating: "1", count: 32)
+        XCTAssertNotNil(NativeSongBackend.artifactURL(id, name: "stems/source/vocals.wav"))
+        XCTAssertNil(NativeSongBackend.artifactURL(id, name: "../secret"))
+        XCTAssertNil(NativeSongBackend.artifactURL("bad", name: "vocals.wav"))
+    }
+
     func testNativeMicrophoneRecorderIsRoutedToItsRealNativeScreen() {
         let recorder = Tool(
             id: "audio-recorder",

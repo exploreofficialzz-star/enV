@@ -1,6 +1,8 @@
 # Local Song Analyzer
 
-The Song Metadata Analyzer at `/tools/audio/song-metadata-analyzer` can work entirely in the browser. This optional Python companion adds local audio-model tagging, a constrained local LLM, optional lyric transcription and four-stem separation. It never calls the hosted enV AI route.
+The Song Metadata Analyzer at `/tools/audio/song-metadata-analyzer` performs metadata and signal analysis on the device. The web version can also run speech recognition, sound classification and four-stem separation in browser workers. The optional Python companion adds CLAP tagging, a constrained local LLM, faster-whisper and Demucs. Android and iOS perform signal analysis natively and can use the optional enV song backend for the heavier models.
+
+When the backend is configured, web analysis selects it for phones and low-memory devices and retries there if a local model fails. Native Full Analysis uses the backend for speech and sound recognition. Separation uses the backend on native clients and on web devices that need it. Backend processing uploads the selected audio; results identify the processing location and audio artifacts expire after an hour. Without a configured backend, the web app uses its on-device models and native apps retain their local measurements.
 
 ## Start locally
 
@@ -59,9 +61,15 @@ env-song-analyzer prepare-stems
 env-song-analyzer serve
 ```
 
-Restart the companion after changing configuration. Select **Lyrics**, **4 stems**, or **Section WAVs** in the tool before starting a job. Results include timestamped lyric candidates and downloadable vocals, drums, bass and other WAVs. The ZIP includes the full analysis and requested audio artifacts. Browser section exports are also available without the companion.
+Restart the companion after changing configuration. Select **Lyrics**, **4 stems**, or **Section WAVs** in the tool before starting a job. Results include timestamped lyric candidates and downloadable vocals, drums, bass and other WAVs. When both transcription and separation are requested, Whisper uses the estimated vocal stem; if the stem cannot be decoded, it falls back to the full mix and reports that choice. CLAP also analyzes the bass, drums and other stems. Demucs processes overlapping bounded windows and joins their complete outputs, including the tail. The ZIP includes the full analysis and requested audio artifacts.
 
-Whisper is speech ASR: singing, Yoruba, Nigerian Pidgin and code-switching need independent review. Empty transcription is valid. Language is not inferred from genre. Full-mix transcription is currently used; vocal-first ASR and word alignment are not implemented. Demucs can leave source leakage and does not isolate every instrument. **The upstream Demucs repository explicitly states that the checkpoint's licensing is unclear**; evaluate the rights for your intended deployment before enabling it. The checkpoint is optional and is never bundled or downloaded by an analysis request.
+Whisper is speech ASR: singing, Yoruba, Nigerian Pidgin and code-switching need independent review. Empty transcription is valid. Language is not inferred from genre. Word alignment is not implemented. Demucs can leave source leakage and does not isolate every instrument. **The upstream Demucs repository explicitly states that the checkpoint's licensing is unclear**; evaluate the rights for your intended deployment before enabling it. The checkpoint is optional and is never downloaded by an analysis request.
+
+## Optional backend worker
+
+`local-song-analyzer/Dockerfile` prepares a separate CPU service with pinned CLAP, faster-whisper tiny and Demucs models. It binds to `PORT` and requires a randomly generated `SONG_PROCESSOR_KEY` of at least 24 characters. Configure the existing Render gateway with `SONG_PROCESSOR_URL` (the worker's HTTPS origin) and the same `SONG_PROCESSOR_KEY`. The key stays on the servers; the clients use `/api/song/v1/...` through the gateway. The worker exposes only health, bounded jobs, cancellation and allowlisted artifacts. Feedback and training endpoints remain exclusive to the local companion. Jobs and audio are ephemeral and deleted after one hour or service restart.
+
+The existing free Render service has 512 MB RAM; do not enable these models inside that shared process. A separate service must be sized for the models and concurrent work. In a local sequential-job smoke test, the companion plus Demucs subprocess reached about 2.4 GiB RSS before OS cache, so a 4 GB plan is a starting point, not a load-test guarantee. One job runs at a time and a bounded queue and retention limit apply. Long tracks can take substantially longer than the browser path. Do not expose the worker key in a `VITE_` variable or a mobile app.
 
 Demucs 4.0.1 serializes model classes. Its subprocess permits legacy PyTorch deserialization only after checking the exact checkpoint SHA-256 and repository configuration. The permission is scoped to that child process. Do not substitute arbitrary checkpoint files. The fixed local repository prevents analysis-time network downloads.
 

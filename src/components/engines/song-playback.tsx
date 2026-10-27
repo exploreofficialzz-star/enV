@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, LoaderCircle, Play } from "lucide-react";
 import { renderSongSection } from "@/lib/media/song-audio-export";
 import { downloadBlob } from "@/lib/utils";
+import { SongCopyButton } from "./song-copy-button";
 
 type Section = { start_seconds: number; end_seconds: number; label: string };
 const time = (value: number) =>
@@ -58,7 +59,7 @@ export function SongPlayback({ file, sections }: { file: File; sections: Section
         src={url || undefined}
         controls
         preload="metadata"
-        className="h-10 w-full"
+        className="h-10 min-w-0 w-full max-w-full"
         aria-label={`Play ${file.name}`}
         onTimeUpdate={() => {
           if (
@@ -91,7 +92,8 @@ export function SongPlayback({ file, sections }: { file: File; sections: Section
                 key={section.start_seconds}
                 className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2"
               >
-                <button
+                  <SongCopyButton label={`${section.label} time range`} value={`${time(section.start_seconds)}–${time(section.end_seconds)}`} />
+                  <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
                   onClick={() => {

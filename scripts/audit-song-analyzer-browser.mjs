@@ -40,6 +40,7 @@ try {
     .locator('html[data-env-tool-hydrated="song-metadata-analyzer"]')
     .waitFor({ state: "attached" });
   await page.getByLabel("Audio files", { exact: true }).setInputFiles(fixture);
+  if (process.env.SONG_AUDIT_BROWSER_MODELS !== "1") await page.getByLabel("Recognize speech, instruments and sounds").uncheck();
   await page.getByRole("button", { name: "Analyze songs", exact: true }).click();
   await page
     .getByRole("heading", { name: "Review tags", exact: true })
@@ -146,6 +147,7 @@ try {
     .locator('html[data-env-tool-hydrated="song-metadata-analyzer"]')
     .waitFor({ state: "attached" });
   await page.getByLabel("Audio files", { exact: true }).setInputFiles(fixture);
+  if (process.env.SONG_AUDIT_BROWSER_MODELS !== "1") await page.getByLabel("Recognize speech, instruments and sounds").uncheck();
   await page.getByRole("button", { name: "Analyze songs", exact: true }).click();
   await page
     .getByRole("heading", { name: "Review tags", exact: true })
@@ -165,6 +167,43 @@ try {
     "Tag review must work independently of detailed DSP",
   );
   assert.deepEqual(errors, []);
+
+  const mobileContext = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, permissions: ["clipboard-read", "clipboard-write"] });
+  await mobileContext.addInitScript(() => localStorage.setItem("env:view-mode", "mobile"));
+  const mobile = await mobileContext.newPage();
+  await mobile.goto(`${base}/tools/audio/song-metadata-analyzer`, { waitUntil: "networkidle" });
+  await mobile.locator('html[data-env-tool-hydrated="song-metadata-analyzer"]').waitFor({ state: "attached" });
+  const view = () => mobile.evaluate(() => ({ mode: document.documentElement.dataset.envViewMode, setting: localStorage.getItem("env:view-mode"), viewport: document.querySelector('meta[name="viewport"]')?.getAttribute("content"), width: innerWidth, scrollWidth: document.documentElement.scrollWidth, scale: visualViewport?.scale }));
+  const before = await view();
+  const payload = await readFile(fixture);
+  await mobile.getByLabel("Audio files", { exact: true }).setInputFiles({ name: `${"long-name-".repeat(14)}song.wav`, mimeType: "audio/wav", buffer: payload });
+  const imported = await view();
+  assert.equal(imported.mode, "mobile");
+  assert.equal(imported.setting, "mobile");
+  assert.equal(imported.viewport, before.viewport);
+  assert.equal(imported.width, before.width);
+  await mobile.getByLabel("Recognize speech, instruments and sounds").uncheck();
+  await mobile.getByRole("button", { name: "Analyze songs", exact: true }).click();
+  await mobile.getByRole("heading", { name: "Review tags", exact: true }).waitFor({ timeout: 60_000 });
+  await mobile.getByLabel("Genre", { exact: true }).fill("Afrobeats, Gospel");
+  const fontSize = await mobile.getByLabel("Genre", { exact: true }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  assert.ok(fontSize >= 16, `Mobile input font size ${fontSize}px can trigger browser zoom`);
+  await mobile.getByRole("button", { name: "Copy style", exact: true }).click();
+  assert.equal(await mobile.evaluate(() => navigator.clipboard.readText()), "Afrobeats");
+  await mobile.getByRole("button", { name: "Copy track analysis", exact: true }).click();
+  assert.match(await mobile.evaluate(() => navigator.clipboard.readText()), /review_annotations/);
+  await mobile.getByText("Signal details", { exact: true }).click();
+  await mobile.getByText(/Time-aligned signal timeline/).click();
+  await mobile.getByText("More tags", { exact: true }).click();
+  const after = await view();
+  assert.equal(after.mode, "mobile");
+  assert.equal(after.setting, "mobile");
+  assert.equal(after.viewport, before.viewport);
+  assert.equal(after.width, before.width);
+  assert.ok(after.scrollWidth <= after.width + 1, `Mobile overflow ${after.scrollWidth} > ${after.width}`);
+  assert.ok((after.scale ?? 1) <= 1.05, `Unexpected mobile viewport scale ${after.scale}`);
+  await mobile.screenshot({ path: join(output, "song-real-mobile.png"), fullPage: true });
+  await mobileContext.close();
   console.log(`Song browser audit passed. Screenshots: ${output}`);
 } finally {
   await browser.close();

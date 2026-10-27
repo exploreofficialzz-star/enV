@@ -1,6 +1,18 @@
 # Song Analyzer validation — 2026-10-27
 
-Scope: the web Song Metadata Analyzer, browser metadata/section exports, and the optional local Python companion. Native Android/iOS clients were not modified or built for this change.
+The latest update covers web, Android, iOS, the local companion and the optional backend worker. The following checks were performed on Linux; an iOS simulator and real mobile devices were not available in this environment.
+
+- The browser audit passed on desktop and an emulated phone, including stable mobile mode after upload, no horizontal overflow, independent copy actions and accessibility checks.
+- A real browser run produced a Whisper transcript and AudioSet speech candidates. The new browser Spleeter path produced all four playable, full-duration WAV stems. A reconstruction test checks stereo samples, high frequencies and both ends of the track.
+- An emulated iPhone used the backend for speech, instrument candidates and four stems; its viewport stayed at 390 px. A desktop test deliberately failed the local models and verified automatic backend fallback.
+- The real Python pipeline decoded an 11-second speech sample, transcribed its separated vocal stem, analyzed the instrumental stems and exported four WAVs and section audio. A 24-second test crossed a separation window boundary and verified the complete duration of all stems.
+- The backend container built with pinned model weights and completed the real model pipeline with a 4 GB memory limit. The running shared Render backend is not yet configured to use this optional worker.
+- Android compilation and unit tests passed locally, including the end-of-track key test and artifact-path validation. Swift parsing, the standalone backend client typecheck and the signal-analysis end-of-track test passed; an Xcode iOS build and simulator test remain to be run by the iOS workflow.
+- The focused analyzer suite passed 28 tests, and the Python suite passed 14 tests. Model suggestions and singing transcription still need a reviewed real-song benchmark; these tests establish functioning paths, not universal accuracy.
+
+## Earlier companion validation
+
+The checks below describe the preceding local-companion update before the cross-platform changes above.
 
 Environment: Linux, Python 3.12.14, Node 24.19.0, system FFmpeg/FFprobe and headless Chromium. The repository targets Node 22; the added GitHub Actions workflow uses Node 22 and Python 3.12. Local build artifacts are not committed.
 

@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.formparsers import MultiPartException
 
-from .audio import Cancelled, check_cancel, decode, export_pieces, probe, run_process, signal_analysis
+from .audio import SAMPLE_RATE, Cancelled, check_cancel, decode, export_pieces, probe, run_process, signal_analysis
 from .contracts import Feedback, TagExport, clean_annotations
 from .learning import LearningStore
 from .models import AudioTagger, ENCODER, installed, local_interpretation, separate, transcribe
@@ -79,9 +79,10 @@ class Job:
 
 
 class Runtime:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, location: str = "local_companion"):
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.root = root
+        self.location = location
         self.jobs: dict[str, Job] = {}
         self.lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="song-analysis")
@@ -101,7 +102,7 @@ class Runtime:
                     del self.jobs[key]
 
     def process(self, job: Job):
-        warnings, artifacts, tags, windows = [], [], {}, []
+        warnings, artifacts, tags, windows, stem_analysis = [], [], {}, [], []
         work = job.path.parent
         try:
             job.state = "running"
@@ -111,20 +112,43 @@ class Runtime:
             samples = decode(job.path, work, job.cancel)
             self.update(job, "Measuring full track", 20)
             signal = signal_analysis(samples, job.cancel)
-            if job.options["tagging"]:
-                self.update(job, "Tagging audio windows", 35)
+            if job.options["stems"]:
+                self.update(job, "Separating stems", 25)
                 try:
-                    job.embedding, tags, windows = self.tagger.analyze(samples, job.cancel, lambda p: self.update(job, "Tagging audio windows", 35 + round(min(1, p) * 30)))
+                    artifacts.extend(separate(job.path, work, job.cancel))
+                except Cancelled:
+                    raise
+                except Exception:
+                    warnings.append("Stem separation unavailable. Install the stems extra and prepare Demucs weights first.")
+            if job.options["tagging"]:
+                self.update(job, "Tagging audio windows", 40)
+                try:
+                    job.embedding, tags, windows = self.tagger.analyze(samples, job.cancel, lambda p: self.update(job, "Tagging audio windows", 40 + round(min(1, p) * 20)))
                     if not job.embedding:
                         warnings.append("No audible content was found for semantic tagging.")
                 except Cancelled:
                     raise
                 except Exception:
                     warnings.append("Audio tagger unavailable. Install the tagger extra and run the prepare command to download the pinned CLAP checkpoint.")
+            if job.options["tagging"] and job.embedding:
+                candidates = [item for item in artifacts if item["kind"] == "stem" and Path(item["name"]).stem in {"bass", "drums", "other"}]
+                for index, artifact in enumerate(candidates):
+                    name = Path(artifact["name"]).stem
+                    self.update(job, f"Recognizing sounds in {name} stem", 60 + round(index / max(1, len(candidates)) * 12))
+                    try:
+                        stem_samples = decode(work / artifact["name"], work, job.cancel, f"stem-{name}.f32")
+                        _, stem_tags, stem_windows = self.tagger.analyze(stem_samples, job.cancel, lambda p: self.update(job, f"Recognizing sounds in {name} stem", 60 + round((index + min(1, p)) / max(1, len(candidates)) * 12)))
+                        stem_analysis.append({"stem": name, "source": "separated_estimate", "coverage_seconds": len(stem_samples) / SAMPLE_RATE,
+                                              "candidates": {"instruments": stem_tags.get("instruments", [])}, "windows": stem_windows})
+                        del stem_samples
+                    except Cancelled:
+                        raise
+                    except Exception:
+                        warnings.append(f"Instrument recognition on the {name} stem was unavailable.")
             learned = self.store.predict(job.embedding, ENCODER) if job.embedding else {}
             llm = None
             if job.options["llm"] and tags:
-                self.update(job, "Reviewing candidates with local LLM", 68)
+                self.update(job, "Reviewing candidates with local LLM", 73)
                 try:
                     llm = local_interpretation({**tags, **{k: v for k, v in learned.items() if v}}, signal, self.store.status(), job.cancel)
                 except Cancelled:
@@ -133,33 +157,38 @@ class Runtime:
                     warnings.append("Local LLM unavailable or returned unsupported tags. Audio candidates are still available.")
             lyrics = {"status": "not_requested", "segments": [], "language": None, "language_score": None}
             if job.options["transcription"]:
-                self.update(job, "Transcribing candidate lyrics", 75)
+                self.update(job, "Transcribing candidate lyrics", 78)
                 try:
-                    lyrics = transcribe(samples, os.getenv("SONG_WHISPER_MODEL", ""), job.cancel)
+                    vocals = next((item for item in artifacts if item["kind"] == "stem" and Path(item["name"]).stem == "vocals"), None)
+                    vocal_samples = None
+                    if vocals:
+                        try:
+                            vocal_samples = decode(work / vocals["name"], work, job.cancel, "stem-vocals.f32")
+                        except Cancelled:
+                            raise
+                        except Exception:
+                            warnings.append("The vocal stem could not be decoded; speech recognition used the full mix.")
+                    lyrics = transcribe(vocal_samples if vocal_samples is not None else samples, os.getenv("SONG_WHISPER_MODEL", ""), job.cancel, "vocal_stem" if vocal_samples is not None else "full_mix")
+                    if lyrics.get("truncated"):
+                        warnings.append("The transcript reached its segment limit before the full track was processed.")
+                    if vocal_samples is not None:
+                        del vocal_samples
                 except Cancelled:
                     raise
                 except Exception:
                     warnings.append("Transcription unavailable. Install the transcription extra and configure a downloaded local Whisper model.")
                     lyrics["status"] = "unavailable"
             if job.options["pieces"]:
-                self.update(job, "Exporting sections", 80)
+                self.update(job, "Exporting sections", 90)
                 artifacts.extend(export_pieces(job.path, work, signal["sections"], job.cancel))
-            if job.options["stems"]:
-                self.update(job, "Separating stems", 85)
-                try:
-                    artifacts.extend(separate(job.path, work, job.cancel))
-                except Cancelled:
-                    raise
-                except Exception:
-                    warnings.append("Stem separation unavailable. Install the stems extra and prepare Demucs weights first.")
             self.update(job, "Packaging results", 95)
             # Values are bounded by our producers; FFprobe contains embedded, unverified tags.
             result = {"schema_version": "env.local-song.v1", "source_sha256": job.source_hash, "filename": job.filename,
                       "metadata": metadata, "signal": signal, "candidates": tags, "learned_tags": learned,
-                      "windows": windows, "lyrics": lyrics, "llm": llm,
+                      "windows": windows, "stem_analysis": stem_analysis, "lyrics": lyrics, "llm": llm,
                       "model": {"encoder": ENCODER if job.embedding else None, "learning": self.store.status(),
                                 "score_meaning": "Uncalibrated similarity/ridge score. Suggestions need human review."},
-                      "processing": {"location": "local_companion", "hosted_inference": False, "audio_retention_seconds": JOB_TTL,
+                      "processing": {"location": self.location, "hosted_inference": self.location == "remote_backend", "audio_retention_seconds": JOB_TTL,
                                      "tagging_coverage": "full_track_10_second_windows" if windows else "not_run"},
                       "artifacts": artifacts, "warnings": warnings, "reviewed": False}
             (work / "analysis.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -180,13 +209,14 @@ class Runtime:
             job.error = str(error)[:200] if isinstance(error, (ValueError, TimeoutError)) else "Local analysis failed; verify the audio file and installed dependencies."
         finally:
             # Keep source for section/stem downloads only until TTL; remove analysis scratch immediately.
-            (work / "analysis.f32").unlink(missing_ok=True)
+            for decoded_file in work.glob("*.f32"):
+                decoded_file.unlink(missing_ok=True)
             job.updated = time.time()
             if job.state in {"failed", "cancelled"}:
                 shutil.rmtree(work, ignore_errors=True)
 
 
-def create_app(root: Path | None = None, token: str | None = None, origins: list[str] | None = None):
+def create_app(root: Path | None = None, token: str | None = None, origins: list[str] | None = None, location: str = "local_companion"):
     root = root or Path(os.getenv("SONG_DATA_DIR", str(Path.home() / ".local/share/env-song-analyzer")))
     token = token or os.getenv("SONG_API_TOKEN")
     if not token or len(token) < 24:
@@ -194,7 +224,9 @@ def create_app(root: Path | None = None, token: str | None = None, origins: list
     origins = origins if origins is not None else os.getenv("SONG_ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080").split(",")
     if "*" in origins:
         raise ValueError("Set explicit SONG_ALLOWED_ORIGINS; wildcards are not supported")
-    runtime = Runtime(root)
+    if location not in {"local_companion", "remote_backend"}:
+        raise ValueError("Invalid processing location")
+    runtime = Runtime(root, location)
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -257,7 +289,7 @@ def create_app(root: Path | None = None, token: str | None = None, origins: list
 
     @app.get("/v1/health")
     def health():
-        return {"schema_version": "env.local-song.v1", "location": "local_companion", "ffmpeg": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
+        return {"schema_version": "env.local-song.v1", "location": location, "ffmpeg": bool(shutil.which("ffmpeg") and shutil.which("ffprobe")),
                 "tagger_installed": installed("transformers") and installed("torch"), "tagger_loaded": runtime.tagger.model is not None,
                 "transcription_configured": installed("faster_whisper") and Path(os.getenv("SONG_WHISPER_MODEL", "/nonexistent")).is_dir(),
                 "stems_configured": installed("demucs") and (Path(os.getenv("SONG_DEMUCS_REPO", "/nonexistent")) / "955717e8-8726e21a.th").is_file(),

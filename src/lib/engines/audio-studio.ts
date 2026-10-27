@@ -223,7 +223,10 @@ function fftRealImag(real: Float64Array, imag: Float64Array) {
 /** Lightweight chroma-template key suggestion; label results as approximate. */
 export function estimateKey(samples: Float32Array, sampleRate: number): string | null {
   if (!Number.isFinite(sampleRate) || sampleRate <= 0 || samples.length < sampleRate * 3) return null;
-  const size = 4096, hop = Math.max(size, Math.floor(sampleRate * 0.4));
+  const size = 4096, baseHop = Math.max(size, Math.floor(sampleRate * 0.4));
+  // Keep the FFT budget bounded while sampling across the entire recording.
+  const possibleFrames = Math.max(1, Math.floor((samples.length - size) / baseHop) + 1);
+  const hop = baseHop * Math.max(1, Math.ceil(possibleFrames / 180));
   const chroma = new Array<number>(12).fill(0);
   const real = new Float64Array(size), imag = new Float64Array(size);
   let frames = 0;

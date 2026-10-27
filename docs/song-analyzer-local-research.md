@@ -1,6 +1,6 @@
 # Song Analyzer: local pipeline research and validation
 
-Reviewed against primary project documentation on 2026-10-27. This implementation enhances the web Song Metadata Analyzer and supplies a separately installed local companion. Existing Android/iOS implementations are unchanged; the new companion controls have not been added to native clients.
+Reviewed against primary project documentation on 2026-10-27. The web, Android and iOS Song Metadata Analyzer use on-device signal measurements and can route heavier recognition and separation through a separately configured backend. Web also provides on-device neural models. The local companion provides a separate reviewed-label learning workflow.
 
 ## Decisions
 
@@ -10,6 +10,9 @@ Reviewed against primary project documentation on 2026-10-27. This implementatio
 | Decode | Browser AudioContext; FFmpeg companion | Browser supports quick private use; FFmpeg broadens local codec support. Original stream properties remain separate from decoded/resampled properties. Unsupported/corrupt inputs produce useful partial/failure states. |
 | Musical measurement | Existing browser DSP; companion librosa | Full-track measurements, beat timestamps and half/double tempo alternatives. Chroma templates are estimates, particularly in polyphonic audio. RMS is not integrated LUFS. |
 | Audio semantics | LAION CLAP via Transformers | Runs on CPU, reusable 512-dimensional audio embeddings and open-label candidate comparison. Checkpoint card declares Apache-2.0. Fixed immutable revision `8fa0f1c6d0433df6e97c127f64b2a1d6c0dcda8a`. |
+| Browser sounds and instruments | Audio Spectrogram Transformer, AudioSet checkpoint | Pinned `Xenova/ast-finetuned-audioset-10-10-0.4593@249a1fbf0286b40e7f1ed687a8ae396997bf7dc6`; independent sigmoid scores over consecutive ten-second windows, including the tail. Scores and candidate labels are uncalibrated. |
+| Browser speech | Whisper tiny via Transformers.js | Pinned `Xenova/whisper-tiny@5332fcc35e32a33b86612b9a57a89be7906102b1`, timestamped speech candidates; singing requires review. |
+| Browser separation | Spleeter four-stem ONNX | Four pinned 19.7 MB U-Nets with periodic-Hann STFT, soft ratio masks and high-band extension, processed in overlapping bounded windows. Browser output is estimated drums, bass, vocals and other. Model files download on first use. |
 | Local LLM | Ollama custom `env-song-tagger`, Qwen2.5 1.5B | Small local curator with schema-constrained candidate selection; checks unknown labels. It does not hear audio and cannot replace an audio encoder. Base weights remain fixed; the result records the installed model digest. |
 | Learning | Local reviewed embeddings + ridge multilabel head | Cheap supervised updates with reproducible held-out evaluation and no self-training on generated labels. Small-data baseline; do not claim calibrated precision on a different corpus. |
 | Lyrics/language | Optional faster-whisper with explicitly downloaded local checkpoint | Timestamped speech-ASR candidates, never verified lyrics. Singing and code-switching are hard; theme inference remains manual. |
@@ -46,4 +49,7 @@ See the [validation report](song-analyzer-validation.md) for exact commands and 
 - [Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs)
 - [Qwen2.5 1.5B model card](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)
 - [faster-whisper local inference](https://github.com/SYSTRAN/faster-whisper)
+- [AudioSet AST checkpoint](https://huggingface.co/Xenova/ast-finetuned-audioset-10-10-0.4593)
+- [Whisper tiny browser checkpoint](https://huggingface.co/Xenova/whisper-tiny)
+- [Spleeter four-stem ONNX model and transform contract](https://huggingface.co/Best-Practice/spleeter-4stems-onnx)
 - [Demucs CPU operation, sources and checkpoint license caveat](https://github.com/adefossez/demucs)
