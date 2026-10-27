@@ -291,7 +291,7 @@ function openBatchDatabase(): Promise<IDBDatabase> {
     return Promise.reject(new Error("Local batch persistence is unavailable in this browser. Use single-track analysis or export results manually."));
   }
   if (databasePromise) return databasePromise;
-  databasePromise = new Promise((resolve, reject) => {
+  const pending = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const database = request.result;
@@ -302,7 +302,10 @@ function openBatchDatabase(): Promise<IDBDatabase> {
     };
     request.onsuccess = () => {
       const database = request.result;
-      database.onversionchange = () => database.close();
+      database.onversionchange = () => {
+        database.close();
+        databasePromise = null;
+      };
       resolve(database);
     };
     request.onerror = () => reject(request.error ?? new Error("Could not open local batch storage."));
@@ -311,7 +314,8 @@ function openBatchDatabase(): Promise<IDBDatabase> {
     databasePromise = null;
     throw error;
   });
-  return databasePromise;
+  databasePromise = pending;
+  return pending;
 }
 
 export async function saveLocalMusicBatch(batch: LocalMusicBatch): Promise<void> {
