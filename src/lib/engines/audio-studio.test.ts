@@ -269,7 +269,7 @@ test("Music Analyzer song profile never promotes embedded genre metadata into AI
   assert.equal(profile.metadata.embedded_genre, "Afrobeats");
   assert.equal(profile.analysis_status.genre, "unknown");
   assert.equal(profile.analysis_status.language, "unknown");
-  assert.equal(profile.analysis_status.classification, "requires_model");
+  assert.equal(profile.analysis_status.classification, "human_review_required");
   assert.equal(profile.analysis_status.tempo_bpm, "unavailable");
 });
 
@@ -346,7 +346,7 @@ test("Music Analyzer profile migration preserves values but removes unverifiable
   assert.equal(status.instruments, "unknown");
   assert.equal(status.tempo_bpm, "signal_estimate");
   assert.equal(status.file_metadata, "embedded_metadata");
-  assert.equal(status.classification, "model_completed", "historical classifier completion is preserved without claiming verified source provenance");
+  assert.equal(status.classification, "historical_model_result", "historical classifier completion is preserved without claiming verified source provenance");
   assert.deepEqual(migrateMusicProfileV1ToV2(migrated), migrated, "migrating a v2 profile is idempotent");
 });
 
