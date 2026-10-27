@@ -138,7 +138,7 @@ test("Music Analyzer returns reproducible signal metrics and leaves semantic lab
   assert.equal(result.classification.genre, null);
   assert.equal(result.classification.sub_style, null);
   assert.deepEqual(result.classification.language, []);
-  assert.equal(result.classification.status, "requires_model");
+  assert.equal(result.classification.status, "human_review_required");
 });
 
 test("Music Analyzer handles silence and short signals without fabricating tempo or key", () => {
@@ -150,7 +150,7 @@ test("Music Analyzer handles silence and short signals without fabricating tempo
   assert.equal(result.rhythm.tempo_bpm, null);
   assert.equal(result.rhythm.status, "unavailable");
   assert.equal(result.tonality.key, null);
-  assert.equal(result.classification.status, "requires_model");
+  assert.equal(result.classification.status, "human_review_required");
 });
 
 test("Music Analyzer rejects invalid sample rate and mismatched channel lengths", () => {
@@ -233,7 +233,7 @@ test("Music Analyzer song profile exports the requested top-level metadata field
       instruments: ["drums", "bass"],
       vocal_style: "melodic",
       genre_candidates: [{ label: "Afrobeats", score: 0.86 }, { label: "Pop", score: 0.42 }],
-      status: "model_completed",
+      status: "historical_model_result",
       note: "Best-effort model predictions.",
     },
   };
@@ -253,7 +253,7 @@ test("Music Analyzer song profile exports the requested top-level metadata field
   assert.equal(profile.analysis_status.instruments, "unknown");
   assert.equal(profile.analysis_status.vocal_style, "unknown");
   assert.equal(profile.analysis_status.tempo_bpm, "signal_estimate");
-  assert.equal(profile.analysis_status.classification, "model_completed");
+  assert.equal(profile.analysis_status.classification, "historical_model_result");
   assert.equal(profile.genre_candidates[0]?.score, 0.86);
 });
 
@@ -287,12 +287,14 @@ test("Music Analyzer migrates v1 detail exports to v2 without relabeling the RMS
     rhythm: { tempo_bpm: 120 },
     tonality: { key: "C major" },
     timbre: { spectral_centroid_hz: 2200 },
+    classification: { status: "requires_model", note: "No model ran." },
   });
   const audio = migrated.audio as Record<string, unknown>;
   const rhythm = migrated.rhythm as Record<string, unknown>;
   const tonality = migrated.tonality as Record<string, unknown>;
   const timbre = migrated.timbre as Record<string, unknown>;
   assert.equal(migrated.schema_version, "env.music-analysis.v2");
+assert.equal((migrated.classification as Record<string, unknown>).status, "human_review_required");
   assert.equal(audio.rms_loudness_proxy_db, -12.75);
   assert.equal(Object.hasOwn(audio, "estimated_loudness_lufs"), false);
   assert.equal(audio.metric_scope_seconds, 183.4, "the old analyzer measured full-track technical statistics");
