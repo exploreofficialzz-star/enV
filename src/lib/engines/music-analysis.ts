@@ -68,7 +68,7 @@ export type MusicAnalysisResult = {
     instruments: string[];
     vocal_style: string | null;
     genre_candidates: Array<{ label: string; score: number | null }>;
-    status: "requires_model" | "model_completed";
+    status: "human_review_required" | "historical_model_result";
     note: string;
   };
 };
@@ -284,8 +284,8 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
       instruments: [],
       vocal_style: null,
       genre_candidates: [],
-      status: "requires_model",
-      note: "No trained semantic classifier has been run. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed.",
+      status: "human_review_required",
+      note: "This Analyzer does not run a semantic model. Genre, sub-style, language, mood, instruments and vocal style remain unknown until supplied and human-reviewed.",
     },
   };
 }
