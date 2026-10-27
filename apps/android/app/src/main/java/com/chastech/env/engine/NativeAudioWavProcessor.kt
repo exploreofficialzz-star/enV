@@ -395,8 +395,8 @@ object NativeAudioWavProcessor {
                 .put("genre", JSONObject.NULL).put("sub_style", JSONObject.NULL)
                 .put("language", JSONArray()).put("mood", JSONArray()).put("instruments", JSONArray())
                 .put("vocal_style", JSONObject.NULL).put("genre_candidates", JSONArray())
-                .put("status", "requires_model")
-                .put("note", "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."))
+                .put("status", "human_review_required")
+                .put("note", "This Analyzer does not run a semantic model. Genre, sub-style, language, mood, instruments and vocal style remain unknown until supplied and human-reviewed."))
         return json.toString(2)
     }
 
