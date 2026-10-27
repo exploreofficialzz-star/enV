@@ -42,6 +42,11 @@ export function migrateMusicAnalysisV1ToV2(input: unknown): JsonRecord {
   return {
     ...root,
     schema_version: "env.music-analysis.v2",
+    fingerprint: {
+      file_sha256: null,
+      exact_match_method: "not-computed",
+      note: "Original file bytes were not retained in this v1 export, so exact-file SHA-256 cannot be reconstructed. Acoustic similarity is a separate fingerprinting task.",
+    },
     audio: {
       ...audio,
       rms_loudness_proxy_db: currentProxy ?? oldProxy,
@@ -83,6 +88,11 @@ export function migrateMusicProfileV1ToV2(input: unknown): JsonRecord {
   return {
     ...root,
     schema_version: "env.music-profile.v2",
+    fingerprint: {
+      file_sha256: null,
+      exact_match_method: "not-computed",
+      note: "Original file bytes were not retained in this v1 export, so exact-file SHA-256 cannot be reconstructed.",
+    },
     analysis_status: migratedStatus,
   };
 }
@@ -101,6 +111,11 @@ export function migrateMusicDatasetAnalysisV1ToV2(input: unknown): JsonRecord {
   return {
     ...root,
     schema_version: "env.music-dataset-analysis.v2",
+    fingerprint: {
+      file_sha256: null,
+      exact_match_method: "not-computed",
+      note: "Original file bytes were not retained in this v1 export, so exact-file SHA-256 cannot be reconstructed.",
+    },
     structure: {
       ...structure,
       repetition_candidates: [],
