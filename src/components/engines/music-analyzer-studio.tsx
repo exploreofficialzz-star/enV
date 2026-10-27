@@ -358,7 +358,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function cancelLocalBatchItem(itemId: string) {
-    if (!localBatch) return;
+    if (!localBatch || batchCloudBusy) return;
     if (activeBatchItemRef.current === itemId) {
       cancelOnlyItemRef.current = itemId;
       batchControllerRef.current?.abort();
@@ -376,7 +376,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function cancelLocalBatch() {
-    if (!localBatch) return;
+    if (!localBatch || batchCloudBusy) return;
     cancelBatchRequestedRef.current = true;
     cancelOnlyItemRef.current = null;
     batchControllerRef.current?.abort();
@@ -509,7 +509,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function deleteCurrentLocalBatch() {
-    if (!localBatch || batchBusy) return;
+    if (!localBatch || batchBusy || batchCloudBusy) return;
     if (!window.confirm("Delete this local batch, its saved analysis results, and its progress history from this browser? Original audio files were not stored here.")) return;
     try {
       const deletedId = localBatch.id;
@@ -549,7 +549,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function runLocalBatch() {
-    if (!localBatch || batchBusy) return;
+    if (!localBatch || batchBusy || batchCloudBusy) return;
     setBatchError("");
     setBatchMessage("");
     const selected = new Map(batchSelection.map((item) => [localBatchFileKey(localBatchDescriptor(item)), item]));
@@ -1231,9 +1231,9 @@ export function MusicAnalyzerStudio() {
           {batchSelection.length ? <div className="mt-2 max-h-28 space-y-1 overflow-auto text-xs text-muted-foreground">{batchSelection.slice(0, 30).map((item, index) => <p key={index} className="break-all">{item.name} · {formatBytes(item.size)}</p>)}{batchSelection.length > 30 ? <p>…and {batchSelection.length - 30} more</p> : null}</div> : null}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={batchBusy || batchSelection.length === 0} onClick={() => void createBatchFromSelection()}>Create batch</Button>
-          <Button type="button" disabled={!localBatch || batchBusy || (localBatch.status === "completed" && countLocalMusicBatchItems(localBatch).queued === 0)} onClick={() => void runLocalBatch()}>{batchBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing batch…</> : "Start / resume"}</Button>
-          <Button type="button" variant="outline" disabled={!localBatch || batchBusy} onClick={() => void retryLocalBatchItems(true)}>Retry failed</Button>
+          <Button type="button" variant="outline" disabled={batchBusy || batchCloudBusy || batchSelection.length === 0} onClick={() => void createBatchFromSelection()}>Create batch</Button>
+          <Button type="button" disabled={!localBatch || batchBusy || batchCloudBusy || (localBatch.status === "completed" && countLocalMusicBatchItems(localBatch).queued === 0)} onClick={() => void runLocalBatch()}>{batchBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing batch…</> : "Start / resume"}</Button>
+          <Button type="button" variant="outline" disabled={!localBatch || batchBusy || batchCloudBusy} onClick={() => void retryLocalBatchItems(true)}>Retry failed</Button>
           {batchBusy ? <Button type="button" variant="outline" onClick={() => void pauseLocalBatchAfterCurrent()}>Pause after track</Button> : null}
           {localBatch ? <Button type="button" variant="outline" onClick={() => void cancelLocalBatch()}>Cancel batch</Button> : null}
         </div>
@@ -1254,7 +1254,7 @@ export function MusicAnalyzerStudio() {
                 const prior = batchHistory.find((entry) => entry.id !== localBatch.id);
                 if (prior) { setLocalBatch(prior); setBatchError(""); setBatchMessage("Viewing a previous local batch. Re-select its source files to resume incomplete items."); }
               }}>Open previous batch</Button>
-              <Button type="button" size="sm" variant="ghost" disabled={batchBusy} onClick={() => void deleteCurrentLocalBatch()}>Delete local batch data</Button>
+              <Button type="button" size="sm" variant="ghost" disabled={batchBusy || batchCloudBusy} onClick={() => void deleteCurrentLocalBatch()}>Delete local batch data</Button>
             </div>
             <div className="rounded-lg border border-border bg-background p-3">
               <label className="flex flex-col gap-1.5 text-xs text-muted-foreground sm:max-w-sm">
@@ -1283,6 +1283,7 @@ export function MusicAnalyzerStudio() {
                     {item.error ? <p className="mt-1 break-words text-xs text-destructive">{item.error}</p> : null}
                     {item.warnings.length ? <p className="mt-1 text-xs text-muted-foreground">{item.warnings.join(" · ")}</p> : null}
                     {item.status === "completed" && item.result ? <p className="mt-1 text-xs text-muted-foreground">Tempo {displayNumber(item.result.analysis.rhythm.tempo_bpm, " BPM")} · Key {item.result.analysis.tonality.key ?? "not available"} · source hash {item.sourceSha256 ? "computed locally" : "not computed"}</p> : null}
+                    {item.cloudSavedTrackId ? <p className="mt-1 text-xs text-muted-foreground">Saved to private dataset</p> : null}
                   </div>
                   <div className="flex shrink-0 flex-wrap justify-end gap-1">
                     {(item.status === "queued" || item.status === "waiting_for_file") && !batchBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void prioritizeLocalBatchItem(item.id)}>Run next</Button> : null}
