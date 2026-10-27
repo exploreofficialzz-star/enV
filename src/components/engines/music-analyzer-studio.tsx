@@ -299,6 +299,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function createBatchFromSelection() {
+    if (loudnessBusy || batchBusy || batchCloudBusy) return;
     try {
       setBatchError("");
       const next = createLocalMusicBatch(batchSelection.map(localBatchDescriptor));
@@ -596,7 +597,7 @@ export function MusicAnalyzerStudio() {
   }
 
   async function runLocalBatch() {
-    if (!localBatch || batchBusy || batchCloudBusy) return;
+    if (!localBatch || batchBusy || batchCloudBusy || loudnessBusy) return;
     setBatchError("");
     setBatchMessage("");
     const selected = new Map(batchSelection.map((item) => [localBatchFileKey(localBatchDescriptor(item)), item]));
@@ -915,6 +916,7 @@ export function MusicAnalyzerStudio() {
       setError("Choose an audio file first.");
       return;
     }
+    if (busy || loudnessBusy || batchBusy || batchCloudBusy) return;
     if (file.size > LOCAL_FILE_LIMIT) {
       setError("This file is larger than the 25 MB on-device analysis limit. Choose a smaller file.");
       return;
@@ -1374,8 +1376,8 @@ export function MusicAnalyzerStudio() {
           {batchSelection.length ? <div className="mt-2 max-h-28 space-y-1 overflow-auto text-xs text-muted-foreground">{batchSelection.slice(0, 30).map((item, index) => <p key={index} className="break-all">{item.name} · {formatBytes(item.size)}</p>)}{batchSelection.length > 30 ? <p>…and {batchSelection.length - 30} more</p> : null}</div> : null}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={batchBusy || batchCloudBusy || batchSelection.length === 0} onClick={() => void createBatchFromSelection()}>Create batch</Button>
-          <Button type="button" disabled={!localBatch || batchBusy || batchCloudBusy || (localBatch.status === "completed" && countLocalMusicBatchItems(localBatch).queued === 0)} onClick={() => void runLocalBatch()}>{batchBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing batch…</> : "Start / resume"}</Button>
+          <Button type="button" variant="outline" disabled={batchBusy || batchCloudBusy || loudnessBusy || batchSelection.length === 0} onClick={() => void createBatchFromSelection()}>Create batch</Button>
+          <Button type="button" disabled={!localBatch || batchBusy || batchCloudBusy || loudnessBusy || (localBatch.status === "completed" && countLocalMusicBatchItems(localBatch).queued === 0)} onClick={() => void runLocalBatch()}>{batchBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing batch…</> : "Start / resume"}</Button>
           <Button type="button" variant="outline" disabled={!localBatch || batchBusy || batchCloudBusy} onClick={() => void retryLocalBatchItems(true)}>Retry failed</Button>
           {batchBusy ? <Button type="button" variant="outline" onClick={() => void pauseLocalBatchAfterCurrent()}>Pause after track</Button> : null}
           {localBatch ? <Button type="button" variant="outline" disabled={batchCloudBusy} onClick={() => void cancelLocalBatch()}>Cancel batch</Button> : null}
@@ -1468,7 +1470,7 @@ export function MusicAnalyzerStudio() {
         ) : null}
         {busy ? <div className="mt-4" role="status" aria-live="polite"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Local analysis</span><span>{Math.round(analysisProgress * 100)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round(analysisProgress * 100)}%` }} /></div></div> : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={!file || busy || loudnessBusy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
+          <Button type="button" disabled={!file || busy || loudnessBusy || batchBusy || batchCloudBusy || file.size > LOCAL_FILE_LIMIT} onClick={() => void runLocalAnalysis()}>{busy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing…</> : "Analyze on this device"}</Button>
           {busy ? <Button type="button" variant="outline" onClick={() => analysisControllerRef.current?.abort()}>Cancel analysis</Button> : null}
           <Button type="button" variant="outline" disabled={!analysis || !datasetAnalysis} onClick={exportSongProfile}><FileJson size={16} className="mr-2" />Song profile JSON</Button>
           <Button type="button" variant="ghost" disabled={!analysis || !datasetAnalysis} onClick={exportJson}><FileJson size={16} className="mr-2" />Training metadata JSON</Button>
