@@ -12,6 +12,8 @@ import { parseAudiomackAlbumPage } from "./media/audiomack-page-parser.mjs";
 import { classifyProviderFailure } from "./media/provider-errors.mjs";
 import { shouldTryGenericExtractor, genericExtractorArgs } from "./media/extraction-strategy.mjs";
 import { extractExplicitPublicAudioLinks, probeExplicitPublicAudioLink, isPublicMediaCollectionPage } from "./media/public-download-links.mjs";
+import { archiveMetadataUrl, isArchiveItemPage, parseArchiveAudioItem } from "./media/archive-org.mjs";
+import { shouldTryAria2Transfer, aria2YtdlpArgs } from "./media/transfer-alternatives.mjs";
 
 const HOST = process.env.URL_MEDIA_HOST || "0.0.0.0";
 const PORT = Number(process.env.URL_MEDIA_PORT || 8790);
@@ -422,6 +424,22 @@ async function discoverExplicitAudioDownload(url, signal) {
   return null;
 }
 
+async function inspectArchiveItem(url, signal) {
+  const metadataUrl = archiveMetadataUrl(url.toString());
+  if (!metadataUrl) throw new Error("UNSUPPORTED_SOURCE: This is not a supported Internet Archive item URL.");
+  const { response } = await fetchPublic(metadataUrl, {
+    method: "GET", headers: { accept: "application/json" },
+  }, signal);
+  if (!response.ok) throw new Error("SOURCE_UNAVAILABLE: Internet Archive metadata returned HTTP " + response.status + ".");
+  const raw = await readBoundedText(response, 2 * 1024 * 1024);
+  let payload;
+  try { payload = JSON.parse(raw); }
+  catch { throw new Error("SOURCE_UNAVAILABLE: Internet Archive returned invalid item metadata."); }
+  const info = parseArchiveAudioItem(payload, url.toString());
+  if (!info) throw new Error("NO_DOWNLOADABLE_FORMAT: This Internet Archive item does not list accessible audio files within enV's 50 MB track limit.");
+  return info;
+}
+
 async function inspectAudiomackAlbumPage(url, signal) {
   const { response, url: finalUrl } = await fetchPublic(url.toString(), {
     method: "GET",
@@ -465,6 +483,10 @@ async function handleInfo(req, res) {
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  if (provider === "archive" && isArchiveItemPage(url.toString())) {
+    json(res, 200, await inspectArchiveItem(url, controller.signal));
+    return;
+  }
   let audiomackPageFallbackFailure = "";
   if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
     try {
@@ -607,6 +629,9 @@ async function handleDownload(req, res) {
     await handleDirectDownload(req, res, url, body, controller.signal);
     return;
   }
+  if (provider === "archive" && isArchiveItemPage(url.toString())) {
+    throw new Error("INVALID_URL: Preview the Internet Archive audio collection and download its individual public audio files.");
+  }
 
   const supportedFormats = new Set(["mp4", "webm", "mp3", "m4a", "best"]);
   if (!supportedFormats.has(String(format))) throw new Error("Unsupported output format.");
@@ -619,7 +644,21 @@ async function handleDownload(req, res) {
     const args = ["--max-filesize", `${maxBytes}`, "--match-filter", `duration <=? ${MAX_DURATION_SECONDS}`, "--format", adapter.formatArg, ...adapter.post, "--output", outputTemplate, "--print", "after_move:filepath", url.toString()];
     try {
       await runYtdlpWithGenericFallback(args, jobDir, controller.signal, provider);
-    } catch (error) {
+    } catch (initialError) {
+      let error = initialError;
+      if (shouldTryAria2Transfer(error) && !controller.signal.aborted) {
+        console.warn("[url-media] transient HTTP transfer failure; retrying once with aria2c");
+        // Avoid mistaking a partial file from the first attempt for a valid result.
+        const leftovers = await fs.readdir(jobDir);
+        for (const name of leftovers) await fs.rm(path.join(jobDir, name), { recursive: true, force: true });
+        try {
+          await runYtdlp(aria2YtdlpArgs(args), jobDir, controller.signal, provider);
+          error = null;
+        } catch (retryError) { error = retryError; }
+      }
+      if (!error) {
+        // The alternate transfer finished; continue to the same ffprobe checks.
+      } else {
       const code = String(error?.message || "");
       if (!/^(?:SOURCE_UNAVAILABLE|UNSUPPORTED_SOURCE|PROVIDER_ERROR|NO_DOWNLOADABLE_FORMAT):/.test(code)) throw error;
       let publicDownload = null;
@@ -628,11 +667,12 @@ async function handleDownload(req, res) {
       if (!publicDownload) throw error;
       await handleDirectDownload(req, res, publicDownload, body, controller.signal);
       return;
+      }
     }
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
     const candidates = [];
     for (const entry of entries) {
-      if (!entry.isFile()) continue;
+      if (!entry.isFile() || /\.(?:part|aria2|ytdl)$/i.test(entry.name)) continue;
       const file = path.join(jobDir, entry.name);
       const stat = await fs.stat(file);
       if (stat.size > maxBytes) continue;

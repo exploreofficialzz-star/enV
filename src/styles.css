@@ -2765,6 +2765,26 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .ux-ui-studio .uxui-toolkit-tile-description { display:none; }
 }
 
+/* Keep the preview device picker tappable in narrow landscape windows.
+   Full device labels need more width than a short phone viewport can provide. */
+@media (max-height:450px) and (max-width:700px) {
+  .ux-ui-studio .uxui-fullscreen-brand { flex:0 0 auto; }
+  .ux-ui-studio .uxui-topbar-left { min-width:0; flex:0 0 auto; }
+  .ux-ui-studio .uxui-target-switch { flex:0 0 auto; gap:2px; }
+  .ux-ui-studio .uxui-target-switch button {
+    flex:0 0 34px;
+    width:34px;
+    min-width:34px;
+    min-height:34px;
+    padding:0;
+  }
+  .ux-ui-studio .uxui-target-switch button span { display:none; }
+  .ux-ui-studio .uxui-topbar-actions { min-width:0; flex:1 1 auto; justify-content:flex-end; gap:2px; }
+  .ux-ui-studio .uxui-icon-button { flex:0 0 30px; width:30px; }
+  .ux-ui-studio .uxui-export-trigger,
+  .ux-ui-studio .uxui-projects-trigger { flex:0 0 auto; }
+}
+
 /* One bounded editing surface: tools take the place of the controller. */
 .ux-ui-studio .uxui-edit-tray { position:relative; flex:0 0 auto; height:172px; min-height:172px; overflow:hidden; border-block:1px solid var(--color-border); background:var(--color-surface); }
 .ux-ui-studio .uxui-edit-tray[data-tool=library] { height:260px; min-height:260px; }

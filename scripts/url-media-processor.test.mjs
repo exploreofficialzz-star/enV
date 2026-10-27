@@ -139,3 +139,12 @@ assert.ok(audiomackAlbumPage.entries.every((entry) => entry.webpageUrl.startsWit
 assert.equal(audiomackAlbumPage.uploader, "Evado");
 assert.throws(() => parseAudiomackAlbumPage("<a href='https://example.com/other/song'>wrong</a>", "https://example.com/album"));
 
+
+assert.match(source, /isArchiveItemPage/);
+assert.match(source, /inspectArchiveItem/);
+assert.match(source, /aria2YtdlpArgs\(args\)/);
+assert.match(source, /shouldTryAria2Transfer/);
+assert.match(dockerfile, /apt-get install[^\n]*aria2/);
+assert.match(dockerfile, /aria2c --version/);
+assert.match(dockerfile, /COPY scripts\/media\/archive-org\.mjs/);
+assert.match(dockerfile, /COPY scripts\/media\/transfer-alternatives\.mjs/);

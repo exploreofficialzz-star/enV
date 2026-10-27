@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, Archive, Download,
-  FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Music2, Pause, Sparkles,
+  FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Music2, Pause,
   Upload, X,
 } from "lucide-react";
 import { strToU8, unzipSync, zipSync } from "fflate";
@@ -11,15 +11,14 @@ import {
   crc32, inspectAudioHeader, inspectSongZip, SONG_ANALYZER_LIMITS, songsToCsv, tempoBandFromBpm,
 } from "@/lib/media/song-metadata-analyzer";
 import { amplitudeDbfs, estimateBpm, estimateKey, rms } from "@/lib/engines/audio-studio";
-import { bytesToBase64, fetchAiAvailability, runAiTask } from "@/lib/ai/client/ai-client";
-import type { MusicAnalysisResult } from "@/lib/ai/contracts";
+import { analyzeMusicDatasetAudio, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
 import { downloadBlob } from "@/lib/utils";
 
 type Mode = "quick" | "full";
 type RowStatus = "queued" | "scanning" | "analyzing" | "done" | "partial" | "failed" | "cancelled";
 
 type SongAnalysisReport = {
-  schema_version: "1.0";
+  schema_version: "1.1";
   filename: string;
   genre: string | null;
   sub_style: string | null;
@@ -41,6 +40,7 @@ type SongAnalysisReport = {
   analysis: Record<string, unknown>;
   lyric_evidence: string;
   warnings: string[];
+  dataset_analysis: MusicDatasetAnalysis | null;
 };
 type SongRow = { id: string; file: File; status: RowStatus; progress: number; report?: SongAnalysisReport; error?: string };
 
@@ -106,47 +106,6 @@ function signalLevels(samples: Float32Array): { peakDbfs: number | null; rmsDbfs
   };
 }
 
-function createMusicSampleWav(buffer: AudioBuffer, monoChannel?: Float32Array): { bytes: Uint8Array; durationSeconds: number } {
-  const targetRate = 16_000;
-  const sectionSeconds = Math.min(20, Math.max(1, buffer.duration / 3));
-  const starts = [
-    0,
-    Math.max(0, buffer.duration / 2 - sectionSeconds / 2),
-    Math.max(0, buffer.duration - sectionSeconds),
-  ];
-  const sectionSamples = Math.max(1, Math.floor(sectionSeconds * targetRate));
-  const gapSamples = Math.floor(targetRate * 0.25);
-  const frameCount = sectionSamples * starts.length + gapSamples * (starts.length - 1);
-  const dataBytes = frameCount * 2;
-  const wav = new Uint8Array(44 + dataBytes);
-  const view = new DataView(wav.buffer);
-  const writeText = (offset: number, text: string) => { for (let i = 0; i < text.length; i += 1) wav[offset + i] = text.charCodeAt(i); };
-  writeText(0, "RIFF"); view.setUint32(4, 36 + dataBytes, true); writeText(8, "WAVE");
-  writeText(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true); view.setUint32(24, targetRate, true); view.setUint32(28, targetRate * 2, true);
-  view.setUint16(32, 2, true); view.setUint16(34, 16, true); writeText(36, "data"); view.setUint32(40, dataBytes, true);
-
-  const channels = monoChannel ? [monoChannel] : Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
-  let outIndex = 0;
-  for (let section = 0; section < starts.length; section += 1) {
-    const startFrame = Math.floor(starts[section] * buffer.sampleRate);
-    for (let i = 0; i < sectionSamples; i += 1) {
-      const sourceOffset = startFrame + (i * buffer.sampleRate) / targetRate;
-      const a = Math.min(buffer.length - 1, Math.max(0, Math.floor(sourceOffset)));
-      const b = Math.min(buffer.length - 1, a + 1);
-      const fraction = sourceOffset - a;
-      let sample = 0;
-      for (const channel of channels) sample += channel[a] + (channel[b] - channel[a]) * fraction;
-      sample /= channels.length || 1;
-      const clipped = Math.max(-1, Math.min(1, sample));
-      view.setInt16(44 + outIndex * 2, clipped < 0 ? clipped * 0x8000 : clipped * 0x7fff, true);
-      outIndex += 1;
-    }
-    if (section < starts.length - 1) outIndex += gapSamples;
-  }
-  return { bytes: wav, durationSeconds: frameCount / targetRate };
-}
-
 function metadataTags(metadata: MusicMetadata): Record<string, unknown> {
   return {
     title: metadata.title ?? null,
@@ -166,6 +125,8 @@ function metadataTags(metadata: MusicMetadata): Record<string, unknown> {
   };
 }
 function outputCsvRow(report: SongAnalysisReport): Record<string, unknown> {
+  const analysis = report.dataset_analysis;
+  const annotations = analysis?.annotations;
   return {
     filename: report.filename,
     title: report.identity.title,
@@ -173,21 +134,44 @@ function outputCsvRow(report: SongAnalysisReport): Record<string, unknown> {
     album: report.identity.album,
     genre: report.genre,
     sub_style: report.sub_style,
+    style_influences: annotations?.style_influences ?? [],
     language: report.language,
     tempo_bpm: report.tempo_bpm,
     tempo_band: report.tempo_band,
     key: report.key,
-    energy: report.energy,
+    energy: annotations?.energy ?? [],
     mood: report.mood,
     theme: report.theme,
     setting: report.setting,
+    source_role: annotations?.source_role ?? [],
     vocals: report.vocals,
+    vocal_delivery: annotations?.vocal_delivery ?? [],
+    vocal_register: annotations?.vocal_register ?? [],
+    vocal_harmony: annotations?.vocal_harmony ?? [],
+    performance_technique: annotations?.performance_technique ?? [],
     instruments: report.instruments,
+    production_traits: annotations?.production_traits ?? [],
+    arrangement: annotations?.arrangement ?? [],
     duration_seconds: report.technical.duration_seconds,
     file_size_bytes: report.technical.file_size_bytes,
     codec: report.technical.codec,
     sample_rate_hz: report.technical.sample_rate_hz,
     channels: report.technical.channels,
+    pitch_lowest_note: analysis?.pitch.lowest_detected_note ?? null,
+    pitch_highest_note: analysis?.pitch.highest_detected_note ?? null,
+    pitch_range_semitones: analysis?.pitch.pitch_range_semitones ?? null,
+    transient_density_per_second: analysis?.rhythm.transient_density_per_second ?? null,
+    spectral_centroid_mean_hz: analysis?.timbre.mean_spectral_centroid_hz ?? null,
+    low_energy_ratio_mean: analysis?.timbre.mean_low_frequency_energy_ratio ?? null,
+    mid_energy_ratio_mean: analysis?.timbre.mean_mid_frequency_energy_ratio ?? null,
+    high_energy_ratio_mean: analysis?.timbre.mean_high_frequency_energy_ratio ?? null,
+    chord_estimates: analysis?.tonality.chord_estimates.map((item) => `${item.start_seconds}-${item.end_seconds}s:${item.chord ?? "unknown"}`).join(" | ") ?? "",
+    section_boundaries: analysis?.structure.change_points.map((item) => `${item.time_seconds}s(${item.change_score})`).join(" | ") ?? "",
+    labels_reviewed: annotations?.reviewed ?? false,
+    reviewer: annotations?.reviewer ?? "",
+    annotation_notes: annotations?.notes ?? "",
+    uses_remote_api: analysis?.processing.uses_remote_api ?? false,
+    uses_hosted_model: analysis?.processing.uses_hosted_model ?? false,
     analysis_status: report.analysis.status,
     warnings: report.warnings,
   };
@@ -196,8 +180,8 @@ function outputCsvRow(report: SongAnalysisReport): Record<string, unknown> {
 async function analyzeLocal(
   file: File,
   mode: Mode,
-  includeAi: boolean,
   signal: AbortSignal,
+  onDeepProgress?: (fraction: number) => void,
 ): Promise<{ report: SongAnalysisReport; status: RowStatus }> {
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
   let metadata: MusicMetadata;
@@ -216,17 +200,12 @@ async function analyzeLocal(
   let rmsDbfs: number | null = null;
   let tempoBpm: number | null = null;
   let key: string | null = null;
+  let datasetAnalysis: MusicDatasetAnalysis | null = null;
   const bpmTag = metadata.bpm && Number.isFinite(Number(metadata.bpm)) ? Number(metadata.bpm) : null;
-  let semantic: MusicAnalysisResult | null = null;
-  let aiRequestId: string | null = null;
-  let aiWarning: string | null = null;
   let decodedSuccessfully = false;
-  let sampleDurationSeconds: number | null = null;
 
   if (!header.container && !file.type.startsWith("audio/")) warnings.push("The file type could not be confirmed from its header.");
   const AudioContextConstructor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  // Estimate the decoded PCM footprint before asking the browser to allocate it.
-  // decodeAudioData allocates the decoded buffers first, so a post-decode check alone is too late.
   const conservativeBitrate = Math.max(32_000, Math.min(header.encodedBitrateBps ?? 64_000, 128_000));
   const preflightDuration = durationSeconds ?? (file.size * 8 / conservativeBitrate);
   const preflightSampleRate = header.sourceSampleRateHz ?? 48_000;
@@ -236,9 +215,9 @@ async function analyzeLocal(
     preflightDuration > 15 * 60 ||
     projectedMemoryBytes > 180 * 1024 * 1024;
   if (shouldSkipDecode) {
-    warnings.push("Estimated decoded audio exceeds the local memory budget; signal and AI analysis were skipped.");
+    warnings.push("Estimated decoded audio exceeds the local memory budget; detailed signal analysis was skipped.");
   } else if (!AudioContextConstructor) {
-    warnings.push("This browser cannot decode audio for tempo/key analysis.");
+    warnings.push("This browser cannot decode audio for local signal analysis.");
   } else {
     const context = new AudioContextConstructor();
     try {
@@ -248,87 +227,68 @@ async function analyzeLocal(
       decodedSuccessfully = true;
       durationSeconds = decoded.duration;
       analysisSampleRate = decoded.sampleRate;
+      sampleRateHz ??= decoded.sampleRate;
       channels ??= decoded.numberOfChannels;
       if (decoded.duration > 15 * 60) {
-        warnings.push("Track is longer than 15 minutes; signal analysis was skipped to protect device memory.");
+        warnings.push("Track is longer than 15 minutes; detailed signal analysis was skipped to protect device memory.");
       } else {
         const memoryBytes = decoded.length * (decoded.numberOfChannels + 1) * 4;
         if (memoryBytes > 180 * 1024 * 1024) {
-          warnings.push("Decoded audio exceeds the local memory budget; tempo/key analysis was skipped.");
+          warnings.push("Decoded audio exceeds the local memory budget; detailed signal analysis was skipped.");
         } else {
-          // Analyze a downmixed signal so instruments on the right channel are not ignored.
+          const decodedChannels = Array.from({ length: decoded.numberOfChannels }, (_, index) => decoded.getChannelData(index));
           const mono = new Float32Array(decoded.length);
-          for (let channelIndex = 0; channelIndex < decoded.numberOfChannels; channelIndex += 1) {
-            const channel = decoded.getChannelData(channelIndex);
-            for (let frame = 0; frame < channel.length; frame += 1) mono[frame] += channel[frame] / decoded.numberOfChannels;
+          for (const channel of decodedChannels) {
+            for (let frame = 0; frame < channel.length; frame += 1) mono[frame] += channel[frame]! / decodedChannels.length;
           }
           const levels = signalLevels(mono);
           peakDbfs = levels.peakDbfs;
           rmsDbfs = levels.rmsDbfs;
-          tempoBpm = estimateBpm(mono, decoded.sampleRate);
-          key = estimateKey(mono, decoded.sampleRate);
-          if (includeAi && mode === "full") {
-            const excerpt = createMusicSampleWav(decoded, mono);
-            sampleDurationSeconds = excerpt.durationSeconds;
-            if (excerpt.bytes.byteLength > 2_800_000) {
-              aiWarning = "The sampled audio is too large for the current AI request limit.";
-            } else {
-              try {
-                const response = await runAiTask("audio.music.analyze", {
-                  audioBase64: bytesToBase64(excerpt.bytes),
-                  mimeType: "audio/wav",
-                  filename: file.name.slice(0, 120),
-                  sampledSeconds: excerpt.durationSeconds,
-                }, { signal, timeoutMs: 180_000 });
-                semantic = response.result;
-                aiRequestId = response.meta.requestId || null;
-                warnings.push(...response.meta.warnings);
-              } catch (error) {
-                if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
-                aiWarning = error instanceof Error ? error.message : "AI analysis could not be completed.";
-              }
-            }
+          tempoBpm = estimateBpm(mono.subarray(0, Math.min(mono.length, decoded.sampleRate * 90)), decoded.sampleRate);
+          key = estimateKey(mono.subarray(0, Math.min(mono.length, decoded.sampleRate * 30)), decoded.sampleRate);
+          if (mode === "full") {
+            datasetAnalysis = await analyzeMusicDatasetAudio(
+              { channels: decodedChannels, sampleRate: decoded.sampleRate, fileName: file.name },
+              { signal, onProgress: onDeepProgress },
+            );
           }
         }
       }
     } catch (error) {
       if (signal.aborted || (error instanceof Error && error.name === "AbortError")) throw new DOMException("Cancelled", "AbortError");
       const message = error instanceof Error ? error.message : "";
-      warnings.push(message ? `Audio decode failed: ${message.slice(0, 180)}` : "Audio decode failed; only available tags were read.");
+      warnings.push(message ? `Audio decode or DSP analysis failed: ${message.slice(0, 180)}` : "Audio decode failed; only embedded tags were read.");
     } finally {
       await context.close().catch(() => undefined);
     }
   }
 
-  if (mode === "full" && includeAi && !semantic && !aiWarning) aiWarning = "Full AI analysis did not return a result.";
-  if (mode === "full" && !includeAi) aiWarning = "AI classification was not run; local analysis results are included.";
-  if (aiWarning) warnings.push(aiWarning);
-  if (!decodedSuccessfully) warnings.push("Technical and embedded tags may still be available, but BPM/key and semantic audio analysis need a decodable file.");
+  if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+  if (!decodedSuccessfully) warnings.push("Embedded tags may still be available, but tempo, key, pitch, chord and timeline analysis need a decodable audio file.");
   const bpmFromTag = bpmTag !== null && bpmTag > 0 && bpmTag <= 300 ? bpmTag : null;
   const finalTempo = tempoBpm ?? bpmFromTag;
-  if (tempoBpm !== null && bpmFromTag !== null && Math.abs(tempoBpm - bpmFromTag) > 8) {
-    warnings.push("Estimated tempo differs from the embedded BPM tag.");
-  }
+  if (tempoBpm !== null && bpmFromTag !== null && Math.abs(tempoBpm - bpmFromTag) > 8) warnings.push("Estimated tempo differs from the embedded BPM tag.");
   const averageBitrate = durationSeconds && durationSeconds > 0 ? (file.size * 8) / durationSeconds : null;
   const embeddedGenre = metadata.genre?.trim() || null;
+  const annotations = datasetAnalysis?.annotations;
   const report: SongAnalysisReport = {
-    schema_version: "1.0",
+    schema_version: "1.1",
     filename: file.name,
-    genre: semantic?.genre ?? embeddedGenre,
-    sub_style: semantic?.sub_style ?? null,
-    language: semantic?.language ?? [],
+    genre: embeddedGenre,
+    sub_style: null,
+    language: [],
     tempo_bpm: finalTempo === null ? null : Math.round(finalTempo),
     tempo_band: tempoBandFromBpm(finalTempo),
     tempo_source: tempoBpm !== null ? "audio_estimate" : bpmFromTag !== null ? "embedded_tag" : null,
     key,
-    energy: semantic?.energy ?? "unknown",
-    mood: semantic?.mood ?? [],
-    theme: semantic?.theme ?? [],
-    setting: semantic?.setting ?? [],
-    vocals: semantic?.vocals ?? [],
-    instruments: semantic?.instruments ?? [],
-    descriptions: semantic?.descriptions ?? [],
-    lyric_evidence: semantic?.lyric_evidence ?? "",
+    energy: "unknown",
+    mood: [],
+    theme: [],
+    setting: [],
+    vocals: [],
+    instruments: [],
+    descriptions: datasetAnalysis?.style_cues.map((cue) => cue.evidence) ?? [],
+    lyric_evidence: "",
     identity: {
       title: metadata.title ?? null,
       artist: metadata.artist ?? null,
@@ -361,18 +321,26 @@ async function analyzeLocal(
     },
     embedded_metadata: metadataTags(metadata),
     analysis: {
-      status: semantic ? "full" : mode === "quick" ? "quick" : "partial",
+      status: datasetAnalysis ? (annotations?.reviewed ? "full_local_reviewed" : "full_local_needs_review") : mode === "quick" ? "quick_local" : "partial",
       local_audio_decoded: decodedSuccessfully,
-      semantic_analysis: semantic ? "completed" : mode === "quick" ? "skipped_by_choice" : "unavailable",
-      genre_source: semantic?.genre ? "music_model" : embeddedGenre ? "embedded_tag" : "unavailable",
-      excerpt_seconds_sent_to_ai: sampleDurationSeconds,
-      ai_request_id: aiRequestId,
+      semantic_analysis: "not_run_local_only",
+      genre_source: embeddedGenre ? "embedded_tag_unverified" : "manual_annotation_required",
+      excerpt_seconds_sent_to_ai: null,
+      ai_request_id: null,
       tempo_source: tempoBpm !== null ? "audio_estimate" : bpmFromTag !== null ? "embedded_tag" : "unavailable",
       key_source: key ? "audio_estimate" : "unavailable",
+      local_dsp_analysis: datasetAnalysis ? "completed" : "not_completed",
+      uses_remote_api: false,
+      uses_hosted_model: false,
     },
+    dataset_analysis: datasetAnalysis,
     warnings: [...new Set(warnings)],
   };
-  const status: RowStatus = semantic || mode === "quick" ? (warnings.length ? "partial" : "done") : "partial";
+  const status: RowStatus = mode === "quick"
+    ? (warnings.length ? "partial" : "done")
+    : datasetAnalysis && datasetAnalysis.annotations.reviewed
+      ? (warnings.length ? "partial" : "done")
+      : "partial";
   return { report, status };
 }
 
@@ -393,28 +361,40 @@ function reportTags(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+type AnnotationListKey = Exclude<keyof MusicDatasetAnnotations, "notes" | "reviewed" | "reviewer">;
+
+const DATASET_ANNOTATION_FIELDS: Array<{ key: AnnotationListKey; label: string; placeholder: string }> = [
+  { key: "genre", label: "Genre", placeholder: "Afrobeats, R&B" },
+  { key: "sub_style", label: "Sub-style", placeholder: "Afro-pop, Amapiano" },
+  { key: "style_influences", label: "Style influences", placeholder: "Highlife, dancehall, soul" },
+  { key: "language", label: "Language", placeholder: "Nigerian Pidgin, Yoruba" },
+  { key: "energy", label: "Energy", placeholder: "Low, medium, high" },
+  { key: "mood", label: "Mood", placeholder: "Celebratory, soulful" },
+  { key: "source_role", label: "Audio part / stem role", placeholder: "Full mix, vocals, drums, bass, melody" },
+  { key: "vocals", label: "Vocal content", placeholder: "Lead vocal, backing vocals, ad-libs" },
+  { key: "vocal_delivery", label: "Vocal delivery", placeholder: "Melodic singing, rap, chant" },
+  { key: "vocal_register", label: "Vocal pitch / register", placeholder: "High pitch, low pitch, soprano, alto, tenor, baritone" },
+  { key: "vocal_harmony", label: "Vocal harmonies", placeholder: "Doubles, thirds, call-and-response" },
+  { key: "performance_technique", label: "Performance techniques", placeholder: "Vibrato, falsetto, melisma, breathy" },
+  { key: "instruments", label: "Instruments", placeholder: "Log drum, shakers, synth bass" },
+  { key: "themes", label: "Themes", placeholder: "Love, celebration" },
+  { key: "listening_scene", label: "Listening scene", placeholder: "Club, road trip" },
+  { key: "production_traits", label: "Production traits", placeholder: "Reverb, saturation, sidechain" },
+  { key: "arrangement", label: "Arrangement", placeholder: "Intro build, drum drop, instrumental break" },
+];
+
 export function SongMetadataAnalyzerEngine() {
   const pickerRef = useRef<HTMLInputElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const [tracks, setTracks] = useState<SongRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("quick");
-  const [aiConsent, setAiConsent] = useState(false);
-  const [aiAvailability, setAiAvailability] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const limits = useMemo(getClientLimits, []);
-
-  useEffect(() => {
-    let alive = true;
-    fetchAiAvailability().then((availability) => {
-      if (alive) setAiAvailability(availability["audio.music.analyze"] === true);
-    }).catch(() => { if (alive) setAiAvailability(false); });
-    return () => { alive = false; };
-  }, []);
 
   const selected = tracks.find((track) => track.id === selectedId) ?? tracks.find((track) => track.report) ?? tracks[0];
   const readyCount = tracks.filter((track) => track.report).length;
@@ -525,8 +505,10 @@ export function SongMetadataAnalyzerEngine() {
       setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "scanning", progress: 12, error: undefined } : item));
       try {
         setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "analyzing", progress: 35 } : item));
-        const includeAi = mode === "full" && aiConsent && aiAvailability === true;
-        const analysis = await analyzeLocal(track.file, mode, includeAi, controller.signal);
+        const analysis = await analyzeLocal(track.file, mode, controller.signal, (fraction) => {
+          setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, progress: 35 + Math.round(fraction * 60) } : item));
+          setProgress(Math.round(((finished + fraction) / Math.max(1, queue.length)) * 100));
+        });
         setTracks((previous) => previous.map((item) => item.id === track.id
           ? { ...item, status: analysis.status, progress: 100, report: analysis.report }
           : item));
@@ -571,7 +553,7 @@ export function SongMetadataAnalyzerEngine() {
   function exportJson() {
     const reports = tracks.flatMap((track) => track.report ? [track.report] : []);
     if (!reports.length) return;
-    downloadBlob(new Blob([JSON.stringify({ schema_version: "1.0", tracks: reports }, null, 2)], { type: "application/json;charset=utf-8" }), "song-analysis.json");
+    downloadBlob(new Blob([JSON.stringify({ schema_version: "env.song-analysis-export.v2", tracks: reports }, null, 2)], { type: "application/json;charset=utf-8" }), "song-analysis.json");
   }
   function exportCsv() {
     const reports = tracks.flatMap((track) => track.report ? [outputCsvRow(track.report)] : []);
@@ -583,7 +565,7 @@ export function SongMetadataAnalyzerEngine() {
     if (!reports.length) return;
     const failed = tracks.filter((track) => track.error || track.status === "failed").map((track) => ({ filename: track.file.name, error: track.error ?? "Failed" }));
     const archive: Record<string, Uint8Array> = {
-      "song-analysis.json": strToU8(JSON.stringify({ schema_version: "1.0", tracks: reports }, null, 2)),
+      "song-analysis.json": strToU8(JSON.stringify({ schema_version: "env.song-analysis-export.v2", tracks: reports }, null, 2)),
       "song-analysis.csv": strToU8(songsToCsv(reports.map(outputCsvRow))),
       "processing-issues.json": strToU8(JSON.stringify(failed, null, 2)),
     };
@@ -594,6 +576,87 @@ export function SongMetadataAnalyzerEngine() {
 
   const selectedReport = selected?.report;
   const progressLabel = busy ? `${progress}%` : `${readyCount} of ${tracks.length} analyzed`;
+
+  function updateSelectedAnnotationList(key: AnnotationListKey, value: string) {
+    const targetId = selected?.id;
+    if (!targetId) return;
+    const tags = value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 80);
+    setTracks((previous) => previous.map((track) => {
+      if (track.id !== targetId || !track.report?.dataset_analysis) return track;
+      const report = track.report;
+      const datasetAnalysis = report.dataset_analysis;
+      if (!datasetAnalysis) return track;
+      const annotations: MusicDatasetAnnotations = { ...datasetAnalysis.annotations, [key]: tags, reviewed: false };
+      const primaryPatch: Partial<SongAnalysisReport> = {};
+      if (key === "genre") primaryPatch.genre = tags[0] ?? null;
+      if (key === "sub_style") primaryPatch.sub_style = tags[0] ?? null;
+      if (key === "language") primaryPatch.language = tags;
+      if (key === "mood") primaryPatch.mood = tags;
+      if (key === "vocals") primaryPatch.vocals = tags;
+      if (key === "instruments") primaryPatch.instruments = tags;
+      if (key === "themes") primaryPatch.theme = tags;
+      if (key === "listening_scene") primaryPatch.setting = tags;
+      return {
+        ...track,
+        status: "partial",
+        report: {
+          ...report,
+          ...primaryPatch,
+          dataset_analysis: { ...datasetAnalysis, annotations },
+          analysis: { ...report.analysis, status: "full_local_needs_review" },
+        },
+      };
+    }));
+  }
+
+  function updateSelectedAnnotationText(key: "notes" | "reviewer", value: string) {
+    const targetId = selected?.id;
+    if (!targetId) return;
+    setTracks((previous) => previous.map((track) => {
+      if (track.id !== targetId || !track.report?.dataset_analysis) return track;
+      const report = track.report;
+      const datasetAnalysis = report.dataset_analysis;
+      if (!datasetAnalysis) return track;
+      const annotations = {
+        ...datasetAnalysis.annotations,
+        [key]: value,
+        reviewed: false,
+      };
+      return {
+        ...track,
+        status: "partial",
+        report: {
+          ...report,
+          dataset_analysis: { ...datasetAnalysis, annotations },
+          analysis: { ...report.analysis, status: "full_local_needs_review" },
+        },
+      };
+    }));
+  }
+
+  function markSelectedReviewed(reviewed: boolean) {
+    const targetId = selected?.id;
+    if (!targetId) return;
+    setTracks((previous) => previous.map((track) => {
+      if (track.id !== targetId || !track.report?.dataset_analysis) return track;
+      const report = track.report;
+      const currentDatasetAnalysis = report.dataset_analysis;
+      if (!currentDatasetAnalysis) return track;
+      const datasetAnalysis = {
+        ...currentDatasetAnalysis,
+        annotations: { ...currentDatasetAnalysis.annotations, reviewed },
+      };
+      return {
+        ...track,
+        status: reviewed ? "done" : "partial",
+        report: {
+          ...report,
+          dataset_analysis: datasetAnalysis,
+          analysis: { ...report.analysis, status: reviewed ? "full_local_reviewed" : "full_local_needs_review" },
+        },
+      };
+    }));
+  }
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -635,32 +698,26 @@ export function SongMetadataAnalyzerEngine() {
             </button>
             <button type="button" disabled={busy} onClick={() => setMode("full")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "full" ? "bg-surface shadow-sm" : "text-muted-foreground"}`}>
               <span className="block text-sm font-semibold">Full Analysis</span>
-              <span className="mt-0.5 block text-[11px]">Local signals, optional AI tags</span>
+              <span className="mt-0.5 block text-[11px]">Pitch, chords, spectrum, structure</span>
             </button>
           </div>
 
           {mode === "full" && (
-            <div className="space-y-2 rounded-xl border border-border p-3">
-              <label className="flex cursor-pointer items-start gap-2 text-sm">
-                <input type="checkbox" className="mt-1 accent-primary" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} disabled={busy} />
-                <span>Add AI music understanding by sending short excerpts.</span>
-              </label>
-              <p className="text-xs leading-5 text-muted-foreground">
-                Local analysis runs in this tab too. AI tags are added only when you opt in and the service is configured.
-              </p>
+            <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-xs leading-5 text-muted-foreground">
+              Detailed analysis runs locally. No audio excerpts are sent to an AI service. Genre, sub-style, language, mood and instrument names must be added or verified by a human reviewer in the dataset-label panel.
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-              {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <Sparkles size={16} /> : <Activity size={16} />}
-              {busy ? "Analyzing…" : mode === "full" ? (aiAvailability === true && aiConsent ? "Analyze with AI" : "Run local analysis") : "Scan songs"}
+              {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <FileJson size={16} /> : <Activity size={16} />}
+              {busy ? "Analyzing locally…" : mode === "full" ? "Run detailed local analysis" : "Scan songs"}
             </button>
             {busy
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
               : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" title="Clear batch"><X size={16} /></button>}
           </div>
-          <p className="text-[11px] text-muted-foreground">{mode === "full" ? "Local signals always run. Short excerpts are sent only after consent and when the AI service is configured." : "Quick Scan runs on this device; your audio is not uploaded."}</p>
+          <p className="text-[11px] text-muted-foreground">Both modes run in this browser. Audio files are not uploaded for analysis.</p>
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
@@ -746,11 +803,92 @@ export function SongMetadataAnalyzerEngine() {
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">DESCRIPTIONS</p>
                 {selectedReport.descriptions.length
                   ? <div className="space-y-2">{selectedReport.descriptions.map((description, index) => <p key={index} className="rounded-lg bg-surface-2 p-3 text-sm leading-5">{description}</p>)}</div>
-                  : <p className="text-sm text-muted-foreground">Run Full Analysis to generate song descriptions.</p>}
+                  : <p className="text-sm text-muted-foreground">Run Full Analysis for local signal descriptions.</p>}
               </div>
               {selectedReport.lyric_evidence && <div><p className="mb-1.5 text-xs font-semibold text-muted-foreground">LYRIC NOTES</p><p className="text-sm leading-5">{selectedReport.lyric_evidence}</p></div>}
             </div>
           </div>
+
+          {selectedReport.dataset_analysis ? (
+            <>
+              <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Detailed local DSP findings</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">These results come from local signal processing. Note and chord detection can be confused by overlapping instruments; no hosted model or AI API is involved.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {[
+                    ["Pitch span", selectedReport.dataset_analysis.pitch.lowest_detected_note && selectedReport.dataset_analysis.pitch.highest_detected_note ? `${selectedReport.dataset_analysis.pitch.lowest_detected_note}–${selectedReport.dataset_analysis.pitch.highest_detected_note}` : "Unknown"],
+                    ["Pitch observations", String(selectedReport.dataset_analysis.pitch.points.length)],
+                    ["Chord windows", String(selectedReport.dataset_analysis.tonality.chord_estimates.filter((item) => item.chord).length)],
+                    ["Transient rate", selectedReport.dataset_analysis.rhythm.transient_density_per_second == null ? "—" : `${selectedReport.dataset_analysis.rhythm.transient_density_per_second}/s`],
+                    ["Crest factor", selectedReport.dataset_analysis.technical.crest_factor_db == null ? "—" : `${selectedReport.dataset_analysis.technical.crest_factor_db} dB`],
+                    ["Dynamic range estimate", selectedReport.dataset_analysis.technical.dynamic_range_estimate_db == null ? "—" : `${selectedReport.dataset_analysis.technical.dynamic_range_estimate_db} dB`],
+                    ["Low-band energy", selectedReport.dataset_analysis.timbre.mean_low_frequency_energy_ratio == null ? "—" : `${Math.round(selectedReport.dataset_analysis.timbre.mean_low_frequency_energy_ratio * 100)}%`],
+                    ["Mid-band energy", selectedReport.dataset_analysis.timbre.mean_mid_frequency_energy_ratio == null ? "—" : `${Math.round(selectedReport.dataset_analysis.timbre.mean_mid_frequency_energy_ratio * 100)}%`],
+                    ["High-band energy", selectedReport.dataset_analysis.timbre.mean_high_frequency_energy_ratio == null ? "—" : `${Math.round(selectedReport.dataset_analysis.timbre.mean_high_frequency_energy_ratio * 100)}%`],
+                    ["Stereo side/mid", selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio == null ? "—" : String(selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio)],
+                    ["Feature changes", String(selectedReport.dataset_analysis.structure.change_points.length)],
+                    ["Pitch class / key", selectedReport.dataset_analysis.tonality.key_estimate ?? "Unknown"],
+                  ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-2.5"><span className="block text-[10px] text-muted-foreground">{label}</span><strong className="mt-1 block break-words text-xs">{value}</strong></div>)}
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">CHORD ESTIMATES</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedReport.dataset_analysis.tonality.chord_estimates.slice(0, 40).map((item) => <span key={`${item.start_seconds}-${item.chord}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{Math.floor(item.start_seconds)}–{Math.floor(item.end_seconds)}s: {item.chord ?? "?"} {item.confidence == null ? "" : `· ${Math.round(item.confidence * 100)}%`}</span>)}
+                    {!selectedReport.dataset_analysis.tonality.chord_estimates.length && <span className="text-xs text-muted-foreground">No chord windows available.</span>}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">DETECTED PITCHES (FULL MIX ESTIMATE)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedReport.dataset_analysis.pitch.points.slice(0, 32).map((item) => <span key={`${item.time_seconds}-${item.note}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{item.time_seconds}s · {item.note} · {item.frequency_hz} Hz</span>)}
+                    {!selectedReport.dataset_analysis.pitch.points.length && <span className="text-xs text-muted-foreground">No stable dominant pitch was detected.</span>}
+                  </div>
+                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.pitch.note}</p>
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">AUTOMATIC SECTION BOUNDARIES</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedReport.dataset_analysis.structure.sections.slice(0, 30).map((section) => <span key={section.label} className="rounded-md border border-border px-2 py-1 text-[11px]">{section.label}: {durationLabel(section.start_seconds)}–{durationLabel(section.end_seconds)}</span>)}
+                  </div>
+                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.structure.note}</p>
+                </div>
+                <details className="rounded-lg border border-border p-2.5">
+                  <summary className="cursor-pointer text-xs font-medium">Time-aligned signal timeline ({selectedReport.dataset_analysis.timeline.length} frames)</summary>
+                  <div className="mt-2 max-h-72 overflow-auto">
+                    <table className="w-full min-w-[620px] text-left text-[11px]">
+                      <thead><tr className="border-b border-border text-muted-foreground"><th className="p-2">Time</th><th className="p-2">RMS dBFS</th><th className="p-2">Centroid Hz</th><th className="p-2">Low</th><th className="p-2">Mid</th><th className="p-2">High</th><th className="p-2">Flux</th></tr></thead>
+                      <tbody>{selectedReport.dataset_analysis.timeline.slice(0, 48).map((frame) => <tr key={frame.start_seconds} className="border-b border-border/60"><td className="p-2">{frame.start_seconds}–{frame.end_seconds}s</td><td className="p-2">{frame.rms_dbfs ?? "—"}</td><td className="p-2">{frame.spectral_centroid_hz ?? "—"}</td><td className="p-2">{frame.low_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.mid_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.high_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.spectral_flux ?? "—"}</td></tr>)}</tbody>
+                    </table>
+                    {selectedReport.dataset_analysis.timeline.length > 48 && <p className="p-2 text-[10px] text-muted-foreground">Showing the first 48 frames here. JSON export contains the complete timeline.</p>}
+                  </div>
+                </details>
+                <details className="rounded-lg border border-border p-2.5">
+                  <summary className="cursor-pointer text-xs font-medium">Method notes and limitations</summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
+                  {selectedReport.dataset_analysis.style_cues.map((cue) => <p key={cue.tag} className="mt-2 text-[11px] leading-4"><strong>{cue.tag.replace(/-/g, " ")}</strong> — {cue.evidence}</p>)}
+                </details>
+              </section>
+
+              <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Human-reviewed training labels</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Add semantic tags by listening and reviewing the audio. These labels are exported alongside measured features; the analyzer does not guess genres, language, instruments, or vocal types.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {DATASET_ANNOTATION_FIELDS.map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs outline-none focus:border-primary" value={selectedReport.dataset_analysis!.annotations[field.key].join(", ")} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
+                </div>
+                <label className="block"><span className="mb-1.5 block text-[11px] font-semibold">Annotation notes</span><textarea className="min-h-16 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs outline-none focus:border-primary" value={selectedReport.dataset_analysis.annotations.notes} maxLength={4000} placeholder="Describe which parts should be preserved/replaced, uncertainty, or notes for another reviewer." onChange={(event) => updateSelectedAnnotationText("notes", event.currentTarget.value)} /></label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedReport.dataset_analysis.annotations.reviewed} onChange={(event) => markSelectedReviewed(event.currentTarget.checked)} />Reviewed for training use</label>
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted-foreground">Reviewer <input className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground" value={selectedReport.dataset_analysis.annotations.reviewer ?? ""} maxLength={100} placeholder="Reviewer initials or team ID" onChange={(event) => updateSelectedAnnotationText("reviewer", event.currentTarget.value)} /></label>
+                </div>
+              </section>
+            </>
+          ) : mode === "full" ? (
+            <p className="rounded-xl border border-border p-3 text-xs leading-5 text-muted-foreground">Run Full Analysis to calculate the detailed local pitch, chord, spectral, and section timeline.</p>
+          ) : null}
 
           <details className="rounded-xl border border-border px-3 py-2.5">
             <summary className="cursor-pointer text-sm font-medium">File details</summary>

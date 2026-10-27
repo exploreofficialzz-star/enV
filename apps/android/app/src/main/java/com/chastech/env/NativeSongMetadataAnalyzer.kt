@@ -8,7 +8,6 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -47,12 +46,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,6 +92,8 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.exp
+import kotlin.math.log10
 import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.log2
@@ -143,22 +144,74 @@ fun NativeSongMetadataAnalyzerScreen() {
     var tracks by remember { mutableStateOf(emptyList<NativeSongSource>()) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var fullAnalysis by remember { mutableStateOf(false) }
-    var aiConsent by remember { mutableStateOf(false) }
-    var aiAvailable by remember { mutableStateOf<Boolean?>(null) }
     var busy by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0) }
     var notice by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var currentJob by remember { mutableStateOf<Job?>(null) }
 
-    LaunchedEffect(Unit) {
-        aiAvailable = runCatching {
-            withContext(Dispatchers.IO) { NativeAiClient.availability(context)["audio.music.analyze"] == true }
-        }.getOrDefault(false)
-    }
-
     fun update(id: String, change: (NativeSongSource) -> NativeSongSource) {
         tracks = tracks.map { if (it.id == id) change(it) else it }
+    }
+
+    fun updateDatasetTag(id: String, key: String, rawValue: String) {
+        val tags = rawValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(80)
+        update(id) { item ->
+            val original = item.report
+            if (original == null) item else {
+                val report = JSONObject(original.toString())
+                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
+                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}")
+                annotations.put(key, JSONArray(tags)).put("reviewed", false)
+                dataset.put("annotations", annotations)
+                report.put("dataset_analysis", dataset)
+                when (key) {
+                    "genre" -> report.put("genre", tags.firstOrNull() ?: JSONObject.NULL)
+                    "sub_style" -> report.put("sub_style", tags.firstOrNull() ?: JSONObject.NULL)
+                    "language" -> report.put("language", JSONArray(tags))
+                    "mood" -> report.put("mood", JSONArray(tags))
+                    "vocals" -> report.put("vocals", JSONArray(tags))
+                    "instruments" -> report.put("instruments", JSONArray(tags))
+                    "themes" -> report.put("theme", JSONArray(tags))
+                    "listening_scene" -> report.put("setting", JSONArray(tags))
+                }
+                val analysis = JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}").put("status", "full_local_needs_review")
+                report.put("analysis", analysis)
+                item.copy(report = report, status = "Partial")
+            }
+        }
+    }
+
+    fun updateDatasetAnnotationText(id: String, key: String, value: String) {
+        update(id) { item ->
+            val original = item.report
+            if (original == null) item else {
+                val report = JSONObject(original.toString())
+                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
+                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}")
+                annotations.put(key, value).put("reviewed", false)
+                dataset.put("annotations", annotations)
+                report.put("dataset_analysis", dataset)
+                report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}").put("status", "full_local_needs_review"))
+                item.copy(report = report, status = "Partial")
+            }
+        }
+    }
+
+    fun markDatasetReviewed(id: String, reviewed: Boolean) {
+        update(id) { item ->
+            val original = item.report
+            if (original == null) item else {
+                val report = JSONObject(original.toString())
+                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
+                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}").put("reviewed", reviewed)
+                dataset.put("annotations", annotations)
+                report.put("dataset_analysis", dataset)
+                report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}")
+                    .put("status", if (reviewed) "full_local_reviewed" else "full_local_needs_review"))
+                item.copy(report = report, status = if (reviewed) "Done" else "Partial")
+            }
+        }
     }
 
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -233,26 +286,11 @@ fun NativeSongMetadataAnalyzerScreen() {
                     FilterChip(selected = fullAnalysis, onClick = { if (!busy) fullAnalysis = true }, label = { Text("Full Analysis") }, enabled = !busy)
                 }
                 if (fullAnalysis) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = aiConsent, onCheckedChange = { if (!busy) aiConsent = it }, enabled = !busy)
-                        Column(Modifier.weight(1f)) {
-                            Text("Send short excerpts to AI", style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                when (aiAvailable) { true -> "AI available"; false -> "AI unavailable · Quick Scan still works"; null -> "Checking AI setup…" },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    Text("Full Analysis runs local signal processing only. Genre, language, mood, instruments and vocal labels are entered and reviewed by your team; no audio is sent to an AI service.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Button(
                     onClick = {
-                        if (fullAnalysis && !aiConsent) {
-                            error = "Confirm AI processing first."
-                        } else if (fullAnalysis && aiAvailable != true) {
-                            error = "AI analysis is unavailable. Quick Scan still works."
-                        } else {
-                            error = ""; notice = ""; progress = 0; busy = true
+                        error = ""; notice = ""; progress = 0; busy = true
                             currentJob = scope.launch {
                                 try {
                                     val queue = tracks.toList()
@@ -260,36 +298,10 @@ fun NativeSongMetadataAnalyzerScreen() {
                                         currentCoroutineContext().ensureActive()
                                         update(item.id) { it.copy(status = "Analyzing", error = null) }
                                         try {
-                                            val scan = withContext(Dispatchers.IO) { analyzeNativeSong(context, item) }
+                                            val scan = withContext(Dispatchers.IO) { analyzeNativeSong(context, item, detailed = fullAnalysis) }
                                             var report = scan.report
-                                            var semanticCompleted = false
-                                            if (fullAnalysis && aiConsent) {
-                                                val decoded = scan.decoded
-                                                if (decoded == null || decoded.samples.size < SONG_ANALYSIS_RATE) {
-                                                    report.put("warnings", (report.optJSONArray("warnings") ?: JSONArray()).put("Audio could not be decoded for AI analysis."))
-                                                } else {
-                                                    val excerpt = buildNativeSongExcerpt(decoded.samples)
-                                                    if (excerpt == null) {
-                                                        report.put("warnings", (report.optJSONArray("warnings") ?: JSONArray()).put("Audio is too short for semantic analysis."))
-                                                    } else {
-                                                        try {
-                                                            val aiInput = JSONObject()
-                                                                .put("audioBase64", Base64.encodeToString(excerpt.first, Base64.NO_WRAP))
-                                                                .put("mimeType", "audio/wav")
-                                                                .put("filename", item.name.take(120))
-                                                                .put("sampledSeconds", excerpt.second)
-                                                            val ai = NativeAiClient.runWithMetadata(context, "audio.music.analyze", aiInput)
-                                                            mergeNativeSemanticResult(report, ai.result)
-                                                            semanticCompleted = true
-                                                            ai.warnings.forEach { report.optJSONArray("warnings")?.put(it) }
-                                                        } catch (failure: Throwable) {
-                                                            if (failure is CancellationException) throw failure
-                                                            report.optJSONArray("warnings")?.put(failure.message ?: "AI analysis could not be completed.")
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            val status = if (semanticCompleted || (!fullAnalysis && report.optString("tempo_bpm") != "null")) "Done" else "Partial"
+                                            val annotationReview = report.optJSONObject("dataset_analysis")?.optJSONObject("annotations")?.optBoolean("reviewed", false) == true
+                                            val status = if (!fullAnalysis && report.optString("tempo_bpm") != "null") "Done" else if (fullAnalysis && annotationReview && report.optString("tempo_bpm") != "null") "Done" else "Partial"
                                             update(item.id) { it.copy(status = status, report = report, error = null) }
                                             if (report.optJSONArray("warnings")?.length() ?: 0 > 0) notice = "Some results need review."
                                         } catch (failure: Throwable) {
@@ -306,15 +318,14 @@ fun NativeSongMetadataAnalyzerScreen() {
                                     busy = false; currentJob = null
                                 }
                             }
-                        }
                     },
-                    enabled = tracks.isNotEmpty() && !busy && (!fullAnalysis || (aiConsent && aiAvailable == true)),
+                    enabled = tracks.isNotEmpty() && !busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (busy) "Analyzing… $progress%" else if (fullAnalysis) "Analyze with AI" else "Scan songs")
+                    Text(if (busy) "Analyzing locally… $progress%" else if (fullAnalysis) "Run detailed local analysis" else "Scan songs")
                 }
                 if (busy) {
                     OutlinedButton(onClick = { currentJob?.cancel() }, modifier = Modifier.fillMaxWidth()) {
@@ -323,7 +334,7 @@ fun NativeSongMetadataAnalyzerScreen() {
                 }
                 if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 if (notice.isNotEmpty()) Text(notice, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                Text("Local by default. Full Analysis sends short excerpts after consent.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Local-only processing. No model inference or external AI request.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -384,6 +395,15 @@ fun NativeSongMetadataAnalyzerScreen() {
                     nativeTagList("VOCALS", *jsonStringList(report.optJSONArray("vocals")).toTypedArray())
                     nativeTagList("INSTRUMENTS", *jsonStringList(report.optJSONArray("instruments")).toTypedArray())
                     nativeTagList("DESCRIPTIONS", *jsonStringList(report.optJSONArray("descriptions")).toTypedArray())
+                    report.optJSONObject("dataset_analysis")?.let { dataset ->
+                        NativeSongDatasetDetails(dataset)
+                        NativeSongDatasetAnnotationEditor(
+                            dataset = dataset,
+                            onTagChange = { key, value -> selected?.id?.let { updateDatasetTag(it, key, value) } },
+                            onTextChange = { key, value -> selected?.id?.let { updateDatasetAnnotationText(it, key, value) } },
+                            onReviewedChange = { reviewed -> selected?.id?.let { markDatasetReviewed(it, reviewed) } },
+                        )
+                    }
                     if (itemWarnings(report).isNotEmpty()) {
                         Text("Notes", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium)
                         itemWarnings(report).take(5).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -392,6 +412,91 @@ fun NativeSongMetadataAnalyzerScreen() {
             }
         }
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+private val nativeDatasetAnnotationFields = listOf(
+    Triple("genre", "Genre", "Afrobeats, R&B"),
+    Triple("sub_style", "Sub-style", "Afro-pop, Amapiano"),
+    Triple("style_influences", "Style influences", "Highlife, dancehall, soul"),
+    Triple("language", "Language", "Nigerian Pidgin, Yoruba"),
+    Triple("energy", "Energy", "Low, medium, high"),
+    Triple("mood", "Mood", "Celebratory, soulful"),
+    Triple("source_role", "Audio part / stem role", "Full mix, vocals, drums, bass, melody"),
+    Triple("vocals", "Vocal content", "Lead vocals, backing vocals, ad-libs"),
+    Triple("vocal_delivery", "Vocal delivery", "Melodic singing, rap, chant"),
+    Triple("vocal_register", "Vocal pitch / register", "High/low pitch, soprano, alto, tenor, baritone"),
+    Triple("vocal_harmony", "Vocal harmony", "Doubles, thirds, call-and-response"),
+    Triple("performance_technique", "Performance techniques", "Vibrato, falsetto, melisma"),
+    Triple("instruments", "Instruments", "Log drum, shakers, synth bass"),
+    Triple("themes", "Themes", "Love, celebration"),
+    Triple("listening_scene", "Listening scene", "Club, road trip"),
+    Triple("production_traits", "Production traits", "Reverb, saturation, sidechain"),
+    Triple("arrangement", "Arrangement", "Intro build, drum drop, instrumental break"),
+)
+
+@Composable
+private fun NativeSongDatasetDetails(dataset: JSONObject) {
+    val technical = dataset.optJSONObject("technical") ?: JSONObject()
+    val timbre = dataset.optJSONObject("timbre") ?: JSONObject()
+    val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
+    val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
+    val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
+    val structure = dataset.optJSONObject("structure") ?: JSONObject()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Local DSP findings", fontWeight = FontWeight.SemiBold)
+        Text("Pitch span: ${pitch.optString("lowest_detected_note", "unknown")}–${pitch.optString("highest_detected_note", "unknown")} · Chords: ${tonality.optJSONArray("chord_estimates")?.length() ?: 0} · Transient rate: ${rhythm.opt("transient_density_per_second") ?: "—"}/s", style = MaterialTheme.typography.bodySmall)
+        Text("Mean spectral centroid: ${timbre.opt("mean_spectral_centroid_hz") ?: "—"} Hz · Feature changes: ${structure.optJSONArray("change_points")?.length() ?: 0}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val cueArray = dataset.optJSONArray("style_cues") ?: JSONArray()
+        for (index in 0 until min(cueArray.length(), 8)) {
+            val cue = cueArray.optJSONObject(index) ?: continue
+            Text("${cue.optString("tag")}: ${cue.optString("evidence")}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text("Pitch and chord values are estimates from a mono mix, not verified vocal-only notes. Section cuts are not confirmed verse/chorus labels.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun NativeSongDatasetAnnotationEditor(
+    dataset: JSONObject,
+    onTagChange: (String, String) -> Unit,
+    onTextChange: (String, String) -> Unit,
+    onReviewedChange: (Boolean) -> Unit,
+) {
+    val annotations = dataset.optJSONObject("annotations") ?: JSONObject()
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Text("Training labels (human-reviewed)", fontWeight = FontWeight.SemiBold)
+        Text("Genre, language, vocal type and instrument identity are annotations, not facts inferred by this local DSP pass.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        nativeDatasetAnnotationFields.forEach { (key, label, placeholder) ->
+            OutlinedTextField(
+                value = jsonStringList(annotations.optJSONArray(key)).joinToString(", "),
+                onValueChange = { onTagChange(key, it) },
+                label = { Text(label) },
+                placeholder = { Text(placeholder) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        }
+        OutlinedTextField(
+            value = annotations.optString("notes"),
+            onValueChange = { onTextChange("notes", it.take(4000)) },
+            label = { Text("Annotation notes") },
+            placeholder = { Text("Parts to preserve or replace, uncertainty, review notes") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+            maxLines = 4,
+        )
+        OutlinedTextField(
+            value = annotations.optString("reviewer").takeUnless { it == "null" } ?: "",
+            onValueChange = { onTextChange("reviewer", it.take(100)) },
+            label = { Text("Reviewer initials / team ID") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = annotations.optBoolean("reviewed", false), onCheckedChange = onReviewedChange)
+            Text("Reviewed for training use", style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
@@ -632,7 +737,7 @@ private fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
 private fun readCurrentEntryBounded(input: InputStream, limit: Long): ByteArray =
     readBoundedContent(input, limit)
 
-private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource): NativeSongScan {
+private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, detailed: Boolean = false): NativeSongScan {
     val bytes = item.bytes ?: withContext(Dispatchers.IO) {
         val stream = item.uri?.let { context.contentResolver.openInputStream(it) } ?: error("Cannot open ${item.name}.")
         stream.use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) }
@@ -648,6 +753,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
         val warnings = JSONArray()
         val tempo = decoded?.let { NativeSongSignalAnalysis.estimateBpm(it.samples, it.sampleRateHz) }
         val key = decoded?.let { NativeSongSignalAnalysis.estimateKey(it.samples, it.sampleRateHz) }
+        val datasetAnalysis = if (detailed && decoded != null) NativeSongSignalAnalysis.analyzeDataset(decoded.samples, decoded.sampleRateHz) else null
         if (decoded == null) warnings.put("This audio format could not be decoded on this device.")
         if (tempo == null) warnings.put("Tempo could not be estimated reliably.")
         if (key == null) warnings.put("Musical key could not be estimated reliably.")
@@ -678,7 +784,7 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
             .put("release_date", meta.optString("year").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("artwork_available", meta.optBoolean("artwork_available", false))
         val report = JSONObject()
-            .put("schema_version", "1.0")
+            .put("schema_version", "1.1")
             .put("filename", item.name)
             .put("genre", meta.optString("genre").takeIf { it.isNotBlank() } ?: JSONObject.NULL)
             .put("sub_style", JSONObject.NULL)
@@ -698,9 +804,11 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource):
             .put("identity", identity)
             .put("technical", technical)
             .put("embedded_metadata", meta)
-            .put("analysis", JSONObject().put("status", "quick").put("local_audio_decoded", decoded != null)
-                .put("semantic_analysis", "skipped_by_choice").put("key_source", if (key != null) "audio_estimate" else "unavailable"))
+            .put("analysis", JSONObject().put("status", if (datasetAnalysis != null) "full_local_needs_review" else "quick_local").put("local_audio_decoded", decoded != null)
+                .put("semantic_analysis", "not_run_local_only").put("uses_remote_api", false).put("uses_hosted_model", false)
+                .put("key_source", if (key != null) "audio_estimate" else "unavailable"))
             .put("warnings", warnings)
+        if (datasetAnalysis != null) report.put("dataset_analysis", datasetAnalysis)
         return NativeSongScan(report, decoded)
     } finally {
         temp.delete()
@@ -879,53 +987,6 @@ private suspend fun decodeNativeSong(file: File, metadataDuration: Double): Nati
     }
 }
 
-private fun buildNativeSongExcerpt(samples: FloatArray): Pair<ByteArray, Double>? {
-    if (samples.size < SONG_ANALYSIS_RATE * 3) return null
-    val sectionSamples = min(20 * SONG_ANALYSIS_RATE, samples.size / 3)
-    if (sectionSamples < SONG_ANALYSIS_RATE) return null
-    val starts = listOf(0, max(0, samples.size / 2 - sectionSamples / 2), max(0, samples.size - sectionSamples))
-    val gapSamples = SONG_ANALYSIS_RATE / 4
-    val outputSamples = sectionSamples * 3 + gapSamples * 2
-    val data = ByteArray(44 + outputSamples * 2)
-    fun text(offset: Int, value: String) { value.forEachIndexed { index, char -> data[offset + index] = char.code.toByte() } }
-    fun putInt(offset: Int, value: Int) { for (i in 0..3) data[offset + i] = (value ushr (i * 8)).toByte() }
-    fun putShort(offset: Int, value: Int) { data[offset] = value.toByte(); data[offset + 1] = (value ushr 8).toByte() }
-    text(0, "RIFF"); putInt(4, data.size - 8); text(8, "WAVE"); text(12, "fmt "); putInt(16, 16)
-    putShort(20, 1); putShort(22, 1); putInt(24, SONG_ANALYSIS_RATE); putInt(28, SONG_ANALYSIS_RATE * 2)
-    putShort(32, 2); putShort(34, 16); text(36, "data"); putInt(40, outputSamples * 2)
-    var out = 44
-    for ((sectionIndex, start) in starts.withIndex()) {
-        for (i in start until start + sectionSamples) {
-            val sample = samples[i].coerceIn(-1f, 1f)
-            val pcm = (if (sample < 0) sample * 32768f else sample * 32767f).roundToInt()
-            data[out++] = pcm.toByte(); data[out++] = (pcm shr 8).toByte()
-        }
-        if (sectionIndex < starts.lastIndex) out += gapSamples * 2
-    }
-    return data to (outputSamples.toDouble() / SONG_ANALYSIS_RATE)
-}
-
-private fun mergeNativeSemanticResult(report: JSONObject, ai: JSONObject) {
-    val scalarFields = listOf("genre", "sub_style", "energy", "lyric_evidence")
-    scalarFields.forEach { field ->
-        val value = ai.opt(field)
-        if (value != null && value != JSONObject.NULL && value.toString().isNotBlank()) report.put(field, value)
-    }
-    val arrayFields = listOf("language", "mood", "theme", "setting", "vocals", "instruments", "descriptions")
-    arrayFields.forEach { field ->
-        val values = ai.optJSONArray(field) ?: return@forEach
-        val copy = JSONArray()
-        for (i in 0 until values.length()) {
-            val value = values.optString(i).trim()
-            if (value.isNotEmpty()) copy.put(value)
-        }
-        report.put(field, copy)
-    }
-    val warnings = report.optJSONArray("warnings") ?: JSONArray().also { report.put("warnings", it) }
-    ai.optJSONArray("warnings")?.let { values -> for (i in 0 until values.length()) warnings.put(values.optString(i)) }
-    report.optJSONObject("analysis")?.put("status", "full")?.put("semantic_analysis", "completed")
-}
-
 private fun nativeTempoBand(bpm: Int): String = when {
     bpm < 80 -> "slow"; bpm < 110 -> "mid"; bpm < 130 -> "upbeat"; else -> "fast"
 }
@@ -958,7 +1019,7 @@ private suspend fun exportNative(context: Context, uri: Uri, tracks: List<Native
     val reports = tracks.filter { it.report != null }.map { it.report!! }
     val outBytes = withContext(Dispatchers.IO) {
         when (kind) {
-            "json" -> JSONObject().put("schema_version", "1.0").put("tracks", JSONArray().also { array -> reports.forEach(array::put) }).toString(2).toByteArray()
+            "json" -> JSONObject().put("schema_version", "env.song-analysis-export.v2").put("tracks", JSONArray().also { array -> reports.forEach(array::put) }).toString(2).toByteArray()
             "csv" -> nativeReportsCsv(reports).toByteArray(Charsets.UTF_8)
             else -> {
                 val buffer = ByteArrayOutputStream()
@@ -979,7 +1040,16 @@ private suspend fun exportNative(context: Context, uri: Uri, tracks: List<Native
 }
 
 private fun nativeReportsCsv(reports: List<JSONObject>): String {
-    val columns = listOf("filename", "title", "artist", "album", "genre", "sub_style", "language", "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting", "vocals", "instruments", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels", "analysis_status", "warnings")
+    val columns = listOf(
+        "filename", "title", "artist", "album", "genre", "sub_style", "style_influences", "language",
+        "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting", "source_role",
+        "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments",
+        "production_traits", "arrangement", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels",
+        "pitch_lowest_note", "pitch_highest_note", "pitch_range_semitones", "transient_density_per_second",
+        "spectral_centroid_mean_hz", "low_energy_ratio_mean", "mid_energy_ratio_mean", "high_energy_ratio_mean",
+        "chord_estimates", "section_boundaries", "labels_reviewed", "reviewer", "annotation_notes",
+        "uses_remote_api", "uses_hosted_model", "analysis_status", "warnings"
+    )
     fun cell(value: Any?): String {
         var text = when (value) {
             null, JSONObject.NULL -> ""
@@ -994,6 +1064,26 @@ private fun nativeReportsCsv(reports: List<JSONObject>): String {
         val identity = report.optJSONObject("identity") ?: JSONObject()
         val technical = report.optJSONObject("technical") ?: JSONObject()
         val analysis = report.optJSONObject("analysis") ?: JSONObject()
+        val dataset = report.optJSONObject("dataset_analysis") ?: JSONObject()
+        val annotations = dataset.optJSONObject("annotations") ?: JSONObject()
+        val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
+        val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
+        val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
+        val timbre = dataset.optJSONObject("timbre") ?: JSONObject()
+        val structure = dataset.optJSONObject("structure") ?: JSONObject()
+        val chordText = (tonality.optJSONArray("chord_estimates") ?: JSONArray()).let { values ->
+            (0 until values.length()).joinToString(" | ") { index ->
+                val item = values.optJSONObject(index) ?: JSONObject()
+                "${item.opt("start_seconds") ?: "?"}-${item.opt("end_seconds") ?: "?"}s:${item.opt("chord")?.takeUnless { it == JSONObject.NULL } ?: "unknown"}"
+            }
+        }
+        val sectionText = (structure.optJSONArray("change_points") ?: JSONArray()).let { values ->
+            (0 until values.length()).joinToString(" | ") { index ->
+                val item = values.optJSONObject(index) ?: JSONObject()
+                "${item.opt("time_seconds") ?: "?"}s(${item.opt("change_score") ?: "?"})"
+            }
+        }
+        val processing = dataset.optJSONObject("processing") ?: JSONObject()
         val row = JSONObject()
             .put("filename", report.optString("filename"))
             .put("title", identity.opt("title"))
@@ -1001,21 +1091,44 @@ private fun nativeReportsCsv(reports: List<JSONObject>): String {
             .put("album", identity.opt("album"))
             .put("genre", report.opt("genre"))
             .put("sub_style", report.opt("sub_style"))
+            .put("style_influences", annotations.optJSONArray("style_influences"))
             .put("language", report.optJSONArray("language"))
             .put("tempo_bpm", report.opt("tempo_bpm"))
             .put("tempo_band", report.optString("tempo_band"))
             .put("key", report.opt("key"))
-            .put("energy", report.optString("energy"))
+            .put("energy", annotations.optJSONArray("energy") ?: report.opt("energy"))
             .put("mood", report.optJSONArray("mood"))
             .put("theme", report.optJSONArray("theme"))
             .put("setting", report.optJSONArray("setting"))
+            .put("source_role", annotations.optJSONArray("source_role"))
             .put("vocals", report.optJSONArray("vocals"))
+            .put("vocal_delivery", annotations.optJSONArray("vocal_delivery"))
+            .put("vocal_register", annotations.optJSONArray("vocal_register"))
+            .put("vocal_harmony", annotations.optJSONArray("vocal_harmony"))
+            .put("performance_technique", annotations.optJSONArray("performance_technique"))
             .put("instruments", report.optJSONArray("instruments"))
+            .put("production_traits", annotations.optJSONArray("production_traits"))
+            .put("arrangement", annotations.optJSONArray("arrangement"))
             .put("duration_seconds", technical.opt("duration_seconds"))
             .put("file_size_bytes", technical.opt("file_size_bytes"))
             .put("codec", technical.opt("codec"))
             .put("sample_rate_hz", technical.opt("sample_rate_hz"))
             .put("channels", technical.opt("channels"))
+            .put("pitch_lowest_note", pitch.opt("lowest_detected_note"))
+            .put("pitch_highest_note", pitch.opt("highest_detected_note"))
+            .put("pitch_range_semitones", pitch.opt("pitch_range_semitones"))
+            .put("transient_density_per_second", rhythm.opt("transient_density_per_second"))
+            .put("spectral_centroid_mean_hz", timbre.opt("mean_spectral_centroid_hz"))
+            .put("low_energy_ratio_mean", timbre.opt("mean_low_frequency_energy_ratio"))
+            .put("mid_energy_ratio_mean", timbre.opt("mean_mid_frequency_energy_ratio"))
+            .put("high_energy_ratio_mean", timbre.opt("mean_high_frequency_energy_ratio"))
+            .put("chord_estimates", chordText)
+            .put("section_boundaries", sectionText)
+            .put("labels_reviewed", annotations.optBoolean("reviewed", false))
+            .put("reviewer", annotations.opt("reviewer"))
+            .put("annotation_notes", annotations.optString("notes"))
+            .put("uses_remote_api", processing.optBoolean("uses_remote_api", false))
+            .put("uses_hosted_model", processing.optBoolean("uses_hosted_model", false))
             .put("analysis_status", analysis.optString("status"))
             .put("warnings", report.optJSONArray("warnings"))
         columns.joinToString(",") { column -> cell(row.opt(column)) }
@@ -1103,6 +1216,283 @@ private object NativeSongSignalAnalysis {
         }
         return bestKey.takeIf { bestScore >= 0.06 }
     }
+
+    private data class LocalFeatureFrame(
+        val start: Double,
+        val end: Double,
+        val rmsDb: Double?,
+        val peakDb: Double?,
+        val centroid: Double?,
+        val flatness: Double?,
+        val lowRatio: Double?,
+        val midRatio: Double?,
+        val highRatio: Double?,
+        val flux: Double,
+        val zcr: Double,
+        val chroma: DoubleArray,
+    )
+
+    private fun noteName(midi: Int): String = "${keyNames[((midi % 12) + 12) % 12]}${midi / 12 - 1}"
+
+    private fun localDb(value: Double): Double =
+        if (!value.isFinite() || value <= 1e-12) -120.0 else (20.0 * log10(value)).coerceAtLeast(-120.0)
+
+    private fun meanValue(values: List<Double>): Double? =
+        values.filter { it.isFinite() }.takeIf { it.isNotEmpty() }?.average()
+
+    private fun localPitch(samples: FloatArray, sampleRate: Int, start: Int, time: Double): JSONObject? {
+        val length = min(2048, samples.size - start)
+        if (length < 512 || sampleRate <= 0) return null
+        val decimation = max(1, ceil(sampleRate / 8000.0).toInt())
+        val rate = sampleRate.toDouble() / decimation
+        val reduced = ArrayList<Double>((length + decimation - 1) / decimation)
+        var cursor = 0
+        while (cursor < length) {
+            val window = 0.5 - 0.5 * cos(2.0 * PI * cursor / max(1, length - 1))
+            reduced += samples[start + cursor].toDouble() * window
+            cursor += decimation
+        }
+        val minLag = max(2, (rate / 1000.0).toInt())
+        val maxLag = min((rate / 55.0).toInt(), reduced.size / 2)
+        if (maxLag <= minLag) return null
+        var bestLag = 0
+        var bestScore = 0.0
+        for (lag in minLag..maxLag) {
+            var dot = 0.0; var left = 0.0; var right = 0.0
+            for (index in 0 until reduced.size - lag) {
+                val a = reduced[index]; val b = reduced[index + lag]
+                dot += a * b; left += a * a; right += b * b
+            }
+            val score = dot / sqrt(max(left * right, 1e-12))
+            if (score > bestScore) { bestScore = score; bestLag = lag }
+        }
+        if (bestLag == 0 || bestScore < 0.55) return null
+        val hz = rate / bestLag
+        if (!hz.isFinite() || hz !in 55.0..1000.0) return null
+        val midi = (69 + 12 * log2(hz / 440.0)).roundToInt()
+        return JSONObject().put("time_seconds", time).put("frequency_hz", (hz * 100.0).roundToInt() / 100.0)
+            .put("midi_note", midi).put("note", noteName(midi)).put("confidence", bestScore.coerceIn(0.0, 1.0))
+    }
+
+    private fun localChord(chroma: DoubleArray, start: Double, end: Double): JSONObject {
+        val total = chroma.sum()
+        if (total <= 1e-9) return JSONObject().put("start_seconds", start).put("end_seconds", end)
+            .put("chord", JSONObject.NULL).put("confidence", JSONObject.NULL).put("method", "spectral-chroma-triad-template")
+        val values = DoubleArray(12) { chroma[it] / total }
+        var bestName: String? = null
+        var bestScore = Double.NEGATIVE_INFINITY
+        var secondScore = Double.NEGATIVE_INFINITY
+        for (root in 0 until 12) for (minor in listOf(false, true)) {
+            val third = (root + if (minor) 3 else 4) % 12
+            val fifth = (root + 7) % 12
+            var score = values[root] + 0.8 * values[third] + 0.6 * values[fifth]
+            for (note in 0 until 12) if (note != root && note != third && note != fifth) score -= values[note] * 0.15
+            if (score > bestScore) { secondScore = bestScore; bestScore = score; bestName = keyNames[root] + if (minor) "m" else "" }
+            else if (score > secondScore) secondScore = score
+        }
+        val confidence = ((bestScore - max(0.0, secondScore)) / max(bestScore, 1e-9) * 3 + 0.3).coerceIn(0.0, 0.99)
+        return JSONObject().put("start_seconds", start).put("end_seconds", end).put("chord", bestName)
+            .put("confidence", confidence).put("method", "spectral-chroma-triad-template")
+    }
+
+    fun analyzeDataset(samples: FloatArray, sampleRate: Int): JSONObject {
+        require(sampleRate in 8_000..192_000) { "Analysis sample rate must be between 8 kHz and 192 kHz." }
+        require(samples.isNotEmpty()) { "No decoded audio samples were supplied." }
+        require(samples.all { it.isFinite() }) { "Audio contains non-finite samples." }
+        val duration = samples.size.toDouble() / sampleRate
+        require(duration <= 15 * 60) { "Detailed local analysis is limited to 15 minutes per track." }
+
+        val fftSize = 2048
+        val hop = max(1, sampleRate / 2)
+        val bins = fftSize / 2
+        val real = DoubleArray(fftSize)
+        val imag = DoubleArray(fftSize)
+        val previousMagnitudes = DoubleArray(bins)
+        val frames = ArrayList<LocalFeatureFrame>()
+        val timeline = JSONArray()
+        val pitchPoints = JSONArray()
+        val blockChroma = linkedMapOf<Int, DoubleArray>()
+        val fluxValues = ArrayList<Double>()
+        var transientCount = 0
+        var previousRmsDb: Double? = null
+        var totalSquares = 0.0
+        var globalPeak = 0.0
+        var dcSum = 0.0
+        var clipped = 0L
+        for (sample in samples) {
+            val value = sample.toDouble()
+            totalSquares += value * value
+            globalPeak = max(globalPeak, abs(value))
+            dcSum += value
+            if (abs(value) >= 0.999f) clipped += 1
+        }
+
+        var frameIndex = 0
+        var frameStart = 0
+        while (frameStart < samples.size) {
+            val frameEnd = min(samples.size, frameStart + hop)
+            val length = frameEnd - frameStart
+            var sum = 0.0; var peak = 0.0; var crossings = 0
+            var previous = samples[frameStart]
+            for (index in frameStart until frameEnd) {
+                val value = samples[index]
+                sum += value * value
+                peak = max(peak, abs(value.toDouble()))
+                if (index > frameStart && ((value >= 0 && previous < 0) || (value < 0 && previous >= 0))) crossings += 1
+                previous = value
+            }
+            val rms = sqrt(sum / max(1, length))
+            val rmsDb = localDb(rms)
+            real.fill(0.0); imag.fill(0.0)
+            val spectralStart = min(frameStart, max(0, samples.size - fftSize))
+            for (index in 0 until fftSize) {
+                val sampleIndex = spectralStart + index
+                val value = if (sampleIndex < samples.size) samples[sampleIndex].toDouble() else 0.0
+                real[index] = value * (0.5 - 0.5 * cos(2.0 * PI * index / (fftSize - 1)))
+            }
+            fft(real, imag)
+            val chroma = DoubleArray(12)
+            var magnitudeSum = 0.0; var weightedFrequency = 0.0; var logSum = 0.0
+            var lowPower = 0.0; var midPower = 0.0; var highPower = 0.0; var powerSum = 0.0; var fluxNumerator = 0.0
+            val magnitudes = DoubleArray(bins)
+            for (bin in 1 until bins) {
+                val magnitude = hypot(real[bin], imag[bin])
+                magnitudes[bin] = magnitude
+                val frequency = bin.toDouble() * sampleRate / fftSize
+                val power = magnitude * magnitude
+                magnitudeSum += magnitude; weightedFrequency += magnitude * frequency; logSum += ln(max(magnitude, 1e-12)); powerSum += power
+                if (frequency < 160) lowPower += power else if (frequency < 2000) midPower += power else highPower += power
+                if (frequency in 45.0..min(5000.0, sampleRate / 2.0)) {
+                    val midi = (69 + 12 * log2(frequency / 440.0)).roundToInt()
+                    chroma[(midi % 12 + 12) % 12] += magnitude
+                }
+                fluxNumerator += max(0.0, magnitude - previousMagnitudes[bin])
+            }
+            val totalMagnitude = magnitudeSum
+            val flux = if (totalMagnitude > 1e-9) fluxNumerator / totalMagnitude else 0.0
+            for (bin in 0 until bins) previousMagnitudes[bin] = magnitudes[bin]
+            if (previousRmsDb != null && rmsDb - previousRmsDb!! >= 3.0) transientCount += 1
+            if (flux > 0.22) transientCount += 1
+            previousRmsDb = rmsDb
+            fluxValues += flux
+            val lowRatio = if (powerSum > 1e-12) lowPower / powerSum else 0.0
+            val midRatio = if (powerSum > 1e-12) midPower / powerSum else 0.0
+            val highRatio = if (powerSum > 1e-12) highPower / powerSum else 0.0
+            val centroid = if (magnitudeSum > 1e-9) weightedFrequency / magnitudeSum else null
+            val flatness = if (magnitudeSum > 1e-9) exp(logSum / max(1, bins - 1)) / (magnitudeSum / max(1, bins - 1)) else null
+            val startSeconds = frameStart.toDouble() / sampleRate
+            val endSeconds = frameEnd.toDouble() / sampleRate
+            val frame = LocalFeatureFrame(startSeconds, endSeconds, rmsDb, localDb(peak), centroid, flatness, lowRatio, midRatio, highRatio, flux, crossings.toDouble() / max(1, length - 1), chroma)
+            frames += frame
+            timeline.put(JSONObject().put("start_seconds", startSeconds).put("end_seconds", endSeconds)
+                .put("rms_dbfs", rmsDb).put("peak_dbfs", localDb(peak))
+                .put("spectral_centroid_hz", centroid ?: JSONObject.NULL).put("spectral_flatness", flatness ?: JSONObject.NULL)
+                .put("low_frequency_energy_ratio", lowRatio).put("mid_frequency_energy_ratio", midRatio)
+                .put("high_frequency_energy_ratio", highRatio).put("spectral_flux", flux)
+                .put("zero_crossing_rate", frame.zcr))
+            val block = (startSeconds / 2.0).toInt()
+            val blockValues = blockChroma.getOrPut(block) { DoubleArray(12) }
+            for (note in 0 until 12) blockValues[note] += chroma[note]
+            if (frameIndex % 2 == 0) localPitch(samples, sampleRate, frameStart, startSeconds)?.let { pitchPoints.put(it) }
+            frameIndex++
+            frameStart += hop
+        }
+
+        val allChroma = DoubleArray(12)
+        blockChroma.values.forEach { block -> for (index in 0 until 12) allChroma[index] += block[index] }
+        val chromaTotal = allChroma.sum()
+        val normalizedChroma = DoubleArray(12) { if (chromaTotal > 1e-9) allChroma[it] / chromaTotal else 0.0 }
+        val chords = JSONArray()
+        blockChroma.forEach { (block, chroma) -> chords.put(localChord(chroma, block * 2.0, min(duration, (block + 1) * 2.0))) }
+        val pitches = (0 until pitchPoints.length()).mapNotNull { pitchPoints.optJSONObject(it)?.optInt("midi_note") }
+        val transientRate = max(transientCount, fluxValues.count { it >= max(0.15, (fluxValues.averageOrZero()) * 1.4) }) / max(duration, 1e-9)
+        val changes = JSONArray()
+        var lastBoundary = 0.0
+        for (index in 1 until frames.size) {
+            val prior = frames[index - 1]; val current = frames[index]
+            val rmsChange = abs((current.rmsDb ?: -120.0) - (prior.rmsDb ?: -120.0)) / 24.0
+            val centroidChange = abs((current.centroid ?: 0.0) - (prior.centroid ?: 0.0)) / max(1000.0, prior.centroid ?: 1000.0)
+            val lowChange = abs((current.lowRatio ?: 0.0) - (prior.lowRatio ?: 0.0))
+            val score = (rmsChange * 0.45 + centroidChange * 0.25 + lowChange * 0.2 + current.flux * 0.1).coerceIn(0.0, 1.0)
+            if (score >= 0.27 && current.start - lastBoundary >= 4.0 && duration - current.start >= 3.0) {
+                changes.put(JSONObject().put("time_seconds", current.start).put("change_score", score)
+                    .put("reason", "Measured level, brightness, frequency balance or spectral flux changed; not a verified verse/chorus label."))
+                lastBoundary = current.start
+            }
+        }
+        val boundaries = mutableListOf(0.0)
+        for (index in 0 until changes.length()) boundaries += changes.getJSONObject(index).getDouble("time_seconds")
+        boundaries += duration
+        val sections = JSONArray()
+        for (index in 0 until boundaries.size - 1) {
+            if (boundaries[index + 1] - boundaries[index] >= 1.0) {
+                sections.put(JSONObject().put("start_seconds", boundaries[index]).put("end_seconds", boundaries[index + 1])
+                    .put("label", "section_${sections.length() + 1}").put("label_source", "automatic_feature_change").put("semantic_section", JSONObject.NULL))
+            }
+        }
+        val descriptors = JSONArray()
+        val meanLow = meanValue(frames.mapNotNull { it.lowRatio }) ?: 0.0
+        val meanMid = meanValue(frames.mapNotNull { it.midRatio }) ?: 0.0
+        val meanHigh = meanValue(frames.mapNotNull { it.highRatio }) ?: 0.0
+        val meanCentroid = meanValue(frames.mapNotNull { it.centroid }) ?: 0.0
+        if (meanLow >= 0.35) descriptors.put(JSONObject().put("tag", "low-frequency-prominent").put("evidence", "Low band carries ${(meanLow * 100).roundToInt()}% of average spectral energy."))
+        if (meanHigh >= 0.30) descriptors.put(JSONObject().put("tag", "high-frequency-prominent").put("evidence", "High band carries ${(meanHigh * 100).roundToInt()}% of average spectral energy."))
+        if (transientRate >= 3) descriptors.put(JSONObject().put("tag", "transient-dense").put("evidence", "Approximately ${(transientRate * 100).roundToInt() / 100.0} onset-like changes per second."))
+        if (meanCentroid >= 3000) descriptors.put(JSONObject().put("tag", "spectrally-bright").put("evidence", "Mean spectral centroid is ${meanCentroid.roundToInt()} Hz."))
+        if (descriptors.length() == 0) descriptors.put(JSONObject().put("tag", "no-dominant-rule-cue").put("evidence", "No conservative measurable rule was triggered."))
+        val pitchLow = pitches.minOrNull()
+        val pitchHigh = pitches.maxOrNull()
+        val sortedLevels = frames.mapNotNull { it.rmsDb }.sorted()
+        val dynamicRange = if (sortedLevels.size > 1) sortedLevels[(sortedLevels.size - 1) * 95 / 100] - sortedLevels[(sortedLevels.size - 1) * 10 / 100] else JSONObject.NULL
+        val rms = sqrt(totalSquares / samples.size)
+        val peak = globalPeak
+        val annotations = JSONObject()
+        listOf("genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement").forEach { annotations.put(it, JSONArray()) }
+        annotations.put("notes", "").put("reviewed", false).put("reviewer", JSONObject.NULL)
+
+        val warnings = JSONArray()
+            .put("No hosted model or AI API was used. Genre, language, mood, instrument identity and vocal type require human annotation.")
+            .put("Pitch/chord estimates are made from the mono mix and may follow instruments rather than a singer.")
+            .put("Section boundaries are generic measured feature changes, not confirmed verse/chorus labels.")
+        if (pitchPoints.length() == 0) warnings.put("No stable dominant pitch was detected with sufficient confidence.")
+        val keyEstimate = estimateKey(samples, sampleRate)
+        val globalPeakDb = localDb(peak)
+        val globalRmsDb = localDb(rms)
+        return JSONObject()
+            .put("schema_version", "env.music-dataset-analysis.v1")
+            .put("source", JSONObject().put("sample_rate_hz", sampleRate).put("channels", 1).put("frame_count", samples.size).put("duration_seconds", duration))
+            .put("processing", JSONObject().put("method", "local-digital-signal-processing").put("uses_remote_api", false).put("uses_hosted_model", false).put("model_inference", false))
+            .put("technical", JSONObject().put("duration_seconds", duration).put("sample_rate_hz", sampleRate).put("channels", 1)
+                .put("peak_dbfs", globalPeakDb).put("rms_dbfs", globalRmsDb)
+                .put("crest_factor_db", if (rms > 1e-12) globalPeakDb - globalRmsDb else JSONObject.NULL)
+                .put("dynamic_range_estimate_db", dynamicRange)
+                .put("clipped_sample_percent", clipped.toDouble() / samples.size * 100.0).put("dc_offset_by_channel", JSONArray().put(dcSum / samples.size)))
+            .put("rhythm", JSONObject().put("tempo_bpm", estimateBpm(samples, sampleRate) ?: JSONObject.NULL)
+                .put("tempo_method", "Local onset-envelope autocorrelation estimate").put("transient_density_per_second", transientRate)
+                .put("transient_event_count", max(transientCount, fluxValues.count { it >= max(0.15, (fluxValues.averageOrZero()) * 1.4) }))
+                .put("interpretation", "Transient estimates are not verified drum-hit counts; tempo may be half/double-time."))
+            .put("tonality", JSONObject().put("key_estimate", keyEstimate ?: JSONObject.NULL).put("key_method", "Local chroma template estimate")
+                .put("pitch_class_profile", JSONArray().also { list -> keyNames.forEachIndexed { index, name -> list.put(JSONObject().put("note", name).put("energy", normalizedChroma[index])) } })
+                .put("chord_estimates", chords).put("interpretation", "Chords are template-based estimates from the mixed signal."))
+            .put("pitch", JSONObject().put("source", "full_mix_dominant_pitch_estimate").put("points", pitchPoints)
+                .put("lowest_detected_note", pitchLow?.let(::noteName) ?: JSONObject.NULL).put("highest_detected_note", pitchHigh?.let(::noteName) ?: JSONObject.NULL)
+                .put("pitch_range_semitones", if (pitchLow != null && pitchHigh != null) pitchHigh - pitchLow else JSONObject.NULL)
+                .put("note", "Dominant pitch of the full mix; not a vocal-only contour or definitive voice type."))
+            .put("timbre", JSONObject().put("mean_spectral_centroid_hz", meanCentroid).put("mean_spectral_flatness", meanValue(frames.mapNotNull { it.flatness }) ?: JSONObject.NULL)
+                .put("mean_low_frequency_energy_ratio", meanLow).put("mean_mid_frequency_energy_ratio", meanMid).put("mean_high_frequency_energy_ratio", meanHigh)
+                .put("mean_zero_crossing_rate", meanValue(frames.map { it.zcr }) ?: JSONObject.NULL).put("descriptors", descriptors))
+            .put("timeline", timeline)
+            .put("structure", JSONObject().put("change_points", changes).put("sections", sections)
+                .put("note", "Automatic boundaries are not verified verse/chorus labels."))
+            .put("style_cues", descriptors)
+            .put("separation", JSONObject().put("status", "not_performed")
+                .put("reason", "Native local mode does not claim true vocal/drum/bass source separation.")
+                .put("supported_local_layers", JSONArray()).put("note", "A future native local-layer export must use explicitly labeled signal candidates, never imply clean source isolation."))
+            .put("annotations", annotations)
+            .put("warnings", warnings)
+    }
+
+    private fun List<Double>.averageOrZero(): Double = if (isEmpty()) 0.0 else average()
 
     private fun fft(real: DoubleArray, imag: DoubleArray) {
         val n = real.size

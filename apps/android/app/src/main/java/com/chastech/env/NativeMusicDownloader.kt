@@ -233,6 +233,13 @@ private fun resolveProviderMusicPage(track: DirectMusicTrack, includePlaylist: B
     return listOf(track.copy(title = info.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: track.title))
 }
 
+private fun musicDownloadRetryable(failure: Exception): Boolean {
+    val message = failure.message.orEmpty().lowercase(Locale.ROOT)
+    return listOf("took too long to respond", "did not respond reliably", "returned an empty or invalid json",
+        "returned an invalid metadata response", "track resolver returned a server error or empty response",
+        "media api could not be reached", "http 502", "http 503", "http 504").any { it in message }
+}
+
 private fun downloadProviderMusicTrack(
     track: DirectMusicTrack,
     folder: File,
@@ -306,6 +313,18 @@ private fun downloadProviderMusicTrack(
         throw failure
     } finally {
         connection.disconnect()
+    }
+}
+
+private fun downloadProviderMusicTrackWithRetry(
+    track: DirectMusicTrack, folder: File, maxBatchRemaining: Long
+): Pair<File, Long> {
+    return try {
+        downloadProviderMusicTrack(track, folder, maxBatchRemaining)
+    } catch (failure: Exception) {
+        if (!musicDownloadRetryable(failure)) throw failure
+        Thread.sleep(700)
+        downloadProviderMusicTrack(track, folder, maxBatchRemaining)
     }
 }
 
@@ -436,7 +455,7 @@ fun NativeMusicDownloaderScreen() {
                     val root = File(context.filesDir, "music-downloader/" + musicSafeName(collectionName, "My music"))
                     for (track in selection) {
                         try {
-                            val (file, count) = downloadProviderMusicTrack(track, root, MUSIC_BATCH_LIMIT - bytes)
+                            val (file, count) = downloadProviderMusicTrackWithRetry(track, root, MUSIC_BATCH_LIMIT - bytes)
                             succeeded += file
                             bytes += count
                         } catch (cause: Exception) {
@@ -457,6 +476,11 @@ fun NativeMusicDownloaderScreen() {
                                     }
                                     archive.putNextEntry(ZipEntry(name))
                                     file.inputStream().buffered().use { it.copyTo(archive) }
+                                    archive.closeEntry()
+                                }
+                                if (failures.isNotEmpty()) {
+                                    archive.putNextEntry(ZipEntry("failed-downloads.txt"))
+                                    archive.write(("These tracks were not included in this partial ZIP:\n\n" + failures.joinToString("\n") + "\n").toByteArray(Charsets.UTF_8))
                                     archive.closeEntry()
                                 }
                             }

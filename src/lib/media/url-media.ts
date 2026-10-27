@@ -19,6 +19,16 @@ export function getUrlMediaConfig() {
   return { endpoint: "/api/backend/url-media", configured: true };
 }
 
+function urlMediaFailure(payload: unknown, status: number): Error {
+  const error = new Error(mediaErrorMessage(payload, status)) as Error & { code?: string; retryable?: boolean };
+  if (payload && typeof payload === "object") {
+    const body = payload as { code?: unknown; retryable?: unknown };
+    if (typeof body.code === "string") error.code = body.code;
+    if (typeof body.retryable === "boolean") error.retryable = body.retryable;
+  }
+  return error;
+}
+
 async function mediaRequest(endpoint: string, action: "info" | "download", payload: unknown, signal?: AbortSignal) {
   try {
     return await fetch(endpoint + "/" + action, {
@@ -46,7 +56,7 @@ export async function downloadUrlMedia(
     const raw = await response.text().catch(() => "");
     let payload: unknown = raw;
     try { payload = JSON.parse(raw); } catch {}
-    throw new Error(mediaErrorMessage(payload, response.status));
+    throw urlMediaFailure(payload, response.status);
   }
   const totalHeader = response.headers.get("content-length");
   const total = totalHeader ? Number(totalHeader) : undefined;
@@ -123,7 +133,7 @@ export async function inspectUrlMedia(url: string, provider?: UrlMediaProvider, 
   const raw = await response.text().catch(() => "");
   let payload: unknown = raw;
   try { payload = JSON.parse(raw); } catch {}
-  if (!response.ok) throw new Error(mediaErrorMessage(payload, response.status));
+  if (!response.ok) throw urlMediaFailure(payload, response.status);
   if (!payload || typeof payload !== "object") throw new Error("URL media service returned an invalid metadata response.");
   return payload as UrlMediaInfo;
 }

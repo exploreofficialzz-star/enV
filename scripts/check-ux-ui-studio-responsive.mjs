@@ -170,4 +170,11 @@ const logoRules = styles.slice(logoRulesStart, styles.indexOf("}", logoRulesStar
 assert.ok(logoRulesStart >= 0 && logoRules.includes(".ux-ui-studio.is-expanded .uxui-fullscreen-logo img"), "Canonical logo dimensions apply to embedded and full-screen editors");
 assert.ok(logoRules.includes("max-width:62px") && logoRules.includes("max-height:28px") && logoRules.includes("object-fit:contain"), "Brand images remain compact and retain their aspect ratio");
 assert.ok(engine.includes("<StudioTextStyle layer={selected} begin={checkpoint}") && engine.includes('["text", "more"].includes(editTool)'), "Text typography controls are connected to the Text tray and More");
-console.log("UX/UI Studio numeric device fit, shared/device edits, primary Add Text, canonical logo, Toolkit and full-screen layout checks: PASS");
+const compactLandscapeStart = styles.lastIndexOf("Keep the preview device picker tappable in narrow landscape windows.");
+assert.ok(compactLandscapeStart >= 0, "Narrow landscape toolbar has an explicit responsive style block");
+const compactLandscapeRules = styles.slice(compactLandscapeStart);
+assert.ok(compactLandscapeRules.includes("@media (max-height:450px) and (max-width:700px)"), "Short landscape viewports activate the compact Studio toolbar");
+assert.ok(compactLandscapeRules.includes("flex:0 0 34px;") && compactLandscapeRules.includes("min-width:34px;"), "Compact device picker buttons retain distinct hit boxes instead of overlapping");
+assert.ok(compactLandscapeRules.includes(".ux-ui-studio .uxui-target-switch button span { display:none; }"), "Landscape device picker hides labels when space is constrained while retaining accessible button names");
+assert.ok(compactLandscapeRules.includes(".ux-ui-studio .uxui-topbar-actions { min-width:0; flex:1 1 auto; justify-content:flex-end; gap:2px; }"), "Compact toolbar controls allocate remaining landscape width without covering the device picker");
+console.log("UX/UI Studio shared/device edits, primary Text, plus-only insertion, canonical logo, toolkit and landscape layout checks: PASS");
