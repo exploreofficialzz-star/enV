@@ -113,7 +113,7 @@ assert.ok(!musicAnalyzer.includes("allowModelUpload"), "Music Analyzer must not 
 assert.ok(!musicAnalyzer.includes("/api/music-analysis"), "Music Analyzer local processing must not call its legacy remote-classification route");
 assert.ok(songMetadataAnalyzer.includes("analyzeMusicDatasetAudio"), "Song Metadata Analyzer must use the local DSP dataset engine");
 assert.ok(!songMetadataAnalyzer.includes("runAiTask") && !songMetadataAnalyzer.includes("fetchAiAvailability"), "Song Metadata Analyzer must not call a hosted AI service");
-assert.ok(songMetadataAnalyzer.includes("Human-reviewed training labels") && songMetadataAnalyzer.includes("dataset_analysis"), "Song Metadata Analyzer must expose label review and detailed analysis data");
+assert.ok(songMetadataAnalyzer.includes("Review tags") && songMetadataAnalyzer.includes("dataset_analysis"), "Song Metadata Analyzer must expose label review and detailed analysis data");
 const localDatasetEngine = fs.readFileSync(new URL("../src/lib/engines/music-dataset-analysis.ts", import.meta.url), "utf8");
 for (const marker of ["env.music-dataset-analysis.v1", "uses_remote_api: false", "uses_hosted_model: false", "chord_estimates", "change_points", "createLocalSignalLayers", "encodeMonoPcm16Wav", "reviewed: false"]) {
   assert.ok(localDatasetEngine.includes(marker), `Local music dataset analysis contract missing: ${marker}`);

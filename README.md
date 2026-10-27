@@ -3,6 +3,8 @@
 
 **Useful tools. One place.** enV is a responsive collection of browser-based tools for everyday calculations, conversions, color and CSS work, QR codes, image tasks, and mockups. Wherever possible, processing happens in the visitor's browser rather than uploading files to a server.
 
+The Song Metadata Analyzer now supports full-track measurements, section exports, reviewed tags and an optional local AI companion. See [local setup and learning](local-song-analyzer/README.md) and [research and validation](docs/song-analyzer-local-research.md).
+
 ## Requirements
 
 - Node.js 22

@@ -16,3 +16,10 @@ src/routeTree.gen.ts
 
 # Kotlin compiler session/cache output
 **/.kotlin/
+
+# Local song models, audio jobs and training data remain on the operator's device.
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+local-song-analyzer/data/

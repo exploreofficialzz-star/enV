@@ -1,24 +1,28 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertCircle, Archive, Download,
-  FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Music2, Pause,
+  FileAudio, FileJson, FileSpreadsheet, LoaderCircle, Pause,
   Upload, X,
 } from "lucide-react";
 import { strToU8, unzipSync, zipSync } from "fflate";
-import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
+import { type MusicMetadata } from "@/lib/media/music-metadata";
+import { readSongFileMetadata } from "@/lib/media/song-file-metadata";
+import { type LocalSongResult } from "@/lib/media/local-song-client";
+import { SongLocalModelPanel } from "./song-local-model-panel";
+import { SongPlayback } from "./song-playback";
 import { MUSIC_AUDIO_EXTENSIONS } from "@/lib/media/music-downloader-policy";
 import {
-  crc32, inspectAudioHeader, inspectSongZip, SONG_ANALYZER_LIMITS, songsToCsv, tempoBandFromBpm,
+  crc32, inspectSongZip, SONG_ANALYZER_LIMITS, songsToCsv, tempoBandFromBpm,
 } from "@/lib/media/song-metadata-analyzer";
 import { amplitudeDbfs, estimateBpm, estimateKey, rms } from "@/lib/engines/audio-studio";
-import { analyzeMusicDatasetAudio, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
+import { analyzeMusicDatasetAudio, emptyAnnotations, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
 import { downloadBlob } from "@/lib/utils";
 
 type Mode = "quick" | "full";
 type RowStatus = "queued" | "scanning" | "analyzing" | "done" | "partial" | "failed" | "cancelled";
 
 type SongAnalysisReport = {
-  schema_version: "1.1";
+  schema_version: "1.2";
   filename: string;
   genre: string | null;
   sub_style: string | null;
@@ -41,6 +45,8 @@ type SongAnalysisReport = {
   lyric_evidence: string;
   warnings: string[];
   dataset_analysis: MusicDatasetAnalysis | null;
+  review_annotations: MusicDatasetAnnotations;
+  local_model?: LocalSongResult;
 };
 type SongRow = { id: string; file: File; status: RowStatus; progress: number; report?: SongAnalysisReport; error?: string };
 
@@ -126,7 +132,7 @@ function metadataTags(metadata: MusicMetadata): Record<string, unknown> {
 }
 function outputCsvRow(report: SongAnalysisReport): Record<string, unknown> {
   const analysis = report.dataset_analysis;
-  const annotations = analysis?.annotations;
+  const annotations = report.review_annotations;
   return {
     filename: report.filename,
     title: report.identity.title,
@@ -184,14 +190,8 @@ async function analyzeLocal(
   onDeepProgress?: (fraction: number) => void,
 ): Promise<{ report: SongAnalysisReport; status: RowStatus }> {
   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
-  let metadata: MusicMetadata;
-  let header: ReturnType<typeof inspectAudioHeader>;
-  {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    metadata = extractMusicMetadata(bytes, file.name);
-    header = inspectAudioHeader(bytes);
-  }
-  const warnings: string[] = [];
+  const { metadata, header, fullTags, warnings: parserWarnings } = await readSongFileMetadata(file);
+  const warnings: string[] = [...parserWarnings];
   let durationSeconds = header.durationSeconds ?? metadata.durationSeconds ?? null;
   let sampleRateHz = header.sourceSampleRateHz;
   let channels = header.channels;
@@ -227,8 +227,7 @@ async function analyzeLocal(
       decodedSuccessfully = true;
       durationSeconds = decoded.duration;
       analysisSampleRate = decoded.sampleRate;
-      sampleRateHz ??= decoded.sampleRate;
-      channels ??= decoded.numberOfChannels;
+      // The decoder may resample. Unknown source rates must remain unknown.
       if (decoded.duration > 15 * 60) {
         warnings.push("Track is longer than 15 minutes; detailed signal analysis was skipped to protect device memory.");
       } else {
@@ -270,9 +269,11 @@ async function analyzeLocal(
   if (tempoBpm !== null && bpmFromTag !== null && Math.abs(tempoBpm - bpmFromTag) > 8) warnings.push("Estimated tempo differs from the embedded BPM tag.");
   const averageBitrate = durationSeconds && durationSeconds > 0 ? (file.size * 8) / durationSeconds : null;
   const embeddedGenre = metadata.genre?.trim() || null;
+  const reviewAnnotations = { ...(datasetAnalysis?.annotations ?? emptyAnnotations()), genre: embeddedGenre ? embeddedGenre.split(";").map((value) => value.trim()).filter(Boolean).slice(0, 30) : [] };
+  if (datasetAnalysis) datasetAnalysis = { ...datasetAnalysis, annotations: reviewAnnotations };
   const annotations = datasetAnalysis?.annotations;
   const report: SongAnalysisReport = {
-    schema_version: "1.1",
+    schema_version: "1.2",
     filename: file.name,
     genre: embeddedGenre,
     sub_style: null,
@@ -304,10 +305,10 @@ async function analyzeLocal(
       mime_type: file.type || mimeForExtension(extensionOf(file.name)),
       duration_seconds: compactNumber(durationSeconds, 3),
       file_size_bytes: file.size,
-      bitrate_bps: header.container === "WAVE" && header.encodedBitrateBps !== null
+      bitrate_bps: header.encodedBitrateBps !== null
         ? header.encodedBitrateBps
         : (averageBitrate ? Math.round(averageBitrate) : null),
-      bitrate_source: header.container === "WAVE" && header.encodedBitrateBps !== null
+      bitrate_source: header.encodedBitrateBps !== null
         ? "stream_header"
         : averageBitrate ? "file_size_duration_estimate" : null,
       bitrate_mode: null,
@@ -319,7 +320,7 @@ async function analyzeLocal(
       peak_dbfs: peakDbfs,
       rms_dbfs: rmsDbfs,
     },
-    embedded_metadata: metadataTags(metadata),
+    embedded_metadata: { ...metadataTags(metadata), ...fullTags },
     analysis: {
       status: datasetAnalysis ? (annotations?.reviewed ? "full_local_reviewed" : "full_local_needs_review") : mode === "quick" ? "quick_local" : "partial",
       local_audio_decoded: decodedSuccessfully,
@@ -334,6 +335,7 @@ async function analyzeLocal(
       uses_hosted_model: false,
     },
     dataset_analysis: datasetAnalysis,
+    review_annotations: reviewAnnotations,
     warnings: [...new Set(warnings)],
   };
   const status: RowStatus = mode === "quick"
@@ -353,9 +355,9 @@ function statusLabel(status: RowStatus): string {
 }
 function statusClass(status: RowStatus): string {
   if (status === "done") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
-  if (status === "partial" || status === "failed") return "bg-amber-500/10 text-amber-700 dark:text-amber-300";
+  if (status === "partial" || status === "failed") return "bg-amber-500/10 text-amber-800 dark:text-amber-300";
   if (status === "analyzing" || status === "scanning") return "bg-sky-500/10 text-sky-700 dark:text-sky-300";
-  return "bg-surface-2 text-muted-foreground";
+  return "bg-surface-2 text-muted";
 }
 function reportTags(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -388,17 +390,18 @@ export function SongMetadataAnalyzerEngine() {
   const controllerRef = useRef<AbortController | null>(null);
   const [tracks, setTracks] = useState<SongRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("quick");
+  const [mode, setMode] = useState<Mode>("full");
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [annotationDrafts, setAnnotationDrafts] = useState<Record<string, string>>({});
   const limits = useMemo(getClientLimits, []);
+  useEffect(() => () => controllerRef.current?.abort(), []);
 
   const selected = tracks.find((track) => track.id === selectedId) ?? tracks.find((track) => track.report) ?? tracks[0];
   const readyCount = tracks.filter((track) => track.report).length;
-  const totalBytes = tracks.reduce((sum, track) => sum + track.file.size, 0);
 
   async function importFiles(items: readonly File[]) {
     if (!items.length || busy || importing) return;
@@ -496,10 +499,12 @@ export function SongMetadataAnalyzerEngine() {
     setError("");
     setNotice("");
     setProgress(0);
+    setAnnotationDrafts({});
     const controller = new AbortController();
     controllerRef.current = controller;
     let finished = 0;
     const queue = [...tracks];
+    setTracks((previous) => previous.map((track) => ({ ...track, status: "queued", progress: 0 })));
     for (const track of queue) {
       if (controller.signal.aborted) break;
       setTracks((previous) => previous.map((item) => item.id === track.id ? { ...item, status: "scanning", progress: 12, error: undefined } : item));
@@ -548,6 +553,7 @@ export function SongMetadataAnalyzerEngine() {
     setNotice("");
     setError("");
     setProgress(0);
+    setAnnotationDrafts({});
   }
 
   function exportJson() {
@@ -580,13 +586,14 @@ export function SongMetadataAnalyzerEngine() {
   function updateSelectedAnnotationList(key: AnnotationListKey, value: string) {
     const targetId = selected?.id;
     if (!targetId) return;
-    const tags = value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 80);
+    if (busy) return;
+    setAnnotationDrafts((current) => ({ ...current, [`${targetId}:${key}`]: value }));
+    const tags = value.split(",").map((tag) => tag.trim().slice(0, 100)).filter(Boolean).slice(0, 30);
     setTracks((previous) => previous.map((track) => {
-      if (track.id !== targetId || !track.report?.dataset_analysis) return track;
+      if (track.id !== targetId || !track.report) return track;
       const report = track.report;
       const datasetAnalysis = report.dataset_analysis;
-      if (!datasetAnalysis) return track;
-      const annotations: MusicDatasetAnnotations = { ...datasetAnalysis.annotations, [key]: tags, reviewed: false };
+      const annotations: MusicDatasetAnnotations = { ...report.review_annotations, [key]: tags, reviewed: false };
       const primaryPatch: Partial<SongAnalysisReport> = {};
       if (key === "genre") primaryPatch.genre = tags[0] ?? null;
       if (key === "sub_style") primaryPatch.sub_style = tags[0] ?? null;
@@ -596,29 +603,31 @@ export function SongMetadataAnalyzerEngine() {
       if (key === "instruments") primaryPatch.instruments = tags;
       if (key === "themes") primaryPatch.theme = tags;
       if (key === "listening_scene") primaryPatch.setting = tags;
+      if (key === "energy") primaryPatch.energy = tags[0] ?? "unknown";
       return {
         ...track,
         status: "partial",
         report: {
           ...report,
           ...primaryPatch,
-          dataset_analysis: { ...datasetAnalysis, annotations },
-          analysis: { ...report.analysis, status: "full_local_needs_review" },
+          review_annotations: annotations,
+          dataset_analysis: datasetAnalysis ? { ...datasetAnalysis, annotations } : null,
+          analysis: { ...report.analysis, status: datasetAnalysis ? "full_local_needs_review" : "tags_needs_review", semantic_analysis: "manual_annotation", [`${key}_source`]: "manual_annotation" },
         },
       };
     }));
   }
 
   function updateSelectedAnnotationText(key: "notes" | "reviewer", value: string) {
+    if (busy) return;
     const targetId = selected?.id;
     if (!targetId) return;
     setTracks((previous) => previous.map((track) => {
-      if (track.id !== targetId || !track.report?.dataset_analysis) return track;
+      if (track.id !== targetId || !track.report) return track;
       const report = track.report;
       const datasetAnalysis = report.dataset_analysis;
-      if (!datasetAnalysis) return track;
       const annotations = {
-        ...datasetAnalysis.annotations,
+        ...report.review_annotations,
         [key]: value,
         reviewed: false,
       };
@@ -627,110 +636,132 @@ export function SongMetadataAnalyzerEngine() {
         status: "partial",
         report: {
           ...report,
-          dataset_analysis: { ...datasetAnalysis, annotations },
-          analysis: { ...report.analysis, status: "full_local_needs_review" },
+          review_annotations: annotations,
+          dataset_analysis: datasetAnalysis ? { ...datasetAnalysis, annotations } : null,
+          analysis: { ...report.analysis, status: datasetAnalysis ? "full_local_needs_review" : "tags_needs_review" },
         },
       };
     }));
   }
 
   function markSelectedReviewed(reviewed: boolean) {
+    if (busy) return;
     const targetId = selected?.id;
     if (!targetId) return;
     setTracks((previous) => previous.map((track) => {
-      if (track.id !== targetId || !track.report?.dataset_analysis) return track;
+      if (track.id !== targetId || !track.report) return track;
       const report = track.report;
       const currentDatasetAnalysis = report.dataset_analysis;
-      if (!currentDatasetAnalysis) return track;
-      const datasetAnalysis = {
+      const annotations = { ...report.review_annotations, reviewed };
+      const datasetAnalysis = currentDatasetAnalysis ? {
         ...currentDatasetAnalysis,
-        annotations: { ...currentDatasetAnalysis.annotations, reviewed },
-      };
+        annotations,
+      } : null;
       return {
         ...track,
-        status: reviewed ? "done" : "partial",
+        status: reviewed && !report.warnings.length ? "done" : "partial",
         report: {
           ...report,
+          review_annotations: annotations,
           dataset_analysis: datasetAnalysis,
-          analysis: { ...report.analysis, status: reviewed ? "full_local_reviewed" : "full_local_needs_review" },
+          analysis: { ...report.analysis, status: reviewed ? (datasetAnalysis ? "full_local_reviewed" : "tags_reviewed") : (datasetAnalysis ? "full_local_needs_review" : "tags_needs_review") },
         },
       };
     }));
   }
-  return (
-    <div className="mx-auto w-full max-w-6xl space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="grid size-11 place-items-center rounded-2xl bg-primary/10 text-primary"><Music2 size={23} /></div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Song Metadata Analyzer</h1>
-          <p className="text-sm text-muted-foreground">Understand the sound behind each track.</p>
-        </div>
-        {tracks.length > 0 && <span className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted-foreground">{tracks.length} track{tracks.length === 1 ? "" : "s"}</span>}
-      </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+  function attachLocalResult(result: LocalSongResult) {
+    const id = selected?.id;
+    setTracks((previous) => previous.map((track) => track.id === id && track.report ? {
+      ...track, report: { ...track.report, local_model: result, analysis: { ...track.report.analysis, semantic_analysis: "local_model_unreviewed", uses_local_companion: true, uses_hosted_model: false } },
+    } : track));
+  }
+
+  function applyLocalSuggestions(tags: Record<string, string[]>) {
+    if (busy) return;
+    const id = selected?.id;
+    setAnnotationDrafts((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}:`))));
+    setTracks((previous) => previous.map((track) => {
+      if (track.id !== id || !track.report) return track;
+      const report = track.report;
+      const dataset = report.dataset_analysis;
+      const valid = Object.fromEntries(Object.entries(tags).filter(([key]) => DATASET_ANNOTATION_FIELDS.some((field) => field.key === key)));
+      const annotations = { ...report.review_annotations, ...valid, reviewed: false };
+      return { ...track, status: "partial", report: {
+        ...report, genre: "genre" in valid ? annotations.genre[0] ?? null : report.genre, sub_style: "sub_style" in valid ? annotations.sub_style[0] ?? null : report.sub_style,
+        language: annotations.language, mood: annotations.mood, vocals: annotations.vocals, instruments: annotations.instruments,
+        theme: annotations.themes, setting: annotations.listening_scene, energy: annotations.energy[0] ?? "unknown",
+        review_annotations: annotations,
+        dataset_analysis: dataset ? { ...dataset, annotations } : null,
+        analysis: { ...report.analysis, status: dataset ? "full_local_needs_review" : "tags_needs_review", semantic_analysis: "local_model_unreviewed", ...Object.fromEntries(Object.keys(valid).map((key) => [`${key}_source`, "local_model_suggestion_unreviewed"])) },
+      } };
+    }));
+  }
+  return (
+    <div className="@container/song mx-auto w-full max-w-6xl space-y-4">
+      <div className="grid gap-4 @min-[760px]/song:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
         <section className="space-y-3 rounded-2xl border border-border bg-surface p-4 sm:p-5">
           <div
-            role="button" tabIndex={0}
+            role="button" tabIndex={0} aria-label="Add songs or ZIP" aria-disabled={busy || importing}
             onClick={() => !busy && pickerRef.current?.click()}
-            onKeyDown={(event) => { if (!busy && (event.key === "Enter" || event.key === " ")) pickerRef.current?.click(); }}
+            onKeyDown={(event) => { if (event.target === event.currentTarget && !busy && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); pickerRef.current?.click(); } }}
             onDragOver={(event) => { event.preventDefault(); }}
             onDrop={(event) => { event.preventDefault(); void importFiles(Array.from(event.dataTransfer.files)); }}
-            className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface-2/60 px-4 py-6 text-center transition hover:border-primary/60 hover:bg-primary/5"
+            className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface-2/60 px-4 py-6 text-center transition hover:border-accent/60 hover:bg-accent/5"
           >
-            <Upload size={23} className="mb-2 text-primary" />
+            <Upload size={23} className="mb-2 text-accent" />
             <strong className="text-sm">Drop songs or a ZIP here</strong>
-            <span className="mt-1 text-xs text-muted-foreground">MP3, WAV, FLAC, M4A, OGG · browser support varies</span>
-            <input
-              ref={pickerRef} type="file" multiple
-              accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,.aiff,.aif,.wma,.webm,.zip,audio/*,application/zip"
-              className="sr-only"
-              disabled={busy || importing}
-              onChange={(event) => { void importFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }}
-            />
-            <span className="mt-3 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">{importing ? "Adding…" : "Choose files"}</span>
+            <span className="mt-1 text-xs text-muted">MP3, WAV, FLAC, M4A, OGG · browser support varies</span>
+            <span className="mt-3 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-accent-fg">{importing ? "Adding…" : "Choose files"}</span>
           </div>
+          <input
+            ref={pickerRef} type="file" multiple tabIndex={-1}
+            accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,.aiff,.aif,.wma,.webm,.zip,audio/*,application/zip"
+            className="sr-only" aria-label="Audio files"
+            disabled={busy || importing}
+            onChange={(event) => { void importFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }}
+          />
 
           <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface-2 p-1">
-            <button type="button" disabled={busy} onClick={() => setMode("quick")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "quick" ? "bg-surface shadow-sm" : "text-muted-foreground"}`}>
+            <button type="button" disabled={busy} aria-pressed={mode === "quick"} onClick={() => setMode("quick")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "quick" ? "bg-surface shadow-sm" : "text-muted"}`}>
               <span className="block text-sm font-semibold">Quick Scan</span>
               <span className="mt-0.5 block text-[11px]">Tags, BPM, key</span>
             </button>
-            <button type="button" disabled={busy} onClick={() => setMode("full")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "full" ? "bg-surface shadow-sm" : "text-muted-foreground"}`}>
+            <button type="button" disabled={busy} aria-pressed={mode === "full"} onClick={() => setMode("full")} className={`rounded-lg px-3 py-2 text-left transition ${mode === "full" ? "bg-surface shadow-sm" : "text-muted"}`}>
               <span className="block text-sm font-semibold">Full Analysis</span>
               <span className="mt-0.5 block text-[11px]">Pitch, chords, spectrum, structure</span>
             </button>
           </div>
 
           {mode === "full" && (
-            <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-xs leading-5 text-muted-foreground">
-              Detailed analysis runs locally. No audio excerpts are sent to an AI service. Genre, sub-style, language, mood and instrument names must be added or verified by a human reviewer in the dataset-label panel.
+            <div className="rounded-xl border border-border bg-surface-2/50 p-3 text-xs leading-5 text-muted">
+              Full-track measurements and sections. Review tags or connect local AI below.
             </div>
           )}
 
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" onClick={() => void startAnalysis()} disabled={!tracks.length || busy || importing} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-fg disabled:cursor-not-allowed disabled:opacity-50">
               {busy ? <LoaderCircle className="animate-spin" size={16} /> : mode === "full" ? <FileJson size={16} /> : <Activity size={16} />}
-              {busy ? "Analyzing locally…" : mode === "full" ? "Run detailed local analysis" : "Scan songs"}
+              {busy ? "Analyzing…" : mode === "full" ? "Analyze songs" : "Scan songs"}
             </button>
             {busy
               ? <button type="button" onClick={cancelAnalysis} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm"><Pause size={15} /> Stop</button>
-              : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" title="Clear batch"><X size={16} /></button>}
+              : tracks.length > 0 && <button type="button" onClick={clearAll} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-3 text-sm" aria-label="Clear batch"><X size={16} /></button>}
           </div>
-          <p className="text-[11px] text-muted-foreground">Both modes run in this browser. Audio files are not uploaded for analysis.</p>
+          <p className="text-[11px] text-muted">Private by default · browser analysis stays on this device.</p>
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Batch results</h2>
-            <span className="text-xs text-muted-foreground">{progressLabel}</span>
+            <span className="text-xs text-muted">{progressLabel}</span>
           </div>
-          {busy && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} /></div>}
+          {busy && <div role="progressbar" aria-label="Batch analysis" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${progress}%` }} /></div>}
           {error && <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-700 dark:text-red-300"><AlertCircle size={16} className="mt-0.5 shrink-0" />{error}</div>}
-          {notice && !error && <div role="status" className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted-foreground">{notice}</div>}
+          {notice && !error && <div role="status" className="mt-3 rounded-lg bg-surface-2 p-3 text-xs text-muted">{notice}</div>}
 
           {tracks.length === 0 ? (
-            <div className="flex min-h-48 flex-col items-center justify-center text-center text-muted-foreground">
+            <div className="flex min-h-48 flex-col items-center justify-center text-center text-muted">
               <Archive size={25} className="mb-2 opacity-60" />
               <p className="text-sm">Your songs will appear here.</p>
               <p className="mt-1 text-xs">Add files or a ZIP collection to begin.</p>
@@ -738,16 +769,16 @@ export function SongMetadataAnalyzerEngine() {
           ) : (
             <div className="mt-3 max-h-72 space-y-1 overflow-y-auto pr-1">
               {tracks.map((track) => (
-                <div key={track.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${selected?.id === track.id ? "border-primary/50 bg-primary/5" : "border-transparent hover:bg-surface-2"}`}>
+                <div key={track.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${selected?.id === track.id ? "border-accent/50 bg-accent/5" : "border-transparent hover:bg-surface-2"}`}>
                   <button type="button" onClick={() => setSelectedId(track.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                    <FileAudio size={17} className="shrink-0 text-muted-foreground" />
+                    <FileAudio size={17} className="shrink-0 text-muted" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-medium">{track.file.name}</span>
                       <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] ${statusClass(track.status)}`}>{statusLabel(track.status)}</span>
                     </span>
                   </button>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">{bytesLabel(track.file.size)}</span>
-                  {!busy && <button type="button" onClick={() => removeTrack(track.id)} aria-label={`Remove ${track.file.name}`} className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-surface-2 hover:text-foreground"><X size={14} /></button>}
+                  <span className="shrink-0 text-[10px] text-muted">{bytesLabel(track.file.size)}</span>
+                  {!busy && <button type="button" onClick={() => removeTrack(track.id)} aria-label={`Remove ${track.file.name}`} className="grid size-7 shrink-0 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"><X size={14} /></button>}
                 </div>
               ))}
             </div>
@@ -757,7 +788,7 @@ export function SongMetadataAnalyzerEngine() {
             <button type="button" onClick={exportCsv} className="flex min-h-9 items-center justify-center gap-1 rounded-lg border border-border px-2 text-xs"><FileSpreadsheet size={14} /> CSV</button>
             <button type="button" onClick={exportZip} className="flex min-h-9 items-center justify-center gap-1 rounded-lg border border-border px-2 text-xs"><Download size={14} /> ZIP report</button>
           </div>}
-          <p className="mt-2 text-[10px] text-muted-foreground">Batch cap: 50 tracks. File and ZIP limits adapt to device memory.</p>
+          <p className="mt-2 text-[10px] text-muted">Batch cap: 50 tracks. File and ZIP limits adapt to device memory.</p>
         </section>
       </div>
 
@@ -765,29 +796,32 @@ export function SongMetadataAnalyzerEngine() {
         <section className="space-y-4 rounded-2xl border border-border bg-surface p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted-foreground">TRACK ANALYSIS</p>
+              <p className="text-xs text-muted">TRACK ANALYSIS</p>
               <h2 className="mt-1 break-words text-base font-semibold">{String(selectedReport.identity.title || selected?.file.name || "Untitled track")}</h2>
-              <p className="mt-0.5 truncate text-sm text-muted-foreground">{String(selectedReport.identity.artist || "Unknown artist")}{selectedReport.identity.album ? ` · ${String(selectedReport.identity.album)}` : ""}</p>
+              <p className="mt-0.5 truncate text-sm text-muted">{String(selectedReport.identity.artist || "Unknown artist")}{selectedReport.identity.album ? ` · ${String(selectedReport.identity.album)}` : ""}</p>
             </div>
             <span className={`rounded-full px-2.5 py-1 text-xs ${statusClass(selected?.status ?? "queued")}`}>{statusLabel(selected?.status ?? "queued")}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {selected && <SongPlayback key={selected.id} file={selected.file} sections={selectedReport.dataset_analysis?.structure.sections ?? []} />}
+          {selected && <SongLocalModelPanel key={`local-${selected.id}`} file={selected.file} annotations={selectedReport.review_annotations} result={selectedReport.local_model} onResult={attachLocalResult} onApply={applyLocalSuggestions} disabled={busy} />}
+
+          <div className="grid grid-cols-2 gap-2 @min-[600px]/song:grid-cols-4">
             {[
               { label: selectedReport.tempo_source === "audio_estimate" ? "Est. BPM" : selectedReport.tempo_source === "embedded_tag" ? "Tag BPM" : "Tempo", value: selectedReport.tempo_bpm ? `${selectedReport.tempo_bpm} BPM` : "—" },
               { label: selectedReport.analysis.key_source === "audio_estimate" ? "Est. key" : "Key", value: selectedReport.key || "—" },
               { label: "Duration", value: durationLabel(selectedReport.technical.duration_seconds) },
               { label: "Energy", value: selectedReport.energy === "unknown" ? "—" : selectedReport.energy },
-            ].map((item) => <div key={item.label} className="rounded-xl bg-surface-2 p-3"><span className="block text-[11px] text-muted-foreground">{item.label}</span><strong className="mt-1 block truncate text-sm capitalize">{item.value}</strong></div>)}
+            ].map((item) => <div key={item.label} className="rounded-xl bg-surface-2 p-3"><span className="block text-[11px] text-muted">{item.label}</span><strong className="mt-1 block truncate text-sm capitalize">{item.value}</strong></div>)}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 @min-[680px]/song:grid-cols-2">
             <div className="space-y-3">
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">STYLE</p>
+                <p className="mb-2 text-xs font-semibold text-muted">STYLE</p>
                 <div className="flex flex-wrap gap-1.5">
                   {[selectedReport.genre, selectedReport.sub_style, ...reportTags(selectedReport.language)].filter((v): v is string => typeof v === "string" && v.length > 0).map((tag) => <span key={tag} className="rounded-full border border-border px-2.5 py-1 text-xs">{tag}</span>)}
-                  {!selectedReport.genre && !selectedReport.sub_style && reportTags(selectedReport.language).length === 0 && <span className="text-xs text-muted-foreground">No reliable style tags yet.</span>}
+                  {!selectedReport.genre && !selectedReport.sub_style && reportTags(selectedReport.language).length === 0 && <span className="text-xs text-muted">No reliable style tags yet.</span>}
                 </div>
               </div>
               {([
@@ -795,28 +829,28 @@ export function SongMetadataAnalyzerEngine() {
                 ["Vocals", selectedReport.vocals], ["Instruments", selectedReport.instruments],
               ] as Array<[string, unknown]>).map(([label, value]) => {
                 const tags = reportTags(value);
-                return <div key={label}><p className="mb-1.5 text-xs font-semibold text-muted-foreground">{label.toUpperCase()}</p><p className="text-sm leading-6">{tags.length ? tags.join(" · ") : "—"}</p></div>;
+                return <div key={label}><p className="mb-1.5 text-xs font-semibold text-muted">{label.toUpperCase()}</p><p className="text-sm leading-6">{tags.length ? tags.join(" · ") : "—"}</p></div>;
               })}
             </div>
             <div className="space-y-3">
               <div>
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">DESCRIPTIONS</p>
+                <p className="mb-2 text-xs font-semibold text-muted">DESCRIPTIONS</p>
                 {selectedReport.descriptions.length
                   ? <div className="space-y-2">{selectedReport.descriptions.map((description, index) => <p key={index} className="rounded-lg bg-surface-2 p-3 text-sm leading-5">{description}</p>)}</div>
-                  : <p className="text-sm text-muted-foreground">Run Full Analysis for local signal descriptions.</p>}
+                  : <p className="text-sm text-muted">Run Full Analysis for local signal descriptions.</p>}
               </div>
-              {selectedReport.lyric_evidence && <div><p className="mb-1.5 text-xs font-semibold text-muted-foreground">LYRIC NOTES</p><p className="text-sm leading-5">{selectedReport.lyric_evidence}</p></div>}
+              {selectedReport.lyric_evidence && <div><p className="mb-1.5 text-xs font-semibold text-muted">LYRIC NOTES</p><p className="text-sm leading-5">{selectedReport.lyric_evidence}</p></div>}
             </div>
           </div>
 
           {selectedReport.dataset_analysis ? (
             <>
-              <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
+              <details className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
+                <summary className="cursor-pointer text-sm font-semibold">Signal details</summary>
                 <div>
-                  <h3 className="text-sm font-semibold">Detailed local DSP findings</h3>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">These results come from local signal processing. Note and chord detection can be confused by overlapping instruments; no hosted model or AI API is involved.</p>
+                  <p className="text-xs text-muted">Signal estimates · overlapping sounds can affect pitch and chord detection.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 @min-[600px]/song:grid-cols-4">
                   {[
                     ["Pitch span", selectedReport.dataset_analysis.pitch.lowest_detected_note && selectedReport.dataset_analysis.pitch.highest_detected_note ? `${selectedReport.dataset_analysis.pitch.lowest_detected_note}–${selectedReport.dataset_analysis.pitch.highest_detected_note}` : "Unknown"],
                     ["Pitch observations", String(selectedReport.dataset_analysis.pitch.points.length)],
@@ -830,69 +864,82 @@ export function SongMetadataAnalyzerEngine() {
                     ["Stereo side/mid", selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio == null ? "—" : String(selectedReport.dataset_analysis.technical.stereo_side_to_mid_ratio)],
                     ["Feature changes", String(selectedReport.dataset_analysis.structure.change_points.length)],
                     ["Pitch class / key", selectedReport.dataset_analysis.tonality.key_estimate ?? "Unknown"],
-                  ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-2.5"><span className="block text-[10px] text-muted-foreground">{label}</span><strong className="mt-1 block break-words text-xs">{value}</strong></div>)}
+                  ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg bg-surface-2 p-2.5"><span className="block text-[10px] text-muted">{label}</span><strong className="mt-1 block break-words text-xs">{value}</strong></div>)}
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">CHORD ESTIMATES</p>
+                  <p className="mb-1.5 text-xs font-semibold text-muted">CHORD ESTIMATES</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {selectedReport.dataset_analysis.tonality.chord_estimates.slice(0, 40).map((item) => <span key={`${item.start_seconds}-${item.chord}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{Math.floor(item.start_seconds)}–{Math.floor(item.end_seconds)}s: {item.chord ?? "?"} {item.confidence == null ? "" : `· ${Math.round(item.confidence * 100)}%`}</span>)}
-                    {!selectedReport.dataset_analysis.tonality.chord_estimates.length && <span className="text-xs text-muted-foreground">No chord windows available.</span>}
+                    {selectedReport.dataset_analysis.tonality.chord_estimates.slice(0, 40).map((item) => <span key={`${item.start_seconds}-${item.chord}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{Math.floor(item.start_seconds)}–{Math.floor(item.end_seconds)}s: {item.chord ?? "?"} {item.confidence == null ? "" : `· score ${item.confidence.toFixed(2)}`}</span>)}
+                    {!selectedReport.dataset_analysis.tonality.chord_estimates.length && <span className="text-xs text-muted">No chord windows available.</span>}
                   </div>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">DETECTED PITCHES (FULL MIX ESTIMATE)</p>
+                  <p className="mb-1.5 text-xs font-semibold text-muted">DETECTED PITCHES (FULL MIX ESTIMATE)</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedReport.dataset_analysis.pitch.points.slice(0, 32).map((item) => <span key={`${item.time_seconds}-${item.note}`} className="rounded-md border border-border px-2 py-1 text-[11px]">{item.time_seconds}s · {item.note} · {item.frequency_hz} Hz</span>)}
-                    {!selectedReport.dataset_analysis.pitch.points.length && <span className="text-xs text-muted-foreground">No stable dominant pitch was detected.</span>}
+                    {!selectedReport.dataset_analysis.pitch.points.length && <span className="text-xs text-muted">No stable dominant pitch was detected.</span>}
                   </div>
-                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.pitch.note}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-muted">{selectedReport.dataset_analysis.pitch.note}</p>
                 </div>
                 <div>
-                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">AUTOMATIC SECTION BOUNDARIES</p>
+                  <p className="mb-1.5 text-xs font-semibold text-muted">AUTOMATIC SECTION BOUNDARIES</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedReport.dataset_analysis.structure.sections.slice(0, 30).map((section) => <span key={section.label} className="rounded-md border border-border px-2 py-1 text-[11px]">{section.label}: {durationLabel(section.start_seconds)}–{durationLabel(section.end_seconds)}</span>)}
                   </div>
-                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.structure.note}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-muted">{selectedReport.dataset_analysis.structure.note}</p>
                 </div>
                 <details className="rounded-lg border border-border p-2.5">
                   <summary className="cursor-pointer text-xs font-medium">Time-aligned signal timeline ({selectedReport.dataset_analysis.timeline.length} frames)</summary>
                   <div className="mt-2 max-h-72 overflow-auto">
                     <table className="w-full min-w-[620px] text-left text-[11px]">
-                      <thead><tr className="border-b border-border text-muted-foreground"><th className="p-2">Time</th><th className="p-2">RMS dBFS</th><th className="p-2">Centroid Hz</th><th className="p-2">Low</th><th className="p-2">Mid</th><th className="p-2">High</th><th className="p-2">Flux</th></tr></thead>
+                      <thead><tr className="border-b border-border text-muted"><th className="p-2">Time</th><th className="p-2">RMS dBFS</th><th className="p-2">Centroid Hz</th><th className="p-2">Low</th><th className="p-2">Mid</th><th className="p-2">High</th><th className="p-2">Flux</th></tr></thead>
                       <tbody>{selectedReport.dataset_analysis.timeline.slice(0, 48).map((frame) => <tr key={frame.start_seconds} className="border-b border-border/60"><td className="p-2">{frame.start_seconds}–{frame.end_seconds}s</td><td className="p-2">{frame.rms_dbfs ?? "—"}</td><td className="p-2">{frame.spectral_centroid_hz ?? "—"}</td><td className="p-2">{frame.low_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.mid_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.high_frequency_energy_ratio ?? "—"}</td><td className="p-2">{frame.spectral_flux ?? "—"}</td></tr>)}</tbody>
                     </table>
-                    {selectedReport.dataset_analysis.timeline.length > 48 && <p className="p-2 text-[10px] text-muted-foreground">Showing the first 48 frames here. JSON export contains the complete timeline.</p>}
+                    {selectedReport.dataset_analysis.timeline.length > 48 && <p className="p-2 text-[10px] text-muted">Showing the first 48 frames here. JSON export contains the complete timeline.</p>}
                   </div>
                 </details>
                 <details className="rounded-lg border border-border p-2.5">
                   <summary className="cursor-pointer text-xs font-medium">Method notes and limitations</summary>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-4 text-muted-foreground">{selectedReport.dataset_analysis.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-4 text-muted">{selectedReport.dataset_analysis.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
                   {selectedReport.dataset_analysis.style_cues.map((cue) => <p key={cue.tag} className="mt-2 text-[11px] leading-4"><strong>{cue.tag.replace(/-/g, " ")}</strong> — {cue.evidence}</p>)}
                 </details>
-              </section>
+              </details>
+
+
+            </>
+          ) : mode === "full" ? (
+            <p className="rounded-xl border border-border p-3 text-xs leading-5 text-muted">Detailed browser measurements are unavailable. Review file details or use local AI.</p>
+          ) : null}
 
               <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4">
                 <div>
-                  <h3 className="text-sm font-semibold">Human-reviewed training labels</h3>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Add semantic tags by listening and reviewing the audio. These labels are exported alongside measured features; the analyzer does not guess genres, language, instruments, or vocal types.</p>
+              <h3 className="text-sm font-semibold">Review tags</h3>
+                  <p className="mt-1 text-xs text-muted">Comma-separated labels · verify suggestions by listening.</p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {DATASET_ANNOTATION_FIELDS.map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs outline-none focus:border-primary" value={selectedReport.dataset_analysis!.annotations[field.key].join(", ")} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
-                </div>
-                <label className="block"><span className="mb-1.5 block text-[11px] font-semibold">Annotation notes</span><textarea className="min-h-16 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs outline-none focus:border-primary" value={selectedReport.dataset_analysis.annotations.notes} maxLength={4000} placeholder="Describe which parts should be preserved/replaced, uncertainty, or notes for another reviewer." onChange={(event) => updateSelectedAnnotationText("notes", event.currentTarget.value)} /></label>
+                <fieldset disabled={busy} className="grid gap-3 @min-[520px]/song:grid-cols-2 @min-[850px]/song:grid-cols-3">
+                  {DATASET_ANNOTATION_FIELDS.filter((field) => ["genre", "sub_style", "language", "energy", "mood", "vocals", "instruments"].includes(field.key)).map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-bg px-2.5 py-2 text-xs outline-none focus:border-accent" value={annotationDrafts[`${selected?.id}:${field.key}`] ?? selectedReport.review_annotations[field.key].join(", ")} maxLength={4000} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
+                </fieldset>
+                <details>
+                  <summary className="cursor-pointer text-xs font-medium">More tags</summary>
+                  <fieldset disabled={busy} className="mt-3 grid gap-3 @min-[520px]/song:grid-cols-2 @min-[850px]/song:grid-cols-3">
+                    {DATASET_ANNOTATION_FIELDS.filter((field) => !["genre", "sub_style", "language", "energy", "mood", "vocals", "instruments"].includes(field.key)).map((field) => <label key={field.key} className="block min-w-0"><span className="mb-1.5 block text-[11px] font-semibold">{field.label}</span><input className="w-full rounded-lg border border-border bg-bg px-2.5 py-2 text-xs outline-none focus:border-accent" value={annotationDrafts[`${selected?.id}:${field.key}`] ?? selectedReport.review_annotations[field.key].join(", ")} maxLength={4000} placeholder={field.placeholder} onChange={(event) => updateSelectedAnnotationList(field.key, event.currentTarget.value)} /></label>)}
+                  </fieldset>
+                </details>
+                <label className="block"><span className="mb-1.5 block text-[11px] font-semibold">Annotation notes</span><textarea className="min-h-16 w-full rounded-lg border border-border bg-bg px-2.5 py-2 text-xs outline-none focus:border-accent" value={selectedReport.review_annotations.notes} maxLength={4000} placeholder="Describe which parts should be preserved/replaced, uncertainty, or notes for another reviewer." onChange={(event) => updateSelectedAnnotationText("notes", event.currentTarget.value)} /></label>
                 <div className="flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedReport.dataset_analysis.annotations.reviewed} onChange={(event) => markSelectedReviewed(event.currentTarget.checked)} />Reviewed for training use</label>
-                  <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted-foreground">Reviewer <input className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground" value={selectedReport.dataset_analysis.annotations.reviewer ?? ""} maxLength={100} placeholder="Reviewer initials or team ID" onChange={(event) => updateSelectedAnnotationText("reviewer", event.currentTarget.value)} /></label>
+                  <label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={busy} checked={selectedReport.review_annotations.reviewed} onChange={(event) => markSelectedReviewed(event.currentTarget.checked)} />Tags reviewed</label>
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted">Reviewer <input className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-2.5 py-2 text-xs text-fg" value={selectedReport.review_annotations.reviewer ?? ""} maxLength={100} placeholder="Reviewer initials or team ID" onChange={(event) => updateSelectedAnnotationText("reviewer", event.currentTarget.value)} /></label>
                 </div>
               </section>
-            </>
-          ) : mode === "full" ? (
-            <p className="rounded-xl border border-border p-3 text-xs leading-5 text-muted-foreground">Run Full Analysis to calculate the detailed local pitch, chord, spectral, and section timeline.</p>
-          ) : null}
 
           <details className="rounded-xl border border-border px-3 py-2.5">
+            <summary className="cursor-pointer text-sm font-medium">Embedded tags</summary>
+            <p className="mt-2 text-xs text-muted">File tags are unverified. Binary artwork is omitted from JSON.</p>
+            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[11px]">{JSON.stringify(selectedReport.embedded_metadata, null, 2)}</pre>
+          </details>
+          <details className="rounded-xl border border-border px-3 py-2.5">
             <summary className="cursor-pointer text-sm font-medium">File details</summary>
-            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3">
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs @min-[520px]/song:grid-cols-3">
               {([
                 ["Format", selectedReport.technical.container || selectedReport.technical.extension || "—"],
                 ["Codec", selectedReport.technical.codec || "Unknown"],
@@ -903,7 +950,7 @@ export function SongMetadataAnalyzerEngine() {
                 ["Average bitrate", selectedReport.technical.bitrate_bps ? `${Math.round(Number(selectedReport.technical.bitrate_bps) / 1000)} kbps` : "Unknown"],
                 ["Peak", selectedReport.technical.peak_dbfs != null ? `${selectedReport.technical.peak_dbfs} dBFS` : "—"],
                 ["RMS", selectedReport.technical.rms_dbfs != null ? `${selectedReport.technical.rms_dbfs} dBFS` : "—"],
-              ] as Array<[string, unknown]>).map(([label, value]) => <div key={label}><span className="block text-muted-foreground">{label}</span><span className="mt-1 block break-words font-medium">{String(value)}</span></div>)}
+              ] as Array<[string, unknown]>).map(([label, value]) => <div key={label}><span className="block text-muted">{label}</span><span className="mt-1 block break-words font-medium">{String(value)}</span></div>)}
             </div>
             {selectedReport.warnings.length > 0 && <div className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200"><p className="font-semibold">Notes</p><ul className="mt-1 list-disc space-y-1 pl-4">{selectedReport.warnings.slice(0, 5).map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
           </details>

@@ -439,7 +439,7 @@ function estimateChord(chroma: readonly number[], start: number, end: number): C
   return { start_seconds: Number(start.toFixed(3)), end_seconds: Number(end.toFixed(3)), chord: bestChord, confidence: Number(confidence.toFixed(3)), method: "spectral-chroma-triad-template" };
 }
 
-function emptyAnnotations(): MusicDatasetAnnotations {
+export function emptyAnnotations(): MusicDatasetAnnotations {
   return { genre: [], sub_style: [], style_influences: [], language: [], energy: [], mood: [], source_role: [], vocals: [], vocal_delivery: [], vocal_register: [], vocal_harmony: [], performance_technique: [], instruments: [], themes: [], listening_scene: [], production_traits: [], arrangement: [], notes: "", reviewed: false, reviewer: null };
 }
 

@@ -91,7 +91,9 @@
     "check:agent-auth-navigation": "node scripts/check-agent-auth-navigation.mjs",
     "check:ux-ui-studio": "node scripts/check-ux-ui-studio-responsive.mjs && node --experimental-strip-types --test src/lib/engines/ux-ui-studio-*.test.ts src/lib/engines/studio-image-mask.test.ts src/lib/engines/studio-font-metadata.test.ts",
     "audit:ux-ui-studio:browser": "node scripts/audit-ux-ui-studio-browser.mjs",
-    "check:modal-moss": "node scripts/check-modal-moss-music.mjs"
+    "check:modal-moss": "node scripts/check-modal-moss-music.mjs",
+    "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts",
+    "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -136,6 +138,7 @@
     "kysely": "^0.28.5",
     "lightningcss": "^1.28.0",
     "lucide-react": "^0.510.0",
+    "music-metadata": "12.3.2",
     "nitro": "3.0.260610-beta",
     "pdf-lib": "^1.17.1",
     "pg": "^8.16.3",
