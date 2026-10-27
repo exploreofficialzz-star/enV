@@ -395,6 +395,19 @@ export function MusicAnalyzerStudio() {
             {datasetAnalysis ? <div className="mt-4 space-y-3">
               <div><h3 className="text-sm font-semibold">Estimated chord timeline</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Approximate triad guesses based on spectral chroma, not confirmed note transcription.</p><div className="mt-2 flex flex-wrap gap-1.5">{datasetAnalysis.tonality.chord_estimates.slice(0, 30).map((chord) => <span key={`${chord.start_seconds}-${chord.chord}`} className="rounded-md border border-border px-2 py-1 text-xs">{Math.floor(chord.start_seconds)}–{Math.floor(chord.end_seconds)}s: {chord.chord ?? "Unknown"}</span>)}</div></div>
               <div><h3 className="text-sm font-semibold">Automatic section boundaries</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">{datasetAnalysis.structure.note}</p><div className="mt-2 flex flex-wrap gap-1.5">{datasetAnalysis.structure.sections.slice(0, 24).map((section) => <span key={section.label} className="rounded-md border border-border px-2 py-1 text-xs">{section.label}: {Math.floor(section.start_seconds)}–{Math.floor(section.end_seconds)}s</span>)}</div></div>
+              <div>
+                <h3 className="text-sm font-semibold">Repeated passage candidates</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{datasetAnalysis.structure.repetition_note}</p>
+                {datasetAnalysis.structure.repetition_candidates.length ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {datasetAnalysis.structure.repetition_candidates.slice(0, 12).map((candidate) => (
+                      <span key={`${candidate.start_seconds}-${candidate.match_start_seconds}`} className="rounded-md border border-border px-2 py-1 text-xs">
+                        {Math.floor(candidate.start_seconds)}–{Math.floor(candidate.end_seconds)}s ↔ {Math.floor(candidate.match_start_seconds)}–{Math.floor(candidate.match_end_seconds)}s · similarity {Math.round(candidate.similarity_score * 100)}%
+                      </span>
+                    ))}
+                  </div>
+                ) : <p className="mt-2 text-xs text-muted-foreground">No strong repeated passage candidates found in this clip.</p>}
+              </div>
               <div><h3 className="text-sm font-semibold">Measured style clues</h3><div className="mt-2 space-y-2">{datasetAnalysis.style_cues.map((cue) => <div key={cue.tag} className="rounded-lg bg-background p-3"><p className="text-sm font-medium">{cue.tag.replace(/-/g, " ")}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{cue.evidence}</p></div>)}</div></div>
               <p className="rounded-lg border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">{datasetAnalysis.pitch.note} {datasetAnalysis.separation.note}</p>
             </div> : null}
