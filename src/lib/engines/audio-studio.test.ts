@@ -114,8 +114,12 @@ test("Music Analyzer returns reproducible signal metrics and leaves semantic lab
   const result = analyzeMusicAudio({
     channels: [pcm, pcm], sampleRate, fileName: "test-track.wav", fileSizeBytes: 64000, mimeType: "audio/wav",
     metadata: { title: "Known Title", artist: "Known Artist", genre: "Tagged genre", bpm: "120" },
+    sourceSha256: "ab".repeat(32),
   });
   assert.equal(result.schema_version, "env.music-analysis.v2");
+  assert.equal(result.fingerprint.file_sha256, "ab".repeat(32));
+  assert.equal(result.fingerprint.exact_match_method, "sha-256-exact-file-bytes");
+  assert.match(result.fingerprint.note, /byte-identical files only/);
   assert.equal(result.audio.duration_seconds, 4);
   assert.equal(result.audio.metric_scope_seconds, 4, "whole-track audio metrics must report their full-track scope");
   assert.equal(result.rhythm.analysis_scope_seconds, 4);
@@ -292,6 +296,7 @@ test("Music Analyzer migrates v1 detail exports to v2 without relabeling the RMS
   assert.equal(audio.rms_loudness_proxy_db, -12.75);
   assert.equal(Object.hasOwn(audio, "estimated_loudness_lufs"), false);
   assert.equal(audio.metric_scope_seconds, 183.4, "the old analyzer measured full-track technical statistics");
+  assert.equal(migrated.fingerprint && (migrated.fingerprint as Record<string, unknown>).exact_match_method, "not-computed");
   assert.equal(rhythm.analysis_scope_seconds, 90);
   assert.equal(tonality.analysis_scope_seconds, 30);
   assert.equal(timbre.spectral_scope_seconds, 30);
