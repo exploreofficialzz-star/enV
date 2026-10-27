@@ -10,11 +10,13 @@ Semantic fields such as genre, sub-style, language, mood, instrument identity, l
 
 ## Current execution boundaries
 
-- Web Music Analyzer decodes locally through the browser's Web Audio APIs. The current implementation retains a 25 MiB file limit and a two-minute duration limit as memory-safety guards. These are local-device limits, not claimed media-format limits.
-- Native Android/iOS offline analysis uses each platform's native WAV path and exposes platform-specific input/resource limits. The native paths do not embed the web app or run a hosted model.
-- The existing FFmpeg processor provides bounded media conversion operations. It is **not yet** a durable Music Analyzer DSP job queue: do not treat its availability as proof of full-track analysis, resumable analysis jobs, or persisted cloud datasets.
-- Long-track and batch analysis require a separately implemented non-model DSP worker/job path, validated resource budgets, authenticated ownership, actual job states/cancellation, checkpointing and explicit consent before upload. Until that path is deployed and verified, the Analyzer must keep its device safety guard instead of increasing limits speculatively.
-- Browser IndexedDB, where used elsewhere in enV, is quota-limited and may be evicted. A local export is a user-controlled copy, not a claim of a durable server backup.
+- Web Music Analyzer decodes locally through the browser's Web Audio APIs and runs the heavy DSP pipeline in a dedicated module Web Worker. The original file is read locally; no audio is uploaded by the local-analysis or batch path.
+- Local device guards are explicit: 25 MiB per source file, 2 minutes per track, 64 MiB decoded PCM per track, 20 files per local batch and 200 MiB combined selected bytes. The 64 MiB PCM budget is checked after decode and before channel copies are transferred to the Worker. These are product resource limits, not claimed media-format limits. Browser codec support remains the actual format capability boundary.
+- Local batch work runs sequentially, with persisted per-track states and completed report data in IndexedDB, per-track failure isolation, cancellation, retry, prioritization, pause-after-current, and ZIP/JSONL/CSV exports. On reload, an interrupted in-progress item is marked as requiring the original source file again; completed reports remain available if browser storage has not been evicted.
+- Saving a completed batch result to the private dataset is a separate, explicit action. That request sends structured analysis JSON and metadata only, not the source audio; per-item idempotency keys prevent duplicate cloud runs when a response is lost. Client-computed SHA-256 stays marked unverified by the server.
+- Native Android/iOS offline analysis uses each platform's native WAV path and exposes platform-specific input/resource limits. These native paths are independent implementations; this web batch/Worker layer does not by itself implement native batch processing or a native cloud-library UI.
+- The existing FFmpeg processor provides bounded media conversion operations. It is **not yet** a durable Music Analyzer DSP job queue: do not treat its availability as proof of cloud full-track processing, accepted-job recovery after worker restart, server-side batch tasking or persisted source audio.
+- Browser IndexedDB is quota-limited and may be evicted. A local export is a user-controlled copy, not a claim of a durable server backup. Local queue state does not continue running after the browser closes or the app is suspended.
 
 ## Measurement contract
 
@@ -47,7 +49,7 @@ The branch adds migration `migrations/0009_music_dataset.sql` and owner-scoped s
 
 Cloud dataset access requires a configured database, and verified authentication must be enabled/configured. Deployment must apply `npm run db:migrate` so the `0009_music_dataset.sql` migration is installed. The API reports an auth/configuration failure when that prerequisite is absent; it does not claim a saved record exists in that case. The web UI uploads only structured results and metadata for this save operation, not the original audio. A client-computed SHA-256 is stored with `source_sha256_verified=false`; it is an unverified duplicate candidate, not a server-verified source identity.
 
-This establishes the private result-library baseline, not the entire target product. Full source-upload/object storage, a durable background DSP worker with real job state/cancellation/restart recovery, batch processing, 10,000-track load testing, cloud result reconstruction/export, native Android/iOS cloud-library UX, and corpus-based accuracy benchmarks remain to be implemented and verified.
+This establishes the private result-library baseline and a local-first batch workflow, not the entire target product. Still outstanding: a deliberately consented backend loudness/long-track path, durable server-side DSP batch jobs and an always-on worker, private source-audio object storage and lifecycle cleanup, server-verified input hashes, 10,000-job metadata load testing, measured full-audio throughput, round-trip cloud export and run comparison, native Android/iOS batch and cloud-library UX, standards-correct BS.1770/EBU loudness and true-peak measurement, plus licensed reference-corpus benchmarks. Those are explicit gaps, not hidden fallbacks.
 
 ## Dataset and provenance expectations
 
@@ -55,4 +57,4 @@ Keep source metadata, DSP measurements, user annotations, and reviewer-confirmed
 
 ## Verification status
 
-The contract updates in this branch add regression assertions for the v2 loudness field and retire the old model-forwarding endpoint. They do not by themselves implement a durable worker queue, standards-compliant LUFS/true-peak analysis, cloud dataset persistence, 10,000-track pagination, or a reference-corpus accuracy benchmark. Those capabilities must be implemented and verified separately; do not advertise them as active until that evidence exists.
+The v2 schema, local Worker/batch engine, its state/recovery tests, and the per-item private-result save flow have been committed for CI verification. Do not call this full production acceptance yet: current-revision build/typecheck/tests must pass, and real deployment, durable backend queue, object storage, BS.1770/EBU loudness validation, native-batch parity, 10,000-job load testing and licensed corpus benchmarks are still outstanding. The machine-checkable acceptance inventory lives at `docs/audits/music-analysis-acceptance.json`; it records unfinished gates instead of presenting them as complete.
