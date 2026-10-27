@@ -17,6 +17,7 @@ import {
   recoverLocalMusicBatch,
   saveLocalMusicBatch,
   transitionLocalMusicBatchItem,
+  updateLocalMusicBatchItem,
   type LocalMusicBatch,
   type LocalMusicFileDescriptor,
 } from "@/lib/media/music-analysis-batch";
