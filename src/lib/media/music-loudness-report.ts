@@ -113,3 +113,17 @@ export function parseMusicLoudnessReport(value: unknown): MusicLoudnessReport {
   }
   return value as MusicLoudnessReport;
 }
+
+/** Verify the response checksum over the exact JSON payload before result_checksum was appended. */
+export async function verifyMusicLoudnessReportChecksum(value: MusicLoudnessReport): Promise<MusicLoudnessReport> {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    throw new Error("This browser cannot verify the processor's loudness-report checksum.");
+  }
+  const { result_checksum: expected, ...payload } = value;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(payload)));
+  const actual = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  if (actual.toLowerCase() !== expected.toLowerCase()) {
+    throw new Error("The processor's loudness report failed its integrity checksum. Do not use this result.");
+  }
+  return value;
+}
