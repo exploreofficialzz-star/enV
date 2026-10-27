@@ -318,12 +318,16 @@ async function handleMedia(req, res) {
   const names = form.getAll("fileNames").map(String);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
   try {
     for (let index = 0; index < mediaFiles.length; index++) {
       const media = mediaFiles[index];
       const fallback = `input-${index + 1}.bin`;
       const inputPath = path.join(jobDir, safeName(media.name || names[index], fallback));
       const uploadedBytes = Buffer.from(await media.arrayBuffer());
+      if (controller.signal.aborted) throw new Error("The media request was canceled.");
       await fs.writeFile(inputPath, uploadedBytes);
       sourceHashes.push(spec.analysis === "ebu-r128" ? createHash("sha256").update(uploadedBytes).digest("hex") : null);
       inputPaths.push(inputPath);
