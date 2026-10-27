@@ -15,6 +15,7 @@ create table if not exists music_tracks (
   channels integer check (channels is null or channels between 1 and 64),
   source_metadata jsonb not null default '{}'::jsonb,
   normalized_metadata jsonb not null default '{}'::jsonb,
+  search_text text not null default '',
   rights_status text not null default 'unknown' check (rights_status in ('unknown','user_owned','permission_granted','licensed','public_domain','restricted','not_applicable')),
   retention_policy text not null default 'analysis_only' check (retention_policy in ('analysis_only','retain_metadata','retain_until_deleted')),
   created_at timestamptz not null default now(),
@@ -26,6 +27,7 @@ create table if not exists music_tracks (
 create index if not exists music_tracks_owner_created_idx on music_tracks (user_id, created_at desc, id);
 create index if not exists music_tracks_owner_hash_idx on music_tracks (user_id, source_sha256) where source_sha256 is not null;
 create index if not exists music_tracks_owner_name_idx on music_tracks (user_id, lower(file_name));
+create index if not exists music_tracks_owner_search_idx on music_tracks using gin (to_tsvector('simple', search_text));
 
 create table if not exists music_analysis_runs (
   id text primary key,
