@@ -98,6 +98,16 @@ function layerExportLimitSeconds(): number {
   return 60;
 }
 
+async function exactFileSha256(bytes: ArrayBuffer): Promise<string | null> {
+  if (typeof crypto === "undefined" || !crypto.subtle) return null;
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
+
 
 export function MusicAnalyzerStudio() {
   const [file, setFile] = useState<File | null>(null);
@@ -189,6 +199,8 @@ export function MusicAnalyzerStudio() {
       if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
       const bytes = await file.arrayBuffer();
       if (!ensureCurrent()) return;
+      const sourceSha256 = await exactFileSha256(bytes);
+      if (!ensureCurrent()) return;
       const context = new Ctx();
       let buffer: AudioBuffer;
       try {
@@ -208,10 +220,11 @@ export function MusicAnalyzerStudio() {
         fileSizeBytes: file.size,
         mimeType: file.type,
         metadata,
+        sourceSha256,
       });
       if (!ensureCurrent()) return;
       const dataset = await analyzeMusicDatasetAudio(
-        { channels, sampleRate: buffer.sampleRate, fileName: file.name },
+        { channels, sampleRate: buffer.sampleRate, fileName: file.name, sourceSha256 },
         {
           signal: controller.signal,
           onProgress: (fraction) => {
