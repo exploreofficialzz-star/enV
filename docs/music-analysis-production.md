@@ -33,9 +33,24 @@ The detailed signal contract is `env.music-analysis.v2`. The compact profile con
 
 A schema change that renames the RMS proxy from the misleading `estimated_loudness_lufs` field is versioned as v2. Consumers must not interpret the legacy field as a standards loudness result.
 
+## Private dataset library currently implemented on this branch
+
+The branch adds migration `migrations/0009_music_dataset.sql` and owner-scoped server handlers at `/api/music-dataset/tracks`, `/api/music-dataset/tracks/:id` and `/api/music-dataset/runs/:id`.
+
+- `GET /api/music-dataset/tracks?page=1&limit=20&q=...` returns a bounded, searchable list. The server caps page size at 100 and queries only the verified user's rows.
+- `POST /api/music-dataset/tracks` saves validated v2 result JSON, technical/source metadata, time-aligned feature frames, event rows, label/review revisions and a result checksum in one database transaction. The request is capped at 4 MiB and requires a UUID idempotency key.
+- `GET /api/music-dataset/tracks/:id` returns the caller's track and latest annotation revisions.
+- `GET /api/music-dataset/runs/:id?frames_offset=0&frames_limit=200&events_offset=0&events_limit=200` returns separately paginated frames and events. Each page is capped at 500 records.
+- `DELETE /api/music-dataset/tracks/:id` removes that user's track and cascaded analysis, event, feature, collection-membership and annotation rows.
+- Tracks, runs, frames, events, and annotations use owner-scoped keys/foreign keys. Analysis runs retain immutable results/checksums; annotation edits are represented as later history rows. Exact SHA-256 matches are returned as candidates, never automatically merged.
+
+Cloud dataset access requires a configured database, and verified authentication must be enabled/configured. Deployment must apply `npm run db:migrate` so the `0009_music_dataset.sql` migration is installed. The API reports an auth/configuration failure when that prerequisite is absent; it does not claim a saved record exists in that case. The web UI uploads only structured results and metadata for this save operation, not the original audio. A client-computed SHA-256 is stored with `source_sha256_verified=false`; it is an unverified duplicate candidate, not a server-verified source identity.
+
+This establishes the private result-library baseline, not the entire target product. Full source-upload/object storage, a durable background DSP worker with real job state/cancellation/restart recovery, batch processing, 10,000-track load testing, cloud result reconstruction/export, native Android/iOS cloud-library UX, and corpus-based accuracy benchmarks remain to be implemented and verified.
+
 ## Dataset and provenance expectations
 
-Keep source metadata, DSP measurements, user annotations, and reviewer-confirmed labels separate. Any future persistent dataset API must enforce authentication and owner/tenant checks for every track, run, annotation and export. Long time-series data should be paginated or stored as bounded artifacts instead of an unbounded JSON object. Exported data should contain schema/engine versions, measurement methods and units, annotation provenance, unknown/missing fields, rights/retention state and checksums when available.
+Keep source metadata, DSP measurements, user annotations, and reviewer-confirmed labels separate. The dataset migration uses separate track, run, feature-frame, event, collection and annotation tables rather than one unbounded timeline JSON. Exported data should contain schema/engine versions, measurement methods and units, annotation provenance, unknown/missing fields, rights/retention state and checksums when available.
 
 ## Verification status
 
