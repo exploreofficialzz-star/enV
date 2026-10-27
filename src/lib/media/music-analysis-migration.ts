@@ -11,6 +11,12 @@ function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function objectOrNull(value: unknown): JsonRecord | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonRecord
+    : null;
+}
+
 function requireDuration(value: unknown): number {
   const duration = finiteNumber(value);
   if (duration === null || duration <= 0) {
@@ -33,7 +39,12 @@ export function migrateMusicAnalysisV1ToV2(input: unknown): JsonRecord {
   }
   const audio = asRecord(root.audio, "audio");
   const duration = requireDuration(audio.duration_seconds);
-  const oldProxy = finiteNumber(audio.estimated_loudness_lufs);
+  const {
+    estimated_loudness_lufs: legacyProxyValue,
+    metric_scope_seconds: _legacyMetricScope,
+    ...audioWithoutLegacyFields
+  } = audio;
+  const oldProxy = finiteNumber(legacyProxyValue);
   const currentProxy = finiteNumber(audio.rms_loudness_proxy_db);
   const rhythm = asRecord(root.rhythm, "rhythm");
   const tonality = asRecord(root.tonality, "tonality");
@@ -48,7 +59,7 @@ export function migrateMusicAnalysisV1ToV2(input: unknown): JsonRecord {
       note: "Original file bytes were not retained in this v1 export, so exact-file SHA-256 cannot be reconstructed. Acoustic similarity is a separate fingerprinting task.",
     },
     audio: {
-      ...audio,
+      ...audioWithoutLegacyFields,
       rms_loudness_proxy_db: currentProxy ?? oldProxy,
       metric_scope_seconds: duration,
     },
@@ -81,6 +92,21 @@ export function migrateMusicProfileV1ToV2(input: unknown): JsonRecord {
   }
   const status = asRecord(root.analysis_status, "analysis_status");
   const migratedStatus: JsonRecord = { ...status };
+  const legacyMetrics = objectOrNull(root.audio_metrics);
+  let migratedAudioMetrics: JsonRecord | null = null;
+  if (legacyMetrics) {
+    const {
+      estimated_loudness_lufs: legacyProxyValue,
+      metric_scope_seconds: _legacyMetricScope,
+      ...metricsWithoutLegacyFields
+    } = legacyMetrics;
+    const duration = finiteNumber(legacyMetrics.duration_seconds) ?? finiteNumber(root.duration_seconds);
+    migratedAudioMetrics = {
+      ...metricsWithoutLegacyFields,
+      rms_loudness_proxy_db: finiteNumber(legacyMetrics.rms_loudness_proxy_db) ?? finiteNumber(legacyProxyValue),
+      ...(duration !== null && duration > 0 ? { metric_scope_seconds: duration } : {}),
+    };
+  }
   for (const key of ["genre", "sub_style", "language", "mood", "instruments", "vocal_style"]) {
     if (migratedStatus[key] === "model_estimate") migratedStatus[key] = "unknown";
   }
@@ -93,6 +119,7 @@ export function migrateMusicProfileV1ToV2(input: unknown): JsonRecord {
       exact_match_method: "not-computed",
       note: "Original file bytes were not retained in this v1 export, so exact-file SHA-256 cannot be reconstructed.",
     },
+    ...(migratedAudioMetrics ? { audio_metrics: migratedAudioMetrics } : {}),
     analysis_status: migratedStatus,
   };
 }
