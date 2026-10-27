@@ -38,7 +38,7 @@ try {
     form.append("file", new Blob([input], { type: "audio/wav" }), "reference-tone.wav");
     form.append("operation", "audio-loudness-report");
     form.append("outputName", "reference-tone-loudness.json");
-    form.append("params", "{}");
+    form.append("params", JSON.stringify({ explicitAudioUploadConsent: true }));
     const response = await fetch(`http://127.0.0.1:${PORT}/media`, { method: "POST", body: form });
     const body = await response.json();
     assert.equal(response.status, 200, JSON.stringify(body));
@@ -57,6 +57,21 @@ try {
     assert.equal(body.source.duration_seconds, 10);
     assert.match(body.engine.binary_version, /^ffmpeg version/i);
     assert.match(body.result_checksum, /^[a-f0-9]{64}$/);
+  });
+
+  await test("rejects loudness uploads without explicit per-request consent", async () => {
+    const fixture = "/tmp/env-media-loudness-test.wav";
+    const input = await fs.readFile(fixture);
+    const form = new FormData();
+    form.append("file", new Blob([input], { type: "audio/wav" }), "must-not-process.wav");
+    form.append("operation", "audio-loudness-report");
+    form.append("outputName", "consent-check.json");
+    form.append("params", "{}");
+    const response = await fetch(`http://127.0.0.1:${PORT}/media`, { method: "POST", body: form });
+    const body = await response.json();
+    assert.equal(response.status, 403);
+    assert.equal(body.error, "AUDIO_UPLOAD_CONSENT_REQUIRED");
+    assert.match(body.message, /explicit per-request audio-upload consent/);
   });
 
   await test("rejects oversized uploads before multipart parsing", async () => {
