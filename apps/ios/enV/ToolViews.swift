@@ -2012,8 +2012,8 @@ enum NativeAudioWavProcessor {
             "classification": [
                 "genre": NSNull(), "sub_style": NSNull(), "language": [String](),
                 "mood": [String](), "instruments": [String](), "vocal_style": NSNull(),
-                "genre_candidates": [[String: Any]](), "status": "requires_model",
-                "note": "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."
+                "genre_candidates": [[String: Any]](), "status": "human_review_required",
+                "note": "This Analyzer does not run a semantic model. Genre, sub-style, language, mood, instruments and vocal style remain unknown until supplied and human-reviewed."
             ]
         ]
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
