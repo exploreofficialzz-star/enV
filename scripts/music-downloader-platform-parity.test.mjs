@@ -133,3 +133,16 @@ test("single-track Audiomack HTML metadata is separate from album extraction", a
   assert.match(processor, /inspectAudiomackSongPage/);
   assert.match(processor, /inspectCollection = Boolean\(includePlaylist\)/);
 });
+
+test("single songs use single-track discovery and direct download across all clients", async () => {
+  const web = await source("../src/components/engines/music-downloader-engine.tsx");
+  const android = await source("../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt");
+  const ios = await source("../apps/ios/enV/ToolViews.swift");
+  assert.match(web, /includePlaylist: isLikelyMusicCollectionUrl\(entry\.url\)/);
+  assert.match(web, /preview\.tracks\.length === 1 \? 0 : undefined/);
+  assert.match(web, /"Download song"/);
+  assert.match(android, /resolveProviderMusicPage\(source, musicPageIsCollection\(source\.url\)\)/);
+  assert.match(android, /downloadSelectedMusic\(previewTracks\.toList\(\), previewTracks\.size > 1\)/);
+  assert.match(ios, /"includePlaylist": nativeMusicCollectionPage\(source\.url\)/);
+  assert.match(ios, /startOnlineDownloads\(only: previewTracks\.count == 1 \? previewTracks\.first : nil\)/);
+});

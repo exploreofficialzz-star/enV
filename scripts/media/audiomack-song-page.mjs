@@ -7,10 +7,10 @@ export function isAudiomackSongUrl(rawUrl) {
   try { url = new URL(rawUrl); } catch { return false; }
   if (url.protocol !== "https:" || !["audiomack.com", "www.audiomack.com"].includes(url.hostname.toLowerCase())) return false;
   const parts = url.pathname.split("/").filter(Boolean);
-  return parts.length === 3 && (
+  return Boolean(parts.length === 3 && (
     (parts[1].toLowerCase() === "song" && parts[0] && parts[2]) ||
     (parts[0].toLowerCase() === "song" && parts[1] && parts[2])
-  );
+  ));
 }
 function decode(value) {
   return String(value || "").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"')

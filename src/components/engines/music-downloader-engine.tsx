@@ -246,7 +246,7 @@ export function MusicDownloaderEngine() {
 
           let info: UrlMediaInfo;
           try {
-            info = await inspectUrlMedia(entry.url, undefined, controller.signal, { includePlaylist: true });
+            info = await inspectUrlMedia(entry.url, undefined, controller.signal, { includePlaylist: isLikelyMusicCollectionUrl(entry.url) });
           } catch (cause) {
             if ((cause as Error)?.name === "AbortError") throw cause;
             if (isLikelyMusicCollectionUrl(entry.url)) throw cause;
@@ -254,8 +254,9 @@ export function MusicDownloaderEngine() {
             warnings.push((entry.title || entry.url) + ": metadata could not be previewed; download availability is unverified.");
             info = { provider: "generic", title: entry.title || "Track", formats: [], isPlaylist: false, webpageUrl: entry.url };
           }
-          const entries = info.entries?.filter((item) => item.webpageUrl?.startsWith("https://")) || [];
-          if ((info.isPlaylist || isLikelyMusicCollectionUrl(entry.url)) && !entries.length) {
+          const collection = isLikelyMusicCollectionUrl(entry.url) || Boolean(info.isPlaylist);
+          const entries = collection ? info.entries?.filter((item) => item.webpageUrl?.startsWith("https://")) || [] : [];
+          if (collection && !entries.length) {
             throw new Error("The collection did not provide any valid individual track links.");
           }
           if (entries.length && !title) title = info.album || info.title || "";
@@ -283,7 +284,7 @@ export function MusicDownloaderEngine() {
         }
       }
       if (!items.length) throw new Error(warnings[0] || "No tracks could be previewed from these links.");
-      setPreview({ title: title || (parsed.entries.length === 1 ? (parsed.entries[0].title || "Music collection") : "My music"), tracks: items, truncated, warnings });
+      setPreview({ title: title || (items.length === 1 ? items[0].title : "My music"), tracks: items, truncated, warnings });
       setResult("Found " + items.length + " track(s). Review the list before downloading.");
       setProgress("");
     } catch (cause) {
@@ -466,10 +467,10 @@ export function MusicDownloaderEngine() {
                 </button>
               ) : null}
               {preview.warnings.length ? <p role="status" className="whitespace-pre-wrap text-xs text-muted">{preview.warnings.length} link(s) could not be fully inspected. {preview.warnings.slice(0, 2).join(" ")}</p> : null}
-              <Button type="button" onClick={() => void downloadPreview()} disabled={busy} className="w-full">{busy ? "Preparing ZIP…" : "Download ZIP (" + preview.tracks.length + " tracks)"}</Button>
+              <Button type="button" onClick={() => void downloadPreview(preview.tracks.length === 1 ? 0 : undefined)} disabled={busy} className="w-full">{busy ? "Downloading…" : preview.tracks.length === 1 ? "Download song" : "Download ZIP (" + preview.tracks.length + " tracks)"}</Button>
               {Object.values(trackStates).some((state) => state === "Unavailable") ? (
-                <Button type="button" variant="outline" onClick={() => void downloadPreview(undefined, true)} disabled={busy} className="w-full">
-                  Retry unavailable tracks as ZIP ({Object.values(trackStates).filter((state) => state === "Unavailable").length})
+                <Button type="button" variant="outline" onClick={() => void downloadPreview(preview.tracks.length === 1 ? 0 : undefined, preview.tracks.length > 1)} disabled={busy} className="w-full">
+                  {preview.tracks.length === 1 ? "Retry song download" : "Retry unavailable tracks as ZIP (" + Object.values(trackStates).filter((state) => state === "Unavailable").length + ")"}
                 </Button>
               ) : null}
             </section>
