@@ -9,6 +9,7 @@ import { extractMusicMetadata } from "@/lib/media/music-metadata";
 import { createMusicAnalysisProfile } from "@/lib/media/music-analysis-profile";
 import { analyzeMusicInWorker } from "@/lib/media/music-analysis.worker-client";
 import {
+  assertLocalDecodedPcmBudget,
   createLocalMusicBatch,
   countLocalMusicBatchItems,
   deleteLocalMusicBatch,
@@ -661,6 +662,7 @@ export function MusicAnalyzerStudio() {
           if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
           if (!buffer || buffer.duration <= 0 || buffer.length <= 0) throw new Error("The file did not decode to usable audio.");
           if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("Decoded duration exceeds the two-minute on-device limit.");
+          assertLocalDecodedPcmBudget(buffer.length, buffer.numberOfChannels);
           const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer!.getChannelData(index));
           const sampleRate = buffer.sampleRate;
           const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
@@ -851,6 +853,7 @@ export function MusicAnalyzerStudio() {
       if (!ensureCurrent()) return;
       if (!buffer || buffer.duration <= 0 || buffer.length <= 0) throw new Error("The selected file did not decode to usable audio.");
       if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
+      assertLocalDecodedPcmBudget(buffer.length, buffer.numberOfChannels);
       const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer!.getChannelData(index));
       const sampleRate = buffer.sampleRate;
       const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
@@ -1340,7 +1343,7 @@ export function MusicAnalyzerStudio() {
         <label className="mt-3 flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 py-5 text-center transition hover:border-accent">
           <Upload size={24} className="mb-2 text-accent" aria-hidden="true" />
           <span className="text-sm font-medium">{file ? "Choose a different audio file" : "Select an audio file"}</span>
-          <span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC · WebM · up to 25 MB and 2 minutes · processed locally</span>
+          <span className="mt-1 text-xs text-muted-foreground">MP3 · WAV · M4A · OGG · FLAC · WebM · up to 25 MB, 2 minutes and 64 MiB decoded PCM · processed locally</span>
           <input className="sr-only" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" onChange={(event) => { chooseFile(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} />
         </label>
         {file ? (
