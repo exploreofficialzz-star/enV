@@ -89,17 +89,27 @@
     },
     {
       "id": "standards-loudness-and-true-peak",
-      "status": "not_implemented",
-      "scope": "Current fields remain sample peak dBFS, RMS dBFS and a clearly named RMS-derived proxy—not integrated LUFS or dBTP.",
+      "status": "implemented_pending_ci",
+      "scope": "A separate, opt-in FFmpeg processor operation runs the ebur128 filter with sample+true peak modes for one selected upload and returns a versioned report with integrated LUFS, LRA, sample peak, true peak, processor-calculated source SHA-256 and response checksum. It is not mixed into the local env.music-analysis.v2 RMS-proxy fields.",
       "code_files": [
-        "src/lib/engines/music-analysis.ts",
-        "docs/music-analysis-production.md"
+        "scripts/media-processor.mjs",
+        "src/lib/media/music-loudness-report.ts",
+        "src/lib/media/media-backends.ts",
+        "src/components/engines/music-analyzer-studio.tsx"
       ],
       "test_files": [
-        "src/lib/engines/audio-studio.test.ts"
+        "scripts/media-processor.test.mjs",
+        "src/lib/media/music-loudness-report.test.ts",
+        "scripts/check-audio-studios.mjs"
       ],
       "limitation": "No current-revision reference-fixture verification of ITU-R BS.1770-5 / EBU R 128 integrated loudness, gating, loudness range, or oversampled true peak.",
-      "next_action": "Choose an auditable implementation/build, verify its license, and validate independent reference fixtures including inter-sample peaks, silence, sine waves and channel layouts."
+      "next_action": "Run current-revision CI and the processor's synthetic reference-tone integration test. Before any broadcast-compliance claim, validate official licensed reference sequences and exact-build licensing, and verify the configured production processor exposes ebur128.",
+      "limitations": [
+        "The UI requires a separate unchecked-by-default consent checkbox and explicit meter action; ordinary local analysis/batch processing does not upload audio.",
+        "The processor path supports one file per report, is limited to 15 minutes, and is bounded by the configured processor request/upload byte limit. The default same-origin gateway is limited to 4 MiB.",
+        "The regression suite includes a synthetic 1 kHz tone with a numeric LUFS tolerance, but the full official ITU-R BS.1770 / EBU R 128 reference-sequence suite, inter-sample peak cases, silence/gating edge cases and representative multichannel sequences have not been run.",
+        "The actual deployed FFmpeg build identity/license/configuration and processor availability still require deployment-level verification. This meter operation is not a durable background job."
+      ]
     },
     {
       "id": "durable-server-batch-queue",
@@ -203,6 +213,26 @@
       ],
       "limitation": "Unit tests over batch states are not a 10,000-job load test, and metadata rows do not stand in for actual full-track DSP throughput.",
       "next_action": "Run 10,000 job metadata/concurrency/fairness/restart tests against real PostgreSQL and separately benchmark real audio duration/bytes, concurrency, RSS, throughput and failure recovery."
+    },
+    {
+      "id": "explicit-consent-remote-meter",
+      "status": "implemented_pending_ci",
+      "scope": "The UI has a separate opt-in for the non-AI remote FFmpeg loudness report. Consent is unchecked by default, the action requires explicit consent in UI and handler, upload starts only after the user activates the meter, and file-change/unmount/cancel aborts the request.",
+      "code_files": [
+        "src/components/engines/music-analyzer-studio.tsx",
+        "src/lib/media/media-backends.ts",
+        "scripts/media-processor.mjs"
+      ],
+      "test_files": [
+        "scripts/check-audio-studios.mjs",
+        "src/lib/media/music-loudness-report.test.ts",
+        "scripts/media-processor.test.mjs"
+      ],
+      "limitations": [
+        "This consent and explicit user action protects the web UI entry point; production deployment URL/authentication configuration and service/operator retention still require deployment/security review.",
+        "Processor inputs are written to temporary per-request files and removed by the processor's cleanup path. No durable private source-audio object storage or authenticated durable DSP-job lifecycle is included."
+      ],
+      "next_action": "Verify the deployed endpoint is correctly secured and configured; test consent cancellation/upload behavior in a live browser, including 4 MiB gateway and unavailable-processor paths."
     }
   ]
 }
