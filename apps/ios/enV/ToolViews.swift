@@ -9,6 +9,7 @@ import CoreText
 import CoreImage
 import UniformTypeIdentifiers
 import Compression
+import CryptoKit
 
 struct ToolCard: View {
     @EnvironmentObject private var store: CatalogStore
@@ -1843,7 +1844,7 @@ enum NativeAudioWavProcessor {
         let dc = input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) } } / max(1, Double(input.frames * input.channels.count))
         func number(_ value: Double) -> String { value.isFinite ? String(format: "%.3f", value) : "unavailable" }
         switch operation {
-        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms), outputWav: nil, durationSeconds: duration)
+        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms, fileSHA256: sha256Hex(data)), outputWav: nil, durationSeconds: duration)
         case "inspector": return NativeAudioWavResult(report: "WAV inspector\nDuration: \(number(duration)) s\nSample rate: \(input.sampleRateHz) Hz\nChannels: \(input.channels.count)\nFrames per channel: \(input.frames)\nSource encoding: \(input.sourceBits)-bit \(input.sourceEncoding == 3 ? "IEEE float" : "PCM")\nSource size: \(data.count) bytes", outputWav: nil, durationSeconds: duration)
         case "duration": return NativeAudioWavResult(report: "Duration: \(number(duration)) seconds\nSample rate: \(input.sampleRateHz) Hz", outputWav: nil, durationSeconds: duration)
         case "peak": return NativeAudioWavResult(report: "Peak amplitude: \(number(peak))\nPeak level: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nSource channels: \(input.channels.count)", outputWav: nil, durationSeconds: duration)
@@ -1906,7 +1907,11 @@ enum NativeAudioWavProcessor {
         let flatness: Double?
     }
 
-    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double) throws -> String {
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double, fileSHA256: String) throws -> String {
         let frames = input.frames, rate = input.sampleRateHz, duration = input.durationSeconds
         let windowFrames = max(1, rate / 10)
         var windowLevels: [Double] = []
@@ -1956,6 +1961,11 @@ enum NativeAudioWavProcessor {
         }
         let payload: [String: Any] = [
             "schema_version": "env.music-analysis.v2",
+            "fingerprint": [
+                "file_sha256": fileSHA256,
+                "exact_match_method": "sha-256-exact-file-bytes",
+                "note": "SHA-256 identifies byte-identical files only; acoustic similarity is a separate fingerprinting task."
+            ],
             "source": [
                 "file_name": fileName.isEmpty ? "audio.wav" : fileName,
                 "mime_type": "audio/wav",
