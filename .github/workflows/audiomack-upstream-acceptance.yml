@@ -25,6 +25,8 @@ jobs:
       - name: Try uploaded Hallelujah single track using isolated extractor
         run: |
           set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
           mkdir -p "$RUNNER_TEMP/enV-audiomack-test"
           "$RUNNER_TEMP/music-extractor/bin/yt-dlp" \
             --ignore-config --no-playlist --no-warnings \
