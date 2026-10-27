@@ -15,9 +15,12 @@ test("local dataset analysis emits time-aligned DSP features without calling a m
     channels: [samples],
     sampleRate,
     fileName: "sine-test.wav",
+    sourceSha256: "cd".repeat(32),
   });
 
   assert.equal(result.schema_version, "env.music-dataset-analysis.v2");
+  assert.equal(result.fingerprint.file_sha256, "cd".repeat(32));
+  assert.equal(result.fingerprint.exact_match_method, "sha-256-exact-file-bytes");
   assert.equal(result.processing.uses_remote_api, false);
   assert.equal(result.processing.uses_hosted_model, false);
   assert.equal(result.processing.model_inference, false);
