@@ -70,7 +70,7 @@ assert.match(webUx, /aria-label="Move selected element"/, 'Web movement controls
 assert.match(webUx, /Technical styling · CSS/, 'Web Studio must expose advanced CSS-oriented controls');
 assert.match(webUx, /:focus-visible fill/, 'Web Studio must expose focus-visible style controls');
 assert.match(uxStudioCss, /\.uxui-gamepad/, 'Mobile gamepad controls must have dedicated responsive styling');
-assert.match(webUx, /svgToPng\(svg, 3, target\)/, 'PDF preview must include the selected device target frame');
+assert.match(webUx, /svgToPng\(preview\.svg, 3, preview\.target\)/, 'Each PDF preview must include its own device target frame');
 assert.match(uxStudioCss, /\.uxui-canvas-stage/, 'The checkerboard photo-editor canvas styles must be shipped');
 assert.match(uxStudioCss, /\.uxui-canvas-hint\s*\{[^}]*color:\s*#E4E7E4/i, 'Canvas hint text must remain readable against the dark device bezel');
 assert.match(uxStudioCss, /\.uxui-device-desktop/, 'Desktop preview must use a monitor mockup');

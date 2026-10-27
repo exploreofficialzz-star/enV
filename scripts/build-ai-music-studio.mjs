@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 import { PDFDocument } from "pdf-lib";
 
 const base = "https://envtools.store";
-const output = resolve(process.env.ENV_MUSIC_DESIGN_DIR || "/mnt/data/ai-music-studio");
+const output = resolve(process.env.ENV_MUSIC_DESIGN_DIR || "/tmp/env-ai-music-studio");
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, args: ["--disable-lcd-text"], executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || "/usr/bin/chromium" });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: "light", acceptDownloads: true, serviceWorkers: "block" });
@@ -193,14 +193,6 @@ try {
   assert.deepEqual(errors,[]);
   const pdf=await PDFDocument.load(await readFile(resolve(output,"ai-music-studio-handoff.pdf")));
   assert.ok(pdf.getPageCount()>=5);
-  const preview = await context.newPage();
-  for (const [device,width,height] of [["mobile",390,844],["tablet",768,1024],["desktop",1440,900]]) {
-    await preview.setViewportSize({width,height});
-    await preview.goto("file://"+resolve(output,"ai-music-studio.html"));
-    await preview.evaluate(()=>document.fonts.ready);
-    await preview.screenshot({path:resolve(output,"ai-music-studio-"+device+"-export.png"),animations:"disabled"});
-  }
-  await preview.close();
   const report={createdAt:new Date().toISOString(),site:base,workflow:"Every layer was created and edited with the live Studio UI. No project or localStorage injection and no external design generator.",layers:44,devices:["mobile","tablet","desktop"],pdfPages:pdf.getPageCount(),screenshots,actions,runtimeErrors:errors};
   await writeFile(resolve(output,"live-studio-design-report.json"),JSON.stringify(report,null,2)+"\n");
   console.log(JSON.stringify({layers:44,pdfPages:pdf.getPageCount(),output,runtimeErrors:errors}));

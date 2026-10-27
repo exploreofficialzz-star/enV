@@ -1,0 +1,760 @@
+{
+  "site": "https://envtools.store",
+  "verifiedAt": "2026-10-27T04:53:12.363Z",
+  "workflow": "Authored with live Studio controls, downloaded with Studio Export, then reopened with the live Import preset file input. No project state injection or external design generator.",
+  "releaseBoundary": "The updated Studio is committed to main. Vercel blocked its deployment for 24 hours, so the live version required separate device exports.",
+  "devices": [
+    {
+      "device": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "visibleLayers": 44,
+      "totalLayers": 45,
+      "pdfPages": 79,
+      "pdfSha256": "a15a331e2de58ed5b952ff99355d4371ded5c925c99783ff21700577a0de83cc",
+      "jsonImportRoundTrip": "passed",
+      "pdfAttachment": "45 editable layers and complete implementation brief verified"
+    },
+    {
+      "device": "tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "visibleLayers": 44,
+      "totalLayers": 45,
+      "pdfPages": 80,
+      "pdfSha256": "3112402940e1a223595d1613ec83113823529251ef520873de96e22a285d01eb",
+      "jsonImportRoundTrip": "passed",
+      "pdfAttachment": "45 editable layers and complete implementation brief verified"
+    },
+    {
+      "device": "desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visibleLayers": 44,
+      "totalLayers": 45,
+      "pdfPages": 80,
+      "pdfSha256": "bddcb046e8842f1a0f0d3d4e08fe9dfa2de9838edee3a638cda6d5d588f0a13e",
+      "jsonImportRoundTrip": "passed",
+      "pdfAttachment": "45 editable layers and complete implementation brief verified"
+    }
+  ],
+  "runtimeErrors": [],
+  "actions": [
+    {
+      "at": "2026-10-27T04:46:25.691Z",
+      "action": "Add shape through Studio",
+      "detail": "Navigation surface"
+    },
+    {
+      "at": "2026-10-27T04:46:26.577Z",
+      "action": "Add shape through Studio",
+      "detail": "Brand disc"
+    },
+    {
+      "at": "2026-10-27T04:46:27.359Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Brand music mark"
+    },
+    {
+      "at": "2026-10-27T04:46:28.227Z",
+      "action": "Add text through Studio",
+      "detail": "Brand name"
+    },
+    {
+      "at": "2026-10-27T04:46:29.150Z",
+      "action": "Add shape through Studio",
+      "detail": "Profile disc"
+    },
+    {
+      "at": "2026-10-27T04:46:29.976Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Profile icon"
+    },
+    {
+      "at": "2026-10-27T04:46:30.826Z",
+      "action": "Add text through Studio",
+      "detail": "Hero eyebrow"
+    },
+    {
+      "at": "2026-10-27T04:46:31.782Z",
+      "action": "Add text through Studio",
+      "detail": "Hero headline"
+    },
+    {
+      "at": "2026-10-27T04:46:32.730Z",
+      "action": "Add text through Studio",
+      "detail": "Hero introduction"
+    },
+    {
+      "at": "2026-10-27T04:46:34.926Z",
+      "action": "Add text through Studio",
+      "detail": "Tools heading"
+    },
+    {
+      "at": "2026-10-27T04:46:35.899Z",
+      "action": "Add shape through Studio",
+      "detail": "Nigerian sounds surface"
+    },
+    {
+      "at": "2026-10-27T04:46:36.893Z",
+      "action": "Add shape through Studio",
+      "detail": "Nigerian sounds icon disc"
+    },
+    {
+      "at": "2026-10-27T04:46:37.794Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Nigerian sounds icon"
+    },
+    {
+      "at": "2026-10-27T04:46:38.726Z",
+      "action": "Add text through Studio",
+      "detail": "Nigerian sounds title"
+    },
+    {
+      "at": "2026-10-27T04:46:39.732Z",
+      "action": "Add text through Studio",
+      "detail": "Nigerian sounds description"
+    },
+    {
+      "at": "2026-10-27T04:46:40.715Z",
+      "action": "Add shape through Studio",
+      "detail": "Your own voice surface"
+    },
+    {
+      "at": "2026-10-27T04:46:41.726Z",
+      "action": "Add shape through Studio",
+      "detail": "Your own voice icon disc"
+    },
+    {
+      "at": "2026-10-27T04:46:42.659Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Your own voice icon"
+    },
+    {
+      "at": "2026-10-27T04:46:43.610Z",
+      "action": "Add text through Studio",
+      "detail": "Your own voice title"
+    },
+    {
+      "at": "2026-10-27T04:46:44.632Z",
+      "action": "Add text through Studio",
+      "detail": "Your own voice description"
+    },
+    {
+      "at": "2026-10-27T04:46:45.818Z",
+      "action": "Add shape through Studio",
+      "detail": "Lyrics in your language surface"
+    },
+    {
+      "at": "2026-10-27T04:46:47.026Z",
+      "action": "Add shape through Studio",
+      "detail": "Lyrics in your language icon disc"
+    },
+    {
+      "at": "2026-10-27T04:46:48.027Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Lyrics in your language icon"
+    },
+    {
+      "at": "2026-10-27T04:46:49.026Z",
+      "action": "Add text through Studio",
+      "detail": "Lyrics in your language title"
+    },
+    {
+      "at": "2026-10-27T04:46:50.133Z",
+      "action": "Add text through Studio",
+      "detail": "Lyrics in your language description"
+    },
+    {
+      "at": "2026-10-27T04:46:51.217Z",
+      "action": "Add shape through Studio",
+      "detail": "Bring your own beat surface"
+    },
+    {
+      "at": "2026-10-27T04:46:52.344Z",
+      "action": "Add shape through Studio",
+      "detail": "Bring your own beat icon disc"
+    },
+    {
+      "at": "2026-10-27T04:46:53.327Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Bring your own beat icon"
+    },
+    {
+      "at": "2026-10-27T04:46:54.326Z",
+      "action": "Add text through Studio",
+      "detail": "Bring your own beat title"
+    },
+    {
+      "at": "2026-10-27T04:46:55.449Z",
+      "action": "Add text through Studio",
+      "detail": "Bring your own beat description"
+    },
+    {
+      "at": "2026-10-27T04:46:56.600Z",
+      "action": "Add shape through Studio",
+      "detail": "Finish that verse surface"
+    },
+    {
+      "at": "2026-10-27T04:46:57.861Z",
+      "action": "Add shape through Studio",
+      "detail": "Finish that verse icon disc"
+    },
+    {
+      "at": "2026-10-27T04:46:58.859Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Finish that verse icon"
+    },
+    {
+      "at": "2026-10-27T04:46:59.909Z",
+      "action": "Add text through Studio",
+      "detail": "Finish that verse title"
+    },
+    {
+      "at": "2026-10-27T04:47:01.149Z",
+      "action": "Add text through Studio",
+      "detail": "Finish that verse description"
+    },
+    {
+      "at": "2026-10-27T04:47:02.316Z",
+      "action": "Add text through Studio",
+      "detail": "Planned tools heading"
+    },
+    {
+      "at": "2026-10-27T04:47:03.568Z",
+      "action": "Add text through Studio",
+      "detail": "Planned tools details"
+    },
+    {
+      "at": "2026-10-27T04:47:04.799Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Create navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:47:05.910Z",
+      "action": "Add text through Studio",
+      "detail": "Create navigation label"
+    },
+    {
+      "at": "2026-10-27T04:47:07.183Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Projects navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:47:08.342Z",
+      "action": "Add text through Studio",
+      "detail": "Projects navigation label"
+    },
+    {
+      "at": "2026-10-27T04:47:09.636Z",
+      "action": "Add bundled icon through Studio",
+      "detail": "Library navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:47:10.811Z",
+      "action": "Add text through Studio",
+      "detail": "Library navigation label"
+    },
+    {
+      "at": "2026-10-27T04:47:12.253Z",
+      "action": "Add text through Studio",
+      "detail": "Implementation brief"
+    },
+    {
+      "at": "2026-10-27T04:47:14.778Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-mobile-handoff.pdf"
+    },
+    {
+      "at": "2026-10-27T04:47:14.962Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-mobile-project.json"
+    },
+    {
+      "at": "2026-10-27T04:47:15.028Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-mobile.html"
+    },
+    {
+      "at": "2026-10-27T04:48:46.435Z",
+      "action": "Import actual Studio download",
+      "detail": "/workspace/artifacts/ai-music-studio/ai-music-studio-mobile-project.json"
+    },
+    {
+      "at": "2026-10-27T04:48:47.174Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Navigation surface"
+    },
+    {
+      "at": "2026-10-27T04:48:47.592Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Brand disc"
+    },
+    {
+      "at": "2026-10-27T04:48:47.991Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Brand music mark"
+    },
+    {
+      "at": "2026-10-27T04:48:48.556Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Brand name"
+    },
+    {
+      "at": "2026-10-27T04:48:48.921Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Profile disc"
+    },
+    {
+      "at": "2026-10-27T04:48:49.324Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Profile icon"
+    },
+    {
+      "at": "2026-10-27T04:48:49.890Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Hero eyebrow"
+    },
+    {
+      "at": "2026-10-27T04:48:50.439Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Hero headline"
+    },
+    {
+      "at": "2026-10-27T04:48:50.972Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Hero introduction"
+    },
+    {
+      "at": "2026-10-27T04:48:51.606Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Create song action"
+    },
+    {
+      "at": "2026-10-27T04:48:52.121Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Tools heading"
+    },
+    {
+      "at": "2026-10-27T04:48:52.473Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Nigerian sounds surface"
+    },
+    {
+      "at": "2026-10-27T04:48:52.822Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Nigerian sounds icon disc"
+    },
+    {
+      "at": "2026-10-27T04:48:53.206Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Nigerian sounds icon"
+    },
+    {
+      "at": "2026-10-27T04:48:53.744Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Nigerian sounds title"
+    },
+    {
+      "at": "2026-10-27T04:48:54.307Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Nigerian sounds description"
+    },
+    {
+      "at": "2026-10-27T04:48:54.705Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Your own voice surface"
+    },
+    {
+      "at": "2026-10-27T04:48:55.056Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Your own voice icon disc"
+    },
+    {
+      "at": "2026-10-27T04:48:55.422Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Your own voice icon"
+    },
+    {
+      "at": "2026-10-27T04:48:55.972Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Your own voice title"
+    },
+    {
+      "at": "2026-10-27T04:48:56.521Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Your own voice description"
+    },
+    {
+      "at": "2026-10-27T04:48:56.889Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Lyrics in your language surface"
+    },
+    {
+      "at": "2026-10-27T04:48:57.306Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Lyrics in your language icon disc"
+    },
+    {
+      "at": "2026-10-27T04:48:57.689Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Lyrics in your language icon"
+    },
+    {
+      "at": "2026-10-27T04:48:58.355Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Lyrics in your language title"
+    },
+    {
+      "at": "2026-10-27T04:48:58.938Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Lyrics in your language description"
+    },
+    {
+      "at": "2026-10-27T04:48:59.305Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Bring your own beat surface"
+    },
+    {
+      "at": "2026-10-27T04:48:59.687Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Bring your own beat icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:00.105Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Bring your own beat icon"
+    },
+    {
+      "at": "2026-10-27T04:49:00.623Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Bring your own beat title"
+    },
+    {
+      "at": "2026-10-27T04:49:01.172Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Bring your own beat description"
+    },
+    {
+      "at": "2026-10-27T04:49:01.555Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Finish that verse surface"
+    },
+    {
+      "at": "2026-10-27T04:49:01.955Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Finish that verse icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:02.338Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Finish that verse icon"
+    },
+    {
+      "at": "2026-10-27T04:49:02.904Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Finish that verse title"
+    },
+    {
+      "at": "2026-10-27T04:49:03.471Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Finish that verse description"
+    },
+    {
+      "at": "2026-10-27T04:49:04.072Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Planned tools heading"
+    },
+    {
+      "at": "2026-10-27T04:49:04.672Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Planned tools details"
+    },
+    {
+      "at": "2026-10-27T04:49:05.089Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Create navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:49:05.722Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Create navigation label"
+    },
+    {
+      "at": "2026-10-27T04:49:06.155Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Projects navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:49:06.888Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Projects navigation label"
+    },
+    {
+      "at": "2026-10-27T04:49:07.305Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Library navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:49:07.904Z",
+      "action": "Device layout through Studio",
+      "detail": "tablet: Library navigation label"
+    },
+    {
+      "at": "2026-10-27T04:49:09.160Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-tablet-handoff.pdf"
+    },
+    {
+      "at": "2026-10-27T04:49:09.246Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-tablet-project.json"
+    },
+    {
+      "at": "2026-10-27T04:49:09.321Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-tablet.html"
+    },
+    {
+      "at": "2026-10-27T04:49:09.855Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Navigation surface"
+    },
+    {
+      "at": "2026-10-27T04:49:10.255Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Brand disc"
+    },
+    {
+      "at": "2026-10-27T04:49:10.637Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Brand music mark"
+    },
+    {
+      "at": "2026-10-27T04:49:11.254Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Brand name"
+    },
+    {
+      "at": "2026-10-27T04:49:11.671Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Profile disc"
+    },
+    {
+      "at": "2026-10-27T04:49:12.088Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Profile icon"
+    },
+    {
+      "at": "2026-10-27T04:49:12.688Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Hero eyebrow"
+    },
+    {
+      "at": "2026-10-27T04:49:13.304Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Hero headline"
+    },
+    {
+      "at": "2026-10-27T04:49:13.905Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Hero introduction"
+    },
+    {
+      "at": "2026-10-27T04:49:14.505Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Create song action"
+    },
+    {
+      "at": "2026-10-27T04:49:15.208Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Tools heading"
+    },
+    {
+      "at": "2026-10-27T04:49:15.690Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Nigerian sounds surface"
+    },
+    {
+      "at": "2026-10-27T04:49:16.155Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Nigerian sounds icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:16.722Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Nigerian sounds icon"
+    },
+    {
+      "at": "2026-10-27T04:49:17.410Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Nigerian sounds title"
+    },
+    {
+      "at": "2026-10-27T04:49:18.121Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Nigerian sounds description"
+    },
+    {
+      "at": "2026-10-27T04:49:18.555Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Your own voice surface"
+    },
+    {
+      "at": "2026-10-27T04:49:19.041Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Your own voice icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:19.540Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Your own voice icon"
+    },
+    {
+      "at": "2026-10-27T04:49:20.306Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Your own voice title"
+    },
+    {
+      "at": "2026-10-27T04:49:21.552Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Your own voice description"
+    },
+    {
+      "at": "2026-10-27T04:49:22.677Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Lyrics in your language surface"
+    },
+    {
+      "at": "2026-10-27T04:49:23.222Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Lyrics in your language icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:23.741Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Lyrics in your language icon"
+    },
+    {
+      "at": "2026-10-27T04:49:24.571Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Lyrics in your language title"
+    },
+    {
+      "at": "2026-10-27T04:49:25.372Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Lyrics in your language description"
+    },
+    {
+      "at": "2026-10-27T04:49:25.872Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Bring your own beat surface"
+    },
+    {
+      "at": "2026-10-27T04:49:26.405Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Bring your own beat icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:26.921Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Bring your own beat icon"
+    },
+    {
+      "at": "2026-10-27T04:49:27.691Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Bring your own beat title"
+    },
+    {
+      "at": "2026-10-27T04:49:28.522Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Bring your own beat description"
+    },
+    {
+      "at": "2026-10-27T04:49:29.038Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Finish that verse surface"
+    },
+    {
+      "at": "2026-10-27T04:49:29.574Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Finish that verse icon disc"
+    },
+    {
+      "at": "2026-10-27T04:49:30.122Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Finish that verse icon"
+    },
+    {
+      "at": "2026-10-27T04:49:30.955Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Finish that verse title"
+    },
+    {
+      "at": "2026-10-27T04:49:31.805Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Finish that verse description"
+    },
+    {
+      "at": "2026-10-27T04:49:32.605Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Planned tools heading"
+    },
+    {
+      "at": "2026-10-27T04:49:33.456Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Planned tools details"
+    },
+    {
+      "at": "2026-10-27T04:49:34.006Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Create navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:49:34.921Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Create navigation label"
+    },
+    {
+      "at": "2026-10-27T04:49:35.488Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Projects navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:49:36.505Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Projects navigation label"
+    },
+    {
+      "at": "2026-10-27T04:49:37.071Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Library navigation icon"
+    },
+    {
+      "at": "2026-10-27T04:49:38.039Z",
+      "action": "Device layout through Studio",
+      "detail": "desktop: Library navigation label"
+    },
+    {
+      "at": "2026-10-27T04:49:39.477Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-desktop-handoff.pdf"
+    },
+    {
+      "at": "2026-10-27T04:49:39.575Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-desktop-project.json"
+    },
+    {
+      "at": "2026-10-27T04:49:39.671Z",
+      "action": "Download from Studio",
+      "detail": "ai-music-studio-desktop.html"
+    }
+  ]
+}
