@@ -1370,6 +1370,17 @@ export function MusicAnalyzerStudio() {
             />
           </label>
         </div>
+        <div
+          className="mt-2 rounded-lg border border-dashed border-border bg-background px-3 py-4 text-center text-xs text-muted-foreground"
+          aria-label="Drop audio files to add them to the local batch"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            selectBatchFiles(Array.from(event.dataTransfer.files));
+          }}
+        >
+          Drop audio files here to add them to this local batch
+        </div>
         <div className="mt-3 rounded-lg border border-border bg-background p-3">
           <p className="text-sm font-medium">{batchSelection.length} selected file(s)</p>
           <p className="mt-1 text-xs text-muted-foreground">{formatBytes(batchSelection.reduce((sum, item) => sum + item.size, 0))} total · each file up to 25 MiB · total selection up to 200 MiB · 2 minutes per track</p>
