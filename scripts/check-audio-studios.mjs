@@ -114,7 +114,7 @@ const mediaProcessorSource = fs.readFileSync(new URL("../scripts/media-processor
 const mediaProcessorTests = fs.readFileSync(new URL("../scripts/media-processor.test.mjs", import.meta.url), "utf8");
 const mediaBackendSource = fs.readFileSync(new URL("../src/lib/media/media-backends.ts", import.meta.url), "utf8");
 for (const marker of [
-  "Standards loudness meter (optional)", "loudnessUploadConsent", "runStandardsLoudnessMeasurement",
+  "FFmpeg ebur128 loudness report (optional)", "loudnessUploadConsent", "runStandardsLoudnessMeasurement",
   "Measure with FFmpeg ebur128", "verifyMusicLoudnessReportChecksum", "standards_loudness_report: standardLoudnessReport",
   "configured enV media processor",
 ]) {
@@ -144,7 +144,7 @@ assert.ok(musicLoudnessTests.includes("rejects tampering"), "Meter report integr
 assert.ok(mediaBackendSource.includes("problem?.message") && mediaBackendSource.includes("slice(0, 600)"), "Media failures must retain bounded actionable processor messages.");
 
 for (const marker of [
-  "Select tracks", "Create batch", "Start / resume", "saveCompletedBatchToCloud",
+  "Select tracks", "Drop audio files here to add them", "Create batch", "Start / resume", "saveCompletedBatchToCloud",
   "Save results to private dataset", "exportLocalBatch(\"zip\")", "exportLocalBatch(\"jsonl\")",
   "exportLocalBatch(\"csv\")", "assertLocalDecodedPcmBudget", "analyzeMusicInWorker",
   "saveCompletedBatchToCloud", "cloudSaveIdempotencyKey", "cloudSavedTrackId",
