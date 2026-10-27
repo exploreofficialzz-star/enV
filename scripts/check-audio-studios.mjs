@@ -116,7 +116,7 @@ const mediaBackendSource = fs.readFileSync(new URL("../src/lib/media/media-backe
 for (const marker of [
   "Standards loudness meter (optional)", "loudnessUploadConsent", "runStandardsLoudnessMeasurement",
   "Measure with FFmpeg ebur128", "verifyMusicLoudnessReportChecksum", "standards_loudness_report: standardLoudnessReport",
-  "source audio file to the configured enV processor",
+  "configured enV media processor",
 ]) {
   assert.ok(musicAnalyzer.includes(marker), `Optional standards meter UI missing explicit opt-in contract ${marker}`);
 }
