@@ -143,6 +143,8 @@ export function MusicAnalyzerStudio() {
   const [libraryPage, setLibraryPage] = useState(1);
   const [libraryTotal, setLibraryTotal] = useState(0);
   const analysisControllerRef = useRef<AbortController | null>(null);
+  const saveAttemptRef = useRef<{ signature: string; key: string } | null>(null);
+  const lastSavedSignatureRef = useRef<string | null>(null);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -330,13 +332,10 @@ export function MusicAnalyzerStudio() {
 
   async function saveAnalysisToCloud() {
     if (!file || !analysis || !datasetAnalysis || savingCloud) return;
-    setSavingCloud(true);
     setCloudSaveError("");
     setCloudSaveNotice("");
     try {
-      const idempotencyKey = crypto.randomUUID();
-      const payload = {
-        idempotency_key: idempotencyKey,
+      const payloadWithoutKey = {
         file: {
           name: file.name,
           size_bytes: file.size,
@@ -349,7 +348,20 @@ export function MusicAnalyzerStudio() {
         analysis,
         dataset_analysis: { ...datasetAnalysis, annotations },
       };
-      // This request intentionally contains structured results only; the audio File/ArrayBuffer is never attached.
+      const signature = JSON.stringify(payloadWithoutKey);
+      if (lastSavedSignatureRef.current === signature) {
+        setCloudSaveNotice("These exact results are already saved. Review the library or change the annotations before saving a new record.");
+        setLibraryOpen(true);
+        await refreshCloudLibrary(1, "");
+        return;
+      }
+      // Reuse one idempotency key when a network response is lost, but create a new one if the reviewed payload changes.
+      if (!saveAttemptRef.current || saveAttemptRef.current.signature !== signature) {
+        saveAttemptRef.current = { signature, key: crypto.randomUUID() };
+      }
+      const payload = { ...payloadWithoutKey, idempotency_key: saveAttemptRef.current.key };
+      setSavingCloud(true);
+      // Only structured analysis results are sent. The audio File/ArrayBuffer is never attached.
       const response = await fetch("/api/music-dataset/tracks", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -359,7 +371,13 @@ export function MusicAnalyzerStudio() {
       if (!response.ok || !result?.ok || !result.data?.track_id) {
         throw new Error(result?.message || (response.status === 401 ? "Sign in to save to your private music library." : response.status === 503 ? "Cloud dataset access is not configured for this deployment. Your local results remain available." : "Could not save this analysis."));
       }
-      setCloudSaveNotice((result.data.already_saved ? "This save was already recorded." : "Analysis saved to your private dataset.") + " Original audio was not uploaded.");
+      lastSavedSignatureRef.current = signature;
+      saveAttemptRef.current = null;
+      const duplicates = result.data.duplicate_candidates?.length ?? 0;
+      const duplicateNote = duplicates
+        ? ` ${duplicates} possible SHA-256 match candidate(s) were found. The hashes are not server-verified and records were not merged; review them separately.`
+        : "";
+      setCloudSaveNotice((result.data.already_saved ? "This save was already recorded." : "Analysis saved to your private dataset.") + " Original audio was not uploaded." + duplicateNote);
       setLibraryOpen(true);
       await refreshCloudLibrary(1, "");
     } catch (cause) {
@@ -433,7 +451,7 @@ export function MusicAnalyzerStudio() {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">enV · Audio intelligence</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Music Analyzer</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Local-only dataset preparation: extract timed musical features, pitch and chord estimates, structure cues, and human-reviewed tags for your music generator.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Analyze on this device, review estimated features and human-supplied labels, then export or save structured results to your private dataset. Cloud save never uploads the source audio.</p>
           </div>
         </div>
       </header>
