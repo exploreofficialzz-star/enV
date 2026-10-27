@@ -107,6 +107,37 @@ test("reload recovery never claims interrupted work completed and preserves succ
   assert.match(recovered.items[1]?.error ?? "", /select the original file again/);
 });
 
+test("recovery preserves completed and completed-with-errors terminal states", () => {
+  let completed = createLocalMusicBatch([file("done.wav")], { id: "completed-recovery" });
+  const completedId = completed.items[0]!.id;
+  completed = transitionLocalMusicBatchItem(completed, completedId, "validating");
+  completed = transitionLocalMusicBatchItem(completed, completedId, "decoding");
+  completed = transitionLocalMusicBatchItem(completed, completedId, "analyzing");
+  completed = transitionLocalMusicBatchItem(completed, completedId, "completed");
+  completed = finalizeLocalMusicBatch(completed);
+  assert.equal(recoverLocalMusicBatch(completed, "2026-10-27T02:00:00.000Z").status, "completed");
+
+  let partial = createLocalMusicBatch([file("bad.wav", 0)], { id: "partial-recovery" });
+  partial = finalizeLocalMusicBatch(partial);
+  assert.equal(partial.status, "completed_with_errors");
+  assert.equal(recoverLocalMusicBatch(partial, "2026-10-27T02:00:00.000Z").status, "completed_with_errors");
+});
+
+test("whole-batch cancellation remains canceled when completed results are preserved", () => {
+  let batch = createLocalMusicBatch([file("done.wav"), file("pending.wav")], { id: "cancel-recovery" });
+  const doneId = batch.items[0]!.id;
+  const pendingId = batch.items[1]!.id;
+  batch = transitionLocalMusicBatchItem(batch, doneId, "validating");
+  batch = transitionLocalMusicBatchItem(batch, doneId, "decoding");
+  batch = transitionLocalMusicBatchItem(batch, doneId, "analyzing");
+  batch = transitionLocalMusicBatchItem(batch, doneId, "completed");
+  batch = transitionLocalMusicBatchItem(batch, pendingId, "canceled", { error: "Batch canceled by the user." });
+  const canceled = finalizeLocalMusicBatch({ ...batch, status: "canceled" });
+  assert.equal(canceled.status, "canceled");
+  assert.equal(canceled.items[0]?.status, "completed");
+  assert.equal(canceled.items[1]?.status, "canceled");
+});
+
 test("batch manifest records partial failures and never fabricates result files", () => {
   let batch = createLocalMusicBatch([file("done.wav"), file("bad.wav", 0)], { id: "export" });
   const doneId = batch.items[0]!.id;
