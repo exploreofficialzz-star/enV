@@ -15,6 +15,40 @@ function apiError(error: unknown): Response {
     message: "The private music dataset could not be saved or loaded. No source audio was uploaded by this request; retry when the service is available.",
   }, 503);
 }
+async function consumeDatasetRateLimit(
+  userId: string,
+  operation: "read" | "write" | "delete",
+  maximumRequests: number,
+  windowSeconds = 3600,
+): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql.query<{ allowed: boolean }>(
+    `insert into music_dataset_api_limits (user_id,operation,window_started_at,request_count)
+     values ($1,$2,now(),1)
+     on conflict (user_id,operation) do update set
+       window_started_at = case
+         when music_dataset_api_limits.window_started_at <= now() - ($4::int * interval '1 second') then now()
+         else music_dataset_api_limits.window_started_at
+       end,
+       request_count = case
+         when music_dataset_api_limits.window_started_at <= now() - ($4::int * interval '1 second') then 1
+         else least(music_dataset_api_limits.request_count + 1, $3::int + 1)
+       end,
+       updated_at = now()
+     returning request_count <= $3::int as allowed`,
+    [userId, operation, maximumRequests, windowSeconds],
+  );
+  return rows[0]?.allowed === true;
+}
+
+function datasetRateLimitedResponse(): Response {
+  return jsonResponse({
+    ok: false,
+    error: "MUSIC_DATASET_RATE_LIMITED",
+    message: "The private dataset API rate limit has been reached. Try again after the current hourly window.",
+  }, 429);
+}
+
 async function principal(request: Request): Promise<{ userId: string } | Response> {
   if (!isSameOriginRequest(request)) return jsonResponse({ ok: false, error: "CROSS_ORIGIN_REJECTED", message: "Music dataset changes must come from the enV application." }, 403);
   const auth = await requireBillingUser(request);
@@ -34,6 +68,7 @@ export async function listMusicDatasetTracks(request: Request): Promise<Response
   const auth = await principal(request);
   if (auth instanceof Response) return auth;
   try {
+    if (!(await consumeDatasetRateLimit(auth.userId, "read", 120))) return datasetRateLimitedResponse();
     const url = new URL(request.url);
     const pageValue = Number(url.searchParams.get("page") ?? "1");
     const limitValue = Number(url.searchParams.get("limit") ?? "20");
@@ -65,9 +100,10 @@ export async function saveMusicDatasetTrack(request: Request): Promise<Response>
   if (Number.isFinite(declaredLength) && declaredLength > MAX_JSON_BYTES) return jsonResponse({ ok: false, error: "MUSIC_DATASET_BODY_TOO_LARGE", message: "The analysis export is larger than the 4 MiB save limit." }, 413);
   const auth = await principal(request);
   if (auth instanceof Response) return auth;
-  const body = await readJsonObject(request, MAX_JSON_BYTES);
-  if (!body) return jsonResponse({ ok: false, error: "MUSIC_DATASET_INVALID_JSON", message: "The save request must be valid JSON within the 4 MiB limit." }, 400);
   try {
+    if (!(await consumeDatasetRateLimit(auth.userId, "write", 30))) return datasetRateLimitedResponse();
+    const body = await readJsonObject(request, MAX_JSON_BYTES);
+    if (!body) return jsonResponse({ ok: false, error: "MUSIC_DATASET_INVALID_JSON", message: "The save request must be valid JSON within the 4 MiB limit." }, 400);
     const input = validateMusicDatasetSaveBody(body, auth.userId);
     const sql = await getSql();
     const saved = await sql.transaction(async (tx) => {
@@ -132,6 +168,7 @@ export async function deleteMusicDatasetTrack(request: Request, trackId: string)
   if (auth instanceof Response) return auth;
   if (!/^[0-9a-f-]{36}$/i.test(trackId)) return jsonResponse({ ok: false, error: "INVALID_TRACK_ID", message: "The track ID is invalid." }, 400);
   try {
+    if (!(await consumeDatasetRateLimit(auth.userId, "delete", 10))) return datasetRateLimitedResponse();
     const sql = await getSql();
     const rows = await sql.query<{ id: string }>("delete from music_tracks where id=$1 and user_id=$2 returning id", [trackId, auth.userId]);
     if (!rows.length) return jsonResponse({ ok: false, error: "TRACK_NOT_FOUND", message: "The track does not exist in your dataset or has already been deleted." }, 404);
@@ -147,6 +184,7 @@ export async function getMusicDatasetTrack(request: Request, trackId: string): P
   if (auth instanceof Response) return auth;
   if (!/^[0-9a-f-]{36}$/i.test(trackId)) return jsonResponse({ ok: false, error: "INVALID_TRACK_ID", message: "The track ID is invalid." }, 400);
   try {
+    if (!(await consumeDatasetRateLimit(auth.userId, "read", 120))) return datasetRateLimitedResponse();
     const sql = await getSql();
     const tracks = await sql.query<JsonRecord>(
       "select id,file_name,file_size_bytes,mime_type,source_sha256,source_sha256_verified,duration_seconds,sample_rate_hz,channels,source_metadata,normalized_metadata,rights_status,retention_policy,created_at,updated_at " +
@@ -178,6 +216,7 @@ export async function getMusicAnalysisRun(request: Request, runId: string): Prom
   if (auth instanceof Response) return auth;
   if (!/^[0-9a-f-]{36}$/i.test(runId)) return jsonResponse({ ok: false, error: "INVALID_ANALYSIS_RUN_ID", message: "The analysis run ID is invalid." }, 400);
   try {
+    if (!(await consumeDatasetRateLimit(auth.userId, "read", 120))) return datasetRateLimitedResponse();
     const url = new URL(request.url);
     const parseOffset = (key: string) => {
       const value = Number(url.searchParams.get(key) ?? "0");
