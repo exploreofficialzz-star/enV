@@ -11,6 +11,7 @@ import { analyzeMusicInWorker } from "@/lib/media/music-analysis.worker-client";
 import {
   createLocalMusicBatch,
   countLocalMusicBatchItems,
+  deleteLocalMusicBatch,
   finalizeLocalMusicBatch,
   listLocalMusicBatches,
   localMusicBatchExport,
@@ -389,6 +390,22 @@ export function MusicAnalyzerStudio() {
       }
     } else {
       setBatchMessage("Cancel requested. The active local track is stopping; completed results will remain available.");
+    }
+  }
+
+  async function deleteCurrentLocalBatch() {
+    if (!localBatch || batchBusy) return;
+    if (!window.confirm("Delete this local batch, its saved analysis results, and its progress history from this browser? Original audio files were not stored here.")) return;
+    try {
+      const deletedId = localBatch.id;
+      await deleteLocalMusicBatch(deletedId);
+      const remaining = batchHistory.filter((entry) => entry.id !== deletedId);
+      setBatchHistory(remaining);
+      setLocalBatch(remaining[0] ?? null);
+      setBatchError("");
+      setBatchMessage("Local batch and its saved results were deleted from this browser.");
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not delete local batch data.");
     }
   }
 
@@ -1120,6 +1137,7 @@ export function MusicAnalyzerStudio() {
                 const prior = batchHistory.find((entry) => entry.id !== localBatch.id);
                 if (prior) { setLocalBatch(prior); setBatchError(""); setBatchMessage("Viewing a previous local batch. Re-select its source files to resume incomplete items."); }
               }}>Open previous batch</Button>
+              <Button type="button" size="sm" variant="ghost" disabled={batchBusy} onClick={() => void deleteCurrentLocalBatch()}>Delete local batch data</Button>
             </div>
             <p className="text-xs leading-5 text-muted-foreground">Progress reflects stages, not a promised completion time. Completed results remain available after cancellation. Local batch history is browser storage, not a cloud backup.</p>
             <div className="space-y-2">
