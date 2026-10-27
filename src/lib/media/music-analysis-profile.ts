@@ -13,6 +13,7 @@ type MetadataSource = "embedded_metadata" | "unknown";
  */
 export type MusicAnalysisProfile = {
   schema_version: "env.music-profile.v2";
+  fingerprint: MusicAnalysisResult["fingerprint"];
   genre: string | null;
   sub_style: string | null;
   language: string[];
@@ -62,6 +63,7 @@ export function createMusicAnalysisProfile(result: MusicAnalysisResult): MusicAn
 
   return {
     schema_version: "env.music-profile.v2",
+    fingerprint: { ...result.fingerprint },
     genre: classification.genre,
     sub_style: classification.sub_style,
     language: [...classification.language],
