@@ -1,8 +1,7 @@
-import { genericOAuthClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { OAUTH_PROVIDERS } from "./providers";
 
-export const authClient = createAuthClient({ plugins: [genericOAuthClient()] });
+export const authClient = createAuthClient();
 
 /** Authentication remains off unless it is explicitly enabled at build time. */
 export const authEnabled = import.meta.env.VITE_AUTH_ENABLED === "true";
@@ -17,8 +16,8 @@ export async function signIn(
   providerId: string,
   options: { callbackURL?: string; errorCallbackURL?: string } = {},
 ): Promise<void> {
-  const { data, error } = await authClient.signIn.oauth2({
-    providerId,
+  const { data, error } = await authClient.signIn.social({
+    provider: providerId,
     callbackURL: options.callbackURL ?? "/",
     errorCallbackURL: options.errorCallbackURL ?? "/login",
   });
