@@ -330,3 +330,88 @@ export async function deleteMusicDatasetTrack(request: Request, trackId: string)
     return apiError(error);
   }
 }
+
+
+export async function getMusicDatasetTrack(request: Request, trackId: string): Promise<Response> {
+  const auth = await principal(request);
+  if (auth instanceof Response) return auth;
+  if (!/^[0-9a-f-]{36}$/i.test(trackId)) return jsonResponse({ ok: false, error: "INVALID_TRACK_ID", message: "The track ID is invalid." }, 400);
+  try {
+    const sql = await getSql();
+    const tracks = await sql.query<JsonRecord>(
+      "select id,file_name,file_size_bytes,mime_type,source_sha256,source_sha256_verified,duration_seconds,sample_rate_hz,channels,source_metadata,normalized_metadata,rights_status,retention_policy,created_at,updated_at " +
+      "from music_tracks where id=$1 and user_id=$2 limit 1",
+      [trackId, auth.userId],
+    );
+    const track = tracks[0];
+    if (!track) return jsonResponse({ ok: false, error: "TRACK_NOT_FOUND", message: "The track does not exist in your private dataset." }, 404);
+    const [runs, annotations] = await Promise.all([
+      sql.query<JsonRecord>(
+        "select id,run_number,analysis_schema_version,dataset_schema_version,engine_version,processing_route,status,source_sha256,warnings,result_checksum,started_at,completed_at,created_at,analysis_summary,dataset_summary " +
+        "from music_analysis_runs where user_id=$1 and track_id=$2 order by run_number desc limit 50",
+        [auth.userId, trackId],
+      ),
+      sql.query<JsonRecord>(
+        "select distinct on (field_key) field_key,field_value,source,review_state,reviewer_id,evidence,notes,created_at " +
+        "from music_annotations where user_id=$1 and track_id=$2 order by field_key,created_at desc",
+        [auth.userId, trackId],
+      ),
+    ]);
+    return jsonResponse({ ok: true, data: { track, runs, latest_annotation_revisions: annotations, source_audio_available: false } });
+  } catch (error) {
+    return apiError(error);
+  }
+}
+
+export async function getMusicAnalysisRun(request: Request, runId: string): Promise<Response> {
+  const auth = await principal(request);
+  if (auth instanceof Response) return auth;
+  if (!/^[0-9a-f-]{36}$/i.test(runId)) return jsonResponse({ ok: false, error: "INVALID_ANALYSIS_RUN_ID", message: "The analysis run ID is invalid." }, 400);
+  try {
+    const url = new URL(request.url);
+    const parseOffset = (key: string) => {
+      const value = Number(url.searchParams.get(key) ?? "0");
+      return Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 10_000_000) : 0;
+    };
+    const parseLimit = (key: string) => {
+      const value = Number(url.searchParams.get(key) ?? "200");
+      return Number.isSafeInteger(value) && value >= 1 ? Math.min(value, 500) : 200;
+    };
+    const frameOffset = parseOffset("frames_offset");
+    const frameLimit = parseLimit("frames_limit");
+    const eventOffset = parseOffset("events_offset");
+    const eventLimit = parseLimit("events_limit");
+    const sql = await getSql();
+    const rows = await sql.query<JsonRecord>(
+      "select id,user_id,track_id,run_number,analysis_schema_version,dataset_schema_version,engine_version,processing_route,status,source_sha256,analysis_summary,dataset_summary,warnings,result_checksum,created_at " +
+      "from music_analysis_runs where id=$1 and user_id=$2 limit 1",
+      [runId, auth.userId],
+    );
+    const run = rows[0];
+    if (!run) return jsonResponse({ ok: false, error: "ANALYSIS_RUN_NOT_FOUND", message: "The analysis run does not exist in your private dataset." }, 404);
+    const [frameCount, frames, eventCount, events] = await Promise.all([
+      sql.query<{ total: number }>("select count(*)::int as total from music_feature_frames where user_id=$1 and analysis_run_id=$2", [auth.userId, runId]),
+      sql.query<JsonRecord>(
+        "select frame_index,start_seconds,end_seconds,start_sample_frame,end_sample_frame,features from music_feature_frames " +
+        "where user_id=$1 and analysis_run_id=$2 order by frame_index limit $3 offset $4",
+        [auth.userId, runId, frameLimit, frameOffset],
+      ),
+      sql.query<{ total: number }>("select count(*)::int as total from music_analysis_events where user_id=$1 and analysis_run_id=$2", [auth.userId, runId]),
+      sql.query<JsonRecord>(
+        "select event_type,event_index,start_seconds,end_seconds,payload from music_analysis_events " +
+        "where user_id=$1 and analysis_run_id=$2 order by start_seconds,event_type,event_index limit $3 offset $4",
+        [auth.userId, runId, eventLimit, eventOffset],
+      ),
+    ]);
+    return jsonResponse({
+      ok: true,
+      data: {
+        run,
+        timeline_page: { items: frames, offset: frameOffset, limit: frameLimit, total: Number(frameCount[0]?.total ?? 0), next_offset: frameOffset + frames.length < Number(frameCount[0]?.total ?? 0) ? frameOffset + frames.length : null },
+        events_page: { items: events, offset: eventOffset, limit: eventLimit, total: Number(eventCount[0]?.total ?? 0), next_offset: eventOffset + events.length < Number(eventCount[0]?.total ?? 0) ? eventOffset + events.length : null },
+      },
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+}
