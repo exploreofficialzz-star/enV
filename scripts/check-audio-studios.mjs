@@ -106,7 +106,7 @@ const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
 const musicAnalysisProfile = fs.readFileSync(new URL("../src/lib/media/music-analysis-profile.ts", import.meta.url), "utf8");
-for (const marker of ["Analyze on this device", "Song profile JSON", "Training metadata JSON", "createMusicAnalysisProfile", "analyzeMusicDatasetAudio", "createLocalSignalLayers", "Repeated passage candidates", "repetition_candidates", "Training labels", "local-signal-layers.zip", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
+for (const marker of ["Analyze on this device", "Song profile JSON", "Training metadata JSON", "createMusicAnalysisProfile", "analyzeMusicInWorker", "createLocalSignalLayers", "Repeated passage candidates", "repetition_candidates", "Training labels", "local-signal-layers.zip", "probeAudioDuration", "MAX_AUDIO_DURATION_SECONDS"]) {
   assert.ok(musicAnalyzer.includes(marker), `Music Analyzer UI contract missing: ${marker}`);
 }
 assert.ok(!musicAnalyzer.includes("allowModelUpload"), "Music Analyzer must not send audio to a hosted classifier");
