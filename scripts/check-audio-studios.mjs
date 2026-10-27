@@ -116,7 +116,7 @@ const mediaBackendSource = fs.readFileSync(new URL("../src/lib/media/media-backe
 for (const marker of [
   "FFmpeg ebur128 loudness report (optional)", "loudnessUploadConsent", "runStandardsLoudnessMeasurement",
   "Measure with FFmpeg ebur128", "verifyMusicLoudnessReportChecksum", "standards_loudness_report: standardLoudnessReport",
-  "configured enV media processor",
+  "configured enV media processor", "explicitAudioUploadConsent",
 ]) {
   assert.ok(musicAnalyzer.includes(marker), `Optional standards meter UI missing explicit opt-in contract ${marker}`);
 }
@@ -128,7 +128,7 @@ for (const marker of [
   'method_id: "ffmpeg-ebur128-peak-sample-plus-true"',
   "integrated_loudness_lufs", "loudness_range_lu", "sample_peak_dbfs", "true_peak_dbtp",
   "file_sha256_verified: true", "result_checksum", "MAX_LOUDNESS_REPORT_DURATION_SECONDS",
-  "hasEbur128Filter()", "ebur128=peak=sample+true",
+  "hasEbur128Filter()", "ebur128=peak=sample+true", "params.explicitAudioUploadConsent !== true", "AUDIO_UPLOAD_CONSENT_REQUIRED",
 ]) {
   assert.ok(mediaProcessorSource.includes(marker), `FFmpeg standards loudness report contract missing ${marker}`);
 }
@@ -139,6 +139,8 @@ for (const marker of [
   assert.ok(musicLoudnessReport.includes(marker), `Loudness report validation missing ${marker}`);
 }
 assert.ok(mediaProcessorTests.includes("known loudness"), "Processor regression test must measure a synthetic known-level tone.");
+assert.ok(mediaProcessorTests.includes("rejects loudness uploads without explicit per-request consent"), "Processor regression must reject loudness uploads lacking explicit consent.");
+
 assert.ok(mediaProcessorTests.includes("expected a 1 kHz -23 dBFS tone near -23 LUFS"), "Processor regression must assert a numerical loudness tolerance.");
 assert.ok(musicLoudnessTests.includes("rejects tampering"), "Meter report integrity validation must have a tamper test.");
 assert.ok(mediaBackendSource.includes("problem?.message") && mediaBackendSource.includes("slice(0, 600)"), "Media failures must retain bounded actionable processor messages.");
