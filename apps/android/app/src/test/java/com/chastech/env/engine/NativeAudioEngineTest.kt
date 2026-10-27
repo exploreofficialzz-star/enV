@@ -67,6 +67,7 @@ class NativeAudioEngineTest {
         val result = NativeAudioWavProcessor.process(wav, operation = "analyze", fileName = "tone.wav")
         val root = JSONObject(result.report)
         assertEquals("env.music-analysis.v2", root.getString("schema_version"))
+        assertEquals("human_review_required", root.getJSONObject("classification").getString("status"))
         val fingerprint = root.getJSONObject("fingerprint")
         val expectedHash = MessageDigest.getInstance("SHA-256").digest(wav)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
