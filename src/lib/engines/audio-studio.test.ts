@@ -309,6 +309,13 @@ test("Music Analyzer profile migration preserves values but removes unverifiable
     schema_version: "env.music-profile.v1",
     genre: "Afrobeats",
     language: ["Nigerian Pidgin", "Yoruba"],
+    duration_seconds: 183.4,
+    audio_metrics: {
+      duration_seconds: 183.4,
+      rms_dbfs: -12.059,
+      estimated_loudness_lufs: -12.75,
+      metric_scope_seconds: 30,
+    },
     analysis_status: {
       genre: "model_estimate",
       sub_style: "model_estimate",
@@ -326,6 +333,11 @@ test("Music Analyzer profile migration preserves values but removes unverifiable
   assert.equal(migrated.schema_version, "env.music-profile.v2");
   assert.equal(migrated.genre, "Afrobeats");
   assert.deepEqual(migrated.language, ["Nigerian Pidgin", "Yoruba"]);
+  const audioMetrics = migrated.audio_metrics as Record<string, unknown>;
+  assert.equal(audioMetrics.rms_loudness_proxy_db, -12.75);
+  assert.equal(Object.hasOwn(audioMetrics, "estimated_loudness_lufs"), false);
+  assert.equal(audioMetrics.metric_scope_seconds, 183.4);
+  assert.equal((migrated.fingerprint as Record<string, unknown>).exact_match_method, "not-computed");
   assert.equal(status.genre, "unknown");
   assert.equal(status.sub_style, "unknown");
   assert.equal(status.language, "unknown");
