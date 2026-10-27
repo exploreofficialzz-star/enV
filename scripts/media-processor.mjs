@@ -311,6 +311,16 @@ async function handleMedia(req, res) {
   if (mediaFiles.some((item) => item.size <= 0)) return json(res, 400, { error: "One of the uploaded media files is empty." });
   if (totalBytes > MAX_BYTES) return json(res, 413, { error: `Combined upload exceeds the ${Math.round(MAX_BYTES / 1024 / 1024)} MB limit.` });
   let params; try { params = JSON.parse(rawParams); } catch { return json(res, 400, { error: "Invalid media parameters." }); }
+  if (
+    spec.analysis === "ebu-r128" &&
+    (!params || typeof params !== "object" || Array.isArray(params) || params.explicitAudioUploadConsent !== true)
+  ) {
+    return json(res, 403, {
+      ok: false,
+      error: "AUDIO_UPLOAD_CONSENT_REQUIRED",
+      message: "This standards loudness operation requires an explicit per-request audio-upload consent flag.",
+    });
+  }
 
   const jobDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-media-"));
   const inputPaths = [];
