@@ -88,7 +88,7 @@ test("collection downloads first preview ten tracks with an expandable list on a
   assert.match(web, /downloadPreview\(index\)/);
   assert.match(web, /See more \(/);
   assert.match(web, /Download ZIP \(/);
-  assert.match(android, /resolveProviderMusicPage\(source, true\)/);
+  assert.match(android, /resolveProviderMusicPage\(source, musicPageIsCollection\(source\.url\)\)/);
   assert.match(android, /previewTracks\.take\(if \(showAllPreview\) previewTracks\.size else 10\)/);
   assert.match(android, /ZipOutputStream\(/);
   assert.match(android, /MediaStore\.Downloads\.EXTERNAL_CONTENT_URI/);
