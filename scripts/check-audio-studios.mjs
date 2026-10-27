@@ -209,7 +209,7 @@ for (const marker of [
   assert.ok(musicDatasetValidation.includes(marker), `Music dataset payload validation missing ${marker}`);
 }
 for (const marker of [
-  "validMusicDatasetSavePayload", "Save validator builds bounded",
+  "validMusicDatasetSavePayload", "save validator builds bounded",
   "inconsistent hashes", "oversized feature/event arrays",
 ]) {
   assert.ok(musicDatasetTest.includes(marker), `Music dataset validation regression coverage missing ${marker}`);
