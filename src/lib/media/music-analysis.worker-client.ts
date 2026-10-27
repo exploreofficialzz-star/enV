@@ -41,15 +41,19 @@ export function analyzeMusicInWorker(
   }
 
   // Embedded artwork can be large; it is not an input to technical DSP.
-  const metadata = input.metadata
-    ? { ...input.metadata, artwork: undefined }
-    : undefined;
+  let metadata: MusicAnalysisInput["metadata"];
+  if (input.metadata) {
+    const { artwork: _artwork, ...textMetadata } = input.metadata;
+    metadata = textMetadata;
+  }
   const payload = {
-    ...input,
-    metadata,
-    channels: channelBuffers,
     type: "analyze" as const,
     requestId,
+    input: {
+      ...input,
+      metadata,
+      channels: channelBuffers,
+    },
   };
 
   return new Promise<MusicWorkerResult>((resolve, reject) => {
