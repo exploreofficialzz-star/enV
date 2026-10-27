@@ -107,6 +107,19 @@ test("reload recovery never claims interrupted work completed and preserves succ
   assert.match(recovered.items[1]?.error ?? "", /select the original file again/);
 });
 
+test("cloud dataset idempotency and saved-record IDs are retained in local manifests", () => {
+  let batch = createLocalMusicBatch([file("cloud.wav")], { id: "cloud-save-state" });
+  const id = batch.items[0]!.id;
+  batch = updateLocalMusicBatchItem(batch, id, {
+    cloudSaveIdempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+    cloudSavedTrackId: "123e4567-e89b-42d3-a456-426614174001",
+  });
+  assert.equal(batch.items[0]?.cloudSaveIdempotencyKey, "123e4567-e89b-42d3-a456-426614174000");
+  const manifest = localMusicBatchExport(batch);
+  assert.equal(manifest.items[0]?.cloud_dataset_track_id, "123e4567-e89b-42d3-a456-426614174001");
+  assert.equal(manifest.items[0]?.cloud_save_idempotency_key, "123e4567-e89b-42d3-a456-426614174000");
+});
+
 test("recovery preserves completed and completed-with-errors terminal states", () => {
   let completed = createLocalMusicBatch([file("done.wav")], { id: "completed-recovery" });
   const completedId = completed.items[0]!.id;
