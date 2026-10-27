@@ -108,6 +108,41 @@ const musicWorker = fs.readFileSync(new URL("../src/lib/media/music-analysis.wor
 const musicWorkerClient = fs.readFileSync(new URL("../src/lib/media/music-analysis.worker-client.ts", import.meta.url), "utf8");
 const musicWorkerCore = fs.readFileSync(new URL("../src/lib/media/music-analysis-worker-core.ts", import.meta.url), "utf8");
 const musicWorkerCoreTests = fs.readFileSync(new URL("../src/lib/media/music-analysis-worker-core.test.ts", import.meta.url), "utf8");
+const musicLoudnessReport = fs.readFileSync(new URL("../src/lib/media/music-loudness-report.ts", import.meta.url), "utf8");
+const musicLoudnessTests = fs.readFileSync(new URL("../src/lib/media/music-loudness-report.test.ts", import.meta.url), "utf8");
+const mediaProcessorSource = fs.readFileSync(new URL("../scripts/media-processor.mjs", import.meta.url), "utf8");
+const mediaProcessorTests = fs.readFileSync(new URL("../scripts/media-processor.test.mjs", import.meta.url), "utf8");
+const mediaBackendSource = fs.readFileSync(new URL("../src/lib/media/media-backends.ts", import.meta.url), "utf8");
+for (const marker of [
+  "Standards loudness meter (optional)", "loudnessUploadConsent", "runStandardsLoudnessMeasurement",
+  "Measure with FFmpeg ebur128", "verifyMusicLoudnessReportChecksum", "standards_loudness_report: standardLoudnessReport",
+  "source audio file to the configured enV processor",
+]) {
+  assert.ok(musicAnalyzer.includes(marker), `Optional standards meter UI missing explicit opt-in contract ${marker}`);
+}
+assert.ok(!musicAnalyzer.includes('checked={true}'), "Standards meter consent must never be pre-checked.");
+assert.ok(musicAnalyzer.includes("if (!loudnessUploadConsent)"), "Standards meter must reject upload attempts without separate explicit consent.");
+assert.ok(musicAnalyzer.includes('operation: "server-media:audio-loudness-report"'), "Standards loudness operation must use the established server-media adapter.");
+for (const marker of [
+  'schema_version: "env.music-loudness-report.v1"',
+  'method_id: "ffmpeg-ebur128-peak-sample-plus-true"',
+  "integrated_loudness_lufs", "loudness_range_lu", "sample_peak_dbfs", "true_peak_dbtp",
+  "file_sha256_verified: true", "result_checksum", "MAX_LOUDNESS_REPORT_DURATION_SECONDS",
+  "hasEbur128Filter()", "ebur128=peak=sample+true",
+]) {
+  assert.ok(mediaProcessorSource.includes(marker), `FFmpeg standards loudness report contract missing ${marker}`);
+}
+for (const marker of [
+  "parseMusicLoudnessReport", "verifyMusicLoudnessReportChecksum", "file_sha256_verified !== true",
+  "method_id !==", "units.true_peak !== \"dBTP\"",
+]) {
+  assert.ok(musicLoudnessReport.includes(marker), `Loudness report validation missing ${marker}`);
+}
+assert.ok(mediaProcessorTests.includes("known loudness"), "Processor regression test must measure a synthetic known-level tone.");
+assert.ok(mediaProcessorTests.includes("expected a 1 kHz -23 dBFS tone near -23 LUFS"), "Processor regression must assert a numerical loudness tolerance.");
+assert.ok(musicLoudnessTests.includes("rejects tampering"), "Meter report integrity validation must have a tamper test.");
+assert.ok(mediaBackendSource.includes("problem?.message") && mediaBackendSource.includes("slice(0, 600)"), "Media failures must retain bounded actionable processor messages.");
+
 for (const marker of [
   "Select tracks", "Create batch", "Start / resume", "saveCompletedBatchToCloud",
   "Save results to private dataset", "exportLocalBatch(\"zip\")", "exportLocalBatch(\"jsonl\")",
