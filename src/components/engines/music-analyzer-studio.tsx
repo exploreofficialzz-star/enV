@@ -108,6 +108,18 @@ async function exactFileSha256(bytes: ArrayBuffer): Promise<string | null> {
   }
 }
 
+type SavedDatasetTrack = {
+  id: string;
+  file_name: string;
+  file_size_bytes: number;
+  duration_seconds: number | null;
+  source_sha256: string | null;
+  normalized_metadata: { title?: string | null; artist?: string | null; album?: string | null } | null;
+  created_at: string;
+  analysis_run_count: number | string;
+  latest_run: { id: string; run_number: number; status: string } | null;
+};
+
 
 export function MusicAnalyzerStudio() {
   const [file, setFile] = useState<File | null>(null);
@@ -120,6 +132,16 @@ export function MusicAnalyzerStudio() {
   const [layersBusy, setLayersBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [savingCloud, setSavingCloud] = useState(false);
+  const [cloudSaveError, setCloudSaveError] = useState("");
+  const [cloudSaveNotice, setCloudSaveNotice] = useState("");
+  const [rightsStatus, setRightsStatus] = useState("unknown");
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryItems, setLibraryItems] = useState<SavedDatasetTrack[]>([]);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [libraryPage, setLibraryPage] = useState(1);
+  const [libraryTotal, setLibraryTotal] = useState(0);
   const analysisControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
@@ -284,6 +306,81 @@ export function MusicAnalyzerStudio() {
   function updateAnnotationList(key: AnnotationListKey, value: string) {
     const tags = value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 80);
     setAnnotations((current) => ({ ...current, [key]: tags, reviewed: false }));
+  }
+
+  async function refreshCloudLibrary(page = libraryPage, query = libraryQuery) {
+    setLibraryLoading(true);
+    setCloudSaveError("");
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: "10", q: query.trim() });
+      const response = await fetch("/api/music-dataset/tracks?" + params.toString(), { headers: { Accept: "application/json" } });
+      const result = await response.json().catch(() => null) as { ok?: boolean; data?: { items?: SavedDatasetTrack[]; pagination?: { page: number; total: number } }; message?: string; error?: string } | null;
+      if (!response.ok || !result?.ok || !result.data) {
+        throw new Error(result?.message || (response.status === 401 ? "Sign in to load your private music library." : response.status === 503 ? "Cloud dataset access is not configured for this deployment. Local analysis and export still work." : "Could not load the private music library."));
+      }
+      setLibraryItems(result.data.items ?? []);
+      setLibraryPage(result.data.pagination?.page ?? page);
+      setLibraryTotal(result.data.pagination?.total ?? 0);
+    } catch (cause) {
+      setCloudSaveError(cause instanceof Error ? cause.message : "Could not load the private music library.");
+    } finally {
+      setLibraryLoading(false);
+    }
+  }
+
+  async function saveAnalysisToCloud() {
+    if (!file || !analysis || !datasetAnalysis || savingCloud) return;
+    setSavingCloud(true);
+    setCloudSaveError("");
+    setCloudSaveNotice("");
+    try {
+      const idempotencyKey = crypto.randomUUID();
+      const payload = {
+        idempotency_key: idempotencyKey,
+        file: {
+          name: file.name,
+          size_bytes: file.size,
+          mime_type: file.type || null,
+          source_sha256: analysis.fingerprint.file_sha256,
+          source_metadata: analysis.metadata,
+          normalized_metadata: analysis.metadata,
+          rights_status: rightsStatus,
+        },
+        analysis,
+        dataset_analysis: { ...datasetAnalysis, annotations },
+      };
+      // This request intentionally contains structured results only; the audio File/ArrayBuffer is never attached.
+      const response = await fetch("/api/music-dataset/tracks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => null) as { ok?: boolean; data?: { track_id?: string; analysis_run_id?: string; already_saved?: boolean; duplicate_candidates?: unknown[] }; message?: string; error?: string; note?: string } | null;
+      if (!response.ok || !result?.ok || !result.data?.track_id) {
+        throw new Error(result?.message || (response.status === 401 ? "Sign in to save to your private music library." : response.status === 503 ? "Cloud dataset access is not configured for this deployment. Your local results remain available." : "Could not save this analysis."));
+      }
+      setCloudSaveNotice((result.data.already_saved ? "This save was already recorded." : "Analysis saved to your private dataset.") + " Original audio was not uploaded.");
+      setLibraryOpen(true);
+      await refreshCloudLibrary(1, "");
+    } catch (cause) {
+      setCloudSaveError(cause instanceof Error ? cause.message : "Could not save this analysis.");
+    } finally {
+      setSavingCloud(false);
+    }
+  }
+
+  async function deleteSavedTrack(trackId: string) {
+    if (!window.confirm("Delete this track's saved metadata, analysis history, feature data and annotations? The original audio was not stored here.")) return;
+    setCloudSaveError("");
+    try {
+      const response = await fetch("/api/music-dataset/tracks/" + encodeURIComponent(trackId), { method: "DELETE", headers: { Accept: "application/json" } });
+      const result = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+      if (!response.ok || !result?.ok) throw new Error(result?.message || "Could not delete this dataset record.");
+      setCloudSaveNotice("Saved dataset record and its derived rows deleted.");
+      await refreshCloudLibrary(libraryPage);
+    } catch (cause) {
+      setCloudSaveError(cause instanceof Error ? cause.message : "Could not delete this dataset record.");
+    }
   }
 
   async function exportSignalLayers() {
