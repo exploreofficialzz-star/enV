@@ -6,6 +6,7 @@ export const MUSIC_LOCAL_BATCH_LIMITS = {
   maxItems: 20,
   maxFileBytes: 25 * 1024 * 1024,
   maxTotalBytes: 200 * 1024 * 1024,
+  maxDecodedPcmBytes: 64 * 1024 * 1024,
   maxDurationSeconds: 120,
   retainedBatchList: 10,
 } as const;
@@ -61,6 +62,21 @@ export type LocalMusicBatchCounts = {
   failed: number;
   canceled: number;
 };
+
+/** Reject decoded PCM whose transferable copy would exceed the local memory budget. */
+export function assertLocalDecodedPcmBudget(frameCount: number, channelCount: number): number {
+  if (!Number.isSafeInteger(frameCount) || frameCount <= 0) {
+    throw new Error("Decoded audio frame count is invalid.");
+  }
+  if (!Number.isSafeInteger(channelCount) || channelCount < 1 || channelCount > 64) {
+    throw new Error("Decoded audio channel count is outside the supported local range.");
+  }
+  const bytes = frameCount * channelCount * Float32Array.BYTES_PER_ELEMENT;
+  if (!Number.isSafeInteger(bytes) || bytes > MUSIC_LOCAL_BATCH_LIMITS.maxDecodedPcmBytes) {
+    throw new Error("Decoded audio exceeds the 64 MiB on-device PCM memory budget. Try a shorter excerpt, fewer channels, or a lower sample rate.");
+  }
+  return bytes;
+}
 
 export type LocalMusicBatchOptions = {
   id?: string;
