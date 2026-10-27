@@ -247,8 +247,9 @@ export function recoverLocalMusicBatch(batch: LocalMusicBatch, now = new Date().
     }
     return item;
   });
-  const recovered = { ...batch, items, status: "paused" as const, updatedAt: now };
-  return recovered;
+  const hasInterruptedWork = items.some((item) => item.status === "waiting_for_file" || item.status === "queued");
+  if (hasInterruptedWork) return { ...batch, items, status: "paused", updatedAt: now };
+  return finalizeLocalMusicBatch({ ...batch, items, updatedAt: now }, now);
 }
 
 export function localMusicBatchExport(batch: LocalMusicBatch, exportedAt = new Date().toISOString()) {
@@ -317,7 +318,16 @@ export async function saveLocalMusicBatch(batch: LocalMusicBatch): Promise<void>
   const database = await openBatchDatabase();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(batch);
+    const store = transaction.objectStore(STORE_NAME);
+    store.put(batch);
+    const list = store.getAll();
+    list.onsuccess = () => {
+      const batches = (list.result as LocalMusicBatch[]).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      for (const expired of batches.slice(MUSIC_LOCAL_BATCH_LIMITS.retainedBatchList)) store.delete(expired.id);
+    };
+    list.onerror = () => {
+      try { transaction.abort(); } catch { /* the transaction may already be aborting */ }
+    };
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error("Could not persist batch progress."));
     transaction.onabort = () => reject(transaction.error ?? new Error("Local batch persistence was aborted."));
