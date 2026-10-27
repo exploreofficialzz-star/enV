@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import enV
 
 final class NativeAudioEngineTests: XCTestCase {
@@ -59,6 +60,10 @@ final class NativeAudioEngineTests: XCTestCase {
         let result = try NativeAudioWavProcessor.process(wav, operation: "analyze", fileName: "tone.wav")
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(result.report.utf8)) as? [String: Any])
         XCTAssertEqual(object["schema_version"] as? String, "env.music-analysis.v2")
+        let fingerprint = try XCTUnwrap(object["fingerprint"] as? [String: Any])
+        let expectedHash = SHA256.hash(data: wav).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(fingerprint["file_sha256"] as? String, expectedHash)
+        XCTAssertEqual(fingerprint["exact_match_method"] as? String, "sha-256-exact-file-bytes")
         let source = try XCTUnwrap(object["source"] as? [String: Any])
         XCTAssertEqual(source["file_name"] as? String, "tone.wav")
         let audio = try XCTUnwrap(object["audio"] as? [String: Any])
