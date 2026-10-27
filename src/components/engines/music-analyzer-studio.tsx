@@ -1429,13 +1429,16 @@ export function MusicAnalyzerStudio() {
               {batchCloudMessage ? <p className="mt-2 text-xs" role="status" aria-live="polite">{batchCloudMessage}</p> : null}
               {batchCloudError ? <p className="mt-2 text-xs text-destructive" role="alert">{batchCloudError}</p> : null}
             </div>
-            <p className="text-xs leading-5 text-muted-foreground">Progress reflects stages, not a promised completion time. Completed results remain available after cancellation. Local batch history is browser storage, not a cloud backup.</p>
+            <p className="text-xs leading-5 text-muted-foreground">The percentage is stage progress, not an ETA or a precise measure of CPU work; DSP progress comes from the worker callbacks and stage milestones are coarse. Completed results remain available after cancellation. Local batch history is browser storage, not a cloud backup.</p>
             <div className="space-y-2">
               {localBatch.items.map((item) => <div key={item.id} className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="break-all text-sm font-medium">{item.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{formatBytes(item.sizeBytes)} · {item.status.replace(/_/g, " ")} · {item.stage}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatBytes(item.sizeBytes)} · {item.status.replace(/_/g, " ")} · {item.stage} · stage progress {Math.round(item.progress * 100)}%</p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label={item.name + " analysis stage progress"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(item.progress * 100)}>
+                      <div className="h-full rounded-full bg-accent" style={{ width: Math.round(item.progress * 100) + "%" }} />
+                    </div>
                     {item.error ? <p className="mt-1 break-words text-xs text-destructive">{item.error}</p> : null}
                     {item.warnings.length ? <p className="mt-1 text-xs text-muted-foreground">{item.warnings.join(" · ")}</p> : null}
                     {item.status === "completed" && item.result ? <p className="mt-1 text-xs text-muted-foreground">Tempo {displayNumber(item.result.analysis.rhythm.tempo_bpm, " BPM")} · Key {item.result.analysis.tonality.key ?? "not available"} · source hash {item.sourceSha256 ? "computed locally" : "not computed"}</p> : null}
