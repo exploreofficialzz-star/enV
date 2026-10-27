@@ -109,7 +109,7 @@ const musicWorkerClient = fs.readFileSync(new URL("../src/lib/media/music-analys
 const musicWorkerCore = fs.readFileSync(new URL("../src/lib/media/music-analysis-worker-core.ts", import.meta.url), "utf8");
 const musicWorkerCoreTests = fs.readFileSync(new URL("../src/lib/media/music-analysis-worker-core.test.ts", import.meta.url), "utf8");
 for (const marker of [
-  "Select tracks", "Create batch", "Start / resume", "Save completed batch reports",
+  "Select tracks", "Create batch", "Start / resume", "saveCompletedBatchToCloud",
   "Save results to private dataset", "exportLocalBatch(\"zip\")", "exportLocalBatch(\"jsonl\")",
   "exportLocalBatch(\"csv\")", "assertLocalDecodedPcmBudget", "analyzeMusicInWorker",
   "saveCompletedBatchToCloud", "cloudSaveIdempotencyKey", "cloudSavedTrackId",
