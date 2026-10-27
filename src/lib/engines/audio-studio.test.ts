@@ -394,7 +394,7 @@ test("Music Analyzer dataset migration creates the persistent owner-scoped schem
     const expected = [
       "music_tracks", "music_analysis_runs", "music_feature_frames",
       "music_analysis_events", "music_annotations", "music_collections",
-      "music_collection_tracks",
+      "music_collection_tracks", "music_dataset_api_limits",
     ];
     const tableResult = await database.query<{ table_name: string }>(
       "select table_name from information_schema.tables where table_schema='public' and table_name = any($1)",
@@ -422,6 +422,27 @@ test("Music Analyzer dataset migration creates the persistent owner-scoped schem
       "select indexname from pg_indexes where schemaname='public' and indexname in ('music_tracks_owner_hash_idx','music_tracks_owner_search_idx','music_analysis_runs_track_history_idx')",
     );
     assert.equal(indexes.rows.length, 3, "Search and owner/history indexes must be applied");
+
+    await database.query('insert into "user" (id) values ($1)', ["test-user"]);
+    const consumeLimit = `insert into music_dataset_api_limits (user_id,operation,window_started_at,request_count)
+      values ($1,$2,now(),1)
+      on conflict (user_id,operation) do update set
+        window_started_at = case
+          when music_dataset_api_limits.window_started_at <= now() - ($4::int * interval '1 second') then now()
+          else music_dataset_api_limits.window_started_at
+        end,
+        request_count = case
+          when music_dataset_api_limits.window_started_at <= now() - ($4::int * interval '1 second') then 1
+          else least(music_dataset_api_limits.request_count + 1, $3::int + 1)
+        end,
+        updated_at = now()
+      returning request_count, request_count <= $3::int as allowed`;
+    const firstLimit = await database.query<{ request_count: number; allowed: boolean }>(consumeLimit, ["test-user", "read", 2, 3600]);
+    const secondLimit = await database.query<{ request_count: number; allowed: boolean }>(consumeLimit, ["test-user", "read", 2, 3600]);
+    const thirdLimit = await database.query<{ request_count: number; allowed: boolean }>(consumeLimit, ["test-user", "read", 2, 3600]);
+    const fourthLimit = await database.query<{ request_count: number; allowed: boolean }>(consumeLimit, ["test-user", "read", 2, 3600]);
+    assert.deepEqual([firstLimit.rows[0]?.allowed, secondLimit.rows[0]?.allowed, thirdLimit.rows[0]?.allowed, fourthLimit.rows[0]?.allowed], [true, true, false, false]);
+    assert.equal(fourthLimit.rows[0]?.request_count, 3, "the durable counter saturates at limit + 1 under repeated excess requests");
   } finally {
     await database.close();
   }
