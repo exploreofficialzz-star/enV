@@ -7,6 +7,20 @@ import { analyzeMusicAudio, type MusicAnalysisResult } from "@/lib/engines/music
 import { analyzeMusicDatasetAudio, createLocalSignalLayers, encodeMonoPcm16Wav, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
 import { createMusicAnalysisProfile } from "@/lib/media/music-analysis-profile";
+import {
+  createLocalMusicBatch,
+  countLocalMusicBatchItems,
+  deleteLocalMusicBatch,
+  finalizeLocalMusicBatch,
+  listLocalMusicBatches,
+  localMusicBatchExport,
+  recoverLocalMusicBatch,
+  saveLocalMusicBatch,
+  transitionLocalMusicBatchItem,
+  type LocalMusicBatch,
+  type LocalMusicBatchItem,
+  type LocalMusicFileDescriptor,
+} from "@/lib/media/music-analysis-batch";
 
 const LOCAL_FILE_LIMIT = 25 * 1024 * 1024;
 const MAX_AUDIO_DURATION_SECONDS = 2 * 60;
@@ -176,6 +190,19 @@ export function MusicAnalyzerStudio() {
   const [selectedTrackDetail, setSelectedTrackDetail] = useState<SavedDatasetDetail | null>(null);
   const [trackDetailLoading, setTrackDetailLoading] = useState(false);
   const [trackDetailError, setTrackDetailError] = useState("");
+  const [batchSelection, setBatchSelection] = useState<File[]>([]);
+  const [localBatch, setLocalBatch] = useState<LocalMusicBatch | null>(null);
+  const [batchHistory, setBatchHistory] = useState<LocalMusicBatch[]>([]);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchMessage, setBatchMessage] = useState("");
+  const [batchError, setBatchError] = useState("");
+  const [batchPauseAfterCurrent, setBatchPauseAfterCurrent] = useState(false);
+  const batchControllerRef = useRef<AbortController | null>(null);
+  const activeBatchItemRef = useRef<string | null>(null);
+  const cancelBatchRequestedRef = useRef(false);
+  const cancelOnlyItemRef = useRef<string | null>(null);
+  const batchPauseRequestedRef = useRef(false);
+  const batchFolderInputRef = useRef<HTMLInputElement | null>(null);
   const analysisControllerRef = useRef<AbortController | null>(null);
   const saveAttemptRef = useRef<{ signature: string; key: string } | null>(null);
   const lastSavedSignatureRef = useRef<string | null>(null);
@@ -187,6 +214,27 @@ export function MusicAnalyzerStudio() {
   useEffect(() => () => {
     analysisControllerRef.current?.abort();
   }, []);
+  useEffect(() => {
+    let disposed = false;
+    void (async () => {
+      try {
+        const saved = await listLocalMusicBatches();
+        const recovered = saved.map((entry) => recoverLocalMusicBatch(entry));
+        await Promise.all(recovered.map((entry) => saveLocalMusicBatch(entry)));
+        if (!disposed) {
+          setBatchHistory(recovered);
+          if (recovered[0]) {
+            setLocalBatch(recovered[0]);
+            setBatchMessage("Local batch history restored. Re-select any source files needed to resume interrupted work.");
+          }
+        }
+      } catch {
+        if (!disposed) setBatchMessage("Local batch history is unavailable in this browser. Single-track local analysis is still available.");
+      }
+    })();
+    return () => { disposed = true; };
+  }, []);
+
 
   const metricCards = useMemo(() => {
     if (!analysis) return [];
@@ -201,6 +249,364 @@ export function MusicAnalyzerStudio() {
       { label: "Clipping", value: displayNumber(analysis.audio.clipped_sample_percent, "%"), hint: "Samples at/above 0.999 magnitude across full track" },
     ];
   }, [analysis]);
+
+  function localBatchDescriptor(selected: File): LocalMusicFileDescriptor {
+    const path = (selected as File & { webkitRelativePath?: string }).webkitRelativePath;
+    return {
+      name: selected.name,
+      sizeBytes: selected.size,
+      lastModified: selected.lastModified,
+      mimeType: selected.type,
+      relativePath: path || selected.name,
+    };
+  }
+
+  function localBatchFileKey(selected: LocalMusicFileDescriptor): string {
+    return [(selected.relativePath || selected.name).normalize("NFC").replace(/\\\\/g, "/"), selected.sizeBytes, selected.lastModified].join("\\u0000");
+  }
+
+  async function persistBatch(next: LocalMusicBatch) {
+    await saveLocalMusicBatch(next);
+    setLocalBatch(next);
+    setBatchHistory((current) => [next, ...current.filter((item) => item.id !== next.id)].slice(0, 10));
+  }
+
+  function selectBatchFiles(files: File[]) {
+    setBatchSelection(files);
+    setBatchError("");
+    setBatchMessage(files.length
+      ? `${files.length} source file(s) selected. Batch processing stays on this device; source audio is not uploaded.`
+      : "No source files selected.");
+  }
+
+  async function createBatchFromSelection() {
+    try {
+      setBatchError("");
+      const next = createLocalMusicBatch(batchSelection.map(localBatchDescriptor));
+      await persistBatch(next);
+      setBatchPauseAfterCurrent(false);
+      batchPauseRequestedRef.current = false;
+      setBatchMessage("Batch created locally. Start it to analyze supported tracks one at a time. Failed tracks do not stop other tracks.");
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not create the local batch.");
+    }
+  }
+
+  function exportLocalBatch(kind: "zip" | "jsonl" | "csv") {
+    if (!localBatch) return;
+    const manifest = localMusicBatchExport(localBatch);
+    if (kind === "zip") {
+      const files: Record<string, Uint8Array> = {
+        "manifest.json": strToU8(JSON.stringify(manifest, null, 2)),
+      };
+      for (const item of localBatch.items) {
+        if (item.status === "completed" && item.result) {
+          files[`tracks/${item.id}.json`] = strToU8(JSON.stringify({
+            schema_version: "env.music-analysis-batch-track.v1",
+            batch_id: localBatch.id,
+            track_id: item.id,
+            file_name: item.name,
+            source_sha256: item.sourceSha256,
+            analysis: item.result.analysis,
+            dataset_analysis: item.result.datasetAnalysis,
+            annotations: item.result.annotations,
+          }, null, 2));
+        }
+      }
+      downloadBlob(new Blob([zipSync(files)], { type: "application/zip" }), `env-music-batch-${localBatch.id}.zip`);
+      return;
+    }
+    if (kind === "jsonl") {
+      const records = [
+        JSON.stringify({ record_type: "manifest", manifest }),
+        ...localBatch.items.map((item) => JSON.stringify({
+          record_type: "track",
+          id: item.id,
+          file_name: item.name,
+          file_size_bytes: item.sizeBytes,
+          status: item.status,
+          stage: item.stage,
+          source_sha256: item.sourceSha256,
+          error: item.error,
+          warnings: item.warnings,
+          result: item.result,
+        })),
+      ];
+      downloadBlob(new Blob([records.join("\\n") + "\\n"], { type: "application/x-ndjson;charset=utf-8" }), `env-music-batch-${localBatch.id}.jsonl`);
+      return;
+    }
+    const headers = ["track_id", "file_name", "status", "stage", "file_size_bytes", "duration_seconds", "tempo_bpm", "key_estimate", "peak_dbfs", "rms_dbfs", "source_sha256", "error"];
+    const csvCell = (value: unknown) => {
+      const raw = value === null || value === undefined ? "" : String(value);
+      return /[",\\r\\n]/.test(raw) ? '"' + raw.replace(/"/g, '""') + '"' : raw;
+    };
+    const rows = localBatch.items.map((item) => [
+      item.id, item.name, item.status, item.stage, item.sizeBytes,
+      item.result?.analysis.audio.duration_seconds ?? "",
+      item.result?.analysis.rhythm.tempo_bpm ?? "",
+      item.result?.analysis.tonality.key ?? "",
+      item.result?.analysis.audio.peak_dbfs ?? "",
+      item.result?.analysis.audio.rms_dbfs ?? "",
+      item.sourceSha256,
+      item.error,
+    ].map(csvCell).join(","));
+    downloadBlob(new Blob([[headers.join(","), ...rows].join("\\r\\n") + "\\r\\n"], { type: "text/csv;charset=utf-8" }), `env-music-batch-${localBatch.id}.csv`);
+  }
+
+  async function cancelLocalBatchItem(itemId: string) {
+    if (!localBatch) return;
+    if (activeBatchItemRef.current === itemId) {
+      cancelOnlyItemRef.current = itemId;
+      batchControllerRef.current?.abort();
+      setBatchMessage("Cancel requested for the active track. Completed tracks will be preserved.");
+      return;
+    }
+    const item = localBatch.items.find((candidate) => candidate.id === itemId);
+    if (!item || (item.status !== "queued" && item.status !== "waiting_for_file")) return;
+    try {
+      const next = transitionLocalMusicBatchItem(localBatch, itemId, "canceled", { error: "Canceled by the user." });
+      await persistBatch(finalizeLocalMusicBatch(next));
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not cancel this batch item.");
+    }
+  }
+
+  async function cancelLocalBatch() {
+    if (!localBatch) return;
+    cancelBatchRequestedRef.current = true;
+    cancelOnlyItemRef.current = null;
+    batchControllerRef.current?.abort();
+    if (!batchBusy) {
+      try {
+        let next = localBatch;
+        for (const item of next.items) {
+          if (item.status === "queued" || item.status === "waiting_for_file") {
+            next = transitionLocalMusicBatchItem(next, item.id, "canceled", { error: "Batch canceled by the user." });
+          }
+        }
+        next = finalizeLocalMusicBatch({ ...next, status: "canceled" });
+        await persistBatch(next);
+        setBatchMessage("Batch canceled. Completed results remain available for export.");
+      } catch (cause) {
+        setBatchError(cause instanceof Error ? cause.message : "Could not cancel the batch.");
+      }
+    } else {
+      setBatchMessage("Cancel requested. The active local track is stopping; completed results will remain available.");
+    }
+  }
+
+  async function retryLocalBatchItems(failedOnly = true) {
+    if (!localBatch || batchBusy) return;
+    try {
+      let next = localBatch;
+      let count = 0;
+      for (const item of next.items) {
+        const retryable = failedOnly ? item.status === "failed" : item.status === "failed" || item.status === "canceled";
+        if (!retryable) continue;
+        next = transitionLocalMusicBatchItem(next, item.id, "queued");
+        count += 1;
+      }
+      if (!count) {
+        setBatchMessage("There are no failed or canceled tracks to retry.");
+        return;
+      }
+      next = { ...next, status: "paused" };
+      await persistBatch(next);
+      setBatchError("");
+      setBatchMessage(`${count} track(s) queued for retry. Select the original source files again, then resume.`);
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not retry batch items.");
+    }
+  }
+
+  async function runLocalBatch() {
+    if (!localBatch || batchBusy) return;
+    setBatchError("");
+    setBatchMessage("");
+    const selected = new Map(batchSelection.map((item) => [localBatchFileKey(localBatchDescriptor(item)), item]));
+    let working = localBatch;
+    const controller = new AbortController();
+    batchControllerRef.current = controller;
+    cancelBatchRequestedRef.current = false;
+    cancelOnlyItemRef.current = null;
+    batchPauseRequestedRef.current = false;
+    setBatchPauseAfterCurrent(false);
+    setBatchBusy(true);
+
+    const persist = async (next: LocalMusicBatch) => {
+      await saveLocalMusicBatch(next);
+      working = next;
+      setLocalBatch(next);
+      setBatchHistory((current) => [next, ...current.filter((item) => item.id !== next.id)].slice(0, 10));
+    };
+    const stopRequested = () => controller.signal.aborted;
+    try {
+      for (const initialItem of [...working.items]) {
+        if (stopRequested() && !cancelOnlyItemRef.current) break;
+        if (batchPauseRequestedRef.current) {
+          working = { ...working, status: "paused", updatedAt: new Date().toISOString() };
+          await persist(working);
+          setBatchMessage("Batch paused after the current track. Resume to continue the remaining items.");
+          break;
+        }
+        let item = working.items.find((candidate) => candidate.id === initialItem.id);
+        if (!item || (item.status !== "queued" && item.status !== "waiting_for_file")) continue;
+        const file = selected.get(localBatchFileKey(item));
+        if (!file) {
+          if (item.status === "queued") {
+            working = transitionLocalMusicBatchItem(working, item.id, "waiting_for_file", {
+              error: "Select this original file again before resuming the batch.",
+              stage: "queued",
+              progress: 0,
+            });
+            await persist(working);
+          }
+          continue;
+        }
+        if (item.status === "waiting_for_file") {
+          working = transitionLocalMusicBatchItem(working, item.id, "queued");
+          await persist(working);
+        }
+        const currentId = item.id;
+        activeBatchItemRef.current = currentId;
+        cancelOnlyItemRef.current = null;
+        try {
+          if (file.size <= 0) throw new Error("The selected file is empty.");
+          if (file.size > LOCAL_FILE_LIMIT) throw new Error("This file exceeds the 25 MiB on-device limit.");
+          working = transitionLocalMusicBatchItem(working, currentId, "validating", { stage: "validation", progress: 0.05, error: null });
+          await persist(working);
+          setBatchMessage(`Checking ${file.name}…`);
+          const probedDuration = await probeAudioDuration(file);
+          if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
+          if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("This track exceeds the two-minute on-device analysis limit.");
+          const bytes = await file.arrayBuffer();
+          if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
+          const sourceSha256 = await exactFileSha256(bytes);
+          const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (!Ctx) throw new Error("This browser does not support Web Audio decoding.");
+          working = transitionLocalMusicBatchItem(working, currentId, "decoding", { stage: "decode", progress: 0.15, sourceSha256 });
+          await persist(working);
+          const context = new Ctx();
+          let buffer: AudioBuffer;
+          try {
+            buffer = await context.decodeAudioData(bytes.slice(0));
+          } finally {
+            await context.close().catch(() => undefined);
+          }
+          if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
+          if (buffer.duration <= 0 || buffer.length <= 0) throw new Error("The file did not decode to usable audio.");
+          if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("Decoded duration exceeds the two-minute on-device limit.");
+          const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+          const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
+          const result = analyzeMusicAudio({
+            channels,
+            sampleRate: buffer.sampleRate,
+            fileName: file.name,
+            fileSizeBytes: file.size,
+            mimeType: file.type,
+            metadata,
+            sourceSha256,
+          });
+          if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
+          working = transitionLocalMusicBatchItem(working, currentId, "analyzing", { stage: "dsp", progress: 0.2 });
+          await persist(working);
+          let lastPersistedProgress = 0.2;
+          const datasetAnalysis = await analyzeMusicDatasetAudio(
+            { channels, sampleRate: buffer.sampleRate, fileName: file.name, sourceSha256 },
+            {
+              signal: controller.signal,
+              onProgress: (fraction) => {
+                if (batchControllerRef.current !== controller || controller.signal.aborted) return;
+                const progress = Math.max(0.2, Math.min(0.95, 0.2 + fraction * 0.75));
+                working = updateLocalMusicBatchItem(working, currentId, {
+                  progress,
+                  stage: "dsp",
+                  status: "analyzing",
+                });
+                setLocalBatch(working);
+                if (progress - lastPersistedProgress >= 0.05 || progress >= 0.95) {
+                  lastPersistedProgress = progress;
+                  void saveLocalMusicBatch(working).catch(() => {
+                    setBatchError("Local storage stopped accepting progress updates. Cancel the batch and export completed tracks.");
+                  });
+                }
+              },
+            },
+          );
+          if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
+          working = transitionLocalMusicBatchItem(working, currentId, "completed", {
+            stage: "complete",
+            progress: 1,
+            sourceSha256,
+            error: null,
+            warnings: sourceSha256 ? [] : ["SHA-256 could not be computed in this browser."],
+            result: { analysis: result, datasetAnalysis, annotations: datasetAnalysis.annotations },
+          });
+          await persist(finalizeLocalMusicBatch(working));
+        } catch (cause) {
+          const aborted = cause instanceof Error && cause.name === "AbortError";
+          const canceledByUser = aborted || cancelOnlyItemRef.current === currentId || (cancelBatchRequestedRef.current && stopRequested());
+          const current = working.items.find((candidate) => candidate.id === currentId);
+          if (current && current.status !== "completed" && current.status !== "failed" && current.status !== "canceled") {
+            working = transitionLocalMusicBatchItem(working, currentId, canceledByUser ? "canceled" : "failed", {
+              error: canceledByUser ? "Canceled by the user." : cause instanceof Error ? cause.message : "Analysis failed.",
+              stage: current.stage,
+            });
+            await persist(working);
+          }
+          if (!canceledByUser) {
+            setBatchError(`${file.name}: ${cause instanceof Error ? cause.message : "Analysis failed."}`);
+          }
+          if (cancelBatchRequestedRef.current) break;
+        } finally {
+          activeBatchItemRef.current = null;
+          if (cancelOnlyItemRef.current === currentId) cancelOnlyItemRef.current = null;
+          if (cancelBatchRequestedRef.current) break;
+        }
+      }
+
+      if (cancelBatchRequestedRef.current) {
+        for (const item of working.items) {
+          if (item.status === "queued" || item.status === "waiting_for_file") {
+            working = transitionLocalMusicBatchItem(working, item.id, "canceled", { error: "Batch canceled by the user." });
+          }
+        }
+        working = finalizeLocalMusicBatch({ ...working, status: "canceled" });
+        await persist(working);
+        setBatchMessage("Batch canceled. Completed results remain available for export.");
+      } else if (batchPauseRequestedRef.current) {
+        working = { ...working, status: "paused", updatedAt: new Date().toISOString() };
+        await persist(working);
+      } else {
+        working = finalizeLocalMusicBatch(working);
+        await persist(working);
+        const counts = countLocalMusicBatchItems(working);
+        setBatchMessage(`Batch ${working.status.replace(/_/g, " ")}: ${counts.completed} complete, ${counts.failed} failed, ${counts.waitingForFile} waiting for source files. Results are kept locally on this device.`);
+      }
+    } catch (cause) {
+      setBatchError(cause instanceof Error ? cause.message : "Could not continue the local batch.");
+      setBatchMessage("");
+    } finally {
+      batchControllerRef.current = null;
+      activeBatchItemRef.current = null;
+      setBatchBusy(false);
+      if (working.id) {
+        setLocalBatch(working);
+        setBatchHistory((current) => [working, ...current.filter((item) => item.id !== working.id)].slice(0, 10));
+      }
+    }
+  }
+
+  async function pauseLocalBatchAfterCurrent() {
+    batchPauseRequestedRef.current = true;
+    setBatchPauseAfterCurrent(true);
+    if (!batchBusy && localBatch) {
+      await persistBatch({ ...localBatch, status: "paused", updatedAt: new Date().toISOString() });
+      setBatchMessage("Batch paused. Resume when ready.");
+    } else {
+      setBatchMessage("Pause requested. The current track will finish before new work is admitted.");
+    }
+  }
 
   function chooseFile(selected: File | null) {
     analysisControllerRef.current?.abort();
@@ -648,6 +1054,83 @@ export function MusicAnalyzerStudio() {
         ) : null}
         {cloudSaveError ? <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{cloudSaveError}</p> : null}
         {cloudSaveNotice ? <p className="mt-3 rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground" role="status" aria-live="polite">{cloudSaveNotice}</p> : null}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="music-batch-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="music-batch-heading" className="text-base font-semibold">Batch analysis</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Analyze up to 20 tracks sequentially on this device. Audio is not uploaded. Interrupted work needs the original files selected again.</p>
+          </div>
+          <span className="rounded-full border border-border px-2.5 py-1 text-xs">{localBatch ? localBatch.status.replace(/_/g, " ") : "not started"}</span>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:border-accent">
+            Select tracks
+            <input className="sr-only" type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" onChange={(event) => { selectBatchFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }} />
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:border-accent">
+            Select a folder (supported browsers)
+            <input
+              className="sr-only"
+              type="file"
+              multiple
+              ref={(node) => {
+                batchFolderInputRef.current = node;
+                if (node) (node as HTMLInputElement & { webkitdirectory?: boolean }).webkitdirectory = true;
+              }}
+              onChange={(event) => { selectBatchFiles(Array.from(event.currentTarget.files ?? [])); event.currentTarget.value = ""; }}
+            />
+          </label>
+        </div>
+        <div className="mt-3 rounded-lg border border-border bg-background p-3">
+          <p className="text-sm font-medium">{batchSelection.length} selected file(s)</p>
+          <p className="mt-1 text-xs text-muted-foreground">{formatBytes(batchSelection.reduce((sum, item) => sum + item.size, 0))} total · each file up to 25 MiB · total selection up to 200 MiB · 2 minutes per track</p>
+          {batchSelection.length ? <div className="mt-2 max-h-28 space-y-1 overflow-auto text-xs text-muted-foreground">{batchSelection.slice(0, 30).map((item, index) => <p key={index} className="break-all">{item.name} · {formatBytes(item.size)}</p>)}{batchSelection.length > 30 ? <p>…and {batchSelection.length - 30} more</p> : null}</div> : null}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button type="button" variant="outline" disabled={batchBusy || batchSelection.length === 0} onClick={() => void createBatchFromSelection()}>Create batch</Button>
+          <Button type="button" disabled={!localBatch || batchBusy || (localBatch.status === "completed" && countLocalMusicBatchItems(localBatch).queued === 0)} onClick={() => void runLocalBatch()}>{batchBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Analyzing batch…</> : "Start / resume"}</Button>
+          <Button type="button" variant="outline" disabled={!localBatch || batchBusy} onClick={() => void retryLocalBatchItems(true)}>Retry failed</Button>
+          {batchBusy ? <Button type="button" variant="outline" onClick={() => void pauseLocalBatchAfterCurrent()}>Pause after track</Button> : null}
+          {localBatch ? <Button type="button" variant="outline" onClick={() => void cancelLocalBatch()}>Cancel batch</Button> : null}
+        </div>
+        {localBatch ? (() => {
+          const counts = countLocalMusicBatchItems(localBatch);
+          return <div className="mt-4 space-y-3">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              {[["Total", counts.total], ["Queued", counts.queued], ["Running", counts.running], ["Complete", counts.completed], ["Failed", counts.failed], ["Need files", counts.waitingForFile]].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-border bg-background p-2"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-1 text-base font-semibold tabular-nums">{value}</p></div>)}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => exportLocalBatch("zip")}>Export ZIP + manifest</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => exportLocalBatch("jsonl")}>Export JSONL</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => exportLocalBatch("csv")}>Export CSV summary</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => void retryLocalBatchItems(false)}>Retry failed / canceled</Button>
+              <Button type="button" size="sm" variant="ghost" disabled={batchBusy} onClick={() => {
+                const prior = batchHistory.find((entry) => entry.id !== localBatch.id);
+                if (prior) { setLocalBatch(prior); setBatchError(""); setBatchMessage("Viewing a previous local batch. Re-select its source files to resume incomplete items."); }
+              }}>Open previous batch</Button>
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">Progress reflects stages, not a promised completion time. Completed results remain available after cancellation. Local batch history is browser storage, not a cloud backup.</p>
+            <div className="space-y-2">
+              {localBatch.items.map((item) => <div key={item.id} className="rounded-lg border border-border bg-background p-3">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-all text-sm font-medium">{item.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatBytes(item.sizeBytes)} · {item.status.replace(/_/g, " ")} · {item.stage}</p>
+                    {item.error ? <p className="mt-1 break-words text-xs text-destructive">{item.error}</p> : null}
+                    {item.warnings.length ? <p className="mt-1 text-xs text-muted-foreground">{item.warnings.join(" · ")}</p> : null}
+                    {item.status === "completed" && item.result ? <p className="mt-1 text-xs text-muted-foreground">Tempo {displayNumber(item.result.analysis.rhythm.tempo_bpm, " BPM")} · Key {item.result.analysis.tonality.key ?? "not available"} · source hash {item.sourceSha256 ? "computed locally" : "not computed"}</p> : null}
+                  </div>
+                  {(item.status === "queued" || item.status === "waiting_for_file" || item.status === "analyzing" || item.status === "decoding" || item.status === "validating") ? <Button type="button" size="sm" variant="ghost" onClick={() => void cancelLocalBatchItem(item.id)}>{activeBatchItemRef.current === item.id ? "Cancel track" : "Skip track"}</Button> : null}
+                </div>
+              </div>)}
+            </div>
+          </div>;
+        })() : null}
+        {batchHistory.length > 1 ? <div className="mt-3 flex flex-wrap gap-2">{batchHistory.slice(0, 5).map((entry) => <Button key={entry.id} type="button" size="sm" variant={entry.id === localBatch?.id ? "default" : "ghost"} onClick={() => { setLocalBatch(entry); setBatchError(""); setBatchMessage("Selected saved local batch. Original files may need to be reselected."); }}>{new Date(entry.createdAt).toLocaleString()} · {entry.status.replace(/_/g, " ")}</Button>)}</div> : null}
+        {batchError ? <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">{batchError}</p> : null}
+        {batchMessage ? <p className="mt-3 rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground" role="status" aria-live="polite">{batchMessage}</p> : null}
       </section>
 
       <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
