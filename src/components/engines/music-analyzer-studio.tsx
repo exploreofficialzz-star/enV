@@ -3,10 +3,11 @@ import { Activity, AudioLines, FileAudio, FileJson, FolderArchive, LoaderCircle,
 import { Button } from "@/components/ui/button";
 import { strToU8, zipSync } from "fflate";
 import { downloadBlob } from "@/lib/utils";
-import { analyzeMusicAudio, type MusicAnalysisResult } from "@/lib/engines/music-analysis";
-import { analyzeMusicDatasetAudio, createLocalSignalLayers, encodeMonoPcm16Wav, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
+import type { MusicAnalysisResult } from "@/lib/engines/music-analysis";
+import { createLocalSignalLayers, encodeMonoPcm16Wav, type MusicDatasetAnalysis, type MusicDatasetAnnotations } from "@/lib/engines/music-dataset-analysis";
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
 import { createMusicAnalysisProfile } from "@/lib/media/music-analysis-profile";
+import { analyzeMusicInWorker } from "@/lib/media/music-analysis.worker-client";
 import {
   createLocalMusicBatch,
   countLocalMusicBatchItems,
@@ -476,62 +477,63 @@ export function MusicAnalyzerStudio() {
           const probedDuration = await probeAudioDuration(file);
           if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
           if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("This track exceeds the two-minute on-device analysis limit.");
-          const bytes = await file.arrayBuffer();
+          let bytes: ArrayBuffer | null = await file.arrayBuffer();
           if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
+          if (!bytes) throw new Error("The file bytes are unavailable.");
           const sourceSha256 = await exactFileSha256(bytes);
           const Ctx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
           if (!Ctx) throw new Error("This browser does not support Web Audio decoding.");
           working = transitionLocalMusicBatchItem(working, currentId, "decoding", { stage: "decode", progress: 0.15, sourceSha256 });
           await persist(working);
           const context = new Ctx();
-          let buffer: AudioBuffer;
+          let buffer: AudioBuffer | null;
           try {
             buffer = await context.decodeAudioData(bytes.slice(0));
           } finally {
             await context.close().catch(() => undefined);
           }
           if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
-          if (buffer.duration <= 0 || buffer.length <= 0) throw new Error("The file did not decode to usable audio.");
+          if (!buffer || buffer.duration <= 0 || buffer.length <= 0) throw new Error("The file did not decode to usable audio.");
           if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("Decoded duration exceeds the two-minute on-device limit.");
-          const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+          const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer!.getChannelData(index));
+          const sampleRate = buffer.sampleRate;
           const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
-          const result = analyzeMusicAudio({
+          bytes = null;
+          working = transitionLocalMusicBatchItem(working, currentId, "analyzing", { stage: "dsp", progress: 0.2 });
+          await persist(working);
+          let lastPersistedProgress = 0.2;
+          const analysisTask = analyzeMusicInWorker({
             channels,
-            sampleRate: buffer.sampleRate,
+            sampleRate,
             fileName: file.name,
             fileSizeBytes: file.size,
             mimeType: file.type,
             metadata,
             sourceSha256,
-          });
-          if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
-          working = transitionLocalMusicBatchItem(working, currentId, "analyzing", { stage: "dsp", progress: 0.2 });
-          await persist(working);
-          let lastPersistedProgress = 0.2;
-          const datasetAnalysis = await analyzeMusicDatasetAudio(
-            { channels, sampleRate: buffer.sampleRate, fileName: file.name, sourceSha256 },
-            {
-              signal: controller.signal,
-              onProgress: (fraction) => {
-                if (batchControllerRef.current !== controller || controller.signal.aborted) return;
-                const progress = Math.max(0.2, Math.min(0.95, 0.2 + fraction * 0.75));
-                working = updateLocalMusicBatchItem(working, currentId, {
-                  progress,
-                  stage: "dsp",
-                  status: "analyzing",
+          }, {
+            signal: controller.signal,
+            onProgress: (fraction) => {
+              if (batchControllerRef.current !== controller || controller.signal.aborted) return;
+              const progress = Math.max(0.2, Math.min(0.95, 0.2 + fraction * 0.75));
+              working = updateLocalMusicBatchItem(working, currentId, {
+                progress,
+                stage: "dsp",
+                status: "analyzing",
+              });
+              setLocalBatch(working);
+              if (progress - lastPersistedProgress >= 0.05 || progress >= 0.95) {
+                lastPersistedProgress = progress;
+                const checkpoint = working;
+                progressWriteChain = progressWriteChain.then(() => saveLocalMusicBatch(checkpoint)).catch(() => {
+                  progressWriteFailed = true;
+                  setBatchError("Local storage stopped accepting progress updates. Completed tracks are preserved only if their last save succeeded.");
                 });
-                setLocalBatch(working);
-                if (progress - lastPersistedProgress >= 0.05 || progress >= 0.95) {
-                  lastPersistedProgress = progress;
-                  const checkpoint = working;
-                  progressWriteChain = progressWriteChain.then(() => saveLocalMusicBatch(checkpoint)).catch(() => {
-                    progressWriteFailed = true;
-                    setBatchError("Local storage stopped accepting progress updates. Completed tracks are preserved only if their last save succeeded.");
-                  });
-                }
-              },
+              }
             },
-          );
+          });
+          channels.length = 0;
+          buffer = null;
+          const { analysis: result, datasetAnalysis } = await analysisTask;
           await progressWriteChain;
           if (progressWriteFailed) throw new Error("Could not persist batch progress to this browser's local storage.");
           if (stopRequested()) throw new DOMException("Cancelled", "AbortError");
@@ -668,45 +670,46 @@ export function MusicAnalyzerStudio() {
       const probedDuration = await probeAudioDuration(file);
       if (!ensureCurrent()) return;
       if (probedDuration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
-      const bytes = await file.arrayBuffer();
+      let bytes: ArrayBuffer | null = await file.arrayBuffer();
       if (!ensureCurrent()) return;
+      if (!bytes) throw new Error("The file bytes are unavailable.");
       const sourceSha256 = await exactFileSha256(bytes);
       if (!ensureCurrent()) return;
       const context = new Ctx();
-      let buffer: AudioBuffer;
+      let buffer: AudioBuffer | null;
       try {
         buffer = await context.decodeAudioData(bytes.slice(0));
       } finally {
         await context.close().catch(() => undefined);
       }
       if (!ensureCurrent()) return;
-      if (buffer.duration <= 0 || buffer.length <= 0) throw new Error("The selected file did not decode to usable audio.");
+      if (!buffer || buffer.duration <= 0 || buffer.length <= 0) throw new Error("The selected file did not decode to usable audio.");
       if (buffer.duration > MAX_AUDIO_DURATION_SECONDS) throw new Error("For device memory safety, analyze clips up to 2 minutes. Split longer files into sections first.");
-      const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+      const channels = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer!.getChannelData(index));
+      const sampleRate = buffer.sampleRate;
       const metadata = extractMusicMetadata(new Uint8Array(bytes), file.name);
-      const result = analyzeMusicAudio({
+      bytes = null;
+      const analysisTask = analyzeMusicInWorker({
         channels,
-        sampleRate: buffer.sampleRate,
+        sampleRate,
         fileName: file.name,
         fileSizeBytes: file.size,
         mimeType: file.type,
         metadata,
         sourceSha256,
-      });
-      if (!ensureCurrent()) return;
-      const dataset = await analyzeMusicDatasetAudio(
-        { channels, sampleRate: buffer.sampleRate, fileName: file.name, sourceSha256 },
-        {
-          signal: controller.signal,
-          onProgress: (fraction) => {
-            if (analysisControllerRef.current === controller && !controller.signal.aborted) setAnalysisProgress(fraction);
-          },
+      }, {
+        signal: controller.signal,
+        onProgress: (fraction) => {
+          if (analysisControllerRef.current === controller && !controller.signal.aborted) setAnalysisProgress(fraction);
         },
-      );
+      });
+      channels.length = 0;
+      buffer = null;
+      const result = await analysisTask;
       if (!ensureCurrent()) return;
-      setAnalysis(result);
-      setDatasetAnalysis(dataset);
-      setAnnotations(dataset.annotations);
+      setAnalysis(result.analysis);
+      setDatasetAnalysis(result.datasetAnalysis);
+      setAnnotations(result.datasetAnalysis.annotations);
       setNotice("Local DSP analysis finished on this device. No AI model or remote API was used. Add and review semantic labels below before exporting training data.");
     } catch (cause) {
       if (analysisControllerRef.current !== controller) return;
