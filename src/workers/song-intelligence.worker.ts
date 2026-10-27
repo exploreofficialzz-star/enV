@@ -1,4 +1,4 @@
-import { env, pipeline } from "@xenova/transformers";
+import { env, pipeline } from "@huggingface/transformers";
 import {
   aggregateSongCandidates, AST_MODEL, AST_REVISION, emptyCandidates, validTranscriptSegments,
   WHISPER_MODEL, WHISPER_REVISION, type BrowserSongIntelligence, type SongCandidateGroup, type SongWindow,
@@ -7,7 +7,7 @@ import {
 type RunRequest = { id: string; samples: Float32Array; sampleRate: number; downmix: BrowserSongIntelligence["downmix"]; sound: boolean; speech: boolean };
 
 env.allowLocalModels = false;
-env.backends.onnx.wasm.numThreads = 1;
+if (env.backends.onnx.wasm) env.backends.onnx.wasm.numThreads = 1;
 // Model files are downloaded and cached by the browser; audio stays inside this worker.
 
 const groups: Record<SongCandidateGroup, number[]> = {
@@ -39,7 +39,7 @@ self.onmessage = async (event: MessageEvent<RunRequest>) => {
     let classifier: any;
     try {
       progress("Loading sound model", 0.02);
-      classifier = await pipeline("audio-classification", AST_MODEL, { revision: AST_REVISION, quantized: true,
+      classifier = await pipeline("audio-classification", AST_MODEL, { revision: AST_REVISION, dtype: "q8",
         progress_callback: (p: { status?: string; progress?: number }) => { if (p.status === "progress" && typeof p.progress === "number") progress("Downloading sound model", 0.03 + p.progress / 100 * 0.12); },
       });
       const windows: SongWindow[] = [];
@@ -77,7 +77,7 @@ self.onmessage = async (event: MessageEvent<RunRequest>) => {
     let recognizer: any;
     try {
       progress("Loading speech model", sound ? 0.46 : 0.02);
-      recognizer = await pipeline("automatic-speech-recognition", WHISPER_MODEL, { revision: WHISPER_REVISION, quantized: true,
+      recognizer = await pipeline("automatic-speech-recognition", WHISPER_MODEL, { revision: WHISPER_REVISION, dtype: "q8",
         progress_callback: (p: { status?: string; progress?: number }) => { if (p.status === "progress" && typeof p.progress === "number") progress("Downloading speech model", 0.46 + p.progress / 100 * 0.1); },
       });
       let power = 0;
