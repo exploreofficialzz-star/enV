@@ -90,7 +90,13 @@ export function createServerMediaAdapter(): MediaRuntimeAdapter {
       form.append("params", JSON.stringify(safeParams));
       onProgress(35);
       response = await fetch(endpoint, { method: "POST", body: form, signal });
-      if (!response.ok) throw new Error(`Media service returned HTTP ${response.status}.`);
+      if (!response.ok) {
+        const problem = await response.clone().json().catch(() => null) as { message?: unknown; error?: unknown } | null;
+        const detail = typeof problem?.message === "string" ? problem.message
+          : typeof problem?.error === "string" ? problem.error
+            : `Media service returned HTTP ${response.status}.`;
+        throw new Error(detail.slice(0, 600));
+      }
       onProgress(90);
       const blob = await response.blob();
       onProgress(100);
