@@ -196,6 +196,7 @@ export function MusicAnalyzerStudio() {
   const [batchHistory, setBatchHistory] = useState<LocalMusicBatch[]>([]);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchMessage, setBatchMessage] = useState("");
+  const [expandedBatchItemId, setExpandedBatchItemId] = useState<string | null>(null);
   const [batchError, setBatchError] = useState("");
   const batchControllerRef = useRef<AbortController | null>(null);
   const activeBatchItemRef = useRef<string | null>(null);
@@ -1150,8 +1151,14 @@ export function MusicAnalyzerStudio() {
                     {item.warnings.length ? <p className="mt-1 text-xs text-muted-foreground">{item.warnings.join(" · ")}</p> : null}
                     {item.status === "completed" && item.result ? <p className="mt-1 text-xs text-muted-foreground">Tempo {displayNumber(item.result.analysis.rhythm.tempo_bpm, " BPM")} · Key {item.result.analysis.tonality.key ?? "not available"} · source hash {item.sourceSha256 ? "computed locally" : "not computed"}</p> : null}
                   </div>
-                  {(item.status === "queued" || item.status === "waiting_for_file" || item.status === "analyzing" || item.status === "decoding" || item.status === "validating") ? <Button type="button" size="sm" variant="ghost" onClick={() => void cancelLocalBatchItem(item.id)}>{activeBatchItemRef.current === item.id ? "Cancel track" : "Skip track"}</Button> : null}
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    {(item.status === "queued" || item.status === "waiting_for_file") && !batchBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void prioritizeLocalBatchItem(item.id)}>Run next</Button> : null}
+                    {(item.status === "failed" || item.status === "canceled") && !batchBusy ? <Button type="button" size="sm" variant="ghost" onClick={() => void retryLocalBatchItem(item.id)}>Retry</Button> : null}
+                    {item.status === "completed" && item.result ? <Button type="button" size="sm" variant="ghost" onClick={() => setExpandedBatchItemId((current) => current === item.id ? null : item.id)}>{expandedBatchItemId === item.id ? "Hide report" : "View report"}</Button> : null}
+                    {(item.status === "queued" || item.status === "waiting_for_file" || item.status === "analyzing" || item.status === "decoding" || item.status === "validating") ? <Button type="button" size="sm" variant="ghost" onClick={() => void cancelLocalBatchItem(item.id)}>{activeBatchItemRef.current === item.id ? "Cancel track" : "Skip track"}</Button> : null}
+                  </div>
                 </div>
+                {expandedBatchItemId === item.id && item.status === "completed" && item.result ? <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-3 text-[11px] leading-4">{JSON.stringify({ track_id: item.id, file_name: item.name, source_sha256: item.sourceSha256, analysis: item.result.analysis, dataset_analysis: item.result.datasetAnalysis, annotations: item.result.annotations }, null, 2)}</pre> : null}
               </div>)}
             </div>
           </div>;
