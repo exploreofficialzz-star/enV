@@ -31,7 +31,7 @@ try {
     await new Promise((resolve, reject) => execFile("ffmpeg", [
       "-hide_banner", "-loglevel", "error",
       "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:duration=10",
-      "-af", "volume=-23dB", "-c:a", "pcm_s16le", "-y", fixture,
+      "-af", "volume=-20dB", "-c:a", "pcm_s16le", "-y", fixture,
     ], (error) => error ? reject(error) : resolve()));
     const input = await fs.readFile(fixture);
     const form = new FormData();
