@@ -16,6 +16,23 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
+    /// SwiftUI Menu presentation can be delayed while Simulator restores the accessibility tree.
+    /// Retry opening the menu once rather than treating a dropped toolbar tap as a navigation failure.
+    private func openMoreOptionsMenu() -> XCUIElement {
+        let moreOptions = toolbarAction("more-options-navigation-action")
+        XCTAssertTrue(moreOptions.waitForExistence(timeout: 10), "The More options action must be accessible.")
+        let walletMenuItem = app.buttons["Wallet"]
+        moreOptions.tap()
+        if !walletMenuItem.waitForExistence(timeout: 8) {
+            // A fresh lookup after a failed presentation avoids stale accessibility snapshots.
+            let refreshedMoreOptions = toolbarAction("more-options-navigation-action")
+            XCTAssertTrue(refreshedMoreOptions.waitForExistence(timeout: 5))
+            refreshedMoreOptions.tap()
+        }
+        XCTAssertTrue(walletMenuItem.waitForExistence(timeout: 10), "More options must expose Wallet after opening.")
+        return walletMenuItem
+    }
+
     func testHomeSearchAndPrimaryActionsHaveAccessibleNames() throws {
         XCTAssertTrue(app.textFields["Search tools"].waitForExistence(timeout: 10), "The home search field should expose its Search tools label.")
         let home = toolbarAction("home-navigation-action")
@@ -37,13 +54,9 @@ final class AccessibilityAuditUITests: XCTestCase {
     }
 
     func testMoreOptionsMenuIsAuditedInItsOpenState() throws {
-        let moreOptions = toolbarAction("more-options-navigation-action")
-        XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
-        moreOptions.tap()
-
-        let walletMenuItem = app.buttons["Wallet"]
+        let walletMenuItem = openMoreOptionsMenu()
         let aboutMenuItem = app.buttons["About"]
-        XCTAssertTrue(walletMenuItem.waitForExistence(timeout: 5), "The open menu should expose the Wallet destination.")
+        XCTAssertTrue(walletMenuItem.exists, "The open menu should expose the Wallet destination.")
         XCTAssertTrue(aboutMenuItem.exists, "The open menu should expose Product destinations.")
 
         if #available(iOS 17.0, *) {
@@ -52,12 +65,7 @@ final class AccessibilityAuditUITests: XCTestCase {
     }
 
     func testWalletDestinationIsAuditedAfterMenuNavigation() throws {
-        let moreOptions = toolbarAction("more-options-navigation-action")
-        XCTAssertTrue(moreOptions.waitForExistence(timeout: 10))
-        moreOptions.tap()
-
-        let walletMenuItem = app.buttons["Wallet"]
-        XCTAssertTrue(walletMenuItem.waitForExistence(timeout: 5))
+        let walletMenuItem = openMoreOptionsMenu()
         walletMenuItem.tap()
 
         XCTAssertTrue(app.staticTexts["Total balance"].waitForExistence(timeout: 5), "The Wallet destination should open its designed balance dashboard.")
