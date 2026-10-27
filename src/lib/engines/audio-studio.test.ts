@@ -5,6 +5,7 @@ import { analyzeMusicAudio, type MusicAnalysisResult } from "./music-analysis.ts
 import { createMusicAnalysisProfile } from "../media/music-analysis-profile.ts";
 import { normalizeMusicModelClassification } from "../media/music-analysis-response.ts";
 import { migrateMusicAnalysisV1ToV2, migrateMusicDatasetAnalysisV1ToV2, migrateMusicProfileV1ToV2 } from "../media/music-analysis-migration.ts";
+import { MusicDatasetInputError, validateMusicDatasetSaveBody } from "../media/music-dataset-validation.ts";
 
 test("audio analysis uses correct amplitude and RMS dBFS math", () => {
   assert.equal(amplitudeDbfs(1), 0);
@@ -424,4 +425,111 @@ test("Music Analyzer dataset migration creates the persistent owner-scoped schem
   } finally {
     await database.close();
   }
+});
+
+
+function validMusicDatasetSavePayload(): Record<string, unknown> {
+  const hash = "ab".repeat(32);
+  return {
+    idempotency_key: "123e4567-e89b-42d3-a456-426614174000",
+    file: {
+      name: "test-track.wav",
+      size_bytes: 176400,
+      mime_type: "audio/wav",
+      source_sha256: hash,
+      source_metadata: { title: "Test Track", artist: "enV test" },
+      normalized_metadata: { title: "Test Track", artist: "enV test" },
+      rights_status: "user_owned",
+    },
+    analysis: {
+      schema_version: "env.music-analysis.v2",
+      fingerprint: { file_sha256: hash, exact_match_method: "sha-256-exact-file-bytes", note: "Exact bytes only." },
+      source: { file_name: "test-track.wav", mime_type: "audio/wav", file_size_bytes: 176400 },
+      metadata: { title: "Test Track", artist: "enV test", album: null },
+      audio: { duration_seconds: 5, sample_rate_hz: 44100, channels: 2, rms_dbfs: -12, metric_scope_seconds: 5, rms_loudness_proxy_db: -12.691 },
+      rhythm: { tempo_bpm: 120, analysis_scope_seconds: 5, status: "estimated", method: "fixture" },
+      tonality: { key: "A minor", analysis_scope_seconds: 5, status: "estimated", method: "fixture" },
+      timbre: { spectral_centroid_hz: 1000, spectral_scope_seconds: 5, zero_crossing_scope_seconds: 5, interpretation: "fixture" },
+      classification: { status: "human_review_required", genre: null, sub_style: null, language: [], mood: [], instruments: [], vocal_style: null, genre_candidates: [], note: "Human review required." },
+    },
+    dataset_analysis: {
+      schema_version: "env.music-dataset-analysis.v2",
+      fingerprint: { file_sha256: hash, exact_match_method: "sha-256-exact-file-bytes", note: "Exact bytes only." },
+      source: { file_name: "test-track.wav", sample_rate_hz: 44100, channels: 2, frame_count: 220500, duration_seconds: 5 },
+      processing: { method: "local-digital-signal-processing", uses_remote_api: false, uses_hosted_model: false, model_inference: false, feature_frame_seconds: 0.5, note: "fixture" },
+      technical: { duration_seconds: 5, sample_rate_hz: 44100, channels: 2, peak_dbfs: -1, rms_dbfs: -12, clipped_sample_percent: 0, dc_offset_by_channel: [0, 0] },
+      timeline: [
+        { start_seconds: 0, end_seconds: 0.5, rms_dbfs: -12, peak_dbfs: -1, spectral_centroid_hz: 1000 },
+        { start_seconds: 0.5, end_seconds: 1, rms_dbfs: -13, peak_dbfs: -2, spectral_centroid_hz: 1200 },
+      ],
+      pitch: { source: "full_mix_dominant_pitch_estimate", points: [{ time_seconds: 0.5, frequency_hz: 440, midi_note: 69, note: "A4", confidence: 0.8 }], lowest_detected_note: "A4", highest_detected_note: "A4", pitch_range_semitones: 0, note: "Mixed signal estimate." },
+      tonality: { key_estimate: "A minor", key_method: "fixture", pitch_class_profile: [], chord_estimates: [{ start_seconds: 0, end_seconds: 2, chord: "Am", confidence: 0.8, method: "spectral-chroma-triad-template" }] },
+      structure: {
+        change_points: [{ time_seconds: 2, change_score: 0.4, reason: "fixture" }],
+        sections: [{ start_seconds: 0, end_seconds: 5, label: "section_1", label_source: "automatic_feature_change", semantic_section: null }],
+        repetition_candidates: [{ start_seconds: 0, end_seconds: 4, match_start_seconds: 1, match_end_seconds: 5, similarity_score: 0.9, method: "normalized-feature-sequence", note: "Candidate only." }],
+        repetition_note: "Candidate only.",
+      },
+      annotations: { genre: ["Afrobeats"], mood: ["celebratory"], notes: "Reviewed against the recording.", reviewed: true, reviewer: "Reviewer A" },
+      warnings: ["fixture"],
+    },
+  };
+}
+
+test("Music dataset save validator builds bounded, provenance-aware result rows without source audio", () => {
+  const payload = validMusicDatasetSavePayload();
+  const result = validateMusicDatasetSaveBody(payload, "user-123");
+  assert.equal(result.fileName, "test-track.wav");
+  assert.equal(result.mimeType, "audio/wav");
+  assert.equal(result.sourceSha256, "ab".repeat(32));
+  assert.equal(result.rightsStatus, "user_owned");
+  assert.equal(result.frames.length, 2);
+  assert.deepEqual(result.frames.map((frame) => frame.frame_index), [0, 1]);
+  assert.deepEqual(result.events.map((event) => event.event_type), [
+    "pitch_point", "chord_candidate", "change_point", "section_candidate", "repetition_candidate",
+  ]);
+  assert.ok(result.annotations.some((annotation) => annotation.field_key === "genre" && annotation.source === "human_review" && annotation.review_state === "confirmed" && annotation.reviewer_id === "user-123"));
+  assert.equal((result.datasetSummary.timeline as unknown[]).length, 0, "time series are stored as paginated frame rows rather than duplicated in the run summary");
+  assert.match(result.resultChecksum, /^[a-f0-9]{64}$/);
+  assert.match(result.trackId, /^[0-9a-f-]{36}$/i);
+  assert.match(result.runId, /^[0-9a-f-]{36}$/i);
+});
+
+test("Music dataset validator rejects schema mismatches, inconsistent hashes, invalid timestamps and missing idempotency", () => {
+  const wrongSchema = validMusicDatasetSavePayload();
+  (wrongSchema.analysis as Record<string, unknown>).schema_version = "env.music-analysis.v1";
+  assert.throws(() => validateMusicDatasetSaveBody(wrongSchema, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && /Only env.music-analysis.v2/.test(error.message));
+
+  const inconsistentHash = validMusicDatasetSavePayload();
+  const data = inconsistentHash.dataset_analysis as Record<string, unknown>;
+  const fingerprint = data.fingerprint as Record<string, unknown>;
+  fingerprint.file_sha256 = "cd".repeat(32);
+  assert.throws(() => validateMusicDatasetSaveBody(inconsistentHash, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && /different source hashes/.test(error.message));
+
+  const invalidTimeline = validMusicDatasetSavePayload();
+  const invalidData = invalidTimeline.dataset_analysis as Record<string, unknown>;
+  invalidData.timeline = [{ start_seconds: 2, end_seconds: 1 }];
+  assert.throws(() => validateMusicDatasetSaveBody(invalidTimeline, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && /invalid time boundaries/.test(error.message));
+
+  const missingKey = validMusicDatasetSavePayload();
+  delete missingKey.idempotency_key;
+  assert.throws(() => validateMusicDatasetSaveBody(missingKey, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && /idempotency_key is required/.test(error.message));
+});
+
+test("Music dataset validator caps oversized feature/event arrays and annotation lists", () => {
+  const tooManyFrames = validMusicDatasetSavePayload();
+  const frameData = tooManyFrames.dataset_analysis as Record<string, unknown>;
+  frameData.timeline = Array.from({ length: 5_001 }, (_, index) => ({ start_seconds: index * 0.5, end_seconds: index * 0.5 + 0.5 }));
+  assert.throws(() => validateMusicDatasetSaveBody(tooManyFrames, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && error.status === 413);
+
+  const tooManyEvents = validMusicDatasetSavePayload();
+  const eventData = tooManyEvents.dataset_analysis as Record<string, unknown>;
+  const pitch = eventData.pitch as Record<string, unknown>;
+  pitch.points = Array.from({ length: 10_001 }, (_, index) => ({ time_seconds: index * 0.0001, frequency_hz: 440, midi_note: 69, note: "A4", confidence: 0.8 }));
+  assert.throws(() => validateMusicDatasetSaveBody(tooManyEvents, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && error.status === 413);
+
+  const tooManyLabels = validMusicDatasetSavePayload();
+  const labels = (tooManyLabels.dataset_analysis as Record<string, unknown>).annotations as Record<string, unknown>;
+  labels.genre = Array.from({ length: 81 }, (_, index) => `tag-${index}`);
+  assert.throws(() => validateMusicDatasetSaveBody(tooManyLabels, "user-123"), (error: unknown) => error instanceof MusicDatasetInputError && /too many values/.test(error.message));
 });
