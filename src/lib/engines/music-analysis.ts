@@ -8,10 +8,17 @@ export type MusicAnalysisInput = {
   fileSizeBytes: number;
   mimeType?: string;
   metadata?: MusicMetadata;
+  /** SHA-256 over the original file bytes; not an acoustic fingerprint. */
+  sourceSha256?: string | null;
 };
 
 export type MusicAnalysisResult = {
   schema_version: "env.music-analysis.v2";
+  fingerprint: {
+    file_sha256: string | null;
+    exact_match_method: "sha-256-exact-file-bytes" | "not-computed";
+    note: string;
+  };
   source: { file_name: string; mime_type: string; file_size_bytes: number };
   metadata: {
     title: string | null;
@@ -219,6 +226,15 @@ export function analyzeMusicAudio(input: MusicAnalysisInput): MusicAnalysisResul
 
   return {
     schema_version: "env.music-analysis.v2",
+    fingerprint: {
+      file_sha256: typeof input.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(input.sourceSha256)
+        ? input.sourceSha256.toLowerCase()
+        : null,
+      exact_match_method: typeof input.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(input.sourceSha256)
+        ? "sha-256-exact-file-bytes"
+        : "not-computed",
+      note: "SHA-256 identifies byte-identical files only; acoustic similarity is a separate fingerprinting task.",
+    },
     source: {
       file_name: input.fileName || "audio",
       mime_type: input.mimeType || "application/octet-stream",
