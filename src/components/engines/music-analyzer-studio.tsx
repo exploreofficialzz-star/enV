@@ -8,6 +8,10 @@ import { createLocalSignalLayers, encodeMonoPcm16Wav, type MusicDatasetAnalysis,
 import { extractMusicMetadata } from "@/lib/media/music-metadata";
 import { createMusicAnalysisProfile } from "@/lib/media/music-analysis-profile";
 import { analyzeMusicInWorker } from "@/lib/media/music-analysis.worker-client";
+import { createServerMediaAdapter, getServerMediaConfig } from "@/lib/media/media-backends";
+import type { MediaJobRequest } from "@/lib/media/media-runtime";
+import { apiUrl } from "@/lib/api/base";
+import { parseMusicLoudnessReport, verifyMusicLoudnessReportChecksum, type MusicLoudnessReport } from "@/lib/media/music-loudness-report";
 import {
   assertLocalDecodedPcmBudget,
   createLocalMusicBatch,
@@ -192,6 +196,12 @@ export function MusicAnalyzerStudio() {
   const [selectedTrackDetail, setSelectedTrackDetail] = useState<SavedDatasetDetail | null>(null);
   const [trackDetailLoading, setTrackDetailLoading] = useState(false);
   const [trackDetailError, setTrackDetailError] = useState("");
+  const [standardLoudnessReport, setStandardLoudnessReport] = useState<MusicLoudnessReport | null>(null);
+  const [loudnessUploadConsent, setLoudnessUploadConsent] = useState(false);
+  const [loudnessBusy, setLoudnessBusy] = useState(false);
+  const [loudnessStage, setLoudnessStage] = useState("");
+  const [loudnessError, setLoudnessError] = useState("");
+  const loudnessControllerRef = useRef<AbortController | null>(null);
   const [batchSelection, setBatchSelection] = useState<File[]>([]);
   const [localBatch, setLocalBatch] = useState<LocalMusicBatch | null>(null);
   const [batchHistory, setBatchHistory] = useState<LocalMusicBatch[]>([]);
@@ -219,6 +229,9 @@ export function MusicAnalyzerStudio() {
 
   useEffect(() => () => {
     analysisControllerRef.current?.abort();
+  }, []);
+  useEffect(() => () => {
+    loudnessControllerRef.current?.abort();
   }, []);
   useEffect(() => {
     let disposed = false;
@@ -788,6 +801,13 @@ export function MusicAnalyzerStudio() {
   function chooseFile(selected: File | null) {
     analysisControllerRef.current?.abort();
     analysisControllerRef.current = null;
+    loudnessControllerRef.current?.abort();
+    loudnessControllerRef.current = null;
+    setLoudnessBusy(false);
+    setLoudnessStage("");
+    setLoudnessError("");
+    setStandardLoudnessReport(null);
+    setLoudnessUploadConsent(false);
     setBusy(false);
     setAnalysisProgress(0);
     setError("");
@@ -802,6 +822,91 @@ export function MusicAnalyzerStudio() {
     });
     if (selected && selected.size > LOCAL_FILE_LIMIT) {
       setError("Choose a file smaller than 25 MB for predictable on-device analysis, especially on phones.");
+    }
+  }
+
+  function exportStandardLoudnessReport() {
+    if (!standardLoudnessReport) return;
+    const blob = new Blob([JSON.stringify(standardLoudnessReport, null, 2)], { type: "application/json;charset=utf-8" });
+    const baseName = file?.name.replace(/\\.[^.]+$/, "").trim() || "env-audio";
+    downloadBlob(blob, baseName + "-standards-loudness-report.json");
+  }
+
+  async function runStandardsLoudnessMeasurement() {
+    if (!file || loudnessBusy) return;
+    if (!loudnessUploadConsent) {
+      setLoudnessError("Confirm the separate source-audio upload permission before starting this measurement.");
+      return;
+    }
+    if (file.size <= 0) {
+      setLoudnessError("The selected file is empty.");
+      return;
+    }
+    const mediaConfig = getServerMediaConfig();
+    if (mediaConfig.endpoint === apiUrl("/api/backend/media") && file.size > 4 * 1024 * 1024) {
+      setLoudnessError("The same-origin media gateway accepts up to 4 MiB per upload. Configure a direct MEDIA_PROCESSOR_URL for larger files, or choose a smaller file.");
+      return;
+    }
+
+    loudnessControllerRef.current?.abort();
+    const controller = new AbortController();
+    loudnessControllerRef.current = controller;
+    setLoudnessBusy(true);
+    setLoudnessStage("Preparing the separately authorized processor request…");
+    setLoudnessError("");
+    setStandardLoudnessReport(null);
+    try {
+      const adapter = createServerMediaAdapter();
+      const request: MediaJobRequest = {
+        id: crypto.randomUUID(),
+        toolId: "audio-analyze-studio",
+        operation: "server-media:audio-loudness-report",
+        inputBytes: file.size,
+        inputMime: file.type || "application/octet-stream",
+        preferredRuntime: "server",
+        params: {
+          input: file,
+          fileName: file.name,
+          outputName: "env-music-loudness-report.json",
+          outputMime: "application/json",
+        },
+      };
+      if (!(await adapter.canHandle(request))) {
+        throw new Error("The configured media adapter cannot run a standards-based loudness report.");
+      }
+      setLoudnessStage("Uploading the selected file to the configured enV processor; measuring with its FFmpeg ebur128 meter…");
+      const responseBlob = await adapter.execute(request, controller.signal, (progress) => {
+        if (loudnessControllerRef.current !== controller || controller.signal.aborted) return;
+        if (progress >= 90) setLoudnessStage("Measurement response received; validating report and integrity checksum…");
+        else if (progress >= 35) setLoudnessStage("The selected audio is being processed by the configured service…");
+      });
+      if (controller.signal.aborted || loudnessControllerRef.current !== controller) return;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(await responseBlob.text()) as unknown;
+      } catch {
+        throw new Error("The processor did not return a valid JSON loudness report. No measurement was saved in the UI.");
+      }
+      const report = parseMusicLoudnessReport(raw);
+      const verified = await verifyMusicLoudnessReportChecksum(report);
+      if (controller.signal.aborted || loudnessControllerRef.current !== controller) return;
+      setStandardLoudnessReport(verified);
+      setLoudnessStage("Report verified. The original file was sent only for this separately selected loudness measurement; no AI model was used.");
+      setLoudnessUploadConsent(false);
+    } catch (cause) {
+      if (loudnessControllerRef.current !== controller) return;
+      if (cause instanceof Error && cause.name === "AbortError") {
+        setLoudnessError("");
+        setLoudnessStage("Loudness measurement canceled. The local analysis and local batch paths remain on-device.");
+      } else {
+        setLoudnessError(cause instanceof Error ? cause.message : "Could not complete the standards-based loudness measurement.");
+        setLoudnessStage("");
+      }
+    } finally {
+      if (loudnessControllerRef.current === controller) {
+        loudnessControllerRef.current = null;
+        setLoudnessBusy(false);
+      }
     }
   }
 
@@ -906,6 +1011,7 @@ export function MusicAnalyzerStudio() {
       exported_at: new Date().toISOString(),
       measurements: analysis,
       dataset_analysis: { ...datasetAnalysis, annotations },
+      standards_loudness_report: standardLoudnessReport,
       labeling_policy: "DSP-derived measurements are estimates; semantic labels are supplied and reviewed by a human. No hosted model or remote API was used.",
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
@@ -918,6 +1024,7 @@ export function MusicAnalyzerStudio() {
       ...createMusicAnalysisProfile(analysis),
       schema_version: "env.music-training-profile.v2",
       dataset_analysis: { ...datasetAnalysis, annotations },
+      standards_loudness_report: standardLoudnessReport,
     };
     const blob = new Blob([JSON.stringify(profile, null, 2)], { type: "application/json;charset=utf-8" });
     const baseName = file?.name.replace(/\.[^.]+$/, "").trim() || "env-song";
@@ -1369,6 +1476,55 @@ export function MusicAnalyzerStudio() {
           <Button type="button" disabled={!analysis || !datasetAnalysis || savingCloud} onClick={() => void saveAnalysisToCloud()}>
             {savingCloud ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Saving results…</> : "Save results to private dataset"}
           </Button>
+        </div>
+        <div className="mt-4 rounded-xl border border-border bg-background p-3 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-semibold">Standards loudness meter (optional)</h3>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Separate from local analysis. This uses the configured enV FFmpeg processor’s ebur128 meter for integrated LUFS, loudness range, sample peak and true peak. It does not use AI. Your selected audio is uploaded only after you give permission below and press Measure.</p>
+            </div>
+            <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">Optional upload</span>
+          </div>
+          <label className="mt-3 flex items-start gap-2 text-xs leading-5">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 shrink-0"
+              checked={loudnessUploadConsent}
+              disabled={loudnessBusy || !file}
+              onChange={(event) => { setLoudnessUploadConsent(event.currentTarget.checked); setLoudnessError(""); }}
+            />
+            <span>I explicitly authorize sending this selected audio file to the configured enV media processor for this loudness measurement. This is not the local-only path.</span>
+          </label>
+          <p className="mt-2 text-[11px] leading-4 text-muted-foreground">The processor limit is 15 minutes and its configured upload-size limit applies; the default same-origin gateway is limited to 4 MiB. Processing uses temporary per-request files and attempts cleanup. The verified server hash identifies the bytes received by that processor. Do not use this mode for audio you are not authorized to upload.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={!file || !loudnessUploadConsent || loudnessBusy} onClick={() => void runStandardsLoudnessMeasurement()}>
+              {loudnessBusy ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Measuring…</> : "Measure with FFmpeg ebur128"}
+            </Button>
+            {loudnessBusy ? <Button type="button" variant="ghost" onClick={() => loudnessControllerRef.current?.abort()}>Cancel meter</Button> : null}
+            {standardLoudnessReport ? <Button type="button" variant="ghost" onClick={exportStandardLoudnessReport}><FileJson size={16} className="mr-2" />Export meter JSON</Button> : null}
+          </div>
+          {loudnessStage ? <p className="mt-2 text-xs text-muted-foreground" role="status" aria-live="polite">{loudnessStage}</p> : null}
+          {loudnessError ? <p className="mt-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive" role="alert">{loudnessError}</p> : null}
+          {standardLoudnessReport ? <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: "Integrated loudness", value: displayNumber(standardLoudnessReport.measurement.integrated_loudness_lufs, " LUFS") },
+                { label: "Loudness range", value: displayNumber(standardLoudnessReport.measurement.loudness_range_lu, " LU") },
+                { label: "Sample peak", value: displayNumber(standardLoudnessReport.measurement.sample_peak_dbfs, " dBFS") },
+                { label: "True peak", value: displayNumber(standardLoudnessReport.measurement.true_peak_dbtp, " dBTP") },
+              ].map((metric) => <div key={metric.label} className="rounded-lg border border-border bg-surface p-3">
+                <p className="text-[11px] text-muted-foreground">{metric.label}</p>
+                <p className="mt-1 break-words text-lg font-semibold">{metric.value}</p>
+              </div>)}
+            </div>
+            {standardLoudnessReport.measurement.status === "unavailable" ? <p className="text-xs text-muted-foreground">Loudness unavailable: {standardLoudnessReport.measurement.unavailable_reason}</p> : null}
+            <div className="rounded-lg border border-border p-3 text-[11px] leading-5 text-muted-foreground">
+              <p>Engine: {standardLoudnessReport.engine.binary_version} · {standardLoudnessReport.engine.filter}</p>
+              <p>Measured scope: {standardLoudnessReport.measurement.scope_seconds.toFixed(3)} seconds · {standardLoudnessReport.source.sample_rate_hz.toLocaleString()} Hz · {standardLoudnessReport.source.channels} channel(s)</p>
+              <p>SHA-256 verified by processor: {standardLoudnessReport.source.file_sha256.slice(0, 12)}… · checksum verified</p>
+              <p className="mt-1">{standardLoudnessReport.measurement.standards_reference}</p>
+            </div>
+          </div> : null}
         </div>
         {analysis && datasetAnalysis ? (
           <div className="mt-3 rounded-xl border border-border bg-background p-3">
