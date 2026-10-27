@@ -57,7 +57,16 @@ function apiError(error: unknown): Response {
 async function principal(request: Request): Promise<{ userId: string } | Response> {
   if (!isSameOriginRequest(request)) return jsonResponse({ ok: false, error: "CROSS_ORIGIN_REJECTED", message: "Music dataset changes must come from the enV application." }, 403);
   const auth = await requireBillingUser(request);
-  if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED", message: "Sign in to save a private music dataset." }, 401);
+  if (auth.response || !auth.userId) {
+    const status = auth.response?.status ?? 401;
+    return jsonResponse({
+      ok: false,
+      error: status === 503 ? "DATASET_AUTH_NOT_CONFIGURED" : "AUTH_REQUIRED",
+      message: status === 503
+        ? "Private cloud datasets are unavailable because verified account authentication is not enabled on this deployment. Local analysis and export still work."
+        : "Sign in to access your private music dataset.",
+    }, status);
+  }
   return { userId: auth.userId };
 }
 function normalizeHash(input: unknown): string | null {
@@ -295,7 +304,7 @@ export async function saveMusicDatasetTrack(request: Request): Promise<Response>
         await tx.query(
           "insert into music_analysis_events (user_id,analysis_run_id,event_type,event_index,start_seconds,end_seconds,payload) " +
           "select $1,$2,item->>'event_type',(item->>'event_index')::integer,(item->>'start_seconds')::double precision,nullif(item->>'end_seconds','')::double precision,item->'payload' " +
-          "from jsonb_array_elements($3::jsonb) as item",
+          "from jsonb_array_elements($3::jsonb) as rows(item)",
           [auth.userId, input.runId, JSON.stringify(input.events)],
         );
       }
