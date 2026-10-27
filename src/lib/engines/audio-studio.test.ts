@@ -5,6 +5,7 @@ import { analyzeMusicAudio, type MusicAnalysisResult } from "./music-analysis.ts
 import { createMusicAnalysisProfile } from "../media/music-analysis-profile.ts";
 import { normalizeMusicModelClassification } from "../media/music-analysis-response.ts";
 import { migrateMusicAnalysisV1ToV2, migrateMusicDatasetAnalysisV1ToV2, migrateMusicProfileV1ToV2 } from "../media/music-analysis-migration.ts";
+import { dbSource, getSql } from "../db.ts";
 
 test("audio analysis uses correct amplitude and RMS dBFS math", () => {
   assert.equal(amplitudeDbfs(1), 0);
@@ -363,4 +364,39 @@ test("Music Analyzer schema migrations reject unsupported versions and invalid d
   }), /duration_seconds must be a positive finite number/);
   assert.throws(() => migrateMusicProfileV1ToV2({ schema_version: "v0" }), /Unsupported music-profile schema/);
   assert.throws(() => migrateMusicDatasetAnalysisV1ToV2({ schema_version: "v0" }), /Unsupported music-dataset-analysis schema/);
+});
+
+
+test("Music Analyzer dataset migration creates the persistent owner-scoped schema", async (t) => {
+  if (dbSource !== "pglite") {
+    t.skip("Schema integration test uses an isolated embedded PGLite database and never queries a configured production database.");
+    return;
+  }
+  const sql = await getSql();
+  const expected = [
+    "music_tracks", "music_analysis_runs", "music_feature_frames",
+    "music_analysis_events", "music_annotations", "music_collections",
+    "music_collection_tracks",
+  ];
+  const tables = await sql.query<{ table_name: string }>(
+    "select table_name from information_schema.tables where table_schema='public' and table_name = any($1)",
+    [expected],
+  );
+  assert.deepEqual(tables.map((row) => row.table_name).sort(), [...expected].sort());
+
+  const requiredColumns = await sql.query<{ table_name: string; column_name: string }>(
+    "select table_name,column_name from information_schema.columns where table_schema='public' and table_name = any($1)",
+    [["music_tracks", "music_analysis_runs", "music_feature_frames", "music_analysis_events", "music_annotations"]],
+  );
+  const columnKeys = new Set(requiredColumns.map((row) => `${row.table_name}.${row.column_name}`));
+  for (const key of [
+    "music_tracks.user_id", "music_tracks.source_sha256", "music_tracks.search_text",
+    "music_tracks.rights_status", "music_analysis_runs.idempotency_key",
+    "music_analysis_runs.result_checksum", "music_feature_frames.frame_index",
+    "music_feature_frames.start_seconds", "music_analysis_events.event_type",
+    "music_analysis_events.start_seconds", "music_annotations.field_key",
+    "music_annotations.source", "music_annotations.review_state",
+  ]) {
+    assert.ok(columnKeys.has(key), `Persistent dataset schema missing ${key}`);
+  }
 });
