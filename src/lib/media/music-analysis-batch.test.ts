@@ -40,7 +40,7 @@ test("local batch preflight marks unsupported, empty, oversized and repeated sel
   assert.match(batch.items[3]?.error ?? "", /Unsupported file type/);
   assert.equal(batch.items[4]?.status, "failed");
   assert.match(batch.items[4]?.error ?? "", /more than once/);
-  assert.equal(batch.totalBytes, 1024 + MUSIC_LOCAL_BATCH_LIMITS.maxFileBytes + 1 + 1024);
+  assert.equal(batch.totalBytes, 1024 + (MUSIC_LOCAL_BATCH_LIMITS.maxFileBytes + 1) + 1024 + 1024);
 });
 
 test("local batch items follow only legal durable state transitions", () => {
