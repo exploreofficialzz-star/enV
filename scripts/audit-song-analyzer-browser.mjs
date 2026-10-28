@@ -147,7 +147,7 @@ const importZip = async (file) => {
   await scope.getByRole("button", { name: "Add music", exact: true }).click();
   await page.getByRole("dialog").waitFor();
   await page.getByLabel("Import music files", { exact: true }).setInputFiles(file);
-  await scope.getByText(/records? imported as drafts/).waitFor({ timeout: 30000 });
+  await scope.getByText(/\d+ songs? added\./).waitFor({ timeout: 30000 });
 };
 const readTracks = () =>
   page.evaluate(
@@ -168,6 +168,13 @@ const readTracks = () =>
 try {
   await page.goto(base + "/tools/audio/song-metadata-analyzer");
   await waitUI();
+  assert.equal(await scope.getByRole("button", { name: "Blank record" }).count(), 0);
+  assert.equal(await scope.getByRole("button", { name: "Export", exact: true }).count(), 0);
+  const icons = [["Overview", "layout-dashboard"], ["Folders", "folder"], ["Drafts", "file-pen-line"], ["Ready to export", "file-check"]];
+  for (const [label, icon] of icons) {
+    const button = scope.locator(".ms-sidebar").getByRole("button", { name: new RegExp(`^${label}`) });
+    assert.ok((await button.locator("svg").getAttribute("class")).includes(`lucide-${icon}`), `${label} has the right icon`);
+  }
   await scope.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("Folder name", { exact: true }).fill("Afrobeats");
   await page.getByLabel("Default genre", { exact: true }).fill("Afrobeats");
@@ -263,6 +270,8 @@ try {
   await importZip(single);
   assert.equal((await readTracks()).length, 3);
   await scope.getByText(/3-song limit/).waitFor();
+  assert.equal(await scope.getByRole("button", { name: "Export", exact: true }).count(), 0);
+  await scope.locator(".ms-sidebar").getByRole("button", { name: /Ready to export/ }).click();
   await scope.getByRole("button", { name: "Export", exact: true }).click();
   await page.getByRole("radio", { name: /Master backup/ }).check();
   downloaded = page.waitForEvent("download");
@@ -355,7 +364,12 @@ try {
   });
   assert.ok(navPosition.navTop >= navPosition.mainBottom - 1, "Navigation is at the bottom on mobile");
   for (const label of ["Overview", "Folders", "Drafts", "Ready to export"]) assert.equal(await mobile.locator(".ms-sidebar").getByRole("button", { name: label }).count(), 1);
-  await mobile.getByRole("button", { name: "Blank record" }).click();
+  assert.equal(await mobile.getByRole("button", { name: "Blank record" }).count(), 0);
+  assert.equal(await mobile.getByRole("button", { name: "Export", exact: true }).count(), 0);
+  await mobile.getByRole("button", { name: "Add music", exact: true }).click();
+  await mobile.getByLabel("Import music files", { exact: true }).setInputFiles(single);
+  await mobile.getByText(/\d+ songs? added\./).waitFor({ timeout: 30000 });
+  await mobile.locator(".ms-record-row button").first().click();
   await mobile.locator(".ms-editor").waitFor();
   for (const section of ["Music", "lyrics.txt", "tags.json"]) {
     await mobile.locator(".ms-data-tabs").getByRole("button", { name: section }).click();
@@ -389,7 +403,7 @@ try {
   await small.locator(".ms-page-heading").waitFor();
   await small.getByRole("button", { name: "Add music", exact: true }).click();
   await small.getByLabel("Import music files", { exact: true }).setInputFiles(musicalFile);
-  await small.getByText(/records? imported as drafts/).waitFor({ timeout: 30000 });
+  await small.getByText(/\d+ songs? added\./).waitFor({ timeout: 30000 });
   await small.locator(".ms-record-row button").first().click();
   for (const section of ["Music", "lyrics.txt", "tags.json"]) {
     await small.locator(".ms-data-tabs").getByRole("button", { name: section }).click();
@@ -427,6 +441,7 @@ try {
           "Unicode lyrics",
           "caption privacy",
           "light and dark layouts at 390/768/1440",
+          "concise library, matching navigation icons and ready-view exports",
           "scrollable phone editor, safe bottom navigation and full-screen viewport override",
           "320px audio editor with persistent playback",
           "accessibility",

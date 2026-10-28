@@ -184,6 +184,7 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
         showRawJson = draft != null; jsonDraft = draft ?: ""; if (draft != null) screen = 2
     }
     var clearanceMenu by remember { mutableStateOf(false) }
+    var licenseMenu by remember { mutableStateOf(false) }
     var trainingExport by remember { mutableStateOf(false) }
     var choosingExport by remember { mutableStateOf(false) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -219,27 +220,6 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
         if (key == "tempo_bpm") { item.put("tempoEstimated", false); item.put("tempoEdited", true); if (item.optBoolean("tempoBandEstimated")) nativeSandboxSuggestTempoBand(item) }
         if (key == "tempo_band") { item.put("tempoBandEstimated", false); item.put("tempoBandEdited", true) }
         if (key == "key") { item.put("keyEstimated", false); item.put("keyEdited", true) }
-    }
-    fun createBlankRecord() {
-        try {
-            val next = JSONObject(workspace.toString())
-            var destination = folderId
-            if (destination.isEmpty()) {
-                val root = nativeSandboxEntries(next.getJSONArray("folders")).firstOrNull { it.optString("parent").isEmpty() }
-                    ?: nativeSandboxNewFolder("My first collection", "").also { next.getJSONArray("folders").put(it) }
-                destination = root.getString("id")
-            }
-            val allFolders = nativeSandboxEntries(next.getJSONArray("folders")); val allTracks = nativeSandboxEntries(next.getJSONArray("tracks"))
-            nativeSandboxFolderCapacity(destination, allFolders, allTracks, 0)
-            val used = allTracks.map { it.getJSONObject("tags").optString("id") }.toSet()
-            var number = allTracks.size + 1; var id = "song_${number.toString().padStart(4, '0')}"
-            while (id in used) { number++; id = "song_${number.toString().padStart(4, '0')}" }
-            val record = JSONObject().put("id", UUID.randomUUID().toString()).put("folder", destination).put("title", "Untitled record")
-                .put("audio", "").put("size", 0).put("tags", JSONObject().put("id", id)).put("reviewed", false)
-                .put("clearance", "pending").put("instrumental", false).put("lyrics", "")
-            next.getJSONArray("tracks").put(record)
-            if (commit(next)) { folderId = destination; selectedId = record.getString("id"); screen = 0; message = "" }
-        } catch (error: Exception) { message = error.message ?: "Could not create a record." }
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty() && !busy) scope.launch {
@@ -310,7 +290,7 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
                     } finally { if (!saved && audioFile.isNotBlank()) store.audio(audioFile).delete() }
                     next = JSONObject(next.toString()); currentFolders = nativeSandboxEntries(next.getJSONArray("folders")); added++
                 }
-                folderId = destination; page = 0; message = "$added songs added. Check BPM and key by ear."
+                folderId = destination; page = 0; message = "$added songs added."
             } catch (error: Exception) { if (error is CancellationException) throw error; message = error.message ?: "Could not import files." }
             finally { busy = false }
         }
@@ -373,8 +353,6 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
                 val ids = if (folderId.isBlank()) folders.map { it.optString("id") }.toSet() else sandboxNativeDescendants(folderId, folders)
                 val chosen = tracks.filter {
                     it.optString("folder") in ids &&
-                        (folderId.isNotBlank() || libraryView != 2 || !sandboxNativeReady(it)) &&
-                        (folderId.isNotBlank() || libraryView != 3 || sandboxNativeReady(it)) &&
                         (!trainingExport || (it.optString("audio").isNotBlank() && sandboxNativeReady(it)))
                 }
                 require(chosen.isNotEmpty()) { "No songs to export." }
@@ -460,7 +438,7 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
     }
     @Composable fun SandboxBottomNavigation() {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf("Home", "LayoutGrid", "FilePenLine", "CircleCheck").zip(listOf("Overview", "Folders", "Drafts", "Ready to export")).forEachIndexed { index, (icon, label) ->
+            listOf("LayoutDashboard", "Folder", "FilePenLine", "FileCheck").zip(listOf("Overview", "Folders", "Drafts", "Ready to export")).forEachIndexed { index, (icon, label) ->
                 val tint = if (libraryView == index && selectedId.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 TextButton(onClick = {
                     player?.release(); player = null; playing = false; audioPosition = 0; audioDuration = 0
@@ -525,10 +503,9 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (screen) {
                     0 -> {
-                        Text("Music", style = MaterialTheme.typography.titleSmall)
                         Field("Title", selected.optString("title")) { edit { item -> item.put("title", it) } }
                         Row { TextButton(onClick = { folderChoicePage = 0; moving = true }) { Text("Move") }; TextButton(onClick = { audioAttacher.launch(arrayOf("audio/*")) }) { Text(if (selected.optString("audio").isEmpty()) "Add audio" else "Replace audio") } }
-                        Text("Tempo and key are estimates; check by ear.", style = MaterialTheme.typography.labelSmall)
+                        Text("Check estimates by ear.", style = MaterialTheme.typography.labelSmall)
                         Field("Tempo (BPM)", nativeSandboxString(tags, "tempo_bpm")) { editTag("tempo_bpm", it) }
                         Field("Musical key", nativeSandboxString(tags, "key")) { editTag("key", it) }
                         Field("Time signature", nativeSandboxString(tags, "time_signature")) { editTag("time_signature", it) }
@@ -541,14 +518,12 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
                         if (selected.optString("analysisNote").isNotBlank()) Text(selected.optString("analysisNote"), style = MaterialTheme.typography.labelSmall)
                     }
                     1 -> {
-                        Text("Lyrics", style = MaterialTheme.typography.titleSmall)
                         Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = selected.optBoolean("instrumental"), onCheckedChange = { value -> edit { it.put("instrumental", value) } }); Text("This track is instrumental") }
                         OutlinedTextField(value = selected.optString("lyrics"), onValueChange = { value -> edit { it.put("lyrics", value) } }, label = { Text("Lyrics") }, modifier = Modifier.fillMaxWidth().height(200.dp))
                         OutlinedButton(onClick = { lyricsImporter.launch(arrayOf("text/plain")) }) { Text("Import lyrics text") }
                     }
                     else -> {
-                        Text("Song tags", style = MaterialTheme.typography.titleSmall)
-                        Text("Separate multiple values with commas. Review each tag before export.", style = MaterialTheme.typography.labelSmall)
+                        Text("Separate tags with commas.", style = MaterialTheme.typography.labelSmall)
                         if (selected.has("tagsDraft")) Text("Apply or discard the JSON draft before editing fields.", color = MaterialTheme.colorScheme.error)
                         val editable = !selected.has("tagsDraft")
                         listOf("id" to "Record ID · required", "genre" to "Genre · required", "sub_style" to "Sub-style", "language" to "Languages", "tempo_bpm" to "Tempo (BPM)", "key" to "Musical key", "time_signature" to "Time signature", "tempo_band" to "Tempo band", "mood" to "Mood", "theme" to "Theme", "setting" to "Setting", "vocals" to "Voice & delivery", "flow" to "Flow", "instruments" to "Instruments", "standout" to "Standout details", "energy" to "Energy").forEach { (key, label) ->
@@ -559,10 +534,19 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
                             OutlinedTextField(value = raw, onValueChange = { value -> raw = value; editTag(key, value) }, label = { Text(label) }, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }, singleLine = true, enabled = editable)
                         }
                         for (i in 0..2) OutlinedTextField(value = tags.optJSONArray("descriptions")?.optString(i) ?: "", onValueChange = { value -> edit { item -> val existing = item.getJSONObject("tags").optJSONArray("descriptions") ?: JSONArray(); val descriptions = JSONArray(); for (index in 0..2) descriptions.put(if (index == i) value else existing.optString(index)); item.getJSONObject("tags").put("descriptions", descriptions) } }, label = { Text("Description ${i + 1}${if (i == 2) " (optional)" else ""}") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
-                        OutlinedTextField(value = tags.optString("license"), onValueChange = { editTag("license", it) }, label = { Text("License · required") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
+                        Box {
+                            OutlinedButton(onClick = { licenseMenu = true }, modifier = Modifier.fillMaxWidth(), enabled = editable) {
+                                Text("License: ${tags.optString("license").ifBlank { "Choose" }}", Modifier.weight(1f))
+                                EnVIcon("ChevronDown", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            DropdownMenu(expanded = licenseMenu, onDismissRequest = { licenseMenu = false }) {
+                                listOf("owned", "written permission", "CC-BY", "royalty-free").forEach { value ->
+                                    DropdownMenuItem(text = { Text(value) }, onClick = { editTag("license", value); licenseMenu = false })
+                                }
+                            }
+                        }
                         OutlinedTextField(value = tags.optString("source"), onValueChange = { editTag("source", it) }, label = { Text("Source & permission · required") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
                         Box { OutlinedButton(onClick = { clearanceMenu = true }, enabled = editable) { Text("Clearance: ${selected.optString("clearance", "pending")}") }; DropdownMenu(expanded = clearanceMenu, onDismissRequest = { clearanceMenu = false }) { listOf("pending", "cleared", "not cleared").forEach { value -> DropdownMenuItem(text = { Text(value) }, onClick = { edit { it.put("clearance", value) }; clearanceMenu = false }) } } }
-                        Text("License: owned, written permission, CC-BY or royalty-free", style = MaterialTheme.typography.labelSmall)
                         TextButton(onClick = { if (!showRawJson) jsonDraft = if (selected.has("tagsDraft")) selected.optString("tagsDraft") else tags.toString(2); showRawJson = !showRawJson }) { Text(if (showRawJson) "Hide advanced JSON" else "Advanced JSON") }
                         if (showRawJson) {
                             OutlinedTextField(value = jsonDraft, onValueChange = { value -> jsonDraft = value; edit { it.put("tagsDraft", value) } }, label = { Text("Tags JSON") }, modifier = Modifier.fillMaxWidth().height(180.dp))
@@ -607,7 +591,6 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
             val rows = children.map { "folder" to it } + visibleTracks.map { "track" to it }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (folderId.isNotBlank()) "Songs & subfolders" else listOf("Folders & drafts", "Folders", "Drafts", "Ready to export")[libraryView], Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                TextButton(onClick = { createBlankRecord() }, enabled = !busy && storageFailure == null) { Text("Blank record") }
             }
             rows.drop(page * 4).take(4).forEach { (kind, item) ->
                 OutlinedButton(onClick = { if (kind == "folder") { folderId = item.optString("id"); page = 0 } else { selectedId = item.optString("id"); screen = 0; message = "" } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
@@ -617,13 +600,16 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
                     EnVIcon("ChevronRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (rows.isEmpty()) Text("No songs yet", style = MaterialTheme.typography.bodySmall)
+            if (rows.isEmpty()) Text(if (libraryView == 3) "No ready songs" else "No songs yet", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { page = (page - 1).coerceAtLeast(0) }, enabled = page > 0) { Text("Previous") }
-                Text("${page + 1} / ${((rows.size + 3) / 4).coerceAtLeast(1)}", style = MaterialTheme.typography.labelSmall)
-                TextButton(onClick = { page++ }, enabled = (page + 1) * 4 < rows.size) { Text("Next") }
-                OutlinedButton(onClick = { choosingExport = true }, enabled = tracks.isNotEmpty() && !busy) { EnVIcon("ArrowDownToLine", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(4.dp)); Text("Export") }
+            if (rows.size > 4 || libraryView == 3) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                if (rows.size > 4) {
+                    TextButton(onClick = { page = (page - 1).coerceAtLeast(0) }, enabled = page > 0) { Text("Previous") }
+                    Text("${page + 1} / ${((rows.size + 3) / 4).coerceAtLeast(1)}", style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = { page++ }, enabled = (page + 1) * 4 < rows.size) { Text("Next") }
+                }
+                Spacer(Modifier.weight(1f))
+                if (libraryView == 3) OutlinedButton(onClick = { choosingExport = true }, enabled = tracks.isNotEmpty() && !busy) { EnVIcon("ArrowDownToLine", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(4.dp)); Text("Export") }
             }
             SandboxBottomNavigation()
         }

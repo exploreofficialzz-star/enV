@@ -3,7 +3,7 @@ import {
   ArrowDownToLine,
   ArrowRight,
   Check,
-  CircleCheck,
+  FileCheck,
   ChevronRight,
   Clock3,
   FileAudio,
@@ -12,8 +12,7 @@ import {
   FolderPlus,
   HardDrive,
   Headphones,
-  Home,
-  LayoutGrid,
+  LayoutDashboard,
   LoaderCircle,
   MoreHorizontal,
   Plus,
@@ -312,35 +311,6 @@ export function AiMusicDataSandbox() {
       setFolderError(errorText(e));
     }
   }
-  async function addRecord() {
-    try {
-      let w = current.current!,
-        dest =
-          w.folders.find((f) => f.key === folderId) ||
-          w.folders.find((f) => f.parentId === null) ||
-          w.folders[0];
-      if (!dest) {
-        dest = newSandboxFolder("My first collection");
-        await writeSandbox([{ store: "folders", value: dest }]);
-        w = { ...w, folders: [dest] };
-        apply(w);
-      }
-      assertSandboxCapacity(dest.key, w.folders, w.tracks, 1, 0);
-      const track = newSandboxTrack(
-        dest,
-        uniqueSandboxId(
-          `${sandboxSlug(dest.name)}_${String(w.tracks.length + 1).padStart(4, "0")}`,
-          w.tracks,
-        ),
-        "Untitled record",
-      );
-      await writeSandbox([{ store: "tracks", value: track }]);
-      apply({ ...w, tracks: [...w.tracks, track] });
-      setEditorId(track.key);
-    } catch (e) {
-      setError(errorText(e));
-    }
-  }
   function openImport() {
     setDestination(folderId || folders[0]?.key || "");
     setImportOpen(true);
@@ -474,7 +444,7 @@ export function AiMusicDataSandbox() {
       }
       navigate("collection", root.key);
       setNotice(
-        `${imported} ${imported === 1 ? "record" : "records"} imported as drafts. File facts are measured where readable; musical tags need your review.`,
+        `${imported} ${imported === 1 ? "song" : "songs"} added.`,
       );
       if (navigator.storage?.persist) void navigator.storage.persist().catch(() => false);
     } catch (e) {
@@ -602,10 +572,10 @@ export function AiMusicDataSandbox() {
                 <nav aria-label="Sandbox navigation">
                   {(
                     [
-                      ["home", Home, "Overview", tracks.length],
-                      ["folders", LayoutGrid, "Folders", folders.length],
+                      ["home", LayoutDashboard, "Overview", tracks.length],
+                      ["folders", Folder, "Folders", folders.length],
                       ["drafts", FilePenLine, "Drafts", draftCount],
-                      ["ready", CircleCheck, "Ready to export", readyCount],
+                      ["ready", FileCheck, "Ready to export", readyCount],
                     ] as const
                   ).map(([key, Icon, label, count]) => (
                     <button
@@ -653,7 +623,6 @@ export function AiMusicDataSandbox() {
                   <div>
                     <strong>This device</strong>
                     <p>{sandboxBytes(bytes)} of audio stored</p>
-                    <small>Export ZIP backups to keep your work safe.</small>
                   </div>
                 </div>
               </aside>
@@ -758,19 +727,12 @@ export function AiMusicDataSandbox() {
                           );
                         }}
                       >
-                        <div className="ms-upload-icon">
-                          <Upload size={23} />
-                        </div>
-                        <div>
-                          <h3>Add your music</h3>
-                          <p>Songs or ZIP files</p>
-                        </div>
                         <button
                           className="ms-button ms-primary"
                           onClick={openImport}
                           disabled={!!busy}
                         >
-                          <Plus size={16} /> Add music
+                          <Upload size={16} /> Add music
                         </button>
                       </div>
                     ) : null}
@@ -856,26 +818,18 @@ export function AiMusicDataSandbox() {
                                   : "Records"}{" "}
                             <span>{view === "home" ? draftCount : filtered.length}</span>
                           </h3>
-                          <div className="ms-actions">
+                          {view === "ready" ? (
                             <button
                               className="ms-text-button"
-                              disabled={!!busy}
-                              onClick={() => void addRecord()}
-                            >
-                              <Plus size={14} /> Blank record
-                            </button>
-                            <button
-                              className="ms-text-button"
-                              disabled={!!busy || !filtered.length}
+                              disabled={!!busy || !tracks.length}
                               onClick={() => {
-                                setWholeWorkspaceExport(false);
+                                setWholeWorkspaceExport(selected.size === 0);
                                 setExportOpen(true);
                               }}
                             >
-                              <ArrowDownToLine size={15} /> Export
-                              {selected.size ? ` (${selected.size})` : ""}
+                              <ArrowDownToLine size={15} /> Export{selected.size ? ` (${selected.size})` : ""}
                             </button>
-                          </div>
+                          ) : null}
                         </div>
                         <div className="ms-search">
                           <Search size={16} />
@@ -897,7 +851,7 @@ export function AiMusicDataSandbox() {
                               .slice(recordPage * recordPageSize, (recordPage + 1) * recordPageSize)
                               .map((t) => (
                                 <div className="ms-record-row" key={t.key}>
-                                  <input
+                                  {view === "ready" ? <input
                                     type="checkbox"
                                     aria-label={`Select ${t.title}`}
                                     checked={selected.has(t.key)}
@@ -908,7 +862,7 @@ export function AiMusicDataSandbox() {
                                         return next;
                                       })
                                     }
-                                  />
+                                  /> : null}
                                   <button disabled={!!busy} onClick={() => setEditorId(t.key)}>
                                     <span className="ms-file-icon">
                                       {t.audio ? (
@@ -920,8 +874,7 @@ export function AiMusicDataSandbox() {
                                     <span className="ms-record-name">
                                       <strong>{t.title || t.tags.id}</strong>
                                       <small>
-                                        {t.tags.id} · {t.tags.genre || "Genre to add"} ·{" "}
-                                        {sandboxDuration(t.tags.duration_seconds)}
+                                        {[t.tags.genre, t.tags.duration_seconds ? sandboxDuration(t.tags.duration_seconds) : ""].filter(Boolean).join(" · ")}
                                       </small>
                                     </span>
                                     <span className="ms-badge">
@@ -952,11 +905,6 @@ export function AiMusicDataSandbox() {
                                   ? "No ready songs"
                                   : "No songs yet"}
                             </h3>
-                            <p>
-                              {query
-                                ? "Try another title, genre, or language."
-                                : "Add music or create a record."}
-                            </p>
                           </div>
                         )}
                         {filtered.length > recordPageSize ? <div className="ms-pagination" aria-label="Song pages">
@@ -972,10 +920,6 @@ export function AiMusicDataSandbox() {
             </div>
             {importOpen ? (
               <SandboxModal title="Add to your collection" onClose={() => setImportOpen(false)}>
-                <p>
-                  Import audio, lyrics, matching tags, a folder, or a ZIP package. Existing records
-                  stay in place.
-                </p>
                 <SandboxField label="Destination folder">
                   <select value={destination} onChange={(e) => setDestination(e.target.value)}>
                     <option value="">Create a new folder</option>
@@ -1005,11 +949,10 @@ export function AiMusicDataSandbox() {
                     <Folder size={17} /> Choose folder
                   </button>
                 </div>
-                <small>
-                  Up to 50 songs / 160 MB per import. ZIP ≤ 80 MB; each audio file ≤ 40 MB. Pair
-                  files using the same name, e.g. song_0001.wav, song_0001.lyrics.txt,
-                  song_0001.tags.json. RAR, 7z and TAR: unpack them first.
-                </small>
+                <details className="ms-import-tips">
+                  <summary>Import tips</summary>
+                  <small>Match audio, lyrics and tags by filename. Up to 50 songs; 40 MB per audio file and 80 MB per ZIP. Unpack RAR, 7z and TAR first.</small>
+                </details>
               </SandboxModal>
             ) : null}
             <input
@@ -1133,10 +1076,6 @@ export function AiMusicDataSandbox() {
                       placeholder="Naming rules, tempo cutoffs, or collection goals."
                     />
                   </SandboxField>
-                  <small>
-                    Defaults apply to new records. Existing tags remain editable. Add songs to this
-                    folder in as many sessions as you need.
-                  </small>
                   {folderError ? (
                     <p className="ms-alert" role="alert">
                       {folderError}
@@ -1162,23 +1101,15 @@ export function AiMusicDataSandbox() {
               </SandboxModal>
             ) : null}
             {exportOpen ? (
-              <SandboxModal title="Export your music data" onClose={() => setExportOpen(false)}>
-                <p>
-                  {exportTracks.length} records{" "}
-                  {wholeWorkspaceExport
-                    ? "in this workspace"
-                    : selected.size
-                      ? "selected"
-                      : "in this view"}
-                  . Keep master files as your source of truth.
-                </p>
+              <SandboxModal title="Export" onClose={() => setExportOpen(false)}>
+                <p>{exportTracks.length} {exportTracks.length === 1 ? "song" : "songs"}</p>
                 <label className="ms-check">
                   <input
                     type="checkbox"
                     checked={wholeWorkspaceExport}
                     onChange={(e) => setWholeWorkspaceExport(e.target.checked)}
                   />{" "}
-                  Export the entire workspace
+                  Include all songs
                 </label>
                 <label className="ms-export-option">
                   <input
@@ -1191,8 +1122,7 @@ export function AiMusicDataSandbox() {
                   <span>
                     <strong>Master backup</strong>
                     <small>
-                      Original audio + editable .tags.json + .lyrics.txt, folder paths, manifest,
-                      and workspace history. Includes drafts.
+                      Audio, tags and lyrics, including drafts.
                     </small>
                   </span>
                 </label>
@@ -1207,16 +1137,10 @@ export function AiMusicDataSandbox() {
                   <span>
                     <strong>Music training preparation</strong>
                     <small>
-                      {exportTracks.filter((t) => t.audio && sandboxReady(t)).length} eligible audio
-                      records. Cleared and reviewed only. Separate captions and controls, converted
-                      section labels, JSONL index.
+                      {exportTracks.filter((t) => t.audio && sandboxReady(t)).length} reviewed and cleared songs.
                     </small>
                   </span>
                 </label>
-                <p>
-                  Check the exact trainer version’s schema before training. This prepares your
-                  files; it does not train a model.
-                </p>
                 <div className="ms-modal-footer">
                   <button className="ms-button" onClick={() => setExportOpen(false)}>
                     Cancel

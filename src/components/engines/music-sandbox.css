@@ -1527,3 +1527,11 @@
 .ms-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
 .ms-editor-page { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
 .ms-editor-footer, .ms-listen, .ms-data-tabs, .ms-editor-top, .ms-save-line { flex-shrink: 0; }
+
+/* A quiet library: one import action and room for the music. */
+.ms-dropzone { justify-content: center; }
+.ms-dropzone > .ms-button { margin: 0; }
+.ms-listen > small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-import-tips { margin-top: 12px; color: var(--ms-muted); font-size: var(--text-sm); }
+.ms-import-tips summary { cursor: pointer; }
+@container music-sandbox (max-width: 600px) { .ms-dropzone > .ms-button { width: 100%; margin: 0; } }

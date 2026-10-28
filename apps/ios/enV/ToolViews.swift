@@ -13020,7 +13020,6 @@ private struct NativeMusicDataSandboxView: View {
             if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
             HStack {
                 Text(folderID.isEmpty ? ["Folders & drafts", "Folders", "Drafts", "Ready to export"][libraryView] : "Songs & subfolders").font(.subheadline.weight(.semibold)); Spacer()
-                Button("Blank record") { createBlankRecord() }.font(.caption).disabled(busy || storageError != nil)
             }
             ForEach(Array(rows.dropFirst(page * 4).prefix(4).enumerated()), id: \.offset) { _, row in
                 Button { if row.0 == "folder" { folderID = row.1; page = 0 } else { selectedID = row.1; screen = 0; message = "" } } label: {
@@ -13028,15 +13027,19 @@ private struct NativeMusicDataSandboxView: View {
                         .frame(maxWidth: .infinity, alignment: .leading).padding(8)
                 }.buttonStyle(.bordered).disabled(busy)
             }
-            if rows.isEmpty { Text("No songs yet").font(.caption).foregroundStyle(.secondary) }
+            if rows.isEmpty { Text(libraryView == 3 ? "No ready songs" : "No songs yet").font(.caption).foregroundStyle(.secondary) }
             Spacer(minLength: 0)
-            HStack {
-                Button("Previous") { page = max(0, page - 1) }.disabled(page == 0)
-                Text("\(page + 1) / \(max(1, (rows.count + 3) / 4))").font(.caption)
-                Button("Next") { page += 1 }.disabled((page + 1) * 4 >= rows.count)
-                Spacer()
-                Button { choosingExport = true } label: { HStack(spacing: 4) { EnVIcon(name: "ArrowDownToLine", size: 16, tint: .envInk); Text("Export") } }.buttonStyle(.bordered).disabled(workspace.tracks.isEmpty || busy)
-            }.font(.caption)
+            if rows.count > 4 || libraryView == 3 {
+                HStack {
+                    if rows.count > 4 {
+                        Button("Previous") { page = max(0, page - 1) }.disabled(page == 0)
+                        Text("\(page + 1) / \(max(1, (rows.count + 3) / 4))").font(.caption)
+                        Button("Next") { page += 1 }.disabled((page + 1) * 4 >= rows.count)
+                    }
+                    Spacer()
+                    if libraryView == 3 { Button { choosingExport = true } label: { HStack(spacing: 4) { EnVIcon(name: "ArrowDownToLine", size: 16, tint: .envInk); Text("Export") } }.buttonStyle(.bordered).disabled(workspace.tracks.isEmpty || busy) }
+                }.font(.caption)
+            }
             bottomNavigation
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -13048,7 +13051,7 @@ private struct NativeMusicDataSandboxView: View {
                     selectedID = ""; screen = 0; libraryView = index; folderID = ""; page = 0; message = ""
                 } label: {
                     VStack(spacing: 3) {
-                        EnVIcon(name: ["Home", "LayoutGrid", "FilePenLine", "CircleCheck"][index], size: 20, tint: libraryView == index && selectedID.isEmpty ? .accentColor : .envMuted)
+                        EnVIcon(name: ["LayoutDashboard", "Folder", "FilePenLine", "FileCheck"][index], size: 20, tint: libraryView == index && selectedID.isEmpty ? .accentColor : .envMuted)
                         Text(["Overview", "Folders", "Drafts", "Ready to export"][index]).font(.caption2).lineLimit(2)
                     }.frame(maxWidth: .infinity, minHeight: 46)
                 }.buttonStyle(.plain).foregroundStyle(libraryView == index && selectedID.isEmpty ? Color.accentColor : Color.secondary)
@@ -13082,10 +13085,9 @@ private struct NativeMusicDataSandboxView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     if screen == 0 {
-                        Text("Music").font(.headline)
                         VStack(alignment: .leading, spacing: 4) { Text("Title").font(.caption).foregroundStyle(.secondary); TextField("Title", text: Binding(get: { selected?.title ?? "" }, set: { value in update { $0.title = value } })).textFieldStyle(.roundedBorder) }
                         HStack { Button("Move") { folderChoicePage = 0; moving = true }; Button(track.audio.isEmpty ? "Add audio" : "Replace audio") { attachingAudio = true } }
-                        Text("Tempo and key are estimates; check by ear.").font(.caption).foregroundStyle(.secondary)
+                        Text("Check estimates by ear.").font(.caption).foregroundStyle(.secondary)
                         Group {
                             trackText("Tempo (BPM)", "tempo_bpm").keyboardType(.decimalPad)
                             trackText("Musical key", "key"); trackText("Time signature", "time_signature")
@@ -13096,13 +13098,11 @@ private struct NativeMusicDataSandboxView: View {
                             if !track.technical.isEmpty { Text(track.technical).font(.caption).foregroundStyle(.secondary) }
                         }
                     } else if screen == 1 {
-                        Text("Lyrics").font(.headline)
                         Toggle("This track is instrumental", isOn: Binding(get: { selected?.instrumental ?? false }, set: { value in update { $0.instrumental = value } }))
                         TextEditor(text: Binding(get: { selected?.lyrics ?? "" }, set: { value in update { $0.lyrics = value } })).frame(minHeight: 200).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder)).accessibilityLabel("Lyrics")
                         Button("Import lyrics text") { importingLyrics = true }.buttonStyle(.bordered)
                     } else {
-                        Text("Song tags").font(.headline)
-                        Text("Separate multiple values with commas. Review each tag before export.").font(.caption).foregroundStyle(.secondary)
+                        Text("Separate tags with commas.").font(.caption).foregroundStyle(.secondary)
                         if track.tagsDraft != nil { Text("Apply or discard the JSON draft before editing fields.").font(.caption).foregroundStyle(.red) }
                         Group {
                             Group {
@@ -13117,11 +13117,14 @@ private struct NativeMusicDataSandboxView: View {
                                 trackText("Description 1", "description_1"); trackText("Description 2", "description_2"); trackText("Description 3 (optional)", "description_3")
                             }
                             Group {
-                                trackText("License · required", "license"); trackText("Source & permission · required", "source")
+                                Picker("License", selection: field("license")) {
+                                    Text("Choose a license").tag("")
+                                    Text("Owned").tag("owned"); Text("Written permission").tag("written permission"); Text("CC-BY").tag("CC-BY"); Text("Royalty-free").tag("royalty-free")
+                                }.pickerStyle(.menu)
+                                trackText("Source & permission · required", "source")
                                 Picker("Clearance", selection: Binding(get: { selected?.clearance ?? "pending" }, set: { value in update { $0.clearance = value } })) { Text("Pending").tag("pending"); Text("Cleared").tag("cleared"); Text("Not cleared").tag("not cleared") }.pickerStyle(.menu)
                             }
                         }.disabled(track.tagsDraft != nil)
-                        Text("License: owned, written permission, CC-BY or royalty-free").font(.caption).foregroundStyle(.secondary)
                         Button(showRawJSON ? "Hide advanced JSON" : "Advanced JSON") {
                             if !showRawJSON { jsonDraft = track.tagsDraft ?? ((try? JSONSerialization.data(withJSONObject: musicSandboxTags(track), options: [.prettyPrinted, .sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}") }
                             showRawJSON.toggle()
@@ -13216,27 +13219,6 @@ private struct NativeMusicDataSandboxView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { saveFolder() } }
             }
         }
-    }
-    private func createBlankRecord() {
-        var next = workspace, destination = folderID
-        if destination.isEmpty {
-            if let root = next.folders.first(where: { $0.parent.isEmpty }) { destination = root.id }
-            else { let root = MusicSandboxFolder(name: "My first collection"); destination = root.id; next.folders.append(root) }
-        }
-        var parent = destination, seen = Set<String>()
-        while !parent.isEmpty && seen.insert(parent).inserted {
-            guard let folder = next.folders.first(where: { $0.id == parent }) else { message = "Folder unavailable."; return }
-            let descendants = musicSandboxDescendants(parent, next.folders)
-            guard next.tracks.filter({ descendants.contains($0.folder) }).count < folder.maxSongs else { message = "Folder song limit reached."; return }
-            parent = folder.parent
-        }
-        let used = Set(next.tracks.map { $0.fields["id"] ?? "" }); var number = next.tracks.count + 1
-        var id = "song_\(String(format: "%04d", number))"
-        while used.contains(id) { number += 1; id = "song_\(String(format: "%04d", number))" }
-        var record = MusicSandboxTrack(folder: destination, title: "Untitled record"); record.fields["id"] = id
-        next.tracks.append(record)
-        do { try store.save(next); workspace = next; folderID = destination; selectedID = record.id; screen = 0; message = "" }
-        catch { message = error.localizedDescription }
     }
     private func saveFolder() {
         let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -13350,7 +13332,7 @@ private struct NativeMusicDataSandboxView: View {
                 do { try store.save(next); workspace = next; added += 1 }
                 catch { if !record.audio.isEmpty { try? FileManager.default.removeItem(at: store.audio(record.audio)) }; throw error }
             }
-            folderID = destination; page = 0; message = "\(added) songs added. Check BPM and key by ear."
+            folderID = destination; page = 0; message = "\(added) songs added."
         } catch { message = error.localizedDescription }
     }
     private func attachAudio(_ url: URL) async {
@@ -13415,8 +13397,6 @@ private struct NativeMusicDataSandboxView: View {
             let ids = folderID.isEmpty ? Set(workspace.folders.map(\.id)) : musicSandboxDescendants(folderID, workspace.folders)
             let selected = workspace.tracks.filter { track in
                 ids.contains(track.folder) &&
-                    (!folderID.isEmpty || libraryView != 2 || !musicSandboxReady(track)) &&
-                    (!folderID.isEmpty || libraryView != 3 || musicSandboxReady(track)) &&
                     (!training || (!track.audio.isEmpty && musicSandboxReady(track)))
             }
             let exportSize = try selected.reduce(0) { total, track in total + track.size + track.lyrics.utf8.count + (try JSONSerialization.data(withJSONObject: musicSandboxTags(track))).count }

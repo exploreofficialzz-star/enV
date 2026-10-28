@@ -338,7 +338,7 @@ export function MusicSandboxEditor({
       <div className="ms-save-line" role="status"><Save size={13} />{analyzing ? "Analyzing audio…" : saveState}</div>
       {error ? <p className="ms-alert" role="alert">{error}</p> : null}
       {audioUrl ? <div className="ms-listen">
-        <div><strong>Listen while you tag</strong><small>{record.audio?.filename}</small></div>
+        <small title={record.audio?.filename}>{record.audio?.filename}</small>
         <audio className="ms-audio" controls preload="metadata" src={audioUrl} aria-label={`Play ${record.title}`} />
       </div> : null}
       <nav className="ms-data-tabs" aria-label="Record data sections">
@@ -348,7 +348,6 @@ export function MusicSandboxEditor({
       </nav>
       <div className="ms-editor-page">
         {section === "music" ? <>
-          <div className="ms-section-heading"><h3>Music</h3><p>Add a recording and listen as you prepare its data.</p></div>
           <SandboxField label={record.audio ? "Replace audio" : "Add audio"}><input type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aac,.aiff,.aif,.opus" onChange={async (e) => {
             const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
             try { await persist(); const next = await onReplace(latest.current, file); latest.current = next; setRecord(next); setAudioUrl(""); setAudioRevision((v) => v + 1); setSaveState("Saved on this device"); }
@@ -360,7 +359,7 @@ export function MusicSandboxEditor({
             <SandboxField label="Folder"><select value={record.folderId} onChange={(e) => update({ ...latest.current, folderId: e.target.value })}>{folders.map((f) => <option key={f.key} value={f.key}>{sandboxFolderPath(f, folders)}</option>)}</select></SandboxField>
           </div>
           <div className="ms-editor-page-title"><h3>Audio analysis</h3>{record.audio ? <button type="button" className="ms-button" onClick={() => void analyze()}>Analyze again</button> : null}</div>
-          <p className="ms-analysis-note">Tempo and key are estimates. Listen and check them before export.</p>
+          <p className="ms-analysis-note">Check estimates by ear.</p>
           <div className="ms-fields">
             <SandboxField label={record.provenance.tempo_bpm === "estimated" ? "Tempo (BPM) · estimate" : "Tempo (BPM)"}><input type="number" min="1" max="400" step="any" value={record.tags.tempo_bpm ?? ""} onChange={(e) => tag("tempo_bpm", e.target.value === "" ? null : Number(e.target.value))} /></SandboxField>
             {stringField("key", record.provenance.key === "estimated" ? "Musical key · estimate" : "Musical key", undefined, "e.g. A minor")}
@@ -373,18 +372,17 @@ export function MusicSandboxEditor({
           {record.analysis?.status === "complete" ? <details className="ms-measurements"><summary>Audio measurements</summary><div className="ms-analysis-metrics" aria-label="Audio measurements"><span>Sample: {record.analysis.analyzedSeconds}s</span><span>Peak: {record.analysis.peakDbfs ?? "—"} dBFS</span><span>RMS: {record.analysis.rmsDbfs ?? "—"} dBFS</span><span>Clipping: {record.analysis.clippedPercent}%</span><span>Silence: {record.analysis.silencePercent}%</span><span>Brightness: {record.analysis.spectralCentroidHz ?? "—"} Hz</span></div></details> : null}
         </> : null}
         {section === "lyrics" ? <>
-          <div className="ms-section-heading"><h3>Lyrics</h3><p>Paste the words or import a text file. Use section labels such as [verse] and [chorus].</p></div>
           <label className="ms-check"><input type="checkbox" checked={record.instrumental} onChange={(e) => update({ ...latest.current, instrumental: e.target.checked })} /> This track is instrumental</label>
           <SandboxField label="Lyrics"><textarea className="ms-code ms-lyrics-input" rows={10} value={record.lyrics} onChange={(e) => update({ ...latest.current, lyrics: e.target.value })} placeholder="[verse]\nYour lyrics…" /></SandboxField>
           <SandboxField label="Import lyrics text"><input type="file" accept=".txt" onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ""; if (!file) return; if (file.size > 1024 * 1024) { setError("Lyrics text must be 1 MB or smaller."); return; } update({ ...latest.current, lyrics: await file.text() }); }} /></SandboxField>
         </> : null}
         {section === "tags" ? <>
-          <div className="ms-section-heading"><h3>Song tags</h3><p>Complete the fields to build your tags.json. Separate multiple values with commas.</p></div>
+          <p className="ms-analysis-note">Separate tags with commas.</p>
           {jsonDirty ? <p className="ms-alert">Apply or discard your JSON changes before editing these fields.</p> : null}
           <fieldset className="ms-tag-fields" disabled={jsonDirty}>
             <h4>Identity & style</h4><div className="ms-fields">{stringField("id", "Record ID · required")}{stringField("genre", "Genre · required", undefined, "e.g. Afrobeats")}{stringField("sub_style", "Sub-style")}{tagField("language")}</div>
             <h4>Sound & performance</h4><div className="ms-fields"><SandboxField label={record.provenance.tempo_bpm === "estimated" ? "Tempo (BPM) · estimate" : "Tempo (BPM)"}><input type="number" min="1" max="400" step="any" value={record.tags.tempo_bpm ?? ""} onChange={(e) => tag("tempo_bpm", e.target.value === "" ? null : Number(e.target.value))} /></SandboxField>{stringField("key", record.provenance.key === "estimated" ? "Musical key · estimate" : "Musical key")}{stringField("time_signature", "Time signature")}{stringField("tempo_band", record.provenance.tempo_band === "estimated" ? "Tempo band · derived" : "Tempo band", undefined, "slow, mid, fast")}{tagField("mood")}{tagField("theme")}{tagField("setting")}{tagField("vocals")}{tagField("flow")}{tagField("instruments")}{tagField("standout")}<SandboxField label="Energy"><select value={record.tags.energy} onChange={(e) => tag("energy", e.target.value)}><option value="">Not tagged</option>{["low", "medium", "high"].map((v) => <option key={v}>{v}</option>)}</select></SandboxField></div>
-            <h4>Descriptions</h4><p className="ms-analysis-note">Add at least two descriptions for a song with audio.</p>
+            <h4>Descriptions</h4><p className="ms-analysis-note">Two descriptions required for audio.</p>
             {[0, 1, 2].map((i) => <SandboxField key={i} label={`Description ${i + 1}${i === 2 ? " (optional)" : ""}`}><textarea rows={2} value={record.tags.descriptions[i] || ""} maxLength={700} onChange={(e) => { const descriptions = [...latest.current.tags.descriptions]; descriptions[i] = e.target.value; tag("descriptions", descriptions); }} /></SandboxField>)}
             <h4>Permission & source</h4><div className="ms-fields"><SandboxField label="License · required"><select value={record.tags.license} onChange={(e) => tag("license", e.target.value)}><option value="">Choose a license</option>{SANDBOX_LICENSES.map((v) => <option key={v}>{v}</option>)}</select></SandboxField><SandboxField label="Clearance status"><select value={record.licenseStatus} onChange={(e) => update({ ...latest.current, licenseStatus: e.target.value as SandboxTrack["licenseStatus"] })}>{["pending", "cleared", "not cleared"].map((v) => <option key={v}>{v}</option>)}</select></SandboxField></div>
             <SandboxField label="Source & permission record · required"><textarea rows={2} value={record.tags.source} onChange={(e) => tag("source", e.target.value)} /></SandboxField>

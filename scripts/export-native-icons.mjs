@@ -39,7 +39,7 @@ const iconNames = new Set([
   "Globe",
   "FilePlus2",
   "Hammer",
-  "FileAudio", "FileJson", "FilePenLine", "Pause", "ChevronRight", "FolderPlus", "ArrowDownToLine", "Trash2",
+  "FileAudio", "FileJson", "FilePenLine", "LayoutDashboard", "Pause", "ChevronRight", "FolderPlus", "ArrowDownToLine", "Trash2",
 ]);
 
 function assetName(name) {
