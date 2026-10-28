@@ -1,210 +1,300 @@
+/** Full import → persistence → review → export regression for the music sandbox. */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { unzipSync } from "fflate";
-import { encodeSongSection } from "../src/lib/media/song-audio-export.ts";
+import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
 
 const base = process.env.BROWSER_AUDIT_BASE_URL || "http://127.0.0.1:8080";
+const output = await mkdtemp(join(tmpdir(), "env-music-sandbox-"));
 const require = createRequire(import.meta.url);
-const output = await mkdtemp(join(tmpdir(), "env-song-browser-"));
-const sr = 16000,
-  seconds = 12;
-const left = Float32Array.from(
-  { length: sr * seconds },
-  (_, i) =>
-    0.15 * Math.sin((2 * Math.PI * 261.626 * i) / sr) +
-    0.1 * Math.sin((2 * Math.PI * 392 * i) / sr),
+const sampleRate = 16000,
+  seconds = 2,
+  frames = sampleRate * seconds;
+const wav = Buffer.alloc(44 + frames * 2);
+wav.write("RIFF");
+wav.writeUInt32LE(wav.length - 8, 4);
+wav.write("WAVEfmt ", 8);
+wav.writeUInt32LE(16, 16);
+wav.writeUInt16LE(1, 20);
+wav.writeUInt16LE(1, 22);
+wav.writeUInt32LE(sampleRate, 24);
+wav.writeUInt32LE(sampleRate * 2, 28);
+wav.writeUInt16LE(2, 32);
+wav.writeUInt16LE(16, 34);
+wav.write("data", 36);
+wav.writeUInt32LE(frames * 2, 40);
+for (let i = 0; i < frames; i++)
+  wav.writeInt16LE(Math.round(Math.sin((i * 2 * Math.PI * 440) / sampleRate) * 4000), 44 + i * 2);
+const tags = {
+  id: "trial_0001",
+  genre: "Afrobeats",
+  sub_style: "afro-fusion",
+  language: ["English", "Yoruba"],
+  mood: ["relaxed"],
+  theme: ["love"],
+  setting: ["chill-out"],
+  vocals: ["soft male lead"],
+  flow: [],
+  instruments: ["guitar", "shaker"],
+  standout: ["call-and-response chorus"],
+  descriptions: [
+    "A relaxed guitar groove with a soft voice, sung in English and Yoruba.",
+    "Warm bilingual vocals over gentle shakers and a sparse guitar melody.",
+  ],
+  tempo_bpm: null,
+  tempo_band: "mid",
+  key: "",
+  time_signature: "",
+  energy: "low",
+  license: "owned",
+  source: "Private permission record — not for captions",
+  custom_note: "Keep this custom field",
+};
+const lyrics = "[verse 1 | English]\nHello there\n\n[chorus | Yoruba]\nẸ káàrọ̀";
+const fixture = join(output, "songs.zip");
+await writeFile(
+  fixture,
+  zipSync(
+    {
+      "afro-fusion/trial_0001.wav": wav,
+      "afro-fusion/trial_0001.tags.json": strToU8(JSON.stringify(tags)),
+      "afro-fusion/trial_0001.lyrics.txt": strToU8(lyrics),
+    },
+    { level: 1 },
+  ),
 );
-const fixture = join(output, "generated-chord.wav");
-await writeFile(fixture, encodeSongSection([left, left], sr, 0, seconds));
+const single = join(output, "trial_0001.wav");
+await writeFile(single, wav);
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || "/usr/bin/chromium",
   args: ["--no-sandbox"],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-const errors = [],
-  uploads = [];
-page.on("pageerror", (error) => errors.push(error.message));
-page.on("request", (request) => {
-  if (request.method() === "POST" && /\/v1\/jobs$/.test(new URL(request.url()).pathname))
-    uploads.push(request.url());
+const context = await browser.newContext({
+  viewport: { width: 1440, height: 1100 },
+  acceptDownloads: true,
 });
-
+await context.addInitScript(() => localStorage.setItem("env:view-mode", "desktop"));
+const page = await context.newPage();
+const errors = [],
+  unexpected = [];
+page.on("pageerror", (e) => errors.push(e.message));
+page.on("request", (r) => {
+  if (
+    /huggingface|onnx|transformers|whisper|demucs|\/api\/ai\/run|\/v1\/jobs/.test(r.url()) ||
+    (r.method() === "POST" && /music-analysis/.test(r.url()))
+  )
+    unexpected.push(r.url());
+});
+const scope = page.locator(".music-sandbox");
+const waitUI = async () => {
+  await scope.locator(".ms-page-heading").waitFor({ timeout: 90000 });
+  await scope.locator(".ms-splash").waitFor({ state: "hidden" });
+};
+const importZip = async (file) => {
+  await scope.getByRole("button", { name: "Add music", exact: true }).click();
+  await page.getByRole("dialog").waitFor();
+  await page.getByLabel("Import music files", { exact: true }).setInputFiles(file);
+  await scope.getByText(/records? imported as drafts/).waitFor({ timeout: 30000 });
+};
+const readTracks = () =>
+  page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const r = indexedDB.open("env:ai-music-data-sandbox:v1");
+        r.onsuccess = () => {
+          const d = r.result,
+            q = d.transaction("tracks").objectStore("tracks").getAll();
+          q.onsuccess = () => {
+            d.close();
+            resolve(q.result);
+          };
+          q.onerror = () => reject(q.error);
+        };
+      }),
+  );
 try {
-  await page.goto(`${base}/tools/audio/song-metadata-analyzer`, { waitUntil: "networkidle" });
-  await page
-    .locator('html[data-env-tool-hydrated="song-metadata-analyzer"]')
-    .waitFor({ state: "attached" });
-  await page.getByLabel("Audio files", { exact: true }).setInputFiles(fixture);
-  if (process.env.SONG_AUDIT_BROWSER_MODELS !== "1") await page.getByLabel("Recognize speech, instruments and sounds").uncheck();
-  await page.getByRole("button", { name: "Analyze songs", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "Review tags", exact: true })
-    .waitFor({ timeout: 60_000 });
-  await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
-  const accessibilityIssues = await page.evaluate(async () => {
-    const report = await window.axe.run(
-      { include: [[".env-tool-interface"]] },
-      { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] } },
-    );
-    return report.violations
-      .filter((item) => ["serious", "critical"].includes(item.impact))
-      .map((item) => item.id);
-  });
-  assert.deepEqual(
-    accessibilityIssues,
-    [],
-    "Analyzer must have no serious or critical accessibility violations",
-  );
-  assert.equal(uploads.length, 0, "Browser analysis must not upload audio");
-  const jsonDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "JSON", exact: true }).click();
-  const exported = JSON.parse(await readFile(await (await jsonDownload).path(), "utf8"));
-  assert.equal(exported.tracks[0].embedded_metadata.parser, "music-metadata@12.3.2");
-  assert.equal(exported.tracks[0].technical.sample_rate_hz, sr);
-  assert.equal(exported.tracks[0].technical.channels, 2);
-  assert.equal(exported.tracks[0].dataset_analysis.annotations.reviewed, false);
-  await page.getByLabel("Genre", { exact: true }).fill("Test genre");
-  await page.getByLabel("Genre", { exact: true }).pressSequentially(", Second genre");
+  await page.goto(base + "/tools/audio/song-metadata-analyzer");
+  await waitUI();
+  await scope.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("Folder name", { exact: true }).fill("Afrobeats");
+  await page.getByLabel("Default genre", { exact: true }).fill("Afrobeats");
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
+  await importZip(fixture);
+  assert.equal(await scope.locator(".ms-record-row").count(), 1);
+  let tracks = await readTracks();
+  assert.equal(tracks[0].tags.duration_seconds, seconds);
+  assert.equal(tracks[0].audio.sampleRate, sampleRate);
+  assert.equal(tracks[0].audio.channels, 1);
+  assert.equal(tracks[0].tags.tempo_bpm, null);
+  assert.equal(tracks[0].reviewed, false);
+  assert.equal(tracks[0].lyrics, lyrics);
+  assert.equal(tracks[0].custom.custom_note, tags.custom_note);
+  await scope.locator(".ms-record-row button").first().click();
+  await scope.getByLabel("Instruments", { exact: true }).fill("guitar, shaker,");
+  await scope.getByLabel("Instruments", { exact: true }).pressSequentially(" piano");
   assert.equal(
-    await page.getByLabel("Genre", { exact: true }).inputValue(),
-    "Test genre, Second genre",
-    "Comma-separated tags must remain typeable",
+    await scope.getByLabel("Instruments", { exact: true }).inputValue(),
+    "guitar, shaker, piano",
   );
-  await page.getByLabel("Reviewer", { exact: true }).fill("Browser QA");
-  await page.getByLabel("Tags reviewed", { exact: true }).check();
-
-  if (process.env.SONG_AUDIT_TOKEN) {
-    await page.getByText("Local AI & stems", { exact: false }).click();
-    await page.getByLabel("API token", { exact: true }).fill(process.env.SONG_AUDIT_TOKEN);
-    if (process.env.SONG_AUDIT_URL)
-      await page.getByLabel("Local address", { exact: true }).fill(process.env.SONG_AUDIT_URL);
-    await page.getByRole("button", { name: "Connect", exact: true }).click();
-    await page.getByRole("button", { name: "Connected", exact: true }).waitFor({ timeout: 20_000 });
-    assert.equal(uploads.length, 0, "Connecting must not upload audio");
-    await page.getByLabel("Section WAVs", { exact: true }).check();
-    if (process.env.SONG_AUDIT_STEMS === "1")
-      await page.getByLabel("4 stems", { exact: true }).check();
-    if (process.env.SONG_AUDIT_LYRICS === "1")
-      await page.getByLabel("Lyrics", { exact: true }).check();
-    await page.getByRole("button", { name: "Analyze locally", exact: true }).click();
-    await page
-      .getByText("Suggestions ready for review.", { exact: true })
-      .waitFor({ timeout: 240_000 });
-    assert.equal(uploads.length, 1);
-    const archiveDownload = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Results & audio ZIP", exact: true }).click();
-    const zip = unzipSync(new Uint8Array(await readFile(await (await archiveDownload).path())));
-    const local = JSON.parse(new TextDecoder().decode(zip["analysis.json"]));
-    assert.equal(local.processing.hosted_inference, false);
-    assert.equal(local.signal.duration_seconds, seconds);
-    assert.equal(local.windows.length, 2, "Tagging must include the tail of the track");
-    assert.ok(local.llm?.model_revision, "Local LLM digest must be recorded");
-    assert.ok(Object.keys(zip).some((name) => /^section-\d+\.wav$/.test(name)));
-    if (process.env.SONG_AUDIT_STEMS === "1")
-      assert.equal(local.artifacts.filter((artifact) => artifact.kind === "stem").length, 4);
-    if (process.env.SONG_AUDIT_LYRICS === "1")
-      assert.equal(local.lyrics.status, "candidate_transcript");
-    const taggedDownload = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export tagged audio", exact: true }).click();
-    assert.match((await taggedDownload).suggestedFilename(), /-reviewed\.wav$/);
-    if (process.env.SONG_AUDIT_LEARNING === "1") {
-      await page.getByText("Learn from reviewed corrections", { exact: true }).click();
-      await page
-        .getByLabel("I have permission to use this track’s reviewed labels for local training.", {
-          exact: true,
-        })
-        .check();
-      await page.getByRole("button", { name: "Save corrections", exact: true }).click();
-      await page.getByText("Reviewed corrections saved locally.", { exact: true }).waitFor();
-    }
-    await page.getByRole("button", { name: "Use suggestions as draft tags", exact: true }).click();
+  await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
+  await scope.getByText("A few things need review").waitFor();
+  await scope.getByRole("tab", { name: "File & music", exact: true }).click();
+  await scope.getByLabel("Display title", { exact: true }).fill("Evening groove");
+  await scope.getByLabel("Record ID", { exact: true }).fill("reviewed_0001");
+  await scope.getByRole("tab", { name: "JSON", exact: true }).click();
+  let edited = JSON.parse(await scope.getByLabel("Tags JSON", { exact: true }).inputValue());
+  edited.custom_session = "round one";
+  await scope.getByLabel("Tags JSON", { exact: true }).fill(JSON.stringify(edited, null, 2));
+  await scope.getByRole("button", { name: "Apply JSON changes", exact: true }).click();
+  await scope.getByRole("tab", { name: "Rights", exact: true }).click();
+  await scope.getByLabel("Clearance status", { exact: true }).selectOption("cleared");
+  await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
+  await scope.locator(".ms-save-line").filter({ hasText: "Reviewed & saved" }).waitFor();
+  await scope.getByRole("button", { name: "Back to collection", exact: true }).click();
+  await page.reload();
+  await waitUI();
+  tracks = await readTracks();
+  assert.equal(tracks.length, 1);
+  assert.equal(tracks[0].tags.id, "reviewed_0001");
+  assert.equal(tracks[0].title, "Evening groove");
+  assert.equal(tracks[0].reviewed, true);
+  assert.equal(tracks[0].custom.custom_session, "round one");
+  await scope.getByRole("button", { name: /Ready to export/ }).click();
+  await scope.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("radio", { name: /Music training preparation/ }).check();
+  let downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download ZIP", exact: true }).click();
+  let archive = unzipSync(new Uint8Array(await readFile(await (await downloaded).path())));
+  const trainingBase = "afrobeats/afro-fusion/reviewed_0001";
+  assert.ok(archive[trainingBase + ".wav"]);
+  assert.equal(Buffer.compare(Buffer.from(archive[trainingBase + ".wav"]), wav), 0);
+  assert.match(strFromU8(archive[trainingBase + ".lyrics.txt"]), /\[Chorus\]\nẸ káàrọ̀/);
+  const caption = strFromU8(archive[trainingBase + ".caption.txt"]);
+  assert.ok(!caption.includes(tags.source));
+  assert.ok(!caption.includes("reviewed_0001"));
+  assert.ok(!caption.includes("Evening groove"));
+  assert.ok(!caption.includes("owned"));
+  assert.equal(JSON.parse(strFromU8(archive[trainingBase + ".json"])).bpm, null);
+  await scope.getByRole("button", { name: "Folders", exact: false }).first().click();
+  await scope
+    .getByRole("button", { name: /^Afrobeats Custom collection|^Afrobeats Afrobeats/ })
+    .first()
+    .click()
+    .catch(async () => {
+      await scope.locator(".ms-folder-card").filter({ hasText: "Afrobeats" }).click();
+    });
+  await importZip(single);
+  await importZip(single);
+  tracks = await readTracks();
+  assert.equal(tracks.length, 3);
+  assert.equal(new Set(tracks.map((t) => t.tags.id)).size, 3);
+  assert.equal(tracks.filter((t) => t.reviewed).length, 1);
+  await scope.getByRole("button", { name: "Folder settings", exact: true }).click();
+  await page.getByLabel("Maximum songs", { exact: true }).fill("3");
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
+  await importZip(single);
+  assert.equal((await readTracks()).length, 3);
+  await scope.getByText(/3-song limit/).waitFor();
+  await scope.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("radio", { name: /Master backup/ }).check();
+  downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download ZIP", exact: true }).click();
+  archive = unzipSync(new Uint8Array(await readFile(await (await downloaded).path())));
+  assert.ok(archive[trainingBase + ".tags.json"]);
+  assert.equal(JSON.parse(strFromU8(archive[trainingBase + ".tags.json"])).source, tags.source);
+  assert.equal(strFromU8(archive[trainingBase + ".lyrics.txt"]), lyrics);
+  assert.ok(archive["manifest.csv"]);
+  assert.equal(JSON.parse(strFromU8(archive["workspace.json"])).tracks.length, 3);
+  await scope.getByRole("button", { name: "Overview", exact: false }).click();
+  assert.equal(await scope.locator(".ms-record-row").count(), 2);
+  await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
+  let violations = await page.evaluate(async () => {
+    const r = await window.axe.run(".music-sandbox", {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
+    });
+    return r.violations
+      .filter((v) => ["serious", "critical"].includes(v.impact))
+      .map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.html) }));
+  });
+  assert.deepEqual(violations, []);
+  for (const [width, mode] of [
+    [1440, "desktop"],
+    [768, "tablet"],
+    [390, "mobile"],
+  ]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate((m) => {
+      localStorage.setItem("env:view-mode", m);
+    }, mode);
+    await page.reload();
+    await waitUI();
     assert.equal(
-      await page.getByLabel("Tags reviewed", { exact: true }).isChecked(),
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,
-      "Model suggestions must clear reviewed state",
+      `${width}px should not overflow`,
     );
+    assert.equal(
+      await scope.evaluate((e) => e.scrollWidth > e.clientWidth),
+      false,
+      `${width}px sandbox should not overflow`,
+    );
+    await scope.screenshot({ path: join(output, `sandbox-${width}-light.png`) });
+    await scope.getByRole("button", { name: "Workspace settings", exact: true }).click();
+    await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
+    await page.getByRole("button", { name: "Save settings", exact: true }).click();
+    await scope.screenshot({ path: join(output, `sandbox-${width}-dark.png`) });
+    await scope.getByRole("button", { name: "Workspace settings", exact: true }).click();
+    await page.getByLabel("Appearance", { exact: true }).selectOption("light");
+    await page.getByRole("button", { name: "Save settings", exact: true }).click();
   }
-
-  // The app defaults to a narrow workspace even on a desktop viewport. Test that
-  // actual container width, then a phone and the explicit desktop preference.
-  for (const width of [390, 1280]) {
-    await page.setViewportSize({ width, height: 900 });
-    const layout = await page.evaluate(() => ({
-      content: document.documentElement.scrollWidth,
-      viewport: innerWidth,
-    }));
-    assert.ok(layout.content <= layout.viewport + 1, `Horizontal overflow at ${width}px`);
-    await page.screenshot({ path: join(output, `song-${width}.png`), fullPage: true });
-  }
-  await page.evaluate(() => localStorage.setItem("env:view-mode", "desktop"));
-  await page.reload({ waitUntil: "networkidle" });
-  await page
-    .locator('html[data-env-tool-hydrated="song-metadata-analyzer"]')
-    .waitFor({ state: "attached" });
-  await page.getByLabel("Audio files", { exact: true }).setInputFiles(fixture);
-  if (process.env.SONG_AUDIT_BROWSER_MODELS !== "1") await page.getByLabel("Recognize speech, instruments and sounds").uncheck();
-  await page.getByRole("button", { name: "Analyze songs", exact: true }).click();
-  await page
-    .getByRole("heading", { name: "Review tags", exact: true })
-    .waitFor({ timeout: 60_000 });
-  await page.screenshot({ path: join(output, "song-desktop-workspace.png"), fullPage: true });
-  await page.getByRole("button", { name: "Quick Scan", exact: false }).click();
-  await page.getByRole("button", { name: "Scan songs", exact: true }).click();
-  await page.getByRole("button", { name: "Scan songs", exact: true }).waitFor();
-  await page.getByLabel("Genre", { exact: true }).fill("Quick label");
-  const quickDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "JSON", exact: true }).click();
-  const quick = JSON.parse(await readFile(await (await quickDownload).path(), "utf8"));
-  assert.equal(quick.tracks[0].dataset_analysis, null);
-  assert.deepEqual(
-    quick.tracks[0].review_annotations.genre,
-    ["Quick label"],
-    "Tag review must work independently of detailed DSP",
+  await scope.locator(".ms-record-row button").first().click();
+  await scope.getByLabel("Genre", { exact: true }).fill("Jazz");
+  await page.locator('a[href="/"]').first().click();
+  await page.waitForURL(base + "/");
+  await page.goto(base + "/tools/audio/ai-music-data-sandbox");
+  await waitUI();
+  assert.ok(
+    (await readTracks()).some((t) => t.tags.genre === "Jazz"),
+    "Navigation must save a pending draft before leaving",
   );
+  assert.deepEqual(unexpected, [], "Sandbox must never load inference models or upload audio");
   assert.deepEqual(errors, []);
-
-  const mobileContext = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3, permissions: ["clipboard-read", "clipboard-write"] });
-  await mobileContext.addInitScript(() => localStorage.setItem("env:view-mode", "mobile"));
-  const mobile = await mobileContext.newPage();
-  await mobile.goto(`${base}/tools/audio/song-metadata-analyzer`, { waitUntil: "networkidle" });
-  await mobile.locator('html[data-env-tool-hydrated="song-metadata-analyzer"]').waitFor({ state: "attached" });
-  const view = () => mobile.evaluate(() => ({ mode: document.documentElement.dataset.envViewMode, setting: localStorage.getItem("env:view-mode"), viewport: document.querySelector('meta[name="viewport"]')?.getAttribute("content"), width: innerWidth, scrollWidth: document.documentElement.scrollWidth, scale: visualViewport?.scale }));
-  const before = await view();
-  const payload = await readFile(fixture);
-  await mobile.getByLabel("Audio files", { exact: true }).setInputFiles({ name: `${"long-name-".repeat(14)}song.wav`, mimeType: "audio/wav", buffer: payload });
-  const imported = await view();
-  assert.equal(imported.mode, "mobile");
-  assert.equal(imported.setting, "mobile");
-  assert.equal(imported.viewport, before.viewport);
-  assert.equal(imported.width, before.width);
-  await mobile.getByLabel("Recognize speech, instruments and sounds").uncheck();
-  await mobile.getByRole("button", { name: "Analyze songs", exact: true }).click();
-  await mobile.getByRole("heading", { name: "Review tags", exact: true }).waitFor({ timeout: 60_000 });
-  await mobile.getByLabel("Genre", { exact: true }).fill("Afrobeats, Gospel");
-  const fontSize = await mobile.getByLabel("Genre", { exact: true }).evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-  assert.ok(fontSize >= 16, `Mobile input font size ${fontSize}px can trigger browser zoom`);
-  await mobile.getByRole("button", { name: "Copy style", exact: true }).click();
-  assert.equal(await mobile.evaluate(() => navigator.clipboard.readText()), "Afrobeats");
-  await mobile.getByRole("button", { name: "Copy track analysis", exact: true }).click();
-  assert.match(await mobile.evaluate(() => navigator.clipboard.readText()), /review_annotations/);
-  await mobile.getByText("Signal details", { exact: true }).click();
-  await mobile.getByText(/Time-aligned signal timeline/).click();
-  await mobile.getByText("More tags", { exact: true }).click();
-  const after = await view();
-  assert.equal(after.mode, "mobile");
-  assert.equal(after.setting, "mobile");
-  assert.equal(after.viewport, before.viewport);
-  assert.equal(after.width, before.width);
-  assert.ok(after.scrollWidth <= after.width + 1, `Mobile overflow ${after.scrollWidth} > ${after.width}`);
-  assert.ok((after.scale ?? 1) <= 1.05, `Unexpected mobile viewport scale ${after.scale}`);
-  await mobile.screenshot({ path: join(output, "song-real-mobile.png"), fullPage: true });
-  await mobileContext.close();
-  console.log(`Song browser audit passed. Screenshots: ${output}`);
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        records: (await readTracks()).length,
+        checks: [
+          "ZIP sidecars",
+          "measured facts",
+          "human review",
+          "editable IDs and custom JSON",
+          "refresh persistence",
+          "save before navigation",
+          "incremental uploads",
+          "duplicate IDs",
+          "folder capacity",
+          "master and training exports",
+          "Unicode lyrics",
+          "caption privacy",
+          "light and dark layouts at 390/768/1440",
+          "accessibility",
+          "no model requests or audio uploads",
+        ],
+        artifacts: output,
+      },
+      null,
+      2,
+    ),
+  );
+} catch (e) {
+  console.error(JSON.stringify({ visible: await scope.innerText().catch(() => ""), output }));
+  await page.screenshot({ path: join(output, "failure.png"), fullPage: true }).catch(() => {});
+  throw e;
 } finally {
   await browser.close();
 }

@@ -1,6 +1,6 @@
 # Local Song Analyzer
 
-The Song Metadata Analyzer at `/tools/audio/song-metadata-analyzer` performs metadata and signal analysis on the device. The web version can also run speech recognition, sound classification and four-stem separation in browser workers. The optional Python companion adds CLAP tagging, a constrained local LLM, faster-whisper and Demucs. Android and iOS perform signal analysis natively and can use the optional enV song backend for the heavier models.
+This is the standalone legacy local analysis companion. The web analyser URLs now open [AI Music Data Sandbox](../docs/ai-music-data-sandbox.md), a persistent preparation workspace that measures file facts and leaves musical labels to human review. The sandbox does not connect to this companion or load speech, tagging or stem models. The companion remains available independently for explicit analysis experiments; native Android/iOS implementations are separate.
 
 When the backend is configured, web analysis selects it for phones and low-memory devices and retries there if a local model fails. Native Full Analysis uses the backend for speech and sound recognition. Separation uses the backend on native clients and on web devices that need it. Backend processing uploads the selected audio; results identify the processing location and audio artifacts expire after an hour. Without a configured backend, the web app uses its on-device models and native apps retain their local measurements.
 

@@ -3,7 +3,7 @@
 
 **Useful tools. One place.** enV is a responsive collection of browser-based tools for everyday calculations, conversions, color and CSS work, QR codes, image tasks, and mockups. Wherever possible, processing happens in the visitor's browser rather than uploading files to a server.
 
-The Song Metadata Analyzer now supports full-track measurements, section exports, reviewed tags and an optional local AI companion. See [local setup and learning](local-song-analyzer/README.md) and [research and validation](docs/song-analyzer-local-research.md).
+The web music analyser is now **AI Music Data Sandbox**: a mobile-friendly workspace with persistent folders, drafts, editable tags and lyrics, lightweight file inspection, and structured dataset exports. Open `/tools/audio/ai-music-data-sandbox`; existing analyser bookmarks still work. See the [sandbox guide](docs/ai-music-data-sandbox.md). The [standalone local companion](local-song-analyzer/README.md) remains separate from this preparation workflow.
 
 ## Requirements
 

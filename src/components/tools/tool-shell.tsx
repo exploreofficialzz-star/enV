@@ -153,7 +153,7 @@ export function ToolShell({
         ref={toolInterfaceRef}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
-          : "env-tool-interface relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
+          : ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id) ? "env-tool-interface relative mt-6" : "env-tool-interface relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
         role={isFullscreen ? "dialog" : undefined}
         aria-modal={isFullscreen || undefined}
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}

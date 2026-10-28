@@ -28,16 +28,16 @@ const musicDownloaderTool: ToolMeta = {
 
 const songMetadataAnalyzerTool: ToolMeta = {
   id: "song-metadata-analyzer",
-  name: "Song Metadata Analyzer",
-  slug: "song-metadata-analyzer",
-  description: "Analyze songs for genre, tempo, key, mood, vocals and instruments. Process batches and export reports.",
+  name: "AI Music Data Sandbox",
+  slug: "ai-music-data-sandbox",
+  description: "Prepare editable music datasets with folders, drafts, lyrics, reviewed tags, batch imports and structured exports. File facts are measured on your device.",
   category: "audio",
   subcategory: "Music",
-  keywords: ["song", "music", "metadata", "analyzer", "analyser", "bpm", "tempo", "key", "genre", "mood", "instruments", "vocals", "batch", "zip", "afrobeats", "afro-pop"],
+  keywords: ["ai", "data", "sandbox", "dataset", "training", "folders", "drafts", "lyrics", "song", "music", "metadata", "analyzer", "analyser", "bpm", "tempo", "key", "genre", "mood", "instruments", "vocals", "batch", "zip", "afrobeats", "afro-pop"],
   tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "mood", "batch", "audio"],
   icon: "AudioLines",
-  iconBackground: "#0f766e",
-  iconAccent: "#67e8f9",
+  iconBackground: "#171717",
+  iconAccent: "#ffffff",
   popularity: 9900,
   featured: true,
   clientSide: true,
@@ -50,7 +50,13 @@ const songMetadataAnalyzerTool: ToolMeta = {
 };
 
 const allTools: ToolMeta[] = [
-  ...catalogTools,
+  // Web aliases share the sandbox; the source catalogue also serves native apps,
+  // whose independent analyzer screens retain their existing descriptions.
+  ...catalogTools.map((tool) => tool.id === songMetadataAnalyzerTool.id
+    ? songMetadataAnalyzerTool
+    : tool.id === "audio-analyze-studio"
+      ? { ...tool, name: songMetadataAnalyzerTool.name, description: songMetadataAnalyzerTool.description, keywords: [...tool.keywords, "dataset", "sandbox", "drafts", "folders"] }
+      : tool),
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
 ];
@@ -87,6 +93,7 @@ export function getToolById(id: string): ToolMeta | undefined {
 }
 
 export function getToolByPath(category: string, slug: string): ToolMeta | undefined {
+  if (category === "audio" && (slug === "song-metadata-analyzer" || slug === "ai-music-data-sandbox")) return songMetadataAnalyzerTool;
   return byPath.get(`${category}/${slug}`);
 }
 
