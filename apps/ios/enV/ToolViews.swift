@@ -12929,10 +12929,16 @@ private struct NativeMusicDataSandboxView: View {
             if key == "key" { track.keyEstimated = false; track.keyEdited = true }
         } })
     }
+    private func roundedInput<Content: View>(_ content: Content) -> some View {
+        content
+            .padding(.horizontal, 12).frame(minHeight: 44)
+            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+    }
     private func trackText(_ label: String, _ key: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            TextField(label, text: field(key)).textFieldStyle(.roundedBorder).font(.body)
+            roundedInput(TextField(label, text: field(key)).textFieldStyle(.plain).font(.body))
         }
     }
     var body: some View {
@@ -12942,7 +12948,8 @@ private struct NativeMusicDataSandboxView: View {
             else { library }
         }
         .padding(12).frame(maxWidth: 430).frame(height: dynamicTypeSize.isAccessibilitySize ? nil : min(650, max(440, UIScreen.main.bounds.height - 110)), alignment: .top).frame(minHeight: 440, alignment: .top)
-        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 20))
+        .buttonBorderShape(.roundedRectangle(radius: 14))
         .disabled(busy)
         .onAppear {
             do { workspace = try store.load(); storageError = nil }
@@ -13043,18 +13050,43 @@ private struct NativeMusicDataSandboxView: View {
             bottomNavigation
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+    private func sandboxNavigationButton(_ index: Int) -> some View {
+        let active = libraryView == index && selectedID.isEmpty
+        return Button {
+            player?.pause(); player = nil; playing = false; audioPosition = 0; audioDuration = 0
+            selectedID = ""; screen = 0; libraryView = index; folderID = ""; page = 0; message = ""
+        } label: {
+            VStack(spacing: 3) {
+                EnVIcon(name: ["LayoutDashboard", "Folder", "FilePenLine", "FileCheck"][index], size: 20, tint: active ? .envInk : .envMuted)
+                Text(["Overview", "Folders", "Drafts", "Ready to export"][index])
+                    .font(.caption2).lineLimit(1).minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.horizontal, 2)
+            .background(active ? Color.envSurface2 : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(active ? Color.envInk : Color.secondary)
+    }
     private var bottomNavigation: some View {
-        HStack(spacing: 0) {
-            ForEach(0..<4, id: \.self) { index in
-                Button {
-                    player?.pause(); player = nil; playing = false; audioPosition = 0; audioDuration = 0
-                    selectedID = ""; screen = 0; libraryView = index; folderID = ""; page = 0; message = ""
-                } label: {
-                    VStack(spacing: 3) {
-                        EnVIcon(name: ["LayoutDashboard", "Folder", "FilePenLine", "FileCheck"][index], size: 20, tint: libraryView == index && selectedID.isEmpty ? .accentColor : .envMuted)
-                        Text(["Overview", "Folders", "Drafts", "Ready to export"][index]).font(.caption2).lineLimit(2)
-                    }.frame(maxWidth: .infinity, minHeight: 46)
-                }.buttonStyle(.plain).foregroundStyle(libraryView == index && selectedID.isEmpty ? Color.accentColor : Color.secondary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(0..<4, id: \.self) { index in
+                            sandboxNavigationButton(index).fixedSize(horizontal: true, vertical: false).padding(.horizontal, 4)
+                        }
+                    }
+                }.frame(minHeight: 52)
+            } else {
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        ForEach(0..<4, id: \.self) { index in
+                            sandboxNavigationButton(index)
+                                .frame(width: geometry.size.width * (index == 3 ? 1.55 : 1.0) / 4.55)
+                        }
+                    }
+                }.frame(height: 52)
             }
         }.padding(.top, 4).overlay(alignment: .top) { Divider() }
     }
@@ -13079,13 +13111,13 @@ private struct NativeMusicDataSandboxView: View {
                 ForEach(0..<3, id: \.self) { index in
                     Button { if track.tagsDraft != nil && index != 2 { message = "Apply or discard the JSON changes before switching sections." } else { screen = index; message = "" } } label: { HStack(spacing: 4) { EnVIcon(name: ["FileAudio", "FileText", "FileJson"][index], size: 16, tint: screen == index ? .envInk : .envMuted); Text(["Music", "lyrics.txt", "tags.json"][index]) } }
                         .font(.caption.weight(screen == index ? .bold : .regular)).frame(maxWidth: .infinity).padding(.vertical, 9)
-                        .background(screen == index ? Color.envSurface2 : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                        .background(screen == index ? Color.envSurface2 : Color.clear, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     if screen == 0 {
-                        VStack(alignment: .leading, spacing: 4) { Text("Title").font(.caption).foregroundStyle(.secondary); TextField("Title", text: Binding(get: { selected?.title ?? "" }, set: { value in update { $0.title = value } })).textFieldStyle(.roundedBorder) }
+                        VStack(alignment: .leading, spacing: 4) { Text("Title").font(.caption).foregroundStyle(.secondary); roundedInput(TextField("Title", text: Binding(get: { selected?.title ?? "" }, set: { value in update { $0.title = value } })).textFieldStyle(.plain)) }
                         HStack { Button("Move") { folderChoicePage = 0; moving = true }; Button(track.audio.isEmpty ? "Add audio" : "Replace audio") { attachingAudio = true } }
                         Text("Check estimates by ear.").font(.caption).foregroundStyle(.secondary)
                         Group {
@@ -13099,7 +13131,11 @@ private struct NativeMusicDataSandboxView: View {
                         }
                     } else if screen == 1 {
                         Toggle("This track is instrumental", isOn: Binding(get: { selected?.instrumental ?? false }, set: { value in update { $0.instrumental = value } }))
-                        TextEditor(text: Binding(get: { selected?.lyrics ?? "" }, set: { value in update { $0.lyrics = value } })).frame(minHeight: 200).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder)).accessibilityLabel("Lyrics")
+                        TextEditor(text: Binding(get: { selected?.lyrics ?? "" }, set: { value in update { $0.lyrics = value } }))
+                            .scrollContentBackground(.hidden).frame(minHeight: 200).padding(8)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder)).accessibilityLabel("Lyrics")
                         Button("Import lyrics text") { importingLyrics = true }.buttonStyle(.bordered)
                     } else {
                         Text("Separate tags with commas.").font(.caption).foregroundStyle(.secondary)
@@ -13130,7 +13166,11 @@ private struct NativeMusicDataSandboxView: View {
                             showRawJSON.toggle()
                         }
                         if showRawJSON {
-                            TextEditor(text: Binding(get: { jsonDraft }, set: { value in jsonDraft = value; update { $0.tagsDraft = value } })).font(.system(.caption, design: .monospaced)).frame(height: 180).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder)).accessibilityLabel("Tags JSON")
+                            TextEditor(text: Binding(get: { jsonDraft }, set: { value in jsonDraft = value; update { $0.tagsDraft = value } }))
+                                .font(.system(.caption, design: .monospaced)).scrollContentBackground(.hidden).frame(height: 180).padding(8)
+                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder)).accessibilityLabel("Tags JSON")
                             HStack { Button("Apply JSON") { applyJSON() }; Button("Discard") { update { $0.tagsDraft = nil }; jsonDraft = ((try? JSONSerialization.data(withJSONObject: musicSandboxTags(track), options: [.prettyPrinted, .sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"); message = "JSON changes discarded." } }
                         }
                     }

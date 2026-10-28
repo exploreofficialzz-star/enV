@@ -124,6 +124,7 @@ const waitUI = async () => {
       "Welcome must be below enV navigation",
     );
     assert.notEqual(placement.position, "fixed", "Welcome must remain in the page layout");
+    await page.locator("article > header h1").waitFor({ state: "visible", timeout: 90000 });
     assert.equal(await page.locator("article > header h1").isVisible(), true, "The enV tool title remains visible above the home");
     assert.equal(
       await scope.locator(".ms-page-heading").isVisible(),
@@ -143,11 +144,41 @@ const waitUI = async () => {
   await splash.waitFor({ state: "hidden" });
   await scope.locator(".ms-page-heading").waitFor({ timeout: 90000 });
 };
+let checkedDialog = false;
 const importZip = async (file) => {
   await scope.getByRole("button", { name: "Add music", exact: true }).click();
   await page.getByRole("dialog").waitFor();
+  if (!checkedDialog) {
+    const radii = await page.getByRole("dialog").evaluate((dialog) => ({
+      dialog: parseFloat(getComputedStyle(dialog).borderTopLeftRadius),
+      field: parseFloat(getComputedStyle(dialog.querySelector("select")).borderTopLeftRadius),
+    }));
+    assert.ok(radii.dialog >= 16 && radii.field >= 12, `Dialog and input have rounded corners: ${JSON.stringify(radii)}`);
+    checkedDialog = true;
+  }
   await page.getByLabel("Import music files", { exact: true }).setInputFiles(file);
   await scope.getByText(/\d+ songs? added\./).waitFor({ timeout: 30000 });
+};
+const assertMobileNavigation = async (target) => {
+  const geometry = await target.locator(".ms-sidebar nav").evaluate((nav) => {
+    const button = nav.querySelector("button:last-child");
+    const label = button?.querySelector("span");
+    if (!button || !label) return null;
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const text = label.getBoundingClientRect(), box = button.getBoundingClientRect();
+    return {
+      label: label.textContent,
+      lines: range.getClientRects().length,
+      textLeft: text.left, textRight: text.right, buttonLeft: box.left, buttonRight: box.right,
+      visibleWidth: nav.clientWidth, contentWidth: nav.scrollWidth,
+    };
+  });
+  assert.ok(geometry, "Mobile navigation must be present");
+  assert.equal(geometry.label, "Ready to export");
+  assert.equal(geometry.lines, 1, "Ready to export stays on one line");
+  assert.ok(geometry.textLeft >= geometry.buttonLeft - 1 && geometry.textRight <= geometry.buttonRight + 1, `The full label must fit its button: ${JSON.stringify(geometry)}`);
+  assert.ok(geometry.contentWidth <= geometry.visibleWidth + 1, `The four navigation buttons fit on a phone: ${JSON.stringify(geometry)}`);
 };
 const readTracks = () =>
   page.evaluate(
@@ -315,6 +346,14 @@ try {
       false,
       `${width}px sandbox should not overflow`,
     );
+    const radii = await scope.evaluate((root) => {
+      const selectors = [".ms-dropzone", ".ms-search", ".ms-folder-card", ".ms-record-row", ".ms-button"];
+      return Object.fromEntries(selectors.map((selector) => {
+        const element = root.querySelector(selector);
+        return [selector, element ? parseFloat(getComputedStyle(element).borderTopLeftRadius) : null];
+      }));
+    });
+    for (const [selector, radius] of Object.entries(radii)) assert.ok(radius >= 12, `${selector} should have rounded corners: ${radius}`);
     await scope.screenshot({ path: join(output, `sandbox-${width}-light.png`) });
     assert.equal(await scope.getByRole("button", { name: "Workspace settings" }).count(), 0);
     await page.evaluate(() => document.documentElement.classList.add("dark"));
@@ -363,6 +402,7 @@ try {
     return { navTop: nav.top, mainBottom: main.bottom };
   });
   assert.ok(navPosition.navTop >= navPosition.mainBottom - 1, "Navigation is at the bottom on mobile");
+  await assertMobileNavigation(mobile);
   for (const label of ["Overview", "Folders", "Drafts", "Ready to export"]) assert.equal(await mobile.locator(".ms-sidebar").getByRole("button", { name: label }).count(), 1);
   assert.equal(await mobile.getByRole("button", { name: "Blank record" }).count(), 0);
   assert.equal(await mobile.getByRole("button", { name: "Export", exact: true }).count(), 0);
@@ -401,6 +441,21 @@ try {
   await small.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
   await small.locator(".env-tool-fullscreen__exit").waitFor();
   await small.locator(".ms-page-heading").waitFor();
+  await assertMobileNavigation(small);
+  const regularFont = await small.locator(".ms-sidebar nav button:last-child span").evaluate((label) => parseFloat(getComputedStyle(label).fontSize));
+  await small.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  await small.locator(".ms-sidebar nav button:last-child").evaluate((button) => button.scrollIntoView({ block: "nearest", inline: "nearest" }));
+  const enlarged = await small.locator(".ms-sidebar nav button:last-child span").evaluate((label) => {
+    const range = document.createRange(); range.selectNodeContents(label);
+    const text = label.getBoundingClientRect(), button = label.parentElement.getBoundingClientRect();
+    return { font: parseFloat(getComputedStyle(label).fontSize), lines: range.getClientRects().length, textLeft: text.left, textRight: text.right, buttonLeft: button.left, buttonRight: button.right };
+  });
+  assert.ok(enlarged.font > regularFont, "Navigation text grows with the user's text size");
+  assert.equal(enlarged.lines, 1, "The larger label stays on one line");
+  assert.ok(enlarged.textLeft >= enlarged.buttonLeft - 1 && enlarged.textRight <= enlarged.buttonRight + 1, "The larger label remains visible within its button");
+  await small.evaluate(() => { document.documentElement.style.fontSize = ""; document.querySelector(".ms-sidebar nav").scrollLeft = 0; });
+  await assertMobileNavigation(small);
+  await small.locator(".music-sandbox").screenshot({ path: join(output, "library-320.png") });
   await small.getByRole("button", { name: "Add music", exact: true }).click();
   await small.getByLabel("Import music files", { exact: true }).setInputFiles(musicalFile);
   await small.getByText(/\d+ songs? added\./).waitFor({ timeout: 30000 });
@@ -409,6 +464,7 @@ try {
     await small.locator(".ms-data-tabs").getByRole("button", { name: section }).click();
     assert.equal(await small.locator("audio").isVisible(), true, "Audio stays visible while editing");
   }
+  await assertMobileNavigation(small);
   await small.locator(".ms-editor-page").evaluate((element) => { element.scrollTop = element.scrollHeight; });
   const playerPlacement = await small.locator("audio").evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -441,6 +497,7 @@ try {
           "Unicode lyrics",
           "caption privacy",
           "light and dark layouts at 390/768/1440",
+          "rounded sandbox surfaces and single-line mobile navigation",
           "concise library, matching navigation icons and ready-view exports",
           "scrollable phone editor, safe bottom navigation and full-screen viewport override",
           "320px audio editor with persistent playback",

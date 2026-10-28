@@ -1535,3 +1535,33 @@
 .ms-import-tips { margin-top: 12px; color: var(--ms-muted); font-size: var(--text-sm); }
 .ms-import-tips summary { cursor: pointer; }
 @container music-sandbox (max-width: 600px) { .ms-dropzone > .ms-button { width: 100%; margin: 0; } }
+
+/* Rounded surfaces across the sandbox. */
+.music-sandbox { border-radius: 22px; }
+.ms-modal { border-radius: 22px; }
+.ms-dropzone, .ms-folder-card, .ms-folder-empty, .ms-empty,
+.ms-listen, .ms-data-tabs, .ms-alert, .ms-notice, .ms-progress,
+.ms-import-report, .ms-export-option, .ms-confirm { border-radius: 16px; }
+.ms-button, .ms-icon-button, .ms-sidebar nav button, .ms-folder-tree button,
+.ms-search, .ms-file-icon, .ms-data-tabs button,
+.ms-field input, .ms-field select, .ms-field textarea { border-radius: 12px; }
+.ms-badge, .ms-section-title h3 > span { border-radius: 999px; }
+.ms-record-list { display: grid; gap: 7px; border-top: 0; }
+.ms-record-row { border: 1px solid var(--ms-border); border-radius: 14px; padding: 0 10px; }
+
+@container music-sandbox (max-width: 600px) {
+  .ms-sidebar nav { gap: 2px; overflow-x: auto; }
+  .ms-sidebar nav button { flex: 1 0 0; min-width: max-content; padding-inline: 6px; }
+  .ms-sidebar nav button:last-child { flex-grow: 1.55; }
+  .ms-sidebar nav button span { white-space: nowrap; font-size: clamp(0.6875rem, 3cqw, 0.75rem); }
+}
+.ms-field input[type="file"]::file-selector-button {
+  border: 1px solid var(--ms-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-right: 10px;
+  background: var(--ms-soft);
+  color: var(--ms-ink);
+  font: inherit;
+  cursor: pointer;
+}

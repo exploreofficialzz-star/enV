@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.AtomicFile
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.chastech.env.ui.EnVLogo
 import com.chastech.env.ui.EnVIcon
 import kotlinx.coroutines.CancellationException
@@ -153,6 +156,20 @@ internal fun nativeSandboxFolderCapacity(folderId: String, folders: List<JSONObj
 
 @Composable
 fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
+    val roundedShapes = remember {
+        Shapes(
+            extraSmall = RoundedCornerShape(12.dp),
+            small = RoundedCornerShape(14.dp),
+            medium = RoundedCornerShape(16.dp),
+            large = RoundedCornerShape(20.dp),
+            extraLarge = RoundedCornerShape(24.dp),
+        )
+    }
+    MaterialTheme(shapes = roundedShapes) { NativeMusicDataSandboxContent(startInWorkspace) }
+}
+
+@Composable
+private fun NativeMusicDataSandboxContent(startInWorkspace: Boolean) {
     val context = LocalContext.current
     val deviceConfiguration = LocalConfiguration.current
     val panelHeight = (deviceConfiguration.screenHeightDp - 100).coerceIn(440, 650).dp
@@ -437,14 +454,27 @@ fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
             }) { Text("Save") } }, dismissButton = { TextButton(onClick = { creatingFolder = false; editingFolder = false }) { Text("Cancel") } })
     }
     @Composable fun SandboxBottomNavigation() {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            listOf("LayoutDashboard", "Folder", "FilePenLine", "FileCheck").zip(listOf("Overview", "Folders", "Drafts", "Ready to export")).forEachIndexed { index, (icon, label) ->
-                val tint = if (libraryView == index && selectedId.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                TextButton(onClick = {
-                    player?.release(); player = null; playing = false; audioPosition = 0; audioDuration = 0
-                    selectedId = ""; screen = 0; libraryView = index; folderId = ""; page = 0; message = ""
-                }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(2.dp), enabled = !busy, colors = ButtonDefaults.textButtonColors(contentColor = tint)) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { EnVIcon(icon, modifier = Modifier.size(20.dp), tint = tint); Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center) }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // Keep every label readable at large text sizes or very narrow widths.
+            val scrollNavigation = deviceConfiguration.fontScale > 1.15f || maxWidth < 250.dp
+            val scroll = rememberScrollState()
+            val rowModifier = if (scrollNavigation) Modifier.fillMaxWidth().horizontalScroll(scroll) else Modifier.fillMaxWidth()
+            Row(rowModifier, horizontalArrangement = Arrangement.SpaceEvenly) {
+                listOf("LayoutDashboard", "Folder", "FilePenLine", "FileCheck").zip(listOf("Overview", "Folders", "Drafts", "Ready to export")).forEachIndexed { index, (icon, label) ->
+                    val active = libraryView == index && selectedId.isBlank()
+                    val tint = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    val itemModifier = if (scrollNavigation) Modifier.widthIn(min = if (index == 3) 112.dp else 76.dp) else Modifier.weight(if (index == 3) 1.55f else 1f)
+                    val labelSize = if (!scrollNavigation && deviceConfiguration.screenWidthDp < 360) 10.sp else MaterialTheme.typography.labelSmall.fontSize
+                    TextButton(onClick = {
+                        player?.release(); player = null; playing = false; audioPosition = 0; audioDuration = 0
+                        selectedId = ""; screen = 0; libraryView = index; folderId = ""; page = 0; message = ""
+                    }, modifier = itemModifier.heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp), enabled = !busy,
+                        colors = ButtonDefaults.textButtonColors(contentColor = tint, containerColor = if (active) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            EnVIcon(icon, modifier = Modifier.size(20.dp), tint = tint)
+                            Text(label, style = MaterialTheme.typography.labelSmall, fontSize = labelSize, maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
+                        }
+                    }
                 }
             }
         }
