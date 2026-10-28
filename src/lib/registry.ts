@@ -30,7 +30,7 @@ const songMetadataAnalyzerTool: ToolMeta = {
   id: "song-metadata-analyzer",
   name: "AI Music Data Sandbox",
   slug: "ai-music-data-sandbox",
-  description: "Prepare editable music datasets with folders, drafts, lyrics, reviewed tags, batch imports and structured exports. File facts are measured on your device.",
+  description: "Organize, tag and prepare music for training, right on your device.",
   category: "audio",
   subcategory: "Music",
   keywords: ["ai", "data", "sandbox", "dataset", "training", "folders", "drafts", "lyrics", "song", "music", "metadata", "analyzer", "analyser", "bpm", "tempo", "key", "genre", "mood", "instruments", "vocals", "batch", "zip", "afrobeats", "afro-pop"],
@@ -70,7 +70,10 @@ const byPath = new Map<string, ToolMeta>([
   ...virtualStudios.map((t) => [`${t.category}/${t.slug}`, t] as const),
 ]);
 const byVirtualId = new Map(virtualStudios.map((tool) => [tool.id, tool] as const));
-const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility"), ...virtualStudios];
+// The old audio-analyze-studio URL remains usable, but its shared sandbox is
+// presented once in discovery and related-tool lists.
+const isDiscoverable = (tool: ToolMeta) => tool.id !== "audio-analyze-studio";
+const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility" && isDiscoverable(tool)), ...virtualStudios];
 
 export function getAllTools(): ToolMeta[] {
   return allTools;
@@ -86,6 +89,7 @@ export function getActiveTools(): ToolMeta[] {
 }
 
 export function getToolById(id: string): ToolMeta | undefined {
+  if (id === "audio-analyze-studio") return songMetadataAnalyzerTool;
   const virtual = byVirtualId.get(id);
   if (virtual) return virtual;
   const tool = byId.get(id);
@@ -93,7 +97,7 @@ export function getToolById(id: string): ToolMeta | undefined {
 }
 
 export function getToolByPath(category: string, slug: string): ToolMeta | undefined {
-  if (category === "audio" && (slug === "song-metadata-analyzer" || slug === "ai-music-data-sandbox")) return songMetadataAnalyzerTool;
+  if (category === "audio" && ["song-metadata-analyzer", "audio-analyze-studio", "ai-music-data-sandbox"].includes(slug)) return songMetadataAnalyzerTool;
   return byPath.get(`${category}/${slug}`);
 }
 
@@ -113,7 +117,7 @@ export function getToolsByCategory(category: CategoryId): ToolMeta[] {
     ? accessibilityStudios
     : category === "developer"
       ? developerStudios
-      : allTools.filter((t) => t.category === category);
+      : allTools.filter((t) => t.category === category && isDiscoverable(t));
   return items.slice().sort((a, b) => {
     // Keep the thirteen workspace entry points first. The original long-tail list
     // follows alphabetically, so every existing catalog URL remains discoverable.
@@ -154,7 +158,7 @@ export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
   }
   const related = tool.related
     .map((id) => byId.get(id))
-    .filter((t): t is ToolMeta => Boolean(t && t.status !== "planned"));
+    .filter((t): t is ToolMeta => Boolean(t && isDiscoverable(t) && t.status !== "planned"));
   if (related.length >= limit) return related.slice(0, limit);
   const seen = new Set([tool.id, ...related.map((t) => t.id)]);
   const rest = getToolsByCategory(tool.category).filter(

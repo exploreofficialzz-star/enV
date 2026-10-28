@@ -1,99 +1,27 @@
 package com.chastech.env
 
 import android.content.Context
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.app.DownloadManager
 import android.media.AudioFormat
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
-import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AudioFile
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FolderZip
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.UploadFile
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.chastech.env.engine.NativeAudioWavProcessor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Locale
 import java.util.UUID
-import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -116,7 +44,7 @@ private const val SONG_MAX_BATCH_BYTES = 60 * 1024 * 1024
 private const val SONG_MAX_ZIP_BYTES = 30 * 1024 * 1024
 private const val SONG_MAX_ZIP_EXPANDED_BYTES = 60 * 1024 * 1024
 private const val SONG_ANALYSIS_RATE = 16_000
-private const val SONG_MAX_ANALYSIS_SECONDS = 15 * 60
+private const val SONG_MAX_ANALYSIS_SECONDS = 5 * 60
 
 internal data class NativeSongSource(
     val id: String = UUID.randomUUID().toString(),
@@ -124,10 +52,6 @@ internal data class NativeSongSource(
     val uri: Uri? = null,
     val bytes: ByteArray? = null,
     val sizeBytes: Long,
-    val status: String = "Queued",
-    val report: JSONObject? = null,
-    val backendJobId: String? = null,
-    val error: String? = null,
 )
 
 private data class NativeDecodedSong(
@@ -140,503 +64,7 @@ private data class NativeDecodedSong(
     val bitRate: Int?,
 )
 
-private data class NativeSongScan(
-    val report: JSONObject,
-    val decoded: NativeDecodedSong?,
-)
-
-@Composable
-fun NativeSongMetadataAnalyzerScreen() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var tracks by remember { mutableStateOf(emptyList<NativeSongSource>()) }
-    var selectedId by remember { mutableStateOf<String?>(null) }
-    var fullAnalysis by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(0) }
-    var notice by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var annotationDrafts by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var currentJob by remember { mutableStateOf<Job?>(null) }
-
-    fun update(id: String, change: (NativeSongSource) -> NativeSongSource) {
-        tracks = tracks.map { if (it.id == id) change(it) else it }
-    }
-
-    fun updateDatasetTag(id: String, key: String, rawValue: String) {
-        annotationDrafts = annotationDrafts + ("$id:$key" to rawValue)
-        val tags = rawValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(80)
-        update(id) { item ->
-            val original = item.report
-            if (original == null) item else {
-                val report = JSONObject(original.toString())
-                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
-                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}")
-                annotations.put(key, JSONArray(tags)).put("reviewed", false)
-                dataset.put("annotations", annotations)
-                report.put("dataset_analysis", dataset)
-                when (key) {
-                    "genre" -> report.put("genre", tags.firstOrNull() ?: JSONObject.NULL)
-                    "sub_style" -> report.put("sub_style", tags.firstOrNull() ?: JSONObject.NULL)
-                    "language" -> report.put("language", JSONArray(tags))
-                    "mood" -> report.put("mood", JSONArray(tags))
-                    "vocals" -> report.put("vocals", JSONArray(tags))
-                    "instruments" -> report.put("instruments", JSONArray(tags))
-                    "themes" -> report.put("theme", JSONArray(tags))
-                    "listening_scene" -> report.put("setting", JSONArray(tags))
-                }
-                val analysis = JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}").put("status", "full_local_needs_review")
-                report.put("analysis", analysis)
-                item.copy(report = report, status = "Partial")
-            }
-        }
-    }
-
-    fun updateDatasetAnnotationText(id: String, key: String, value: String) {
-        update(id) { item ->
-            val original = item.report
-            if (original == null) item else {
-                val report = JSONObject(original.toString())
-                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
-                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}")
-                annotations.put(key, value).put("reviewed", false)
-                dataset.put("annotations", annotations)
-                report.put("dataset_analysis", dataset)
-                report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}").put("status", "full_local_needs_review"))
-                item.copy(report = report, status = "Partial")
-            }
-        }
-    }
-
-    fun markDatasetReviewed(id: String, reviewed: Boolean) {
-        update(id) { item ->
-            val original = item.report
-            if (original == null) item else {
-                val report = JSONObject(original.toString())
-                val dataset = JSONObject(report.optJSONObject("dataset_analysis")?.toString() ?: "{}")
-                val annotations = JSONObject(dataset.optJSONObject("annotations")?.toString() ?: "{}").put("reviewed", reviewed)
-                dataset.put("annotations", annotations)
-                report.put("dataset_analysis", dataset)
-                report.put("analysis", JSONObject(report.optJSONObject("analysis")?.toString() ?: "{}")
-                    .put("status", if (reviewed) "full_local_reviewed" else "full_local_needs_review"))
-                item.copy(report = report, status = if (reviewed) "Done" else "Partial")
-            }
-        }
-    }
-
-    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris.isNotEmpty()) {
-            scope.launch {
-                busy = true; error = ""; notice = "Adding files…"
-                try {
-                    val additions = withContext(Dispatchers.IO) { collectUriSources(context, uris) }
-                    val combined = tracks + additions
-                    val totalBytes = combined.sumOf { it.sizeBytes }
-                    require(combined.size <= SONG_MAX_TRACKS) { "Choose up to $SONG_MAX_TRACKS tracks." }
-                    require(totalBytes <= SONG_MAX_BATCH_BYTES) { "This batch is too large for safe local processing." }
-                    tracks = combined
-                    if (selectedId == null) selectedId = additions.firstOrNull()?.id
-                    notice = if (additions.isEmpty()) "No supported audio tracks found." else "${additions.size} track${if (additions.size == 1) "" else "s"} added."
-                } catch (failure: Throwable) {
-                    if (failure is CancellationException) throw failure
-                    error = failure.message ?: "Files could not be added."
-                    notice = ""
-                } finally {
-                    busy = false
-                }
-            }
-        }
-    }
-    val jsonExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) scope.launch { exportNative(context, uri, tracks, "json") { error = it } }
-    }
-    val csvExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) scope.launch { exportNative(context, uri, tracks, "csv") { error = it } }
-    }
-    val zipExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        if (uri != null) scope.launch { exportNative(context, uri, tracks, "zip") { error = it } }
-    }
-
-    val selected = tracks.firstOrNull { it.id == selectedId } ?: tracks.firstOrNull { it.report != null } ?: tracks.firstOrNull()
-    val analyzedCount = tracks.count { it.report != null }
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.padding(10.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Song Metadata Analyzer", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text("Understand the sound behind each track.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        OutlinedCard {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(Icons.Default.UploadFile, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Column(Modifier.weight(1f)) {
-                        Text("Add songs", fontWeight = FontWeight.SemiBold)
-                        Text("Select tracks or a ZIP collection", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Button(
-                    onClick = { audioPicker.launch(arrayOf("audio/*", "application/zip", "application/x-zip-compressed")) },
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.FolderZip, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Choose files")
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !fullAnalysis, onClick = { if (!busy) fullAnalysis = false }, label = { Text("Quick Scan") }, enabled = !busy)
-                    FilterChip(selected = fullAnalysis, onClick = { if (!busy) fullAnalysis = true }, label = { Text("Full Analysis") }, enabled = !busy)
-                }
-                if (fullAnalysis) {
-                    Text("Measurements run on this device. Speech and sound recognition use the backend when available; audio is uploaded for that stage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Button(
-                    onClick = {
-                        error = ""; notice = ""; progress = 0; busy = true; annotationDrafts = emptyMap()
-                            currentJob = scope.launch {
-                                try {
-                                    val queue = tracks.toList()
-                                    var backendUnavailable = false
-                                    for ((index, item) in queue.withIndex()) {
-                                        currentCoroutineContext().ensureActive()
-                                        update(item.id) { it.copy(status = "Analyzing", error = null) }
-                                        try {
-                                            var localFailure: String? = null
-                                            val scan = try { withContext(Dispatchers.IO) { analyzeNativeSong(context, item, detailed = fullAnalysis) } }
-                                                catch (failure: Throwable) { if (failure is CancellationException) throw failure; localFailure = failure.message ?: "Local decoding failed."; null }
-                                            var report = scan?.report ?: nativeSongPartialReport(item.name, localFailure ?: "Local analysis was unavailable.")
-                                            var backendId: String? = null
-                                            if (fullAnalysis && NativeSongBackend.available()) {
-                                                try {
-                                                    val bytes = withContext(Dispatchers.IO) { item.bytes ?: (context.contentResolver.openInputStream(item.uri ?: kotlin.error("Audio file is unavailable.")) ?: kotlin.error("Audio file is unavailable.")).use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) } }
-                                                    val remote = NativeSongBackend.analyze(bytes, separate = false) { stage -> withContext(Dispatchers.Main) { notice = stage } }
-                                                    report = nativeSongMergeBackend(report, remote.report)
-                                                    report.optJSONObject("analysis")?.put("uses_remote_api", true)?.put("uses_hosted_model", true)?.put("semantic_analysis", "backend_audio_models_unreviewed")
-                                                    backendId = remote.id
-                                                } catch (failure: Throwable) { if (failure is CancellationException) throw failure; backendUnavailable = true }
-                                            } else if (fullAnalysis) backendUnavailable = true
-                                            if (scan == null && backendId == null) kotlin.error(localFailure ?: "This track could not be analyzed.")
-                                            val annotationReview = report.optJSONObject("dataset_analysis")?.optJSONObject("annotations")?.optBoolean("reviewed", false) == true
-                                            val status = if (!fullAnalysis && report.optString("tempo_bpm") != "null") "Done" else if (fullAnalysis && annotationReview && report.optString("tempo_bpm") != "null") "Done" else "Partial"
-                                            update(item.id) { it.copy(status = status, report = report, backendJobId = backendId, error = null) }
-                                            if (report.optJSONArray("warnings")?.length() ?: 0 > 0) notice = "Some results need review."
-                                        } catch (failure: Throwable) {
-                                            if (failure is CancellationException) throw failure
-                                            update(item.id) { it.copy(status = "Failed", error = failure.message ?: "This track could not be analyzed.") }
-                                        }
-                                        progress = (((index + 1).toFloat() / queue.size.coerceAtLeast(1)) * 100).roundToInt()
-                                    }
-                                    notice = if (tracks.any { it.status == "Failed" }) "Some tracks could not be read." else if (backendUnavailable) "Backend recognition unavailable; local results were kept." else "Batch complete."
-                                } catch (_: CancellationException) {
-                                    notice = "Stopped. Completed results were kept."
-                                    tracks.filter { it.status == "Queued" || it.status == "Analyzing" }.forEach { item -> update(item.id) { it.copy(status = "Cancelled") } }
-                                } finally {
-                                    busy = false; currentJob = null
-                                }
-                            }
-                    },
-                    enabled = tracks.isNotEmpty() && !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (busy) "Analyzing… $progress%" else if (fullAnalysis) "Analyze songs" else "Scan songs")
-                }
-                if (busy) {
-                    OutlinedButton(onClick = { currentJob?.cancel() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)); Text("Stop")
-                    }
-                }
-                if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                if (notice.isNotEmpty()) Text(notice, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                Text("Results show where processing happened.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        OutlinedCard {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Batch results", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Text("$analyzedCount of ${tracks.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (tracks.isEmpty()) {
-                    Text("Your songs will appear here.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 20.dp))
-                } else {
-                    tracks.forEach { item ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().background(
-                                if (item.id == selected?.id) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-                                RoundedCornerShape(10.dp),
-                            ).padding(horizontal = 8.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(if (item.report != null) Icons.Default.CheckCircle else Icons.Default.AudioFile, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                            Column(Modifier.weight(1f)) {
-                                Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                                Text(item.status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(formatNativeBytes(item.sizeBytes), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton(onClick = { if (!busy) selectedId = item.id }, enabled = !busy) { Text(if (item.id == selected?.id) "View" else "Open") }
-                            if (!busy) TextButton(onClick = { tracks = tracks.filterNot { it.id == item.id }; if (selectedId == item.id) selectedId = null }) { Icon(Icons.Default.Close, contentDescription = "Remove track", modifier = Modifier.size(16.dp)) }
-                        }
-                    }
-                }
-                if (analyzedCount > 0) {
-                    Divider()
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                        OutlinedButton(onClick = { jsonExporter.launch("song-analysis.json") }, enabled = !busy) { Text("JSON") }
-                        OutlinedButton(onClick = { csvExporter.launch("song-analysis.csv") }, enabled = !busy) { Text("CSV") }
-                        OutlinedButton(onClick = { zipExporter.launch("song-analysis-report.zip") }, enabled = !busy) { Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("ZIP report") }
-                    }
-                }
-                Text("Up to 50 tracks · 20 MB each · 60 MB per batch", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        selected?.report?.let { report ->
-            OutlinedCard {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(report.optJSONObject("identity")?.optString("title")?.takeIf { it.isNotBlank() && it != "null" } ?: selected.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(report.optJSONObject("identity")?.optString("artist")?.takeIf { it.isNotBlank() && it != "null" } ?: "Unknown artist", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    NativeSongCopyButton("track analysis", report.toString(2))
-                    OutlinedButton(onClick = {
-                        val target = selected ?: return@OutlinedButton
-                        busy = true; error = ""; notice = "Preparing separation…"
-                        currentJob = scope.launch {
-                            try {
-                                require(NativeSongBackend.available()) { "Backend separation is unavailable." }
-                                val bytes = withContext(Dispatchers.IO) { target.bytes ?: (context.contentResolver.openInputStream(target.uri ?: kotlin.error("Audio file is unavailable.")) ?: kotlin.error("Audio file is unavailable.")).use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) } }
-                                val remote = NativeSongBackend.analyze(bytes, separate = true) { stage -> withContext(Dispatchers.Main) { notice = stage } }
-                                update(target.id) { current -> val next = nativeSongMergeBackend(current.report ?: nativeSongPartialReport(target.name, "Local analysis was unavailable."), remote.report); next.optJSONObject("analysis")?.put("uses_remote_api", true)?.put("uses_hosted_model", true); current.copy(report = next, backendJobId = remote.id, status = "Partial") }
-                                notice = "Separated sounds ready."
-                            } catch (failure: Throwable) { if (failure is CancellationException) notice = "Stopped." else error = failure.message ?: "Separation failed." }
-                            finally { busy = false; currentJob = null }
-                        }
-                    }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Separate sounds") }
-                    report.optJSONObject("backend_model")?.let { backend ->
-                        NativeSongBackendDetails(backend, selected?.backendJobId, onApply = { field, value -> selected?.id?.let { updateDatasetTag(it, field, value) } })
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                        nativeMetric("Tempo", report.opt("tempo_bpm")?.takeIf { it != JSONObject.NULL }?.let { "$it BPM" } ?: "—")
-                        nativeMetric("Key", report.optString("key").takeIf { it.isNotBlank() && it != "null" } ?: "—")
-                        nativeMetric("Energy", report.optString("energy").takeIf { it.isNotBlank() && it != "unknown" } ?: "—")
-                    }
-                    nativeTagList("STYLE", report.optString("genre"), report.optString("sub_style"), *jsonStringList(report.optJSONArray("language")).toTypedArray())
-                    nativeTagList("MOOD", *jsonStringList(report.optJSONArray("mood")).toTypedArray())
-                    nativeTagList("THEMES", *jsonStringList(report.optJSONArray("theme")).toTypedArray())
-                    nativeTagList("VOCALS", *jsonStringList(report.optJSONArray("vocals")).toTypedArray())
-                    nativeTagList("INSTRUMENTS", *jsonStringList(report.optJSONArray("instruments")).toTypedArray())
-                    nativeTagList("DESCRIPTIONS", *jsonStringList(report.optJSONArray("descriptions")).toTypedArray())
-                    report.optJSONObject("dataset_analysis")?.let { dataset ->
-                        NativeSongDatasetDetails(dataset)
-                        NativeSongDatasetAnnotationEditor(
-                            dataset = dataset,
-                            draftValue = { key -> selected?.id?.let { annotationDrafts["$it:$key"] } },
-                            onTagChange = { key, value -> selected?.id?.let { updateDatasetTag(it, key, value) } },
-                            onTextChange = { key, value -> selected?.id?.let { updateDatasetAnnotationText(it, key, value) } },
-                            onReviewedChange = { reviewed -> selected?.id?.let { markDatasetReviewed(it, reviewed) } },
-                        )
-                    }
-                    if (itemWarnings(report).isNotEmpty()) {
-                        Text("Notes", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium)
-                        itemWarnings(report).take(5).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-}
-
-private fun nativeSongPartialReport(name: String, reason: String): JSONObject {
-    val annotations = JSONObject()
-    listOf("genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement").forEach { annotations.put(it, JSONArray()) }
-    annotations.put("notes", "").put("reviewer", JSONObject.NULL).put("reviewed", false)
-    return JSONObject().put("schema_version", "1.2").put("filename", name).put("identity", JSONObject().put("title", name))
-        .put("analysis", JSONObject().put("local_audio_decoded", false).put("status", "partial"))
-        .put("dataset_analysis", JSONObject().put("annotations", annotations))
-        .put("warnings", JSONArray().put(reason))
-}
-
-private fun nativeSongMergeBackend(local: JSONObject, backend: JSONObject): JSONObject {
-    val report = JSONObject(local.toString()).put("backend_model", backend)
-    val signal = backend.optJSONObject("signal") ?: JSONObject()
-    if (report.isNull("tempo_bpm") && !signal.isNull("tempo_bpm")) report.put("tempo_bpm", signal.opt("tempo_bpm")).put("tempo_source", "backend_audio_estimate")
-    if (report.isNull("key") && !signal.isNull("key")) report.put("key", signal.opt("key"))
-    val technical = report.optJSONObject("technical") ?: JSONObject()
-    if (technical.isNull("duration_seconds")) technical.put("duration_seconds", signal.opt("duration_seconds"))
-    report.put("technical", technical)
-    val embedded = report.optJSONObject("embedded_metadata") ?: JSONObject()
-    embedded.put("backend_ffprobe", backend.optJSONObject("metadata") ?: JSONObject())
-    report.put("embedded_metadata", embedded)
-    return report
-}
-
-@Composable
-private fun NativeSongCopyButton(label: String, value: String) {
-    val context = LocalContext.current
-    TextButton(onClick = {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
-    }, enabled = value.isNotBlank(), modifier = Modifier.semantics { contentDescription = "Copy $label" }) { Text("Copy", style = MaterialTheme.typography.labelSmall) }
-}
-
-@Composable
-private fun NativeSongBackendDetails(result: JSONObject, jobId: String?, onApply: (String, String) -> Unit) {
-    val context = LocalContext.current
-    var player by remember(jobId) { mutableStateOf<MediaPlayer?>(null) }
-    var playerError by remember(jobId) { mutableStateOf("") }
-    DisposableEffect(jobId) { onDispose { player?.release(); player = null } }
-    val candidates = result.optJSONObject("candidates") ?: JSONObject()
-    val lyrics = result.optJSONObject("lyrics") ?: JSONObject()
-    val segments = lyrics.optJSONArray("segments") ?: JSONArray()
-    val transcript = (0 until segments.length()).mapNotNull { segments.optJSONObject(it)?.optString("text")?.takeIf(String::isNotBlank) }.joinToString(" ")
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Text("Backend audio results", fontWeight = FontWeight.SemiBold)
-        Text("Audio is processed on the server and expires after one hour. Sound labels and lyrics need review.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        listOf("genre", "mood", "instruments", "vocals").forEach { field ->
-            val values = candidates.optJSONArray(field) ?: JSONArray()
-            val labels = (0 until values.length()).mapNotNull { values.optJSONObject(it)?.optString("label")?.takeIf(String::isNotBlank) }
-            if (labels.isNotEmpty()) {
-                nativeTagList(field.uppercase(Locale.ROOT), *labels.toTypedArray())
-                TextButton(onClick = { onApply(field, labels.joinToString(", ")) }) { Text("Use $field as draft") }
-            }
-        }
-        if (lyrics.optString("status") == "candidate_transcript") {
-            Text("Speech & lyrics", fontWeight = FontWeight.SemiBold)
-            Text(transcript.ifBlank { "No transcript produced." }, style = MaterialTheme.typography.bodySmall)
-            if (transcript.isNotBlank()) NativeSongCopyButton("transcript", transcript)
-            Text(if (lyrics.optString("source") == "vocal_stem") "From the estimated vocal stem." else "From the full mix.", style = MaterialTheme.typography.labelSmall)
-        }
-        val stemAnalysis = result.optJSONArray("stem_analysis") ?: JSONArray()
-        for (index in 0 until stemAnalysis.length()) {
-            val stem = stemAnalysis.optJSONObject(index) ?: continue
-            val values = stem.optJSONObject("candidates")?.optJSONArray("instruments") ?: JSONArray()
-            val labels = (0 until values.length()).mapNotNull { values.optJSONObject(it)?.optString("label")?.takeIf(String::isNotBlank) }
-            nativeTagList("${stem.optString("stem").uppercase(Locale.ROOT)} SOUNDS", *labels.toTypedArray())
-        }
-        val artifacts = result.optJSONArray("artifacts") ?: JSONArray()
-        if (jobId != null) for (index in 0 until artifacts.length()) {
-            val artifact = artifacts.optJSONObject(index) ?: continue
-            if (artifact.optString("kind") != "stem") continue
-            val name = artifact.optString("name")
-            val url = runCatching { NativeSongBackend.artifactUrl(jobId, name) }.getOrNull() ?: continue
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(name.substringAfterLast('/').removeSuffix(".wav"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = {
-                    runCatching {
-                        player?.release()
-                        player = MediaPlayer().apply { setDataSource(url); setOnPreparedListener { it.start() }; setOnErrorListener { _, _, _ -> playerError = "Playback failed."; true }; prepareAsync() }
-                    }.onFailure { playerError = "Playback failed." }
-                }) { Text("Play") }
-                TextButton(onClick = {
-                    runCatching { (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(DownloadManager.Request(Uri.parse(url)).setTitle(name.substringAfterLast('/')).setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)) }.onFailure { playerError = "Download failed." }
-                }) { Text("WAV") }
-            }
-        }
-        if (player != null) TextButton(onClick = { player?.release(); player = null }) { Text("Stop playback") }
-        if (playerError.isNotBlank()) Text(playerError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-        jsonStringList(result.optJSONArray("warnings")).forEach { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall) }
-    }
-}
-
-private val nativeDatasetAnnotationFields = listOf(
-    Triple("genre", "Genre", "Afrobeats, R&B"),
-    Triple("sub_style", "Sub-style", "Afro-pop, Amapiano"),
-    Triple("style_influences", "Style influences", "Highlife, dancehall, soul"),
-    Triple("language", "Language", "Nigerian Pidgin, Yoruba"),
-    Triple("energy", "Energy", "Low, medium, high"),
-    Triple("mood", "Mood", "Celebratory, soulful"),
-    Triple("source_role", "Audio part / stem role", "Full mix, vocals, drums, bass, melody"),
-    Triple("vocals", "Vocal content", "Lead vocals, backing vocals, ad-libs"),
-    Triple("vocal_delivery", "Vocal delivery", "Melodic singing, rap, chant"),
-    Triple("vocal_register", "Vocal pitch / register", "High/low pitch, soprano, alto, tenor, baritone"),
-    Triple("vocal_harmony", "Vocal harmony", "Doubles, thirds, call-and-response"),
-    Triple("performance_technique", "Performance techniques", "Vibrato, falsetto, melisma"),
-    Triple("instruments", "Instruments", "Log drum, shakers, synth bass"),
-    Triple("themes", "Themes", "Love, celebration"),
-    Triple("listening_scene", "Listening scene", "Club, road trip"),
-    Triple("production_traits", "Production traits", "Reverb, saturation, sidechain"),
-    Triple("arrangement", "Arrangement", "Intro build, drum drop, instrumental break"),
-)
-
-@Composable
-private fun NativeSongDatasetDetails(dataset: JSONObject) {
-    val technical = dataset.optJSONObject("technical") ?: JSONObject()
-    val timbre = dataset.optJSONObject("timbre") ?: JSONObject()
-    val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
-    val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
-    val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
-    val structure = dataset.optJSONObject("structure") ?: JSONObject()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Local DSP findings", fontWeight = FontWeight.SemiBold)
-        Text("Pitch span: ${pitch.optString("lowest_detected_note", "unknown")}–${pitch.optString("highest_detected_note", "unknown")} · Chords: ${tonality.optJSONArray("chord_estimates")?.length() ?: 0} · Transient rate: ${rhythm.opt("transient_density_per_second") ?: "—"}/s", style = MaterialTheme.typography.bodySmall)
-        Text("Mean spectral centroid: ${timbre.opt("mean_spectral_centroid_hz") ?: "—"} Hz · Feature changes: ${structure.optJSONArray("change_points")?.length() ?: 0}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val cueArray = dataset.optJSONArray("style_cues") ?: JSONArray()
-        for (index in 0 until min(cueArray.length(), 8)) {
-            val cue = cueArray.optJSONObject(index) ?: continue
-            Text("${cue.optString("tag")}: ${cue.optString("evidence")}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text("Pitch and chord values are estimates from a mono mix, not verified vocal-only notes. Section cuts are not confirmed verse/chorus labels.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun NativeSongDatasetAnnotationEditor(
-    dataset: JSONObject,
-    draftValue: (String) -> String?,
-    onTagChange: (String, String) -> Unit,
-    onTextChange: (String, String) -> Unit,
-    onReviewedChange: (Boolean) -> Unit,
-) {
-    val annotations = dataset.optJSONObject("annotations") ?: JSONObject()
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        Text("Training labels (human-reviewed)", fontWeight = FontWeight.SemiBold)
-        Text("Genre, language, vocal type and instrument identity are annotations, not facts inferred by this local DSP pass.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        nativeDatasetAnnotationFields.forEach { (key, label, placeholder) ->
-            OutlinedTextField(
-                value = draftValue(key) ?: jsonStringList(annotations.optJSONArray(key)).joinToString(", "),
-                onValueChange = { onTagChange(key, it) },
-                label = { Text(label) },
-                placeholder = { Text(placeholder) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-        }
-        OutlinedTextField(
-            value = annotations.optString("notes"),
-            onValueChange = { onTextChange("notes", it.take(4000)) },
-            label = { Text("Annotation notes") },
-            placeholder = { Text("Parts to preserve or replace, uncertainty, review notes") },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 2,
-            maxLines = 4,
-        )
-        OutlinedTextField(
-            value = annotations.optString("reviewer").takeUnless { it == "null" } ?: "",
-            onValueChange = { onTextChange("reviewer", it.take(100)) },
-            label = { Text("Reviewer initials / team ID") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(checked = annotations.optBoolean("reviewed", false), onCheckedChange = onReviewedChange)
-            Text("Reviewed for training use", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSongSource> {
+internal fun collectUriSources(context: Context, uris: List<Uri>, includeSidecars: Boolean = false): List<NativeSongSource> {
     val result = mutableListOf<NativeSongSource>()
     val seenUris = mutableSetOf<String>()
     var bytesTotal = 0L
@@ -654,26 +82,29 @@ private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSon
         if (!seenUris.add(uri.toString())) continue
         if (lower.endsWith(".zip")) {
             val zipBytes = (context.contentResolver.openInputStream(uri) ?: error("Cannot open $name.")).use { readBoundedContent(it, SONG_MAX_ZIP_BYTES.toLong()) }
-            val extracted = extractNativeSongZip(zipBytes)
+            val extracted = extractNativeSongZip(zipBytes, includeSidecars)
             for (entry in extracted) {
                 bytesTotal += entry.sizeBytes
                 if (bytesTotal > SONG_MAX_BATCH_BYTES) error("Batch exceeds 60 MB.")
                 result += entry
-                require(result.size <= SONG_MAX_TRACKS) { "Choose up to 50 tracks." }
+                require(result.size <= if (includeSidecars) SONG_MAX_TRACKS * 3 else SONG_MAX_TRACKS) { "Too many package entries." }
             }
             continue
         }
         val ext = lower.substringAfterLast('.', "")
-        if (ext !in nativeSongExtensions && context.contentResolver.getType(uri)?.startsWith("audio/") != true) continue
+        val sidecar = includeSidecars && (lower.endsWith(".tags.json") || lower.endsWith(".lyrics.txt"))
+        if (ext !in nativeSongExtensions && context.contentResolver.getType(uri)?.startsWith("audio/") != true && !sidecar) continue
         val size = info.second
+        if (sidecar && lower.endsWith(".lyrics.txt") && size == 0L) continue
         require(size != 0L) { "$name is empty." }
         require(size < 0L || size <= SONG_MAX_TRACK_BYTES) { "$name exceeds the 20 MB track limit." }
-        require(result.size < SONG_MAX_TRACKS) { "Choose up to 50 tracks." }
+        require(result.size < if (includeSidecars) SONG_MAX_TRACKS * 3 else SONG_MAX_TRACKS) { "Too many files." }
         if (size < 0L) {
             // Some document providers omit SIZE. Read bounded bytes now so the batch cap stays real.
             val bytes = (context.contentResolver.openInputStream(uri) ?: error("Cannot open $name.")).use {
                 readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong())
             }
+            if (sidecar && lower.endsWith(".lyrics.txt") && bytes.isEmpty()) continue
             require(bytes.isNotEmpty()) { "$name is empty." }
             bytesTotal += bytes.size
             require(bytesTotal <= SONG_MAX_BATCH_BYTES) { "Batch exceeds 60 MB." }
@@ -689,7 +120,7 @@ private fun collectUriSources(context: Context, uris: List<Uri>): List<NativeSon
 
 private val nativeSongExtensions = setOf("mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "3gp", "mp4", "amr", "webm")
 
-internal fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
+internal fun extractNativeSongZip(bytes: ByteArray, includeSidecars: Boolean = false): List<NativeSongSource> {
     require(bytes.size >= 22 && bytes.size <= SONG_MAX_ZIP_BYTES) { "ZIP must be between 22 bytes and 30 MB." }
     fun u16(offset: Int): Int {
         require(offset >= 0 && offset + 2 <= bytes.size) { "ZIP directory is damaged." }
@@ -803,8 +234,13 @@ internal fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
         require(uncompressedSize == 0 || compressedSize > 0) { "ZIP entry has an invalid zero-size payload." }
 
         val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
-        if (extension !in nativeSongExtensions) continue
-        require(uncompressedSize > 0) { "ZIP contains an empty audio track." }
+        val sidecar = includeSidecars && (name.endsWith(".tags.json", true) || name.endsWith(".lyrics.txt", true))
+        if (extension !in nativeSongExtensions && !sidecar) continue
+        if (sidecar && name.endsWith(".lyrics.txt", true) && uncompressedSize == 0) {
+            require(crcExpected == 0L && (method != 0 || compressedSize == 0)) { "Empty lyrics entry is damaged." }
+            continue
+        }
+        require(uncompressedSize > 0 && (!sidecar || uncompressedSize <= 1024 * 1024)) { "ZIP contains an empty or oversized entry." }
         val compressed = bytes.copyOfRange(payloadStart, payloadEnd)
         val decoded = when (method) {
             0 -> {
@@ -817,8 +253,8 @@ internal fun extractNativeSongZip(bytes: ByteArray): List<NativeSongSource> {
         val crc = java.util.zip.CRC32().apply { update(decoded) }.value
         require(crc == crcExpected) { "ZIP entry checksum failed." }
         val displayName = name.split('/').filter { it.isNotBlank() }.joinToString(" — ")
-        results += NativeSongSource(name = displayName, bytes = decoded, sizeBytes = decoded.size.toLong())
-        require(results.size <= SONG_MAX_TRACKS) { "ZIP contains more than 50 audio tracks." }
+        results += NativeSongSource(name = if (includeSidecars) name else displayName, bytes = decoded, sizeBytes = decoded.size.toLong())
+        require(results.size <= if (includeSidecars) SONG_MAX_TRACKS * 3 else SONG_MAX_TRACKS) { "ZIP contains too many entries." }
     }
     require(cursor == directoryEnd) { "ZIP directory has unexpected trailing data." }
     localRanges.sortBy { it.first }
@@ -856,7 +292,7 @@ private fun inflateNativeSongEntry(compressed: ByteArray, expectedSize: Int): By
     }
 }
 
-private fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
+internal fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
     val output = ByteArrayOutputStream()
     val buffer = ByteArray(16 * 1024)
     var total = 0L
@@ -870,10 +306,7 @@ private fun readBoundedContent(input: InputStream, limit: Long): ByteArray {
     return output.toByteArray()
 }
 
-private fun readCurrentEntryBounded(input: InputStream, limit: Long): ByteArray =
-    readBoundedContent(input, limit)
-
-private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, detailed: Boolean = false): NativeSongScan {
+private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource): JSONObject {
     val bytes = item.bytes ?: withContext(Dispatchers.IO) {
         val stream = item.uri?.let { context.contentResolver.openInputStream(it) } ?: error("Cannot open ${item.name}.")
         stream.use { readBoundedContent(it, SONG_MAX_TRACK_BYTES.toLong()) }
@@ -889,7 +322,6 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, 
         val warnings = JSONArray()
         val tempo = decoded?.let { NativeSongSignalAnalysis.estimateBpm(it.samples, it.sampleRateHz) }
         val key = decoded?.let { NativeSongSignalAnalysis.estimateKey(it.samples, it.sampleRateHz) }
-        val datasetAnalysis = if (detailed && decoded != null) NativeSongSignalAnalysis.analyzeDataset(decoded.samples, decoded.sampleRateHz) else null
         if (decoded == null) warnings.put("This audio format could not be decoded on this device.")
         if (tempo == null) warnings.put("Tempo could not be estimated reliably.")
         if (key == null) warnings.put("Musical key could not be estimated reliably.")
@@ -940,16 +372,19 @@ private suspend fun analyzeNativeSong(context: Context, item: NativeSongSource, 
             .put("identity", identity)
             .put("technical", technical)
             .put("embedded_metadata", meta)
-            .put("analysis", JSONObject().put("status", if (datasetAnalysis != null) "full_local_needs_review" else "quick_local").put("local_audio_decoded", decoded != null)
+            .put("analysis", JSONObject().put("status", "quick_local").put("local_audio_decoded", decoded != null)
                 .put("semantic_analysis", "not_run_local_only").put("uses_remote_api", false).put("uses_hosted_model", false)
                 .put("key_source", if (key != null) "audio_estimate" else "unavailable"))
             .put("warnings", warnings)
-        if (datasetAnalysis != null) report.put("dataset_analysis", datasetAnalysis)
-        return NativeSongScan(report, decoded)
+        return report
     } finally {
         temp.delete()
     }
 }
+
+/** The sandbox uses the local, bounded signal engine without the remote analyzer UI. */
+internal suspend fun analyzeSandboxSong(context: Context, item: NativeSongSource): JSONObject =
+    analyzeNativeSong(context, item)
 
 private fun readNativeMetadata(file: File): JSONObject {
     val meta = JSONObject()
@@ -1082,7 +517,7 @@ private suspend fun decodeNativeSong(file: File, metadataDuration: Double): Nati
                     pcmEncoding = if (outFormat.containsKey(MediaFormat.KEY_PCM_ENCODING)) outFormat.getInteger(MediaFormat.KEY_PCM_ENCODING) else AudioFormat.ENCODING_PCM_16BIT
                 }
                 MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    if (inputDone) idleLoops++ else idleLoops = 0
+                    idleLoops++
                 }
                 else -> if (outputIndex >= 0) {
                     val output = decoder.getOutputBuffer(outputIndex)
@@ -1131,153 +566,6 @@ private suspend fun decodeNativeSong(file: File, metadataDuration: Double): Nati
 private fun nativeTempoBand(bpm: Int): String = when {
     bpm < 80 -> "slow"; bpm < 110 -> "mid"; bpm < 130 -> "upbeat"; else -> "fast"
 }
-private fun formatNativeBytes(bytes: Long): String = when {
-    bytes < 1024 -> "$bytes B"
-    bytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
-    else -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
-}
-private fun jsonStringList(array: JSONArray?): List<String> = array?.let { values -> (0 until values.length()).mapNotNull { values.optString(it).takeIf(String::isNotBlank) } } ?: emptyList()
-private fun itemWarnings(report: JSONObject): List<String> = jsonStringList(report.optJSONArray("warnings"))
-@Composable
-private fun nativeMetric(label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("$label:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-        NativeSongCopyButton(label.lowercase(Locale.ROOT), value.takeUnless { it == "—" } ?: "")
-    }
-}
-@Composable
-private fun nativeTagList(label: String, vararg values: String) {
-    val actual = values.filter { it.isNotBlank() && it != "null" && it != "unknown" }
-    if (actual.isNotEmpty()) {
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
-            Text(actual.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
-            NativeSongCopyButton(label.lowercase(Locale.ROOT), actual.joinToString(", "))
-        }
-    }
-}
-
-private suspend fun exportNative(context: Context, uri: Uri, tracks: List<NativeSongSource>, kind: String, setError: (String) -> Unit) {
-    val reports = tracks.filter { it.report != null }.map { it.report!! }
-    val outBytes = withContext(Dispatchers.IO) {
-        when (kind) {
-            "json" -> JSONObject().put("schema_version", "env.song-analysis-export.v2").put("tracks", JSONArray().also { array -> reports.forEach(array::put) }).toString(2).toByteArray()
-            "csv" -> nativeReportsCsv(reports).toByteArray(Charsets.UTF_8)
-            else -> {
-                val buffer = ByteArrayOutputStream()
-                ZipOutputStream(buffer).use { zip ->
-                    val json = JSONObject().put("schema_version", "1.0").put("tracks", JSONArray().also { array -> reports.forEach(array::put) }).toString(2).toByteArray()
-                    zip.putNextEntry(ZipEntry("song-analysis.json")); zip.write(json); zip.closeEntry()
-                    zip.putNextEntry(ZipEntry("song-analysis.csv")); zip.write(nativeReportsCsv(reports).toByteArray()); zip.closeEntry()
-                    val failures = tracks.filter { it.error != null }.map { JSONObject().put("filename", it.name).put("error", it.error) }
-                    zip.putNextEntry(ZipEntry("processing-issues.json")); zip.write(JSONArray(failures).toString(2).toByteArray()); zip.closeEntry()
-                }
-                buffer.toByteArray()
-            }
-        }
-    }
-    try {
-        withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(outBytes) } ?: error("Cannot create export file.") }
-    } catch (failure: Throwable) { setError(failure.message ?: "Could not export report.") }
-}
-
-private fun nativeReportsCsv(reports: List<JSONObject>): String {
-    val columns = listOf(
-        "filename", "title", "artist", "album", "genre", "sub_style", "style_influences", "language",
-        "tempo_bpm", "tempo_band", "key", "energy", "mood", "theme", "setting", "source_role",
-        "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments",
-        "production_traits", "arrangement", "duration_seconds", "file_size_bytes", "codec", "sample_rate_hz", "channels",
-        "pitch_lowest_note", "pitch_highest_note", "pitch_range_semitones", "transient_density_per_second",
-        "spectral_centroid_mean_hz", "low_energy_ratio_mean", "mid_energy_ratio_mean", "high_energy_ratio_mean",
-        "chord_estimates", "section_boundaries", "labels_reviewed", "reviewer", "annotation_notes",
-        "uses_remote_api", "uses_hosted_model", "analysis_status", "warnings"
-    )
-    fun cell(value: Any?): String {
-        var text = when (value) {
-            null, JSONObject.NULL -> ""
-            is JSONArray -> (0 until value.length()).joinToString("; ") { value.optString(it) }
-            is JSONObject -> value.toString()
-            else -> value.toString()
-        }
-        if (text.trimStart().startsWith("=") || text.trimStart().startsWith("+") || text.trimStart().startsWith("@") || text.trimStart().matches(Regex("-[0-9].*"))) text = "'$text"
-        return "\"" + text.replace("\"", "\"\"") + "\""
-    }
-    return (listOf(columns.joinToString(",") { cell(it) }) + reports.map { report ->
-        val identity = report.optJSONObject("identity") ?: JSONObject()
-        val technical = report.optJSONObject("technical") ?: JSONObject()
-        val analysis = report.optJSONObject("analysis") ?: JSONObject()
-        val dataset = report.optJSONObject("dataset_analysis") ?: JSONObject()
-        val annotations = dataset.optJSONObject("annotations") ?: JSONObject()
-        val pitch = dataset.optJSONObject("pitch") ?: JSONObject()
-        val rhythm = dataset.optJSONObject("rhythm") ?: JSONObject()
-        val tonality = dataset.optJSONObject("tonality") ?: JSONObject()
-        val timbre = dataset.optJSONObject("timbre") ?: JSONObject()
-        val structure = dataset.optJSONObject("structure") ?: JSONObject()
-        val chordText = (tonality.optJSONArray("chord_estimates") ?: JSONArray()).let { values ->
-            (0 until values.length()).joinToString(" | ") { index ->
-                val item = values.optJSONObject(index) ?: JSONObject()
-                "${item.opt("start_seconds") ?: "?"}-${item.opt("end_seconds") ?: "?"}s:${item.opt("chord")?.takeUnless { it == JSONObject.NULL } ?: "unknown"}"
-            }
-        }
-        val sectionText = (structure.optJSONArray("change_points") ?: JSONArray()).let { values ->
-            (0 until values.length()).joinToString(" | ") { index ->
-                val item = values.optJSONObject(index) ?: JSONObject()
-                "${item.opt("time_seconds") ?: "?"}s(${item.opt("change_score") ?: "?"})"
-            }
-        }
-        val processing = dataset.optJSONObject("processing") ?: JSONObject()
-        val row = JSONObject()
-            .put("filename", report.optString("filename"))
-            .put("title", identity.opt("title"))
-            .put("artist", identity.opt("artist"))
-            .put("album", identity.opt("album"))
-            .put("genre", report.opt("genre"))
-            .put("sub_style", report.opt("sub_style"))
-            .put("style_influences", annotations.optJSONArray("style_influences"))
-            .put("language", report.optJSONArray("language"))
-            .put("tempo_bpm", report.opt("tempo_bpm"))
-            .put("tempo_band", report.optString("tempo_band"))
-            .put("key", report.opt("key"))
-            .put("energy", annotations.optJSONArray("energy") ?: report.opt("energy"))
-            .put("mood", report.optJSONArray("mood"))
-            .put("theme", report.optJSONArray("theme"))
-            .put("setting", report.optJSONArray("setting"))
-            .put("source_role", annotations.optJSONArray("source_role"))
-            .put("vocals", report.optJSONArray("vocals"))
-            .put("vocal_delivery", annotations.optJSONArray("vocal_delivery"))
-            .put("vocal_register", annotations.optJSONArray("vocal_register"))
-            .put("vocal_harmony", annotations.optJSONArray("vocal_harmony"))
-            .put("performance_technique", annotations.optJSONArray("performance_technique"))
-            .put("instruments", report.optJSONArray("instruments"))
-            .put("production_traits", annotations.optJSONArray("production_traits"))
-            .put("arrangement", annotations.optJSONArray("arrangement"))
-            .put("duration_seconds", technical.opt("duration_seconds"))
-            .put("file_size_bytes", technical.opt("file_size_bytes"))
-            .put("codec", technical.opt("codec"))
-            .put("sample_rate_hz", technical.opt("sample_rate_hz"))
-            .put("channels", technical.opt("channels"))
-            .put("pitch_lowest_note", pitch.opt("lowest_detected_note"))
-            .put("pitch_highest_note", pitch.opt("highest_detected_note"))
-            .put("pitch_range_semitones", pitch.opt("pitch_range_semitones"))
-            .put("transient_density_per_second", rhythm.opt("transient_density_per_second"))
-            .put("spectral_centroid_mean_hz", timbre.opt("mean_spectral_centroid_hz"))
-            .put("low_energy_ratio_mean", timbre.opt("mean_low_frequency_energy_ratio"))
-            .put("mid_energy_ratio_mean", timbre.opt("mean_mid_frequency_energy_ratio"))
-            .put("high_energy_ratio_mean", timbre.opt("mean_high_frequency_energy_ratio"))
-            .put("chord_estimates", chordText)
-            .put("section_boundaries", sectionText)
-            .put("labels_reviewed", annotations.optBoolean("reviewed", false))
-            .put("reviewer", annotations.opt("reviewer"))
-            .put("annotation_notes", annotations.optString("notes"))
-            .put("uses_remote_api", processing.optBoolean("uses_remote_api", false))
-            .put("uses_hosted_model", processing.optBoolean("uses_hosted_model", false))
-            .put("analysis_status", analysis.optString("status"))
-            .put("warnings", report.optJSONArray("warnings"))
-        columns.joinToString(",") { column -> cell(row.opt(column)) }
-    }).joinToString("\r\n")
-}
-
 internal object NativeSongSignalAnalysis {
     private val keyNames = listOf("C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B")
     private val majorProfile = doubleArrayOf(6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88)

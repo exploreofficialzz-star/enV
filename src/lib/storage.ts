@@ -7,6 +7,7 @@ const THEME_KEY = "env:theme";
 const VIEW_MODE_KEY = "env:view-mode";
 const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1, viewport-fit=cover";
 const MAX_RECENT = 24;
+const canonicalToolId = (id: string) => id === "audio-analyze-studio" ? "song-metadata-analyzer" : id;
 
 export type ThemePreference = "system" | "light" | "dark";
 export type ViewMode = "mobile" | "tablet" | "desktop";
@@ -168,10 +169,21 @@ export const usePrefs = create<PrefsState>((set, get) => ({
     document.documentElement.classList.toggle("dark", theme === "dark");
     if (storage && storedViewMode !== viewMode) writeSetting(VIEW_MODE_KEY, viewMode);
     applyViewMode(viewMode);
+    const oldFavorites = readList(FAV_KEY), oldRecent = readList(RECENT_KEY), oldCounts = readCounts(USAGE_KEY);
+    const favorites = [...new Set(oldFavorites.map(canonicalToolId))];
+    const recent = [...new Set(oldRecent.map(canonicalToolId))];
+    const usageCounts: Record<string, number> = {};
+    for (const [id, count] of Object.entries(oldCounts)) {
+      const canonical = canonicalToolId(id);
+      usageCounts[canonical] = Math.min((usageCounts[canonical] ?? 0) + count, 1_000_000);
+    }
+    if (oldFavorites.includes("audio-analyze-studio")) writeList(FAV_KEY, favorites);
+    if (oldRecent.includes("audio-analyze-studio")) writeList(RECENT_KEY, recent);
+    if (Object.hasOwn(oldCounts, "audio-analyze-studio")) writeCounts(usageCounts);
     set({
-      favorites: readList(FAV_KEY),
-      recent: readList(RECENT_KEY),
-      usageCounts: readCounts(USAGE_KEY),
+      favorites,
+      recent,
+      usageCounts,
       theme,
       themePreference,
       viewMode,

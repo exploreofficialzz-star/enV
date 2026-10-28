@@ -1,84 +1,31 @@
 # AI Music Data Sandbox
 
-The web music analyser is now a persistent workspace for preparing music generation datasets. Open `/tools/audio/ai-music-data-sandbox`. Existing `/tools/audio/song-metadata-analyzer` and `/tools/audio/audio-analyze-studio` bookmarks still work and share the same device storage.
+The sandbox replaces the separate song and audio analyzer interfaces on web, Android and iOS. Existing web analyzer URLs open the same sandbox. enV discovery shows one sandbox entry. The sandbox is a music dataset preparation workspace for any genre or language; it does not train a model.
 
-This implementation follows the supplied *Nigerian AI Music — Music Model Training Guide* as a data preparation template. Genres, languages, instruments, vocabulary and folder names are customizable; there is no country restriction. It prepares files and does not train a model.
+## Workflow
 
-## Working in the sandbox
+The home appears inside the enV tool page, below its title and description. Enter the workspace to create folders and subfolders, import songs or ZIP packages, continue drafts, edit metadata and lyrics, review permissions, and export. Collections persist locally and accept additional imports later. A folder's song and storage limits include its descendants. The default is 100 songs and 250 MB; both limits are editable.
 
-1. Create a folder. Optional defaults supply the genre and sub-style for new records. Create subfolders for styles, projects or another arrangement.
-2. Add a song, multiple files, a device folder, or a ZIP. Existing records are retained. Return to the same folder in another session to add more.
-3. Open a draft and listen to its audio. Tags, descriptions, technical controls, title, ID, lyrics, clearance, source and internal notes are editable. The advanced JSON section supports custom fields as well as the standard schema.
-4. Draft edits save automatically to IndexedDB. Save failures remain visible and keep the editor open. Renaming an ID changes the names of all exported companion files together. Moving a record changes its folder without rewriting its musical tags.
-5. Check the rights record and select **Mark ready** after human review. Further edits require another review. Blank or unclear rights never qualify for a music training export.
-6. Export selected records, the current view, or the entire workspace. Master exports include drafts. Music training preparation exports include only reviewed, cleared records with audio; lyrics-only records remain in master exports.
+The compact editor presents a few fields at a time. Descriptive fields are human-supplied. BPM and key are editable estimates and should be checked by ear: tempo may be half or double the intended beat, and a mixed or percussion-only track may not have a clear key. Genre, language, instruments, mood, vocals, meter and lyrics are not inferred. Measurements such as duration, sample rate, channels, peak and RMS are included where the device can read them. The JSON editor retains custom tag fields. Lyrics and audio can be attached to a draft; replacing audio preserves manual BPM and key while discarding estimates from the old recording.
 
-The homepage shows recent drafts. The Drafts and Ready views show the full corresponding collection, with search and incremental listing. Workspace settings provide a shared vocabulary editor, device storage information, a full-workspace backup action and a splash preview.
+A training preparation export includes only reviewed, cleared audio records; it supplies captions, lyrics and separate tempo, key and meter controls. The master backup contains drafts and sidecars. Confirm the exact export schema against the trainer version before training. Audio and data are stored on the current device and do not sync between web and native apps. Export a backup before clearing browser data or uninstalling the app.
 
-## What is automatic
+## Analysis and limits
 
-- File size and original format/extension.
-- Duration, when available from the header or the browser's media metadata.
-- Sample rate, channel count and bit depth when the supported header makes these readable.
-- A deterministic caption assembled from the user's tags, shown before export.
+Analysis runs locally with existing signal-processing code. No models are downloaded and no audio is uploaded for this workflow. The web decodes only recordings whose expected PCM fits an 80 MiB budget, analyzes up to 45 seconds in a worker, and leaves fields editable if a format, duration or device budget prevents analysis. Android and iOS use bounded local decoders and skip signal analysis beyond five minutes. Peak and RMS describe the analyzed audio; they are not semantic classifications. The browser's estimates reflect a sample rather than necessarily the whole recording.
 
-Unknown values remain blank. Readable duration is marked measured; imported and edited values have separate provenance. Musical labels, BPM, key, meter, energy, mood, language, vocals, flow, instruments and lyrics are not guessed. Embedded labels or imported sidecars are editable drafts, not verified inference.
+| Limit | Web | Android / iOS |
+| --- | --- | --- |
+| Audio file | 40 MB | 20 MB |
+| Files per import | 50 records | 50 records |
+| ZIP input | 80 MB; 160 MB expanded | 30 MB; 60 MB expanded |
+| ZIP export | 78 MB estimated payload | 28 MB estimated payload |
+| Folder limits | 1–500 songs; 10–2000 MB | 1–500 songs; 10–2000 MB |
 
-The active sandbox does not load Transformers/ONNX, CLAP, Whisper, Demucs, stem separation, full-track PCM decoding, chord detection, pitch analysis or remote AI jobs. It adds no npm dependencies. Existing tools and the standalone Python companion retain their separate implementations; shared libraries are not removed from unrelated tools.
+ZIP import checks paths, entry sizes and checksums. RAR, TAR and 7z must be unpacked first. Native imports can pair `.tags.json` and `.lyrics.txt` sidecars with audio and retain folder paths. A master re-import becomes a fresh draft requiring review. On web, the master ZIP also includes `workspace.json` with workspace settings and history for reference; native exports contain the audio, tags, lyrics and manifest.
 
-## Storage and limits
-
-All records and audio live in this browser on this device. They survive refreshes and ordinary navigation, but do not sync between devices. Browser eviction, clearing site data or private browsing can remove them. Export backups to device storage or a separate storage provider. Persistent browser storage is requested where available, without assuming it will be granted.
-
-| Scope | Limit |
-| --- | --- |
-| Default folder | 100 songs and 250 MB, including descendants |
-| Editable folder budgets | 1–500 songs; 10–2000 MB |
-| Audio file | 40 MB |
-| Import batch | 50 records, up to 160 MB total expansion |
-| ZIP | 80 MB compressed; 600 entries; 160 MB total expansion |
-| Lyrics or tags sidecar | 1 MB |
-| Export | 78 MB estimated payload, leaving room under the 80 MB ZIP import limit |
-
-Device quota is checked as well as folder budgets. Budget checks include ancestors, existing records, moves and later imports; subfolders cannot evade a parent budget. Imports process one record at a time and atomically commit its audio and metadata. Cancellation preserves completed records. Duplicate IDs get a suffix rather than overwriting earlier songs. Unsupported files and per-record failures are reported.
-
-ZIP directories are preflighted before inflation. Extraction runs in a disposable worker with a fixed output buffer, checksum verification, cancellation and a deadline. Unsafe paths, overlapping payloads, duplicate entries, links, encrypted archives, ZIP64, unreasonable expansion and unsupported compression methods are rejected. RAR, TAR and 7z must be unpacked first.
-
-## Exports
-
-Master files preserve the structure:
-
-```text
-afrobeats/afro_fusion/song_0001.wav
-afrobeats/afro_fusion/song_0001.tags.json
-afrobeats/afro_fusion/song_0001.lyrics.txt
-manifest.csv
-workspace.json
-README.txt
-```
-
-Audio bytes are copied, never transcoded. Original display names, notes, settings, folder budgets, provenance and review history are retained in `workspace.json`. The paired audio/lyrics/tags can be imported again; imports require a fresh review. The manifest references complete relative paths and includes clearance and reviewed status.
-
-The optional training preparation export adds `.caption.txt`, `.json` annotations and a `dataset.jsonl` index, and converts lyrics labels such as `[verse 1 | Yoruba]` to `[Verse]` without removing Unicode text. It keeps BPM, key and meter as separate controls. Mixed or unsupported vocal-language controls use `unknown` while captions retain language names. Identity, license, source, notes and custom fields never enter automatically generated captions.
-
-Annotation names and JSONL layout must be checked against the exact ACE-Step or other trainer version before training. These files are a preparation format, not a claimed validated native trainer schema.
-
-## Appearance and platform scope
-
-The sandbox uses enV's fonts, type scale, colors, controls, and system/light/dark preference. Container queries accommodate both the actual device width and enV's user-selected mobile/tablet/desktop layout. Forms have labels, the editor uses keyboard-accessible sections, dialogs trap focus, and motion respects the device preference.
-
-The welcome screen uses the same light and dark enV logo assets as the homepage and the supplied Rumuo icon. The original splash layout appears within the enV page, below its navigation, and stays open until the user selects Enter sandbox. The artboard scales to the available width and uses enV typography and controls. Entering full screen shows the splash again, and the open workspace and draft remain available after entering.
-
-This change implements the responsive web sandbox. Native Android/iOS analyser screens and their storage are separate and are not represented as having the new browser workflow.
+Full screen shows the home again without losing the draft. The web presents the mobile interface and temporarily uses the device viewport in full screen, regardless of enV's saved view mode; exiting restores that preference. Android and iOS use their own native views and private storage, not an embedded website.
 
 ## Validation
 
-```bash
-npm run typecheck
-npm run test:song-analyzer
-npm run check:audio-studios
-npm run audit:song-analyzer:browser
-npm run build
-```
-
-The browser audit uses generated audio and ZIP sidecars, checks persisted IndexedDB records after refresh, repeated imports, duplicate IDs, folder limits, review gating, exact downloaded audio bytes, captions, Unicode lyrics, custom tags, master/training files, accessibility, and 390/768/1440 light/dark layouts. It also rejects model downloads or audio-upload requests during this workflow.
+The browser audit covers import, bounded signal analysis, metadata preservation, drafts, review, exports, light/dark layouts, full-screen viewport restoration, accessibility and the absence of model downloads or audio uploads. Android unit tests cover native sidecar ZIPs, folder limits, review gating and training captions. The iOS source and data/ZIP helpers can be checked on Linux, but an iOS application build and simulator testing require Xcode on macOS.

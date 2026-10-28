@@ -2,6 +2,51 @@ import XCTest
 @testable import enV
 
 final class NativeAudioEngineTests: XCTestCase {
+    func testSandboxLocalTempoAndKeyOnTonalBeat() {
+        let rate = 16_000
+        var samples = [Float](repeating: 0, count: rate * 12)
+        for index in samples.indices {
+            let time = Double(index) / Double(rate)
+            let chord = [261.626, 329.628, 391.995].reduce(0.0) { $0 + sin(2 * Double.pi * $1 * time) } * 0.09
+            let beat = time.truncatingRemainder(dividingBy: 0.5)
+            let pulse = beat < 0.025 ? exp(-beat * 80) * 0.65 : 0
+            samples[index] = Float(chord + pulse)
+        }
+        XCTAssertNotNil(NativeSongSignal.estimateBPM(samples, sampleRate: Double(rate)))
+        XCTAssertNotNil(NativeSongSignal.estimateKey(samples, sampleRate: Double(rate)))
+        XCTAssertNil(NativeSongSignal.estimateBPM([Float](repeating: 0, count: rate * 3), sampleRate: Double(rate)))
+    }
+
+    func testMusicSandboxPreservesCustomTagsAndRequiresReviewedRights() throws {
+        let original = Data(#"{"id":"song_01","genre":"Jazz","language":["Yoruba"],"custom":{"score":3},"descriptions":["Warm guitar","Soft percussion"],"license":"owned","source":"private permission","tempo_bpm":110}"#.utf8)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+        var track = MusicSandboxTrack(folder: "child", title: "Example")
+        track.fields = musicSandboxFields(json); track.originalTags = original; track.audio = "song.wav"
+        track.lyrics = "Ẹ káàrọ̀"; track.clearance = "cleared"; track.reviewed = true
+        XCTAssertTrue(musicSandboxReady(track))
+        XCTAssertEqual((musicSandboxTags(track)["custom"] as? [String: Int])?["score"], 3)
+        XCTAssertEqual(musicSandboxCaption(track), "Jazz, sung in Yoruba")
+        XCTAssertEqual(musicSandboxLyrics("[verse 1 | Yoruba]\nẸ káàrọ̀"), "[Verse]\nẸ káàrọ̀")
+        track.tagsDraft = "{"; XCTAssertFalse(musicSandboxReady(track))
+        track.tagsDraft = nil; track.audio = ""; track.fields["description_1"] = ""; track.fields["description_2"] = ""
+        XCTAssertTrue(musicSandboxReady(track))
+        track.fields["tempo_bpm"] = "401"; XCTAssertFalse(musicSandboxReady(track))
+        let root = MusicSandboxFolder(id: "root", name: "Afrobeats")
+        let child = MusicSandboxFolder(id: "child", name: "Afro Fusion", parent: "root")
+        XCTAssertEqual(musicSandboxDescendants("root", [root, child]), Set(["root", "child"]))
+        XCTAssertEqual(musicSandboxPath("child", [root, child]), "afrobeats/afro_fusion")
+    }
+
+    func testMusicSandboxZIPIncludesSidecarsAndFolderPaths() throws {
+        let entries = [("afro/song.wav", Data([1, 2, 3])), ("afro/song.tags.json", Data("{}".utf8)), ("afro/song.lyrics.txt", Data("Ẹ káàrọ̀".utf8))]
+        let zip = try nativeSongZIPStore(entries)
+        let unpacked = try nativeSongUnpackZIP(zip, includeSidecars: true)
+        XCTAssertEqual(unpacked.map(\.filename), entries.map { $0.0 })
+        XCTAssertEqual(unpacked.last?.data, entries.last?.1)
+        let instrumental = try nativeSongZIPStore([("music/song.wav", Data([1, 2, 3])), ("music/song.lyrics.txt", Data())])
+        XCTAssertEqual(try nativeSongUnpackZIP(instrumental, includeSidecars: true).map(\.filename), ["music/song.wav"])
+    }
+
     func testSongKeyIncludesAudioNearTheEndOfTheTrack() {
         let rate = 16_000
         var samples = [Float](repeating: 0, count: rate * 96)

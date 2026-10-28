@@ -133,14 +133,13 @@ fun Catalog.withMusicDownloader(): Catalog {
 }
 
 fun Catalog.withSongMetadataAnalyzer(): Catalog {
-    if (tools.any { it.id == "song-metadata-analyzer" }) return this
     val tool = ToolRecord(
         id = "song-metadata-analyzer",
-        name = "Song Metadata Analyzer",
-        slug = "song-metadata-analyzer",
-        description = "Analyze genre, tempo, key, mood, vocals and instruments. Batch songs and export reports.",
+        name = "AI Music Data Sandbox",
+        slug = "ai-music-data-sandbox",
+        description = "Organize, tag and prepare music for training, right on your device.",
         category = "audio",
-        keywords = listOf("song", "music", "metadata", "analyzer", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"),
+        keywords = listOf("song", "music", "metadata", "sandbox", "dataset", "training", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"),
         tags = listOf("song", "music", "metadata", "analysis", "bpm", "key", "genre", "batch"),
         icon = "AudioLines",
         popularity = 9900,
@@ -153,9 +152,12 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
         engine = EngineInfo("audio", "song-metadata-analyzer"),
         subcategory = "Music",
     )
+    val remaining = tools.filterNot { it.id == "song-metadata-analyzer" || it.id == "audio-analyze-studio" }
+    val updated = remaining + tool
     return copy(
-        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
-        tools = (tools + tool).sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+        relatedReferenceTools = relatedReferenceTools.filterNot { it.id == "audio-analyze-studio" || it.id == "song-metadata-analyzer" },
     )
 }
 

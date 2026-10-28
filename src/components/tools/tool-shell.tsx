@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
-import { usePrefs } from "@/lib/storage";
+import { applyViewMode, usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ export function ToolShell({
   const note = disclaimerText(tool);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
+  const prefsHydrated = usePrefs((s) => s.hydrated);
   const recordRecent = usePrefs((s) => s.recordRecent);
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
@@ -37,6 +38,15 @@ export function ToolShell({
 
   useEffect(() => {
     if (isFullscreen && isMusicSandbox) window.dispatchEvent(new Event("env-music-sandbox-fullscreen"));
+  }, [isFullscreen, isMusicSandbox]);
+
+  useEffect(() => {
+    if (!isFullscreen || !isMusicSandbox) return;
+    // A desktop/tablet preference can widen a phone's viewport meta tag. Restore
+    // the real device viewport for this tool while leaving the preference alone.
+    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (viewport) viewport.content = "width=device-width, initial-scale=1, viewport-fit=cover";
+    return () => applyViewMode(usePrefs.getState().viewMode);
   }, [isFullscreen, isMusicSandbox]);
 
   useEffect(() => {
@@ -122,6 +132,7 @@ export function ToolShell({
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
+                disabled={isMusicSandbox && !prefsHydrated}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
                 title={isFullscreen ? "Exit full screen" : "View tool in full screen"}

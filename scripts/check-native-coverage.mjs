@@ -23,12 +23,12 @@ const nativeAnalyzerRoute = fs.readFileSync(new URL('../apps/android/app/src/mai
 const nativeAnalyzerEngine = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt', import.meta.url), 'utf8');
 const iosAnalyzerRoutes = fs.readFileSync(new URL('../apps/ios/enV/ToolViews.swift', import.meta.url), 'utf8');
 for (const [label, source, marker] of [
-  ['Android screen dispatch', nativeAnalyzerRoute, 'NativeSongMetadataAnalyzerScreen()'],
+  ['Android screen dispatch', nativeAnalyzerRoute, 'NativeMusicDataSandboxScreen()'],
   ['Android engine route', nativeAnalyzerEngine, 'song-metadata-analyzer'],
-  ['iOS native screen dispatch', iosAnalyzerRoutes, 'NativeSongMetadataAnalyzerView(title: tool.name)'],
+  ['iOS native screen dispatch', iosAnalyzerRoutes, 'NativeMusicDataSandboxView()'],
   ['iOS engine route', iosAnalyzerRoutes, 'if tool.id == "song-metadata-analyzer"'],
 ]) {
-  if (!source.includes(marker)) throw new Error(`Song Metadata Analyzer missing ${label}.`);
+  if (!source.includes(marker)) throw new Error(`Music data sandbox missing ${label}.`);
 }
 const active = catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta');
 const byId = new Map(catalog.map((tool) => [tool.id, tool]));

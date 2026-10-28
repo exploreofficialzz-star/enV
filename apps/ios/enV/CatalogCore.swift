@@ -224,15 +224,14 @@ extension Catalog {
 extension Catalog {
     /// Adds the native Song Metadata Analyzer when loading an older generated catalog.
     func includingSongMetadataAnalyzer() -> Catalog {
-        guard !tools.contains(where: { $0.id == "song-metadata-analyzer" }) else { return self }
         let tool = Tool(
             id: "song-metadata-analyzer",
-            name: "Song Metadata Analyzer",
-            slug: "song-metadata-analyzer",
-            description: "Analyze genre, tempo, key, mood, vocals and instruments. Batch songs and export reports.",
+            name: "AI Music Data Sandbox",
+            slug: "ai-music-data-sandbox",
+            description: "Organize, tag and prepare music for training, right on your device.",
             category: "audio",
             subcategory: "Music",
-            keywords: ["song", "music", "metadata", "analyzer", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"],
+            keywords: ["song", "music", "metadata", "sandbox", "dataset", "training", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"],
             tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "batch"],
             icon: "AudioLines",
             popularity: 9900,
@@ -245,19 +244,20 @@ extension Catalog {
             related: ["audio-file-inspector", "music-studio", "music-downloader"],
             engine: ToolEngine(type: "audio", id: "song-metadata-analyzer", op: "song-metadata-analyzer", configuration: [:])
         )
+        let updated = tools.filter { $0.id != "song-metadata-analyzer" && $0.id != "audio-analyze-studio" } + [tool]
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
             categories: categories,
-            tools: (tools + [tool]).sorted {
+            tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
                 let rightCategory = $1.category.lowercased()
                 return leftCategory == rightCategory
                     ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
                     : leftCategory < rightCategory
             },
-            relatedReferenceTools: relatedReferenceTools
+            relatedReferenceTools: relatedReferenceTools?.filter { $0.id != "audio-analyze-studio" && $0.id != "song-metadata-analyzer" }
         )
     }
 }
@@ -379,9 +379,15 @@ final class CatalogStore: ObservableObject {
         self.bundle = bundle
         self.catalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [], relatedReferenceTools: nil)
         self.loadState = catalog == nil ? .loading : .ready
-        self.favoriteIDs = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
-        self.recentIDs = Array(NSOrderedSet(array: UserDefaults.standard.stringArray(forKey: recentKey) ?? []).array.compactMap { $0 as? String }.prefix(24))
-        self.usageCounts = UserDefaults.standard.dictionary(forKey: usageKey)?.compactMapValues { $0 as? Int } ?? [:]
+        let canonical: (String) -> String = { $0 == "audio-analyze-studio" ? "song-metadata-analyzer" : $0 }
+        self.favoriteIDs = Set((UserDefaults.standard.stringArray(forKey: favoritesKey) ?? []).map(canonical))
+        self.recentIDs = Array(NSOrderedSet(array: (UserDefaults.standard.stringArray(forKey: recentKey) ?? []).map(canonical)).array.compactMap { $0 as? String }.prefix(24))
+        var counts = UserDefaults.standard.dictionary(forKey: usageKey)?.compactMapValues { $0 as? Int } ?? [:]
+        if let old = counts.removeValue(forKey: "audio-analyze-studio") { counts["song-metadata-analyzer", default: 0] += old }
+        self.usageCounts = counts
+        UserDefaults.standard.set(Array(favoriteIDs).sorted(), forKey: favoritesKey)
+        UserDefaults.standard.set(recentIDs, forKey: recentKey)
+        UserDefaults.standard.set(usageCounts, forKey: usageKey)
         if catalog == nil { reloadCatalog() }
     }
 

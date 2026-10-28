@@ -10,7 +10,8 @@ export const Route = createFileRoute("/favorites")({ component: Favorites });
 function Favorites() {
   const favorites = usePrefs((state) => state.favorites);
   const hydrated = usePrefs((state) => state.hydrated);
-  const tools = favorites.map(getToolById).filter((tool): tool is NonNullable<typeof tool> => Boolean(tool));
+  const tools = favorites.map(getToolById).filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
+    .filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index);
 
   return (
     <AppShell>

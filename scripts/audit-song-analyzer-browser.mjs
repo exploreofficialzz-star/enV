@@ -68,6 +68,20 @@ await writeFile(
 );
 const single = join(output, "trial_0001.wav");
 await writeFile(single, wav);
+const musicalSeconds = 12, musicalFrames = sampleRate * musicalSeconds;
+const musical = Buffer.alloc(44 + musicalFrames * 2);
+wav.copy(musical, 0, 0, 44);
+musical.writeUInt32LE(musical.length - 8, 4);
+musical.writeUInt32LE(musicalFrames * 2, 40);
+for (let i = 0; i < musicalFrames; i++) {
+  const t = i / sampleRate, pulse = (t % 0.5) < 0.025 ? Math.exp(-(t % 0.5) * 80) * 0.65 : 0;
+  const chord = [261.626, 329.628, 391.995].reduce((sum, hz) => sum + Math.sin(2 * Math.PI * hz * t), 0) * 0.09;
+  musical.writeInt16LE(Math.round(Math.max(-1, Math.min(1, chord + pulse)) * 24000), 44 + i * 2);
+}
+const musicalFile = join(output, "musical.wav");
+await writeFile(musicalFile, musical);
+const taggedFile = join(output, "tagged.zip");
+await writeFile(taggedFile, zipSync({ "tagged.wav": musical, "tagged.tags.json": strToU8(JSON.stringify({ id: "tagged", tempo_bpm: 97, key: "G minor" })) }));
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || "/usr/bin/chromium",
@@ -110,6 +124,7 @@ const waitUI = async () => {
       "Welcome must be below enV navigation",
     );
     assert.notEqual(placement.position, "fixed", "Welcome must remain in the page layout");
+    assert.equal(await page.locator("article > header h1").isVisible(), true, "The enV tool title remains visible above the home");
     assert.equal(
       await scope.locator(".ms-page-heading").isVisible(),
       false,
@@ -167,7 +182,12 @@ try {
   assert.equal(tracks[0].lyrics, lyrics);
   assert.equal(tracks[0].custom.custom_note, tags.custom_note);
   await scope.locator(".ms-record-row button").first().click();
-  await scope.getByText("Sound and descriptions", { exact: true }).click();
+  await scope.getByRole("button", { name: "Listen to recording" }).click();
+  assert.equal(await page.getByRole("dialog", { name: "Listen" }).locator("audio").count(), 1);
+  await page.getByRole("button", { name: "Close audio preview" }).click();
+  await scope.getByLabel("Edit", { exact: true }).selectOption("sound");
+  await scope.getByRole("button", { name: "Next", exact: true }).click();
+  await scope.getByRole("button", { name: "Next", exact: true }).click();
   await scope.getByLabel("Instruments", { exact: true }).fill("guitar, shaker,");
   await scope.getByLabel("Instruments", { exact: true }).pressSequentially(" piano");
   assert.equal(
@@ -176,6 +196,7 @@ try {
   );
   await page.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
   await scope.locator(".ms-splash").waitFor({ state: "visible" });
+  assert.ok((await scope.boundingBox()).width <= 430, "Full screen uses the mobile workspace regardless of view preference");
   await scope.getByRole("button", { name: "Enter sandbox" }).click();
   assert.equal(
     await scope.getByLabel("Instruments", { exact: true }).inputValue(),
@@ -190,14 +211,15 @@ try {
   );
   await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
   await scope.getByText("A few things need review").waitFor();
+  await scope.getByLabel("Edit", { exact: true }).selectOption("details");
   await scope.getByLabel("Display title", { exact: true }).fill("Evening groove");
   await scope.getByLabel("Record ID", { exact: true }).fill("reviewed_0001");
-  await scope.getByText("Advanced JSON", { exact: true }).click();
+  await scope.getByLabel("Edit", { exact: true }).selectOption("more");
   let edited = JSON.parse(await scope.getByLabel("Tags JSON", { exact: true }).inputValue());
   edited.custom_session = "round one";
   await scope.getByLabel("Tags JSON", { exact: true }).fill(JSON.stringify(edited, null, 2));
   await scope.getByRole("button", { name: "Apply JSON changes", exact: true }).click();
-  await scope.getByText("Permission and review", { exact: true }).click();
+  await scope.getByLabel("Edit", { exact: true }).selectOption("rights");
   await scope.getByLabel("Clearance status", { exact: true }).selectOption("cleared");
   await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
   await scope.locator(".ms-save-line").filter({ hasText: "Reviewed & saved" }).waitFor();
@@ -299,7 +321,7 @@ try {
     await page.getByRole("button", { name: "Save settings", exact: true }).click();
   }
   await scope.locator(".ms-record-row button").first().click();
-  await scope.getByText("Sound and descriptions", { exact: true }).click();
+  await scope.getByLabel("Edit", { exact: true }).selectOption("sound");
   await scope.getByLabel("Genre", { exact: true }).fill("Jazz");
   await page.locator('a[href="/"]').first().click();
   await page.waitForURL(base + "/");
@@ -309,6 +331,79 @@ try {
     (await readTracks()).some((t) => t.tags.genre === "Jazz"),
     "Navigation must save a pending draft before leaving",
   );
+  await scope.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("Folder name", { exact: true }).fill("Analysis test");
+  await page.getByRole("button", { name: "Save folder", exact: true }).click();
+  await importZip(musicalFile);
+  let analyzed = (await readTracks()).find((t) => t.tags.id === "musical");
+  assert.equal(analyzed.analysis?.status, "complete", "A real local worker must analyze playable audio");
+  assert.ok(analyzed.tags.tempo_bpm > 0 && analyzed.tags.key, "The worker supplies tempo and key estimates");
+  assert.equal(analyzed.provenance.tempo_bpm, "estimated");
+  assert.equal(typeof analyzed.analysis.rmsDbfs, "number");
+  await importZip(taggedFile);
+  analyzed = (await readTracks()).find((t) => t.tags.id === "tagged");
+  assert.equal(analyzed.tags.tempo_bpm, 97, "Analysis must preserve imported BPM");
+  assert.equal(analyzed.tags.key, "G minor", "Analysis must preserve an imported key");
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await phone.addInitScript(() => localStorage.setItem("env:view-mode", "desktop"));
+  const mobile = await phone.newPage();
+  await mobile.goto(base + "/tools/audio/ai-music-data-sandbox");
+  await mobile.locator(".ms-splash").waitFor({ timeout: 90000 });
+  await mobile.waitForFunction(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content")?.includes("width=1024"));
+  await mobile.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
+  await mobile.locator(".env-tool-fullscreen__exit").waitFor({ state: "visible" });
+  await mobile.waitForFunction(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content")?.includes("width=device-width"));
+  assert.equal(await mobile.evaluate(() => localStorage.getItem("env:view-mode")), "desktop", "Full screen must not change the saved view preference");
+  assert.equal(await mobile.evaluate(() => window.innerWidth), 390, "Full screen must use the device viewport even when desktop view is selected");
+  await mobile.getByRole("button", { name: "Enter sandbox" }).click();
+  await mobile.locator(".ms-page-heading").waitFor();
+  const noPanelScroll = async (label) => {
+    const dimensions = await mobile.locator(".ms-main").evaluate((element) => ({ visible: element.clientHeight, content: element.scrollHeight }));
+    assert.ok(dimensions.content <= dimensions.visible + 1, `${label} should fit in the phone screen: ${JSON.stringify(dimensions)}`);
+  };
+  await noPanelScroll("Library");
+  await mobile.getByRole("button", { name: "Blank record" }).click();
+  await mobile.locator(".ms-editor").waitFor();
+  for (const [section, pages] of [["details", 4], ["sound", 5], ["lyrics", 1], ["rights", 1], ["more", 1]]) {
+    await mobile.getByLabel("Edit", { exact: true }).selectOption(section);
+    for (let i = 0; i < pages; i++) {
+      await noPanelScroll(`${section} ${i + 1}`);
+      if (i + 1 < pages) await mobile.getByRole("button", { name: "Next", exact: true }).click();
+    }
+  }
+  await mobile.locator(".env-tool-fullscreen__exit").click();
+  await mobile.waitForFunction(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content")?.includes("width=1024"));
+  assert.equal(await mobile.evaluate(() => localStorage.getItem("env:view-mode")), "desktop");
+  await phone.close();
+  const regularPhone = await browser.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const normal = await regularPhone.newPage();
+  await normal.goto(base + "/tools/audio/ai-music-data-sandbox");
+  await normal.getByRole("button", { name: "Enter sandbox" }).click();
+  await normal.locator(".ms-page-heading").waitFor();
+  await normal.waitForFunction(() => {
+    const box = document.querySelector(".music-sandbox")?.getBoundingClientRect();
+    return box && box.top >= 55 && box.bottom <= innerHeight + 1;
+  });
+  await regularPhone.close();
+  const smallPhone = await browser.newContext({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
+  const small = await smallPhone.newPage();
+  await small.goto(base + "/tools/audio/ai-music-data-sandbox");
+  await small.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
+  await small.locator(".env-tool-fullscreen__exit").waitFor();
+  await small.getByRole("button", { name: "Enter sandbox" }).click();
+  await small.getByRole("button", { name: "Add music", exact: true }).click();
+  await small.getByLabel("Import music files", { exact: true }).setInputFiles(musicalFile);
+  await small.getByText(/records? imported as drafts/).waitFor({ timeout: 30000 });
+  await small.locator(".ms-record-row button").first().click();
+  for (const [section, pages] of [["details", 4], ["sound", 5], ["lyrics", 1], ["rights", 1], ["more", 1]]) {
+    await small.getByLabel("Edit", { exact: true }).selectOption(section);
+    for (let i = 0; i < pages; i++) {
+      const box = await small.locator(".ms-main").evaluate((element) => ({ visible: element.clientHeight, content: element.scrollHeight }));
+      assert.ok(box.content <= box.visible + 1, `320px audio editor ${section} ${i + 1} should fit: ${JSON.stringify(box)}`);
+      if (i + 1 < pages) await small.getByRole("button", { name: "Next", exact: true }).click();
+    }
+  }
+  await smallPhone.close();
   assert.deepEqual(unexpected, [], "Sandbox must never load inference models or upload audio");
   assert.deepEqual(errors, []);
   console.log(
@@ -319,6 +414,8 @@ try {
         checks: [
           "ZIP sidecars",
           "measured facts",
+          "local tempo, key and signal measurements",
+          "imported musical values preserved",
           "human review",
           "editable IDs and custom JSON",
           "refresh persistence",
@@ -330,6 +427,8 @@ try {
           "Unicode lyrics",
           "caption privacy",
           "light and dark layouts at 390/768/1440",
+          "screen-sized phone editor and full-screen viewport override",
+          "320px audio editor and listening preview",
           "accessibility",
           "no model requests or audio uploads",
         ],

@@ -51,6 +51,26 @@ class NativeSongMetadataAnalyzerTest {
     }
 
     @Test
+    fun sandboxImportsMatchingSidecarsWithTheirFolderPaths() {
+        val zip = makeZip(listOf(
+            "afro/track.wav" to byteArrayOf(1, 2, 3),
+            "afro/track.tags.json" to "{\"genre\":\"Afrobeats\"}".toByteArray(),
+            "afro/track.lyrics.txt" to "Ẹ káàrọ̀".toByteArray(),
+            "README.txt" to "ignored".toByteArray(),
+        ))
+        val entries = extractNativeSongZip(zip, includeSidecars = true)
+        assertEquals(listOf("afro/track.wav", "afro/track.tags.json", "afro/track.lyrics.txt"), entries.map { it.name })
+        assertArrayEquals("Ẹ káàrọ̀".toByteArray(), entries.last().bytes!!)
+    }
+
+    @Test
+    fun sandboxAcceptsAnEmptyLyricsSidecarInAStoredBackup() {
+        val zip = makeZip(listOf("music/song.wav" to byteArrayOf(1, 2, 3), "music/song.lyrics.txt" to byteArrayOf()))
+        val entries = extractNativeSongZip(zip, includeSidecars = true)
+        assertEquals(listOf("music/song.wav"), entries.map { it.name })
+    }
+
+    @Test
     fun rejectsTraversalPathsBeforeReturningEntries() {
         val zip = makeZip(listOf("../outside.mp3" to byteArrayOf(1, 2, 3)))
         assertThrows(IllegalArgumentException::class.java) { extractNativeSongZip(zip) }

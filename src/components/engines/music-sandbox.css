@@ -26,6 +26,7 @@
   overflow: hidden;
   min-height: 760px;
   text-align: left;
+  scroll-margin-top: 64px;
 }
 .music-sandbox *,
 .ms-modal * {
@@ -1347,21 +1348,9 @@
   }
 }
 
-/* The splash is the tool's home; enV navigation stays above it. */
-.env-music-sandbox-shell:has(.ms-splash) {
-  padding: 0;
-}
-.env-music-sandbox-shell:has(.ms-splash) > nav,
-.env-music-sandbox-shell:has(.ms-splash) > header {
-  display: none;
-}
-.env-music-sandbox-shell:has(.ms-splash) > .env-tool-interface {
-  margin-top: 0;
-}
+/* The welcome remains inside the standard enV tool page. */
 .music-sandbox:has(.ms-splash) {
   min-height: 0;
-  border: 0;
-  border-radius: 0;
 }
 
 .ms-editor-sections {
@@ -1391,3 +1380,115 @@
 .ms-section-content > .ms-section-heading:first-child {
   margin-top: 18px;
 }
+
+/* Compact workspace: pages keep the primary controls in view. */
+.ms-splash-artboard { width: min(100%, 320px, calc((100dvh - 340px) * 0.4621)); }
+.env-tool-fullscreen .ms-splash-artboard { width: min(100%, 390px, calc((100dvh - 80px) * 0.4621)); }
+.music-sandbox:not(:has(.ms-splash)) { min-height: 0; height: min(700px, calc(100dvh - 75px)); }
+.music-sandbox > div:not([hidden]) { height: 100%; display: flex; flex-direction: column; }
+.music-sandbox .ms-layout { flex: 1; min-height: 0; }
+.music-sandbox .ms-main { min-height: 0; overflow-y: auto; }
+.ms-header { padding: 12px 20px; }
+.ms-page-heading { margin-bottom: 12px; }
+.ms-page-heading h2 { margin: 3px 0; }
+.ms-page-heading p:last-child { line-height: 1.4; }
+.ms-dropzone { padding: 10px 14px; margin-bottom: 13px; flex-wrap: nowrap; }
+.ms-dropzone h3, .ms-dropzone p { margin: 0; }
+.ms-folder-section { margin-bottom: 12px; }
+.ms-section-title { margin-bottom: 5px; }
+.ms-folder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ms-folder-card { padding: 10px 12px; }
+.ms-folder-card-top svg:first-child { width: 19px; height: 19px; }
+.ms-folder-card strong { margin-top: 4px; }
+.ms-folder-card p, .ms-folder-card small { margin-top: 1px; }
+.ms-folder-empty { min-height: 65px; padding: 8px; flex-direction: row; }
+.ms-record-row > button { padding: 7px 0; }
+.ms-file-icon { width: 34px; height: 34px; }
+.ms-search { margin-bottom: 5px; }
+.ms-empty { padding: 10px; flex-direction: row; gap: 12px; text-align: left; }
+.ms-empty h3 { margin: 0; }
+.ms-empty p { display: none; }
+.ms-empty .ms-button { margin-left: auto; }
+.ms-capacity { margin: 0 0 8px; }
+.ms-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; color: var(--ms-muted); font-size: var(--text-xs); }
+.ms-pagination button { padding: 4px; border: 0; color: var(--ms-ink); background: none; }
+.ms-editor { min-height: 0; }
+.ms-editor-top { margin-bottom: 3px; }
+.ms-save-line { margin-bottom: 6px; }
+.ms-audio { height: 36px; margin: 0 0 8px; }
+.ms-editor-picker { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.ms-editor-picker label { font-size: var(--text-sm); color: var(--ms-muted); }
+.ms-editor-picker select { flex: 1; min-width: 0; height: 39px; padding: 4px 9px; border: 1px solid var(--ms-border); border-radius: 7px; color: var(--ms-ink); background: var(--ms-bg); }
+.ms-editor-page h3 { margin-bottom: 10px; }
+.ms-editor-page .ms-field { margin-bottom: 8px; gap: 3px; }
+.ms-editor-page .ms-field input, .ms-editor-page .ms-field select, .ms-editor-page .ms-field textarea { padding: 7px 9px; min-height: 36px; }
+.ms-editor-page .ms-check { margin-bottom: 7px; }
+.ms-editor-page textarea { resize: vertical; }
+.ms-editor-page .ms-analysis-note { font-size: var(--text-xs); margin-top: 5px; }
+.ms-analysis-metrics { display: flex; flex-wrap: wrap; gap: 5px 12px; font-size: var(--text-xs); color: var(--ms-muted); }
+.ms-editor-footer { margin-top: 12px; padding-top: 9px; }
+.ms-page-count { font-size: var(--text-xs); color: var(--ms-muted); white-space: nowrap; }
+.ms-review-issues { max-height: 140px; overflow-y: auto; margin: 8px 0; }
+@container music-sandbox (max-width:600px) {
+  .ms-header { padding: 8px 12px; }
+  .ms-sidebar { padding: 2px 8px; }
+  .ms-sidebar nav button { padding: 6px 3px; gap: 1px; }
+  .ms-sidebar nav button span { font-size: var(--text-xs); }
+  .music-sandbox .ms-main { padding: 12px; }
+  .ms-page-heading { margin-bottom: 8px; }
+  .ms-page-heading h2 { margin: 1px 0; font-size: var(--text-lg); }
+  .ms-dropzone { gap: 8px; padding: 9px; margin-bottom: 9px; }
+  .ms-dropzone > div:nth-child(2) { min-width: 0; }
+  .ms-dropzone > .ms-button { width: auto; margin: 0 0 0 auto; white-space: nowrap; }
+  .ms-upload-icon { width: 32px; height: 32px; }
+  .ms-folder-card { padding: 8px; }
+  .ms-folder-card p, .ms-folder-card small { display: none; }
+  .ms-folder-empty { min-height: 48px; }
+  .ms-record-row > button { padding: 5px 0; }
+  .ms-record-name small { white-space: nowrap; }
+  .ms-empty { padding: 8px; }
+  .ms-empty > svg { width: 20px; height: 20px; }
+  .ms-empty .ms-button { min-height: 34px; padding: 5px 8px; }
+  .music-sandbox.is-editing .ms-header, .music-sandbox.is-editing .ms-sidebar { display: none; }
+  .ms-editor-top h2 { font-size: var(--text-lg); }
+  .ms-editor-footer { flex-wrap: nowrap; gap: 4px; }
+  .ms-editor-footer > .ms-actions { gap: 4px; }
+  .ms-editor-footer .ms-button { padding: 7px 8px; }
+  .ms-lyrics-input { max-height: 130px; }
+  .ms-json-input { max-height: 180px; }
+}
+/* Full screen always presents the touch-first sandbox layout without changing enV preferences. */
+.env-tool-fullscreen__content:has(> .music-sandbox) { width: min(100%, 430px); padding: 0 10px 10px; }
+.env-tool-fullscreen .music-sandbox:not(:has(.ms-splash)) { height: calc(100dvh - var(--env-tool-fullscreen-toolbar-height) - 12px); }
+
+/* Keep the ordinary controls visible on shorter phones; long text remains editable. */
+@media (max-height: 680px) {
+  @container music-sandbox (max-width: 600px) {
+    .ms-brand { min-width: 0; flex: 1; }
+    .ms-brand > div { min-width: 0; }
+    .ms-brand strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ms-header { padding-block: 4px; }
+    .ms-sidebar nav button { padding-block: 4px; }
+    .ms-main { padding: 8px 12px !important; }
+    .ms-page-heading { margin-bottom: 4px; }
+    .ms-dropzone { padding: 6px 8px; margin-bottom: 4px; }
+    .ms-dropzone h3 { display: none; }
+    .ms-dropzone p { margin: 0; }
+    .ms-folder-section { margin-bottom: 4px; }
+    .ms-section-title { margin-bottom: 2px; }
+    .view-home .ms-records .ms-search,
+    .view-home .ms-records .ms-actions > button:last-child { display: none; }
+    .ms-editor-page .ms-field { margin-bottom: 5px; }
+    .ms-editor-page .ms-field textarea:not(.ms-lyrics-input):not(.ms-json-input) { height: 38px; min-height: 38px; }
+    .ms-editor-page .ms-rights-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ms-lyrics-input { max-height: 100px; }
+    .ms-json-input { max-height: 140px; }
+    .ms-editor-footer { margin-top: 6px; padding-top: 6px; }
+  }
+}
+.ms-editor-page-title { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.ms-editor-page-title h3 { margin: 0; }
+.ms-editor-page-title .ms-button { min-height: 32px; padding: 4px 9px; }
+.ms-measurements { color: var(--ms-muted); font-size: var(--text-xs); }
+.ms-measurements summary { cursor: pointer; padding: 3px 0; }
+.ms-preview-modal .ms-audio { margin: 0; }

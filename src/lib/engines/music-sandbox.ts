@@ -51,6 +51,19 @@ export interface SandboxAudio {
   channels: number | null;
   bitDepth: number | null;
 }
+export type SandboxAnalysis =
+  | {
+      status: "complete";
+      analyzedSeconds: number;
+      tempo: number | null;
+      key: string | null;
+      peakDbfs: number | null;
+      rmsDbfs: number | null;
+      clippedPercent: number;
+      silencePercent: number;
+      spectralCentroidHz: number | null;
+    }
+  | { status: "unavailable"; reason: string };
 export interface SandboxTrack {
   key: string;
   folderId: string;
@@ -63,8 +76,9 @@ export interface SandboxTrack {
   createdAt: string;
   updatedAt: string;
   audio: SandboxAudio | null;
+  analysis?: SandboxAnalysis;
   custom: Record<string, unknown>;
-  provenance: Record<string, "measured" | "imported" | "edited">;
+  provenance: Record<string, "measured" | "estimated" | "imported" | "edited">;
   notes: string;
 }
 export interface SandboxFolder {

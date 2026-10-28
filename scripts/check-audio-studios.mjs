@@ -52,7 +52,7 @@ assert.match(urlMedia, /YouTube Terms and applicable law/);
 assert.match(urlMedia, /I own this media or have permission to process it/);
 
 const audioEngine = fs.readFileSync(new URL("../src/components/engines/audio-engine.tsx", import.meta.url), "utf8");
-assert.match(audioEngine, /toolId === "audio-analyze-studio"\) return <MusicAnalyzerStudio \/>/, "Music Analyzer route must render the actual analyzer");
+assert.match(audioEngine, /toolId === "audio-analyze-studio"\) return <AiMusicDataSandbox \/>/, "The legacy audio analyzer route must open the sandbox");
 for (const operation of ["voice-noise-reducer", "voice-noise-gate", "audio-hum-reducer", "audio-trim-silence", "audio-lufs-meter", "audio-spectrogram", "volume-local", "resample-local", "channels-local"]) {
   assert.ok(audioEngine.includes(operation), `local processor route missing: ${operation}`);
 }
@@ -100,16 +100,17 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
     assert.ok(processor.toLowerCase().includes(marker.toLowerCase()), `native WAV processor is missing ${marker}`);
   }
 }
-const musicAnalyzer = fs.readFileSync(new URL("../src/components/engines/music-analyzer-studio.tsx", import.meta.url), "utf8");
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
-const songMetadataAnalyzer = fs.readFileSync(new URL("../src/components/engines/song-metadata-analyzer-engine.tsx", import.meta.url), "utf8");
+const toolEngine = fs.readFileSync(new URL("../src/components/tools/tool-engine.tsx", import.meta.url), "utf8");
 const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
 const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
 const musicAnalysisProfile = fs.readFileSync(new URL("../src/lib/media/music-analysis-profile.ts", import.meta.url), "utf8");
 const sandbox = fs.readFileSync(new URL("../src/components/engines/ai-music-data-sandbox.tsx", import.meta.url), "utf8");
 const sandboxFiles = fs.readFileSync(new URL("../src/lib/engines/music-sandbox-files.ts", import.meta.url), "utf8");
-assert.ok(musicAnalyzer.includes("AiMusicDataSandbox") && songMetadataAnalyzer.includes("AiMusicDataSandbox"), "Both analyzer bookmarks must open the persistent sandbox");
-for (const marker of ["loadSandbox", "writeSandbox", "importFiles", "exportSandboxZip", "MusicSandboxEditor"]) assert.ok(sandbox.includes(marker), `Sandbox workflow missing: ${marker}`);
+assert.ok(audioEngine.includes("AiMusicDataSandbox") && toolEngine.includes("AiMusicDataSandbox"), "Both analyzer bookmarks must open the persistent sandbox");
+for (const marker of ["loadSandbox", "writeSandbox", "importFiles", "exportSandboxZip", "MusicSandboxEditor", "analyzeSandboxAudio"]) assert.ok(sandbox.includes(marker), `Sandbox workflow missing: ${marker}`);
+const sandboxAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-sandbox-analysis.ts", import.meta.url), "utf8");
+for (const marker of ["MAX_DECODE_BYTES", "MAX_SAMPLE_SECONDS", "music-sandbox-audio.ts", "worker.terminate"]) assert.ok(sandboxAnalysis.includes(marker), `Bounded sandbox analysis missing: ${marker}`);
 for (const forbidden of ["decodeAudioData", "song-intelligence", "song-stem-separation", "runAiTask", "fetchAiAvailability", "@xenova", "createLocalSignalLayers"]) {
   assert.ok(!sandbox.includes(forbidden) && !sandboxFiles.includes(forbidden), `Heavy analysis must stay out of the sandbox import path: ${forbidden}`);
 }

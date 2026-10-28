@@ -12,7 +12,13 @@ class FavoritesStore(context: Context) {
     private val usageKey = "tool_use_counts"
     private val themeKey = "theme_mode"
 
-    fun getFavorites(): Set<String> = preferences.getStringSet(key, emptySet())?.toSet() ?: emptySet()
+    fun getFavorites(): Set<String> {
+        val stored = preferences.getStringSet(key, emptySet())?.toSet() ?: emptySet()
+        if ("audio-analyze-studio" !in stored) return stored
+        val migrated = stored - "audio-analyze-studio" + "song-metadata-analyzer"
+        preferences.edit().putStringSet(key, migrated).apply()
+        return migrated
+    }
 
     fun isFavorite(toolId: String): Boolean = toolId in getFavorites()
 
@@ -24,12 +30,13 @@ class FavoritesStore(context: Context) {
 
     fun getRecent(): List<String> = runCatching {
         val array = JSONArray(preferences.getString(recentKey, "[]") ?: "[]")
-        (0 until array.length()).map { array.optString(it) }.filter { it.isNotBlank() && it != "null" }.distinct().take(24)
+        (0 until array.length()).map { array.optString(it) }.filter { it.isNotBlank() && it != "null" }.map { if (it == "audio-analyze-studio") "song-metadata-analyzer" else it }.distinct().take(24)
     }.getOrDefault(emptyList())
 
     fun getMostUsed(limit: Int = 10): List<String> {
         val recent = getRecent()
         val counts = runCatching { JSONObject(preferences.getString(usageKey, "{}") ?: "{}") }.getOrElse { JSONObject() }
+        if (counts.has("audio-analyze-studio")) { counts.put("song-metadata-analyzer", counts.optInt("song-metadata-analyzer") + counts.optInt("audio-analyze-studio")); counts.remove("audio-analyze-studio") }
         val candidates = (recent + counts.keys().asSequence().toList()).distinct()
         val recency = recent.withIndex().associate { it.value to it.index }
         return candidates.sortedWith(

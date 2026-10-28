@@ -1302,7 +1302,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 @Composable
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
-    if (tool.id == "song-metadata-analyzer") { NativeSongMetadataAnalyzerScreen(); return }
+    if (tool.id == "song-metadata-analyzer") { NativeMusicDataSandboxScreen(); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "audio" -> if (tool.id == "music-live-video-studio") NativeMusicLiveVideoStudio() else NativeAudioToolForm(tool)

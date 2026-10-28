@@ -25,6 +25,7 @@ import { downloadBlob } from "@/lib/utils";
 import { usePrefs } from "@/lib/storage";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import { analyzeSandboxAudio, applySandboxAnalysis } from "@/lib/engines/music-sandbox-analysis";
 import { MusicSandboxEditor, SandboxField } from "./music-sandbox-editor";
 import {
   loadSandbox,
@@ -53,7 +54,6 @@ import {
   sandboxFolderPath,
   sandboxReady,
   sandboxSlug,
-  sandboxTags,
   uniqueSandboxId,
   type SandboxFolder,
   type SandboxTrack,
@@ -62,6 +62,7 @@ import {
 import "./music-sandbox.css";
 
 type View = "home" | "folders" | "drafts" | "ready" | "collection";
+const emptyTracks: SandboxTrack[] = [];
 const errorText = (e: unknown): string =>
   e instanceof Error
     ? e.name === "QuotaExceededError"
@@ -151,12 +152,14 @@ export function AiMusicDataSandbox() {
     [destination, setDestination] = useState(""),
     [newFolderName, setNewFolderName] = useState("My first collection");
   const [importErrors, setImportErrors] = useState<string[]>([]),
-    [pageSize, setPageSize] = useState(50),
+    [recordPage, setRecordPage] = useState(0),
+    [folderPage, setFolderPage] = useState(0),
     [selected, setSelected] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false),
     [wholeWorkspaceExport, setWholeWorkspaceExport] = useState(false),
     [exportKind, setExportKind] = useState<"master" | "training">("master");
   const controller = useRef<AbortController | null>(null);
+  const sandboxRoot = useRef<HTMLElement | null>(null);
   const operation = useRef(false),
     fileInput = useRef<HTMLInputElement>(null),
     directoryInput = useRef<HTMLInputElement>(null);
@@ -213,7 +216,7 @@ export function AiMusicDataSandbox() {
     return () => window.removeEventListener("focus", refresh);
   }, [editorId]);
   const folder = workspace?.folders.find((f) => f.key === folderId);
-  const tracks = workspace?.tracks || [];
+  const tracks = workspace?.tracks ?? emptyTracks;
   const folders = useMemo(
     () =>
       [...(workspace?.folders || [])].sort((a, b) =>
@@ -246,10 +249,13 @@ export function AiMusicDataSandbox() {
   const exportTracks = wholeWorkspaceExport
     ? tracks
     : filtered.filter((t) => !selected.size || selected.has(t.key));
+  const visibleFolders = folders.filter((f) => f.parentId === (view === "collection" ? folderId : null));
+  const recordPageSize = view === "home" || view === "collection" ? 2 : 4;
   function navigate(next: View, id = "") {
     setView(next);
     setFolderId(id);
-    setPageSize(50);
+    setRecordPage(0);
+    setFolderPage(0);
     setQuery("");
     setSelected(new Set());
     setError("");
@@ -460,6 +466,8 @@ export function AiMusicDataSandbox() {
               track.tags.duration_seconds = facts.duration;
               track.provenance.duration_seconds = "measured";
             }
+            setBusy(`Analyzing ${i + 1} of ${groups.length} · ${group.name}`);
+            track = applySandboxAnalysis(track, await analyzeSandboxAudio(blob, facts.audio, facts.duration, signal));
             operations.push({ store: "audio", value: { key: track.key, blob } });
           }
           signal.throwIfAborted();
@@ -517,19 +525,26 @@ export function AiMusicDataSandbox() {
         audio: facts.audio,
         reviewed: false,
         updatedAt: new Date().toISOString(),
-        tags: { ...track.tags, duration_seconds: facts.duration },
+        tags: {
+          ...track.tags,
+          duration_seconds: facts.duration,
+          tempo_bpm: track.provenance.tempo_bpm === "estimated" ? null : track.tags.tempo_bpm,
+          key: track.provenance.key === "estimated" ? "" : track.tags.key,
+        },
         provenance: { ...track.provenance, duration_seconds: "measured" },
       };
+      if (facts.duration === null) delete next.provenance.duration_seconds;
+      const analyzed = applySandboxAnalysis(next, await analyzeSandboxAudio(file, facts.audio, facts.duration, control.signal));
       control.signal.throwIfAborted();
       await writeSandbox([
         { store: "audio", value: { key: track.key, blob: file } },
-        { store: "tracks", value: next },
+        { store: "tracks", value: analyzed },
       ]);
       apply({
         ...current.current!,
-        tracks: current.current!.tracks.map((t) => (t.key === next.key ? next : t)),
+        tracks: current.current!.tracks.map((t) => (t.key === analyzed.key ? analyzed : t)),
       });
-      return next;
+      return analyzed;
     } finally {
       operation.current = false;
       setBusy("");
@@ -583,8 +598,12 @@ export function AiMusicDataSandbox() {
   }
   const editing = workspace?.tracks.find((t) => t.key === editorId);
   return (
-    <section className="music-sandbox" aria-label="AI Music Data Sandbox">
-      {splash ? <SandboxSplash onEnter={() => setSplash(false)} /> : null}
+    <section ref={sandboxRoot} className={`music-sandbox view-${view}${editing && !splash ? " is-editing" : ""}`} aria-label="AI Music Data Sandbox">
+      {splash ? <SandboxSplash onEnter={() => {
+        setSplash(false);
+        if (!sandboxRoot.current?.closest(".env-tool-fullscreen"))
+          requestAnimationFrame(() => sandboxRoot.current?.scrollIntoView({ block: "start" }));
+      }} /> : null}
       <div hidden={splash}>
         {!ready && !error ? (
           <div className="ms-loading">
@@ -597,7 +616,6 @@ export function AiMusicDataSandbox() {
               <div className="ms-brand">
                 <Logo size="search" />
                 <div>
-                  <p className="ms-eyebrow">enV workspace</p>
                   <strong>
                     AI Music Data Sandbox<span>.</span>
                   </strong>
@@ -686,13 +704,13 @@ export function AiMusicDataSandbox() {
                     {error}
                   </p>
                 ) : null}
-                {notice ? (
+                {notice && !editing ? (
                   <p className="ms-notice" role="status">
                     <Check size={16} />
                     {notice}
                   </p>
                 ) : null}
-                {importErrors.length ? (
+                {importErrors.length && !editing ? (
                   <details className="ms-import-report" open>
                     <summary>Import report · {importErrors.length} notices</summary>
                     <ul>
@@ -728,33 +746,19 @@ export function AiMusicDataSandbox() {
                   <>
                     <div className="ms-page-heading">
                       <div>
-                        <p className="ms-eyebrow">
-                          {view === "collection"
-                            ? sandboxFolderPath(folder, folders)
-                            : workspace.settings.name}
-                        </p>
+                        {view === "collection" ? <p className="ms-eyebrow">{sandboxFolderPath(folder, folders)}</p> : null}
                         <h2>
                           {
                             {
-                              home: "A home for your music data.",
-                              folders: "Your folders",
-                              drafts: "Pick up where you left off.",
-                              ready: "Ready for the next step.",
+                              home: "Music library",
+                              folders: "Folders",
+                              drafts: "Drafts",
+                              ready: "Ready",
                               collection: folder?.name || "Collection",
                             }[view]
                           }
                         </h2>
-                        <p>
-                          {view === "home"
-                            ? "Collect, describe, and prepare. One good record at a time."
-                            : view === "drafts"
-                              ? "Every unfinished record stays here until you review it."
-                              : view === "ready"
-                                ? "Reviewed records with permissions recorded."
-                                : view === "collection"
-                                  ? `${filtered.length} records · Add more whenever you’re ready.`
-                                  : "Organize by genre, style, project, or a structure of your own."}
-                        </p>
+                        <p>{view === "collection" ? `${filtered.length} songs` : `${tracks.length} songs · ${draftCount} drafts`}</p>
                       </div>
                       {view === "collection" && folder ? (
                         <button
@@ -767,24 +771,6 @@ export function AiMusicDataSandbox() {
                         </button>
                       ) : null}
                     </div>
-                    {view === "home" ? (
-                      <div className="ms-stats">
-                        {[
-                          ["Records", tracks.length, FileAudio],
-                          ["In draft", draftCount, FilePenLine],
-                          ["Ready", readyCount, Check],
-                        ].map(([label, count, Icon]) => {
-                          const ItemIcon = Icon as typeof FileAudio;
-                          return (
-                            <div key={String(label)}>
-                              <ItemIcon size={17} />
-                              <strong>{String(count)}</strong>
-                              <span>{String(label)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
                     {view === "home" || view === "collection" ? (
                       <div
                         className="ms-dropzone"
@@ -809,11 +795,8 @@ export function AiMusicDataSandbox() {
                           <Upload size={23} />
                         </div>
                         <div>
-                          <h3>Good datasets start here.</h3>
-                          <p>Drop songs or a ZIP. Keep adding to the same folder.</p>
-                          <small>
-                            MP3, WAV, FLAC + more · 40 MB per file · 50 songs per import
-                          </small>
+                          <h3>Add your music</h3>
+                          <p>Songs or ZIP files</p>
                         </div>
                         <button
                           className="ms-button ms-primary"
@@ -848,11 +831,7 @@ export function AiMusicDataSandbox() {
                           <h3>
                             {view === "collection" ? "Subfolders" : "Folders"}{" "}
                             <span>
-                              {
-                                folders.filter(
-                                  (f) => f.parentId === (view === "collection" ? folderId : null),
-                                ).length
-                              }
+                              {visibleFolders.length}
                             </span>
                           </h3>
                           <button
@@ -864,8 +843,8 @@ export function AiMusicDataSandbox() {
                           </button>
                         </div>
                         <div className="ms-folder-grid">
-                          {folders
-                            .filter((f) => f.parentId === (view === "collection" ? folderId : null))
+                          {visibleFolders
+                            .slice(folderPage * 2, folderPage * 2 + 2)
                             .map((f) => {
                               const ids = sandboxDescendants(f.key, folders),
                                 count = tracks.filter((t) => ids.has(t.folderId)).length;
@@ -881,8 +860,7 @@ export function AiMusicDataSandbox() {
                                   </div>
                                   <strong>{f.name}</strong>
                                   <p>
-                                    {f.genre || "Custom collection"}
-                                    {f.subStyle ? ` · ${f.subStyle}` : ""}
+                                    {f.genre || "Collection"}{f.subStyle ? ` · ${f.subStyle}` : ""}
                                   </p>
                                   <small>
                                     {count} records <span>·</span> {f.maxSongs} max
@@ -890,18 +868,12 @@ export function AiMusicDataSandbox() {
                                 </button>
                               );
                             })}
-                          {!folders.some(
-                            (f) => f.parentId === (view === "collection" ? folderId : null),
-                          ) ? (
-                            <button className="ms-folder-empty" onClick={() => openFolderDialog()}>
-                              <FolderPlus size={23} />
-                              <strong>
-                                Create a {view === "collection" ? "subfolder" : "folder"}
-                              </strong>
-                              <span>Your structure, any genre.</span>
-                            </button>
-                          ) : null}
                         </div>
+                        {visibleFolders.length > 2 ? <div className="ms-pagination" aria-label="Folder pages">
+                          <button type="button" disabled={folderPage === 0} onClick={() => setFolderPage((p) => p - 1)}>Previous</button>
+                          <span>{folderPage + 1} / {Math.ceil(visibleFolders.length / 2)}</span>
+                          <button type="button" disabled={(folderPage + 1) * 2 >= visibleFolders.length} onClick={() => setFolderPage((p) => p + 1)}>Next</button>
+                        </div> : null}
                       </section>
                     ) : null}
                     {view !== "folders" ? (
@@ -942,11 +914,11 @@ export function AiMusicDataSandbox() {
                           <Search size={16} />
                           <input
                             aria-label="Search records"
-                            placeholder="Search records, genres, languages…"
+                            placeholder="Search songs"
                             value={query}
                             onChange={(e) => {
                               setQuery(e.target.value);
-                              setPageSize(50);
+                              setRecordPage(0);
                               setSelected(new Set());
                             }}
                           />
@@ -955,7 +927,7 @@ export function AiMusicDataSandbox() {
                           <div className="ms-record-list">
                             {filtered
                               .filter((t) => view !== "home" || !sandboxReady(t))
-                              .slice(0, view === "home" ? 6 : pageSize)
+                              .slice(recordPage * recordPageSize, (recordPage + 1) * recordPageSize)
                               .map((t) => (
                                 <div className="ms-record-row" key={t.key}>
                                   <input
@@ -1010,44 +982,23 @@ export function AiMusicDataSandbox() {
                               {query
                                 ? "No matching records"
                                 : view === "ready"
-                                  ? "Your reviewed records will live here."
-                                  : "Space for your next idea."}
+                                  ? "No ready songs"
+                                  : "No songs yet"}
                             </h3>
                             <p>
                               {query
                                 ? "Try another title, genre, or language."
-                                : "Add a song, import a collection, or start with lyrics. Drafts save as you work."}
+                                : "Add music or create a record."}
                             </p>
-                            <button
-                              className="ms-button"
-                              disabled={!!busy}
-                              onClick={() => void addRecord()}
-                            >
-                              Create a record <ArrowRight size={14} />
-                            </button>
                           </div>
                         )}
-                        {view !== "home" && filtered.length > pageSize ? (
-                          <button
-                            className="ms-button ms-load-more"
-                            onClick={() => setPageSize((n) => n + 50)}
-                          >
-                            Show more records ({filtered.length - pageSize} remaining)
-                          </button>
-                        ) : null}
+                        {filtered.length > recordPageSize ? <div className="ms-pagination" aria-label="Song pages">
+                          <button type="button" disabled={recordPage === 0} onClick={() => setRecordPage((p) => p - 1)}>Previous</button>
+                          <span>{recordPage + 1} / {Math.ceil(filtered.length / recordPageSize)}</span>
+                          <button type="button" disabled={(recordPage + 1) * recordPageSize >= filtered.length} onClick={() => setRecordPage((p) => p + 1)}>Next</button>
+                        </div> : null}
                       </section>
                     ) : null}
-                    <footer className="ms-workflow-note">
-                      <Headset size={16} />
-                      <p>
-                        File facts, measured. Musical details, human reviewed.
-                        <br />
-                        <span>
-                          Your audio stays on this device. Export backups before clearing browser
-                          data.
-                        </span>
-                      </p>
-                    </footer>
                   </>
                 )}
               </div>

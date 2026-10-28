@@ -26,7 +26,7 @@ function Home() {
     () => rankMostUsedToolIds(recent, usageCounts, 10).flatMap((id) => {
       const tool = getToolById(id);
       return tool ? [tool] : [];
-    }),
+    }).filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index),
     [recent, usageCounts],
   );
 

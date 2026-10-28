@@ -7,6 +7,7 @@ import UIKit
 import WebKit
 import CoreText
 import CoreImage
+import CoreFoundation
 import UniformTypeIdentifiers
 import Compression
 
@@ -2623,10 +2624,6 @@ struct NativeSongAnalysisTrack: Identifiable {
     let id = UUID()
     let filename: String
     let data: Data
-    var status = "Queued"
-    var report: [String: Any]?
-    var backendJobID: String?
-    var error: String?
 }
 
 private struct NativeSongAnalysisScan {
@@ -2715,628 +2712,9 @@ private struct NativeSongAnalysisDocument: FileDocument {
     }
 }
 
-private struct NativeSongAnnotationField: Identifiable {
-    let key: String
-    let label: String
-    let placeholder: String
-    var id: String { key }
-}
-
-private struct NativeSongMetadataAnalyzerView: View {
-    let title: String
-    @State private var tracks: [NativeSongAnalysisTrack] = []
-    @State private var selectedID: UUID?
-    @State private var showImporter = false
-    @State private var showExporter = false
-    @State private var document = NativeSongAnalysisDocument(data: Data())
-    @State private var exportKind = "json"
-    @State private var fullAnalysis = false
-    @State private var busy = false
-    @State private var progress = 0
-    @State private var notice = ""
-    @State private var error: String?
-    @State private var currentTask: Task<Void, Never>?
-    @State private var stemPlayer: AVPlayer?
-    @State private var annotationDrafts: [String: String] = [:]
-
-    private let maxTracks = 50
-    private let maxTrackBytes = 20 * 1024 * 1024
-    private let maxBatchBytes = 60 * 1024 * 1024
-
-    private let datasetAnnotationFields: [NativeSongAnnotationField] = [
-        .init(key: "genre", label: "Genre", placeholder: "Afrobeats, R&B"),
-        .init(key: "sub_style", label: "Sub-style", placeholder: "Afro-pop, Amapiano"),
-        .init(key: "style_influences", label: "Style influences", placeholder: "Highlife, dancehall, soul"),
-        .init(key: "language", label: "Language", placeholder: "Nigerian Pidgin, Yoruba"),
-        .init(key: "energy", label: "Energy", placeholder: "Low, medium, high"),
-        .init(key: "mood", label: "Mood", placeholder: "Celebratory, soulful"),
-        .init(key: "source_role", label: "Audio part / stem role", placeholder: "Full mix, vocals, drums, bass"),
-        .init(key: "vocals", label: "Vocal content", placeholder: "Lead vocal, backing vocals, ad-libs"),
-        .init(key: "vocal_delivery", label: "Vocal delivery", placeholder: "Melodic singing, rap, chant"),
-        .init(key: "vocal_register", label: "Vocal pitch / register", placeholder: "High/low pitch, soprano, alto, tenor"),
-        .init(key: "vocal_harmony", label: "Vocal harmony", placeholder: "Doubles, thirds, call-and-response"),
-        .init(key: "performance_technique", label: "Performance techniques", placeholder: "Vibrato, falsetto, melisma"),
-        .init(key: "instruments", label: "Instruments", placeholder: "Log drum, shakers, synth bass"),
-        .init(key: "themes", label: "Themes", placeholder: "Love, celebration"),
-        .init(key: "listening_scene", label: "Listening scene", placeholder: "Club, road trip"),
-        .init(key: "production_traits", label: "Production traits", placeholder: "Reverb, saturation, sidechain"),
-        .init(key: "arrangement", label: "Arrangement", placeholder: "Intro build, drum drop, break")
-    ]
-
-    private var analyzedCount: Int { tracks.filter { $0.report != nil }.count }
-    private var selectedTrack: NativeSongAnalysisTrack? {
-        tracks.first(where: { $0.id == selectedID }) ?? tracks.first(where: { $0.report != nil }) ?? tracks.first
-    }
-    private var exportType: UTType {
-        exportKind == "csv" ? .commaSeparatedText : exportKind == "zip" ? .zip : .json
-    }
-    private var exportFilename: String {
-        exportKind == "csv" ? "song-analysis.csv" : exportKind == "zip" ? "song-analysis-report" : "song-analysis.json"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Image(systemName: "waveform.path").font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(Color.cyan)
-                    .frame(width: 46, height: 46)
-                    .background(Color.cyan.opacity(0.12), in: RoundedRectangle(cornerRadius: 13))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.title3.weight(.semibold))
-                    Text("Understand the sound behind each track.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-
-            VStack(alignment: .leading, spacing: 12) {
-                Button { showImporter = true } label: {
-                    Label("Choose songs or ZIP", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(busy)
-
-                HStack(spacing: 8) {
-                    modeChip("Quick Scan", selected: !fullAnalysis) { fullAnalysis = false }
-                    modeChip("Full Analysis", selected: fullAnalysis) { fullAnalysis = true }
-                }
-
-                if fullAnalysis {
-                    Text("Measurements run on this device. Speech and sound recognition use the backend when available; audio is uploaded for that stage.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-
-                Button { startBatch() } label: {
-                    HStack(spacing: 8) {
-                        if busy { ProgressView().tint(.white) }
-                        else { Image(systemName: fullAnalysis ? "sparkles" : "waveform") }
-                        Text(busy ? "Analyzing… \(progress)%" : fullAnalysis ? "Analyze songs" : "Scan songs")
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(tracks.isEmpty || busy)
-
-                if busy {
-                    Button {
-                        currentTask?.cancel()
-                        notice = "Stopping… completed results are kept."
-                    } label: {
-                        Label("Stop", systemImage: "pause.circle")
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                    }
-                    .buttonStyle(.bordered)
-                }
-                if let error { Text(error).font(.caption).foregroundStyle(.red) }
-                if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(.secondary) }
-                Text("Results show where processing happened.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            .padding(15)
-            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Batch results").font(.headline)
-                    Spacer()
-                    Text("\(analyzedCount) of \(tracks.count)").font(.caption).foregroundStyle(.secondary)
-                }
-                if tracks.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "music.note.list").font(.title2).foregroundStyle(.secondary)
-                        Text("No songs yet").font(.subheadline.weight(.medium))
-                        Text("Add audio files or a ZIP collection.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 110)
-                } else {
-                    ForEach(tracks) { track in
-                        HStack(spacing: 9) {
-                            Image(systemName: track.report == nil ? "waveform" : "checkmark.circle.fill")
-                                .foregroundStyle(track.report == nil ? Color.secondary : Color.green)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(track.filename).font(.caption.weight(.medium)).lineLimit(1)
-                                Text(track.error ?? track.status).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                            }
-                            Spacer(minLength: 0)
-                            Button(selectedID == track.id ? "Selected" : "View") { selectedID = track.id }
-                                .font(.caption.weight(.medium)).buttonStyle(.bordered).controlSize(.small).disabled(busy)
-                            if !busy {
-                                Button {
-                                    tracks.removeAll { $0.id == track.id }
-                                    if selectedID == track.id { selectedID = nil }
-                                } label: {
-                                    Image(systemName: "xmark.circle").foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Remove \(track.filename)")
-                            }
-                        }
-                        .padding(10)
-                        .background(selectedID == track.id ? Color.cyan.opacity(0.08) : Color.secondary.opacity(0.04),
-                                    in: RoundedRectangle(cornerRadius: 10))
-                    }
-                    if analyzedCount > 0 {
-                        HStack(spacing: 8) {
-                            Button("JSON") { prepareExport("json") }.buttonStyle(.bordered)
-                            Button("CSV") { prepareExport("csv") }.buttonStyle(.bordered)
-                            Button("ZIP report") { prepareExport("zip") }.buttonStyle(.borderedProminent)
-                        }
-                    }
-                    Text("Up to 50 tracks · 20 MB each · 60 MB per batch")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            .padding(15)
-            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-
-            if let report = selectedTrack?.report {
-                VStack(alignment: .leading, spacing: 12) {
-                    let identity = report["identity"] as? [String: Any] ?? [:]
-                    Text(nativeSongString(identity["title"], fallback: selectedTrack?.filename ?? "Song"))
-                        .font(.headline)
-                    Text(nativeSongString(identity["artist"], fallback: "Unknown artist"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]), let text = String(data: data, encoding: .utf8) { songCopy("track analysis", text) }
-                    Button("Separate sounds") { separateSelected() }.buttonStyle(.bordered).disabled(busy)
-                    if let backend = report["backend_model"] as? [String: Any] { backendDetails(backend, jobID: selectedTrack?.backendJobID) }
-                    HStack(spacing: 16) {
-                        metric("Tempo", nativeSongString(report["tempo_bpm"], fallback: "—") == "—" ? "—" : "\(nativeSongString(report["tempo_bpm"])) BPM")
-                        metric("Key", nativeSongString(report["key"], fallback: "—"))
-                        metric("Energy", nativeSongString(report["energy"], fallback: "—"))
-                    }
-                    nativeSongTags("STYLE", [nativeSongString(report["genre"]), nativeSongString(report["sub_style"])] + nativeSongStrings(report["language"]))
-                    nativeSongTags("MOOD", nativeSongStrings(report["mood"]))
-                    nativeSongTags("THEMES", nativeSongStrings(report["theme"]))
-                    nativeSongTags("VOCALS", nativeSongStrings(report["vocals"]))
-                    nativeSongTags("INSTRUMENTS", nativeSongStrings(report["instruments"]))
-                    nativeSongTags("DESCRIPTIONS", nativeSongStrings(report["descriptions"]))
-                    if let dataset = report["dataset_analysis"] as? [String: Any] {
-                        let pitch = dataset["pitch"] as? [String: Any] ?? [:]
-                        let tonality = dataset["tonality"] as? [String: Any] ?? [:]
-                        let rhythm = dataset["rhythm"] as? [String: Any] ?? [:]
-                        let timbre = dataset["timbre"] as? [String: Any] ?? [:]
-                        let structure = dataset["structure"] as? [String: Any] ?? [:]
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Local DSP findings").font(.subheadline.weight(.semibold))
-                            Text("Pitch span: \(nativeSongString(pitch["lowest_detected_note"], fallback: "—"))–\(nativeSongString(pitch["highest_detected_note"], fallback: "—"))")
-                                .font(.caption)
-                            Text("Tempo estimate: \(nativeSongString(rhythm["tempo_bpm"], fallback: "—")) BPM · Chord windows: \((tonality["chord_estimates"] as? [[String: Any]] ?? []).count)")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text("Mean spectral centroid: \(nativeSongString(timbre["mean_spectral_centroid_hz"], fallback: "—")) Hz · Feature changes: \((structure["change_points"] as? [[String: Any]] ?? []).count)")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text("These are estimates from the full mix, not verified vocal-only notes. Generic section cuts are not confirmed verse/chorus labels.")
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text("Human-reviewed training labels").font(.subheadline.weight(.semibold))
-                            Text("Add tags by listening and reviewing the recording. These are annotations, not automatic genre or language classifications.")
-                                .font(.caption).foregroundStyle(.secondary)
-                            ForEach(datasetAnnotationFields) { field in
-                                TextField(field.label, text: Binding(
-                                    get: { selectedDatasetAnnotationText(key: field.key) },
-                                    set: { updateSelectedDatasetAnnotation(key: field.key, value: $0) }
-                                ), prompt: Text(field.placeholder))
-                                .textFieldStyle(.roundedBorder)
-                            }
-                            TextField("Annotation notes", text: Binding(
-                                get: { selectedDatasetAnnotationText(key: "notes") },
-                                set: { updateSelectedDatasetAnnotation(key: "notes", value: $0) }
-                            ), prompt: Text("Parts to preserve, uncertainty, review notes"))
-                            .textFieldStyle(.roundedBorder)
-                            TextField("Reviewer initials / team ID", text: Binding(
-                                get: { selectedDatasetAnnotationText(key: "reviewer") },
-                                set: { updateSelectedDatasetAnnotation(key: "reviewer", value: $0) }
-                            ), prompt: Text("Who reviewed the tags"))
-                            .textFieldStyle(.roundedBorder)
-                            Toggle("Reviewed for training use", isOn: Binding(
-                                get: { selectedDatasetAnnotationsReviewed() },
-                                set: { setSelectedDatasetReviewed($0) }
-                            ))
-                            .font(.caption)
-                        }
-                        .padding(12)
-                        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    let warnings = nativeSongStrings(report["warnings"])
-                    if !warnings.isEmpty {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Notes").font(.caption.weight(.semibold))
-                            ForEach(Array(warnings.prefix(5)), id: \.self) { warning in
-                                Text("• \(warning)").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                .padding(15)
-                .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.audio, .zip], allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls): Task { await importFiles(urls) }
-            case .failure(let failure): error = failure.localizedDescription
-            }
-        }
-        .fileExporter(isPresented: $showExporter, document: document, contentType: exportType, defaultFilename: exportFilename) { result in
-            if case .failure(let failure) = result { error = failure.localizedDescription }
-        }
-        .onDisappear { stemPlayer?.pause() }
-
-    }
-
-    private func selectedDatasetAnnotationText(key: String) -> String {
-        if let selectedID, let draft = annotationDrafts["\(selectedID.uuidString):\(key)"] { return draft }
-        guard let report = selectedTrack?.report,
-              let dataset = report["dataset_analysis"] as? [String: Any],
-              let annotations = dataset["annotations"] as? [String: Any] else { return "" }
-        if let values = annotations[key] as? [String] { return values.joined(separator: ", ") }
-        return nativeSongString(annotations[key])
-    }
-
-    private func selectedDatasetAnnotationsReviewed() -> Bool {
-        guard let report = selectedTrack?.report,
-              let dataset = report["dataset_analysis"] as? [String: Any],
-              let annotations = dataset["annotations"] as? [String: Any] else { return false }
-        return annotations["reviewed"] as? Bool == true
-    }
-
-    private func updateSelectedDatasetAnnotation(key: String, value: String) {
-        guard let selectedID,
-              let index = tracks.firstIndex(where: { $0.id == selectedID }),
-              var report = tracks[index].report,
-              var dataset = report["dataset_analysis"] as? [String: Any],
-              var annotations = dataset["annotations"] as? [String: Any] else { return }
-        annotationDrafts["\(selectedID.uuidString):\(key)"] = value
-        if key == "notes" {
-            annotations[key] = String(value.prefix(4_000))
-        } else if key == "reviewer" {
-            annotations[key] = String(value.prefix(100))
-        } else {
-            let tags = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(80)
-            let list = Array(tags)
-            annotations[key] = list
-            switch key {
-            case "genre": report["genre"] = list.first as Any? ?? NSNull()
-            case "sub_style": report["sub_style"] = list.first as Any? ?? NSNull()
-            case "language", "mood", "vocals", "instruments": report[key] = list
-            case "themes": report["theme"] = list
-            case "listening_scene": report["setting"] = list
-            default: break
-            }
-        }
-        annotations["reviewed"] = false
-        dataset["annotations"] = annotations
-        report["dataset_analysis"] = dataset
-        var analysis = report["analysis"] as? [String: Any] ?? [:]
-        analysis["status"] = "full_local_needs_review"
-        report["analysis"] = analysis
-        tracks[index].report = report
-        tracks[index].status = "Partial"
-    }
-
-    private func setSelectedDatasetReviewed(_ reviewed: Bool) {
-        guard let selectedID,
-              let index = tracks.firstIndex(where: { $0.id == selectedID }),
-              var report = tracks[index].report,
-              var dataset = report["dataset_analysis"] as? [String: Any],
-              var annotations = dataset["annotations"] as? [String: Any] else { return }
-        annotations["reviewed"] = reviewed
-        dataset["annotations"] = annotations
-        report["dataset_analysis"] = dataset
-        var analysis = report["analysis"] as? [String: Any] ?? [:]
-        analysis["status"] = reviewed ? "full_local_reviewed" : "full_local_needs_review"
-        report["analysis"] = analysis
-        tracks[index].report = report
-        tracks[index].status = reviewed ? "Done" : "Partial"
-    }
-
-    private func modeChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label).font(.caption.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 36)
-                .background(selected ? Color.cyan.opacity(0.16) : Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9).stroke(selected ? Color.cyan.opacity(0.6) : Color.clear, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .disabled(busy)
-    }
-
-    private func metric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.subheadline.weight(.semibold)).lineLimit(1)
-            songCopy(label.lowercased(), value == "—" ? "" : value)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func nativeSongTags(_ heading: String, _ values: [String]) -> some View {
-        let actual = values.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && $0 != "unknown" && $0 != "null" }
-        return Group {
-            if !actual.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(heading).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    Text(actual.joined(separator: " · ")).font(.subheadline)
-                    songCopy(heading.lowercased(), actual.joined(separator: ", "))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    private func songCopy(_ label: String, _ value: String) -> some View {
-        Button { UIPasteboard.general.string = value } label: { Label("Copy", systemImage: "doc.on.doc").font(.caption) }
-            .buttonStyle(.borderless).disabled(value.isEmpty).accessibilityLabel("Copy \(label)")
-    }
-
-    @ViewBuilder private func backendDetails(_ result: [String: Any], jobID: String?) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text("Backend audio results").font(.subheadline.weight(.semibold))
-            Text("Audio is processed on the server and expires after one hour. Review sound labels and lyrics.").font(.caption).foregroundStyle(.secondary)
-            let candidates = result["candidates"] as? [String: [[String: Any]]] ?? [:]
-            ForEach(["genre", "mood", "instruments", "vocals"], id: \.self) { field in
-                let labels = (candidates[field] ?? []).compactMap { $0["label"] as? String }
-                if !labels.isEmpty {
-                    nativeSongTags(field.uppercased(), labels)
-                    Button("Use \(field) as draft") { updateSelectedDatasetAnnotation(key: field, value: labels.joined(separator: ", ")) }.font(.caption).buttonStyle(.bordered)
-                }
-            }
-            let lyrics = result["lyrics"] as? [String: Any] ?? [:]
-            let segments = lyrics["segments"] as? [[String: Any]] ?? []
-            let transcript = segments.compactMap { $0["text"] as? String }.joined(separator: " ")
-            if lyrics["status"] as? String == "candidate_transcript" {
-                Text("Speech & lyrics").font(.subheadline.weight(.semibold))
-                Text(transcript.isEmpty ? "No transcript produced." : transcript).font(.caption)
-                songCopy("transcript", transcript)
-                Text(lyrics["source"] as? String == "vocal_stem" ? "From the estimated vocal stem." : "From the full mix.").font(.caption2).foregroundStyle(.secondary)
-            }
-            let stems = result["stem_analysis"] as? [[String: Any]] ?? []
-            ForEach(Array(stems.enumerated()), id: \.offset) { _, stem in
-                let groups = stem["candidates"] as? [String: [[String: Any]]] ?? [:]
-                nativeSongTags("\((stem["stem"] as? String ?? "stem").uppercased()) SOUNDS", (groups["instruments"] ?? []).compactMap { $0["label"] as? String })
-            }
-            let artifacts = (result["artifacts"] as? [[String: Any]] ?? []).filter { $0["kind"] as? String == "stem" }
-            if let jobID {
-                ForEach(Array(artifacts.enumerated()), id: \.offset) { _, artifact in
-                    if let name = artifact["name"] as? String, let url = NativeSongBackend.artifactURL(jobID, name: name) {
-                        HStack {
-                            Text(URL(fileURLWithPath: name).lastPathComponent.replacingOccurrences(of: ".wav", with: "")).font(.caption).frame(maxWidth: .infinity, alignment: .leading)
-                            Button("Play") { stemPlayer?.pause(); stemPlayer = AVPlayer(url: url); stemPlayer?.play() }.buttonStyle(.bordered)
-                            Link("WAV", destination: url).font(.caption).buttonStyle(.bordered)
-                        }
-                    }
-                }
-                if stemPlayer != nil { Button("Stop playback") { stemPlayer?.pause(); stemPlayer = nil }.font(.caption) }
-            }
-            ForEach(nativeSongStrings(result["warnings"]), id: \.self) { warning in Text(warning).font(.caption2).foregroundStyle(.secondary) }
-        }.padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func importFiles(_ urls: [URL]) async {
-        guard !busy else { return }
-        busy = true
-        error = nil
-        notice = "Adding files…"
-        do {
-            let existing = tracks.reduce(Int64(0)) { $0 + Int64($1.data.count) }
-            let existingCount = tracks.count
-            let incoming = try await Task.detached(priority: .userInitiated) { () throws -> [NativeSongAnalysisTrack] in
-                var output: [NativeSongAnalysisTrack] = []
-                var batchBytes = existing
-                for url in urls {
-                    let opened = url.startAccessingSecurityScopedResource()
-                    defer { if opened { url.stopAccessingSecurityScopedResource() } }
-                    let name = url.lastPathComponent
-                    if url.pathExtension.lowercased() == "zip" {
-                        let zipSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                        guard zipSize > 0 && zipSize <= 30 * 1024 * 1024 else {
-                            throw NativeNativeError.message("ZIP must be between 1 byte and 30 MB.")
-                        }
-                        let zipData = try Data(contentsOf: url, options: [.mappedIfSafe])
-                        guard zipData.count == zipSize else { throw NativeNativeError.message("ZIP size changed during import.") }
-                        let entries = try nativeSongUnpackZIP(zipData)
-                        for entry in entries {
-                            batchBytes += Int64(entry.data.count)
-                            guard batchBytes <= 60 * 1024 * 1024 else { throw NativeNativeError.message("Batch exceeds 60 MB.") }
-                            output.append(entry)
-                            guard output.count + existingCount <= 50 else { throw NativeNativeError.message("Choose up to 50 tracks.") }
-                        }
-                    } else {
-                        let ext = url.pathExtension.lowercased()
-                        guard nativeSongExtensions.contains(ext) else { continue }
-                        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-                        let size = attrs?[.size] as? Int ?? 0
-                        guard size > 0 && size <= 20 * 1024 * 1024 else {
-                            throw NativeNativeError.message("Each track must be smaller than 20 MB.")
-                        }
-                        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-                        batchBytes += Int64(data.count)
-                        guard batchBytes <= 60 * 1024 * 1024 else { throw NativeNativeError.message("Batch exceeds 60 MB.") }
-                        output.append(NativeSongAnalysisTrack(filename: name, data: data))
-                        guard output.count + tracks.count <= 50 else { throw NativeNativeError.message("Choose up to 50 tracks.") }
-                    }
-                }
-                return output
-            }.value
-            tracks.append(contentsOf: incoming)
-            if selectedID == nil { selectedID = incoming.first?.id }
-            notice = incoming.isEmpty ? "No supported audio tracks found." : "\(incoming.count) track\(incoming.count == 1 ? "" : "s") added."
-        } catch {
-            self.error = error.localizedDescription
-            notice = ""
-        }
-        busy = false
-    }
-
-    private func startBatch() {
-        guard !busy else { return }
-        busy = true
-        error = nil
-        notice = ""
-        progress = 0
-        annotationDrafts = [:]
-        let queue = tracks
-        currentTask = Task { await runBatch(queue) }
-    }
-
-    private func separateSelected() {
-        guard let track = selectedTrack, !busy else { return }
-        busy = true; error = nil; notice = "Preparing separation…"
-        currentTask = Task {
-            do {
-                guard await NativeSongBackend.available() else { throw NativeNativeError.message("Backend separation is unavailable.") }
-                let result = try await NativeSongBackend.analyze(track.data, separate: true) { notice = $0 }
-                updateTrack(track.id) { current in
-                    var report = current.report ?? nativeSongPartialReport(track.filename, reason: "Local analysis was unavailable.")
-                    report = nativeSongMergeBackend(report, backend: result.report)
-                    var analysis = report["analysis"] as? [String: Any] ?? [:]
-                    analysis["uses_remote_api"] = true; analysis["uses_hosted_model"] = true
-                    report["analysis"] = analysis
-                    current.report = report; current.backendJobID = result.id; current.status = "Partial"
-                }
-                notice = "Separated sounds ready."
-            } catch {
-                if Task.isCancelled { notice = "Stopped." } else { self.error = error.localizedDescription }
-            }
-            busy = false; currentTask = nil
-        }
-    }
-
-    @MainActor
-    private func runBatch(_ queue: [NativeSongAnalysisTrack]) async {
-        for (index, track) in queue.enumerated() {
-            if Task.isCancelled { break }
-            updateTrack(track.id) { $0.status = "Analyzing"; $0.error = nil }
-            do {
-                let detailed = fullAnalysis
-                let localTask = Task.detached(priority: .userInitiated) { try nativeSongAnalyzeAudio(track.data, filename: track.filename, detailed: detailed) }
-                var scan: NativeSongAnalysisScan?
-                var localFailure = "Local analysis was unavailable."
-                do { scan = try await withTaskCancellationHandler { try await localTask.value } onCancel: { localTask.cancel() } }
-                catch { if Task.isCancelled { throw error }; scan = nil; localFailure = error.localizedDescription }
-                var report = scan?.report ?? nativeSongPartialReport(track.filename, reason: localFailure)
-                var backendID: String?
-                var backendReady = false
-                if detailed { backendReady = await NativeSongBackend.available() }
-                try Task.checkCancellation()
-                if backendReady {
-                    do {
-                        let result = try await NativeSongBackend.analyze(track.data, separate: false) { notice = $0 }
-                        report = nativeSongMergeBackend(report, backend: result.report)
-                        var analysis = report["analysis"] as? [String: Any] ?? [:]
-                        analysis["uses_remote_api"] = true; analysis["uses_hosted_model"] = true; analysis["semantic_analysis"] = "backend_audio_models_unreviewed"
-                        report["analysis"] = analysis; backendID = result.id
-                    } catch { if Task.isCancelled { throw error }; notice = "Backend recognition unavailable; local results were kept." }
-                } else if detailed { notice = "Backend recognition unavailable; local results were kept." }
-                if scan == nil && backendID == nil { throw NativeNativeError.message(localFailure) }
-                let annotations = (report["dataset_analysis"] as? [String: Any])?["annotations"] as? [String: Any]
-                let reviewed = annotations?["reviewed"] as? Bool == true
-                let status = detailed && !reviewed ? "Partial" : (nativeSongString(report["tempo_bpm"], fallback: "") == "" ? "Partial" : "Done")
-                updateTrack(track.id) {
-                    $0.report = report
-                    $0.backendJobID = backendID
-                    $0.status = status
-                }
-                if status == "Partial" && notice.isEmpty { notice = "Some results need review." }
-            } catch {
-                updateTrack(track.id) { $0.status = Task.isCancelled ? "Cancelled" : "Failed"; $0.error = Task.isCancelled ? nil : error.localizedDescription }
-            }
-            progress = Int(Double(index + 1) / Double(max(1, queue.count)) * 100)
-        }
-        if Task.isCancelled {
-            for track in queue where track.status == "Queued" || track.status == "Analyzing" {
-                updateTrack(track.id) { $0.status = "Cancelled" }
-            }
-            notice = "Stopped. Completed results are kept."
-        } else if notice.isEmpty {
-            notice = "Batch complete."
-        }
-        busy = false
-        currentTask = nil
-    }
-
-    private func updateTrack(_ id: UUID, change: (inout NativeSongAnalysisTrack) -> Void) {
-        guard let index = tracks.firstIndex(where: { $0.id == id }) else { return }
-        change(&tracks[index])
-    }
-
-    private func prepareExport(_ kind: String) {
-        do {
-            exportKind = kind
-            let reports = tracks.compactMap(\.report)
-            guard !reports.isEmpty else { return }
-            if kind == "json" {
-                document = NativeSongAnalysisDocument(data: try JSONSerialization.data(withJSONObject: ["schema_version": "1.0", "tracks": reports], options: [.prettyPrinted, .sortedKeys]))
-            } else if kind == "csv" {
-                document = NativeSongAnalysisDocument(data: Data(nativeSongCSV(reports).utf8))
-            } else {
-                let json = try JSONSerialization.data(withJSONObject: ["schema_version": "1.0", "tracks": reports], options: [.prettyPrinted, .sortedKeys])
-                let csv = Data(nativeSongCSV(reports).utf8)
-                let issues = try JSONSerialization.data(withJSONObject: tracks.filter { $0.error != nil }.map { ["filename": $0.filename, "error": $0.error ?? "Failed"] }, options: [.prettyPrinted, .sortedKeys])
-                document = NativeSongAnalysisDocument(data: try nativeSongZIPStore([("song-analysis.json", json), ("song-analysis.csv", csv), ("processing-issues.json", issues)]))
-            }
-            showExporter = true
-        } catch { self.error = error.localizedDescription }
-    }
-}
-
-private func nativeSongPartialReport(_ name: String, reason: String) -> [String: Any] {
-    let fields = ["genre", "sub_style", "style_influences", "language", "energy", "mood", "source_role", "vocals", "vocal_delivery", "vocal_register", "vocal_harmony", "performance_technique", "instruments", "themes", "listening_scene", "production_traits", "arrangement"]
-    var annotations: [String: Any] = [:]
-    for field in fields { annotations[field] = [String]() }
-    annotations["notes"] = ""; annotations["reviewer"] = NSNull(); annotations["reviewed"] = false
-    return ["schema_version": "1.2", "filename": name, "identity": ["title": name], "analysis": ["local_audio_decoded": false, "status": "partial"], "dataset_analysis": ["annotations": annotations], "warnings": [reason]]
-}
-
-private func nativeSongMergeBackend(_ local: [String: Any], backend: [String: Any]) -> [String: Any] {
-    var report = local
-    report["backend_model"] = backend
-    let signal = backend["signal"] as? [String: Any] ?? [:]
-    if nativeSongString(report["tempo_bpm"]).isEmpty, let tempo = signal["tempo_bpm"], !(tempo is NSNull) { report["tempo_bpm"] = tempo; report["tempo_source"] = "backend_audio_estimate" }
-    if nativeSongString(report["key"]).isEmpty, let key = signal["key"], !(key is NSNull) { report["key"] = key }
-    var technical = report["technical"] as? [String: Any] ?? [:]
-    if technical["duration_seconds"] == nil || technical["duration_seconds"] is NSNull { technical["duration_seconds"] = signal["duration_seconds"] }
-    report["technical"] = technical
-    var embedded = report["embedded_metadata"] as? [String: Any] ?? [:]
-    embedded["backend_ffprobe"] = backend["metadata"] ?? [:]
-    report["embedded_metadata"] = embedded
-    return report
-}
-
 private let nativeSongExtensions: Set<String> = ["mp3", "wav", "flac", "m4a", "aac", "ogg", "oga", "opus", "aif", "aiff", "caf", "3gp", "mp4", "webm"]
 
-private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bool = false) throws -> NativeSongAnalysisScan {
+private func nativeSongAnalyzeAudio(_ data: Data, filename: String) throws -> NativeSongAnalysisScan {
     guard !data.isEmpty && data.count <= 20 * 1024 * 1024 else { throw NativeNativeError.message("Track exceeds the local file limit.") }
     let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
     let temp = FileManager.default.temporaryDirectory.appendingPathComponent("env-song-\(UUID().uuidString).\(ext.isEmpty ? "audio" : ext)")
@@ -3345,7 +2723,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     let asset = AVURLAsset(url: temp)
     let duration = CMTimeGetSeconds(asset.duration)
     guard duration.isFinite && duration > 0 else { throw NativeNativeError.message("Could not read the track duration.") }
-    guard duration <= 15 * 60 else { throw NativeNativeError.message("Tracks over 15 minutes are not supported for local analysis.") }
+    guard duration <= 5 * 60 else { throw NativeNativeError.message("This track is too long for safe local analysis.") }
     let audioFile = try AVAudioFile(forReading: temp, commonFormat: .pcmFormatFloat32, interleaved: false)
     let format = audioFile.processingFormat
     guard format.sampleRate > 0 && format.channelCount > 0 else { throw NativeNativeError.message("Audio stream details are unavailable.") }
@@ -3375,6 +2753,8 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     guard audioFile.framePosition >= audioFile.length && !mono.isEmpty else { throw NativeNativeError.message("The device could not decode the complete audio track.") }
     let bpm = NativeSongSignal.estimateBPM(mono, sampleRate: 16_000)
     let key = NativeSongSignal.estimateKey(mono, sampleRate: 16_000)
+    let peak = mono.reduce(Float(0)) { max($0, abs($1)) }
+    let rms = sqrt(mono.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(mono.count))
     let metadata = asset.commonMetadata
     func tag(_ key: String) -> String? {
         metadata.first(where: { $0.commonKey?.rawValue == key })?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3395,7 +2775,7 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
     if key == nil { warnings.append("Key could not be estimated reliably.") }
     if tag("genre") == nil { warnings.append("Genre is not embedded; add a human-reviewed label in Full Analysis.") }
     let bitrateEstimate = duration > 0 ? Double(fileSize * 8) / duration : 0
-    var report: [String: Any] = [
+    let report: [String: Any] = [
         "schema_version": "1.1", "filename": filename,
         "genre": tag("genre") as Any? ?? NSNull(), "sub_style": NSNull(), "language": [String](),
         "tempo_bpm": tempo as Any? ?? NSNull(), "tempo_band": tempo.map(nativeSongTempoBand) ?? "unknown",
@@ -3409,6 +2789,8 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
             "bitrate_bps": Int(bitrateEstimate), "bitrate_source": "file_size_duration_estimate",
             "sample_rate_hz": Int(sourceRate), "analysis_sample_rate_hz": 16_000,
             "bit_depth": NSNull(), "channels": channelCount,
+            "peak_dbfs": peak > 0 ? 20 * log10(Double(peak)) as Any : NSNull(),
+            "rms_dbfs": rms > 0 ? 20 * log10(rms) as Any : NSNull(),
             "channel_layout": channelCount == 1 ? "mono" : channelCount == 2 ? "stereo" : "\(channelCount) channels"
         ],
         "embedded_metadata": [
@@ -3419,17 +2801,12 @@ private func nativeSongAnalyzeAudio(_ data: Data, filename: String, detailed: Bo
             "year": tag("creationDate") as Any? ?? NSNull()
         ],
         "analysis": [
-            "status": detailed ? "full_local_needs_review" : "quick_local", "local_audio_decoded": true,
+            "status": "quick_local", "local_audio_decoded": true,
             "semantic_analysis": "not_run_local_only", "key_source": key == nil ? "unavailable" : "audio_estimate",
             "uses_remote_api": false, "uses_hosted_model": false
         ],
         "warnings": warnings
     ]
-    if detailed {
-        report["dataset_analysis"] = NativeSongSignal.analyzeDataset(mono, sampleRate: 16_000)
-        warnings.append("Genre, language, mood, vocal type and instrument identity require human review.")
-        report["warnings"] = Array(Set(warnings))
-    }
     return NativeSongAnalysisScan(report: report)
 }
 
@@ -3459,77 +2836,7 @@ private func nativeSongString(_ value: Any?, fallback: String = "") -> String {
     let text = String(describing: value).trimmingCharacters(in: .whitespacesAndNewlines)
     return text == "unknown" || text == "null" ? fallback : text
 }
-private func nativeSongStrings(_ value: Any?) -> [String] { value as? [String] ?? [] }
-private func nativeSongCSV(_ reports: [[String: Any]]) -> String {
-    let columns = [
-        "filename","title","artist","album","genre","sub_style","style_influences","language",
-        "tempo_bpm","tempo_band","key","energy","mood","theme","setting","source_role",
-        "vocals","vocal_delivery","vocal_register","vocal_harmony","performance_technique","instruments",
-        "production_traits","arrangement","duration_seconds","file_size_bytes","codec","sample_rate_hz","channels",
-        "pitch_lowest_note","pitch_highest_note","pitch_range_semitones","transient_density_per_second",
-        "spectral_centroid_mean_hz","low_energy_ratio_mean","mid_energy_ratio_mean","high_energy_ratio_mean",
-        "chord_estimates","section_boundaries","labels_reviewed","reviewer","annotation_notes",
-        "uses_remote_api","uses_hosted_model","analysis_status","warnings"
-    ]
-    func cell(_ value: Any?) -> String {
-        var text: String
-        if value == nil || value is NSNull { text = "" }
-        else if let values = value as? [String] { text = values.joined(separator: "; ") }
-        else if let jsonValue = value, JSONSerialization.isValidJSONObject(jsonValue),
-                let bytes = try? JSONSerialization.data(withJSONObject: jsonValue, options: [.sortedKeys]),
-                let json = String(data: bytes, encoding: .utf8) { text = json }
-        else { text = String(describing: value!) }
-        let trim = text.trimmingCharacters(in: .whitespaces)
-        if trim.hasPrefix("=") || trim.hasPrefix("+") || trim.hasPrefix("@") || trim.range(of: #"^-[0-9]"#, options: .regularExpression) != nil { text = "'" + text }
-        return "\"\(text.replacingOccurrences(of: "\"", with: "\"\""))\""
-    }
-    return ([columns.map { cell($0) }.joined(separator: ",")] + reports.map { report in
-        let identity = report["identity"] as? [String: Any] ?? [:]
-        let technical = report["technical"] as? [String: Any] ?? [:]
-        let analysis = report["analysis"] as? [String: Any] ?? [:]
-        let dataset = report["dataset_analysis"] as? [String: Any] ?? [:]
-        let annotations = dataset["annotations"] as? [String: Any] ?? [:]
-        let pitch = dataset["pitch"] as? [String: Any] ?? [:]
-        let rhythm = dataset["rhythm"] as? [String: Any] ?? [:]
-        let tonality = dataset["tonality"] as? [String: Any] ?? [:]
-        let timbre = dataset["timbre"] as? [String: Any] ?? [:]
-        let structure = dataset["structure"] as? [String: Any] ?? [:]
-        let chordText = (tonality["chord_estimates"] as? [[String: Any]] ?? []).map { item in
-            "\(item["start_seconds"] ?? "?")-\(item["end_seconds"] ?? "?")s:\(item["chord"] ?? "unknown")"
-        }.joined(separator: " | ")
-        let sectionText = (structure["change_points"] as? [[String: Any]] ?? []).map { item in
-            "\(item["time_seconds"] ?? "?")s(\(item["change_score"] ?? "?"))"
-        }.joined(separator: " | ")
-        let fields: [String: Any] = [
-            "filename": report["filename"] ?? "", "title": identity["title"] ?? "", "artist": identity["artist"] ?? "", "album": identity["album"] ?? "",
-            "genre": report["genre"] ?? "", "sub_style": report["sub_style"] ?? "", "style_influences": annotations["style_influences"] ?? [],
-            "language": report["language"] ?? [], "tempo_bpm": report["tempo_bpm"] ?? "", "tempo_band": report["tempo_band"] ?? "",
-            "key": report["key"] ?? "", "energy": annotations["energy"] ?? report["energy"] ?? "",
-            "mood": report["mood"] ?? [], "theme": report["theme"] ?? [], "setting": report["setting"] ?? [],
-            "source_role": annotations["source_role"] ?? [], "vocals": report["vocals"] ?? [],
-            "vocal_delivery": annotations["vocal_delivery"] ?? [], "vocal_register": annotations["vocal_register"] ?? [],
-            "vocal_harmony": annotations["vocal_harmony"] ?? [], "performance_technique": annotations["performance_technique"] ?? [],
-            "instruments": report["instruments"] ?? [], "production_traits": annotations["production_traits"] ?? [],
-            "arrangement": annotations["arrangement"] ?? [],
-            "duration_seconds": technical["duration_seconds"] ?? "", "file_size_bytes": technical["file_size_bytes"] ?? "",
-            "codec": technical["codec"] ?? "", "sample_rate_hz": technical["sample_rate_hz"] ?? "", "channels": technical["channels"] ?? "",
-            "pitch_lowest_note": pitch["lowest_detected_note"] ?? "", "pitch_highest_note": pitch["highest_detected_note"] ?? "",
-            "pitch_range_semitones": pitch["pitch_range_semitones"] ?? "", "transient_density_per_second": rhythm["transient_density_per_second"] ?? "",
-            "spectral_centroid_mean_hz": timbre["mean_spectral_centroid_hz"] ?? "",
-            "low_energy_ratio_mean": timbre["mean_low_frequency_energy_ratio"] ?? "",
-            "mid_energy_ratio_mean": timbre["mean_mid_frequency_energy_ratio"] ?? "",
-            "high_energy_ratio_mean": timbre["mean_high_frequency_energy_ratio"] ?? "",
-            "chord_estimates": chordText, "section_boundaries": sectionText, "labels_reviewed": annotations["reviewed"] ?? false,
-            "reviewer": annotations["reviewer"] ?? "", "annotation_notes": annotations["notes"] ?? "",
-            "uses_remote_api": dataset["processing"].flatMap { ($0 as? [String: Any])?["uses_remote_api"] as? Bool } ?? false,
-            "uses_hosted_model": dataset["processing"].flatMap { ($0 as? [String: Any])?["uses_hosted_model"] as? Bool } ?? false,
-            "analysis_status": analysis["status"] ?? "", "warnings": report["warnings"] ?? []
-        ]
-        return columns.map { cell(fields[$0]) }.joined(separator: ",")
-    }).joined(separator: "\r\n")
-}
-
-func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
+func nativeSongUnpackZIP(_ data: Data, includeSidecars: Bool = false) throws -> [NativeSongAnalysisTrack] {
     guard data.count >= 22 && data.count <= 30 * 1024 * 1024 else { throw NativeNativeError.message("ZIP must be 30 MB or smaller.") }
     let bytes = [UInt8](data)
     func u16(_ offset: Int) throws -> Int {
@@ -3617,8 +2924,13 @@ func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
             throw NativeNativeError.message("ZIP contains an unusually high compression ratio.")
         }
         let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
-        guard nativeSongExtensions.contains(ext) else { continue }
-        guard uncompressedSize > 0 else { throw NativeNativeError.message("ZIP contains an empty audio track.") }
+        let sidecar = includeSidecars && (name.lowercased().hasSuffix(".tags.json") || name.lowercased().hasSuffix(".lyrics.txt"))
+        guard nativeSongExtensions.contains(ext) || sidecar else { continue }
+        if sidecar && name.lowercased().hasSuffix(".lyrics.txt") && uncompressedSize == 0 {
+            guard crc == 0 && (method != 0 || compressedSize == 0) else { throw NativeNativeError.message("Empty lyrics entry is damaged.") }
+            continue
+        }
+        guard uncompressedSize > 0 && (!sidecar || uncompressedSize <= 1024 * 1024) else { throw NativeNativeError.message("ZIP contains an empty or oversized entry.") }
         let compressed = Data(bytes[payloadStart..<payloadEnd])
         let unpacked: Data
         if method == 0 {
@@ -3637,8 +2949,8 @@ func nativeSongUnpackZIP(_ data: Data) throws -> [NativeSongAnalysisTrack] {
             unpacked = destination
         }
         guard nativeSongCRC32(unpacked) == UInt32(crc) else { throw NativeNativeError.message("ZIP entry checksum failed.") }
-        output.append(NativeSongAnalysisTrack(filename: name.split(separator: "/").joined(separator: " — "), data: unpacked))
-        guard output.count <= 50 else { throw NativeNativeError.message("ZIP contains more than 50 audio files.") }
+        output.append(NativeSongAnalysisTrack(filename: includeSidecars ? name : name.split(separator: "/").joined(separator: " — "), data: unpacked))
+        guard output.count <= (includeSidecars ? 150 : 50) else { throw NativeNativeError.message("ZIP contains too many entries.") }
     }
     guard cursor == dirOffset + dirSize else { throw NativeNativeError.message("ZIP directory has unexpected trailing data.") }
     localRanges.sort { $0.0 < $1.0 }
@@ -3661,8 +2973,8 @@ private func nativeSongCRC32(_ data: Data) -> UInt32 {
     return ~crc
 }
 
-private func nativeSongZIPStore(_ files: [(String, Data)]) throws -> Data {
-    guard files.count <= 100 else { throw NativeNativeError.message("Too many report files.") }
+func nativeSongZIPStore(_ files: [(String, Data)]) throws -> Data {
+    guard files.count <= 250 else { throw NativeNativeError.message("Too many files.") }
     var output = Data()
     var directory = Data()
     for (name, contents) in files {
@@ -6061,7 +5373,7 @@ private struct NativeAudioToolView: View {
     var body: some View {
         let operation = NativeAudioEngine.operation(for: tool) ?? "guide"
         if operation == "song-metadata-analyzer" {
-            NativeSongMetadataAnalyzerView(title: tool.name)
+            NativeMusicDataSandboxView()
         } else if operation == "record-mic" {
             NativeAudioRecorderToolView(title: tool.name)
         } else if operation == "generate-tone" || operation == "generate-metronome" {
@@ -13386,3 +12698,642 @@ private struct NativeUxUiStudioView: View {
     }
 }
 
+
+// Persistent native music-data workspace. Audio never leaves the device for analysis.
+struct MusicSandboxFolder: Codable, Identifiable {
+    var id = UUID().uuidString
+    var name: String
+    var parent: String = ""
+    var maxSongs = 100
+    var maxMB = 250
+}
+struct MusicSandboxTrack: Codable, Identifiable {
+    var id = UUID().uuidString
+    var folder: String
+    var title: String
+    var audio: String = ""
+    var size = 0
+    var fields: [String: String] = [:]
+    var originalTags: Data = Data()
+    var tagsDraft: String? = nil
+    var tempoEstimated: Bool? = nil
+    var keyEstimated: Bool? = nil
+    var tempoEdited: Bool? = nil
+    var keyEdited: Bool? = nil
+    var lyrics = ""
+    var instrumental = false
+    var clearance = "pending"
+    var reviewed = false
+    var technical: String = ""
+}
+private struct MusicSandboxWorkspace: Codable {
+    var folders: [MusicSandboxFolder] = []
+    var tracks: [MusicSandboxTrack] = []
+}
+private let musicSandboxListFields = ["language", "mood", "theme", "setting", "vocals", "flow", "instruments", "standout"]
+private let musicSandboxScalarFields = ["id", "genre", "sub_style", "tempo_bpm", "tempo_band", "time_signature", "key", "duration_seconds", "sample_rate_hz", "channels", "bit_depth", "format", "energy", "license", "source"]
+private func musicSandboxID(_ name: String) -> String {
+    let result = name.lowercased().replacingOccurrences(of: "[^a-z0-9_-]+", with: "_", options: .regularExpression).trimmingCharacters(in: CharacterSet(charactersIn: "_-"))
+    return String((result.isEmpty ? "song" : result).prefix(90))
+}
+private func musicSandboxArray(_ string: String) -> [String] {
+    string.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+}
+func musicSandboxCaption(_ track: MusicSandboxTrack) -> String {
+    let fields = track.fields
+    var values = [fields["genre"] ?? "", fields["sub_style"] ?? ""].filter { !$0.isEmpty }
+    if let band = fields["tempo_band"], !band.isEmpty { values.append("\(band) tempo") }
+    if let energy = fields["energy"], !energy.isEmpty { values.append("\(energy) energy") }
+    for key in ["mood", "theme", "vocals", "flow", "instruments", "standout"] { values.append(contentsOf: musicSandboxArray(fields[key] ?? "")) }
+    let languages = musicSandboxArray(fields["language"] ?? "")
+    if !languages.isEmpty { values.append("sung in " + languages.joined(separator: " and ")) }
+    return values.joined(separator: ", ")
+}
+func musicSandboxLyrics(_ lyrics: String) -> String {
+    guard let regex = try? NSRegularExpression(pattern: #"\[([^\]]+)\]"#) else { return lyrics }
+    var result = lyrics
+    let matches = regex.matches(in: lyrics, range: NSRange(lyrics.startIndex..., in: lyrics))
+    for match in matches.reversed() {
+        guard let whole = Range(match.range(at: 0), in: result), let content = Range(match.range(at: 1), in: result) else { continue }
+        let original = String(result[content]).components(separatedBy: "|").first ?? ""
+        let base = original.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: #"\s+\d+$"#, with: "", options: .regularExpression).lowercased()
+        let label = base == "pre-chorus" ? "Pre-Chorus" : base == "post-chorus" ? "Post-Chorus" : base.prefix(1).uppercased() + base.dropFirst()
+        result.replaceSubrange(whole, with: "[\(label)]")
+    }
+    return result
+}
+func musicSandboxTags(_ track: MusicSandboxTrack) -> [String: Any] {
+    var tags = (try? JSONSerialization.jsonObject(with: track.originalTags)) as? [String: Any] ?? [:]
+    for (key, value) in track.fields where !key.hasPrefix("description_") {
+        if musicSandboxListFields.contains(key) { tags[key] = musicSandboxArray(value) }
+        else if ["tempo_bpm", "duration_seconds", "sample_rate_hz", "channels", "bit_depth"].contains(key) { tags[key] = Double(value) as Any? ?? NSNull() }
+        else { tags[key] = value }
+    }
+    tags["descriptions"] = (1...3).map { track.fields["description_\($0)"] ?? "" }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    return tags
+}
+func musicSandboxFields(_ tags: [String: Any]) -> [String: String] {
+    var fields: [String: String] = [:]
+    for (key, value) in tags where musicSandboxListFields.contains(key) || musicSandboxScalarFields.contains(key) || key == "descriptions" {
+        if let values = value as? [String] {
+            if key == "descriptions" { for (index, text) in values.prefix(3).enumerated() { fields["description_\(index + 1)"] = text } }
+            else { fields[key] = values.joined(separator: ", ") }
+        } else if let string = value as? String { fields[key] = string }
+        else if let number = value as? NSNumber { fields[key] = number.stringValue }
+    }
+    return fields
+}
+private func validateMusicSandboxTags(_ tags: [String: Any]) throws {
+    for key in musicSandboxListFields + ["descriptions"] where tags[key] != nil {
+        guard tags[key] is [String] else { throw NativeNativeError.message("\(key) must be a list of strings.") }
+    }
+    for key in ["id", "genre", "sub_style", "key", "time_signature", "tempo_band", "energy", "format", "license", "source"] where tags[key] != nil {
+        guard tags[key] is String else { throw NativeNativeError.message("\(key) must be text.") }
+    }
+    for key in ["tempo_bpm", "duration_seconds", "sample_rate_hz", "channels", "bit_depth"] where tags[key] != nil && !(tags[key] is NSNull) {
+        guard let number = tags[key] as? NSNumber, number.doubleValue.isFinite, CFGetTypeID(number) != CFBooleanGetTypeID() else { throw NativeNativeError.message("\(key) must be a number or null.") }
+    }
+}
+func musicSandboxReady(_ track: MusicSandboxTrack) -> Bool {
+    let fields = track.fields
+    let validID = (fields["id"] ?? "").range(of: #"^[a-z0-9][a-z0-9_-]{0,119}$"#, options: .regularExpression) != nil
+    let tempoText = fields["tempo_bpm"] ?? "", durationText = fields["duration_seconds"] ?? ""
+    let validTempo = tempoText.isEmpty || (Double(tempoText).map { $0.isFinite && (1...400).contains($0) } ?? false)
+    let validDuration = durationText.isEmpty || (Double(durationText).map { $0.isFinite && $0 > 0 } ?? false)
+    return track.reviewed && track.tagsDraft == nil && validID && !(fields["genre"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        validTempo && validDuration &&
+        (track.instrumental || !(fields["language"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
+        track.clearance == "cleared" && ["owned", "written permission", "CC-BY", "royalty-free"].contains(fields["license"] ?? "") &&
+        !(fields["source"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        (!track.audio.isEmpty || !track.lyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
+        (track.instrumental || !track.lyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
+        (track.audio.isEmpty || (1...3).filter { !(fields["description_\($0)"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count >= 2)
+}
+func musicSandboxDescendants(_ folder: String, _ folders: [MusicSandboxFolder]) -> Set<String> {
+    var result: Set<String> = [folder]
+    var changed = true
+    while changed {
+        changed = false
+        for child in folders where result.contains(child.parent) && !result.contains(child.id) { result.insert(child.id); changed = true }
+    }
+    return result
+}
+func musicSandboxPath(_ id: String, _ folders: [MusicSandboxFolder]) -> String {
+    var result = [String](), current = id, seen = Set<String>()
+    while !current.isEmpty && seen.insert(current).inserted {
+        guard let folder = folders.first(where: { $0.id == current }) else { break }
+        result.insert(musicSandboxID(folder.name), at: 0); current = folder.parent
+    }
+    return result.joined(separator: "/")
+}
+private struct MusicSandboxStore {
+    let root: URL
+    init() {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        root = base.appendingPathComponent("music-data-sandbox", isDirectory: true)
+    }
+    func load() throws -> MusicSandboxWorkspace {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = root.appendingPathComponent("workspace.json")
+        guard FileManager.default.fileExists(atPath: url.path) else { return MusicSandboxWorkspace() }
+        return try JSONDecoder().decode(MusicSandboxWorkspace.self, from: Data(contentsOf: url))
+    }
+    func save(_ workspace: MusicSandboxWorkspace) throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try JSONEncoder().encode(workspace).write(to: root.appendingPathComponent("workspace.json"), options: .atomic)
+    }
+    func audio(_ name: String) -> URL { root.appendingPathComponent(URL(fileURLWithPath: name).lastPathComponent) }
+}
+
+private struct NativeMusicDataSandboxView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var workspace = MusicSandboxWorkspace()
+    @State private var storageError: String?
+    @State private var welcome = true
+    @State private var folderID = ""
+    @State private var selectedID = ""
+    @State private var screen = 0
+    @State private var page = 0
+    @State private var showFolder = false
+    @State private var editingFolder = false
+    @State private var moving = false
+    @State private var deleting = false
+    @State private var folderChoicePage = 0
+    @State private var jsonDraft = ""
+    @State private var folderName = ""
+    @State private var folderLimit = "100"
+    @State private var folderMB = "250"
+    @State private var importing = false
+    @State private var attachingAudio = false
+    @State private var exporting = false
+    @State private var choosingExport = false
+    @State private var busy = false
+    @State private var message = ""
+    @State private var exportDocument = NativeSongAnalysisDocument(data: Data())
+    @State private var player: AVPlayer?
+    @State private var playing = false
+    @State private var importTask: Task<Void, Never>?
+    private let store = MusicSandboxStore()
+    private var selected: MusicSandboxTrack? { workspace.tracks.first { $0.id == selectedID } }
+    private var folder: MusicSandboxFolder? { workspace.folders.first { $0.id == folderID } }
+    private var rows: [(String, String, String)] {
+        let folders = workspace.folders.filter { $0.parent == folderID }.map { ("folder", $0.id, $0.name) }
+        let tracks = workspace.tracks.filter { folderID.isEmpty ? !musicSandboxReady($0) : $0.folder == folderID }.map { ("track", $0.id, $0.title) }
+        return folders + tracks
+    }
+    private func commit(_ value: MusicSandboxWorkspace) {
+        guard storageError == nil else { message = storageError ?? "Storage unavailable."; return }
+        do { try store.save(value); workspace = value }
+        catch { message = "Could not save: \(error.localizedDescription)" }
+    }
+    private func update(_ change: (inout MusicSandboxTrack) -> Void) {
+        guard let index = workspace.tracks.firstIndex(where: { $0.id == selectedID }) else { return }
+        var next = workspace; change(&next.tracks[index]); next.tracks[index].reviewed = false; commit(next)
+    }
+    private func field(_ key: String) -> Binding<String> {
+        Binding(get: { selected?.fields[key] ?? "" }, set: { value in update { $0.fields[key] = value; if key == "tempo_bpm" { $0.tempoEstimated = false; $0.tempoEdited = true }; if key == "key" { $0.keyEstimated = false; $0.keyEdited = true } } })
+    }
+    private func trackText(_ label: String, _ key: String) -> some View {
+        TextField(label, text: field(key)).textFieldStyle(.roundedBorder).font(.body)
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if welcome { welcomeView }
+            else if let track = selected { editor(track) }
+            else { library }
+        }
+        .padding(12).frame(maxWidth: 430).frame(height: dynamicTypeSize.isAccessibilitySize ? nil : min(650, max(440, UIScreen.main.bounds.height - 110)), alignment: .top).frame(minHeight: 440, alignment: .top)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+        .disabled(busy)
+        .onAppear {
+            do { workspace = try store.load(); storageError = nil }
+            catch { storageError = "Could not open saved workspace: \(error.localizedDescription)"; message = storageError ?? "" }
+        }
+        .onDisappear { player?.pause(); playing = false; importTask?.cancel() }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
+            if let item = notification.object as? AVPlayerItem, item === player?.currentItem { player?.seek(to: .zero); playing = false }
+        }
+        .sheet(isPresented: $showFolder) { folderSheet }
+        .sheet(isPresented: $moving) { moveSheet }
+        .confirmationDialog("Export", isPresented: $choosingExport) {
+            Button("Master backup") { prepareExport(training: false) }
+            Button("Training preparation") { prepareExport(training: true) }
+            Button("Cancel", role: .cancel) { }
+        }
+        .alert("Delete this record?", isPresented: $deleting) {
+            Button("Delete", role: .destructive) { deleteSelected() }
+            Button("Cancel", role: .cancel) { }
+        } message: { Text("Its saved audio will also be removed.") }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.audio, .zip, .json, .plainText], allowsMultipleSelection: true) { result in
+            switch result { case .success(let urls): importTask = Task { await importFiles(urls) }; case .failure(let error): message = error.localizedDescription }
+        }
+        .fileImporter(isPresented: $attachingAudio, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
+            switch result { case .success(let urls): if let url = urls.first { importTask = Task { await attachAudio(url) } }; case .failure(let error): message = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .zip, defaultFilename: "music-sandbox") { result in
+            if case .failure(let error) = result { message = error.localizedDescription } else { message = "ZIP exported." }
+        }
+    }
+    private var welcomeView: some View {
+        VStack(spacing: 8) {
+            Spacer()
+            EnVLogo(homeHero: true).frame(width: 150, height: 80)
+            Image(systemName: "headphones").font(.system(size: 40)).foregroundStyle(.secondary)
+            Text("AI Music Data Sandbox.").font(.title3.weight(.semibold)).foregroundStyle(.secondary)
+            Button("Enter sandbox") { welcome = false }.buttonStyle(.borderedProminent).padding(.top, 12)
+            Spacer()
+            Text("By").font(.caption2)
+            HStack(spacing: 4) { Image("RumuoMark").resizable().scaledToFill().frame(width: 20, height: 20).clipShape(RoundedRectangle(cornerRadius: 6)); Text("Rumuo").font(.subheadline.weight(.semibold)) }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    private var library: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack { EnVLogo().frame(width: 48, height: 35); Text("AI Music Data Sandbox").font(.subheadline.weight(.semibold)); Spacer() }
+            HStack {
+                if !folderID.isEmpty { Button("‹ Back") { folderID = folder?.parent ?? ""; page = 0 } }
+                Text(folder?.name ?? "Music library").font(.headline).lineLimit(1); Spacer()
+                if let folder { Button("Settings") { folderName = folder.name; folderLimit = String(folder.maxSongs); folderMB = String(folder.maxMB); editingFolder = true; showFolder = true } }
+            }
+            HStack {
+                Button(busy ? "Adding…" : "Add music") { importing = true }.buttonStyle(.borderedProminent).disabled(busy || storageError != nil)
+                Button("New folder") { folderName = ""; folderLimit = "100"; folderMB = "250"; editingFolder = false; showFolder = true }.buttonStyle(.bordered).disabled(busy || storageError != nil)
+            }
+            if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+            HStack {
+                Text(folderID.isEmpty ? "Folders & drafts" : "Songs & subfolders").font(.subheadline.weight(.semibold)); Spacer()
+                Button("Blank record") { createBlankRecord() }.font(.caption).disabled(busy || storageError != nil)
+            }
+            ForEach(Array(rows.dropFirst(page * 4).prefix(4).enumerated()), id: \.offset) { _, row in
+                Button { if row.0 == "folder" { folderID = row.1; page = 0 } else { selectedID = row.1; screen = 0; message = "" } } label: {
+                    HStack { Label(row.2, systemImage: row.0 == "folder" ? "folder" : "music.note").lineLimit(1); Spacer(); Image(systemName: "chevron.right") }
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                }.buttonStyle(.bordered).disabled(busy)
+            }
+            if rows.isEmpty { Text("No songs yet").font(.caption).foregroundStyle(.secondary) }
+            Spacer(minLength: 0)
+            HStack {
+                Button("Previous") { page = max(0, page - 1) }.disabled(page == 0)
+                Text("\(page + 1) / \(max(1, (rows.count + 3) / 4))").font(.caption)
+                Button("Next") { page += 1 }.disabled((page + 1) * 4 >= rows.count)
+                Spacer()
+                Button("Export") { choosingExport = true }.buttonStyle(.bordered).disabled(workspace.tracks.isEmpty || busy)
+            }.font(.caption)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    @ViewBuilder private func editor(_ track: MusicSandboxTrack) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button("‹ Back") { player?.pause(); player = nil; playing = false; selectedID = ""; screen = 0 }
+                Text(track.title).font(.headline).lineLimit(1); Spacer()
+                Text(musicSandboxReady(track) ? "Ready" : "Draft").font(.caption).foregroundStyle(.secondary)
+            }
+            if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+            if !track.audio.isEmpty { Button(playing ? "Pause audio" : "Play audio") { if playing { player?.pause(); playing = false } else { if player == nil { player = AVPlayer(url: store.audio(track.audio)) }; player?.play(); playing = true } }.font(.caption) }
+            let sectionNames = ["Track", "Tempo & key", "Style", "Sound", "Descriptions", "Lyrics", "Permission", "Extra tags", "All tags", "File facts", "File format"]
+            Menu {
+                ForEach([0, 1, 2, 5, 6, 7, 8, 9], id: \.self) { destination in
+                    Button(sectionNames[destination]) {
+                        if destination == 8 { jsonDraft = track.tagsDraft ?? ((try? JSONSerialization.data(withJSONObject: musicSandboxTags(track), options: [.prettyPrinted, .sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}") }
+                        screen = destination
+                    }
+                }
+            } label: { HStack { Text("Edit: \(sectionNames[screen])"); Spacer(); Image(systemName: "chevron.down") }.frame(maxWidth: .infinity) }.buttonStyle(.bordered)
+            switch screen {
+            case 0:
+                TextField("Title", text: Binding(get: { selected?.title ?? "" }, set: { value in update { $0.title = value } })).textFieldStyle(.roundedBorder)
+                trackText("Record ID", "id")
+                HStack {
+                    Button("Move") { folderChoicePage = 0; moving = true }
+                    Button(track.audio.isEmpty ? "Attach audio" : "Replace audio") { attachingAudio = true }
+                }.font(.caption)
+            case 1:
+                trackText("Tempo (BPM)", "tempo_bpm").keyboardType(.decimalPad)
+                trackText("Musical key", "key")
+                trackText("Time signature", "time_signature")
+                Text("BPM and key are estimates. Check by ear.").font(.caption).foregroundStyle(.secondary)
+                if !track.technical.isEmpty { Text(track.technical).font(.caption2).foregroundStyle(.secondary).lineLimit(3) }
+            case 2:
+                trackText("Genre", "genre"); trackText("Sub-style", "sub_style"); trackText("Languages", "language")
+            case 3:
+                trackText("Mood", "mood"); trackText("Voice", "vocals"); trackText("Instruments", "instruments")
+            case 4:
+                trackText("Description 1", "description_1"); trackText("Description 2", "description_2"); trackText("Description 3 (optional)", "description_3")
+            case 5:
+                Toggle("Instrumental", isOn: Binding(get: { selected?.instrumental ?? false }, set: { value in update { $0.instrumental = value } }))
+                TextEditor(text: Binding(get: { selected?.lyrics ?? "" }, set: { value in update { $0.lyrics = value } })).frame(height: 150).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder)).accessibilityLabel("Lyrics")
+            case 6:
+                trackText("License", "license"); trackText("Source & permission", "source")
+                Picker("Clearance", selection: Binding(get: { selected?.clearance ?? "pending" }, set: { value in update { $0.clearance = value } })) { Text("Pending").tag("pending"); Text("Cleared").tag("cleared"); Text("Not cleared").tag("not cleared") }.pickerStyle(.menu)
+                Text("License: owned, written permission, CC-BY or royalty-free").font(.caption2).foregroundStyle(.secondary)
+            case 7:
+                trackText("Theme", "theme"); trackText("Flow", "flow"); trackText("Energy", "energy")
+            case 8:
+                TextEditor(text: Binding(get: { jsonDraft }, set: { value in jsonDraft = value; update { $0.tagsDraft = value } })).font(.system(.caption, design: .monospaced)).frame(height: 150).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.envBorder)).accessibilityLabel("Tags JSON")
+                HStack { Button("Apply") { applyJSON() }; Button("Delete", role: .destructive) { deleting = true } }
+            case 9:
+                trackText("Duration (seconds)", "duration_seconds").keyboardType(.decimalPad); trackText("Sample rate (Hz)", "sample_rate_hz").keyboardType(.numberPad); trackText("Channels", "channels").keyboardType(.numberPad)
+            default:
+                trackText("Format / codec", "format"); trackText("Bit depth", "bit_depth").keyboardType(.numberPad)
+            }
+            Spacer(minLength: 0)
+            HStack {
+                Button("Previous") { screen = max(0, screen - 1) }.disabled(screen == 0)
+                Text("\(screen + 1) / 11").font(.caption)
+                Button("Next") { if screen == 7 { jsonDraft = track.tagsDraft ?? ((try? JSONSerialization.data(withJSONObject: musicSandboxTags(track), options: [.prettyPrinted, .sortedKeys])).flatMap { String(data: $0, encoding: .utf8) } ?? "{}") }; screen = min(10, screen + 1) }.disabled(screen == 10)
+                Spacer()
+                Button("Ready") {
+                    guard let index = workspace.tracks.firstIndex(where: { $0.id == selectedID }) else { return }
+                    var next = workspace; next.tracks[index].reviewed = true
+                    let id = next.tracks[index].fields["id"] ?? ""
+                    if musicSandboxReady(next.tracks[index]) && next.tracks.filter({ $0.fields["id"] == id }).count == 1 { commit(next); message = "Reviewed and saved." }
+                    else { message = "Add genre, languages, two descriptions, lyrics and cleared permission." }
+                }.buttonStyle(.borderedProminent)
+            }.font(.caption)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    private var moveSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading) {
+                ForEach(Array(workspace.folders.dropFirst(folderChoicePage * 4).prefix(4))) { destination in
+                    Button(musicSandboxPath(destination.id, workspace.folders)) { moveSelected(to: destination.id) }
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                }
+                HStack {
+                    Button("Previous") { folderChoicePage -= 1 }.disabled(folderChoicePage == 0)
+                    Button("Next") { folderChoicePage += 1 }.disabled((folderChoicePage + 1) * 4 >= workspace.folders.count)
+                }
+                if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary) }
+                Spacer()
+            }.padding().navigationTitle("Move to folder")
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { moving = false } } }
+        }
+    }
+    private func moveSelected(to destination: String) {
+        guard let index = workspace.tracks.firstIndex(where: { $0.id == selectedID }) else { return }
+        var parent = destination, seen = Set<String>()
+        while !parent.isEmpty && seen.insert(parent).inserted {
+            guard let folder = workspace.folders.first(where: { $0.id == parent }) else { message = "Folder unavailable."; return }
+            let descendants = musicSandboxDescendants(parent, workspace.folders)
+            let others = workspace.tracks.filter { $0.id != selectedID && descendants.contains($0.folder) }
+            guard others.count + 1 <= folder.maxSongs && others.reduce(0, { $0 + $1.size }) + workspace.tracks[index].size <= folder.maxMB * 1024 * 1024 else { message = "Folder capacity reached."; return }
+            parent = folder.parent
+        }
+        var next = workspace; next.tracks[index].folder = destination; next.tracks[index].reviewed = false
+        do { try store.save(next); workspace = next; moving = false; message = "Moved." }
+        catch { message = error.localizedDescription }
+    }
+    private func deleteSelected() {
+        guard let track = selected else { return }
+        var next = workspace; next.tracks.removeAll { $0.id == track.id }
+        do {
+            try store.save(next); workspace = next
+            if !track.audio.isEmpty { try? FileManager.default.removeItem(at: store.audio(track.audio)) }
+            player?.pause(); player = nil; playing = false; selectedID = ""; screen = 0; message = "Record deleted."
+        } catch { message = error.localizedDescription }
+    }
+    private func applyJSON() {
+        do {
+            let data = Data(jsonDraft.utf8)
+            guard data.count <= 1024 * 1024, let tags = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw NativeNativeError.message("Invalid tags JSON.") }
+            try validateMusicSandboxTags(tags)
+            update { $0.originalTags = data; $0.fields = musicSandboxFields(tags); $0.tagsDraft = nil; $0.tempoEstimated = false; $0.keyEstimated = false; $0.tempoEdited = true; $0.keyEdited = true }
+            message = "Tags saved."
+        } catch { message = error.localizedDescription }
+    }
+    private var folderSheet: some View {
+        NavigationStack {
+            Form {
+                TextField("Folder name", text: $folderName)
+                TextField("Maximum songs", text: $folderLimit).keyboardType(.numberPad)
+                TextField("Maximum MB", text: $folderMB).keyboardType(.numberPad)
+                if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary) }
+            }
+            .navigationTitle(editingFolder ? "Folder settings" : "New folder")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showFolder = false } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { saveFolder() } }
+            }
+        }
+    }
+    private func createBlankRecord() {
+        var next = workspace, destination = folderID
+        if destination.isEmpty {
+            if let root = next.folders.first(where: { $0.parent.isEmpty }) { destination = root.id }
+            else { let root = MusicSandboxFolder(name: "My first collection"); destination = root.id; next.folders.append(root) }
+        }
+        var parent = destination, seen = Set<String>()
+        while !parent.isEmpty && seen.insert(parent).inserted {
+            guard let folder = next.folders.first(where: { $0.id == parent }) else { message = "Folder unavailable."; return }
+            let descendants = musicSandboxDescendants(parent, next.folders)
+            guard next.tracks.filter({ descendants.contains($0.folder) }).count < folder.maxSongs else { message = "Folder song limit reached."; return }
+            parent = folder.parent
+        }
+        let used = Set(next.tracks.map { $0.fields["id"] ?? "" }); var number = next.tracks.count + 1
+        var id = "song_\(String(format: "%04d", number))"
+        while used.contains(id) { number += 1; id = "song_\(String(format: "%04d", number))" }
+        var record = MusicSandboxTrack(folder: destination, title: "Untitled record"); record.fields["id"] = id
+        next.tracks.append(record)
+        do { try store.save(next); workspace = next; folderID = destination; selectedID = record.id; screen = 0; message = "" }
+        catch { message = error.localizedDescription }
+    }
+    private func saveFolder() {
+        let name = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 80, !name.contains("/"), !name.contains("\\"), name.rangeOfCharacter(from: .controlCharacters) == nil, let limit = Int(folderLimit), (1...500).contains(limit), let mb = Int(folderMB), (10...2000).contains(mb) else { message = "Enter a valid name, 1–500 songs and 10–2000 MB."; return }
+        var next = workspace
+        let parent = editingFolder ? (folder?.parent ?? "") : folderID
+        guard !next.folders.contains(where: { $0.parent == parent && $0.id != (editingFolder ? folderID : "") && musicSandboxID($0.name) == musicSandboxID(name) }) else { message = "A folder with this name already exists."; return }
+        let id: String
+        if editingFolder, let index = next.folders.firstIndex(where: { $0.id == folderID }) {
+            id = next.folders[index].id; next.folders[index].name = name; next.folders[index].maxSongs = limit; next.folders[index].maxMB = mb
+        } else {
+            let folder = MusicSandboxFolder(name: name, parent: folderID, maxSongs: limit, maxMB: mb); id = folder.id; next.folders.append(folder)
+        }
+        let descendants = musicSandboxDescendants(id, next.folders)
+        let items = next.tracks.filter { descendants.contains($0.folder) }
+        guard items.count <= limit && items.reduce(0, { $0 + $1.size }) <= mb * 1024 * 1024 else { message = "The new limit is below the folder's current contents."; return }
+        do { try store.save(next); workspace = next; folderID = id; page = 0; showFolder = false; message = "" }
+        catch { message = error.localizedDescription }
+    }
+    private func importFiles(_ urls: [URL]) async {
+        guard !busy, storageError == nil else { return }
+        busy = true; message = "Adding music…"
+        defer { busy = false }
+        do {
+            let sources = try await Task.detached(priority: .userInitiated) { () throws -> [NativeSongAnalysisTrack] in
+                var output = [NativeSongAnalysisTrack](), total = 0
+                for url in urls {
+                    let opened = url.startAccessingSecurityScopedResource()
+                    defer { if opened { url.stopAccessingSecurityScopedResource() } }
+                    let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                    let zip = url.pathExtension.lowercased() == "zip"
+                    if !zip && size == 0 && url.lastPathComponent.lowercased().hasSuffix(".lyrics.txt") { continue }
+                    guard size > 0 && size <= (zip ? 30 : 20) * 1024 * 1024 else { throw NativeNativeError.message("File exceeds the import limit.") }
+                    let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                    guard data.count == size else { throw NativeNativeError.message("File changed during import.") }
+                    let incoming = zip ? try nativeSongUnpackZIP(data, includeSidecars: true) : [NativeSongAnalysisTrack(filename: url.lastPathComponent, data: data)]
+                    output.append(contentsOf: incoming)
+                    total += incoming.reduce(0) { $0 + $1.data.count }
+                    guard output.count <= 150 && total <= 60 * 1024 * 1024 else { throw NativeNativeError.message("Import up to 60 MB at a time.") }
+                }
+                return output
+            }.value
+            try Task.checkCancellation()
+            var groups: [String: [NativeSongAnalysisTrack]] = [:]
+            let suffix = #"(?i)\.(tags\.json|lyrics\.txt|mp3|m4a|aac|wav|flac|ogg|oga|opus|aiff|aif|3gp|mp4|amr|webm)$"#
+            for source in sources {
+                let stem = source.filename.replacingOccurrences(of: suffix, with: "", options: .regularExpression)
+                if stem != source.filename { groups[stem, default: []].append(source) }
+            }
+            guard !groups.isEmpty else { throw NativeNativeError.message("No audio, tags or lyrics found.") }
+            guard groups.count <= 50 else { throw NativeNativeError.message("Add up to 50 songs at a time.") }
+            var next = workspace
+            var destination = folderID
+            if destination.isEmpty { let created = MusicSandboxFolder(name: "My first collection"); destination = created.id; next.folders.append(created) }
+            var added = 0
+            for stem in groups.keys.sorted() {
+                try Task.checkCancellation()
+                guard let group = groups[stem] else { continue }
+                let audio = group.first { nativeSongExtensions.contains(URL(fileURLWithPath: $0.filename).pathExtension.lowercased()) }
+                let tagSource = group.first { $0.filename.lowercased().hasSuffix(".tags.json") }
+                let lyricSource = group.first { $0.filename.lowercased().hasSuffix(".lyrics.txt") }
+                var target = destination
+                let parts = stem.split(separator: "/").map(String.init)
+                guard parts.count <= 13 && parts.dropLast().allSatisfy({ $0.count <= 80 }) else { throw NativeNativeError.message("Invalid folder path.") }
+                if parts.count > 1 {
+                    for name in parts.dropLast() {
+                        if let existing = next.folders.first(where: { $0.parent == target && $0.name.caseInsensitiveCompare(name) == .orderedSame }) { target = existing.id }
+                        else { let folder = MusicSandboxFolder(name: name, parent: target); next.folders.append(folder); target = folder.id }
+                    }
+                }
+                var parent = target, seen = Set<String>()
+                while !parent.isEmpty && seen.insert(parent).inserted {
+                    guard let folder = next.folders.first(where: { $0.id == parent }) else { throw NativeNativeError.message("Folder unavailable.") }
+                    let descendants = musicSandboxDescendants(parent, next.folders)
+                    let items = next.tracks.filter { descendants.contains($0.folder) }
+                    guard items.count + 1 <= folder.maxSongs && items.reduce(0, { $0 + $1.size }) + (audio?.data.count ?? 0) <= folder.maxMB * 1024 * 1024 else { throw NativeNativeError.message("Folder capacity reached.") }
+                    parent = folder.parent
+                }
+                var record = MusicSandboxTrack(folder: target, title: parts.last ?? stem)
+                if let source = tagSource {
+                    guard source.data.count <= 1024 * 1024, let tags = try JSONSerialization.jsonObject(with: source.data) as? [String: Any] else { throw NativeNativeError.message("Invalid tags JSON.") }
+                    try validateMusicSandboxTags(tags)
+                    record.originalTags = source.data
+                    record.fields = musicSandboxFields(tags)
+                }
+                let base = musicSandboxID((record.fields["id"] ?? "").isEmpty ? (parts.last ?? stem) : record.fields["id"]!)
+                let used = Set(next.tracks.map { $0.fields["id"] ?? "" }); var id = base; var suffixNumber = 2
+                while used.contains(id) { id = "\(base)_\(String(format: "%03d", suffixNumber))"; suffixNumber += 1 }
+                record.fields["id"] = id
+                if let lyrics = lyricSource { guard lyrics.data.count <= 1024 * 1024, let text = String(data: lyrics.data, encoding: .utf8) else { throw NativeNativeError.message("Invalid lyrics text.") }; record.lyrics = text }
+                if let audio {
+                    record.audio = UUID().uuidString + "." + URL(fileURLWithPath: audio.filename).pathExtension.lowercased(); record.size = audio.data.count
+                    try audio.data.write(to: store.audio(record.audio), options: .atomic)
+                    do {
+                        let report = try await Task.detached(priority: .userInitiated) { try nativeSongAnalyzeAudio(audio.data, filename: audio.filename) }.value.report
+                        if (record.fields["tempo_bpm"] ?? "").isEmpty, let value = report["tempo_bpm"] as? NSNumber { record.fields["tempo_bpm"] = value.stringValue; record.tempoEstimated = true }
+                        if (record.fields["key"] ?? "").isEmpty, let value = report["key"] as? String { record.fields["key"] = value; record.keyEstimated = true }
+                        if let technical = report["technical"] as? [String: Any] {
+                            for field in ["duration_seconds", "sample_rate_hz", "channels", "bit_depth"] { if let number = technical[field] as? NSNumber { record.fields[field] = number.stringValue } }
+                            if let codec = technical["codec"] as? String { record.fields["format"] = codec }
+                            record.technical = "\(nativeSongString(technical["sample_rate_hz"], fallback: "—")) Hz · \(nativeSongString(technical["channels"], fallback: "—")) channels · Peak \(nativeSongString(technical["peak_dbfs"], fallback: "—")) dBFS · RMS \(nativeSongString(technical["rms_dbfs"], fallback: "—")) dBFS"
+                        }
+                        try Task.checkCancellation()
+                    } catch is CancellationError {
+                        try? FileManager.default.removeItem(at: store.audio(record.audio))
+                        throw CancellationError()
+                    } catch { record.technical = "Analysis unavailable. Add details manually." }
+                }
+                next.tracks.append(record)
+                do { try store.save(next); workspace = next; added += 1 }
+                catch { if !record.audio.isEmpty { try? FileManager.default.removeItem(at: store.audio(record.audio)) }; throw error }
+            }
+            folderID = destination; page = 0; message = "\(added) songs added. Check BPM and key by ear."
+        } catch { message = error.localizedDescription }
+    }
+    private func attachAudio(_ url: URL) async {
+        guard !busy, storageError == nil, let current = selected else { return }
+        busy = true; message = "Adding audio…"; player?.pause(); player = nil; playing = false
+        var newFile = "", saved = false
+        defer {
+            if !saved && !newFile.isEmpty { try? FileManager.default.removeItem(at: store.audio(newFile)) }
+            busy = false
+        }
+        do {
+            let ext = url.pathExtension.lowercased()
+            guard nativeSongExtensions.contains(ext) else { throw NativeNativeError.message("Choose a supported audio file.") }
+            let data = try await Task.detached(priority: .userInitiated) { () throws -> Data in
+                let opened = url.startAccessingSecurityScopedResource(); defer { if opened { url.stopAccessingSecurityScopedResource() } }
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                guard size > 0 && size <= 20 * 1024 * 1024 else { throw NativeNativeError.message("Audio must be 20 MB or smaller.") }
+                let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                guard data.count == size else { throw NativeNativeError.message("File changed during import.") }
+                return data
+            }.value
+            try Task.checkCancellation()
+            var parent = current.folder, seen = Set<String>()
+            while !parent.isEmpty && seen.insert(parent).inserted {
+                guard let folder = workspace.folders.first(where: { $0.id == parent }) else { throw NativeNativeError.message("Folder unavailable.") }
+                let descendants = musicSandboxDescendants(parent, workspace.folders)
+                let others = workspace.tracks.filter { $0.id != current.id && descendants.contains($0.folder) }
+                guard others.count + 1 <= folder.maxSongs && others.reduce(0, { $0 + $1.size }) + data.count <= folder.maxMB * 1024 * 1024 else { throw NativeNativeError.message("Folder capacity reached.") }
+                parent = folder.parent
+            }
+            newFile = UUID().uuidString + "." + ext
+            try data.write(to: store.audio(newFile), options: .atomic)
+            guard let index = workspace.tracks.firstIndex(where: { $0.id == current.id }) else { throw NativeNativeError.message("Record unavailable.") }
+            var next = workspace, record = next.tracks[index]
+            if record.tempoEstimated == true { record.fields["tempo_bpm"] = ""; record.tempoEstimated = false }
+            if record.keyEstimated == true { record.fields["key"] = ""; record.keyEstimated = false }
+            record.audio = newFile; record.size = data.count; record.reviewed = false
+            do {
+                let report = try await Task.detached(priority: .userInitiated) { try nativeSongAnalyzeAudio(data, filename: url.lastPathComponent) }.value.report
+                try Task.checkCancellation()
+                if record.tempoEdited != true, (record.fields["tempo_bpm"] ?? "").isEmpty, let tempo = report["tempo_bpm"] as? NSNumber { record.fields["tempo_bpm"] = tempo.stringValue; record.tempoEstimated = true }
+                if record.keyEdited != true, (record.fields["key"] ?? "").isEmpty, let key = report["key"] as? String { record.fields["key"] = key; record.keyEstimated = true }
+                if let technical = report["technical"] as? [String: Any] {
+                    for field in ["duration_seconds", "sample_rate_hz", "channels", "bit_depth"] { record.fields[field] = (technical[field] as? NSNumber)?.stringValue ?? "" }
+                    record.fields["format"] = technical["codec"] as? String ?? ""
+                    record.technical = "\(nativeSongString(technical["sample_rate_hz"], fallback: "—")) Hz · \(nativeSongString(technical["channels"], fallback: "—")) channels · Peak \(nativeSongString(technical["peak_dbfs"], fallback: "—")) dBFS · RMS \(nativeSongString(technical["rms_dbfs"], fallback: "—")) dBFS"
+                }
+            } catch is CancellationError { throw CancellationError() }
+            catch { record.technical = "Analysis unavailable. Add details manually."; record.fields["duration_seconds"] = "" }
+            next.tracks[index] = record
+            try store.save(next); workspace = next; saved = true
+            if !current.audio.isEmpty { try? FileManager.default.removeItem(at: store.audio(current.audio)) }
+            message = "Audio saved. Check BPM and key by ear."
+        } catch { if !(error is CancellationError) { message = error.localizedDescription } }
+    }
+    private func prepareExport(training: Bool) {
+        do {
+            let ids = folderID.isEmpty ? Set(workspace.folders.map(\.id)) : musicSandboxDescendants(folderID, workspace.folders)
+            let selected = workspace.tracks.filter { ids.contains($0.folder) && (!training || (!$0.audio.isEmpty && musicSandboxReady($0))) }
+            let exportSize = try selected.reduce(0) { total, track in total + track.size + track.lyrics.utf8.count + (try JSONSerialization.data(withJSONObject: musicSandboxTags(track))).count }
+            guard !selected.isEmpty, exportSize <= 28 * 1024 * 1024 else { throw NativeNativeError.message("Choose records to export, up to 28 MB at a time.") }
+            let idsToExport = selected.map { $0.fields["id"] ?? "" }
+            guard selected.allSatisfy({ $0.tagsDraft == nil }), Set(idsToExport).count == idsToExport.count,
+                  idsToExport.allSatisfy({ $0.range(of: #"^[a-z0-9][a-z0-9_-]{0,119}$"#, options: .regularExpression) != nil }) else { throw NativeNativeError.message("Apply pending JSON and use unique lowercase record IDs before exporting.") }
+            var files = [(String, Data)](), manifest = "id,folder,audio,license_status,reviewed\n", dataset = [String]()
+            for track in selected {
+                let id = track.fields["id"]!, path = musicSandboxPath(track.folder, workspace.folders), base = "\(path)/\(id)"
+                let filename = track.audio.isEmpty ? "" : "\(base).\(URL(fileURLWithPath: track.audio).pathExtension)"
+                if !filename.isEmpty { files.append((filename, try Data(contentsOf: store.audio(track.audio)))) }
+                files.append(("\(base).lyrics.txt", Data((training ? musicSandboxLyrics(track.lyrics) : track.lyrics).utf8)))
+                if training {
+                    let caption = musicSandboxCaption(track)
+                    guard caption.count <= 500 else { throw NativeNativeError.message("Shorten the caption for \(id).") }
+                    let annotation: [String: Any] = ["caption": caption, "bpm": Double(track.fields["tempo_bpm"] ?? "") as Any? ?? NSNull(), "keyscale": track.fields["key"] ?? "", "timesignature": track.fields["time_signature"] ?? "", "vocal_language": track.instrumental ? "instrumental" : "unknown", "duration": Double(track.fields["duration_seconds"] ?? "") as Any? ?? NSNull()]
+                    files.append(("\(base).caption.txt", Data(caption.utf8)))
+                    files.append(("\(base).json", try JSONSerialization.data(withJSONObject: annotation, options: [.prettyPrinted, .sortedKeys])))
+                    var row = annotation; row["audio"] = filename; row["lyrics"] = "\(base).lyrics.txt"
+                    let rowData = try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys])
+                    dataset.append(String(decoding: rowData, as: UTF8.self))
+                } else { files.append(("\(base).tags.json", try JSONSerialization.data(withJSONObject: musicSandboxTags(track), options: [.prettyPrinted, .sortedKeys]))) }
+                manifest += "\(id),\(path),\(filename),\(track.clearance),\(track.reviewed)\n"
+            }
+            files.append(("manifest.csv", Data(manifest.utf8)))
+            if training { files.append(("dataset.jsonl", Data(dataset.joined(separator: "\n").utf8))) }
+            exportDocument = NativeSongAnalysisDocument(data: try nativeSongZIPStore(files)); exporting = true
+        } catch { message = error.localizedDescription }
+    }
+}

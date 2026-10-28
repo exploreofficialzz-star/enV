@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AudioMusicStudio, AudioStudioGuide } from "@/components/engines/audio-music-studio";
-import { MusicAnalyzerStudio } from "@/components/engines/music-analyzer-studio";
+import { AiMusicDataSandbox } from "@/components/engines/ai-music-data-sandbox";
 import { MusicLiveVideoStudio } from "@/components/engines/music-live-video-studio";
 import { AudioExtraTool } from "@/components/engines/audio-extra-tools";
 import { approximateLufs, amplitudeDbfs, estimateBitrateKbpsFromSize, estimateCompressedAudioBytes, estimatePcmAudioBytes, humReduceSamples, noiseGateSamples, reduceVoiceNoiseSamples, spectrogramData, trimSilenceBounds } from "@/lib/engines/audio-studio";
@@ -326,7 +326,7 @@ export function AudioEngine({ op, toolId = "", initialMode }: Props) {
   // Keep conditional routing in a hook-free shell. Moving between audio routes must
   // never change the number/order of hooks called by a single mounted component.
   if (toolId === "music-live-video-studio") return <MusicLiveVideoStudio />;
-  if (toolId === "audio-analyze-studio") return <MusicAnalyzerStudio />;
+  if (toolId === "audio-analyze-studio") return <AiMusicDataSandbox />;
   if (toolId === "music-studio" || toolId.startsWith("music-") || op === "music-studio") return <AudioMusicStudio mode={initialMode ?? (toolId.replace("music-", "") || "separate")} />;
   if (op.startsWith("studio-")) return <AudioStudioGuide studio={op.slice("studio-".length)} />;
   const guidePlatform = platformFromOp(op);

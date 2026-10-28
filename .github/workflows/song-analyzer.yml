@@ -11,6 +11,7 @@ on:
         "src/components/engines/*music*sandbox*",
         "src/components/engines/music-analyzer-studio.tsx",
         "src/workers/music-sandbox-zip.ts",
+        "src/workers/music-sandbox-audio.ts",
         "public/music-sandbox/**",
         "src/lib/engines/audio-studio.ts",
         "src/workers/song-*.ts",
@@ -31,6 +32,7 @@ on:
         "src/components/engines/*music*sandbox*",
         "src/components/engines/music-analyzer-studio.tsx",
         "src/workers/music-sandbox-zip.ts",
+        "src/workers/music-sandbox-audio.ts",
         "public/music-sandbox/**",
         "src/lib/engines/audio-studio.ts",
         "src/workers/song-*.ts",
@@ -84,5 +86,5 @@ jobs:
         if: always()
         with:
           name: song-analyzer-browser
-          path: /tmp/env-song-browser-*/*.png
+          path: /tmp/env-music-sandbox-*/*.png
           if-no-files-found: ignore
