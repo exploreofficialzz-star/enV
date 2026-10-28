@@ -15,6 +15,7 @@ const iconNames = new Set([
   "ArrowLeft", "ArrowRight", "ChevronDown", "Wrench", "Settings", "Bell", "Info",
   "ShieldCheck", "CircleCheck", "Clock3", "Copy", "RotateCcw", "Play",
   "Globe", "FilePlus2", "Hammer",
+  "FileAudio", "FileJson", "FilePenLine", "Pause", "ChevronRight", "FolderPlus", "ArrowDownToLine", "Trash2",
 ]);
 
 function assetName(name) {

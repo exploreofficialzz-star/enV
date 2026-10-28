@@ -14,6 +14,12 @@ export function sandboxAnalysisLimit(audio: SandboxAudio, duration: number | nul
   return null;
 }
 
+/** A simple, reviewable grouping derived from BPM, not a musical classification. */
+export function sandboxTempoBand(tempo: number | null): string {
+  if (tempo === null || !Number.isFinite(tempo) || tempo < 1 || tempo > 400) return "";
+  return tempo < 90 ? "slow" : tempo < 130 ? "mid" : "fast";
+}
+
 /** Only fill empty fields; imported and manually edited values always win. */
 export function applySandboxAnalysis(track: SandboxTrack, analysis: SandboxAnalysis): SandboxTrack {
   const next = { ...track, tags: { ...track.tags }, provenance: { ...track.provenance }, analysis };
@@ -25,6 +31,13 @@ export function applySandboxAnalysis(track: SandboxTrack, analysis: SandboxAnaly
     if (next.provenance.key === "estimated" || (!next.tags.key.trim() && next.provenance.key !== "edited" && analysis.key)) {
       next.tags.key = analysis.key || "";
       next.provenance.key = "estimated";
+    }
+    if (next.provenance.tempo_band === "estimated" || (!next.tags.tempo_band.trim() && next.provenance.tempo_band !== "edited")) {
+      const band = sandboxTempoBand(next.tags.tempo_bpm);
+      if (band || next.provenance.tempo_band === "estimated") {
+        next.tags.tempo_band = band;
+        next.provenance.tempo_band = "estimated";
+      }
     }
   }
   return next;

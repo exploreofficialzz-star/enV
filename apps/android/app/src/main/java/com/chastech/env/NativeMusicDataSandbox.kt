@@ -6,26 +6,27 @@ import android.net.Uri
 import android.util.AtomicFile
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.chastech.env.ui.EnVLogo
+import com.chastech.env.ui.EnVIcon
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -105,6 +106,19 @@ internal fun sandboxNativeReady(track: JSONObject): Boolean {
         (track.optBoolean("instrumental") || track.optString("lyrics").isNotBlank()) &&
         (track.optString("audio").isBlank() || (0 until descriptions.length()).count { descriptions.optString(it).isNotBlank() } >= 2)
 }
+internal fun nativeSandboxTempoBand(tempo: Double): String = when {
+    !tempo.isFinite() || tempo < 1 || tempo > 400 -> ""
+    tempo < 90 -> "slow"
+    tempo < 130 -> "mid"
+    else -> "fast"
+}
+internal fun nativeSandboxSuggestTempoBand(track: JSONObject) {
+    val tags = track.optJSONObject("tags") ?: return
+    if (track.optBoolean("tempoBandEdited")) return
+    if (tags.optString("tempo_band").isNotBlank() && !track.optBoolean("tempoBandEstimated")) return
+    val band = nativeSandboxTempoBand(tags.optDouble("tempo_bpm", Double.NaN))
+    if (band.isNotBlank() || track.optBoolean("tempoBandEstimated")) { tags.put("tempo_band", band); track.put("tempoBandEstimated", true) }
+}
 private fun nativeSandboxNewFolder(name: String, parent: String): JSONObject = JSONObject().put("id", UUID.randomUUID().toString())
     .put("name", name.trim()).put("parent", parent).put("maxSongs", 100).put("maxMB", 250)
 internal fun nativeSandboxCaption(tags: JSONObject): String {
@@ -138,7 +152,7 @@ internal fun nativeSandboxFolderCapacity(folderId: String, folders: List<JSONObj
 }
 
 @Composable
-fun NativeMusicDataSandboxScreen() {
+fun NativeMusicDataSandboxScreen(startInWorkspace: Boolean = false) {
     val context = LocalContext.current
     val deviceConfiguration = LocalConfiguration.current
     val panelHeight = (deviceConfiguration.screenHeightDp - 100).coerceIn(440, 650).dp
@@ -147,10 +161,12 @@ fun NativeMusicDataSandboxScreen() {
     val loaded = remember { runCatching { store.read() } }
     var workspace by remember { mutableStateOf(loaded.getOrElse { JSONObject().put("folders", JSONArray()).put("tracks", JSONArray()) }) }
     val storageFailure = loaded.exceptionOrNull()
-    var welcome by remember { mutableStateOf(true) }
+    var welcome by remember { mutableStateOf(!startInWorkspace) }
     var folderId by remember { mutableStateOf("") }
     var selectedId by remember { mutableStateOf("") }
     var screen by remember { mutableIntStateOf(0) }
+    var libraryView by remember { mutableIntStateOf(0) }
+    var showRawJson by remember { mutableStateOf(false) }
     var page by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf(storageFailure?.let { "Could not open saved workspace: ${it.message}" } ?: "") }
@@ -163,12 +179,23 @@ fun NativeMusicDataSandboxScreen() {
     var deleting by remember { mutableStateOf(false) }
     var folderChoicePage by remember { mutableIntStateOf(0) }
     var jsonDraft by remember { mutableStateOf("") }
-    var editorMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedId) {
+        val draft = nativeSandboxEntries(workspace.optJSONArray("tracks") ?: JSONArray()).firstOrNull { it.optString("id") == selectedId }?.takeIf { it.has("tagsDraft") }?.optString("tagsDraft")
+        showRawJson = draft != null; jsonDraft = draft ?: ""; if (draft != null) screen = 2
+    }
     var clearanceMenu by remember { mutableStateOf(false) }
     var trainingExport by remember { mutableStateOf(false) }
     var choosingExport by remember { mutableStateOf(false) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var playing by remember { mutableStateOf(false) }
+    var audioPosition by remember { mutableIntStateOf(0) }
+    var audioDuration by remember { mutableIntStateOf(0) }
+    LaunchedEffect(playing, player) {
+        while (playing && player != null) {
+            audioPosition = runCatching { player?.currentPosition ?: 0 }.getOrDefault(0)
+            delay(500)
+        }
+    }
     DisposableEffect(Unit) { onDispose { player?.release() } }
 
     val folders = nativeSandboxEntries(workspace.optJSONArray("folders") ?: JSONArray())
@@ -189,7 +216,8 @@ fun NativeMusicDataSandboxScreen() {
             key in nativeSandboxLists -> nativeSandboxValues(value)
             else -> value
         })
-        if (key == "tempo_bpm") { item.put("tempoEstimated", false); item.put("tempoEdited", true) }
+        if (key == "tempo_bpm") { item.put("tempoEstimated", false); item.put("tempoEdited", true); if (item.optBoolean("tempoBandEstimated")) nativeSandboxSuggestTempoBand(item) }
+        if (key == "tempo_band") { item.put("tempoBandEstimated", false); item.put("tempoBandEdited", true) }
         if (key == "key") { item.put("keyEstimated", false); item.put("keyEdited", true) }
     }
     fun createBlankRecord() {
@@ -274,6 +302,7 @@ fun NativeMusicDataSandboxScreen() {
                                     if (!technical.isNull("codec")) tags.put("format", technical.optString("codec"))
                                 }
                             } catch (error: Exception) { if (error is CancellationException) throw error; item.put("analysisNote", "Analysis unavailable. Add details manually.") }
+                            nativeSandboxSuggestTempoBand(item)
                         }
                         next.getJSONArray("tracks").put(item)
                         check(commit(next)) { "Saving the import failed." }
@@ -288,7 +317,7 @@ fun NativeMusicDataSandboxScreen() {
     }
     val audioAttacher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null && !busy && selected != null) scope.launch {
-            busy = true; message = "Adding audio…"; player?.release(); player = null; playing = false
+            busy = true; message = "Adding audio…"; player?.release(); player = null; playing = false; audioPosition = 0; audioDuration = 0
             var newFile = ""; var saved = false
             try {
                 val source = withContext(Dispatchers.IO) { collectUriSources(context, listOf(uri)).singleOrNull() } ?: error("Choose a supported audio file.")
@@ -301,6 +330,9 @@ fun NativeMusicDataSandboxScreen() {
                 val oldFile = item.optString("audio"); val tags = item.getJSONObject("tags")
                 if (item.optBoolean("tempoEstimated")) { tags.put("tempo_bpm", JSONObject.NULL); item.put("tempoEstimated", false) }
                 if (item.optBoolean("keyEstimated")) { tags.put("key", ""); item.put("keyEstimated", false) }
+                if (item.optBoolean("tempoBandEstimated")) { tags.put("tempo_band", "") }
+                item.remove("technical"); item.remove("analysisNote")
+                for (field in listOf("duration_seconds", "sample_rate_hz", "channels", "bit_depth", "format")) tags.remove(field)
                 item.put("audio", newFile).put("size", bytes.size).put("reviewed", false)
                 try {
                     val report = withContext(Dispatchers.IO) { analyzeSandboxSong(context, source.copy(bytes = bytes, uri = null, sizeBytes = bytes.size.toLong())) }
@@ -312,6 +344,7 @@ fun NativeMusicDataSandboxScreen() {
                         tags.put("format", nativeSandboxString(technical, "codec"))
                     }
                 } catch (error: Exception) { if (error is CancellationException) throw error; item.put("analysisNote", "Analysis unavailable. Add details manually.") }
+                nativeSandboxSuggestTempoBand(item)
                 check(commit(next)) { "Saving audio failed." }; saved = true
                 if (oldFile.isNotBlank()) store.audio(oldFile).delete()
                 message = "Audio saved. Check BPM and key by ear."
@@ -319,12 +352,31 @@ fun NativeMusicDataSandboxScreen() {
             finally { if (!saved && newFile.isNotBlank()) store.audio(newFile).delete(); busy = false }
         }
     }
+    val lyricsImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null && !busy && selected != null) scope.launch {
+            val targetId = selectedId
+            busy = true
+            try {
+                val text = withContext(Dispatchers.IO) {
+                    (context.contentResolver.openInputStream(uri) ?: error("Cannot open lyrics.")).use { readBoundedContent(it, 1024L * 1024).toString(Charsets.UTF_8) }
+                }
+                check(selectedId == targetId) { "The selected record changed. Import the lyrics again." }
+                edit { it.put("lyrics", text) }; message = "Lyrics imported."
+            } catch (error: Exception) { if (error is CancellationException) throw error; message = error.message ?: "Could not import lyrics." }
+            finally { busy = false }
+        }
+    }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null && !busy) scope.launch {
             busy = true
             try {
                 val ids = if (folderId.isBlank()) folders.map { it.optString("id") }.toSet() else sandboxNativeDescendants(folderId, folders)
-                val chosen = tracks.filter { it.optString("folder") in ids && (!trainingExport || (it.optString("audio").isNotBlank() && sandboxNativeReady(it))) }
+                val chosen = tracks.filter {
+                    it.optString("folder") in ids &&
+                        (folderId.isNotBlank() || libraryView != 2 || !sandboxNativeReady(it)) &&
+                        (folderId.isNotBlank() || libraryView != 3 || sandboxNativeReady(it)) &&
+                        (!trainingExport || (it.optString("audio").isNotBlank() && sandboxNativeReady(it)))
+                }
                 require(chosen.isNotEmpty()) { "No songs to export." }
                 val exportedIds = chosen.map { it.getJSONObject("tags").optString("id") }
                 require(chosen.none { it.has("tagsDraft") }) { "Apply pending tags JSON before exporting." }
@@ -406,98 +458,163 @@ fun NativeMusicDataSandboxScreen() {
                 } catch (error: Exception) { message = error.message ?: "Could not save folder." }
             }) { Text("Save") } }, dismissButton = { TextButton(onClick = { creatingFolder = false; editingFolder = false }) { Text("Cancel") } })
     }
-    val panelSizing = if (deviceConfiguration.fontScale > 1.15f || deviceConfiguration.screenHeightDp < 540) Modifier.heightIn(min = panelHeight) else Modifier.height(panelHeight)
+    @Composable fun SandboxBottomNavigation() {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            listOf("Home", "LayoutGrid", "FilePenLine", "CircleCheck").zip(listOf("Overview", "Folders", "Drafts", "Ready to export")).forEachIndexed { index, (icon, label) ->
+                val tint = if (libraryView == index && selectedId.isBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                TextButton(onClick = {
+                    player?.release(); player = null; playing = false; audioPosition = 0; audioDuration = 0
+                    selectedId = ""; screen = 0; libraryView = index; folderId = ""; page = 0; message = ""
+                }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(2.dp), enabled = !busy, colors = ButtonDefaults.textButtonColors(contentColor = tint)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { EnVIcon(icon, modifier = Modifier.size(20.dp), tint = tint); Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2, textAlign = TextAlign.Center) }
+                }
+            }
+        }
+    }
+    // The editor contains a scroll area, so it must always receive a finite height.
+    // Larger text gets extra room and the enclosing tool page can scroll as needed.
+    val panelSizing = Modifier.height(if (deviceConfiguration.fontScale > 1.15f) panelHeight + 160.dp else panelHeight)
     Column(Modifier.widthIn(max = 430.dp).fillMaxWidth().then(panelSizing), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (welcome) {
             Spacer(Modifier.weight(1f))
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 EnVLogo(Modifier.width(150.dp).height(80.dp), darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f, homeHero = true)
-                Icon(Icons.Default.Headset, contentDescription = null, modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                EnVIcon("Headphones", modifier = Modifier.size(42.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("AI Music Data Sandbox.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { welcome = false }) { Text("Enter sandbox") }
             }
             Spacer(Modifier.weight(1f))
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("By", style = MaterialTheme.typography.labelSmall)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Image(painterResource(R.drawable.rumuo_mark), contentDescription = null, modifier = Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)))
-                    Text("Rumuo", style = MaterialTheme.typography.titleSmall)
-                }
-            }
         } else if (selected != null) {
             val tags = selected.getJSONObject("tags")
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { player?.release(); player = null; playing = false; selectedId = ""; screen = 0 }, enabled = !busy) { Text("‹ Back") }
+                TextButton(onClick = { player?.release(); player = null; playing = false; audioPosition = 0; audioDuration = 0; selectedId = ""; screen = 0 }, enabled = !busy) { EnVIcon("ArrowLeft", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface); Spacer(Modifier.width(4.dp)); Text("Back") }
                 Text(selected.optString("title"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(if (sandboxNativeReady(selected)) "Ready" else "Draft", style = MaterialTheme.typography.labelSmall)
             }
             if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
-            if (selected.optString("audio").isNotBlank()) TextButton(onClick = {
-                try {
-                    if (playing) { player?.pause(); playing = false }
-                    else { if (player == null) player = MediaPlayer().apply { setDataSource(store.audio(selected.optString("audio")).absolutePath); prepare(); setOnCompletionListener { playing = false } }; player?.start(); playing = true }
+            if (selected.optString("audio").isNotBlank()) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = {
+                        try {
+                            if (playing) { player?.pause(); playing = false }
+                            else {
+                                if (player == null) player = MediaPlayer().apply {
+                                    setDataSource(store.audio(selected.optString("audio")).absolutePath); prepare()
+                                    audioDuration = duration; setOnCompletionListener { seekTo(0); audioPosition = 0; playing = false }
+                                }
+                                player?.start(); playing = true
+                            }
+                        } catch (error: Exception) { message = error.message ?: "Cannot play audio." }
+                    }) { EnVIcon(if (playing) "Pause" else "Play", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(4.dp)); Text(if (playing) "Pause" else "Play") }
+                    Slider(value = audioPosition.coerceAtMost(audioDuration).toFloat(), onValueChange = { value -> audioPosition = value.toInt(); player?.seekTo(audioPosition) }, valueRange = 0f..audioDuration.coerceAtLeast(1).toFloat(), modifier = Modifier.weight(1f), enabled = player != null)
                 }
-                catch (error: Exception) { message = error.message ?: "Cannot play audio." }
-            }) { Text(if (playing) "Pause audio" else "Play audio") }
-            val sectionNames = listOf("Track", "Tempo & key", "Style", "Sound", "Descriptions", "Lyrics", "Permission", "Extra tags", "All tags", "File facts", "File format")
-            Box {
-                OutlinedButton(onClick = { editorMenu = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Edit: ${sectionNames[screen]}") }
-                DropdownMenu(expanded = editorMenu, onDismissRequest = { editorMenu = false }) {
-                    listOf(0, 1, 2, 5, 6, 7, 8, 9).forEach { destination ->
-                        DropdownMenuItem(text = { Text(sectionNames[destination]) }, onClick = { if (destination == 8) jsonDraft = if (selected.has("tagsDraft")) selected.optString("tagsDraft") else tags.toString(2); screen = destination; editorMenu = false })
-                    }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("FileAudio" to "Music", "FileText" to "lyrics.txt", "FileJson" to "tags.json").forEachIndexed { index, (icon, label) ->
+                    val tint = if (screen == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    TextButton(onClick = { if (selected.has("tagsDraft") && index != 2) message = "Apply or discard the JSON changes before switching sections." else { screen = index; message = "" } }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp), colors = ButtonDefaults.textButtonColors(contentColor = tint)) { EnVIcon(icon, Modifier.size(16.dp), tint = tint); Spacer(Modifier.width(4.dp)); Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium) }
                 }
             }
             @Composable fun Field(label: String, value: String, onValue: (String) -> Unit) {
-                OutlinedTextField(value = value, onValueChange = onValue, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !busy)
+                var focused by remember(selectedId, label) { mutableStateOf(false) }
+                var raw by remember(selectedId, label) { mutableStateOf(value) }
+                LaunchedEffect(value, focused) { if (!focused) raw = value }
+                OutlinedTextField(value = raw, onValueChange = { raw = it; onValue(it) }, label = { Text(label) }, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }, singleLine = true, enabled = !busy)
             }
-            when (screen) {
-                0 -> { Field("Title", selected.optString("title")) { edit { item -> item.put("title", it) } }; Field("Record ID", tags.optString("id")) { value -> editTag("id", value) }; Row { TextButton(onClick = { folderChoicePage = 0; moving = true }, enabled = !busy) { Text("Move") }; TextButton(onClick = { audioAttacher.launch(arrayOf("audio/*")) }, enabled = !busy) { Text(if (selected.optString("audio").isEmpty()) "Attach audio" else "Replace audio") } } }
-                1 -> { Field("Tempo (BPM)", nativeSandboxString(tags, "tempo_bpm")) { editTag("tempo_bpm", it) }; Field("Musical key", nativeSandboxString(tags, "key")) { editTag("key", it) }; Field("Time signature", nativeSandboxString(tags, "time_signature")) { editTag("time_signature", it) }; Text("BPM and key are estimates. Check by ear.", style = MaterialTheme.typography.labelSmall); selected.optJSONObject("technical")?.let { technical -> Text("${nativeSandboxString(technical, "sample_rate_hz")} Hz · ${nativeSandboxString(technical, "channels")} channels · Peak ${nativeSandboxString(technical, "peak_dbfs")} dBFS · RMS ${nativeSandboxString(technical, "rms_dbfs")} dBFS", style = MaterialTheme.typography.labelSmall, maxLines = 2) } }
-                2 -> { Field("Genre", nativeSandboxString(tags, "genre")) { editTag("genre", it) }; Field("Sub-style", nativeSandboxString(tags, "sub_style")) { editTag("sub_style", it) }; Field("Languages", nativeSandboxString(tags, "language")) { editTag("language", it) } }
-                3 -> { Field("Mood", nativeSandboxString(tags, "mood")) { editTag("mood", it) }; Field("Voice", nativeSandboxString(tags, "vocals")) { editTag("vocals", it) }; Field("Instruments", nativeSandboxString(tags, "instruments")) { editTag("instruments", it) } }
-                4 -> { for (i in 0..2) Field("Description ${i + 1}", tags.optJSONArray("descriptions")?.optString(i) ?: "") { value -> edit { item -> val existing = item.getJSONObject("tags").optJSONArray("descriptions") ?: JSONArray(); val descriptions = JSONArray(); for (index in 0..2) descriptions.put(if (index == i) value else existing.optString(index)); item.getJSONObject("tags").put("descriptions", descriptions) } } }
-                5 -> { Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = selected.optBoolean("instrumental"), onCheckedChange = { value -> edit { it.put("instrumental", value) } }); Text("Instrumental") }; OutlinedTextField(value = selected.optString("lyrics"), onValueChange = { value -> edit { it.put("lyrics", value) } }, label = { Text("Lyrics") }, modifier = Modifier.fillMaxWidth().height(170.dp), maxLines = 7) }
-                6 -> { Field("License", tags.optString("license")) { editTag("license", it) }; Field("Source & permission", tags.optString("source")) { editTag("source", it) }; Box { OutlinedButton(onClick = { clearanceMenu = true }, enabled = !busy) { Text("Clearance: ${selected.optString("clearance", "pending")}") }; DropdownMenu(expanded = clearanceMenu, onDismissRequest = { clearanceMenu = false }) { listOf("pending", "cleared", "not cleared").forEach { value -> DropdownMenuItem(text = { Text(value) }, onClick = { edit { it.put("clearance", value) }; clearanceMenu = false }) } } }; Text("License: owned, written permission, CC-BY or royalty-free", style = MaterialTheme.typography.labelSmall) }
-                7 -> { Field("Theme", nativeSandboxString(tags, "theme")) { editTag("theme", it) }; Field("Flow", nativeSandboxString(tags, "flow")) { editTag("flow", it) }; Field("Energy", nativeSandboxString(tags, "energy")) { editTag("energy", it) } }
-                8 -> { OutlinedTextField(value = jsonDraft, onValueChange = { value -> jsonDraft = value; edit { it.put("tagsDraft", value) } }, label = { Text("Tags JSON") }, modifier = Modifier.fillMaxWidth().height(160.dp)); Row { TextButton(onClick = { try { require(jsonDraft.toByteArray().size <= 1024 * 1024); val newTags = JSONObject(jsonDraft); validateNativeSandboxTags(newTags); edit { it.put("tags", newTags); it.remove("tagsDraft"); it.put("tempoEstimated", false); it.put("keyEstimated", false); it.put("tempoEdited", true); it.put("keyEdited", true) }; message = "Tags saved." } catch (error: Exception) { message = error.message ?: "Invalid tags JSON." } }) { Text("Apply") }; TextButton(onClick = { deleting = true }) { Text("Delete") } } }
-                9 -> { Field("Duration (seconds)", nativeSandboxString(tags, "duration_seconds")) { value -> edit { it.getJSONObject("tags").put("duration_seconds", value.toDoubleOrNull() ?: JSONObject.NULL) } }; Field("Sample rate (Hz)", nativeSandboxString(tags, "sample_rate_hz")) { value -> edit { it.getJSONObject("tags").put("sample_rate_hz", value.toIntOrNull() ?: JSONObject.NULL) } }; Field("Channels", nativeSandboxString(tags, "channels")) { value -> edit { it.getJSONObject("tags").put("channels", value.toIntOrNull() ?: JSONObject.NULL) } } }
-                else -> { Field("Format / codec", nativeSandboxString(tags, "format")) { editTag("format", it) }; Field("Bit depth", nativeSandboxString(tags, "bit_depth")) { value -> edit { it.getJSONObject("tags").put("bit_depth", value.toIntOrNull() ?: JSONObject.NULL) } } }
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                when (screen) {
+                    0 -> {
+                        Text("Music", style = MaterialTheme.typography.titleSmall)
+                        Field("Title", selected.optString("title")) { edit { item -> item.put("title", it) } }
+                        Row { TextButton(onClick = { folderChoicePage = 0; moving = true }) { Text("Move") }; TextButton(onClick = { audioAttacher.launch(arrayOf("audio/*")) }) { Text(if (selected.optString("audio").isEmpty()) "Add audio" else "Replace audio") } }
+                        Text("Tempo and key are estimates; check by ear.", style = MaterialTheme.typography.labelSmall)
+                        Field("Tempo (BPM)", nativeSandboxString(tags, "tempo_bpm")) { editTag("tempo_bpm", it) }
+                        Field("Musical key", nativeSandboxString(tags, "key")) { editTag("key", it) }
+                        Field("Time signature", nativeSandboxString(tags, "time_signature")) { editTag("time_signature", it) }
+                        Field("Duration (seconds)", nativeSandboxString(tags, "duration_seconds")) { value -> edit { it.getJSONObject("tags").put("duration_seconds", value.toDoubleOrNull() ?: JSONObject.NULL) } }
+                        Field("Sample rate (Hz)", nativeSandboxString(tags, "sample_rate_hz")) { value -> edit { it.getJSONObject("tags").put("sample_rate_hz", value.toIntOrNull() ?: JSONObject.NULL) } }
+                        Field("Channels", nativeSandboxString(tags, "channels")) { value -> edit { it.getJSONObject("tags").put("channels", value.toIntOrNull() ?: JSONObject.NULL) } }
+                        Field("Format / codec", nativeSandboxString(tags, "format")) { editTag("format", it) }
+                        Field("Bit depth", nativeSandboxString(tags, "bit_depth")) { value -> edit { it.getJSONObject("tags").put("bit_depth", value.toIntOrNull() ?: JSONObject.NULL) } }
+                        selected.optJSONObject("technical")?.let { technical -> Text("Peak ${nativeSandboxString(technical, "peak_dbfs")} dBFS · RMS ${nativeSandboxString(technical, "rms_dbfs")} dBFS", style = MaterialTheme.typography.labelSmall) }
+                        if (selected.optString("analysisNote").isNotBlank()) Text(selected.optString("analysisNote"), style = MaterialTheme.typography.labelSmall)
+                    }
+                    1 -> {
+                        Text("Lyrics", style = MaterialTheme.typography.titleSmall)
+                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = selected.optBoolean("instrumental"), onCheckedChange = { value -> edit { it.put("instrumental", value) } }); Text("This track is instrumental") }
+                        OutlinedTextField(value = selected.optString("lyrics"), onValueChange = { value -> edit { it.put("lyrics", value) } }, label = { Text("Lyrics") }, modifier = Modifier.fillMaxWidth().height(200.dp))
+                        OutlinedButton(onClick = { lyricsImporter.launch(arrayOf("text/plain")) }) { Text("Import lyrics text") }
+                    }
+                    else -> {
+                        Text("Song tags", style = MaterialTheme.typography.titleSmall)
+                        Text("Separate multiple values with commas. Review each tag before export.", style = MaterialTheme.typography.labelSmall)
+                        if (selected.has("tagsDraft")) Text("Apply or discard the JSON draft before editing fields.", color = MaterialTheme.colorScheme.error)
+                        val editable = !selected.has("tagsDraft")
+                        listOf("id" to "Record ID · required", "genre" to "Genre · required", "sub_style" to "Sub-style", "language" to "Languages", "tempo_bpm" to "Tempo (BPM)", "key" to "Musical key", "time_signature" to "Time signature", "tempo_band" to "Tempo band", "mood" to "Mood", "theme" to "Theme", "setting" to "Setting", "vocals" to "Voice & delivery", "flow" to "Flow", "instruments" to "Instruments", "standout" to "Standout details", "energy" to "Energy").forEach { (key, label) ->
+                            var focused by remember(selectedId, key) { mutableStateOf(false) }
+                            var raw by remember(selectedId, key) { mutableStateOf(nativeSandboxString(tags, key)) }
+                            val stored = nativeSandboxString(tags, key)
+                            LaunchedEffect(stored, focused) { if (!focused) raw = stored }
+                            OutlinedTextField(value = raw, onValueChange = { value -> raw = value; editTag(key, value) }, label = { Text(label) }, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }, singleLine = true, enabled = editable)
+                        }
+                        for (i in 0..2) OutlinedTextField(value = tags.optJSONArray("descriptions")?.optString(i) ?: "", onValueChange = { value -> edit { item -> val existing = item.getJSONObject("tags").optJSONArray("descriptions") ?: JSONArray(); val descriptions = JSONArray(); for (index in 0..2) descriptions.put(if (index == i) value else existing.optString(index)); item.getJSONObject("tags").put("descriptions", descriptions) } }, label = { Text("Description ${i + 1}${if (i == 2) " (optional)" else ""}") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
+                        OutlinedTextField(value = tags.optString("license"), onValueChange = { editTag("license", it) }, label = { Text("License · required") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
+                        OutlinedTextField(value = tags.optString("source"), onValueChange = { editTag("source", it) }, label = { Text("Source & permission · required") }, modifier = Modifier.fillMaxWidth(), enabled = editable)
+                        Box { OutlinedButton(onClick = { clearanceMenu = true }, enabled = editable) { Text("Clearance: ${selected.optString("clearance", "pending")}") }; DropdownMenu(expanded = clearanceMenu, onDismissRequest = { clearanceMenu = false }) { listOf("pending", "cleared", "not cleared").forEach { value -> DropdownMenuItem(text = { Text(value) }, onClick = { edit { it.put("clearance", value) }; clearanceMenu = false }) } } }
+                        Text("License: owned, written permission, CC-BY or royalty-free", style = MaterialTheme.typography.labelSmall)
+                        TextButton(onClick = { if (!showRawJson) jsonDraft = if (selected.has("tagsDraft")) selected.optString("tagsDraft") else tags.toString(2); showRawJson = !showRawJson }) { Text(if (showRawJson) "Hide advanced JSON" else "Advanced JSON") }
+                        if (showRawJson) {
+                            OutlinedTextField(value = jsonDraft, onValueChange = { value -> jsonDraft = value; edit { it.put("tagsDraft", value) } }, label = { Text("Tags JSON") }, modifier = Modifier.fillMaxWidth().height(180.dp))
+                            Row { TextButton(onClick = { try { require(jsonDraft.toByteArray().size <= 1024 * 1024); val newTags = JSONObject(jsonDraft); validateNativeSandboxTags(newTags); edit { item ->
+                                val oldTags = item.getJSONObject("tags")
+                                if (nativeSandboxString(newTags, "tempo_bpm") != nativeSandboxString(oldTags, "tempo_bpm")) { item.put("tempoEstimated", false); item.put("tempoEdited", true) }
+                                if (nativeSandboxString(newTags, "key") != nativeSandboxString(oldTags, "key")) { item.put("keyEstimated", false); item.put("keyEdited", true) }
+                                if (nativeSandboxString(newTags, "tempo_band") != nativeSandboxString(oldTags, "tempo_band")) { item.put("tempoBandEstimated", false); item.put("tempoBandEdited", true) }
+                                item.put("tags", newTags); item.remove("tagsDraft")
+                            }; message = "Tags saved." } catch (error: Exception) { message = error.message ?: "Invalid tags JSON." } }) { Text("Apply JSON") }; TextButton(onClick = { edit { it.remove("tagsDraft") }; jsonDraft = tags.toString(2); message = "JSON changes discarded." }) { Text("Discard") } }
+                        }
+                    }
+                }
             }
-            Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { screen = (screen - 1).coerceAtLeast(0) }, enabled = screen > 0 && !busy) { Text("Previous") }
-                Text("${screen + 1} / 11", style = MaterialTheme.typography.labelSmall)
-                TextButton(onClick = { if (screen == 7) jsonDraft = if (selected.has("tagsDraft")) selected.optString("tagsDraft") else tags.toString(2); screen = (screen + 1).coerceAtMost(10) }, enabled = screen < 10 && !busy) { Text("Next") }
-                Button(onClick = { val copy = JSONObject(workspace.toString()); val all = nativeSandboxEntries(copy.getJSONArray("tracks")); val item = all.first { it.optString("id") == selectedId }; item.put("reviewed", true); val id = item.getJSONObject("tags").optString("id"); if (sandboxNativeReady(item) && all.count { it.getJSONObject("tags").optString("id") == id } == 1) { if (commit(copy)) message = "Reviewed and saved." } else message = "Check ID, genre, languages, descriptions, lyrics and permission." }, enabled = !busy) { Text("Ready") }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = { deleting = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { EnVIcon("Trash2", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error); Spacer(Modifier.width(4.dp)); Text("Delete") }
+                Button(onClick = { val copy = JSONObject(workspace.toString()); val all = nativeSandboxEntries(copy.getJSONArray("tracks")); val item = all.first { it.optString("id") == selectedId }; item.put("reviewed", true); val id = item.getJSONObject("tags").optString("id"); if (sandboxNativeReady(item) && all.count { it.getJSONObject("tags").optString("id") == id } == 1) { if (commit(copy)) message = "Reviewed and saved." } else message = "Check ID, genre, languages, descriptions, lyrics and permission." }, enabled = !busy && !selected.has("tagsDraft")) { EnVIcon("CircleCheck", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(4.dp)); Text("Mark ready") }
             }
+            SandboxBottomNavigation()
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 EnVLogo(Modifier.width(48.dp).height(35.dp), darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f)
                 Text("AI Music Data Sandbox", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (folderId.isNotBlank()) TextButton(onClick = { folderId = folder?.optString("parent") ?: ""; page = 0 }) { Text("‹ Back") }
+                if (folderId.isNotBlank()) TextButton(onClick = { folderId = folder?.optString("parent") ?: ""; page = 0 }) { EnVIcon("ArrowLeft", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface); Spacer(Modifier.width(4.dp)); Text("Back") }
                 Text(folder?.optString("name") ?: "Music library", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                if (folder != null) TextButton(onClick = { folderName = folder.optString("name"); folderLimit = folder.optInt("maxSongs", 100).toString(); folderMB = folder.optInt("maxMB", 250).toString(); editingFolder = true }) { Text("Settings") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { importer.launch(arrayOf("audio/*", "application/zip", "application/x-zip-compressed", "application/json", "text/plain")) }, enabled = !busy && storageFailure == null, modifier = Modifier.weight(1f)) { Text(if (busy) "Adding…" else "Add music") }
-                OutlinedButton(onClick = { folderName = ""; folderLimit = "100"; folderMB = "250"; creatingFolder = true }, enabled = !busy && storageFailure == null) { Text("New folder") }
+                Button(onClick = { importer.launch(arrayOf("audio/*", "application/zip", "application/x-zip-compressed", "application/json", "text/plain")) }, enabled = !busy && storageFailure == null, modifier = Modifier.weight(1f)) { EnVIcon("FileAudio", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(5.dp)); Text(if (busy) "Adding…" else "Add music") }
+                OutlinedButton(onClick = { folderName = ""; folderLimit = "100"; folderMB = "250"; creatingFolder = true }, enabled = !busy && storageFailure == null) { EnVIcon("FolderPlus", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(5.dp)); Text("New folder") }
             }
             if (message.isNotBlank()) Text(message, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-            val children = folders.filter { it.optString("parent") == folderId }
-            val visibleTracks = if (folderId.isBlank()) tracks.filterNot(::sandboxNativeReady) else tracks.filter { it.optString("folder") == folderId }
+            val children = if (libraryView <= 1) folders.filter { it.optString("parent") == folderId } else emptyList()
+            val visibleTracks = when {
+                folderId.isNotBlank() -> tracks.filter { it.optString("folder") == folderId }
+                libraryView == 1 -> emptyList()
+                libraryView == 2 -> tracks.filterNot(::sandboxNativeReady)
+                libraryView == 3 -> tracks.filter(::sandboxNativeReady)
+                else -> tracks.filterNot(::sandboxNativeReady)
+            }
             val rows = children.map { "folder" to it } + visibleTracks.map { "track" to it }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (folderId.isBlank()) "Folders & drafts" else "Songs & subfolders", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                Text(if (folderId.isNotBlank()) "Songs & subfolders" else listOf("Folders & drafts", "Folders", "Drafts", "Ready to export")[libraryView], Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = { createBlankRecord() }, enabled = !busy && storageFailure == null) { Text("Blank record") }
             }
             rows.drop(page * 4).take(4).forEach { (kind, item) ->
                 OutlinedButton(onClick = { if (kind == "folder") { folderId = item.optString("id"); page = 0 } else { selectedId = item.optString("id"); screen = 0; message = "" } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (kind == "folder") "📁  ${item.optString("name")}" else "♫  ${item.optString("title")}", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("›")
+                    EnVIcon(if (kind == "folder") "Folder" else "FileAudio", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (kind == "folder") item.optString("name") else item.optString("title"), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    EnVIcon("ChevronRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (rows.isEmpty()) Text("No songs yet", style = MaterialTheme.typography.bodySmall)
@@ -506,8 +623,9 @@ fun NativeMusicDataSandboxScreen() {
                 TextButton(onClick = { page = (page - 1).coerceAtLeast(0) }, enabled = page > 0) { Text("Previous") }
                 Text("${page + 1} / ${((rows.size + 3) / 4).coerceAtLeast(1)}", style = MaterialTheme.typography.labelSmall)
                 TextButton(onClick = { page++ }, enabled = (page + 1) * 4 < rows.size) { Text("Next") }
-                OutlinedButton(onClick = { choosingExport = true }, enabled = tracks.isNotEmpty() && !busy) { Text("Export") }
+                OutlinedButton(onClick = { choosingExport = true }, enabled = tracks.isNotEmpty() && !busy) { EnVIcon("ArrowDownToLine", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(4.dp)); Text("Export") }
             }
+            SandboxBottomNavigation()
         }
     }
 }

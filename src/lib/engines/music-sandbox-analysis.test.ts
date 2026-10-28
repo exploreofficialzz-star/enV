@@ -39,3 +39,23 @@ test("unavailable analysis leaves existing metadata intact", async () => {
   assert.equal(unavailable.status, "unavailable");
   assert.deepEqual(next.tags, track.tags);
 });
+
+test("tempo band is derived consistently and respects manual or imported tags", () => {
+  const track = newSandboxTrack(newSandboxFolder("Music"), "song");
+  const derived = applySandboxAnalysis(track, result);
+  assert.equal(derived.tags.tempo_band, "mid");
+  assert.equal(derived.provenance.tempo_band, "estimated");
+  assert.equal(applySandboxAnalysis(derived, { ...result, tempo: 145 }).tags.tempo_band, "fast");
+  assert.equal(applySandboxAnalysis(derived, { ...result, tempo: null }).tags.tempo_band, "");
+  assert.equal(applySandboxAnalysis({ ...track, tags: { ...track.tags, tempo_band: "laid-back" }, provenance: { tempo_band: "imported" } }, result).tags.tempo_band, "laid-back");
+  assert.equal(applySandboxAnalysis({ ...track, provenance: { tempo_band: "edited" } }, result).tags.tempo_band, "");
+});
+
+test("master tags include readable file facts without inventing unknown values", async () => {
+  const { sandboxMasterTags } = await import("./music-sandbox.ts");
+  const track = { ...newSandboxTrack(newSandboxFolder("Music"), "song"), audio };
+  assert.deepEqual(Object.fromEntries(Object.entries(sandboxMasterTags(track)).filter(([key]) => ["format", "sample_rate_hz", "channels", "bit_depth"].includes(key))), {
+    format: "WAV", sample_rate_hz: 44100, channels: 2, bit_depth: 16,
+  });
+  assert.equal(sandboxMasterTags({ ...track, audio: { ...audio, sampleRate: null } }).sample_rate_hz, null);
+});

@@ -1067,7 +1067,7 @@ private fun ToolDetail(
                                 Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                             ) {
-                                NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
+                                NativeToolInterfaceContent(tool, backend, supported, onRelatedTool, startInWorkspace = true)
                             }
                         }
                     }
@@ -1191,11 +1191,12 @@ private fun NativeToolInterfaceContent(
     backend: Boolean,
     supported: Boolean,
     onRelatedTool: (String) -> Unit,
+    startInWorkspace: Boolean = false,
 ) {
     val context = LocalContext.current
     when {
         backend -> NativeBackendToolForm(tool, true)
-        supported -> NativeToolForm(tool, onRelatedTool)
+        supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
         tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             StatusPill("Coming soon")
             Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1300,9 +1301,9 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit) {
+private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, startInWorkspace: Boolean = false) {
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
-    if (tool.id == "song-metadata-analyzer") { NativeMusicDataSandboxScreen(); return }
+    if (tool.id == "song-metadata-analyzer") { NativeMusicDataSandboxScreen(startInWorkspace); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
         "audio" -> if (tool.id == "music-live-video-studio") NativeMusicLiveVideoStudio() else NativeAudioToolForm(tool)

@@ -23,7 +23,7 @@ const nativeAnalyzerRoute = fs.readFileSync(new URL('../apps/android/app/src/mai
 const nativeAnalyzerEngine = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt', import.meta.url), 'utf8');
 const iosAnalyzerRoutes = fs.readFileSync(new URL('../apps/ios/enV/ToolViews.swift', import.meta.url), 'utf8');
 for (const [label, source, marker] of [
-  ['Android screen dispatch', nativeAnalyzerRoute, 'NativeMusicDataSandboxScreen()'],
+  ['Android screen dispatch', nativeAnalyzerRoute, 'NativeMusicDataSandboxScreen('],
   ['Android engine route', nativeAnalyzerEngine, 'song-metadata-analyzer'],
   ['iOS native screen dispatch', iosAnalyzerRoutes, 'NativeMusicDataSandboxView()'],
   ['iOS engine route', iosAnalyzerRoutes, 'if tool.id == "song-metadata-analyzer"'],

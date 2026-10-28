@@ -1449,7 +1449,7 @@
   .ms-empty { padding: 8px; }
   .ms-empty > svg { width: 20px; height: 20px; }
   .ms-empty .ms-button { min-height: 34px; padding: 5px 8px; }
-  .music-sandbox.is-editing .ms-header, .music-sandbox.is-editing .ms-sidebar { display: none; }
+  .music-sandbox.is-editing .ms-header { display: none; }
   .ms-editor-top h2 { font-size: var(--text-lg); }
   .ms-editor-footer { flex-wrap: nowrap; gap: 4px; }
   .ms-editor-footer > .ms-actions { gap: 4px; }
@@ -1492,3 +1492,38 @@
 .ms-measurements { color: var(--ms-muted); font-size: var(--text-xs); }
 .ms-measurements summary { cursor: pointer; padding: 3px 0; }
 .ms-preview-modal .ms-audio { margin: 0; }
+
+/* Three-part record editor, with the recording available throughout. */
+.ms-listen { padding: 11px 12px 7px; border: 1px solid var(--ms-border); border-radius: 10px; background: var(--ms-soft); margin-bottom: 12px; }
+.ms-listen > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ms-listen strong { font-size: var(--text-sm); }
+.ms-listen small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-listen .ms-audio { display: block; margin: 7px 0 0; }
+.ms-data-tabs { display: flex; gap: 4px; padding: 4px; margin-bottom: 18px; border: 1px solid var(--ms-border); border-radius: 10px; background: var(--ms-soft); }
+.ms-data-tabs button { display: flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 42px; padding: 7px 4px; border-radius: 7px; color: var(--ms-muted); font-size: var(--text-sm); white-space: nowrap; }
+.ms-data-tabs button[aria-pressed="true"] { color: var(--ms-ink); background: var(--ms-bg); box-shadow: 0 1px 4px #0002; font-weight: 600; }
+.ms-section-heading { margin-bottom: 15px; }
+.ms-section-heading h3 { margin-bottom: 4px; }
+.ms-section-heading p { line-height: 1.5; }
+.ms-tag-fields { min-width: 0; padding: 0; margin: 0; border: 0; }
+.ms-tag-fields h4 { margin: 20px 0 10px; font-size: var(--text-sm); }
+.ms-tag-fields h4:first-child { margin-top: 0; }
+.ms-json-details { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--ms-border); }
+.ms-json-details summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); margin-bottom: 12px; }
+.ms-editor-page .ms-lyrics-input { min-height: 200px; max-height: none; }
+.ms-editor-page .ms-json-input { min-height: 180px; max-height: none; }
+@container music-sandbox (max-width: 600px) {
+  .ms-layout { flex-direction: column; }
+  .ms-sidebar { order: 2; flex: none; border-top: 1px solid var(--ms-border); border-bottom: 0; padding: 5px 8px max(5px, env(safe-area-inset-bottom)); }
+  .ms-main { order: 1; flex: 1 1 auto; }
+  .ms-sidebar nav button { min-height: 48px; white-space: normal; line-height: 1.15; }
+  .ms-sidebar nav button span { text-align: center; }
+  .ms-data-tabs button { font-size: var(--text-xs); }
+  .ms-editor-page .ms-field textarea:not(.ms-lyrics-input):not(.ms-json-input) { height: auto; min-height: 68px; }
+}
+
+/* Keep listening controls in view while the record fields scroll. */
+.music-sandbox.is-editing .ms-main { display: flex; flex-direction: column; overflow: hidden; }
+.ms-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.ms-editor-page { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
+.ms-editor-footer, .ms-listen, .ms-data-tabs, .ms-editor-top, .ms-save-line { flex-shrink: 0; }

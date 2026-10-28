@@ -3,6 +3,7 @@ import {
   ArrowDownToLine,
   ArrowRight,
   Check,
+  CircleCheck,
   ChevronRight,
   Clock3,
   FileAudio,
@@ -10,19 +11,17 @@ import {
   Folder,
   FolderPlus,
   HardDrive,
-  Headset,
+  Headphones,
   Home,
   LayoutGrid,
   LoaderCircle,
   MoreHorizontal,
   Plus,
   Search,
-  Settings2,
   Upload,
   X,
 } from "lucide-react";
 import { downloadBlob } from "@/lib/utils";
-import { usePrefs } from "@/lib/storage";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { analyzeSandboxAudio, applySandboxAnalysis } from "@/lib/engines/music-sandbox-analysis";
@@ -113,17 +112,12 @@ function SandboxSplash({ onEnter }: { onEnter: () => void }) {
       <div className="ms-splash-artboard">
         <img className="ms-splash-logo ms-logo-light" src="/logo-home-transparent.png" alt="enV" />
         <img className="ms-splash-logo ms-logo-dark" src="/logo-home-dark.png" alt="" />
-        <Headset className="ms-splash-headset" aria-hidden="true" />
+        <Headphones className="ms-splash-headset" aria-hidden="true" />
         <h1 className="ms-splash-title">AI Music Data Sandbox.</h1>
         <div className="ms-splash-entry">
           <Button size="lg" disabled={!interactive} onClick={onEnter}>
             Enter sandbox <ArrowRight aria-hidden="true" />
           </Button>
-        </div>
-        <span className="ms-splash-by">By</span>
-        <div className="ms-splash-credit">
-          <img src="/music-sandbox/rumuo-mark.jpg" alt="" />
-          <span>Rumuo</span>
         </div>
       </div>
     </section>
@@ -143,11 +137,6 @@ export function AiMusicDataSandbox() {
     [ready, setReady] = useState(false);
   const [folderDialog, setFolderDialog] = useState<SandboxFolder | null>(null),
     [folderError, setFolderError] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false),
-    [settingsName, setSettingsName] = useState(""),
-    [vocabulary, setVocabulary] = useState("");
-  const [settingsError, setSettingsError] = useState("");
-  const [storage, setStorage] = useState("Checking device storage…");
   const [importOpen, setImportOpen] = useState(false),
     [destination, setDestination] = useState(""),
     [newFolderName, setNewFolderName] = useState("My first collection");
@@ -160,11 +149,10 @@ export function AiMusicDataSandbox() {
     [exportKind, setExportKind] = useState<"master" | "training">("master");
   const controller = useRef<AbortController | null>(null);
   const sandboxRoot = useRef<HTMLElement | null>(null);
+  const editorNavigation = useRef<(() => Promise<boolean>) | null>(null);
   const operation = useRef(false),
     fileInput = useRef<HTMLInputElement>(null),
     directoryInput = useRef<HTMLInputElement>(null);
-  const themePreference = usePrefs((s) => s.themePreference),
-    setThemePreference = usePrefs((s) => s.setThemePreference);
   function apply(next: SandboxWorkspace) {
     current.current = next;
     setWorkspace(next);
@@ -200,9 +188,9 @@ export function AiMusicDataSandbox() {
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
   useEffect(() => {
-    const showSplash = () => setSplash(true);
-    window.addEventListener("env-music-sandbox-fullscreen", showSplash);
-    return () => window.removeEventListener("env-music-sandbox-fullscreen", showSplash);
+    const enterWorkspace = () => setSplash(false);
+    window.addEventListener("env-music-sandbox-fullscreen", enterWorkspace);
+    return () => window.removeEventListener("env-music-sandbox-fullscreen", enterWorkspace);
   }, []);
   // Refresh after changes from another tab without reading any audio blobs into memory.
   useEffect(() => {
@@ -530,6 +518,7 @@ export function AiMusicDataSandbox() {
           duration_seconds: facts.duration,
           tempo_bpm: track.provenance.tempo_bpm === "estimated" ? null : track.tags.tempo_bpm,
           key: track.provenance.key === "estimated" ? "" : track.tags.key,
+          tempo_band: track.provenance.tempo_band === "estimated" ? "" : track.tags.tempo_band,
         },
         provenance: { ...track.provenance, duration_seconds: "measured" },
       };
@@ -581,21 +570,6 @@ export function AiMusicDataSandbox() {
       controller.current = null;
     }
   }
-  function openSettings() {
-    setSettingsName(workspace!.settings.name);
-    setVocabulary(JSON.stringify(workspace!.settings.vocabulary, null, 2));
-    setSettingsError("");
-    setSettingsOpen(true);
-    if (navigator.storage?.estimate)
-      void navigator.storage
-        .estimate()
-        .then(({ usage, quota }) =>
-          setStorage(
-            `${sandboxBytes(usage || 0)} used${quota ? ` of ${sandboxBytes(quota)} available to this browser` : ""}`,
-          ),
-        )
-        .catch(() => setStorage("Storage estimate unavailable."));
-  }
   const editing = workspace?.tracks.find((t) => t.key === editorId);
   return (
     <section ref={sandboxRoot} className={`music-sandbox view-${view}${editing && !splash ? " is-editing" : ""}`} aria-label="AI Music Data Sandbox">
@@ -621,14 +595,6 @@ export function AiMusicDataSandbox() {
                   </strong>
                 </div>
               </div>
-              <button
-                className="ms-icon-button"
-                aria-label="Workspace settings"
-                disabled={!!editing || !!busy}
-                onClick={openSettings}
-              >
-                <Settings2 size={19} />
-              </button>
             </header>
             <div className="ms-layout">
               <aside className="ms-sidebar">
@@ -639,14 +605,14 @@ export function AiMusicDataSandbox() {
                       ["home", Home, "Overview", tracks.length],
                       ["folders", LayoutGrid, "Folders", folders.length],
                       ["drafts", FilePenLine, "Drafts", draftCount],
-                      ["ready", Check, "Ready to export", readyCount],
+                      ["ready", CircleCheck, "Ready to export", readyCount],
                     ] as const
                   ).map(([key, Icon, label, count]) => (
                     <button
                       key={key}
                       className={view === key ? "active" : ""}
-                      disabled={!!editing || !!busy}
-                      onClick={() => navigate(key)}
+                      disabled={!!busy}
+                      onClick={() => { void (async () => { if (editing && (!editorNavigation.current || !(await editorNavigation.current()))) return; navigate(key); })(); }}
                     >
                       <Icon size={17} />
                       <span>{label}</span>
@@ -730,6 +696,7 @@ export function AiMusicDataSandbox() {
                     onSave={saveTrack}
                     onClose={() => setEditorId("")}
                     onReplace={replaceAudio}
+                    navigationGuard={editorNavigation}
                     onDelete={async (t) => {
                       setSelected(new Set());
                       await writeSandbox([
@@ -1192,105 +1159,6 @@ export function AiMusicDataSandbox() {
                     </button>
                   </div>
                 </form>
-              </SandboxModal>
-            ) : null}
-            {settingsOpen ? (
-              <SandboxModal title="Workspace settings" onClose={() => setSettingsOpen(false)}>
-                <SandboxField label="Workspace name">
-                  <input value={settingsName} onChange={(e) => setSettingsName(e.target.value)} />
-                </SandboxField>
-                <SandboxField label="Appearance">
-                  <select
-                    value={themePreference}
-                    onChange={(e) =>
-                      setThemePreference(e.target.value as "system" | "light" | "dark")
-                    }
-                  >
-                    <option value="system">Use device theme</option>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
-                </SandboxField>
-                <SandboxField
-                  label="Shared vocabulary (JSON)"
-                  hint="Add agreed words before tagging. Suggestions support music from anywhere."
-                >
-                  <textarea
-                    className="ms-code"
-                    rows={10}
-                    value={vocabulary}
-                    onChange={(e) => setVocabulary(e.target.value)}
-                  />
-                </SandboxField>
-                <p className="ms-storage-status">
-                  <HardDrive size={16} />
-                  {storage}
-                </p>
-                <p>
-                  Records and audio are saved in this browser, on this device. They do not sync to
-                  another device. Use master ZIP exports as your backups.
-                </p>
-                {settingsError ? (
-                  <p className="ms-alert" role="alert">
-                    {settingsError}
-                  </p>
-                ) : null}
-                <div className="ms-import-options">
-                  <button
-                    className="ms-button"
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      setWholeWorkspaceExport(true);
-                      setExportKind("master");
-                      setExportOpen(true);
-                    }}
-                  >
-                    <ArrowDownToLine size={15} /> Back up workspace
-                  </button>
-                  <button
-                    className="ms-text-button"
-                    onClick={() => {
-                      setSettingsOpen(false);
-                      setSplash(true);
-                    }}
-                  >
-                    Preview splash screen
-                  </button>
-                </div>
-                <div className="ms-modal-footer">
-                  <span />
-                  <button
-                    className="ms-button ms-primary"
-                    onClick={async () => {
-                      try {
-                        const words: unknown = JSON.parse(vocabulary);
-                        if (
-                          !words ||
-                          Array.isArray(words) ||
-                          typeof words !== "object" ||
-                          Object.values(words).some(
-                            (v) => !Array.isArray(v) || v.some((x) => typeof x !== "string"),
-                          )
-                        )
-                          throw new Error(
-                            "Vocabulary must be an object whose values are lists of words.",
-                          );
-                        const settings = {
-                          ...workspace.settings,
-                          name: settingsName.trim() || "My music workspace",
-                          vocabulary: words as Record<string, string[]>,
-                        };
-                        await writeSandbox([{ store: "settings", value: settings }]);
-                        apply({ ...current.current!, settings });
-                        setSettingsOpen(false);
-                      } catch (e) {
-                        setSettingsError(errorText(e));
-                      }
-                    }}
-                  >
-                    Save settings
-                  </button>
-                </div>
               </SandboxModal>
             ) : null}
             {exportOpen ? (

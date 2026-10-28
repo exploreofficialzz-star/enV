@@ -374,7 +374,13 @@ export function sandboxApplyTags(
   return result;
 }
 export function sandboxMasterTags(t: SandboxTrack): Record<string, unknown> {
-  return { ...t.custom, ...t.tags };
+  const facts = t.audio ? {
+    format: t.audio.format || "",
+    sample_rate_hz: t.audio.sampleRate,
+    channels: t.audio.channels,
+    bit_depth: t.audio.bitDepth,
+  } : {};
+  return { ...t.custom, ...t.tags, ...facts };
 }
 export function sandboxManifest(tracks: SandboxTrack[], folders: SandboxFolder[]): string {
   // Escape spreadsheet formula prefixes without changing IDs or the master JSON.

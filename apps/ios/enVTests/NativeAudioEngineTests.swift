@@ -17,6 +17,14 @@ final class NativeAudioEngineTests: XCTestCase {
         XCTAssertNil(NativeSongSignal.estimateBPM([Float](repeating: 0, count: rate * 3), sampleRate: Double(rate)))
     }
 
+    func testSandboxTempoBandBoundaries() {
+        XCTAssertEqual(musicSandboxTempoBand(89.9), "slow")
+        XCTAssertEqual(musicSandboxTempoBand(90), "mid")
+        XCTAssertEqual(musicSandboxTempoBand(130), "fast")
+        XCTAssertEqual(musicSandboxTempoBand(nil), "")
+        XCTAssertEqual(musicSandboxTempoBand(.nan), "")
+    }
+
     func testMusicSandboxPreservesCustomTagsAndRequiresReviewedRights() throws {
         let original = Data(#"{"id":"song_01","genre":"Jazz","language":["Yoruba"],"custom":{"score":3},"descriptions":["Warm guitar","Soft percussion"],"license":"owned","source":"private permission","tempo_bpm":110}"#.utf8)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])

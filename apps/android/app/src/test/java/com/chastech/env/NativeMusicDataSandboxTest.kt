@@ -39,4 +39,19 @@ class NativeMusicDataSandboxTest {
         assertEquals("[Verse]\nẸ káàrọ̀", nativeSandboxLyrics("[verse 1 | Yoruba]\nẸ káàrọ̀"))
         assertThrows(IllegalStateException::class.java) { validateNativeSandboxTags(JSONObject().put("mood", "not an array")) }
     }
+    @Test fun derivedTempoBandsNeverOverwriteHumanTags() {
+        assertEquals("slow", nativeSandboxTempoBand(89.9))
+        assertEquals("mid", nativeSandboxTempoBand(90.0))
+        assertEquals("fast", nativeSandboxTempoBand(130.0))
+        assertEquals("", nativeSandboxTempoBand(Double.NaN))
+        val tags = JSONObject().put("tempo_bpm", 110)
+        val track = JSONObject().put("tags", tags)
+        nativeSandboxSuggestTempoBand(track)
+        assertEquals("mid", tags.optString("tempo_band"))
+        tags.put("tempo_bpm", 150); nativeSandboxSuggestTempoBand(track)
+        assertEquals("fast", tags.optString("tempo_band"))
+        tags.put("tempo_band", "human choice"); track.put("tempoBandEdited", true)
+        nativeSandboxSuggestTempoBand(track)
+        assertEquals("human choice", tags.optString("tempo_band"))
+    }
 }

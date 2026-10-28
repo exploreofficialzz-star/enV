@@ -136,6 +136,7 @@ const waitUI = async () => {
       true,
       "The welcome screen must stay open until the user enters",
     );
+    assert.equal(await splash.getByText("Rumuo").count(), 0, "Welcome must not show the old credit");
     checkedWelcome = true;
   }
   await splash.getByRole("button", { name: "Enter sandbox" }).click();
@@ -182,44 +183,38 @@ try {
   assert.equal(tracks[0].lyrics, lyrics);
   assert.equal(tracks[0].custom.custom_note, tags.custom_note);
   await scope.locator(".ms-record-row button").first().click();
-  await scope.getByRole("button", { name: "Listen to recording" }).click();
-  assert.equal(await page.getByRole("dialog", { name: "Listen" }).locator("audio").count(), 1);
-  await page.getByRole("button", { name: "Close audio preview" }).click();
-  await scope.getByLabel("Edit", { exact: true }).selectOption("sound");
-  await scope.getByRole("button", { name: "Next", exact: true }).click();
-  await scope.getByRole("button", { name: "Next", exact: true }).click();
+  assert.equal(await scope.locator("audio").count(), 1, "Audio remains on screen while tagging");
+  await scope.locator("audio").evaluate((audio) => audio.play());
+  await page.waitForFunction(() => document.querySelector(".music-sandbox audio")?.currentTime > 0.1);
+  await scope.locator(".ms-data-tabs").getByRole("button", { name: "tags.json" }).click();
+  assert.equal(await scope.locator("audio").evaluate((audio) => audio.paused), false, "Playback continues when changing sections");
+  await scope.locator("audio").evaluate((audio) => audio.pause());
   await scope.getByLabel("Instruments", { exact: true }).fill("guitar, shaker,");
   await scope.getByLabel("Instruments", { exact: true }).pressSequentially(" piano");
-  assert.equal(
-    await scope.getByLabel("Instruments", { exact: true }).inputValue(),
-    "guitar, shaker, piano",
-  );
+  assert.equal(await scope.getByLabel("Instruments", { exact: true }).inputValue(), "guitar, shaker, piano");
   await page.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
-  await scope.locator(".ms-splash").waitFor({ state: "visible" });
+  await page.locator(".env-tool-fullscreen__exit").waitFor({ state: "visible" });
+  assert.equal(await scope.locator(".ms-splash").count(), 0, "Full screen opens the workspace directly");
   assert.ok((await scope.boundingBox()).width <= 430, "Full screen uses the mobile workspace regardless of view preference");
-  await scope.getByRole("button", { name: "Enter sandbox" }).click();
-  assert.equal(
-    await scope.getByLabel("Instruments", { exact: true }).inputValue(),
-    "guitar, shaker, piano",
-    "Entering full screen must preserve an open draft",
-  );
+  assert.equal(await scope.getByLabel("Instruments", { exact: true }).inputValue(), "guitar, shaker, piano", "Full screen preserves the open draft");
   await page.locator(".env-tool-fullscreen__exit").click();
-  assert.equal(
-    await scope.getByLabel("Instruments", { exact: true }).inputValue(),
-    "guitar, shaker, piano",
-    "Exiting full screen must preserve the draft",
-  );
+  assert.equal(await scope.getByLabel("Instruments", { exact: true }).inputValue(), "guitar, shaker, piano");
   await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
   await scope.getByText("A few things need review").waitFor();
-  await scope.getByLabel("Edit", { exact: true }).selectOption("details");
+  await scope.locator(".ms-data-tabs").getByRole("button", { name: "Music" }).click();
   await scope.getByLabel("Display title", { exact: true }).fill("Evening groove");
-  await scope.getByLabel("Record ID", { exact: true }).fill("reviewed_0001");
-  await scope.getByLabel("Edit", { exact: true }).selectOption("more");
+  await scope.locator(".ms-data-tabs").getByRole("button", { name: "tags.json" }).click();
+  await scope.getByLabel("Record ID · required", { exact: true }).fill("reviewed_0001");
+  await scope.getByText("Advanced JSON", { exact: true }).click();
   let edited = JSON.parse(await scope.getByLabel("Tags JSON", { exact: true }).inputValue());
   edited.custom_session = "round one";
   await scope.getByLabel("Tags JSON", { exact: true }).fill(JSON.stringify(edited, null, 2));
-  await scope.getByRole("button", { name: "Apply JSON changes", exact: true }).click();
-  await scope.getByLabel("Edit", { exact: true }).selectOption("rights");
+  await scope.locator(".ms-data-tabs").getByRole("button", { name: "Music" }).click();
+  await scope.getByText("Apply or discard the JSON changes before switching sections.").waitFor();
+  await scope.locator(".ms-sidebar").getByRole("button", { name: /Drafts/ }).click();
+  await scope.getByText("Apply or discard the JSON changes before leaving this record.").waitFor();
+  assert.equal(await scope.locator(".ms-editor").isVisible(), true, "A pending JSON draft cannot be lost through navigation");
+  await scope.getByRole("button", { name: "Apply JSON", exact: true }).click();
   await scope.getByLabel("Clearance status", { exact: true }).selectOption("cleared");
   await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
   await scope.locator(".ms-save-line").filter({ hasText: "Reviewed & saved" }).waitFor();
@@ -312,17 +307,14 @@ try {
       `${width}px sandbox should not overflow`,
     );
     await scope.screenshot({ path: join(output, `sandbox-${width}-light.png`) });
-    await scope.getByRole("button", { name: "Workspace settings", exact: true }).click();
-    await page.getByLabel("Appearance", { exact: true }).selectOption("dark");
-    await page.getByRole("button", { name: "Save settings", exact: true }).click();
+    assert.equal(await scope.getByRole("button", { name: "Workspace settings" }).count(), 0);
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
     await scope.screenshot({ path: join(output, `sandbox-${width}-dark.png`) });
-    await scope.getByRole("button", { name: "Workspace settings", exact: true }).click();
-    await page.getByLabel("Appearance", { exact: true }).selectOption("light");
-    await page.getByRole("button", { name: "Save settings", exact: true }).click();
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
   }
   await scope.locator(".ms-record-row button").first().click();
-  await scope.getByLabel("Edit", { exact: true }).selectOption("sound");
-  await scope.getByLabel("Genre", { exact: true }).fill("Jazz");
+  await scope.locator(".ms-data-tabs").getByRole("button", { name: "tags.json" }).click();
+  await scope.getByLabel("Genre · required", { exact: true }).fill("Jazz");
   await page.locator('a[href="/"]').first().click();
   await page.waitForURL(base + "/");
   await page.goto(base + "/tools/audio/ai-music-data-sandbox");
@@ -355,22 +347,26 @@ try {
   await mobile.waitForFunction(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content")?.includes("width=device-width"));
   assert.equal(await mobile.evaluate(() => localStorage.getItem("env:view-mode")), "desktop", "Full screen must not change the saved view preference");
   assert.equal(await mobile.evaluate(() => window.innerWidth), 390, "Full screen must use the device viewport even when desktop view is selected");
-  await mobile.getByRole("button", { name: "Enter sandbox" }).click();
   await mobile.locator(".ms-page-heading").waitFor();
-  const noPanelScroll = async (label) => {
-    const dimensions = await mobile.locator(".ms-main").evaluate((element) => ({ visible: element.clientHeight, content: element.scrollHeight }));
-    assert.ok(dimensions.content <= dimensions.visible + 1, `${label} should fit in the phone screen: ${JSON.stringify(dimensions)}`);
-  };
-  await noPanelScroll("Library");
+  assert.equal(await mobile.locator(".ms-splash").count(), 0);
+  const navPosition = await mobile.locator(".ms-sidebar").evaluate((element) => {
+    const nav = element.getBoundingClientRect(), main = element.parentElement.querySelector(".ms-main").getBoundingClientRect();
+    return { navTop: nav.top, mainBottom: main.bottom };
+  });
+  assert.ok(navPosition.navTop >= navPosition.mainBottom - 1, "Navigation is at the bottom on mobile");
+  for (const label of ["Overview", "Folders", "Drafts", "Ready to export"]) assert.equal(await mobile.locator(".ms-sidebar").getByRole("button", { name: label }).count(), 1);
   await mobile.getByRole("button", { name: "Blank record" }).click();
   await mobile.locator(".ms-editor").waitFor();
-  for (const [section, pages] of [["details", 4], ["sound", 5], ["lyrics", 1], ["rights", 1], ["more", 1]]) {
-    await mobile.getByLabel("Edit", { exact: true }).selectOption(section);
-    for (let i = 0; i < pages; i++) {
-      await noPanelScroll(`${section} ${i + 1}`);
-      if (i + 1 < pages) await mobile.getByRole("button", { name: "Next", exact: true }).click();
-    }
+  for (const section of ["Music", "lyrics.txt", "tags.json"]) {
+    await mobile.locator(".ms-data-tabs").getByRole("button", { name: section }).click();
+    assert.equal(await mobile.locator(".ms-data-tabs").getByRole("button", { name: section }).getAttribute("aria-pressed"), "true");
   }
+  assert.equal(await mobile.getByLabel("Genre · required").isVisible(), true);
+  await mobile.getByLabel("Genre · required").fill("Phone draft");
+  await mobile.locator(".ms-sidebar").getByRole("button", { name: /Drafts/ }).click();
+  await mobile.locator(".ms-record-row button").first().click();
+  await mobile.locator(".ms-data-tabs").getByRole("button", { name: "tags.json" }).click();
+  assert.equal(await mobile.getByLabel("Genre · required").inputValue(), "Phone draft", "Bottom navigation saves the open record");
   await mobile.locator(".env-tool-fullscreen__exit").click();
   await mobile.waitForFunction(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content")?.includes("width=1024"));
   assert.equal(await mobile.evaluate(() => localStorage.getItem("env:view-mode")), "desktop");
@@ -390,19 +386,23 @@ try {
   await small.goto(base + "/tools/audio/ai-music-data-sandbox");
   await small.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
   await small.locator(".env-tool-fullscreen__exit").waitFor();
-  await small.getByRole("button", { name: "Enter sandbox" }).click();
+  await small.locator(".ms-page-heading").waitFor();
   await small.getByRole("button", { name: "Add music", exact: true }).click();
   await small.getByLabel("Import music files", { exact: true }).setInputFiles(musicalFile);
   await small.getByText(/records? imported as drafts/).waitFor({ timeout: 30000 });
   await small.locator(".ms-record-row button").first().click();
-  for (const [section, pages] of [["details", 4], ["sound", 5], ["lyrics", 1], ["rights", 1], ["more", 1]]) {
-    await small.getByLabel("Edit", { exact: true }).selectOption(section);
-    for (let i = 0; i < pages; i++) {
-      const box = await small.locator(".ms-main").evaluate((element) => ({ visible: element.clientHeight, content: element.scrollHeight }));
-      assert.ok(box.content <= box.visible + 1, `320px audio editor ${section} ${i + 1} should fit: ${JSON.stringify(box)}`);
-      if (i + 1 < pages) await small.getByRole("button", { name: "Next", exact: true }).click();
-    }
+  for (const section of ["Music", "lyrics.txt", "tags.json"]) {
+    await small.locator(".ms-data-tabs").getByRole("button", { name: section }).click();
+    assert.equal(await small.locator("audio").isVisible(), true, "Audio stays visible while editing");
   }
+  await small.locator(".ms-editor-page").evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const playerPlacement = await small.locator("audio").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: innerHeight };
+  });
+  assert.ok(playerPlacement.top >= 0 && playerPlacement.bottom <= playerPlacement.height, "Player remains on screen while the tags form scrolls");
+  await small.locator(".music-sandbox").screenshot({ path: join(output, "editor-320.png") });
+  assert.equal(await small.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await smallPhone.close();
   assert.deepEqual(unexpected, [], "Sandbox must never load inference models or upload audio");
   assert.deepEqual(errors, []);
@@ -427,8 +427,8 @@ try {
           "Unicode lyrics",
           "caption privacy",
           "light and dark layouts at 390/768/1440",
-          "screen-sized phone editor and full-screen viewport override",
-          "320px audio editor and listening preview",
+          "scrollable phone editor, safe bottom navigation and full-screen viewport override",
+          "320px audio editor with persistent playback",
           "accessibility",
           "no model requests or audio uploads",
         ],
