@@ -946,7 +946,7 @@
 .ms-confirm button + button {
   margin-left: 9px;
 }
-/* The welcome screen uses enV's type scale, shared button, and theme tokens. */
+/* Original 390 x 844 splash artboard, kept in the enV page below navigation. */
 .ms-logo-dark {
   display: none;
 }
@@ -956,61 +956,87 @@
 .dark .ms-logo-dark {
   display: block;
 }
-.ms-welcome {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 24px;
-  text-align: center;
+.ms-splash {
+  background: var(--ms-bg);
+  color: var(--ms-ink);
 }
-.ms-welcome-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  width: min(100%, 480px);
-  margin: auto 0;
+.ms-splash-artboard {
+  position: relative;
+  width: min(100%, 390px, calc(46.2085dvh - 29.57344px));
+  container-type: inline-size;
+  aspect-ratio: 390 / 844;
+  margin: 0 auto;
 }
-.ms-welcome-logo {
-  width: 163px;
-  height: 76px;
+.ms-splash-logo {
+  position: absolute;
+  left: 28.205%;
+  top: 30.806%;
+  width: 39.231%;
+  height: 12.559%;
   object-fit: contain;
+  border-radius: 14px;
 }
-.ms-welcome-icon {
-  width: 54px;
-  height: 54px;
-  color: var(--color-accent);
+.ms-splash-headset {
+  position: absolute;
+  left: 48.974%;
+  top: 38.033%;
+  width: 24.103%;
+  height: 11.137%;
+  padding: 3.077%;
+  color: var(--color-fg);
+  opacity: 0.5;
 }
-.ms-welcome h1 {
+.ms-splash-title {
+  position: absolute;
+  left: 13.077%;
+  top: 47.393%;
+  width: 86.923%;
+  height: 5.332%;
+  padding: 3.077%;
   margin: 0;
-  font-size: var(--text-2xl);
-  line-height: 1.2;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 5.7cqw, var(--text-xl));
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--color-fg);
+  opacity: 0.6;
 }
-.ms-welcome p {
-  color: var(--color-muted);
-  font-size: var(--text-base);
-  line-height: 1.5;
+.ms-splash-entry {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
-.ms-welcome-credit {
+.ms-splash-by {
+  position: absolute;
+  top: 93.365%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--color-fg);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+.ms-splash-credit {
+  position: absolute;
+  top: 95.735%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--color-muted);
-  font-size: var(--text-sm);
-}
-.ms-welcome-credit img {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-.ms-welcome-credit strong {
+  gap: 4px;
   color: var(--color-fg);
-  font-weight: 500;
+  font-size: var(--text-lg);
+  line-height: 1.35;
+  opacity: 0.75;
+}
+.ms-splash-credit img {
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  object-fit: cover;
 }
 @container music-sandbox (max-width:800px) {
   .ms-layout {
@@ -1240,15 +1266,6 @@
   .ms-modal .ms-fields {
     grid-template-columns: 1fr 1fr;
   }
-  .ms-splash {
-    min-height: 800px;
-  }
-  .ms-splash-artboard {
-    transform-origin: center center;
-  }
-  .ms-skip {
-    bottom: 85px;
-  }
   .ms-records .ms-section-title {
     flex-wrap: wrap;
   }
@@ -1301,24 +1318,6 @@
   }
 }
 
-.music-sandbox .ms-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  width: 100vw;
-  height: 100dvh;
-  max-width: none;
-  max-height: none;
-  min-height: 0;
-  background: var(--ms-bg);
-  color: var(--ms-ink);
-}
-.music-sandbox .ms-splash:not([open]) {
-  display: none;
-}
 .ms-load-more {
   margin-top: 16px;
   width: 100%;
@@ -1346,4 +1345,49 @@
   .ms-record-name small {
     white-space: normal;
   }
+}
+
+/* The splash is the tool's home; enV navigation stays above it. */
+.env-music-sandbox-shell:has(.ms-splash) {
+  padding: 0;
+}
+.env-music-sandbox-shell:has(.ms-splash) > nav,
+.env-music-sandbox-shell:has(.ms-splash) > header {
+  display: none;
+}
+.env-music-sandbox-shell:has(.ms-splash) > .env-tool-interface {
+  margin-top: 0;
+}
+.music-sandbox:has(.ms-splash) {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.ms-editor-sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+.ms-editor-section {
+  border: 1px solid var(--ms-border);
+  border-radius: var(--radius-md);
+  background: var(--ms-bg);
+}
+.ms-editor-section > summary {
+  cursor: pointer;
+  padding: 16px;
+  color: var(--ms-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.ms-editor-section > summary:hover {
+  background: var(--ms-soft);
+}
+.ms-section-content {
+  padding: 4px 16px 16px;
+  border-top: 1px solid var(--ms-border);
+}
+.ms-section-content > .ms-section-heading:first-child {
+  margin-top: 18px;
 }

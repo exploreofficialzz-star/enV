@@ -33,6 +33,11 @@ export function ToolShell({
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
+  const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
+
+  useEffect(() => {
+    if (isFullscreen && isMusicSandbox) window.dispatchEvent(new Event("env-music-sandbox-fullscreen"));
+  }, [isFullscreen, isMusicSandbox]);
 
   useEffect(() => {
     recordRecent(tool.id);
@@ -91,7 +96,7 @@ export function ToolShell({
   const cat = CATEGORY_MAP[tool.category];
 
   return (
-    <article className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+    <article className={"mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10" + (isMusicSandbox ? " env-music-sandbox-shell" : "")}>
       <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">
           Home
@@ -158,7 +163,14 @@ export function ToolShell({
         aria-modal={isFullscreen || undefined}
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
       >
-        {isFullscreen ? (
+        {isMusicSandbox ? (
+          <>
+            {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
+              <button type="button" onClick={() => void toggleFullscreen()} className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" aria-label={`Exit full screen for ${tool.name}`} title="Exit full screen"><Minimize2 className="size-4" aria-hidden="true" /></button>
+            </div> : null}
+            <div className={isFullscreen ? "env-tool-fullscreen__content" : undefined}>{children}</div>
+          </>
+        ) : isFullscreen ? (
           <>
             <div className="env-tool-fullscreen__toolbar">
               <button

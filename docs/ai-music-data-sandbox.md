@@ -8,7 +8,7 @@ This implementation follows the supplied *Nigerian AI Music — Music Model Trai
 
 1. Create a folder. Optional defaults supply the genre and sub-style for new records. Create subfolders for styles, projects or another arrangement.
 2. Add a song, multiple files, a device folder, or a ZIP. Existing records are retained. Return to the same folder in another session to add more.
-3. Open a draft and listen to its audio. Tags, descriptions, technical controls, title, ID, lyrics, clearance, source and internal notes are editable. The JSON tab supports custom fields as well as the standard schema.
+3. Open a draft and listen to its audio. Tags, descriptions, technical controls, title, ID, lyrics, clearance, source and internal notes are editable. The advanced JSON section supports custom fields as well as the standard schema.
 4. Draft edits save automatically to IndexedDB. Save failures remain visible and keep the editor open. Renaming an ID changes the names of all exported companion files together. Moving a record changes its folder without rewriting its musical tags.
 5. Check the rights record and select **Mark ready** after human review. Further edits require another review. Blank or unclear rights never qualify for a music training export.
 6. Export selected records, the current view, or the entire workspace. Master exports include drafts. Music training preparation exports include only reviewed, cleared records with audio; lyrics-only records remain in master exports.
@@ -65,9 +65,9 @@ Annotation names and JSONL layout must be checked against the exact ACE-Step or 
 
 ## Appearance and platform scope
 
-The sandbox uses enV's fonts, type scale, colors, controls, and system/light/dark preference. Container queries accommodate both the actual device width and enV's user-selected mobile/tablet/desktop layout. Forms have labels, the editor has keyboard tabs, dialogs trap focus, and motion respects the device preference.
+The sandbox uses enV's fonts, type scale, colors, controls, and system/light/dark preference. Container queries accommodate both the actual device width and enV's user-selected mobile/tablet/desktop layout. Forms have labels, the editor uses keyboard-accessible sections, dialogs trap focus, and motion respects the device preference.
 
-The welcome screen uses the same light and dark enV logo assets as the homepage and the supplied Rumuo icon. It stays open until the user selects Enter sandbox. The screen adapts to the available viewport and uses the same typography and controls as enV.
+The welcome screen uses the same light and dark enV logo assets as the homepage and the supplied Rumuo icon. The original splash layout appears within the enV page, below its navigation, and stays open until the user selects Enter sandbox. The artboard scales to the available width and uses enV typography and controls. Entering full screen shows the splash again, and the open workspace and draft remain available after entering.
 
 This change implements the responsive web sandbox. Native Android/iOS analyser screens and their storage are separate and are not represented as having the new browser workflow.
 

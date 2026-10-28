@@ -95,6 +95,26 @@ const waitUI = async () => {
   const splash = scope.locator(".ms-splash");
   await splash.waitFor({ state: "visible", timeout: 90000 });
   if (!checkedWelcome) {
+    const placement = await page.evaluate(() => {
+      const navigation = document.querySelector(".env-app-shell > header");
+      const welcome = document.querySelector(".ms-splash");
+      if (!navigation || !welcome) return null;
+      return {
+        navigationBottom: navigation.getBoundingClientRect().bottom,
+        welcomeTop: welcome.getBoundingClientRect().top,
+        position: getComputedStyle(welcome).position,
+      };
+    });
+    assert.ok(
+      placement && placement.welcomeTop >= placement.navigationBottom,
+      "Welcome must be below enV navigation",
+    );
+    assert.notEqual(placement.position, "fixed", "Welcome must remain in the page layout");
+    assert.equal(
+      await scope.locator(".ms-page-heading").isVisible(),
+      false,
+      "The workspace opens only after entry",
+    );
     await page.waitForTimeout(2000);
     assert.equal(
       await splash.isVisible(),
@@ -147,23 +167,37 @@ try {
   assert.equal(tracks[0].lyrics, lyrics);
   assert.equal(tracks[0].custom.custom_note, tags.custom_note);
   await scope.locator(".ms-record-row button").first().click();
+  await scope.getByText("Sound and descriptions", { exact: true }).click();
   await scope.getByLabel("Instruments", { exact: true }).fill("guitar, shaker,");
   await scope.getByLabel("Instruments", { exact: true }).pressSequentially(" piano");
   assert.equal(
     await scope.getByLabel("Instruments", { exact: true }).inputValue(),
     "guitar, shaker, piano",
   );
+  await page.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
+  await scope.locator(".ms-splash").waitFor({ state: "visible" });
+  await scope.getByRole("button", { name: "Enter sandbox" }).click();
+  assert.equal(
+    await scope.getByLabel("Instruments", { exact: true }).inputValue(),
+    "guitar, shaker, piano",
+    "Entering full screen must preserve an open draft",
+  );
+  await page.locator(".env-tool-fullscreen__exit").click();
+  assert.equal(
+    await scope.getByLabel("Instruments", { exact: true }).inputValue(),
+    "guitar, shaker, piano",
+    "Exiting full screen must preserve the draft",
+  );
   await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
   await scope.getByText("A few things need review").waitFor();
-  await scope.getByRole("tab", { name: "File & music", exact: true }).click();
   await scope.getByLabel("Display title", { exact: true }).fill("Evening groove");
   await scope.getByLabel("Record ID", { exact: true }).fill("reviewed_0001");
-  await scope.getByRole("tab", { name: "JSON", exact: true }).click();
+  await scope.getByText("Advanced JSON", { exact: true }).click();
   let edited = JSON.parse(await scope.getByLabel("Tags JSON", { exact: true }).inputValue());
   edited.custom_session = "round one";
   await scope.getByLabel("Tags JSON", { exact: true }).fill(JSON.stringify(edited, null, 2));
   await scope.getByRole("button", { name: "Apply JSON changes", exact: true }).click();
-  await scope.getByRole("tab", { name: "Rights", exact: true }).click();
+  await scope.getByText("Permission and review", { exact: true }).click();
   await scope.getByLabel("Clearance status", { exact: true }).selectOption("cleared");
   await scope.getByRole("button", { name: "Mark ready", exact: true }).click();
   await scope.locator(".ms-save-line").filter({ hasText: "Reviewed & saved" }).waitFor();
@@ -265,6 +299,7 @@ try {
     await page.getByRole("button", { name: "Save settings", exact: true }).click();
   }
   await scope.locator(".ms-record-row button").first().click();
+  await scope.getByText("Sound and descriptions", { exact: true }).click();
   await scope.getByLabel("Genre", { exact: true }).fill("Jazz");
   await page.locator('a[href="/"]').first().click();
   await page.waitForURL(base + "/");

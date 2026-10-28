@@ -86,7 +86,7 @@ function TagField({
     standout: "Standout details",
   };
   return (
-    <SandboxField label={names[field]} hint="Separate tags with commas. Use words you can confirm.">
+    <SandboxField label={names[field]}>
       <input
         value={raw}
         list={`ms-list-${field}`}
@@ -132,7 +132,6 @@ export function MusicSandboxEditor({
   onReplace,
 }: SandboxEditorProps) {
   const [record, setRecord] = useState(() => structuredClone(track));
-  const [tab, setTab] = useState("describe");
   const [saveState, setSaveState] = useState("Saved on this device");
   const [error, setError] = useState("");
   const [issues, setIssues] = useState<string[]>([]);
@@ -190,6 +189,9 @@ export function MusicSandboxEditor({
       if (url) URL.revokeObjectURL(url);
     };
   }, [record.key, record.audio?.filename, record.audio?.size, audioRevision]);
+  useEffect(() => {
+    if (!jsonDirty) setJson(JSON.stringify(sandboxMasterTags(record), null, 2));
+  }, [record, jsonDirty]);
   function update(next: SandboxTrack) {
     next = { ...next, reviewed: false, updatedAt: new Date().toISOString() };
     latest.current = next;
@@ -334,136 +336,10 @@ export function MusicSandboxEditor({
           aria-label={`Preview ${record.title}`}
         />
       ) : null}
-      <div className="ms-tabs" role="tablist" aria-label="Record editor">
-        {[
-          ["describe", "Tags"],
-          ["technical", "File & music"],
-          ["lyrics", "Lyrics"],
-          ["rights", "Rights"],
-          ["json", "JSON"],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={tab === key}
-            aria-controls={`ms-panel-${key}`}
-            id={`ms-tab-${key}`}
-            tabIndex={tab === key ? 0 : -1}
-            onKeyDown={(e) => {
-              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-                e.preventDefault();
-                if (jsonDirty) {
-                  setError("Apply the JSON changes before switching tabs.");
-                  return;
-                }
-                const tabs = ["describe", "technical", "lyrics", "rights", "json"];
-                const at = tabs.indexOf(tab);
-                const next =
-                  e.key === "Home"
-                    ? tabs[0]!
-                    : e.key === "End"
-                      ? tabs.at(-1)!
-                      : tabs[(at + (e.key === "ArrowRight" ? 1 : 4)) % 5]!;
-                setTab(next);
-                document.getElementById(`ms-tab-${next}`)?.focus();
-              }
-            }}
-            onClick={() => {
-              if (jsonDirty && key !== "json") {
-                setError("Apply the JSON changes before switching tabs.");
-                return;
-              }
-              if (key === "json" && !jsonDirty)
-                setJson(JSON.stringify(sandboxMasterTags(record), null, 2));
-              setTab(key);
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <section
-        className="ms-tab-panel"
-        role="tabpanel"
-        id={`ms-panel-${tab}`}
-        aria-labelledby={`ms-tab-${tab}`}
-      >
-        {tab === "describe" ? (
-          <>
-            <div className="ms-section-heading">
-              <h3>Describe what you hear</h3>
-              <p>
-                Specific, natural words make better training data. Keep artist and song names out of
-                tags and captions.
-              </p>
-            </div>
-            <div className="ms-fields">
-              {stringField(
-                "genre",
-                "Genre",
-                "Any music tradition or genre.",
-                "e.g. Afrobeats, jazz, folk",
-              )}
-              {stringField("sub_style", "Sub-style", undefined, "e.g. afro-fusion")}
-              {SANDBOX_TAG_FIELDS.map((field) => (
-                <TagField
-                  key={field}
-                  field={field}
-                  value={record.tags[field]}
-                  vocabulary={settings.vocabulary[field] || []}
-                  onChange={(v) => tag(field, v)}
-                />
-              ))}
-              <SandboxField label="Energy">
-                <select value={record.tags.energy} onChange={(e) => tag("energy", e.target.value)}>
-                  <option value="">Not tagged</option>
-                  {["low", "medium", "high"].map((v) => (
-                    <option key={v}>{v}</option>
-                  ))}
-                </select>
-              </SandboxField>
-              {stringField(
-                "tempo_band",
-                "Tempo band",
-                "Use the cutoffs agreed for this genre.",
-                "slow, mid, fast",
-              )}
-            </div>
-            <div className="ms-section-heading">
-              <h3>Natural descriptions</h3>
-              <p>
-                Write two or three short variations. Cover style, voice, instruments, groove, mood,
-                topic, language, and a standout detail.
-              </p>
-            </div>
-            {[0, 1, 2].map((i) => (
-              <SandboxField key={i} label={`Description ${i + 1}${i === 2 ? " (optional)" : ""}`}>
-                <textarea
-                  rows={3}
-                  value={record.tags.descriptions[i] || ""}
-                  maxLength={700}
-                  placeholder={
-                    i === 0
-                      ? "A smooth, mid-tempo song with a soft voice over light guitar and shakers…"
-                      : "Describe the same sound in a different way…"
-                  }
-                  onChange={(e) => {
-                    const descriptions = [...latest.current.tags.descriptions];
-                    descriptions[i] = e.target.value;
-                    tag("descriptions", descriptions);
-                  }}
-                />
-              </SandboxField>
-            ))}
-            <div className="ms-caption">
-              <p className="ms-eyebrow">Generated tag caption</p>
-              <p>{sandboxCaption(record) || "Your confirmed tags will appear here."}</p>
-              <small>Built from your tags. License, source, identity, BPM and key stay out.</small>
-            </div>
-          </>
-        ) : null}
-        {tab === "technical" ? (
-          <>
+      <div className="ms-editor-sections">
+        <details className="ms-editor-section" open>
+          <summary>Track details</summary>
+          <div className="ms-section-content">
             <div className="ms-section-heading">
               <h3>Identity & organization</h3>
               <p>Renaming the ID keeps all three exported files matched.</p>
@@ -606,10 +482,86 @@ export function MusicSandboxEditor({
             <small>
               Original file bytes are preserved. Editing metadata does not transcode the recording.
             </small>
-          </>
-        ) : null}
-        {tab === "lyrics" ? (
-          <>
+          </div>
+        </details>
+        <details className="ms-editor-section">
+          <summary>Sound and descriptions</summary>
+          <div className="ms-section-content">
+            <div className="ms-section-heading">
+              <h3>Describe what you hear</h3>
+              <p>
+                Describe what you hear, using commas between tags. Keep artist and song names out of
+                tags and captions.
+              </p>
+            </div>
+            <div className="ms-fields">
+              {stringField(
+                "genre",
+                "Genre",
+                "Any music tradition or genre.",
+                "e.g. Afrobeats, jazz, folk",
+              )}
+              {stringField("sub_style", "Sub-style", undefined, "e.g. afro-fusion")}
+              {SANDBOX_TAG_FIELDS.map((field) => (
+                <TagField
+                  key={field}
+                  field={field}
+                  value={record.tags[field]}
+                  vocabulary={settings.vocabulary[field] || []}
+                  onChange={(v) => tag(field, v)}
+                />
+              ))}
+              <SandboxField label="Energy">
+                <select value={record.tags.energy} onChange={(e) => tag("energy", e.target.value)}>
+                  <option value="">Not tagged</option>
+                  {["low", "medium", "high"].map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+              </SandboxField>
+              {stringField(
+                "tempo_band",
+                "Tempo band",
+                "Use the cutoffs agreed for this genre.",
+                "slow, mid, fast",
+              )}
+            </div>
+            <div className="ms-section-heading">
+              <h3>Natural descriptions</h3>
+              <p>
+                Write two or three short variations. Cover style, voice, instruments, groove, mood,
+                topic, language, and a standout detail.
+              </p>
+            </div>
+            {[0, 1, 2].map((i) => (
+              <SandboxField key={i} label={`Description ${i + 1}${i === 2 ? " (optional)" : ""}`}>
+                <textarea
+                  rows={3}
+                  value={record.tags.descriptions[i] || ""}
+                  maxLength={700}
+                  placeholder={
+                    i === 0
+                      ? "A smooth, mid-tempo song with a soft voice over light guitar and shakers…"
+                      : "Describe the same sound in a different way…"
+                  }
+                  onChange={(e) => {
+                    const descriptions = [...latest.current.tags.descriptions];
+                    descriptions[i] = e.target.value;
+                    tag("descriptions", descriptions);
+                  }}
+                />
+              </SandboxField>
+            ))}
+            <div className="ms-caption">
+              <p className="ms-eyebrow">Generated tag caption</p>
+              <p>{sandboxCaption(record) || "Your confirmed tags will appear here."}</p>
+              <small>Built from your tags. License, source, identity, BPM and key stay out.</small>
+            </div>
+          </div>
+        </details>
+        <details className="ms-editor-section">
+          <summary>Lyrics</summary>
+          <div className="ms-section-content">
             <div className="ms-section-heading">
               <h3>Lyrics that match the recording</h3>
               <p>
@@ -656,10 +608,11 @@ export function MusicSandboxEditor({
                 }}
               />
             </SandboxField>
-          </>
-        ) : null}
-        {tab === "rights" ? (
-          <>
+          </div>
+        </details>
+        <details className="ms-editor-section">
+          <summary>Permission and review</summary>
+          <div className="ms-section-content">
             <div className="ms-section-heading">
               <h3>Permission & review</h3>
               <p>Rights are stored as records. They never enter generated training captions.</p>
@@ -716,10 +669,17 @@ export function MusicSandboxEditor({
                 training exports.
               </p>
             </div>
-          </>
-        ) : null}
-        {tab === "json" ? (
-          <>
+          </div>
+        </details>
+        <details
+          className="ms-editor-section"
+          onToggle={(event) => {
+            if (event.currentTarget.open && !jsonDirty)
+              setJson(JSON.stringify(sandboxMasterTags(latest.current), null, 2));
+          }}
+        >
+          <summary>Advanced JSON</summary>
+          <div className="ms-section-content">
             <div className="ms-section-heading">
               <h3>All tags, fully editable</h3>
               <p>
@@ -755,9 +715,9 @@ export function MusicSandboxEditor({
             >
               <FileJson size={15} /> Apply JSON changes
             </button>
-          </>
-        ) : null}
-      </section>
+          </div>
+        </details>
+      </div>
       {issues.length ? (
         <div className="ms-alert" role="alert">
           <strong>A few things need review</strong>
