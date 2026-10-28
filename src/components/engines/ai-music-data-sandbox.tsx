@@ -24,6 +24,7 @@ import {
 import { downloadBlob } from "@/lib/utils";
 import { usePrefs } from "@/lib/storage";
 import { Logo } from "@/components/brand/logo";
+import { Button } from "@/components/ui/button";
 import { MusicSandboxEditor, SandboxField } from "./music-sandbox-editor";
 import {
   loadSandbox,
@@ -103,44 +104,41 @@ function SandboxModal({
     </dialog>
   );
 }
-function SandboxSplash({ onSkip }: { onSkip: () => void }) {
+function SandboxSplash({ onEnter }: { onEnter: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [scale, setScale] = useState(1);
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
-    const resize = () => setScale(Math.min(1, window.innerWidth / 390, window.innerHeight / 844));
-    resize();
-    window.addEventListener("resize", resize);
-    return () => {
-      element?.close();
-      window.removeEventListener("resize", resize);
-    };
+    return () => element?.close();
   }, []);
   return (
     <dialog
       ref={dialog}
-      onCancel={(e) => {
-        e.preventDefault();
-        onSkip();
-      }}
       className="ms-splash"
-      aria-label="AI Music Data Sandbox loading"
+      aria-label="AI Music Data Sandbox welcome"
+      onCancel={(event) => event.preventDefault()}
     >
-      <div className="ms-splash-artboard" style={{ transform: `scale(${scale})` }}>
-        <img className="ms-splash-logo ms-logo-light" src="/logo-home-transparent.png" alt="enV" />
-        <img className="ms-splash-logo ms-logo-dark" src="/logo-home-dark.png" alt="" />
-        <Headset className="ms-splash-headset" aria-hidden="true" />
-        <div className="ms-splash-title">AI Music Data Sandbox.</div>
-        <div className="ms-splash-by">By</div>
-        <div className="ms-splash-credit">
+      <div className="ms-welcome">
+        <div className="ms-welcome-content">
+          <img
+            className="ms-welcome-logo ms-logo-light"
+            src="/logo-home-transparent.png"
+            alt="enV"
+          />
+          <img className="ms-welcome-logo ms-logo-dark" src="/logo-home-dark.png" alt="" />
+          <Headset className="ms-welcome-icon" aria-hidden="true" />
+          <h1>AI Music Data Sandbox</h1>
+          <p>Organize your music and prepare it for training.</p>
+          <Button size="lg" onClick={onEnter}>
+            Enter sandbox <ArrowRight aria-hidden="true" />
+          </Button>
+        </div>
+        <div className="ms-welcome-credit">
+          <span>By</span>
           <img src="/music-sandbox/rumuo-mark.jpg" alt="" />
-          Rumuo
+          <strong>Rumuo</strong>
         </div>
       </div>
-      <button className="ms-skip" onClick={onSkip}>
-        Open workspace <ArrowRight size={15} />
-      </button>
     </dialog>
   );
 }
@@ -195,15 +193,10 @@ export function AiMusicDataSandbox() {
       .catch((e) => {
         if (active) {
           setError(errorText(e));
-          setSplash(false);
         }
       });
-    const timer = setTimeout(() => {
-      if (active) setSplash(false);
-    }, 1500);
     return () => {
       active = false;
-      clearTimeout(timer);
       controller.current?.abort();
     };
   }, []);
@@ -600,7 +593,7 @@ export function AiMusicDataSandbox() {
   const editing = workspace?.tracks.find((t) => t.key === editorId);
   return (
     <section className="music-sandbox" aria-label="AI Music Data Sandbox">
-      {splash ? <SandboxSplash onSkip={() => setSplash(false)} /> : null}
+      {splash ? <SandboxSplash onEnter={() => setSplash(false)} /> : null}
       {!ready && !error ? (
         <div className="ms-loading">
           <LoaderCircle size={22} className="ms-spin" /> Opening your workspace…

@@ -90,9 +90,22 @@ page.on("request", (r) => {
     unexpected.push(r.url());
 });
 const scope = page.locator(".music-sandbox");
+let checkedWelcome = false;
 const waitUI = async () => {
+  const splash = scope.locator(".ms-splash");
+  await splash.waitFor({ state: "visible", timeout: 90000 });
+  if (!checkedWelcome) {
+    await page.waitForTimeout(2000);
+    assert.equal(
+      await splash.isVisible(),
+      true,
+      "The welcome screen must stay open until the user enters",
+    );
+    checkedWelcome = true;
+  }
+  await splash.getByRole("button", { name: "Enter sandbox" }).click();
+  await splash.waitFor({ state: "hidden" });
   await scope.locator(".ms-page-heading").waitFor({ timeout: 90000 });
-  await scope.locator(".ms-splash").waitFor({ state: "hidden" });
 };
 const importZip = async (file) => {
   await scope.getByRole("button", { name: "Add music", exact: true }).click();

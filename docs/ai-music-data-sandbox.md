@@ -65,9 +65,9 @@ Annotation names and JSONL layout must be checked against the exact ACE-Step or 
 
 ## Appearance and platform scope
 
-The sandbox is monochrome and inherits enV's system/light/dark preference. Container queries accommodate both the actual device width and enV's user-selected mobile/tablet/desktop layout. Forms have labels, the editor has keyboard tabs, dialogs trap focus, and motion respects the device preference.
+The sandbox uses enV's fonts, type scale, colors, controls, and system/light/dark preference. Container queries accommodate both the actual device width and enV's user-selected mobile/tablet/desktop layout. Forms have labels, the editor has keyboard tabs, dialogs trap focus, and motion respects the device preference.
 
-The splash uses the same light and dark enV logo assets as the homepage and the supplied Rumuo icon. It keeps the PDF's embedded Lora font, Lucide headset, mobile artboard coordinates and title. Brand images retain their colors against the monochrome interface. Inter and Aclonica are served locally. The 390×844 artboard scales to fit smaller viewports and centers on larger devices.
+The welcome screen uses the same light and dark enV logo assets as the homepage and the supplied Rumuo icon. It stays open until the user selects Enter sandbox. The screen adapts to the available viewport and uses the same typography and controls as enV.
 
 This change implements the responsive web sandbox. Native Android/iOS analyser screens and their storage are separate and are not represented as having the new browser workflow.
 
