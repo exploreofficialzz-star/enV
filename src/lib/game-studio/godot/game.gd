@@ -8,6 +8,8 @@ var status: Label
 var touch_controls: HBoxContainer
 var touch_exit: Button
 var touch_buttons: Array[Button] = []
+var last_safe_area := Rect2i()
+var safe_area_poll := 0.0
 var loaded_objects := 0
 var failure := ""
 var assets: Dictionary = {}
@@ -249,3 +251,13 @@ func _physics_process(_delta: float) -> void:
     player.move_and_slide()
     game_camera.position = player.global_position + Vector3(0, 6, -8)
     game_camera.look_at(player.global_position)
+
+func _process(delta: float) -> void:
+    if not touch_controls: return
+    safe_area_poll -= delta
+    if safe_area_poll > 0: return
+    safe_area_poll = 0.5
+    var current_safe_area := DisplayServer.get_display_safe_area()
+    if current_safe_area != last_safe_area:
+        last_safe_area = current_safe_area
+        _layout_touch_controls()
