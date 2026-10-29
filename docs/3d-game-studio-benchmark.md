@@ -17,7 +17,7 @@ Research date: 29 October 2026. This compares documented workflows, not measured
 
 ## Current enV state
 
-The web editor has a 3D viewport, primitives, transform controls, validated self-contained GLB import, an Artboard image handoff, three scenes, local save/load, player collision movement and a verified browser export. A Godot source export reads the same project. Android has a native Godot preview integration; iOS has a native SceneKit preview integration in development. The UX/UI Artboard in this repository is a 2D design tool, and its 3D handoff is an image plane; it is not a 3D mesh authoring library.
+The web editor has a 3D viewport, primitives, transform controls, validated self-contained GLB import, an Artboard image handoff, three scenes, local save/load, player collision movement and a verified browser export. A Godot source export reads the same project. Android has a native Godot preview integration; iOS has a native SceneKit preview integration with simulator tests. Both require further device testing. The UX/UI Artboard in this repository is a 2D design tool, and its 3D handoff is an image plane; it is not a 3D mesh authoring library.
 
 The current project supports static scene objects and 2D Artboard images *inside* a 3D scene. Dedicated static and 2D game authoring modes, a comprehensive 3D modeling Artboard, complete native editors, production-grade animation, physics, interaction authoring, cloud collaboration, account-owned asset storage, and signed native game builds are not implemented. See [implementation status](./3d-game-studio.md) for the detailed list. None should be represented as complete until implemented and tested.
 

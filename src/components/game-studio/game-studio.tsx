@@ -509,6 +509,8 @@ export default function GameStudio() {
   }
   function play() {
     try {
+      if (!scene.current) throw new Error("The 3D renderer is not ready.");
+      scene.current.assertReadyForGame(projectRef.current);
       const valid = validateProject(projectRef.current);
       setPlayHtml(previewHtml(valid));
       setMobilePanel("view");
@@ -541,7 +543,7 @@ export default function GameStudio() {
     setNotice("Preparing 3D model…");
     try {
       if (!scene.current) throw new Error("The 3D renderer is not ready.");
-      const blob = await scene.current.exportSceneGlb();
+      const blob = await scene.current.exportSceneGlb(current);
       if (projectRef.current !== current)
         throw new Error("The scene changed during export. Please try again.");
       download(blob, `${safeName(current.name)}-scene.glb`);
@@ -558,10 +560,15 @@ export default function GameStudio() {
     setNotice("Preparing browser build…");
     setError("");
     try {
-      const bytes = await buildGame(projectRef.current);
+      const current = projectRef.current;
+      if (!scene.current) throw new Error("The 3D renderer is not ready.");
+      scene.current.assertReadyForGame(current);
+      const bytes = await buildGame(current);
+      if (projectRef.current !== current)
+        throw new Error("The scene changed during the build. Please try again.");
       download(
         new Blob([new Uint8Array(bytes)], { type: "application/zip" }),
-        `${safeName(project.name)}-browser.zip`,
+        `${safeName(current.name)}-browser.zip`,
       );
       setNotice("Browser package downloaded. Open index.html from the extracted folder.");
     } catch (reason) {
@@ -573,10 +580,13 @@ export default function GameStudio() {
   }
   function exportGodot() {
     try {
-      const bytes = buildGodotProject(projectRef.current);
+      const current = projectRef.current;
+      if (!scene.current) throw new Error("The 3D renderer is not ready.");
+      scene.current.assertReadyForGame(current);
+      const bytes = buildGodotProject(current);
       download(
         new Blob([new Uint8Array(bytes)], { type: "application/zip" }),
-        `${safeName(project.name)}-godot-source.zip`,
+        `${safeName(current.name)}-godot-source.zip`,
       );
       setProjectMenu(false);
       setError("");

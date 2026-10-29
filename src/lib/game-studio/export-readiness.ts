@@ -11,3 +11,12 @@ export function visibleExportEntries<T>(
     return entry;
   });
 }
+
+/** A playable project loads hidden objects as well, so all scene entries must be ready. */
+export function assertGameEntriesReady(
+  objects: readonly { id: string; name: string }[],
+  entries: ReadonlyMap<string, unknown>,
+): void {
+  const missing = objects.find((object) => !entries.has(object.id));
+  if (missing) throw new Error(`“${missing.name}” could not be loaded. Fix the scene before playing or building.`);
+}

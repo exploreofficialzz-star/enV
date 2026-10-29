@@ -1,7 +1,7 @@
 import * as B from "babylonjs";
 import "babylonjs-loaders";
 import { MAX_ASSET_BYTES, validateGlb, type GameAsset, type GameObject, type GameProject } from "@/lib/game-studio/project";
-import { visibleExportEntries } from "@/lib/game-studio/export-readiness";
+import { assertGameEntriesReady, visibleExportEntries } from "@/lib/game-studio/export-readiness";
 
 type Mode = "select" | "move" | "rotate" | "scale";
 type Callbacks = {
@@ -302,10 +302,17 @@ export class StudioScene {
       if (retry && this.current) this.sync(this.current, this.selected);
     }
   }
-  async exportSceneGlb(): Promise<Blob> {
+  assertReadyForGame(project: GameProject): void {
+    if (this.disposed || this.current !== project)
+      throw new Error("The scene is still updating. Try again in a moment.");
+    if (this.pending.size) throw new Error("Objects are still loading. Try again in a moment.");
+    assertGameEntriesReady(project.objects, this.entries);
+  }
+  async exportSceneGlb(expectedProject: GameProject): Promise<Blob> {
     if (this.pending.size) throw new Error("Models are still loading. Try exporting again in a moment.");
     const project = this.current;
-    if (!project) throw new Error("The 3D renderer is not ready.");
+    if (!project || this.disposed || project !== expectedProject)
+      throw new Error("The scene is still updating. Try exporting again in a moment.");
     const roots = visibleExportEntries(project.objects, this.entries).map((entry) => entry.root);
 
     // Exclude editor helpers, camera and lights. Only scene-object descendants are assets.

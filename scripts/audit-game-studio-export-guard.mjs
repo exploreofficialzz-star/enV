@@ -51,7 +51,15 @@ try {
   await page.getByRole("button", { name: "Export scene as GLB" }).click();
   await page.getByText("A visible object could not be loaded. Fix the scene before exporting.").waitFor({ timeout: 10000 });
   assert.equal(downloaded, false, "A partial model must not be downloaded");
-  console.log("PASS: a failed visible model prevents an incomplete GLB export");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByText("“Triangle” could not be loaded. Fix the scene before playing or building.").waitFor({ timeout: 10000 });
+  assert.equal(await page.locator('iframe[title="Playable game preview"]').count(), 0, "An invalid scene must not start playing");
+  await page.getByRole("button", { name: "Build browser" }).click();
+  await page.getByRole("button", { name: "Project options" }).click();
+  await page.getByRole("button", { name: "Export Godot project" }).click();
+  await page.waitForTimeout(500);
+  assert.equal(downloaded, false, "A broken game package must not be downloaded");
+  console.log("PASS: a failed model prevents incomplete exports, play and builds");
 } finally {
   await browser.close();
 }
