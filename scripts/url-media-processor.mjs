@@ -3,6 +3,8 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { PROVIDERS, detectProvider, createProviderAdapter, createProviderRequestArgs } from "./media/provider-registry.mjs";
@@ -44,7 +46,8 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
     const child = spawn(extractorBinary, ["--ignore-config", playlistMode, "--restrict-filenames", "--js-runtimes", "node", "--retries", "3", "--fragment-retries", "3", "--extractor-retries", "2", "--socket-timeout", "25", ...createProviderRequestArgs(provider), ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = ""; let stderr = "";
     let stdoutExceeded = false;
-    const timer = setTimeout(() => child.kill("SIGTERM"), DOWNLOAD_TIMEOUT_MS);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGTERM"); }, DOWNLOAD_TIMEOUT_MS);
     const abort = () => child.kill("SIGTERM");
     signal?.addEventListener("abort", abort, { once: true });
     child.stdout.on("data", (c) => {
@@ -61,6 +64,7 @@ function runYtdlp(args, cwd, signal, provider, includePlaylist = false) {
     child.on("close", (code) => {
       clearTimeout(timer); signal?.removeEventListener("abort", abort);
       if (signal?.aborted) return reject(new Error("Download cancelled."));
+      if (timedOut) return reject(new Error("JOB_TIMEOUT: The extractor exceeded its processing deadline."));
       if (stdoutExceeded) return reject(new Error("PROVIDER_ERROR: The media provider returned too much metadata."));
       if (code !== 0) {
         const detail = stderr.trim().slice(-1200);
@@ -109,11 +113,18 @@ function runFfprobe(file, signal) {
   });
 }
 
-async function verifyDownloadedMedia(file, expectedMaxBytes, signal) {
+async function verifyDownloadedMedia(file, expectedMaxBytes, signal, requireAudio = false) {
   const stat = await fs.stat(file);
   if (!stat.isFile() || stat.size <= 0) throw new Error("OUTPUT_VERIFICATION_FAILED: The downloaded result is empty.");
   if (stat.size > expectedMaxBytes) throw new Error("FILE_TOO_LARGE: The downloaded result exceeds the configured limit.");
   const probe = await runFfprobe(file, signal);
+  const streams = Array.isArray(probe?.streams) ? probe.streams : [];
+  if (!streams.some((stream) => stream.codec_type === "audio" || stream.codec_type === "video")) {
+    throw new Error("OUTPUT_VERIFICATION_FAILED: The downloaded file has no playable audio or video stream.");
+  }
+  if (requireAudio && !streams.some((stream) => stream.codec_type === "audio")) {
+    throw new Error("OUTPUT_VERIFICATION_FAILED: The downloaded file does not contain an audio stream.");
+  }
   const duration = Number(probe?.format?.duration);
   if (Number.isFinite(duration) && duration > MAX_DURATION_SECONDS) throw new Error("DURATION_TOO_LONG: The downloaded media exceeds the configured duration limit.");
   return stat;
@@ -660,6 +671,7 @@ async function handleDownload(req, res) {
   await assertPublicHostname(url.hostname);
   const controller = new AbortController();
   req.on("aborted", () => controller.abort());
+  res.on("close", () => { if (!res.writableEnded) controller.abort(); });
   if (provider === "generic") {
     await handleDirectDownload(req, res, url, body, controller.signal);
     return;
@@ -733,12 +745,12 @@ async function handleDownload(req, res) {
     if (!candidates.length) throw new Error("The provider returned no downloadable media within the configured limits.");
     candidates.sort((a,b) => b.stat.size - a.stat.size);
     const chosen = candidates[0];
-    await verifyDownloadedMedia(chosen.file, maxBytes, controller.signal);
-    const data = await fs.readFile(chosen.file);
+    await verifyDownloadedMedia(chosen.file, maxBytes, controller.signal, Boolean(audioOnly));
     const ext = path.extname(chosen.file).toLowerCase().replace(".", "") || "bin";
     const mime = ext === "mp4" ? "video/mp4" : ext === "webm" ? "video/webm" : ext === "mp3" ? "audio/mpeg" : ext === "m4a" ? "audio/mp4" : "application/octet-stream";
-    res.writeHead(200, { "content-type": mime, "content-disposition": `attachment; filename="${safeName(path.basename(chosen.file))}"`, "content-length": String(data.length), "access-control-allow-origin": ALLOWED_ORIGIN, "cache-control": "no-store" });
-    res.end(data);
+    res.writeHead(200, { "content-type": mime, "content-disposition": `attachment; filename="${safeName(path.basename(chosen.file))}"`, "content-length": String(chosen.stat.size), "access-control-allow-origin": ALLOWED_ORIGIN, "cache-control": "no-store" });
+    // Stream with backpressure instead of loading potentially hundreds of MB into RAM.
+    await pipeline(createReadStream(chosen.file), res, { signal: controller.signal });
   } finally {
     await fs.rm(jobDir, { recursive: true, force: true }).catch(() => undefined);
   }
