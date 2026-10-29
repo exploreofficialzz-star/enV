@@ -188,6 +188,9 @@ export function MusicDownloaderEngine() {
   const [showAllTracks, setShowAllTracks] = useState(false);
   const [trackStates, setTrackStates] = useState<Record<number, string>>({});
   const abortRef = useRef<AbortController | null>(null);
+  // Preserve verified tracks across partial failures and ZIP retries within one preview.
+  const completedRef = useRef<Map<number, DownloadResult>>(new Map());
+  const failedRef = useRef<Map<number, string>>(new Map());
   const manifestInputRef = useRef<HTMLInputElement | null>(null);
   const localFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -196,6 +199,8 @@ export function MusicDownloaderEngine() {
     setError("");
     try {
       setUrlText(await file.text());
+      completedRef.current.clear();
+      failedRef.current.clear();
       setPreview(null);
       setTrackStates({});
       setMode("online");
@@ -211,6 +216,8 @@ export function MusicDownloaderEngine() {
     setResult("");
     setProgress("");
     setPreview(null);
+    completedRef.current.clear();
+    failedRef.current.clear();
     setShowAllTracks(false);
     setTrackStates({});
     if (!rightsConfirmed) {
@@ -308,29 +315,34 @@ export function MusicDownloaderEngine() {
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
-    const collected: DownloadResult[] = [];
-    const failures: string[] = [];
-    let totalBytes = 0;
+    const completed = completedRef.current;
+    const previousFailures = failedRef.current;
+    let totalBytes = [...completed.values()].reduce((sum, track) => sum + track.bytes.byteLength, 0);
+    // The initial batch, a resumed batch and a failed-only retry all share the
+    // same verified tracks. A retry must never produce a ZIP of only the retried songs.
     const indices = trackIndex === undefined
-      ? preview.tracks.map((_, i) => i).filter((i) => !failedOnly || trackStates[i] === "Unavailable")
+      ? preview.tracks.map((_, i) => i).filter((i) =>
+          !completed.has(i) && (!failedOnly || trackStates[i] === "Unavailable"))
       : [trackIndex];
     try {
-      for (const index of indices) {
+      for (const [position, index] of indices.entries()) {
         const item = preview.tracks[index];
         if (!item) continue;
         setTrackStates((previous) => ({ ...previous, [index]: "Downloading…" }));
-        setProgress("Downloading " + (indices.indexOf(index) + 1) + " of " + indices.length + ": " + item.title);
+        setProgress("Downloading " + (position + 1) + " of " + indices.length + ": " + item.title);
         try {
           const track = await downloadMusicWithSingleRetry(
             () => downloadMusicTrack(item.url, item.source, item.metadata, item.title, controller.signal, setProgress),
             controller.signal,
             () => { setTrackStates((previous) => ({ ...previous, [index]: "Retrying…" })); setProgress("Temporary source failure. Retrying " + item.title + " once…"); },
           );
-          if (totalBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) {
+          const oldBytes = completed.get(index)?.bytes.byteLength || 0;
+          if (totalBytes - oldBytes + track.bytes.byteLength > MAX_COLLECTION_BYTES) {
             throw new Error("Batch size exceeds " + formatFileSize(MAX_COLLECTION_BYTES) + ".");
           }
-          totalBytes += track.bytes.byteLength;
-          collected.push(track);
+          totalBytes = totalBytes - oldBytes + track.bytes.byteLength;
+          completed.set(index, track);
+          previousFailures.delete(index);
           setTrackStates((previous) => ({ ...previous, [index]: "Ready" }));
           if (trackIndex !== undefined) {
             downloadBlob(new Blob([new Uint8Array(track.bytes).buffer], { type: mimeForExtension(track.extension) }), track.name);
@@ -339,25 +351,32 @@ export function MusicDownloaderEngine() {
           if ((cause as Error)?.name === "AbortError") throw cause;
           const message = cause instanceof Error ? cause.message : "Download failed.";
           setTrackStates((previous) => ({ ...previous, [index]: "Unavailable" }));
-          failures.push(item.title + ": " + message);
+          previousFailures.set(index, item.title + ": " + message);
         }
       }
-      if (trackIndex === undefined && collected.length) {
-        const title = safeName(preview.title || inferredCollectionTitle(collected), "My music");
-        const archive = buildArchive(title, collected, failures);
+      const savedInOrder = preview.tracks.flatMap((_, index) => {
+        const track = completed.get(index);
+        return track ? [track] : [];
+      });
+      const failures = preview.tracks.flatMap((item, index) =>
+        completed.has(index) ? [] : [previousFailures.get(index) || item.title + ": Download not completed."]);
+      if (trackIndex === undefined && savedInOrder.length) {
+        const title = safeName(preview.title || inferredCollectionTitle(savedInOrder), "My music");
+        const archive = buildArchive(title, savedInOrder, failures);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
-      if (collected.length) {
-        setResult((trackIndex === undefined ? "ZIP prepared with " : "Downloaded ") + collected.length + " track(s) · " + formatFileSize(totalBytes) +
+      if (savedInOrder.length) {
+        setResult((trackIndex === undefined ? "ZIP prepared with " + savedInOrder.length : "Downloaded 1") +
+          " track(s) · " + formatFileSize(totalBytes) +
           (failures.length ? ". " + failures.length + " unavailable track(s) were skipped." : "."));
       }
       if (failures.length) {
         setError(failures.slice(0, 5).join("\n") + (failures.length > 5 ? "\n…and " + (failures.length - 5) + " more." : ""));
       }
-      if (!collected.length && !failures.length) setError("No audio was downloaded.");
+      if (!savedInOrder.length && !failures.length) setError("No audio was downloaded.");
       setProgress("");
     } catch (cause) {
-      if ((cause as Error)?.name === "AbortError") setProgress("Download cancelled. Completed tracks were not added to a ZIP.");
+      if ((cause as Error)?.name === "AbortError") setProgress("Download cancelled. Completed tracks remain available for a resumed ZIP.");
       else setError(cause instanceof Error ? cause.message : "Unable to download the selected music.");
     } finally {
       abortRef.current = null;
@@ -437,7 +456,7 @@ export function MusicDownloaderEngine() {
             <button type="button" onClick={() => manifestInputRef.current?.click()} className="text-sm font-medium text-accent hover:underline">Import list</button>
             <input ref={manifestInputRef} type="file" accept=".txt,.m3u,.m3u8,.json,application/json,text/plain" className="hidden" onChange={(event) => void importManifest(event.target.files?.[0])} />
           </div>
-          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); setPreview(null); setTrackStates({}); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
+          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); setPreview(null); completedRef.current.clear(); failedRef.current.clear(); setTrackStates({}); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
           <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm">
             <input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
             <span>I have permission to download this music and the source allows downloads.</span>
@@ -470,7 +489,7 @@ export function MusicDownloaderEngine() {
               <Button type="button" onClick={() => void downloadPreview(preview.tracks.length === 1 ? 0 : undefined)} disabled={busy} className="w-full">{busy ? "Downloading…" : preview.tracks.length === 1 ? "Download song" : "Download ZIP (" + preview.tracks.length + " tracks)"}</Button>
               {Object.values(trackStates).some((state) => state === "Unavailable") ? (
                 <Button type="button" variant="outline" onClick={() => void downloadPreview(preview.tracks.length === 1 ? 0 : undefined, preview.tracks.length > 1)} disabled={busy} className="w-full">
-                  {preview.tracks.length === 1 ? "Retry song download" : "Retry unavailable tracks as ZIP (" + Object.values(trackStates).filter((state) => state === "Unavailable").length + ")"}
+                  {preview.tracks.length === 1 ? "Retry song download" : "Retry unavailable tracks and rebuild ZIP (" + Object.values(trackStates).filter((state) => state === "Unavailable").length + ")"}
                 </Button>
               ) : null}
             </section>
