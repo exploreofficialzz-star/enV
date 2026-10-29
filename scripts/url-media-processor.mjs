@@ -532,29 +532,74 @@ async function handleInfo(req, res) {
       console.warn("[url-media] Audiomack single-song public metadata unavailable; trying configured extractor");
     }
   }
-  let audiomackPageFallbackFailure = "";
   if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
+    // Prefer the isolated, reworked Audiomack extractor to enumerate the
+    // collection's real public song pages. The old primary extractor uses a
+    // retired API; the bundled rework reads the current page hydration.
+    // Never return signed playback URLs as downloadable track page entries.
+    let extractorFailure = "";
+    const collectionDir = await fs.mkdtemp(path.join(os.tmpdir(), "env-audiomack-collection-"));
     try {
-      const albumInfo = await inspectAudiomackAlbumPage(url, controller.signal);
-      if (albumInfo?.entries?.length) {
-        json(res, 200, albumInfo);
+      const { stdout } = await runYtdlp([
+        "--dump-single-json", "--skip-download", "--no-warnings",
+        "--flat-playlist", "--playlist-end", "50", url.toString(),
+      ], collectionDir, controller.signal, provider, true);
+      const collection = parseYtDlpJson(stdout);
+      const seen = new Set();
+      const tracks = [];
+      for (const item of Array.isArray(collection.entries) ? collection.entries : []) {
+        const raw = String(item?.webpage_url || item?.original_url || item?.url || "");
+        if (!isAudiomackSongUrl(raw)) continue;
+        const canonical = new URL(raw);
+        canonical.search = "";
+        canonical.hash = "";
+        if (seen.has(canonical.href)) continue;
+        seen.add(canonical.href);
+        tracks.push({
+          id: item.id ? String(item.id) : undefined,
+          title: String(item.title || item.fulltitle || canonical.pathname.split("/").at(-1) || "Track"),
+          webpageUrl: canonical.href,
+          uploader: item.uploader ? String(item.uploader) : undefined,
+          album: collection.title ? String(collection.title) : undefined,
+          duration: typeof item.duration === "number" ? item.duration : undefined,
+        });
+        if (tracks.length >= 50) break;
+      }
+      if (tracks.length) {
+        const advertisedCount = Number(collection.playlist_count || collection.n_entries || 0);
+        json(res, 200, {
+          provider, title: String(collection.title || "Audiomack collection"),
+          uploader: collection.uploader ? String(collection.uploader) : undefined,
+          album: collection.title ? String(collection.title) : undefined,
+          webpageUrl: url.toString(), isPlaylist: true,
+          entries: tracks,
+          truncated: tracks.length >= 50 || (advertisedCount > 0 && advertisedCount > tracks.length),
+          formats: [],
+        });
         return;
       }
-      audiomackPageFallbackFailure = "The public collection page did not expose usable song links.";
+      extractorFailure = "The configured collection extractor did not enumerate public song pages.";
     } catch (error) {
       if (error?.name === "AbortError") throw error;
-      const failure = error instanceof Error ? error.message : String(error);
-      audiomackPageFallbackFailure = failure.replace(/https?:\/\/\S+/g, "[source url]").replace(/[\r\n]+/g, " ").slice(0, 220);
-      console.warn("[url-media] Audiomack page-link fallback unavailable: " + audiomackPageFallbackFailure);
+      extractorFailure = String(error?.message || error).replace(/https?:\/\/\S+/g, "[source URL]").replace(/[\r\n]+/g, " ").slice(0, 180);
+      console.warn("[url-media] Audiomack collection extractor could not enumerate public song pages: " + extractorFailure);
+    } finally {
+      await fs.rm(collectionDir, { recursive: true, force: true }).catch(() => undefined);
     }
-  }
-  // yt-dlp's historical Audiomack album extractor loops over the obsolete
-  // /api/music/url/album endpoint. Running it after public-page discovery fails
-  // produces a misleading JSON error, not a usable album track list.
-  if (provider === "audiomack" && includePlaylist && isAudiomackCollectionUrl(url)) {
-    throw new Error("SOURCE_UNAVAILABLE: Audiomack's public collection page did not expose readable song links. " +
-      (audiomackPageFallbackFailure || "Track enumeration was unavailable.") +
-      " The legacy album API extractor cannot recover those links. No audio was downloaded.");
+    // Secondary discovery uses only genuine song links from public HTML.
+    // If either engine succeeds, preview valid entries rather than a fake song.
+    try {
+      const page = await inspectAudiomackAlbumPage(url, controller.signal);
+      if (page?.entries?.length) {
+        json(res, 200, page);
+        return;
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      console.warn("[url-media] Audiomack HTML collection discovery failed: " + String(error?.message || error).slice(0, 180));
+    }
+    throw new Error("SOURCE_UNAVAILABLE: Audiomack's collection could not be enumerated from its public page or the isolated extractor. " +
+      extractorFailure + " No song links were invented and no audio was downloaded.");
   }
   if (provider === "generic") {
     const info = await inspectDirectUrl(url, controller.signal);
@@ -678,6 +723,9 @@ async function handleDownload(req, res) {
   }
   if (provider === "archive" && isArchiveItemPage(url.toString())) {
     throw new Error("INVALID_URL: Preview the Internet Archive audio collection and download its individual public audio files.");
+  }
+  if (provider === "audiomack" && isAudiomackCollectionUrl(url)) {
+    throw new Error("INVALID_URL: Preview this Audiomack album or playlist and download its individual songs.");
   }
 
   // Prefer a creator-enabled public download link rather than an obsolete
