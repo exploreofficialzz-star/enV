@@ -358,22 +358,26 @@ export function MusicDownloaderEngine() {
         const track = completed.get(index);
         return track ? [track] : [];
       });
-      const failures = preview.tracks.flatMap((item, index) =>
-        completed.has(index) ? [] : [previousFailures.get(index) || item.title + ": Download not completed."]);
+      const failures = trackIndex === undefined
+        ? preview.tracks.flatMap((item, index) =>
+            completed.has(index) ? [] : [previousFailures.get(index) || item.title + ": Download not completed."])
+        : previousFailures.has(trackIndex) ? [previousFailures.get(trackIndex)!] : [];
+      const successfulCount = trackIndex === undefined
+        ? savedInOrder.length : completed.has(trackIndex) && !previousFailures.has(trackIndex) ? 1 : 0;
       if (trackIndex === undefined && savedInOrder.length) {
         const title = safeName(preview.title || inferredCollectionTitle(savedInOrder), "My music");
         const archive = buildArchive(title, savedInOrder, failures);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
-      if (savedInOrder.length) {
-        setResult((trackIndex === undefined ? "ZIP prepared with " + savedInOrder.length : "Downloaded 1") +
-          " track(s) · " + formatFileSize(totalBytes) +
+      if (successfulCount) {
+        setResult((trackIndex === undefined ? "ZIP prepared with " + successfulCount : "Downloaded 1") +
+          " track(s) · " + formatFileSize(trackIndex === undefined ? totalBytes : completed.get(trackIndex)?.bytes.byteLength || 0) +
           (failures.length ? ". " + failures.length + " unavailable track(s) were skipped." : "."));
       }
       if (failures.length) {
         setError(failures.slice(0, 5).join("\n") + (failures.length > 5 ? "\n…and " + (failures.length - 5) + " more." : ""));
       }
-      if (!savedInOrder.length && !failures.length) setError("No audio was downloaded.");
+      if (!successfulCount && !failures.length) setError("No audio was downloaded.");
       setProgress("");
     } catch (cause) {
       if ((cause as Error)?.name === "AbortError") setProgress("Download cancelled. Completed tracks remain available for a resumed ZIP.");
