@@ -18,8 +18,11 @@ final class NativeGameSceneTests: XCTestCase {
         XCTAssertLessThanOrEqual(player.position.x, 1.01)
         let stopped = player.position
         game.paused = true
+        XCTAssertTrue(game.scene.rootNode.isPaused)
         game.move(x: 0, z: -1, seconds: 0.1)
         XCTAssertEqual(player.position.z, stopped.z)
+        game.paused = false
+        XCTAssertFalse(game.scene.rootNode.isPaused)
     }
 
     func testSharedProjectLoadsActualGLBAndArtboard() throws {

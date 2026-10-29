@@ -228,6 +228,43 @@ try {
   console.log(
     "PASS: viewport, transforms, save/reload, GLB import/export, movement, collision, pause/stop, extracted browser build",
   );
+  // A slow storage restore must never overwrite edits made while it is pending.
+  const delayed = await page.context().newPage();
+  await delayed.addInitScript(() => {
+    const originalOpen = IDBFactory.prototype.open;
+    const pending = [];
+    window.__envPendingRestores = pending;
+    window.__envReleaseRestores = () => {
+      for (const resume of pending.splice(0)) resume();
+    };
+    IDBFactory.prototype.open = function (name, version) {
+      const request = version === undefined
+        ? originalOpen.call(this, name)
+        : originalOpen.call(this, name, version);
+      if (name !== "env-3d-studio-v1") return request;
+      let handler = null;
+      Object.defineProperty(request, "onsuccess", {
+        configurable: true,
+        get: () => handler,
+        set: (value) => { handler = value; },
+      });
+      request.addEventListener("success", (event) => {
+        pending.push(() => handler?.call(request, event));
+      });
+      return request;
+    };
+  });
+  await delayed.goto(`${origin}/3d-game-studio`, { waitUntil: "domcontentloaded", timeout: 90000 });
+  await delayed.locator("[data-renderer-ready=true]").waitFor({ timeout: 90000 });
+  await delayed.waitForFunction(() => window.__envPendingRestores?.length >= 2, null, { timeout: 30000 });
+  await delayed.getByLabel("Project name").fill("My work in progress");
+  await delayed.evaluate(() => window.__envReleaseRestores());
+  await delayed.getByRole("button", { name: "Project options", exact: true }).click();
+  await delayed.locator(".game-menu").getByRole("button", { name: "Starter world", exact: true }).waitFor({ timeout: 30000 });
+  assert.equal(await delayed.getByLabel("Project name").inputValue(), "My work in progress",
+    "A delayed restore must not overwrite work started in the editor");
+  await delayed.close();
+
   await page.goto(`${origin}/tools/developer/ux-ui-studio`, {
     waitUntil: "domcontentloaded",
     timeout: 90000,

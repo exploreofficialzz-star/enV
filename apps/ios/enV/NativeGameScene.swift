@@ -10,7 +10,9 @@ final class NativeGameScene: ObservableObject {
     @Published private(set) var scene = SCNScene()
     @Published private(set) var status = "Preparing game…"
     @Published private(set) var ready = false
-    @Published var paused = false
+    @Published var paused = false {
+        didSet { scene.rootNode.isPaused = paused }
+    }
     private(set) var player: SCNNode?
     private(set) var objectNodes: [String: SCNNode] = [:]
     private var obstacles: [SCNNode] = []

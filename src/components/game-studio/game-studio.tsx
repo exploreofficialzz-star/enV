@@ -218,6 +218,7 @@ export default function GameStudio() {
   );
   useEffect(() => {
     let cancelled = false;
+    const projectAtRestoreStart = projectRef.current;
     Promise.all([listArtboards(), listGameProjects()])
       .then(([assets, saved]) => {
         if (cancelled) return;
@@ -225,7 +226,7 @@ export default function GameStudio() {
         setProjects(saved);
         const lastId = localStorage.getItem("env-3d-last-project");
         const last = saved.find((item) => item.id === lastId);
-        if (last) {
+        if (last && projectRef.current === projectAtRestoreStart) {
           try {
             replace(validateProject(last), false);
             setNotice("Opened your last saved project.");
