@@ -25,6 +25,9 @@ class NativeGamePlaybackTest {
     fun starterSceneLoadsInTheNativeRuntime() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         automation.executeShellCommand("logcat -c").close()
+        // The emulator is fresh on each CI run; suppress Android's one-time immersive-mode tutorial.
+        val confirmation = automation.executeShellCommand("settings put secure immersive_mode_confirmations confirmed")
+        ParcelFileDescriptor.AutoCloseInputStream(confirmation).use { it.readBytes() }
         compose.onNodeWithText("Play preset").performClick()
         val deadline = SystemClock.elapsedRealtime() + 120_000
         var logs = ""
@@ -38,6 +41,12 @@ class NativeGamePlaybackTest {
                 it.contains("ENV_GAME") || it.contains("FATAL EXCEPTION")
         }.toList().takeLast(30).joinToString("\n")
         assertTrue("Native game did not finish loading.\n$relevant", logs.contains("ENV_GAME_READY"))
+        // Some Android images still show the tutorial; dismiss it as a user would.
+        repeat(5) {
+            val button = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Got it")?.firstOrNull()
+            if (button != null) button.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+            SystemClock.sleep(300)
+        }
         val frameDeadline = SystemClock.elapsedRealtime() + 30_000
         var colors = emptySet<Int>()
         var screenshot: android.graphics.Bitmap? = null
