@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/media/audiomack-hallelujah-smoke.mjs"
       - "scripts/media/vendor/audiomack.py"
+      - "scripts/media/audiomack-live-diagnostics.py"
       - "processor/Dockerfile"
       - ".github/workflows/audiomack-hallelujah-live.yml"
   workflow_dispatch:
@@ -27,6 +28,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           ffprobe -version | head -n 1
+      - name: Inspect creator-approved Audiomack source resolver safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/env-audiomack-debug"
+          "$RUNNER_TEMP/env-audiomack-debug/bin/pip" install --quiet 'yt-dlp==2026.10.21'
+          EXTRACTOR="$("$RUNNER_TEMP/env-audiomack-debug/bin/python" -c 'import yt_dlp.extractor.audiomack as m; print(m.__file__)')"
+          cp scripts/media/vendor/audiomack.py "$EXTRACTOR"
+          "$RUNNER_TEMP/env-audiomack-debug/bin/python" scripts/media/audiomack-live-diagnostics.py
       - name: Verify the bundled Audiomack extractor on an authorized real song
         shell: bash
         run: |
