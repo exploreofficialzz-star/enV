@@ -533,6 +533,25 @@ export default function GameStudio() {
     );
     setPaused(next);
   }
+  async function exportSceneGlb() {
+    const current = projectRef.current;
+    setBusy(true);
+    setError("");
+    setNotice("Preparing 3D model…");
+    try {
+      if (!scene.current) throw new Error("The 3D renderer is not ready.");
+      const blob = await scene.current.exportSceneGlb();
+      if (projectRef.current !== current)
+        throw new Error("The scene changed during export. Please try again.");
+      download(blob, `${safeName(current.name)}-scene.glb`);
+      setNotice("3D model downloaded as GLB.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The 3D model could not be exported.");
+      setNotice("Model export failed; the scene was not changed.");
+    } finally {
+      setBusy(false);
+    }
+  }
   async function build() {
     setBusy(true);
     setNotice("Preparing browser build…");
@@ -962,6 +981,15 @@ export default function GameStudio() {
                     <span>YOUR LIBRARY</span>
                     <strong>Assets</strong>
                   </div>
+                  <button
+                    className="game-icon-button"
+                    title="Export scene as GLB"
+                    aria-label="Export scene as GLB"
+                    disabled={busy || playing || !rendererReady}
+                    onClick={() => void exportSceneGlb()}
+                  >
+                    <Download size={17} />
+                  </button>
                 </div>
                 <div className="game-assets">
                   <button

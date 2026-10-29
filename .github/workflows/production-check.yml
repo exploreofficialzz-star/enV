@@ -68,6 +68,12 @@ jobs:
       - name: Check Studio in phone, landscape, tablet and desktop layouts
         run: npm run audit:ux-ui-studio:browser
 
+      - name: Verify 3D project format
+        run: npm run check:game-studio
+
+      - name: Exercise 3D Studio and exported game in the browser
+        run: npm run audit:game-studio:browser
+
       - name: Upload Studio visual checks
         if: always()
         uses: actions/upload-artifact@v4

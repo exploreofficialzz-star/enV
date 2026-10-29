@@ -142,7 +142,7 @@ assert.ok(
   "Web fullscreen must target only the working interface and use a safe-area-aware viewport layout."
 );
 assert.ok(
-  androidFullscreenBranch.includes("NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)") &&
+  androidFullscreenBranch.includes("NativeToolInterfaceContent(tool, backend, supported, onRelatedTool, startInWorkspace = true)") &&
   androidFullscreenBranch.includes("Exit full screen for ${tool.name}") &&
   !androidFullscreenBranch.includes("NativeToolHeader") &&
   !androidFullscreenBranch.includes("tool.description") &&

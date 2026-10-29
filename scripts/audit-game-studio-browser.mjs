@@ -54,8 +54,10 @@ binaryHeader.writeUInt32LE(binary.length, 0);
 binaryHeader.write("BIN\0", 4);
 const modelFile = join(temporary, "triangle.glb");
 await writeFile(modelFile, Buffer.concat([header, jsonHeader, json, binaryHeader, binary]));
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+  (existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined);
 const browser = await chromium.launch({
-  ...(existsSync("/usr/bin/chromium") ? { executablePath: "/usr/bin/chromium" } : {}),
+  ...(executablePath ? { executablePath } : {}),
   headless: true,
   args: [
     "--no-sandbox",
@@ -211,8 +213,20 @@ try {
     assert.match(result.stdout, /GODOT_RUNTIME_PASS/);
     console.log("PASS: exported Godot project loads its scene, GLB, movement and collision");
   }
+  await page.getByRole("button", { name: "Assets", exact: true }).click();
+  const modelDownload = page.waitForEvent("download", { timeout: 90000 });
+  await page.getByRole("button", { name: "Export scene as GLB" }).click();
+  const modelPath = join(temporary, "roundtrip.glb");
+  await (await modelDownload).saveAs(modelPath);
+  const modelBytes = await readFile(modelPath);
+  assert.equal(modelBytes.toString("ascii", 0, 4), "glTF", "Scene export must be a real GLB");
+  const modelJson = JSON.parse(modelBytes.toString("utf8", 20, 20 + modelBytes.readUInt32LE(12)));
+  assert.ok(modelJson.meshes?.length >= 3, "Scene export must contain the scene geometry");
+  assert.ok(!(modelJson.nodes || []).some((node) => node.name === "editor grid"), "Editor grid must stay out of the model");
+  await page.locator("input[type=file]").first().setInputFiles(modelPath);
+  await page.getByText("roundtrip.glb added to the scene.").waitFor({ timeout: 60000 });
   console.log(
-    "PASS: viewport, transforms, save/reload, GLB import, movement, collision, pause/stop, extracted browser build",
+    "PASS: viewport, transforms, save/reload, GLB import/export, movement, collision, pause/stop, extracted browser build",
   );
   await page.goto(`${origin}/tools/developer/ux-ui-studio`, {
     waitUntil: "domcontentloaded",

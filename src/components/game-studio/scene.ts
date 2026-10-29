@@ -1,6 +1,6 @@
 import * as B from "babylonjs";
 import "babylonjs-loaders";
-import type { GameAsset, GameObject, GameProject } from "@/lib/game-studio/project";
+import { MAX_ASSET_BYTES, validateGlb, type GameAsset, type GameObject, type GameProject } from "@/lib/game-studio/project";
 
 type Mode = "select" | "move" | "rotate" | "scale";
 type Callbacks = {
@@ -300,6 +300,28 @@ export class StudioScene {
       this.pending.delete(object.id);
       if (retry && this.current) this.sync(this.current, this.selected);
     }
+  }
+  async exportSceneGlb(): Promise<Blob> {
+    if (this.pending.size) throw new Error("Models are still loading. Try exporting again in a moment.");
+    const project = this.current;
+    if (!project) throw new Error("The 3D renderer is not ready.");
+    const roots = [...this.entries.values()]
+      .filter((entry) => entry.object.visible)
+      .map((entry) => entry.root);
+    if (!roots.length) throw new Error("Add a visible object to the scene before exporting.");
+
+    // Exclude editor helpers, camera and lights. Only scene-object descendants are assets.
+    const { GLTF2Export } = await import("babylonjs-serializers");
+    const output = await GLTF2Export.GLBAsync(this.scene, "env-scene", {
+      shouldExportNode: (node) => roots.some((root) => node === root || node.isDescendantOf(root)),
+    });
+    if (this.disposed || this.current !== project)
+      throw new Error("The scene changed during export. Please try again.");
+    const blob = output.files["env-scene.glb"];
+    if (!(blob instanceof Blob)) throw new Error("The 3D model could not be generated.");
+    if (blob.size > MAX_ASSET_BYTES) throw new Error("Exported models must be 15 MB or smaller.");
+    validateGlb(new Uint8Array(await blob.arrayBuffer()));
+    return blob;
   }
   dispose(canvas: HTMLCanvasElement) {
     this.disposed = true;
