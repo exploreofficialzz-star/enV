@@ -23,6 +23,11 @@ android {
     sourceSets["main"].assets.srcDir(file("../../shared"))
     sourceSets["test"].resources.srcDir(file("../../shared"))
     sourceSets["test"].resources.srcDir(file("../../../tests/fixtures"))
+    // The game preview test needs a graphics-capable emulator; keep it separate from
+    // the general Android suite, which also runs on SwiftShader-only emulators.
+    if (providers.gradleProperty("envNativeGameTest").orNull == "true") {
+        sourceSets["androidTest"].java.srcDir("src/gamePreviewTest/java")
+    }
 
     val keystorePath = System.getenv("ANDROID_KEYSTORE_FILE")
     val hasReleaseKey = !keystorePath.isNullOrBlank()
