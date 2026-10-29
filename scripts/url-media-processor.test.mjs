@@ -165,3 +165,8 @@ assert.match(audiomackVendor, /def _track_page_url\(track\)/);
 assert.match(audiomackVendor, /'ie_key': AudiomackIE.ie_key\(\)/);
 assert.match(audiomackVendor, /'url': page_url/);
 assert.doesNotMatch(audiomackVendor.slice(audiomackVendor.indexOf("class AudiomackAlbumIE")), /self\._get_audio_info\(track\)/);
+
+assert.match(source, /const audioExt = new Set/);
+assert.match(source, /const videoExt = new Set/);
+assert.match(source, /audioOnly \? audioExt\.has\(ext\)/);
+assert.match(source, /NO_DOWNLOADABLE_FORMAT: The extractor did not produce a supported media file/);
