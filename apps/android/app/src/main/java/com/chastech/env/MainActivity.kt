@@ -1325,7 +1325,11 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
             else -> Text("This native calculator engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
-        "developer" -> if (tool.id == "ux-ui-studio") NativeUxUiStudioForm() else NativeDeveloperToolForm(tool, onRelatedTool)
+        "developer" -> when (tool.id) {
+            "ux-ui-studio" -> NativeUxUiStudioForm()
+            "artboard-studio" -> { val context = LocalContext.current; Button(onClick = { context.startActivity(android.content.Intent(context, NativeGamePreviewActivity::class.java)) }) { Text("Open Artboard Studio preview") } }
+            else -> NativeDeveloperToolForm(tool, onRelatedTool)
+        }
     "custom" -> when {
         NativeProductivityEngine.supports(tool.id) -> NativeProductivityToolForm(tool.id)
         NativeAccessibilityEngine.supports(tool.id, tool.category) -> NativeAccessibilityToolForm(tool)

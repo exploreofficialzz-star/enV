@@ -24,7 +24,7 @@ const web = extractDefinitions(webSource, /\bid:\s*"([a-z0-9-]+-studio)"\s*,\s*s
 const android = extractDefinitions(kotlinSource, /NativeDeveloperStudioSpec\("([a-z0-9-]+-studio)"/g, /NativeDeveloperStudioMode\("([a-z0-9-]+)"\s*,/g, 'Android Kotlin');
 const ios = extractDefinitions(swiftSource, /\.init\(id:\s*"([a-z0-9-]+-studio)"/g, /\.init\("([a-z0-9-]+)"\s*,/g, 'iOS Swift');
 
-assert.equal(web.size, 13, 'Web must define all thirteen Developer Studios');
+assert.equal(web.size, 14, 'Web must define all fourteen Developer Studios');
 assert.deepEqual([...android.keys()].sort(), [...web.keys()].sort(), 'Android Studio IDs must match Web');
 assert.deepEqual([...ios.keys()].sort(), [...web.keys()].sort(), 'iOS Studio IDs must match Web');
 for (const [id, modes] of web) {
@@ -41,7 +41,9 @@ const iosTools = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
 assert.ok(webRegistry.includes('makeDeveloperStudioTools(allTools)'), 'UX/UI Studio must enter the searchable virtual tool registry');
 assert.ok(webRoute.includes('getToolByPath(category, slug)'), 'The public tools route must resolve the Studio slug');
 assert.ok(webDispatcher.includes('tool.slug === "ux-ui-studio" ? <UxUiStudioEngine />'), 'Web route must launch the dedicated UX/UI editor');
-assert.ok(androidMain.includes('tool.id == "ux-ui-studio") NativeUxUiStudioForm()'), 'Android route must launch the native Kotlin UX/UI editor');
+assert.ok(androidMain.includes('"ux-ui-studio" -> NativeUxUiStudioForm()'), 'Android route must launch the native Kotlin UX/UI editor');
+assert.ok(androidMain.includes('"artboard-studio" ->') && androidMain.includes('NativeGamePreviewActivity::class.java'), 'Android must expose the separate Artboard Studio preview');
+assert.ok(iosTools.includes('tool.id == "artboard-studio"') && iosTools.includes('NativeGamePreview()'), 'iOS must expose the separate Artboard Studio preview');
 assert.ok(iosTools.includes('if tool.id == "ux-ui-studio"') && iosTools.includes('NativeUxUiStudioView()'), 'iOS route must launch the native SwiftUI UX/UI editor');
 assert.match(webUx, /PDFDocument\.create\(\)/, 'Web UX/UI Studio must create a downloadable PDF');
 assert.match(webUx, /api\.iconify\.design\/search/, 'Web UX/UI Studio must search the icon catalogue on demand');

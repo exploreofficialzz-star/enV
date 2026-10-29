@@ -22,7 +22,7 @@ struct NativeGamePreview: View {
                     HStack(spacing: 8) {
                         Button("Close") { dismiss() }
                         Spacer(minLength: 4)
-                        Text("enV  /  3D preview").font(.headline).lineLimit(1)
+                        Text("enV  /  Artboard Studio").font(.headline).lineLimit(1)
                             .padding(7).background(Color.black.opacity(0.68), in: RoundedRectangle(cornerRadius: 8))
                         Spacer(minLength: 4)
                         Button(game.paused ? "Resume" : "Pause") { game.paused.toggle(); pressed.removeAll() }

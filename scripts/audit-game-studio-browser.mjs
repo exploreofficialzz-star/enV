@@ -279,7 +279,8 @@ try {
   await page.locator('svg[aria-label$=" design artboard"]').waitFor();
   await page.getByRole("button", { name: "Add text", exact: true }).first().click();
   await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "Send to 3D" }).click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("button", { name: /Send to 3D/ }).click();
   await page.waitForURL("**/3d-game-studio", { timeout: 90000 });
   await page.locator("[data-renderer-ready=true]").waitFor({ timeout: 90000 });
   await page.getByRole("button", { name: "Assets", exact: true }).click();

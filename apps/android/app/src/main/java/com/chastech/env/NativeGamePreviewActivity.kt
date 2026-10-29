@@ -116,11 +116,11 @@ class NativeGamePreviewActivity : ComponentActivity() {
                 Column(Modifier.fillMaxSize().padding(if (compact) 8.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 8.dp)) {
                     if (compact) {
                         Row(Modifier.fillMaxWidth()) {
-                            Text("enV  /  3D game preview", modifier = Modifier.weight(1f).padding(top = 8.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            Text("enV  /  Artboard Studio", modifier = Modifier.weight(1f).padding(top = 8.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                             TextButton(onClick = { finish() }) { Text("Back") }
                         }
                     } else {
-                        Text("enV  /  3D game preview", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text("enV  /  Artboard Studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     }
                     if (compact) {
                         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {

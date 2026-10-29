@@ -623,7 +623,7 @@ export default function GameStudio() {
   return (
     <section
       className="game-studio"
-      aria-label="3D Game Studio"
+      aria-label="Artboard Studio"
       data-renderer-ready={rendererReady}
     >
       <header className="game-heading">
@@ -632,15 +632,15 @@ export default function GameStudio() {
             <Logo size="search" className="game-brand-logo" />
             <span>CREATIVE WORKSPACE</span>
             <span className="game-eyebrow-divider">/</span>
-            <span>3D GAME STUDIO</span>
+            <span>ARTBOARD STUDIO</span>
           </div>
           <h1>
             Make a world of your own<span>.</span>
           </h1>
           <p>Build a scene, bring in your designs, and play what you create.</p>
         </div>
-        <a className="game-back-link" href="/tools/developer/ux-ui-studio">
-          ← UX/UI Studio
+        <a className="game-back-link" href="/tools/developer">
+          ← Developer tools
         </a>
       </header>
       <div className="game-window">

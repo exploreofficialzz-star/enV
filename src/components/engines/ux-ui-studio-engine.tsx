@@ -2501,7 +2501,6 @@ export function UxUiStudioEngine() {
         <header className="uxui-home-heading text-center">
           <h2 className="text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">UX/UI Studio</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">Bring your idea to life. Start with a clean mockup, then add and style anything by tapping it.</p>
-          <a href="/3d-game-studio" className="mt-3 inline-block text-sm font-semibold text-accent underline underline-offset-4">Open 3D Game Studio</a>
         </header>
         <div className="uxui-home-device-picker">
           <span className="uxui-home-device-picker-label">Start with</span>
@@ -2852,7 +2851,6 @@ export function UxUiStudioEngine() {
           </div>
         </div>
         <div className="uxui-topbar-actions">
-          <button type="button" onClick={() => { void sendArtboardToGameStudio(); }} className="uxui-projects-trigger" title="Send the current Artboard as an image to 3D Game Studio"><span>Send to 3D</span></button>
           <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
           <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
           <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
@@ -2861,6 +2859,7 @@ export function UxUiStudioEngine() {
         </div>
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
           <div className="uxui-export-menu-title">Export your design</div>
+          <button type="button" onClick={() => { void sendArtboardToGameStudio(); setShowExportPanel(false); }}><span><strong>Send to 3D</strong><small>Use this design in Artboard Studio</small></span></button>
           <button type="button" onClick={() => { void exportPdf(); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>PDF handoff</strong><small>Mockup preview, design brief and exact specs</small></span></button>
           <button type="button" aria-label="All-device PDF handoff" onClick={() => { void exportPdf(true); setShowExportPanel(false); }} disabled={exporting || elements.length === 0}><Download size={15} /><span><strong>All-device PDF handoff</strong><small>Mobile, tablet and desktop previews in one PDF</small></span></button>
           <button type="button" onClick={() => { exportProject(); setShowExportPanel(false); }}><FileJson size={15} /><span><strong>Project JSON</strong><small>Editable layers, fonts, colors and AI prompt</small></span></button>

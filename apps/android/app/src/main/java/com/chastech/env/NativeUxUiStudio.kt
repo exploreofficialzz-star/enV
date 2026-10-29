@@ -1901,7 +1901,6 @@ selectedId=elements.firstOrNull()?.id.orEmpty();notice="Local draft restored."};
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Text("UX/UI Studio",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
             Text("Design by eye. Export exact developer and AI handoff.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(onClick={context.startActivity(android.content.Intent(context, NativeGamePreviewActivity::class.java))},modifier=Modifier.fillMaxWidth()) { Text("Open 3D game preview") }
             if(onboarding){
                 Card { Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment=Alignment.CenterHorizontally, verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.size(72.dp).border(2.dp,MaterialTheme.colorScheme.onSurface,RoundedCornerShape(50)),contentAlignment=Alignment.Center) {

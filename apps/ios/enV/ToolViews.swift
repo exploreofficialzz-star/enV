@@ -429,7 +429,9 @@ struct ToolDestinationView: View {
     let tool: Tool
 
     @ViewBuilder var body: some View {
-        if tool.id == "ux-ui-studio" {
+        if tool.id == "artboard-studio" {
+            NativeGamePreview()
+        } else if tool.id == "ux-ui-studio" {
             NativeUxUiStudioView()
         } else if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
             ToolDetailView(
@@ -10137,7 +10139,6 @@ private struct NativeUxUiStudioView: View {
     @State private var qaReport: [String] = []
     @State private var toolkitQuery = ""
     @State private var isImportingProjectJSON = false
-    @State private var showGamePreview = false
     @State private var isImportingSVGIcon = false
     @State private var showAllLayers = false
     @State private var showAdvancedInspector = false
@@ -10299,12 +10300,6 @@ private struct NativeUxUiStudioView: View {
                         Text("Make it by eye. Export a developer-ready design.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.uxUiMuted)
                     }
                 }
-                Button { showGamePreview = true } label: {
-                    Label("Open 3D game preview", systemImage: "cube.transparent")
-                        .frame(maxWidth: .infinity).padding(10)
-                        .background(Color.envAccent.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
                 if onboarding {
                     VStack(alignment: .leading, spacing: 18) {
                         Button { createNewProject() } label: {
@@ -10363,7 +10358,6 @@ private struct NativeUxUiStudioView: View {
         .background(Color.uxUiSurface.ignoresSafeArea())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $showGamePreview) { NativeGamePreview() }
         .onAppear {
             guard !didInitialize else { return }
             didInitialize = true

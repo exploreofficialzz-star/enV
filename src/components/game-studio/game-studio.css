@@ -1,18 +1,14 @@
 .game-studio {
-  --ink: #252a39;
-  --muted: #7d8393;
-  --line: #e6e7ed;
-  --violet: #087f70;
+  --ink: var(--color-fg);
+  --muted: var(--color-muted);
+  --line: var(--color-border);
+  --violet: var(--color-accent);
   max-width: 1440px;
   margin: 0 auto;
   padding: 38px 28px 30px;
   color: var(--ink);
   font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    sans-serif;
+    var(--font-sans);
 }
 .game-studio * {
   box-sizing: border-box;

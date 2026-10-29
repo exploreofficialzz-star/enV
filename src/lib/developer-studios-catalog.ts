@@ -136,6 +136,12 @@ export const DEVELOPER_STUDIOS: DeveloperStudioDefinition[] = [
     ],
   },
   {
+    id: "artboard-studio", slug: "artboard-studio", name: "Artboard Studio",
+    description: "Create and play 3D worlds, import models and designs, and export browser games.",
+    sourceId: "javascript-formatter", icon: "Box", keywords: ["artboard", "3d", "game", "scene", "model", "design"],
+    modes: [{ key: "workspace", label: "Workspace", op: "artboard-studio" }],
+  },
+  {
     id: "ux-ui-studio", slug: "ux-ui-studio", name: "UX/UI Studio",
     description: "Design mobile apps and websites, then export a handoff prompt for your builder or AI agent.",
     sourceId: "javascript-formatter", icon: "PanelsTopLeft",
