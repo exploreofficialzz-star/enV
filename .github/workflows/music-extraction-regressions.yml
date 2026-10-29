@@ -6,6 +6,9 @@ on:
       - "scripts/media/**"
       - "scripts/url-media-processor.mjs"
       - "scripts/url-media-processor.test.mjs"
+      - "scripts/music-downloader-platform-parity.test.mjs"
+      - "src/components/engines/music-downloader-engine.tsx"
+      - "src/lib/media/music-download-retry.ts"
       - "processor/Dockerfile"
       - ".github/workflows/music-extraction-regressions.yml"
   push:
@@ -14,6 +17,9 @@ on:
       - "scripts/media/**"
       - "scripts/url-media-processor.mjs"
       - "scripts/url-media-processor.test.mjs"
+      - "scripts/music-downloader-platform-parity.test.mjs"
+      - "src/components/engines/music-downloader-engine.tsx"
+      - "src/lib/media/music-download-retry.ts"
       - "processor/Dockerfile"
       - ".github/workflows/music-extraction-regressions.yml"
   workflow_dispatch:
@@ -45,3 +51,4 @@ jobs:
         run: |
           node --test scripts/media/public-download-links.test.mjs scripts/media/audiomack-page-parser.test.mjs scripts/media/audiomack-song-page.test.mjs scripts/media/extraction-strategy.test.mjs scripts/media/provider-errors.test.mjs scripts/media/archive-org.test.mjs scripts/media/transfer-alternatives.test.mjs
           node scripts/url-media-processor.test.mjs
+          node --test scripts/music-downloader-platform-parity.test.mjs
