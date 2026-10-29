@@ -168,3 +168,11 @@ test("shared worker streams checked files and verifies audio-only outputs", asyn
   assert.match(processor, /JOB_TIMEOUT: The extractor exceeded its processing deadline/);
   assert.doesNotMatch(processor, /await fs\.readFile\(chosen\.file\)/);
 });
+
+test("Web media stream enforces per-track byte limits and refuses HTML errors", async () => {
+  const client = await source("../src/lib/media/url-media.ts");
+  assert.match(client, /requestedLimit = Number\(request\.maxBytes\)/);
+  assert.match(client, /if \(bytes > maxBytes\)/);
+  assert.match(client, /await reader\.cancel\(\)/);
+  assert.match(client, /text\\/html\\|application\\/json/);
+});
