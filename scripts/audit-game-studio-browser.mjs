@@ -69,10 +69,11 @@ const browser = await chromium.launch({
 });
 let server;
 try {
-  const page = await browser.newPage({
+  const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     acceptDownloads: true,
   });
+  const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`${origin}/3d-game-studio`, { waitUntil: "domcontentloaded", timeout: 90000 });
