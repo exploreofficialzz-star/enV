@@ -102,6 +102,38 @@ class AudiomackBaseIE(InfoExtractor):
             }),
         })
 
+    def _get_public_song_data(self, data, slug, display_id):
+        # Audiomack's public pages can use Next.js App Router / streamed
+        # hydration, where _search_nextjs_v13_data returns no song record.
+        # The documented public API still provides the ID required by the
+        # existing signed public-web audio resolver. Never invent a numeric ID.
+        if traverse_obj(data, 'id', 'song_id'):
+            return data
+
+        parts = [part for part in slug.split('/') if part]
+        if len(parts) == 3 and parts[1] == 'song':
+            artist_slug, _, track_slug = parts
+        elif len(parts) == 3 and parts[0] == 'song':
+            _, artist_slug, track_slug = parts
+        else:
+            raise ExtractorError('Audiomack song URL has no valid artist/song slug')
+
+        api_url = (
+            'https://api.audiomack.com/v1/music/song/'
+            + urllib.parse.quote(artist_slug, safe='')
+            + '/' + urllib.parse.quote(track_slug, safe='')
+        )
+        response = self._download_json(
+            api_url, display_id,
+            note='Fetching public Audiomack song metadata',
+            query=self.sign_params({}, api_url),
+            errnote=False, fatal=False,
+        )
+        metadata = traverse_obj(response, ('results', {dict}), ('data', {dict}), ('result', {dict}))
+        if not metadata or not traverse_obj(metadata, 'id', 'song_id'):
+            raise ExtractorError('Audiomack public metadata did not include a song ID')
+        return metadata
+
     def _get_audio_info(self, data, slug=None):
         song_id = traverse_obj(data, 'id', 'song_id')
         slug = slug or traverse_obj(data, ('links', 'self', {lambda x: urllib.parse.urlparse(x).path}, {str}))
@@ -187,6 +219,7 @@ class AudiomackIE(AudiomackBaseIE):
         song_id = slug.split('/')[-1]
 
         data = self._get_next_data(self._download_webpage(url, song_id))
+        data = self._get_public_song_data(data, slug, song_id)
 
         return {
             'display_id': song_id,
