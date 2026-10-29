@@ -7,6 +7,7 @@ on:
       - "scripts/url-media-processor.mjs"
       - "scripts/url-media-processor.test.mjs"
       - "scripts/music-downloader-platform-parity.test.mjs"
+      - "scripts/media/audiomack-vendor-regression.py"
       - "src/components/engines/music-downloader-engine.tsx"
       - "src/lib/media/music-failure-summary.ts"
       - "src/lib/media/music-failure-summary.test.ts"
@@ -22,6 +23,7 @@ on:
       - "scripts/url-media-processor.mjs"
       - "scripts/url-media-processor.test.mjs"
       - "scripts/music-downloader-platform-parity.test.mjs"
+      - "scripts/media/audiomack-vendor-regression.py"
       - "src/components/engines/music-downloader-engine.tsx"
       - "src/lib/media/music-failure-summary.ts"
       - "src/lib/media/music-failure-summary.test.ts"
@@ -61,3 +63,11 @@ jobs:
           node scripts/url-media-processor.test.mjs
           node --test scripts/music-downloader-platform-parity.test.mjs
           node --experimental-strip-types --test src/lib/media/music-failure-summary.test.ts
+      - name: Test isolated Audiomack metadata-to-audio path with mocks
+        run: |
+          python3 -m venv "$RUNNER_TEMP/env-audiomack-regression"
+          "$RUNNER_TEMP/env-audiomack-regression/bin/python" -m pip install --quiet 'yt-dlp==2026.10.21'
+          EXTRACTOR="$("$RUNNER_TEMP/env-audiomack-regression/bin/python" -c 'import yt_dlp.extractor.audiomack as m; print(m.__file__)')"
+          cp scripts/media/vendor/audiomack.py "$EXTRACTOR"
+          "$RUNNER_TEMP/env-audiomack-regression/bin/python" scripts/media/audiomack-vendor-regression.py
+
