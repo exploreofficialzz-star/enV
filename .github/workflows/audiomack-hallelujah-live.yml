@@ -8,6 +8,7 @@ on:
       - "scripts/media/vendor/audiomack.py"
       - "scripts/media/audiomack-live-diagnostics.py"
       - "scripts/media/audiomack-vendor-regression.py"
+      - "scripts/media/audiomack-album-preview-smoke.mjs"
       - "processor/Dockerfile"
       - ".github/workflows/audiomack-hallelujah-live.yml"
   workflow_dispatch:
@@ -64,6 +65,10 @@ jobs:
           DURATION="$(ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "$AUDIO")"
           awk -v duration="$DURATION" 'BEGIN { exit !(duration > 30) }'
           echo "Vendored extractor audio acceptance passed (playable MP3)."
+      - name: Verify real album preview enumerates individual Audiomack songs
+        env:
+          MUSIC_ACCEPTANCE_API: https://env-q3mq.onrender.com/api/backend/url-media
+        run: node scripts/media/audiomack-album-preview-smoke.mjs
       - name: Inspect public song and validate actual downloadable audio
         env:
           MUSIC_ACCEPTANCE_API: https://env-q3mq.onrender.com/api/backend/url-media
