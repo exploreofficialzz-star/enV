@@ -12,6 +12,7 @@ test("twelve repeated Audiomack failures become one readable reason and twelve t
   assert.equal(summary.groups[0].count, 12);
   assert.deepEqual(summary.groups[0].titles, titles);
   assert.equal(summary.groups[0].reason, "Audiomack did not provide a downloadable audio file.");
+  assert.equal(shortMusicFailureReason("NO_DOWNLOADABLE_FORMAT: Audiomack\'s audio resolver did not return a downloadable file."), summary.groups[0].reason);
 });
 
 test("different failures stay distinct and common cause is first", () => {
