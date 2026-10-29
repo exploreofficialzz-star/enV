@@ -191,7 +191,10 @@ class AudiomackIE(AudiomackBaseIE):
         return {
             'display_id': song_id,
             **self._parse_metadata(data, song_id),
-            **self._get_audio_info(data),
+            # The public URL already carries a trustworthy song slug. Some
+            # Next.js hydration payloads omit links.self and uploader_url_slug,
+            # so do not require those optional fields to resolve the track.
+            **self._get_audio_info(data, slug),
         }
 
 
