@@ -9,6 +9,7 @@ import { StudioScreenshotImport, type StudioScreenshotImportResult } from "./ux-
 import { StudioShapeStyle } from "./ux-ui-studio-shape-style";
 import { studioFontWeightRange } from "@/lib/engines/studio-font-metadata";
 import { packStudioProjectAssets, unpackStudioProjectAssets } from "@/lib/engines/ux-ui-studio-storage";
+import { saveArtboard } from "@/lib/game-studio/storage";
 import { StudioTextStyle } from "./ux-ui-studio-text-style";
 import { roundedRectanglePath, shapeStrokeDasharray, type CornerRadii, type ShapeBorderStyle } from "@/lib/engines/ux-ui-studio-shape-style";
 import { createResponsiveDesign, responsiveElements, commitResponsiveElements, resetResponsiveDevice, hasResponsiveOverrides, restoreResponsiveDesign, cloneResponsiveDesign, remapResponsiveScreenLinks, type ResponsiveDesign, type ResponsiveEditMode } from "@/lib/engines/ux-ui-studio-responsive";
@@ -2462,12 +2463,45 @@ export function UxUiStudioEngine() {
     setNotice("Finished editing. Tap + for another item, or tap an item to edit it.");
   }
 
+  async function sendArtboardToGameStudio() {
+    if (!artboardRef.current) return;
+    try {
+      const clean = artboardRef.current.cloneNode(true) as SVGSVGElement;
+      clean.querySelectorAll("[data-editor-only]").forEach(node => node.remove());
+      clean.querySelectorAll("[tabindex]").forEach(node => node.removeAttribute("tabindex"));
+      const blob = new Blob([new XMLSerializer().serializeToString(clean)], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+      try {
+        await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("The Artboard could not be rendered.")); image.src = url; });
+        const canvas = document.createElement("canvas"); canvas.width = board.width; canvas.height = board.height;
+        const context = canvas.getContext("2d"); if (!context) throw new Error("The browser could not create an image canvas.");
+        context.drawImage(image, 0, 0, board.width, board.height);
+        const dataUrl = canvas.toDataURL("image/png");
+        if (dataUrl.length > 20 * 1024 * 1024) throw new Error("This Artboard image is too large to send to the 3D Studio.");
+        const projectId = activeDraftId || "draft-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+        const screenId = activeScreenId || "screen-home";
+        // Persist the source before navigating away, including a newly created blank design.
+        const saved = { ...project, id: projectId, description: projectBrief, category: savedProject?.category || "Uncategorized", isFavorite: savedProject?.isFavorite || false } as SavedProject;
+        const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        const existing = Array.isArray(parsed) ? parsed.filter((item): item is SavedProject => Boolean(item && typeof item === "object" && (item as SavedProject).schemaVersion === 2)).map(unpackStudioProjectAssets) : [];
+        const nextDrafts = [saved, ...existing.filter(item => item.id !== projectId)].sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 50);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(packStudioProjectAssets(saved)));
+        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(nextDrafts.map(packStudioProjectAssets)));
+        await saveArtboard({ id: `artboard-${projectId}-${screenId}`, name: `${projectName} · ${screens.find(screen => screen.id === activeScreenId)?.name || "Artboard"}`.slice(0, 160), kind: "artboard", dataUrl, width: board.width, height: board.height, source: { projectId, screenId, updatedAt: new Date().toISOString() } });
+        window.location.assign("/3d-game-studio");
+      } finally { URL.revokeObjectURL(url); }
+    } catch (error) { setNotice(error instanceof Error ? error.message : "The Artboard could not be sent to the 3D Studio."); }
+  }
+
   if (onboarding) {
     return (
       <section className="uxui-home mx-auto w-full max-w-5xl space-y-7 rounded-2xl border border-border bg-surface p-4 sm:p-8">
         <header className="uxui-home-heading text-center">
           <h2 className="text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">UX/UI Studio</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">Bring your idea to life. Start with a clean mockup, then add and style anything by tapping it.</p>
+          <a href="/3d-game-studio" className="mt-3 inline-block text-sm font-semibold text-accent underline underline-offset-4">Open 3D Game Studio</a>
         </header>
         <div className="uxui-home-device-picker">
           <span className="uxui-home-device-picker-label">Start with</span>
@@ -2818,6 +2852,7 @@ export function UxUiStudioEngine() {
           </div>
         </div>
         <div className="uxui-topbar-actions">
+          <button type="button" onClick={() => { void sendArtboardToGameStudio(); }} className="uxui-projects-trigger" title="Send the current Artboard as an image to 3D Game Studio"><span>Send to 3D</span></button>
           <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
           <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
           <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
@@ -2887,7 +2922,7 @@ export function UxUiStudioEngine() {
                 {customFonts.length > 0 && <defs><style>{Array.from(new Map(customFonts.filter(layer => layer.fontDataUrl.startsWith("data:")).map(layer => [layer.fontFamily, layer])).values()).map(layer => "@font-face{font-family:" + JSON.stringify(layer.fontFamily) + ";src:url(" + JSON.stringify(layer.fontDataUrl) + ");font-weight:" + studioFontWeightRange(layer.fontDataUrl) + ";font-display:block;}").join("\n")}</style></defs>}
                 <rect width={board.width} height={board.height} fill={background} role="button" tabIndex={prototypePreview ? -1 : 0} aria-label="Select canvas background" onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectCanvas(); } }} />
                 {showGrid && <defs><pattern id="ux-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="#94A3B8" strokeWidth="0.55" opacity="0.35" /></pattern></defs>}
-                {showGrid && <rect width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
+                {showGrid && <rect data-editor-only="true" width={board.width} height={board.height} fill="url(#ux-grid)" pointerEvents="none" />}
                 {[...elements].filter((layer) => !layer.hidden && layer.display !== "none" && (!layer.visibleOn || layer.visibleOn.includes(target))).sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1)).map((layer) => {
                   const boxFill = layer.background === "transparent" ? "none" : layer.background;
                   const stroke = layer.borderWidth > 0 ? layer.borderColor : "none";

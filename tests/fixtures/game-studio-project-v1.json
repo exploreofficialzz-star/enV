@@ -1,0 +1,135 @@
+{
+  "format": "env-3d-game",
+  "version": 1,
+  "id": "fixture-project",
+  "name": "Compatibility fixture",
+  "objects": [
+    {
+      "id": "ground",
+      "name": "Ground",
+      "kind": "ground",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 10,
+        "y": 1,
+        "z": 10
+      },
+      "color": "#2bb6a4",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "player",
+      "name": "Player",
+      "kind": "box",
+      "position": {
+        "x": 1.25,
+        "y": 0.5,
+        "z": -2
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#2bb6a4",
+      "visible": true,
+      "locked": false,
+      "collider": false,
+      "player": true,
+      "speed": 4
+    },
+    {
+      "id": "artboard-object",
+      "name": "Artboard",
+      "kind": "artboard",
+      "position": {
+        "x": 0,
+        "y": 1,
+        "z": 2
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#2bb6a4",
+      "visible": true,
+      "locked": false,
+      "collider": false,
+      "player": false,
+      "speed": 3,
+      "assetId": "artboard-1"
+    },
+    {
+      "id": "model-object",
+      "name": "Triangle",
+      "kind": "model",
+      "position": {
+        "x": 2,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#2bb6a4",
+      "visible": true,
+      "locked": false,
+      "collider": false,
+      "player": false,
+      "speed": 3,
+      "assetId": "model-1"
+    }
+  ],
+  "assets": [
+    {
+      "id": "artboard-1",
+      "name": "Artboard image",
+      "kind": "artboard",
+      "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=",
+      "width": 1,
+      "height": 1,
+      "source": {
+        "projectId": "design-1",
+        "screenId": "screen-1",
+        "updatedAt": "2026-01-01T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "model-1",
+      "name": "triangle.glb",
+      "kind": "glb",
+      "dataUrl": "data:model/gltf-binary;base64,Z2xURgIAAACwAgAAaAIAAEpTT057ImFzc2V0Ijp7InZlcnNpb24iOiIyLjAifSwic2NlbmUiOjAsInNjZW5lcyI6W3sibm9kZXMiOlswXX1dLCJub2RlcyI6W3sibWVzaCI6MH1dLCJtZXNoZXMiOlt7InByaW1pdGl2ZXMiOlt7ImF0dHJpYnV0ZXMiOnsiUE9TSVRJT04iOjB9LCJpbmRpY2VzIjoxLCJtYXRlcmlhbCI6MH1dfV0sIm1hdGVyaWFscyI6W3sicGJyTWV0YWxsaWNSb3VnaG5lc3MiOnsiYmFzZUNvbG9yRmFjdG9yIjpbMC44LDAuMjUsMC4yLDFdLCJtZXRhbGxpY0ZhY3RvciI6MCwicm91Z2huZXNzRmFjdG9yIjowLjh9fV0sImJ1ZmZlcnMiOlt7ImJ5dGVMZW5ndGgiOjQ0fV0sImJ1ZmZlclZpZXdzIjpbeyJidWZmZXIiOjAsImJ5dGVPZmZzZXQiOjAsImJ5dGVMZW5ndGgiOjM2LCJ0YXJnZXQiOjM0OTYyfSx7ImJ1ZmZlciI6MCwiYnl0ZU9mZnNldCI6MzYsImJ5dGVMZW5ndGgiOjYsInRhcmdldCI6MzQ5NjN9XSwiYWNjZXNzb3JzIjpbeyJidWZmZXJWaWV3IjowLCJjb21wb25lbnRUeXBlIjo1MTI2LCJjb3VudCI6MywidHlwZSI6IlZFQzMiLCJtaW4iOlswLDAsMF0sIm1heCI6WzEsMSwwXX0seyJidWZmZXJWaWV3IjoxLCJjb21wb25lbnRUeXBlIjo1MTIzLCJjb3VudCI6MywidHlwZSI6IlNDQUxBUiJ9XX0gLAAAAEJJTgAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAEAAgAAAA=="
+    }
+  ]
+}

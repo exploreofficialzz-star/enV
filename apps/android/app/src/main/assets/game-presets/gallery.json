@@ -1,0 +1,165 @@
+{
+  "format": "env-3d-game",
+  "version": 1,
+  "id": "preset-gallery",
+  "name": "Gallery room",
+  "objects": [
+    {
+      "id": "preset-gallery-0",
+      "name": "Ground",
+      "kind": "ground",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 12,
+        "y": 1,
+        "z": 10
+      },
+      "color": "#d3d5ce",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-gallery-1",
+      "name": "Player",
+      "kind": "box",
+      "position": {
+        "x": 0,
+        "y": 0.5,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#25ad9c",
+      "visible": true,
+      "locked": false,
+      "collider": false,
+      "player": true,
+      "speed": 3
+    },
+    {
+      "id": "preset-gallery-2",
+      "name": "Back wall",
+      "kind": "box",
+      "position": {
+        "x": 0,
+        "y": 1.5,
+        "z": 4.5
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 12,
+        "y": 3,
+        "z": 0.2
+      },
+      "color": "#ece7df",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-gallery-3",
+      "name": "Left wall",
+      "kind": "box",
+      "position": {
+        "x": -5.9,
+        "y": 1.5,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 0.2,
+        "y": 3,
+        "z": 9
+      },
+      "color": "#ece7df",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-gallery-4",
+      "name": "Right wall",
+      "kind": "box",
+      "position": {
+        "x": 5.9,
+        "y": 1.5,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 0.2,
+        "y": 3,
+        "z": 9
+      },
+      "color": "#ece7df",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-gallery-5",
+      "name": "Display plinth",
+      "kind": "box",
+      "position": {
+        "x": 0,
+        "y": 0.5,
+        "z": 2.5
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#e4c4a7",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    }
+  ],
+  "assets": []
+}

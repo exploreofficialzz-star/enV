@@ -22,6 +22,7 @@ android {
     // Keep the canonical catalog in apps/shared; do not duplicate the 10,001 records.
     sourceSets["main"].assets.srcDir(file("../../shared"))
     sourceSets["test"].resources.srcDir(file("../../shared"))
+    sourceSets["test"].resources.srcDir(file("../../../tests/fixtures"))
 
     val keystorePath = System.getenv("ANDROID_KEYSTORE_FILE")
     val hasReleaseKey = !keystorePath.isNullOrBlank()
@@ -78,6 +79,8 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
+    // The play preview uses the native Godot runtime, not a WebView.
+    implementation("org.godotengine:godot:4.6.3.stable")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
