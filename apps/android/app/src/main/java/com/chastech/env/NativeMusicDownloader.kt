@@ -341,6 +341,32 @@ private fun listOfflineMusic(context: Context): List<File> {
         .sortedBy { it.name.lowercase(Locale.ROOT) }.toList()
 }
 
+private fun nativeMusicFailureSummary(failures: List<String>): String {
+    if (failures.isEmpty()) return ""
+    val reasons = failures.map { failure ->
+        when {
+            failure.contains("Audiomack supplied song metadata", ignoreCase = true) ||
+                failure.contains("Audiomack's audio resolver did not return a downloadable file", ignoreCase = true) ->
+                "Audiomack did not provide a downloadable audio file."
+            failure.contains("RATE_LIMITED", ignoreCase = true) ||
+                failure.contains("SOURCE_CHALLENGE", ignoreCase = true) ->
+                "The source is limiting or challenging requests."
+            failure.contains("NO_DOWNLOADABLE_FORMAT", ignoreCase = true) ->
+                "No downloadable audio file was available."
+            failure.contains("DOWNLOAD_NOT_PERMITTED", ignoreCase = true) ||
+                failure.contains("AUTH_REQUIRED", ignoreCase = true) ->
+                "The source did not allow this download."
+            failure.contains("NETWORK_TIMEOUT", ignoreCase = true) ->
+                "The music source timed out."
+            else -> "The source could not complete the download."
+        }
+    }
+    val reason = if (reasons.distinct().size == 1) reasons.first()
+        else "Different sources returned download errors."
+    val label = if (failures.size == 1) "track" else "tracks"
+    return "${failures.size} $label could not be downloaded. $reason"
+}
+
 @Composable
 fun NativeMusicDownloaderScreen() {
     val context = LocalContext.current
@@ -522,7 +548,7 @@ fun NativeMusicDownloaderScreen() {
             val (count, failures, exportResult) = outcome
             val (exported, archiveToSave) = exportResult
             status = if (exported) "Saved ZIP to Downloads with $count track(s)." else if (count > 0) "Saved $count track(s) to the enV offline library." else "No audio files were saved."
-            if (failures.isNotEmpty()) error = "${failures.size} track(s) unavailable: " + failures.take(3).joinToString("; ")
+            if (failures.isNotEmpty()) error = nativeMusicFailureSummary(failures)
             busy = false
             if (archiveToSave != null) {
                 pendingZip = archiveToSave
