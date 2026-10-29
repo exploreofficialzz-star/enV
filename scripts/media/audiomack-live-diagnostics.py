@@ -27,9 +27,26 @@ with YoutubeDL({"quiet": True, "no_warnings": True, "socket_timeout": 20}) as dl
     webpage = extractor._download_webpage(SONG, "hallelujah")
     info = extractor._get_next_data(webpage)
     song_id = traverse_obj(info, "id", "song_id")
-    print("HYDRATION:", json.dumps({"field_names": sorted(info)[:40], "id_present": bool(song_id), "id_type": type(song_id).__name__, "title_present": bool(info.get("title"))}))
+    print("HYDRATION:", json.dumps({"field_names": sorted(info)[:40], "id_present": bool(song_id), "id_type": type(song_id).__name__, "title_present": bool(info.get("title")),
+         "page_length": len(webpage), "has_next_data": "__NEXT_DATA__" in webpage,
+         "has_og_title": 'og:title' in webpage}))
+    # The public API explicitly documents GET /v1/music/song/<artist>/<song>.
+    # Use the same signed public-web request rather than inventing a song ID.
+    meta_url = "https://api.audiomack.com/v1/music/song/chas-d/hallelujah"
+    try:
+        signature = extractor.sign_params({}, meta_url)
+        req = urllib.request.Request(meta_url + "?" + urllib.parse.urlencode(signature), headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            parsed = json.loads(resp.read(65536))
+            print("PUBLIC SONG METADATA:", json.dumps({"status": resp.status, **summarize(parsed)}))
+            song_id = song_id or traverse_obj(parsed, "id", "song_id", ("data", "id"), ("result", "id"), ("music", "id"))
+    except urllib.error.HTTPError as err:
+        print("PUBLIC SONG METADATA:", json.dumps({"status": err.code}))
+    except Exception as err:
+        print("PUBLIC SONG METADATA:", json.dumps({"failure_type": type(err).__name__}))
     if not song_id:
-        raise SystemExit("No stable song ID was found. Do not request a /None playback endpoint.")
+        print("No song ID available from either public metadata route.")
+        raise SystemExit(1)
 
     base = "https://api.audiomack.com"
     tests = [
