@@ -170,3 +170,5 @@ assert.match(source, /const audioExt = new Set/);
 assert.match(source, /const videoExt = new Set/);
 assert.match(source, /audioOnly \? audioExt\.has\(ext\)/);
 assert.match(source, /NO_DOWNLOADABLE_FORMAT: The extractor did not produce a supported media file/);
+
+assert.match(audiomackVendor, /\*\*self\._get_audio_info\(data, slug\)/);
