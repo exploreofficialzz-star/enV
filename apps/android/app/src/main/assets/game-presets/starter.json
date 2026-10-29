@@ -1,0 +1,87 @@
+{
+  "format": "env-3d-game",
+  "version": 1,
+  "id": "preset-starter",
+  "name": "Starter world",
+  "objects": [
+    {
+      "id": "preset-starter-0",
+      "name": "Ground",
+      "kind": "ground",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 10,
+        "y": 1,
+        "z": 10
+      },
+      "color": "#768b7b",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-starter-1",
+      "name": "Player",
+      "kind": "box",
+      "position": {
+        "x": 0,
+        "y": 0.5,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#25ad9c",
+      "visible": true,
+      "locked": false,
+      "collider": false,
+      "player": true,
+      "speed": 3
+    },
+    {
+      "id": "preset-starter-2",
+      "name": "Obstacle",
+      "kind": "box",
+      "position": {
+        "x": 2,
+        "y": 0.5,
+        "z": 2
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#f6bb82",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    }
+  ],
+  "assets": []
+}

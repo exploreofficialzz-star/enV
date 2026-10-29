@@ -22,6 +22,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.EnV">
         <activity
+            android:name=".NativeGamePreviewActivity"
+            android:exported="false" />
+        <activity
+            android:name=".NativeGameRuntimeActivity"
+            android:exported="false"
+            android:process=":game_preview"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|uiMode" />
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="unspecified">

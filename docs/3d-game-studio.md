@@ -1,0 +1,35 @@
+# enV 3D Game Studio: implementation status
+
+The web workspace is available at `/3d-game-studio` and is linked from UX/UI Studio. It uses the canonical enV logo, color palette, and a screen-fitting interface. On smaller screens, View, Objects, Assets, and Inspect switch between the viewport and compact panels; scene and asset lists are paged rather than scrolled.
+
+## What works
+
+- Babylon.js renders a 3D editor scene with orbit/pan/zoom, selection, focus, move/rotate/scale gizmos, and numeric transforms. Cubes, spheres, cylinders, ground, image planes, and self-contained GLB models can be placed. Objects can be renamed, hidden, locked, duplicated, deleted, and restored through undo.
+- UX/UI Studio's **Send to 3D** action renders the current Artboard to a PNG snapshot and makes it available in the 3D Studio on the same browser and origin. The snapshot retains the source project/screen reference. Sending an updated Artboard again makes an explicit refresh action available for existing project instances; their transforms are preserved. The existing UX/UI Artboard is a **2D** design editor, not a 3D asset authoring system.
+- Local GLB imports are limited to 15 MiB, validated and loaded by Babylon before they are added. Only glTF 2.0 GLB with embedded resources is supported. External files and compressed formats that require external decoders are rejected. Imported GLB meshes and materials are loaded by Babylon's glTF loader; script execution is not supported.
+- A versioned project contains scene objects, transforms, embedded asset snapshots/references, and simple gameplay settings. Save uses IndexedDB in this browser; JSON export/import provides a portable backup. Save failure is reported. The project data is not a synced account service.
+- Play creates a separate runtime frame from the current in-memory project. One primitive can be marked as a player; WASD/arrow keys and on-screen touch controls move it, and marked solid objects use Babylon's collision movement. Pause/resume and Stop work without changing editor transforms.
+- The starter, courtyard, and gallery templates create editable scenes containing actual primitive objects and an operational player. They are starting points, not demonstrations of features that have not been implemented.
+- **Build browser** creates a ZIP containing an HTML entry point, Babylon runtime/loader, project data, and runtime script. The build is for browsers with WebGL; it is not an Android, iOS, or desktop-native build. Extract the ZIP and serve the folder with a local static web server if browser security settings prevent opening `index.html` directly.
+- **Export Godot project** creates a source project for Godot 4.6 that reads the same project data, imports embedded GLB and Artboard images, and provides player movement and collisions. This is an editable Godot source project, not a compiled mobile application. In a Godot export preset, include `*.json` as a non-resource file; platform SDKs, export templates, and signing setup are still required. Results need testing on each target device because the Godot and browser runtimes are separate implementations.
+- Android and iOS include native decoders for the same versioned project contract, with a shared fixture containing both an Artboard image and GLB. The Android app includes a native Godot play-preview integration, and an iOS SceneKit preview is being integrated, both accessible from UX/UI Studio. They are intended to open web-exported project JSON or the three shared starter scenes; editing remains on the web. The iOS preview needs Xcode/simulator verification before its behavior can be claimed as working.
+
+## Known limitations and next integration work
+
+This is a working foundation, not the complete production studio described in the integration brief. The current enV repository has no 3D Artboard asset library or API to connect to. A real Artboard-created 3D model, source permissions, source deletion and model reimport have therefore not been verified. The handoff above is a 2D image snapshot, not a 3D model.
+
+Hierarchy grouping/reordering, multiselect, snapping and world/local modes, terrain sculpting, editable lights/cameras/shadows, full PBR editing, animation controls, rigid-body physics, trigger/interactable/checkpoint components, configurable input maps, asset thumbnails/metadata, source synchronization, cloud project ownership, autosave, runtime logs, native editing, and native export targets remain unimplemented. The player uses collision movement rather than a full physics simulation. GLB animation and texture fidelity across varied real-world assets require further testing. Browser storage can be cleared by the user or browser; export project JSON as a backup.
+
+## Reproduce checks
+
+1. `npm ci` with the repository's required Node 22 runtime.
+2. `npm run check:game-studio` validates the project format and rejection paths.
+3. `npm run check:ux-ui-studio` checks the existing Artboard behavior.
+4. With Godot 4.6 installed, `npm run check:game-studio:godot` loads the shared fixture in the Godot runtime and tests movement and collision headlessly.
+5. Start `npm run dev`, then run `npm run audit:game-studio:browser`. The browser audit uses a real generated GLB fixture, creates an actual UX/UI Artboard, tests persistence, runs movement/collision and pause/stop, builds/extracts the browser package, and checks small/landscape screen fit. Set `GODOT_BIN` to the Godot 4.6 executable to test the exported Godot ZIP too. `ENV_GAME_AUDIT_ORIGIN` can override the default `http://127.0.0.1:8080`.
+6. Android's `NativeGameProjectTest` and iOS's `NativeGameProjectTests` exercise the shared fixture and rejection paths. Run the Android Gradle tests/build with the SDK, and the iOS XCTest/build with Xcode. To regenerate the bundled Android runtime after modifying the Godot source, install Godot 4.6.3 and run `npm run build:game-studio:android-pack`; the script checks the version and loads the shared fixture from the generated pack before saving it. Run `npm run build:game-studio:android-presets` after changing the web starter scenes.
+7. Run `npm run typecheck`, `npm run lint`, and `npm run build` as appropriate for the repository.
+
+Automated desktop Chromium and headless Godot tests do not replace testing on physical touch devices, native renderers, GPU drivers, large animated/textured models, or a full production deployment. The Android app and contract tests build successfully. Its native activity launches on a software emulator, but the emulator's SwiftShader renderer reports shader compilation failures; playable rendering and touch controls need verification on a supported GPU and physical devices. The Godot Android library increases the universal debug APK substantially; a release needs Android App Bundle or ABI-specific packaging and size testing. The Swift contract was compiled and exercised with Swift on Linux, but the iOS preview and XCTest require Xcode and were not run here.
+
+The [research baseline](./3d-game-studio-benchmark.md) records competitor workflows and the tests needed to make a measurable comparison.

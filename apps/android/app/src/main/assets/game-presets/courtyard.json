@@ -1,0 +1,191 @@
+{
+  "format": "env-3d-game",
+  "version": 1,
+  "id": "preset-courtyard",
+  "name": "Courtyard explorer",
+  "objects": [
+    {
+      "id": "preset-courtyard-0",
+      "name": "Ground",
+      "kind": "ground",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 16,
+        "y": 1,
+        "z": 16
+      },
+      "color": "#a7b99d",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-courtyard-1",
+      "name": "Player",
+      "kind": "box",
+      "position": {
+        "x": 0,
+        "y": 0.5,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#25ad9c",
+      "visible": true,
+      "locked": false,
+      "collider": false,
+      "player": true,
+      "speed": 3
+    },
+    {
+      "id": "preset-courtyard-2",
+      "name": "Pillar 1",
+      "kind": "cylinder",
+      "position": {
+        "x": -3,
+        "y": 1,
+        "z": 3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 2,
+        "z": 1
+      },
+      "color": "#e0c7a6",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-courtyard-3",
+      "name": "Pillar 2",
+      "kind": "cylinder",
+      "position": {
+        "x": 3,
+        "y": 1,
+        "z": 3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 2,
+        "z": 1
+      },
+      "color": "#e0c7a6",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-courtyard-4",
+      "name": "Pillar 3",
+      "kind": "cylinder",
+      "position": {
+        "x": -3,
+        "y": 1,
+        "z": -3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 2,
+        "z": 1
+      },
+      "color": "#e0c7a6",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-courtyard-5",
+      "name": "Pillar 4",
+      "kind": "cylinder",
+      "position": {
+        "x": 3,
+        "y": 1,
+        "z": -3
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 2,
+        "z": 1
+      },
+      "color": "#e0c7a6",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    },
+    {
+      "id": "preset-courtyard-6",
+      "name": "Obstacle",
+      "kind": "box",
+      "position": {
+        "x": 2,
+        "y": 0.5,
+        "z": 2
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "color": "#f6bb82",
+      "visible": true,
+      "locked": false,
+      "collider": true,
+      "player": false,
+      "speed": 3
+    }
+  ],
+  "assets": []
+}
