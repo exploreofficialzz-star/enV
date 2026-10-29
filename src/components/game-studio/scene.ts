@@ -1,6 +1,7 @@
 import * as B from "babylonjs";
 import "babylonjs-loaders";
 import { MAX_ASSET_BYTES, validateGlb, type GameAsset, type GameObject, type GameProject } from "@/lib/game-studio/project";
+import { visibleExportEntries } from "@/lib/game-studio/export-readiness";
 
 type Mode = "select" | "move" | "rotate" | "scale";
 type Callbacks = {
@@ -305,10 +306,7 @@ export class StudioScene {
     if (this.pending.size) throw new Error("Models are still loading. Try exporting again in a moment.");
     const project = this.current;
     if (!project) throw new Error("The 3D renderer is not ready.");
-    const roots = [...this.entries.values()]
-      .filter((entry) => entry.object.visible)
-      .map((entry) => entry.root);
-    if (!roots.length) throw new Error("Add a visible object to the scene before exporting.");
+    const roots = visibleExportEntries(project.objects, this.entries).map((entry) => entry.root);
 
     // Exclude editor helpers, camera and lights. Only scene-object descendants are assets.
     const { GLTF2Export } = await import("babylonjs-serializers");
