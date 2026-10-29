@@ -70,4 +70,9 @@ jobs:
           EXTRACTOR="$("$RUNNER_TEMP/env-audiomack-regression/bin/python" -c 'import yt_dlp.extractor.audiomack as m; print(m.__file__)')"
           cp scripts/media/vendor/audiomack.py "$EXTRACTOR"
           "$RUNNER_TEMP/env-audiomack-regression/bin/python" scripts/media/audiomack-vendor-regression.py
+      - name: Typecheck Web music downloader integration
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+
 
