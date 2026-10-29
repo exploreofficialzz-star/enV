@@ -18,7 +18,9 @@ UA = "enV authorized creator media acceptance probe"
 def summarize(value):
     if isinstance(value, dict):
         return {"kind": "object", "fields": sorted(str(k) for k in value)[:40],
-                "nested": {k: sorted(value[k])[:15] for k in ["data", "result", "music", "song"] if isinstance(value.get(k), dict)},
+                "nested": {k: sorted(value[k])[:20] for k in ["data", "result", "results", "music", "song"] if isinstance(value.get(k), dict)},
+                "result_kind": type(value.get("results")).__name__,
+                "result_count": len(value["results"]) if isinstance(value.get("results"), list) else None,
                 "audio_field_found": any(isinstance(value.get(k), str) and value[k].startswith("https://") for k in ["signedUrl", "url", "audio_url", "stream_url"])}
     return {"kind": type(value).__name__, "audio_field_found": isinstance(value, str) and value.startswith("https://")}
 
@@ -39,7 +41,7 @@ with YoutubeDL({"quiet": True, "no_warnings": True, "socket_timeout": 20}) as dl
         with urllib.request.urlopen(req, timeout=20) as resp:
             parsed = json.loads(resp.read(65536))
             print("PUBLIC SONG METADATA:", json.dumps({"status": resp.status, **summarize(parsed)}))
-            song_id = song_id or traverse_obj(parsed, "id", "song_id", ("data", "id"), ("result", "id"), ("music", "id"))
+            song_id = song_id or traverse_obj(parsed, "id", "song_id", ("results", "id"), ("results", "song_id"), ("results", 0, "id"), ("data", "id"), ("result", "id"), ("music", "id"))
     except urllib.error.HTTPError as err:
         print("PUBLIC SONG METADATA:", json.dumps({"status": err.code}))
     except Exception as err:
