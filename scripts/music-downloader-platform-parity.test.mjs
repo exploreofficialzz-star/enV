@@ -176,3 +176,19 @@ test("Web media stream enforces per-track byte limits and refuses HTML errors", 
   assert.match(client, /await reader\.cancel\(\)/);
   assert.match(client, /media service returned a page or an error response/i);
 });
+
+test("all three music clients compact repeated batch errors without masking track failures", async () => {
+  const web = await source("../src/components/engines/music-downloader-engine.tsx");
+  const android = await source("../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt");
+  const ios = await source("../apps/ios/enV/ToolViews.swift");
+  const backend = await source("./media/provider-errors.mjs");
+  assert.match(web, /summarizeMusicDownloadFailures\(failedEntries\)/);
+  assert.match(web, /See affected tracks \(/);
+  assert.match(web, /const failures = failedEntries\.map/);
+  assert.doesNotMatch(web, /failures\.slice\(0, 5\)\.join/);
+  assert.match(android, /nativeMusicFailureSummary\(failures\)/);
+  assert.doesNotMatch(android, /failures\.take\(3\)\.joinToString/);
+  assert.match(ios, /nativeMusicFailureSummary\(outcome\.failures\)/);
+  assert.doesNotMatch(ios, /outcome\.failures\.prefix\(3\)\.joined/);
+  assert.match(backend, /Audiomack's audio resolver did not return a downloadable file/);
+});
