@@ -36,7 +36,7 @@ export function classifyProviderFailure(provider, diagnostic) {
   }
   if (/audiomack/i.test(name) &&
       /unable to extract (?:audio url|song slug)/i.test(detail)) {
-    return new Error("NO_DOWNLOADABLE_FORMAT: Audiomack supplied song metadata but its current audio resolver did not return a usable file URL. The song may be playable on Audiomack without permitting portable file export, or its public resolver may have changed. This is not a broken album link. Use a creator-authorized direct audio file or the provider's permitted download option.");
+    return new Error("NO_DOWNLOADABLE_FORMAT: Audiomack's audio resolver did not return a downloadable file.");
   }
   if (/http error 403|http error 401|forbidden|not authorized|access denied|geo.?restricted/i.test(detail)) {
     return new Error(`DOWNLOAD_NOT_PERMITTED: ${name} refused this request. The content may require authorization, be region-restricted, or not permit this download method. Use its official download feature or a direct URL the rights holder permits.`);
