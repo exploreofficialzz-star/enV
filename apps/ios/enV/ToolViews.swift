@@ -4923,6 +4923,29 @@ private enum NativeMusicArchive {
     }
 }
 
+private func nativeMusicFailureSummary(_ failures: [String]) -> String {
+    guard !failures.isEmpty else { return "" }
+    let reasons = failures.map { failure -> String in
+        let value = failure.lowercased()
+        if value.contains("audiomack supplied song metadata") ||
+            value.contains("audiomack's audio resolver did not return a downloadable file") {
+            return "Audiomack did not provide a downloadable audio file."
+        }
+        if value.contains("rate_limited") || value.contains("source_challenge") {
+            return "The source is limiting or challenging requests."
+        }
+        if value.contains("no_downloadable_format") { return "No downloadable audio file was available." }
+        if value.contains("download_not_permitted") || value.contains("auth_required") {
+            return "The source did not allow this download."
+        }
+        if value.contains("network_timeout") { return "The music source timed out." }
+        return "The source could not complete the download."
+    }
+    let reason = Set(reasons).count == 1 ? (reasons.first ?? "") : "Different sources returned download errors."
+    let noun = failures.count == 1 ? "track" : "tracks"
+    return "\(failures.count) \(noun) could not be downloaded. \(reason)"
+}
+
 private struct NativeMusicDownloaderView: View {
     @State private var mode = "Online"
     @State private var collectionType = "Track"
@@ -5254,12 +5277,12 @@ private struct NativeMusicDownloaderView: View {
             refreshLibrary()
             zipExportURL = outcome.zip
             if outcome.saved.isEmpty {
-                errorMessage = outcome.failures.first ?? "No audio files were downloaded."
+                errorMessage = outcome.failures.isEmpty ? "No audio files were downloaded." : nativeMusicFailureSummary(outcome.failures)
                 status = "No files saved."
             } else {
                 status = "\(outcome.saved.count) track(s) saved · \(ByteCountFormatter.string(fromByteCount: outcome.totalBytes, countStyle: .file))." +
                     (outcome.zip == nil ? "" : " ZIP ready: tap Share or save ZIP in Files.") +
-                    (outcome.failures.isEmpty ? "" : " \(outcome.failures.count) unavailable: " + outcome.failures.prefix(3).joined(separator: "; "))
+                    (outcome.failures.isEmpty ? "" : " " + nativeMusicFailureSummary(outcome.failures))
             }
             if zipRequested && outcome.zip == nil && !outcome.saved.isEmpty {
                 errorMessage = "The tracks were saved to the library, but the ZIP could not be prepared."
