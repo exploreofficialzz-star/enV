@@ -60,7 +60,25 @@ class NativeGamePlaybackTest {
         val capture = automation.executeShellCommand("screencap -p /sdcard/Download/env-game-preview.png")
         ParcelFileDescriptor.AutoCloseInputStream(capture).use { it.readBytes() }
         println("Native frame: ${image.width}x${image.height}, sampled colors=${colors.size}")
-        image.recycle()
         assertTrue("Native game screen did not contain visible scene content; sampled colors=${colors.size}", colors.size >= 4)
+        // Hold the on-screen right arrow and compare only the scene, excluding UI controls.
+        val x = (image.width * 0.2625).toInt()
+        val y = (image.height * 0.91).toInt()
+        val swipe = automation.executeShellCommand("input swipe $x $y $x $y 1500")
+        ParcelFileDescriptor.AutoCloseInputStream(swipe).use { it.readBytes() }
+        SystemClock.sleep(500)
+        val after = requireNotNull(automation.takeScreenshot())
+        var changed = 0
+        val step = maxOf(4, image.height / 80)
+        for (py in image.height / 5 until image.height * 4 / 5 step step) {
+            for (px in image.width / 5 until image.width * 4 / 5 step step) {
+                if (image.getPixel(px, py) != after.getPixel(px, py)) changed++
+            }
+        }
+        val afterCapture = automation.executeShellCommand("screencap -p /sdcard/Download/env-game-after.png")
+        ParcelFileDescriptor.AutoCloseInputStream(afterCapture).use { it.readBytes() }
+        image.recycle()
+        after.recycle()
+        assertTrue("Touch movement did not change the rendered scene; changed samples=$changed", changed > 25)
     }
 }

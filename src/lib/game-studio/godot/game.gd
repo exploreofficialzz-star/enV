@@ -105,27 +105,35 @@ func _setup_ui() -> void:
         touch_buttons.append(button)
     get_viewport().size_changed.connect(_layout_touch_controls)
     _layout_touch_controls()
+    call_deferred("_layout_touch_controls")
 
 func _layout_touch_controls() -> void:
     if not touch_controls: return
     # Convert a 48 dp touch target into the scaled Godot viewport's coordinates.
     var viewport := get_viewport().get_visible_rect().size
-    var screen_width := maxi(DisplayServer.window_get_size().x, 1)
+    var screen := Vector2(DisplayServer.window_get_size())
+    var screen_width := maxf(screen.x, 1.0)
+    var safe := Rect2(Vector2.ZERO, viewport)
+    var device_safe := DisplayServer.get_display_safe_area()
+    if device_safe.size.x > 0 and device_safe.size.y > 0 and screen.y > 0:
+        var scale := viewport / screen
+        var clipped := Rect2(Vector2(device_safe.position) * scale, Vector2(device_safe.size) * scale).intersection(safe)
+        if clipped.size.x > 0 and clipped.size.y > 0: safe = clipped
     var density := maxf(1.0, float(DisplayServer.screen_get_dpi()) / 160.0)
-    var button_size := minf(maxf(64.0, 48.0 * density * viewport.x / screen_width), viewport.x / 5.0)
+    var button_size := minf(maxf(64.0, 48.0 * density * viewport.x / screen_width), minf(safe.size.x / 5.0, safe.size.y / 3.0))
     var padding := button_size * 0.25
     var separation := roundi(button_size * 0.08)
     touch_controls.add_theme_constant_override("separation", separation)
-    touch_controls.position = Vector2(padding, viewport.y - button_size - padding)
+    touch_controls.position = Vector2(safe.position.x + padding, safe.end.y - button_size - padding)
     touch_controls.size = Vector2(4 * button_size + 3 * separation, button_size)
     for button in touch_buttons:
         button.custom_minimum_size = Vector2(button_size, button_size)
         button.add_theme_font_size_override("font_size", roundi(button_size * 0.42))
     touch_exit.custom_minimum_size = Vector2(button_size * 1.5, button_size)
     touch_exit.size = touch_exit.custom_minimum_size
-    touch_exit.position = Vector2(viewport.x - touch_exit.size.x - padding, padding)
+    touch_exit.position = Vector2(safe.end.x - touch_exit.size.x - padding, safe.position.y + padding)
     touch_exit.add_theme_font_size_override("font_size", roundi(button_size * 0.32))
-    status.position = Vector2(padding, padding)
+    status.position = safe.position + Vector2(padding, padding)
     status.add_theme_font_size_override("font_size", roundi(button_size * 0.28))
 
 func _create_object(item: Dictionary) -> bool:
