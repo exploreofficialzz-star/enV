@@ -7,7 +7,7 @@ into its extractor package. No provider calls, credentials or audio downloads.
 import unittest
 from unittest.mock import patch
 
-from yt_dlp.extractor.audiomack import AudiomackIE
+from yt_dlp.extractor.audiomack import AudiomackIE, AudiomackAlbumIE
 from yt_dlp.utils import ExtractorError
 
 CREATOR_SONG = "https://audiomack.com/chas-d/song/hallelujah?share-user-id=118614535"
@@ -68,6 +68,56 @@ class AudiomackVendorTests(unittest.TestCase):
                 ie._real_extract(CREATOR_SONG)
         self.assertEqual(len(calls), 1)
         self.assertNotIn("/None", calls[0])
+
+    def test_album_app_router_falls_back_to_documented_public_track_list(self):
+        ie = AudiomackAlbumIE()
+        url = "https://audiomack.com/evadolee/album/promise-land"
+        expected_api = "https://api.audiomack.com/v1/music/album/evadolee/promise-land"
+        requests = []
+
+        def metadata(endpoint, video_id, **kwargs):
+            requests.append(endpoint)
+            self.assertEqual(endpoint, expected_api)
+            return {"results": {"id": 123, "title": "Promise Land", "tracks": [
+                {"id": 1, "title": "MARCH AM", "url_slug": "march-am", "uploader": {"url_slug": "evadolee"}},
+                {"id": 2, "title": "AZAMAN", "url_slug": "azaman", "uploader": {"url_slug": "evadolee"}},
+            ]}}
+
+        with patch.object(ie, "_download_webpage", return_value="App Router HTML"), \\
+             patch.object(ie, "_get_next_data", return_value={}), \\
+             patch.object(ie, "_download_json", side_effect=metadata):
+            playlist = ie._real_extract(url)
+        tracks = list(playlist["entries"])
+        self.assertEqual(len(tracks), 2)
+        self.assertEqual([item["url"] for item in tracks], [
+            "https://audiomack.com/evadolee/song/march-am",
+            "https://audiomack.com/evadolee/song/azaman",
+        ])
+        self.assertEqual(requests, [expected_api])
+
+    def test_playlist_app_router_uses_public_playlist_endpoint(self):
+        ie = AudiomackAlbumIE()
+        expected_api = "https://api.audiomack.com/v1/playlist/chas-d/my-music"
+
+        def metadata(endpoint, video_id, **kwargs):
+            self.assertEqual(endpoint, expected_api)
+            return {"results": {"id": 8, "title": "My Music", "tracks": [
+                {"id": 7, "title": "Hallelujah", "url_slug": "hallelujah", "uploader": {"url_slug": "chas-d"}},
+            ]}}
+
+        with patch.object(ie, "_download_webpage", return_value="App Router HTML"), \\
+             patch.object(ie, "_get_next_data", return_value={}), \\
+             patch.object(ie, "_download_json", side_effect=metadata):
+            playlist = ie._real_extract("https://audiomack.com/chas-d/playlist/my-music")
+        self.assertEqual(list(playlist["entries"])[0]["url"], "https://audiomack.com/chas-d/song/hallelujah")
+
+    def test_collection_does_not_invent_song_slugs_when_metadata_is_empty(self):
+        ie = AudiomackAlbumIE()
+        with patch.object(ie, "_download_webpage", return_value="html"), \\
+             patch.object(ie, "_get_next_data", return_value={}), \\
+             patch.object(ie, "_download_json", return_value={"results": {"title": "Empty", "tracks": []}}):
+            playlist = ie._real_extract("https://audiomack.com/evadolee/album/empty")
+        self.assertEqual(list(playlist["entries"]), [])
 
 
 if __name__ == "__main__":
