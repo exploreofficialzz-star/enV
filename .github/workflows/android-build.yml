@@ -46,6 +46,10 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           test -e /dev/kvm
+      - name: Start virtual display for host graphics
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 > "$RUNNER_TEMP/env-xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
       - name: Run native game playback test
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -55,7 +59,7 @@ jobs:
           profile: pixel_2
           disable-linux-hw-accel: false
           emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
+          emulator-options: -no-window -gpu host -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
           script: bash scripts/test-android-game-preview.sh
       - name: Upload test evidence
         if: always()
