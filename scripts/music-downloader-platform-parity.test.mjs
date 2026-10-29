@@ -104,7 +104,7 @@ test("transient-only music download recovery is implemented natively and on Web"
   const ios = await source("../apps/ios/enV/ToolViews.swift");
   const client = await source("../src/lib/media/url-media.ts");
   assert.match(web, /downloadMusicWithSingleRetry/);
-  assert.match(web, /Retry unavailable tracks as ZIP/);
+  assert.match(web, /Retry unavailable tracks and rebuild ZIP/);
   assert.match(web, /failed-downloads\.txt/);
   assert.match(android, /downloadProviderMusicTrackWithRetry/);
   assert.match(android, /failed-downloads\.txt/);
@@ -145,4 +145,26 @@ test("single songs use single-track discovery and direct download across all cli
   assert.match(android, /downloadSelectedMusic\(previewTracks\.toList\(\), previewTracks\.size > 1\)/);
   assert.match(ios, /"includePlaylist": nativeMusicCollectionPage\(source\.url\)/);
   assert.match(ios, /startOnlineDownloads\(only: previewTracks\.count == 1 \? previewTracks\.first : nil\)/);
+});
+
+test("Web ZIP retries preserve completed tracks and create archives off the UI thread", async () => {
+  const web = await source("../src/components/engines/music-downloader-engine.tsx");
+  assert.match(web, /completedRef = useRef<Map<number, DownloadResult>>/);
+  assert.match(web, /completed\.set\(index, track\)/);
+  assert.match(web, /savedInOrder = preview\.tracks\.flatMap/);
+  assert.match(web, /!completed\.has\(i\)/);
+  assert.match(web, /previousFailures\.delete\(index\)/);
+  assert.match(web, /await buildArchive\(title, savedInOrder, failures\)/);
+  assert.match(web, /zip\(files, \{ level: 0 \},/);
+  assert.doesNotMatch(web, /zipSync\(/);
+});
+
+test("shared worker streams checked files and verifies audio-only outputs", async () => {
+  const processor = await source("../scripts/url-media-processor.mjs");
+  assert.match(processor, /await pipeline\(createReadStream\(chosen\.file\), res/);
+  assert.match(processor, /verifyDownloadedMedia\(chosen\.file, maxBytes, controller\.signal, Boolean\(audioOnly\)\)/);
+  assert.match(processor, /requireAudio && !streams\.some/);
+  assert.match(processor, /res\.on\("close"/);
+  assert.match(processor, /JOB_TIMEOUT: The extractor exceeded its processing deadline/);
+  assert.doesNotMatch(processor, /await fs\.readFile\(chosen\.file\)/);
 });
