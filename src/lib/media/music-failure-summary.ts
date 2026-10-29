@@ -7,7 +7,7 @@ export type MusicFailureSummary = { heading: string; total: number; groups: Musi
 
 export function shortMusicFailureReason(message: string): string {
   const raw = String(message || "").replace(/[\r\n\t]+/g, " ").trim();
-  if (/audiomack supplied song metadata but its current audio resolver|audiomack.*(?:unable to extract audio url|unable to extract song slug|did not return a usable file url)/i.test(raw)) {
+  if (/audiomack supplied song metadata but its current audio resolver|audiomack.*(?:unable to extract audio url|unable to extract song slug|did not return a usable file url|audio resolver did not return a downloadable file|did not provide a downloadable audio file)/i.test(raw)) {
     return "Audiomack did not provide a downloadable audio file.";
   }
   if (/\b(?:DOWNLOAD_NOT_PERMITTED|AUTH_REQUIRED|PRIVATE_CONTENT)\b|does not permit downloading|downloads are disabled/i.test(raw)) {
