@@ -782,15 +782,21 @@ async function handleDownload(req, res) {
       }
     }
     const entries = await fs.readdir(jobDir, { withFileTypes: true });
+    // yt-dlp can leave artwork, descriptions, metadata and transfer state in
+    // the same job directory. Never accidentally export a sidecar as audio.
+    const audioExt = new Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "webm", "wma", "aiff", "aif"]);
+    const videoExt = new Set(["mp4", "webm", "mkv", "mov", "m4v", "avi", "flv", "ts"]);
     const candidates = [];
     for (const entry of entries) {
-      if (!entry.isFile() || /\.(?:part|aria2|ytdl)$/i.test(entry.name)) continue;
+      if (!entry.isFile()) continue;
+      const ext = path.extname(entry.name).toLowerCase().slice(1);
+      if (!(audioOnly ? audioExt.has(ext) : audioExt.has(ext) || videoExt.has(ext))) continue;
       const file = path.join(jobDir, entry.name);
       const stat = await fs.stat(file);
       if (stat.size > maxBytes) continue;
       candidates.push({ file, stat });
     }
-    if (!candidates.length) throw new Error("The provider returned no downloadable media within the configured limits.");
+    if (!candidates.length) throw new Error("NO_DOWNLOADABLE_FORMAT: The extractor did not produce a supported media file within the configured limits.");
     candidates.sort((a,b) => b.stat.size - a.stat.size);
     const chosen = candidates[0];
     await verifyDownloadedMedia(chosen.file, maxBytes, controller.signal, Boolean(audioOnly));
