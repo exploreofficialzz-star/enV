@@ -332,11 +332,44 @@ class AudiomackAlbumIE(AudiomackBaseIE):
             return 'https://audiomack.com/' + urllib.parse.quote(artist, safe='') + '/song/' + urllib.parse.quote(song, safe='')
         return None
 
+    def _get_public_collection_data(self, data, slug, collection_id):
+        # App Router pages may omit Next.js v13 hydration entirely. The
+        # documented read-only metadata APIs expose real track records for
+        # public albums and playlists without resolving media during preview.
+        if traverse_obj(data, ('tracks', {list})) or traverse_obj(data, ('tracks', {tuple})):
+            return data
+        parts = [part for part in slug.split('/') if part]
+        if len(parts) != 3:
+            return data
+        if parts[0].lower() in ('album', 'playlist'):
+            kind, artist, title = parts
+        elif parts[1].lower() in ('album', 'playlist'):
+            artist, kind, title = parts
+        else:
+            return data
+        category = 'music/album' if kind.lower() == 'album' else 'playlist'
+        api_url = (
+            'https://api.audiomack.com/v1/' + category + '/'
+            + urllib.parse.quote(artist, safe='')
+            + '/' + urllib.parse.quote(title, safe='')
+        )
+        response = self._download_json(
+            api_url, collection_id,
+            note='Fetching public Audiomack collection metadata',
+            query=self.sign_params({}, api_url),
+            errnote=False, fatal=False,
+        )
+        collection = traverse_obj(response, ('results', {dict}), ('data', {dict}), ('result', {dict}))
+        if collection and traverse_obj(collection, ('tracks', {list})):
+            return collection
+        return data
+
     def _real_extract(self, url):
         slug = self._match_id(url)
         playlist_id = slug.split('/')[-1]
 
         data = self._get_next_data(self._download_webpage(url, playlist_id))
+        data = self._get_public_collection_data(data, slug, playlist_id)
 
         def entries(data):
             for track in traverse_obj(data, ('tracks', lambda _, x: self.is_available('song_id', 'id', obj=x))) or []:
