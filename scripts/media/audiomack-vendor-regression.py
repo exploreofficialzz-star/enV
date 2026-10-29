@@ -83,8 +83,8 @@ class AudiomackVendorTests(unittest.TestCase):
                 {"id": 2, "title": "AZAMAN", "url_slug": "azaman", "uploader": {"url_slug": "evadolee"}},
             ]}}
 
-        with patch.object(ie, "_download_webpage", return_value="App Router HTML"), \\
-             patch.object(ie, "_get_next_data", return_value={}), \\
+        with patch.object(ie, "_download_webpage", return_value="App Router HTML"), \
+             patch.object(ie, "_get_next_data", return_value={}), \
              patch.object(ie, "_download_json", side_effect=metadata):
             playlist = ie._real_extract(url)
         tracks = list(playlist["entries"])
@@ -105,16 +105,16 @@ class AudiomackVendorTests(unittest.TestCase):
                 {"id": 7, "title": "Hallelujah", "url_slug": "hallelujah", "uploader": {"url_slug": "chas-d"}},
             ]}}
 
-        with patch.object(ie, "_download_webpage", return_value="App Router HTML"), \\
-             patch.object(ie, "_get_next_data", return_value={}), \\
+        with patch.object(ie, "_download_webpage", return_value="App Router HTML"), \
+             patch.object(ie, "_get_next_data", return_value={}), \
              patch.object(ie, "_download_json", side_effect=metadata):
             playlist = ie._real_extract("https://audiomack.com/chas-d/playlist/my-music")
         self.assertEqual(list(playlist["entries"])[0]["url"], "https://audiomack.com/chas-d/song/hallelujah")
 
     def test_collection_does_not_invent_song_slugs_when_metadata_is_empty(self):
         ie = AudiomackAlbumIE()
-        with patch.object(ie, "_download_webpage", return_value="html"), \\
-             patch.object(ie, "_get_next_data", return_value={}), \\
+        with patch.object(ie, "_download_webpage", return_value="html"), \
+             patch.object(ie, "_get_next_data", return_value={}), \
              patch.object(ie, "_download_json", return_value={"results": {"title": "Empty", "tracks": []}}):
             playlist = ie._real_extract("https://audiomack.com/evadolee/album/empty")
         self.assertEqual(list(playlist["entries"]), [])
