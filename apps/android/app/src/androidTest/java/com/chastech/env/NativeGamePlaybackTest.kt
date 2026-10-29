@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,17 +39,30 @@ class NativeGamePlaybackTest {
                 it.contains("ENV_GAME") || it.contains("FATAL EXCEPTION")
         }.toList().takeLast(30).joinToString("\n")
         assertTrue("Native game did not finish loading.\n$relevant", logs.contains("ENV_GAME_READY"))
-        assertTrue("Native renderer reported shader compilation failure.\n$relevant",
-            !logs.contains("Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS"))
-        SystemClock.sleep(2_000)
-        val screenshot = automation.takeScreenshot()
+        val frameDeadline = SystemClock.elapsedRealtime() + 30_000
+        var colors = emptySet<Int>()
+        var screenshot: android.graphics.Bitmap? = null
+        while (SystemClock.elapsedRealtime() < frameDeadline) {
+            SystemClock.sleep(2_000)
+            screenshot?.recycle()
+            screenshot = automation.takeScreenshot()
+            val image = screenshot ?: continue
+            colors = buildSet {
+                for (y in 1..7) for (x in 1..7) {
+                    add(image.getPixel(image.width * x / 8, image.height * y / 8))
+                }
+            }
+            if (colors.size >= 4) break
+        }
         assertNotNull("Native game did not produce a screen image", screenshot)
         val image = requireNotNull(screenshot)
-        val colors = mutableSetOf<Int>()
-        for (y in 1..7) for (x in 1..7) {
-            colors += image.getPixel(image.width * x / 8, image.height * y / 8)
+        val files = InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null)
+        if (files != null) File(files, "env-game-preview.png").outputStream().use {
+            image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
-        assertTrue("Native game screen did not contain visible scene content", colors.size >= 4)
         image.recycle()
+        assertTrue("Native renderer reported shader compilation failure.\n$relevant",
+            !logs.contains("Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS"))
+        assertTrue("Native game screen did not contain visible scene content; sampled colors=${colors.size}", colors.size >= 4)
     }
 }

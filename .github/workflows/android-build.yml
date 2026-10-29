@@ -56,7 +56,13 @@ jobs:
           disable-linux-hw-accel: false
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
-          script: cd apps/android && ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.chastech.env.NativeGamePlaybackTest
+          script: |
+            cd apps/android
+            result=0
+            ./gradlew --no-daemon --max-workers=2 :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.chastech.env.NativeGamePlaybackTest || result=$?
+            mkdir -p "$GITHUB_WORKSPACE/android-game-evidence"
+            adb pull /sdcard/Android/data/com.chastech.env/files/env-game-preview.png "$GITHUB_WORKSPACE/android-game-evidence/preview.png" || true
+            exit "$result"
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,4 +71,5 @@ jobs:
           path: |
             apps/android/app/build/outputs/androidTest-results/connected/debug/
             apps/android/app/build/reports/androidTests/connected/debug/
+            android-game-evidence/
           if-no-files-found: ignore
