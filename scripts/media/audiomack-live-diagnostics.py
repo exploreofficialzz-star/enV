@@ -50,6 +50,22 @@ with YoutubeDL({"quiet": True, "no_warnings": True, "socket_timeout": 20}) as dl
         print("No song ID available from either public metadata route.")
         raise SystemExit(1)
 
+    album_api = "https://api.audiomack.com/v1/music/album/evadolee/promise-land"
+    try:
+        signature = extractor.sign_params({}, album_api)
+        request = urllib.request.Request(album_api + "?" + urllib.parse.urlencode(signature), headers={"User-Agent": UA})
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read(128 * 1024))
+            collection = payload.get("results") if isinstance(payload, dict) else None
+            tracks = collection.get("tracks") if isinstance(collection, dict) else None
+            print("PUBLIC ALBUM METADATA:", json.dumps({"status": response.status, **summarize(payload),
+                "tracks_type": type(tracks).__name__, "track_count": len(tracks) if isinstance(tracks, list) else None,
+                "first_track_fields": sorted(tracks[0])[:25] if isinstance(tracks, list) and tracks and isinstance(tracks[0], dict) else []}))
+    except urllib.error.HTTPError as error:
+        print("PUBLIC ALBUM METADATA:", json.dumps({"status": error.code}))
+    except Exception as error:
+        print("PUBLIC ALBUM METADATA:", json.dumps({"failure_type": type(error).__name__}))
+
     base = "https://api.audiomack.com"
     tests = [
         ("site-current", "GET", f"/v1/music/play/{song_id}", {"environment": "desktop-web", "hq": "true", "section": "/chas-d/song/hallelujah"}),
