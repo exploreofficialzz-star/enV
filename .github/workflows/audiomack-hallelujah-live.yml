@@ -7,6 +7,7 @@ on:
       - "scripts/media/audiomack-hallelujah-smoke.mjs"
       - "scripts/media/vendor/audiomack.py"
       - "scripts/media/audiomack-live-diagnostics.py"
+      - "scripts/media/audiomack-vendor-regression.py"
       - "processor/Dockerfile"
       - ".github/workflows/audiomack-hallelujah-live.yml"
   workflow_dispatch:
@@ -49,6 +50,7 @@ jobs:
           EXTRACTOR="$("$RUNNER_TEMP/env-audiomack/bin/python" -c 'import yt_dlp.extractor.audiomack as m; print(m.__file__)')"
           cp scripts/media/vendor/audiomack.py "$EXTRACTOR"
           "$RUNNER_TEMP/env-audiomack/bin/python" -m py_compile "$EXTRACTOR"
+          "$RUNNER_TEMP/env-audiomack/bin/python" scripts/media/audiomack-vendor-regression.py
           mkdir -p "$RUNNER_TEMP/env-audiomack-audio"
           "$RUNNER_TEMP/env-audiomack/bin/yt-dlp" \
             --ignore-config --no-playlist --no-warnings --quiet \
