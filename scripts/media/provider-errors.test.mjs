@@ -64,3 +64,11 @@ test("provider diagnostics are URL-redacted, bounded, and newline-safe", () => {
   assert.doesNotMatch(failure.message, /https:\/\/private\.example|token=secret|\\n/);
   assert.ok(failure.message.length < 1000);
 });
+
+test("Audiomack missing audio URL is not misreported as generic server failure", () => {
+  for (const detail of ["Unable to extract audio url", "Unable to extract Song slug"]) {
+    const error = classifyProviderFailure("audiomack", detail);
+    assert.match(error.message, /^NO_DOWNLOADABLE_FORMAT:/);
+    assert.match(error.message, /song metadata but its current audio resolver/);
+  }
+});
