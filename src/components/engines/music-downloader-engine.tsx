@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { strToU8, zipSync } from "fflate";
+import { strToU8, zip } from "fflate";
 import { Button } from "@/components/ui/button";
 import { downloadBlob, formatFileSize, slugify } from "@/lib/utils";
 import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
@@ -74,7 +74,7 @@ function mimeForExtension(extension: string): string {
   return types[extension] || "application/octet-stream";
 }
 
-function buildArchive(title: string, tracks: DownloadResult[], failures: string[] = []): Uint8Array {
+function buildArchive(title: string, tracks: DownloadResult[], failures: string[] = []): Promise<Uint8Array> {
   const files: Record<string, Uint8Array> = {};
   const used = new Set<string>();
   const playlist = ["#EXTM3U"];
@@ -100,7 +100,11 @@ function buildArchive(title: string, tracks: DownloadResult[], failures: string[
   files["README.txt"] = strToU8(
     title + "\n\nCreated with enV Music Downloader.\nThe archive contains the selected audio files, an M3U playlist and the metadata detected in each file. Audio bytes are preserved unchanged. Keep copyright notices and license terms supplied by the original source.\n",
   );
-  return zipSync(files, { level: 0 });
+  // Use fflate's asynchronous worker-backed path so large collections do not
+  // synchronously block the browser UI during archive creation.
+  return new Promise((resolve, reject) => {
+    zip(files, { level: 0 }, (error, data) => error ? reject(error) : resolve(data));
+  });
 }
 
 function isDirectAudioLink(raw: string): boolean {
@@ -366,7 +370,7 @@ export function MusicDownloaderEngine() {
         ? savedInOrder.length : completed.has(trackIndex) && !previousFailures.has(trackIndex) ? 1 : 0;
       if (trackIndex === undefined && savedInOrder.length) {
         const title = safeName(preview.title || inferredCollectionTitle(savedInOrder), "My music");
-        const archive = buildArchive(title, savedInOrder, failures);
+        const archive = await buildArchive(title, savedInOrder, failures);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
       if (successfulCount) {
@@ -426,7 +430,7 @@ export function MusicDownloaderEngine() {
         downloadBlob(localFiles[0], tracks[0].name);
       } else {
         const title = inferredCollectionTitle(tracks);
-        const archive = buildArchive(title, tracks);
+        const archive = await buildArchive(title, tracks);
         downloadBlob(new Blob([new Uint8Array(archive).buffer], { type: "application/zip" }), (slugify(title) || "music") + ".zip");
       }
       setResult("Prepared " + tracks.length + " track(s) · " + formatFileSize(total) + ".");
