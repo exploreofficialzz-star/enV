@@ -1,0 +1,72 @@
+name: Android native game preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/android/**"
+      - "apps/shared/**"
+      - "src/lib/game-studio/godot/**"
+      - "scripts/test-android-game-preview.sh"
+      - ".github/workflows/android-game-preview.yml"
+  pull_request:
+    paths:
+      - "apps/android/**"
+      - "apps/shared/**"
+      - "src/lib/game-studio/godot/**"
+      - "scripts/test-android-game-preview.sh"
+      - ".github/workflows/android-game-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-game-preview-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+      - name: Start virtual display for host graphics
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 > "$RUNNER_TEMP/env-xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+      - name: Test rendered game and touch controls
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-linux-hw-accel: false
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu host -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
+          script: bash scripts/test-android-game-preview.sh
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-native-game-preview
+          path: |
+            apps/android/app/build/outputs/androidTest-results/connected/debug/
+            apps/android/app/build/reports/androidTests/connected/debug/
+            android-game-evidence/
+          if-no-files-found: ignore
