@@ -5,6 +5,7 @@ import { downloadBlob, formatFileSize, slugify } from "@/lib/utils";
 import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
 import { downloadUrlMedia, inspectUrlMedia, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
 import { downloadMusicWithSingleRetry } from "@/lib/media/music-download-retry";
+import { summarizeMusicDownloadFailures, type MusicDownloadFailure, type MusicFailureSummary } from "@/lib/media/music-failure-summary";
 import {
   MUSIC_AUDIO_EXTENSIONS,
   isLikelyMusicCollectionUrl,
@@ -187,6 +188,7 @@ export function MusicDownloaderEngine() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  const [failureSummary, setFailureSummary] = useState<MusicFailureSummary | null>(null);
   const [result, setResult] = useState("");
   const [preview, setPreview] = useState<MusicPreview | null>(null);
   const [showAllTracks, setShowAllTracks] = useState(false);
@@ -194,13 +196,14 @@ export function MusicDownloaderEngine() {
   const abortRef = useRef<AbortController | null>(null);
   // Preserve verified tracks across partial failures and ZIP retries within one preview.
   const completedRef = useRef<Map<number, DownloadResult>>(new Map());
-  const failedRef = useRef<Map<number, string>>(new Map());
+  const failedRef = useRef<Map<number, MusicDownloadFailure>>(new Map());
   const manifestInputRef = useRef<HTMLInputElement | null>(null);
   const localFileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function importManifest(file?: File) {
     if (!file) return;
     setError("");
+    setFailureSummary(null);
     try {
       setUrlText(await file.text());
       completedRef.current.clear();
@@ -217,6 +220,7 @@ export function MusicDownloaderEngine() {
 
   async function previewOnline() {
     setError("");
+    setFailureSummary(null);
     setResult("");
     setProgress("");
     setPreview(null);
@@ -310,6 +314,7 @@ export function MusicDownloaderEngine() {
   async function downloadPreview(trackIndex?: number, failedOnly = false) {
     if (!preview || busy) return;
     setError("");
+    setFailureSummary(null);
     setResult("");
     setProgress("");
     if (!rightsConfirmed) {
@@ -355,17 +360,18 @@ export function MusicDownloaderEngine() {
           if ((cause as Error)?.name === "AbortError") throw cause;
           const message = cause instanceof Error ? cause.message : "Download failed.";
           setTrackStates((previous) => ({ ...previous, [index]: "Unavailable" }));
-          previousFailures.set(index, item.title + ": " + message);
+          previousFailures.set(index, { title: item.title, message });
         }
       }
       const savedInOrder = preview.tracks.flatMap((_, index) => {
         const track = completed.get(index);
         return track ? [track] : [];
       });
-      const failures = trackIndex === undefined
+      const failedEntries: MusicDownloadFailure[] = trackIndex === undefined
         ? preview.tracks.flatMap((item, index) =>
-            completed.has(index) ? [] : [previousFailures.get(index) || item.title + ": Download not completed."])
+            completed.has(index) ? [] : [previousFailures.get(index) || { title: item.title, message: "Download not completed." }])
         : previousFailures.has(trackIndex) ? [previousFailures.get(trackIndex)!] : [];
+      const failures = failedEntries.map(({ title, message }) => title + ": " + message);
       const successfulCount = trackIndex === undefined
         ? savedInOrder.length : completed.has(trackIndex) && !previousFailures.has(trackIndex) ? 1 : 0;
       if (trackIndex === undefined && savedInOrder.length) {
@@ -378,8 +384,8 @@ export function MusicDownloaderEngine() {
           " track(s) · " + formatFileSize(trackIndex === undefined ? totalBytes : completed.get(trackIndex)?.bytes.byteLength || 0) +
           (failures.length ? ". " + failures.length + " unavailable track(s) were skipped." : "."));
       }
-      if (failures.length) {
-        setError(failures.slice(0, 5).join("\n") + (failures.length > 5 ? "\n…and " + (failures.length - 5) + " more." : ""));
+      if (failedEntries.length) {
+        setFailureSummary(summarizeMusicDownloadFailures(failedEntries));
       }
       if (!successfulCount && !failures.length) setError("No audio was downloaded.");
       setProgress("");
@@ -394,6 +400,7 @@ export function MusicDownloaderEngine() {
 
   async function runOffline() {
     setError("");
+    setFailureSummary(null);
     setResult("");
     setProgress("");
     if (!localFiles.length) {
@@ -464,7 +471,7 @@ export function MusicDownloaderEngine() {
             <button type="button" onClick={() => manifestInputRef.current?.click()} className="text-sm font-medium text-accent hover:underline">Import list</button>
             <input ref={manifestInputRef} type="file" accept=".txt,.m3u,.m3u8,.json,application/json,text/plain" className="hidden" onChange={(event) => void importManifest(event.target.files?.[0])} />
           </div>
-          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); setPreview(null); completedRef.current.clear(); failedRef.current.clear(); setTrackStates({}); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
+          <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); setPreview(null); setFailureSummary(null); completedRef.current.clear(); failedRef.current.clear(); setTrackStates({}); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
           <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm">
             <input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
             <span>I have permission to download this music and the source allows downloads.</span>
@@ -505,7 +512,7 @@ export function MusicDownloaderEngine() {
         </div>
       ) : (
         <div className="space-y-3 rounded-2xl border border-border p-3 sm:p-4">
-          <input ref={localFileInputRef} id="music-offline-files" type="file" multiple accept={Array.from(MUSIC_AUDIO_EXTENSIONS, (ext) => "." + ext).join(",")} onChange={(event) => { setLocalFiles(Array.from(event.target.files ?? [])); setError(""); setResult(""); }} className="hidden" />
+          <input ref={localFileInputRef} id="music-offline-files" type="file" multiple accept={Array.from(MUSIC_AUDIO_EXTENSIONS, (ext) => "." + ext).join(",")} onChange={(event) => { setLocalFiles(Array.from(event.target.files ?? [])); setError(""); setFailureSummary(null); setResult(""); }} className="hidden" />
           <button type="button" onClick={() => localFileInputRef.current?.click()} className="flex min-h-20 w-full items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 px-4 py-3 text-left hover:bg-background">
             <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-xl">♫</span>
             <span className="min-w-0">
@@ -532,6 +539,23 @@ export function MusicDownloaderEngine() {
       )}
 
       {busy ? <div className="space-y-2" role="status" aria-live="polite"><div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full w-1/3 animate-pulse rounded-full bg-accent" /></div><p className="text-sm text-muted">{progress}</p><Button type="button" variant="outline" onClick={() => abortRef.current?.abort()}>Cancel</Button></div> : null}
+      {failureSummary ? (
+        <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <p className="font-medium">{failureSummary.heading}</p>
+          {failureSummary.groups[0] ? <p>{failureSummary.groups[0].reason}{failureSummary.groups.length > 1 ? " Other tracks had different errors." : ""}</p> : null}
+          <details className="text-xs">
+            <summary className="cursor-pointer font-medium">See affected tracks ({failureSummary.total})</summary>
+            <div className="mt-2 space-y-2">
+              {failureSummary.groups.map((group) => (
+                <div key={group.reason} className="break-words">
+                  {failureSummary.groups.length > 1 ? <p className="font-medium">{group.reason} · {group.count}</p> : null}
+                  <p>{group.titles.join(", ")}</p>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      ) : null}
       {error ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
       {result ? <p role="status" className="rounded-xl border border-border bg-surface-2 p-3 text-sm">{result}</p> : null}
       {!busy && progress ? <p className="whitespace-pre-wrap break-words text-sm text-muted">{progress}</p> : null}
