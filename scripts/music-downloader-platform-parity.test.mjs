@@ -174,5 +174,5 @@ test("Web media stream enforces per-track byte limits and refuses HTML errors", 
   assert.match(client, /requestedLimit = Number\(request\.maxBytes\)/);
   assert.match(client, /if \(bytes > maxBytes\)/);
   assert.match(client, /await reader\.cancel\(\)/);
-  assert.match(client, /text\\/html\\|application\\/json/);
+  assert.match(client, /media service returned a page or an error response/i);
 });
