@@ -60,8 +60,20 @@ export async function downloadUrlMedia(
   }
   const totalHeader = response.headers.get("content-length");
   const total = totalHeader ? Number(totalHeader) : undefined;
+  const requestedLimit = Number(request.maxBytes);
+  const maxBytes = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : Infinity;
+  const type = response.headers.get("content-type") || "application/octet-stream";
+  if (/^(?:text\/html|application\/json|text\/plain)(?:;|$)/i.test(type)) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("The media service returned a page or an error response, not a downloadable media file.");
+  }
+  if (total != null && Number.isFinite(total) && total > maxBytes) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("The media exceeds the allowed download size.");
+  }
   if (!response.body) {
     const blob = await response.blob();
+    if (blob.size > maxBytes) throw new Error("The media exceeds the allowed download size.");
     onProgress?.(100, { bytes: blob.size, total });
     return blob;
   }
@@ -72,12 +84,15 @@ export async function downloadUrlMedia(
     const { done, value } = await reader.read();
     if (done) break;
     if (!value) continue;
-    chunks.push(value);
     bytes += value.byteLength;
+    if (bytes > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error("The media exceeds the allowed download size.");
+    }
+    chunks.push(value);
     onProgress?.(total ? Math.min(100, (bytes / total) * 100) : 0, { bytes, total });
   }
   onProgress?.(100, { bytes, total: total ?? bytes });
-  const type = response.headers.get("content-type") || "application/octet-stream";
   return new Blob(chunks, { type });
 }
 
