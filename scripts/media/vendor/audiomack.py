@@ -277,6 +277,25 @@ class AudiomackAlbumIE(AudiomackBaseIE):
         },
     ]
 
+    @staticmethod
+    def _track_page_url(track):
+        # Enumerate real public song pages. Do not resolve signed playback URLs
+        # during a playlist preview; each track is inspected/downloaded later.
+        link = traverse_obj(track, ('links', 'self', {str_or_none}))
+        if link:
+            candidate = urllib.parse.urlparse(urllib.parse.urljoin('https://audiomack.com/', link))
+            parts = [part for part in candidate.path.split('/') if part]
+            if candidate.scheme == 'https' and candidate.hostname in ('audiomack.com', 'www.audiomack.com'):
+                if len(parts) == 3 and parts[1].lower() == 'song':
+                    return f'https://audiomack.com/{parts[0]}/song/{parts[2]}'
+                if len(parts) == 3 and parts[0].lower() == 'song':
+                    return f'https://audiomack.com/{parts[1]}/song/{parts[2]}'
+        artist = traverse_obj(track, 'uploader_url_slug', ('uploader', 'url_slug'), ('artist', 'url_slug'))
+        song = traverse_obj(track, 'url_slug')
+        if isinstance(artist, str) and isinstance(song, str) and artist and song:
+            return 'https://audiomack.com/' + urllib.parse.quote(artist, safe='') + '/song/' + urllib.parse.quote(song, safe='')
+        return None
+
     def _real_extract(self, url):
         slug = self._match_id(url)
         playlist_id = slug.split('/')[-1]
@@ -285,9 +304,14 @@ class AudiomackAlbumIE(AudiomackBaseIE):
 
         def entries(data):
             for track in traverse_obj(data, ('tracks', lambda _, x: self.is_available('song_id', 'id', obj=x))) or []:
+                page_url = self._track_page_url(track)
+                if not page_url:
+                    continue
                 yield {
+                    '_type': 'url',
+                    'url': page_url,
+                    'ie_key': AudiomackIE.ie_key(),
                     **self._parse_metadata(track),
-                    **self._get_audio_info(track),
                 }
 
         return self.playlist_result(entries(data), **self._parse_metadata(data, playlist_id))
