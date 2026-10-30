@@ -9,7 +9,6 @@ import {
   format,
   getISOWeek,
   getISOWeekYear,
-  intervalToDuration,
   isLeapYear,
   isValid,
   parseISO,
@@ -340,7 +339,7 @@ function unixTimestampRows(raw: string): DateTimeRow[] {
   ];
 }
 
-function meetingSlots(options: Record<string, string>): DateTimeRow[] {
+function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[] {
   const zones = parseZoneList(options.zones, 8);
   if (zones.length < 2) throw new Error("Add at least two cities or time zones to compare.");
   const anchor = resolveZone(options.sourceTz || zones[0].zone);
@@ -388,9 +387,9 @@ function meetingSlots(options: Record<string, string>): DateTimeRow[] {
   const end = new Date(first.getTime() + duration * 60_000);
   const stamp = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const ics = [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN",
-    "BEGIN:VEVENT", `DTSTART:${stamp(first)}`, `DTEND:${stamp(end)}`,
-    "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR",
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN", "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT", "UID:env-" + stamp(first) + "-meeting@envtools.store", "DTSTAMP:" + stamp(now),
+    "DTSTART:" + stamp(first), "DTEND:" + stamp(end), "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR",
   ].join("\r\n");
   rows.push({ label: "ICS for option 1", value: ics });
   return rows;
@@ -597,7 +596,7 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
       ];
     }
     case "meeting-planner":
-      return meetingSlots(opts);
+      return meetingSlots(opts, now);
     default:
       throw new Error("Unknown date operation.");
   }

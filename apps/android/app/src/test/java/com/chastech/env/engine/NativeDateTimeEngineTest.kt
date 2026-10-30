@@ -94,6 +94,8 @@ class NativeDateTimeEngineTest {
         ), now = fixedNow).output
         assertTrue(meeting.contains("Option 1:"))
         assertTrue(meeting.contains("ICS for option 1:"))
+        assertTrue(meeting.contains("UID:env-"))
+        assertTrue(meeting.contains("DTSTAMP:"))
     }
 
     @Test fun repeatedDaylightSavingTimeSelectsEarlierOccurrenceAndExplainsIt() {

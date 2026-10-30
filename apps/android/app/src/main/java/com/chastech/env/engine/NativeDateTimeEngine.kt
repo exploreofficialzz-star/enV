@@ -202,7 +202,7 @@ object NativeDateTimeEngine {
                     "End-date rule" to if (includeEnd) "Deadline date included" else "Deadline date excluded"
                 )
             }
-            "meeting-planner" -> meetingSlots(options)
+            "meeting-planner" -> meetingSlots(options, now)
             else -> throw IllegalArgumentException("Unknown date operation.")
         }
     }
@@ -345,7 +345,7 @@ object NativeDateTimeEngine {
         throw IllegalArgumentException("That workday range is too large.")
     }
 
-    private fun meetingSlots(options: Map<String, String>): Result {
+    private fun meetingSlots(options: Map<String, String>, now: Instant): Result {
         val zones = parseZoneList(options["zones"] ?: "", 8)
         if (zones.size < 2) throw IllegalArgumentException("Add at least two cities or time zones to compare.")
         val anchor = resolveZone(options["sourceTz"]?.takeIf { it.isNotBlank() } ?: zones.first().zone.id)
@@ -385,11 +385,12 @@ object NativeDateTimeEngine {
         shown.forEachIndexed { index, slot -> rows += Row("Option ${index + 1}", slot.second) }
         val first = shown.first().first
         val finish = first.plusSeconds(duration * 60L)
+        val icsFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
         val ics = listOf(
-            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN",
-            "BEGIN:VEVENT", "DTSTART:${DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC).format(first)}",
-            "DTEND:${DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC).format(finish)}",
-            "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR"
+            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN", "CALSCALE:GREGORIAN",
+            "BEGIN:VEVENT", "UID:env-" + icsFormatter.format(first) + "-meeting@envtools.store",
+            "DTSTAMP:" + icsFormatter.format(now), "DTSTART:" + icsFormatter.format(first),
+            "DTEND:" + icsFormatter.format(finish), "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR"
         ).joinToString("\r\n")
         rows += Row("ICS for option 1", ics)
         return Result(rows)

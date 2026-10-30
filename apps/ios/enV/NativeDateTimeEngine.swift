@@ -175,7 +175,7 @@ public enum NativeDateTimeEngine {
             let working = try countWorkingDays(from: today, to: target, options: options, includeEnd: includeEnd)
             return result(("Calendar days remaining", String(calendar(.gregorian).dateComponents([.day], from: today, to: target).day ?? 0)), ("Working days remaining", String(working)), ("Deadline weekday", format(target, pattern: "EEEE")), ("End-date rule", includeEnd ? "Deadline date included" : "Deadline date excluded"))
         case "meeting-planner":
-            return try meetingSlots(options)
+            return try meetingSlots(options, now: now)
         default: throw NativeDateTimeError.invalidOperation("Unknown date operation.")
         }
     }
@@ -489,7 +489,7 @@ public enum NativeDateTimeEngine {
         return pieces[0] * 60 + pieces[1]
     }
 
-    private static func meetingSlots(_ options: [String: String]) throws -> NativeDateTimeResult {
+    private static func meetingSlots(_ options: [String: String], now: Date) throws -> NativeDateTimeResult {
         let zones = try parseZoneList(options["zones"] ?? "", limit: 8)
         guard zones.count >= 2 else { throw NativeDateTimeError.invalidOperation("Add at least two cities or time zones to compare.") }
         let anchor = try resolveZone(options["sourceTz"]?.isEmpty == false ? options["sourceTz"]! : zones[0].zone.identifier)
@@ -550,7 +550,12 @@ public enum NativeDateTimeEngine {
         let stamp = ISO8601DateFormatter()
         stamp.timeZone = utc
         stamp.formatOptions = [.withInternetDateTime]
-        let ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN", "BEGIN:VEVENT", "DTSTART:\(stamp.string(from: first).replacingOccurrences(of: "-", with: "").replacingOccurrences(of: ":", with: ""))", "DTEND:\(stamp.string(from: last).replacingOccurrences(of: "-", with: "").replacingOccurrences(of: ":", with: ""))", "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR"].joined(separator: "\r\n")
+        let icsDate: (Date) -> String = { stamp.string(from: $0).replacingOccurrences(of: "-", with: "").replacingOccurrences(of: ":", with: "") }
+        let ics = [
+            "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN", "CALSCALE:GREGORIAN",
+            "BEGIN:VEVENT", "UID:env-" + icsDate(first) + "-meeting@envtools.store", "DTSTAMP:" + icsDate(now),
+            "DTSTART:" + icsDate(first), "DTEND:" + icsDate(last), "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR"
+        ].joined(separator: "\r\n")
         output.append(("ICS for option 1", ics))
         return NativeDateTimeResult(rows: output.map { NativeDateTimeRow(label: $0.0, value: $0.1) })
     }

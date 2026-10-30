@@ -66,6 +66,8 @@ final class NativeDateTimeEngineTests: XCTestCase {
         ], now: fixedNow)
         XCTAssertTrue(meeting.output.contains("Option 1:"))
         XCTAssertTrue(meeting.output.contains("ICS for option 1:"))
+        XCTAssertTrue(meeting.output.contains("UID:env-"))
+        XCTAssertTrue(meeting.output.contains("DTSTAMP:"))
     }
 
     func testCustomHolidayRulesAndNanosecondPrecision() throws {

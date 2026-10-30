@@ -74,6 +74,8 @@ const meeting = runDateTime("meeting-planner", {
   workStart: "09:00", workEnd: "17:00", durationMinutes: "30", intervalMinutes: "30",
 });
 assert.ok(meeting.some((row) => row.label === "Option 1"));
-assert.ok(meeting.some((row) => row.label === "ICS for option 1"));
+const ics = meeting.find((row) => row.label === "ICS for option 1")?.value ?? "";
+assert.match(ics, /UID:env-/);
+assert.match(ics, /DTSTAMP:/);
 
 console.log("Date & Time behaviour audit PASS: calculations, DST handling, workday rules, world clock, timestamp precision and meeting planner.");
