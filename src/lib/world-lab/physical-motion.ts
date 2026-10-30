@@ -131,6 +131,8 @@ export function runDropExperiment(input: DropInput, source: DropRun["source"],
       grounded: height === 0 && velocity === 0,
     }));
     if (i === steps) break;
+    // A settled object remains at rest: do not invent repeated ground impacts.
+    if (height === 0 && velocity === 0) continue;
     // Quadratic drag opposes movement; semi-implicit integration.
     const a = -input.gravityMps2 - coefficient * velocity * Math.abs(velocity);
     velocity += a * dt;
