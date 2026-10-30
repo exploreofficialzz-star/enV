@@ -5778,6 +5778,24 @@ struct NativeDateTimeToolView: View {
             NativeOutputView(output: output, error: error)
         }
         .onAppear { for key in fields where values[key] == nil { values[key] = defaultValue(for: key) } }
+        .task(id: "\(tool.id)|\(values["target"] ?? "")|\(values["zones"] ?? "")") {
+            guard tool.id == "countdown" || tool.id == "world-clock" else { return }
+            for key in fields where values[key] == nil { values[key] = defaultValue(for: key) }
+            while !Task.isCancelled {
+                do {
+                    output = try NativeDateTimeEngine.run(toolID: tool.id, options: values).output
+                    error = nil
+                } catch {
+                    output = ""
+                    self.error = error.localizedDescription
+                }
+                do {
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                } catch {
+                    return
+                }
+            }
+        }
     }
 
     private func run() {
@@ -5820,6 +5838,7 @@ struct NativeDateTimeToolView: View {
         case "durationMinutes": return "30"
         case "intervalMinutes": return "30"
         case "time": return "2026-10-30T12:00"
+        case "target": return tool.id == "countdown" ? ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600)) : ""
         default: return ""
         }
     }
@@ -9985,7 +10004,7 @@ private func uxUiGenerateSwift(name: String, target: String, background: String,
         "  if let cached = generatedUxFontCache.object(forKey:key) { return cached as String }",
         "  guard let data=Data(base64Encoded:base64), data.count <= 4*1024*1024 else { return nil }",
         "  let safe=family.replacingOccurrences(of:\"[^A-Za-z0-9_-]\",with:\"-\",options:.regularExpression)",
-        "  let url=FileManager.default.temporaryDirectory.appendingPathComponent(\"env-generated-font-\\(safe).ttf\")",
+        "  let url=FileManager.default.temporaryDirectory.appendingPathComponent(\"env-generated-font-\(safe).ttf\")",
         "  do { try data.write(to:url,options:.atomic) } catch { return nil }",
         "  var error: Unmanaged<CFError>?",
         "  _ = CTFontManagerRegisterFontsForURL(url as CFURL,.process,&error)",
