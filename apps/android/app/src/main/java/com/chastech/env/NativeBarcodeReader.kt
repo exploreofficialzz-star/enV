@@ -62,6 +62,8 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -82,6 +84,23 @@ internal fun safeBarcodeHttpUrl(value: String): String? {
     val scheme = parsed.scheme?.lowercase(Locale.ROOT)
     if (scheme !in setOf("http", "https") || parsed.host.isNullOrBlank()) return null
     return parsed.toASCIIString()
+}
+
+private const val MAX_BARCODE_IMAGE_BYTES = 20 * 1024 * 1024
+
+internal fun readBarcodeImageBytes(input: InputStream, maxBytes: Int = MAX_BARCODE_IMAGE_BYTES): ByteArray {
+    require(maxBytes > 0) { "Image size limit must be positive." }
+    val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
+    val buffer = ByteArray(16 * 1024)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        require(output.size() + count <= maxBytes) {
+            "Image is larger than 20 MB. Resize it before scanning."
+        }
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
 }
 
 private fun readerHints(): Map<DecodeHintType, Any> = mapOf(
@@ -131,13 +150,10 @@ object NativeBarcodeImageDecoder {
     }
 
     fun decode(context: Context, uri: Uri): NativeBarcodeScan? {
-        val resolver = context.contentResolver
-        val declaredSize = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
-        require(declaredSize <= 20L * 1024L * 1024L || declaredSize < 0L) {
-            "Image is larger than 20 MB. Resize it before scanning."
-        }
+        val imageBytes = context.contentResolver.openInputStream(uri)?.use(::readBarcodeImageBytes)
+            ?: return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "The selected image could not be read." }
         var sampleSize = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > 2800) sampleSize *= 2
@@ -145,7 +161,7 @@ object NativeBarcodeImageDecoder {
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options) ?: return null
         return try { decode(bitmap) } finally { bitmap.recycle() }
     }
 }
