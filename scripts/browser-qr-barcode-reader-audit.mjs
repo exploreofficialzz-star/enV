@@ -30,7 +30,7 @@ async function makeQrImage(payload) {
   const image = page.getByRole("img", { name: "Generated QR code" });
   await image.waitFor({ state: "visible", timeout: 12000 });
   const bytes = await image.evaluate(async (element) => {
-    const response = await fetchelement.src;
+    const response = await fetch(element.src);
     return Array.from(new Uint8Array(await response.arrayBuffer()));
   });
   return Buffer.from(bytes);
