@@ -129,6 +129,20 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     }
 }
 
+enum NativeBarcodeImageDecoder {
+    static func decode(_ data: Data) throws -> [NativeBarcodeReadRecord] {
+        let request = VNDetectBarcodesRequest()
+        request.symbologies = try request.supportedSymbologies()
+        try VNImageRequestHandler(data: data).perform([request])
+        let results = (request.results ?? []).compactMap { observation -> NativeBarcodeReadRecord? in
+            guard let payload = observation.payloadStringValue, !payload.isEmpty else { return nil }
+            return NativeBarcodeReadRecord(value: payload, format: observation.symbology.rawValue)
+        }
+        guard !results.isEmpty else { throw NativeBarcodeReaderError.imageUnreadable }
+        return results
+    }
+}
+
 private enum NativeBarcodeReaderError: LocalizedError {
     case cameraUnavailable
     case permissionDenied
@@ -280,16 +294,10 @@ struct NativeBarcodeReaderView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw NativeBarcodeReaderError.imageUnreadable
             }
-            let request = VNDetectBarcodesRequest()
-            request.symbologies = try request.supportedSymbologies()
-            try VNImageRequestHandler(data: data).perform([request])
-            let observations = request.results ?? []
-            guard !observations.isEmpty else { throw NativeBarcodeReaderError.imageUnreadable }
-            for observation in observations {
-                guard let payload = observation.payloadStringValue, !payload.isEmpty else { continue }
-                scanner.addResult(value: payload, format: observation.symbology.rawValue)
+            let records = try NativeBarcodeImageDecoder.decode(data)
+            for record in records {
+                scanner.addResult(value: record.value, format: record.format)
             }
-            if observations.isEmpty { throw NativeBarcodeReaderError.imageUnreadable }
         } catch {
             scanner.status = error.localizedDescription
         }
