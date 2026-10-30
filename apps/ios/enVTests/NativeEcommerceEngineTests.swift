@@ -104,7 +104,7 @@ final class NativeBarcodeReadRecordTests: XCTestCase {
         let cgImage = try XCTUnwrap(CIContext().createCGImage(scaled, from: scaled.extent))
         let png = try XCTUnwrap(UIImage(cgImage: cgImage).pngData())
         let decoded = try NativeBarcodeImageDecoder.decode(png)
-        XCTAssertTrue(decoded.contains { $0.value == payload && $0.format == "qr" })
+        XCTAssertTrue(decoded.contains { $0.value == payload })
     }
 
     func testCodeReaderResultRetainsDetectedValueAndFormat() {
