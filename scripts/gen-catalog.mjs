@@ -630,7 +630,7 @@ add([
   ["qr-version-helper","QR Version Helper","qr","Estimate a QR version from payload length and error-correction level.","qr","version","qr version modules",0,64],
   ["qr-capacity-helper","QR Capacity Helper","qr","Show approximate QR character capacity by version and error correction.","qr","capacity","qr capacity characters",0,64],
   ["qr-payload-encoder","QR Payload Encoder","qr","Build common QR payload strings such as Wi-Fi, mailto, tel and geo.","qr","payload","qr payload encoder wifi mailto geo",0,70],
-  ["qr-payload-inspector","QR & Barcode Reader","qr","Scan QR codes and 1D/2D barcodes using your camera or an image file. Decode results locally on this device.","qr","inspect","qr barcode scan reader camera image decode",1,88],
+  ["qr-payload-inspector","QR Payload Inspector","qr","Inspect and classify a raw QR payload string without uploading it.","qr","inspect","qr payload inspect uri",0,68],
   ["ean13-barcode","EAN-13 Barcode Generator","qr","Generate an EAN-13 product barcode.","barcode","ean13","ean13 barcode product",1,82],
   ["ean8-barcode","EAN-8 Barcode Generator","qr","Generate an EAN-8 barcode for compact product identifiers.","barcode","ean8","ean8 barcode product",0,76],
   ["upc-barcode","UPC-A Barcode Generator","qr","Generate a UPC-A retail barcode.","barcode","upca","upc upca barcode",0,78],
@@ -1465,13 +1465,11 @@ for (const row of RAW) {
   const isImageEngine = cat === "image" && engineType === "image";
   const isCreatorCustom = cat === "creators" && engineType === "custom";
   const isBusinessTool = cat === "business";
-  // All E-commerce catalog combinations resolve through EcommerceEngine in the Web app.
-  const isEcommerceTool = cat === "ecommerce" && engineType === "custom" && /^(product|order|inventory|shipping|pricing|discount|coupon|sku|barcode|catalog|store|customer|return|profit|margin)-(generator|calculator|planner|template|mockup|helper)$/.test(id);
   const isMockupsTool = cat === "mockups";
   const effectiveEngineType = isCalculatorFamily ? "calculator" : isDeveloperFamily ? "developer" : isTextCustom ? "text" : isCreatorCustom ? "creator" : isBusinessTool ? "business" : engineType;
   const effectiveEngineKey = isCalculatorFamily ? engineKey.toLowerCase() : isDeveloperFamily ? id : isBusinessTool ? id.replace(/-(calculator|generator|template|estimator|planner)$/, "") : engineKey;
   const unsupportedEngineType = ["custom", "ai", "document", "pdf"].includes(effectiveEngineType);
-  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper || isEcommerceTool ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
+  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
   let disclaimer;
   if (extra.includes("h")) disclaimer = "health";
   else if (extra.includes("f")) disclaimer = "finance";
