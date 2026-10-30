@@ -104,7 +104,7 @@ object NativeAnalytics {
 
     fun record(context: Context, name: String, toolId: String? = null, outcome: String = "unknown", durationMs: Long? = null, errorCode: String? = null) {
         val store = prefs(context)
-        if (store.getString(CONSENT_KEY, "unset") != "granted") return
+        if (!BuildConfig.ANALYTICS_ENABLED || store.getString(CONSENT_KEY, "unset") != "granted") return
         val subject = store.getString(SUBJECT_KEY, null) ?: return
         if (name !in setOf("app_opened","tool_viewed","tool_started","tool_completed","tool_failed","tool_cancelled","tool_abandoned","feedback_submitted","update_viewed","offline_sync_succeeded","offline_sync_failed")) return
         val (online, networkType) = network(context)
