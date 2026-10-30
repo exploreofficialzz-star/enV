@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { MessageCircle, ThumbsDown, ThumbsUp, Flag, Ban, Trash2, Send, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -120,7 +121,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
     }
   }
 
-  async function submitComment(event: React.FormEvent<HTMLFormElement>) {
+  async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!visitorId || !body.trim()) return;
     setSending(true); setProblem(""); setNotice("");
