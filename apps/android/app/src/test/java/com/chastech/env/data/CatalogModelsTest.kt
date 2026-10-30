@@ -30,14 +30,15 @@ class CatalogModelsTest {
         assertEquals(7, catalog.relatedTools(studios.first { it.id == "aria-checker" }, 20).count { it.category == "accessibility" })
     }
 
-    @Test fun developerCategoryProjectsTwelveNativeStudiosWithoutDroppingSourceTools() {
+    @Test fun developerCategoryProjectsFifteenNativeStudiosWithoutDroppingSourceTools() {
         val sources = NativeDeveloperStudios.specs.distinctBy { it.sourceId }.map { spec ->
             ToolRecord(spec.sourceId, spec.sourceId, spec.sourceId, "source", "developer", emptyList(), emptyList(), "Code", 10, false, true, false, false, "active", emptyList(), EngineInfo("developer", spec.sourceId, mapOf("op" to (spec.modes.firstOrNull()?.op ?: spec.sourceId))))
         }
         val catalog = Catalog(1, "test", CatalogCounts(sources.size, sources.size, 0, 1), emptyList(), sources)
         val studios = catalog.developerStudioTools()
-        assertEquals(14, studios.size)
-        assertEquals(14, studios.map { it.id }.distinct().size)
+        assertEquals(15, studios.size)
+        assertEquals(15, studios.map { it.id }.distinct().size)
+        assertTrue(studios.any { it.id == "the-world-lab" })
         val uxUiStudio = NativeDeveloperStudios.specs.first { it.id == "ux-ui-studio" }
         assertTrue(uxUiStudio.modes.map { it.key }.containsAll(listOf("workspace", "components", "icons", "tokens", "presets")))
         assertTrue(studios.all { it.engine.type == "developer" })
@@ -47,7 +48,7 @@ class CatalogModelsTest {
         assertEquals("file", NativeDeveloperStudios.modeForLegacySlug(NativeDeveloperStudios.forLegacySlug("file-hash-calculator"), "file-hash-calculator"))
         assertEquals("dockerfile", NativeDeveloperStudios.modeForLegacySlug(NativeDeveloperStudios.forLegacySlug("developer-dockerfile-helper"), "developer-dockerfile-helper"))
         assertEquals("developer-gitignore-generator", studios.first { it.id == "devops-studio" }.engine.extras["op"])
-        assertEquals(14, catalog.search("", "developer").count { "developer-studio" in it.tags })
+        assertEquals(15, catalog.search("", "developer").count { "developer-studio" in it.tags })
         assertTrue(catalog.tools.any { it.id == "json-formatter" })
         assertTrue(NativeDeveloperStudios.specs.first { it.id == "json-studio" }.modes.any { it.key == "schema" })
         assertTrue(NativeDeveloperStudios.specs.first { it.id == "markup-studio" }.modes.any { it.key == "samples" })
