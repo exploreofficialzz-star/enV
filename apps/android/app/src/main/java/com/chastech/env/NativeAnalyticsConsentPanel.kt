@@ -30,10 +30,10 @@ fun NativeAnalyticsConsentPanel() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var choice by remember { mutableStateOf(NativeAnalytics.consentChoice(context)) }
-    if (!BuildConfig.ANALYTICS_ENABLED && choice != "granted") return
     var expanded by remember { mutableStateOf(choice == "unset") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    if (!BuildConfig.ANALYTICS_ENABLED && choice == "unset") return
 
     LaunchedEffect(Unit) {
         NativeAnalytics.startNewSession(context)
