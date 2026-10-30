@@ -515,7 +515,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id)
+        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
         default: return false
         }
     }
