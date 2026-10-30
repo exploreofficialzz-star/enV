@@ -754,14 +754,14 @@ struct ToolCommunityPanel: View {
         guard !text.isEmpty else { return }
         isSending = true
         defer { isSending = false }
-        var payload: [String: Any] = [
+        let payload: [String: Any] = [
             "toolId": toolID,
             "visitorId": visitorID,
             "idempotencyKey": UUID().uuidString.lowercased(),
             "body": text,
             "identityMode": publicIdentity ? "public" : "anonymous",
-            "displayName": publicIdentity ? displayName.trimmingCharacters(in: .whitespacesAndNewlines) : NSNull(),
-            "parentId": replyTo ?? NSNull()
+            "displayName": publicIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
+            "parentId": replyTo as Any? ?? NSNull()
         ]
         do {
             try await NativeCommunityClient.post("api/community/comments", payload: payload)
