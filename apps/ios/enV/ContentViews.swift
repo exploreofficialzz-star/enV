@@ -167,7 +167,7 @@ private enum NativeAnalyticsKeychain {
 }
 
 @MainActor
-private enum NativeAnalyticsClient {
+enum NativeAnalyticsClient {
     private static let defaults = UserDefaults.standard
     private static let policyVersion = "2026-10-30.v1"
     private static let choiceKey = "env.analytics.choice.v1"
