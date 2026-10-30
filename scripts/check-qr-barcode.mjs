@@ -37,6 +37,7 @@ const androidGate = read("apps/android/app/src/main/java/com/chastech/env/MainAc
 const androidCatalog = read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt");
 const androidReader = read("apps/android/app/src/main/java/com/chastech/env/NativeBarcodeReader.kt");
 const androidCommerce = read("apps/android/app/src/main/java/com/chastech/env/NativeEcommerceEngine.kt");
+const androidCommerceForm = read("apps/android/app/src/main/java/com/chastech/env/NativeEcommerceToolForm.kt");
 const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
 assert.ok(androidCatalog.includes('name = if (stringOrEmpty("id") == "qr-payload-inspector") "QR & Barcode Reader"'), "Android catalog presents the QR reader label");
 assert.ok(iosCatalog.includes('name: id == "qr-payload-inspector" ? "QR & Barcode Reader" : name'), "iOS catalog presents the QR reader label");
@@ -60,10 +61,15 @@ assert.ok(iosCatalog.includes('"ecommerce", "qr"'), "iOS production gate exempts
 assert.ok(androidCatalog.includes('category in setOf("qr", "ecommerce")') && androidCatalog.includes('"active"'), "Android catalog activates QR and E-commerce records");
 assert.ok(iosCatalog.includes('["qr", "ecommerce"].contains(category.lowercased()) ? "active" : status'), "iOS catalog activates QR and E-commerce records");
 assert.ok(androidReader.includes("ProcessCameraProvider") && androidReader.includes("NativeBarcodeCameraAnalyzer") && androidReader.includes("NativeBarcodeImageDecoder"), "Android QR/barcode reader uses CameraX, ZXing and local image decoding");
+assert.ok(androidReader.includes("safeBarcodeHttpUrl") && androidReader.includes("Intent.ACTION_VIEW") && androidTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts"), "Android decoded links require an explicit safe HTTP(S) action");
 assert.ok(androidCommerce.includes("fun supports(tool: ToolRecord)") && androidCommerce.includes("fun execute("), "Android has its own native E-commerce engine");
 assert.ok(androidCommerce.includes("safetyStock") && androidCommerce.includes("feePercent") && androidCommerce.includes("targetMargin"), "Android commerce engine includes inventory safety and pricing economics");
+assert.ok(androidCommerce.includes('"pricing" -> common + finance.filter') && androidCommerce.includes('targetMargin + feePercent < 100'), "Android pricing exposes target margin and rejects impossible fee/margin combinations");
+assert.ok(androidCommerceForm.includes("ActivityResultContracts.CreateDocument") && androidCommerceForm.includes("openOutputStream(uri)") && androidCommerceForm.includes('Text("Save")'), "Android E-commerce results can be saved through the system document picker");
+assert.ok(androidTests.includes("pricingCalculatorExposesTargetMarginAndCalculatesFeeAwarePrice"), "Android tests target-margin pricing and form fields");
 assert.ok(iosViews.includes('tool.id == "qr-payload-inspector" { NativeBarcodeReaderView() }') && iosViews.includes("NativeEcommerceEngine.supports(tool)"), "iOS native dispatch routes reader and E-commerce tools");
 assert.ok(iosReader.includes("AVCaptureMetadataOutput") && iosReader.includes("VNDetectBarcodesRequest") && iosReader.includes("PhotosPicker"), "iOS reader uses AVFoundation and Vision for camera and image scanning");
+assert.ok(iosReader.includes("quiet zone") && iosTests.includes("testVisionReaderDecodesLocallyGeneratedQrImage"), "iOS image reader pads cropped codes and tests Vision QR decoding");
 assert.ok(iosCommerce.includes("static func supports(_ tool: Tool)") && iosCommerce.includes("static func run("), "iOS has an independent native E-commerce engine");
 assert.ok(iosCommerce.includes("safetyStock") && iosCommerce.includes("feePercent") && iosCommerce.includes("targetMargin"), "iOS commerce engine includes inventory safety and pricing economics");
 assert.ok(iosProject.includes("NativeEcommerceEngine.swift in Sources") && iosProject.includes("NativeQrBarcodeAndEcommerceViews.swift in Sources") && iosProject.includes("NativeEcommerceEngineTests.swift in Sources"), "iOS native engine and test files are registered in Xcode");
