@@ -162,9 +162,34 @@ enum NativeBarcodeImageDecoder {
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
             throw NativeBarcodeReaderError.imageUnreadable
         }
+        // Cropped images and programmatically generated QR codes may have no
+        // surrounding quiet zone. Add a clean white border before Vision analysis;
+        // keep the source pixels crisp so narrow barcode modules are not blurred.
+        let border = max(32, max(image.width, image.height) / 10)
+        let canvasWidth = image.width + border * 2
+        let canvasHeight = image.height + border * 2
+        guard let context = CGContext(
+            data: nil,
+            width: canvasWidth,
+            height: canvasHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            throw NativeBarcodeReaderError.imageUnreadable
+        }
+        context.setFillColor(UIColor.white.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
+        context.interpolationQuality = .none
+        context.draw(image, in: CGRect(x: border, y: border, width: image.width, height: image.height))
+        guard let scanImage = context.makeImage() else {
+            throw NativeBarcodeReaderError.imageUnreadable
+        }
+
         let request = VNDetectBarcodesRequest()
         request.symbologies = try request.supportedSymbologies()
-        try VNImageRequestHandler(cgImage: image).perform([request])
+        try VNImageRequestHandler(cgImage: scanImage, orientation: .up).perform([request])
         let results = (request.results ?? []).compactMap { observation -> NativeBarcodeReadRecord? in
             guard let payload = observation.payloadStringValue, !payload.isEmpty else { return nil }
             return NativeBarcodeReadRecord(value: payload, format: observation.symbology.rawValue)
