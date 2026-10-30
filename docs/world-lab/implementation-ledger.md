@@ -231,3 +231,7 @@ release-candidate evidence bundle are unfinished.
 ## iOS fluid-mechanical reference (2026-10-30)
 
 - Implemented independent Swift Archimedes solver for ideal immersed boxes, spheres (spherical caps) and upright cylinders, with numerical equilibrium draft, fluid pressure and explicit unknown-mass status. SwiftUI exposes an accessible density/immersion control and scientific readouts. Added platform-native XCTest source; comprehensive audit deferred as directed. This closes source-level hydrostatics parity, not verified native execution.
+
+## Hypothetical component model assumptions — source implementation (2026-10-30)
+
+- Portable Web network schema now accepts an optional explicit assumed Ohmic-equivalent resistance for invented components. Previously unmodelled inventions still fail closed; components with user-supplied positive bounded resistance enter actual MNA current and Joule heat accounting while remaining tagged hypothetical, and evidence lists their exact IDs. Web UI lets inventors opt into this assumption without presenting it as discovered conductivity. Native decoder/solver parity for this optional field is the next source batch. Full audits remain deferred by request.

@@ -15,6 +15,7 @@ export type DcNetworkResult=Readonly<{
   projectRevision:number;
   nodeVoltagesV:Readonly<Record<string,number>>;
   branchCurrentsA:Readonly<Record<string,number>>;
+  assumedOhmicDeviceIds:readonly string[];
   sourcePowerSuppliedW:number;
   resistivePowerW:number;
   powerResidualW:number;
@@ -65,12 +66,13 @@ export function solveDcNetwork(network:WorldLabCircuitNetwork,
       !nodes.includes(c.negativeNodeId)||c.positiveNodeId===c.negativeNodeId)
       throw new Error("Circuit ports are disconnected or invalid.");
     const a=locate(c.positiveNodeId), b=locate(c.negativeNodeId);
-    if(c.kind==="hypothetical-device")
+    if(c.kind==="hypothetical-device" && c.assumedResistanceOhm===undefined)
       throw new Error("This invented device has no verified electrical law. Supply a supported model before solving.");
-    if(c.kind==="resistor"){
-      if(!Number.isFinite(c.resistanceOhm)||c.resistanceOhm<0.01||c.resistanceOhm>1e9)
+    if(c.kind==="resistor" || c.kind==="hypothetical-device"){
+      const ohms=c.kind==="resistor"?c.resistanceOhm:c.assumedResistanceOhm;
+      if(ohms===undefined||!Number.isFinite(ohms)||ohms<0.01||ohms>1e9)
         throw new Error("Resistance is outside the bounded SI domain.");
-      const g=1/c.resistanceOhm;
+      const g=1/ohms;
       if(a>=0)matrix[a][a]+=g;
       if(b>=0)matrix[b][b]+=g;
       if(a>=0&&b>=0){matrix[a][b]-=g;matrix[b][a]-=g;}
@@ -107,9 +109,11 @@ export function solveDcNetwork(network:WorldLabCircuitNetwork,
   let delivered=0,heat=0;
   for(const c of network.components){
     let current=0;
-    if(c.kind==="resistor"){
-      current=(voltages[c.positiveNodeId]-voltages[c.negativeNodeId])/c.resistanceOhm;
-      heat+=current*current*c.resistanceOhm;
+    if(c.kind==="resistor" || c.kind==="hypothetical-device"){
+      const ohms=c.kind==="resistor"?c.resistanceOhm:c.assumedResistanceOhm;
+      if(ohms===undefined)throw new Error("Unknown invention has no assumed Ohmic model.");
+      current=(voltages[c.positiveNodeId]-voltages[c.negativeNodeId])/ohms;
+      heat+=current*current*ohms;
     }else if(c.kind==="dc-source"){
       const k=nodeIds.length+sources.findIndex(x=>x.id===c.id);
       current=matrix[k][unknowns];
@@ -131,9 +135,12 @@ export function solveDcNetwork(network:WorldLabCircuitNetwork,
     networkId:network.id,projectId:project.id,projectRevision:project.revision,
     nodeVoltagesV:Object.freeze(voltages),
     branchCurrentsA:Object.freeze(currents),
+    assumedOhmicDeviceIds:Object.freeze(network.components.filter(c=>
+      c.kind==="hypothetical-device"&&c.assumedResistanceOhm!==undefined).map(c=>c.id)),
     sourcePowerSuppliedW:delivered,resistivePowerW:heat,powerResidualW:residual,
     validity:"Linear, steady DC ideal voltage sources and ohmic resistors; no transient, " +
       "battery discharge, coil temperature, electromagnetic fields, wire resistance or " +
-      "real material measurement. Hypothetical devices have no solver behavior.",
+      "real material measurement. Invented-device behavior is only an explicitly " +
+      "user-assumed Ohmic approximation, never verified physical chemistry.",
   });
 }

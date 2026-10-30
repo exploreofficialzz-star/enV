@@ -54,7 +54,8 @@ const circuitComponentSchema=z.discriminatedUnion("kind",[
     name:z.string().trim().min(1).max(120),
     assumption:z.string().trim().min(1).max(500),
     positiveNodeId:uid,negativeNodeId:uid,
-    evidence:z.literal("hypothetical-user-assumed")}).strict(),
+    evidence:z.literal("hypothetical-user-assumed"),
+    assumedResistanceOhm:scalar.min(0.01).max(1e9).optional()}).strict(),
 ]);
 const circuitNetworkSchema=z.object({
   id:uid,name:z.string().trim().min(1).max(120),groundNodeId:uid,

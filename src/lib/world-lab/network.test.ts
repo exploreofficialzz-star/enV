@@ -48,3 +48,20 @@ test("dangling branches and duplicate components are rejected during project par
     negativeNodeId:"ground",resistanceOhm:50});
   assert.throws(()=>parseWorldLabProject(p),/ports/);
 });
+
+
+test("invented component can be explored only after user supplies an explicitly assumed Ohmic model",()=>{
+  const network=starterDcNetwork("invention");
+  network.components.push({
+    id:"unknown-part",kind:"hypothetical-device",name:"Novel conductor",
+    assumption:"I hypothesize the device behaves like a 20 Ω resistor at fixed temperature",
+    assumedResistanceOhm:20,positiveNodeId:"supply",
+    negativeNodeId:"ground",evidence:"hypothetical-user-assumed",
+  });
+  const result=solveDcNetwork(network,{id:"world",revision:4});
+  assert.ok(Math.abs(result.branchCurrentsA["unknown-part"]-9/20)<1e-12);
+  assert.deepEqual(result.assumedOhmicDeviceIds,["unknown-part"]);
+  assert.ok(Math.abs(result.powerResidualW)<1e-9);
+  network.components[2]={...network.components[2],assumedResistanceOhm:0} as typeof network.components[number];
+  assert.throws(()=>solveDcNetwork(network,{id:"world",revision:4}),/Resistance/);
+});

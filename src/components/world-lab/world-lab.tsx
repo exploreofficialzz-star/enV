@@ -105,6 +105,7 @@ export default function WorldLab() {
   const [wiredMotorRun,setWiredMotorRun]=useState<NetworkMotorRun|null>(null);
   const [inventedDeviceName,setInventedDeviceName]=useState("");
   const [inventedDeviceAssumption,setInventedDeviceAssumption]=useState("");
+  const [inventedDeviceResistance,setInventedDeviceResistance]=useState("");
   const [actuatorRun, setActuatorRun] = useState<ActuatorRun | null>(null);
   const [actuatorAudit, setActuatorAudit] = useState<ActuatorNumericalAudit | null>(null);
   const [actuatorTime, setActuatorTime] = useState(0);
@@ -717,12 +718,15 @@ export default function WorldLab() {
     mutateProject(p=>({...p,networks:(p.networks??[]).map((net,index)=>index!==0?net:{
       ...net,components:[...net.components,{id:crypto.randomUUID(),kind:"hypothetical-device" as const,
         name:inventedDeviceName.trim(),assumption:inventedDeviceAssumption.trim(),
+        ...(inventedDeviceResistance.trim()?{assumedResistanceOhm:Number(inventedDeviceResistance)}:{}),
         positiveNodeId:net.components.find(c=>c.kind==="dc-source")?.positiveNodeId??net.groundNodeId,
         negativeNodeId:net.components.find(c=>c.kind==="dc-source")?.negativeNodeId??net.groundNodeId,
         evidence:"hypothetical-user-assumed" as const}],
     })}));
-    setInventedDeviceName("");setInventedDeviceAssumption("");
-    setMessage("Invented device added without fabricated electrical properties; numerical solving requires a supported behavior law.");
+    setInventedDeviceName("");setInventedDeviceAssumption("");setInventedDeviceResistance("");
+    setMessage(inventedDeviceResistance.trim()
+      ?"Invented component connected using your assumed equivalent Ohmic resistance; the invention is not physically verified."
+      :"Invented device connected without fabricated properties; enter an explicit model before solving.");
   }
   function addShape(shape: WorldLabEntity["shape"]) {
     if (!project || shapeCount >= 200) return;
@@ -939,13 +943,25 @@ export default function WorldLab() {
               <input className={inputLabel} maxLength={500} aria-label="Invented device assumption"
                 value={inventedDeviceAssumption} onChange={e=>setInventedDeviceAssumption(e.target.value)}/>
             </label>
+            <label className="block text-xs">Optional assumed equivalent resistance (Ω)
+              <input className={inputLabel} type="number" min={0.01} max={1000000000}
+                aria-label="Invented component assumed resistance" value={inventedDeviceResistance}
+                placeholder="Leave blank if unknown"
+                onChange={e=>setInventedDeviceResistance(e.target.value)}/>
+            </label>
+            <p className="text-xs text-muted-foreground">Only a declared Ohmic approximation can be calculated; this does not establish how an unknown invention really behaves.</p>
             <button type="button" className={buttonClass} onClick={inventDevice}
               disabled={!inventedDeviceName.trim()||!inventedDeviceAssumption.trim()||
+                (inventedDeviceResistance.trim()!==""
+                  && (!Number.isFinite(Number(inventedDeviceResistance))||
+                      Number(inventedDeviceResistance)<0.01||Number(inventedDeviceResistance)>1e9))||
                 project.networks[0].components.length>=48}>Add hypothetical device</button>
             <p className="text-xs text-muted-foreground">Unknown parts do not receive fabricated electronic behavior.</p>
             {project.networks[0].components.filter(c=>c.kind==="hypothetical-device"||c.kind==="resistor").map(c=>
               <div key={c.id} className="mt-2 flex items-center justify-between gap-2 text-xs">
-                <span>{c.kind==="hypothetical-device"?c.name:"Resistor ("+c.id+")"}</span>
+                <span>{c.kind==="hypothetical-device"
+                  ? c.name+(c.assumedResistanceOhm===undefined?" (unknown)": " (assumed "+c.assumedResistanceOhm+" Ω)")
+                  :"Resistor ("+c.id+")"}</span>
                 <button type="button" className={buttonClass}
                   aria-label={"Remove circuit part "+c.id}
                   onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:{
@@ -959,7 +975,9 @@ export default function WorldLab() {
                 project.networks[0].components.find(c=>c.kind==="dc-source")?.positiveNodeId??project.networks[0].groundNodeId
               ]?.toFixed(3)} V</p>
               <p>Delivered power: {dcRun.sourcePowerSuppliedW.toFixed(4)} W</p>
-              <p>Resistor heating: {dcRun.resistivePowerW.toFixed(4)} W</p>
+              <p>Resistor and assumed-Ohmic-device heating: {dcRun.resistivePowerW.toFixed(4)} W</p>
+              {dcRun.assumedOhmicDeviceIds.length>0 && <p>Hypothetical equivalent resistors used:
+                {" "+dcRun.assumedOhmicDeviceIds.join(", ")}. Their properties are not measured.</p>}
               <p>Conservation residual: {dcRun.powerResidualW.toExponential(2)} W</p>
               {Object.entries(dcRun.branchCurrentsA).map(([id,current])=><p key={id}>{id}: {current.toFixed(5)} A</p>)}
               <button type="button" className={buttonClass} onClick={()=>downloadJson("world-lab-dc-evidence.json",dcRun)}>Export DC evidence</button>
