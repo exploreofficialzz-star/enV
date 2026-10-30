@@ -3,6 +3,7 @@ package com.chastech.env
 import com.chastech.env.data.EngineInfo
 import com.chastech.env.data.ToolRecord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
@@ -36,6 +37,24 @@ class NativeBarcodeEngineTest {
         assertTrue(NativeBarcodeEngine.supports(tool("code128-barcode")))
         assertTrue(NativeBarcodeEngine.supports(tool("isbn-check-digit")))
         assertTrue(NativeBarcodeEngine.run("isbn-check-digit", "9780143127741").startsWith("Valid"))
+    }
+
+    @Test fun cameraLuminanceFramesRotateForPortraitAndUpsideDownDevices() {
+        val source = byteArrayOf(1, 2, 3, 4, 5, 6)
+        val clockwise = NativeBarcodeImageDecoder.rotateLumaFrame(source, 2, 3, 90)
+        assertEquals(3, clockwise.width)
+        assertEquals(2, clockwise.height)
+        assertArrayEquals(byteArrayOf(5, 3, 1, 6, 4, 2), clockwise.data)
+
+        val upsideDown = NativeBarcodeImageDecoder.rotateLumaFrame(source, 2, 3, 180)
+        assertEquals(2, upsideDown.width)
+        assertEquals(3, upsideDown.height)
+        assertArrayEquals(byteArrayOf(6, 5, 4, 3, 2, 1), upsideDown.data)
+
+        val counterClockwise = NativeBarcodeImageDecoder.rotateLumaFrame(source, 2, 3, 270)
+        assertEquals(3, counterClockwise.width)
+        assertEquals(2, counterClockwise.height)
+        assertArrayEquals(byteArrayOf(2, 4, 6, 1, 3, 5), counterClockwise.data)
     }
 
     @Test fun supportedImageOperationsBypassGenericBackend() {
