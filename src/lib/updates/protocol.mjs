@@ -5,6 +5,7 @@ const severities = new Set(["info", "success", "warning", "critical"]);
 const actions = new Set(["create", "update", "publish", "archive"]);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const versionPattern = /^(?:v)?(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))?(?:-[0-9A-Za-z.-]+)?$/;
 
 function record(value) { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function plainText(value, label, min, max) {
@@ -44,6 +45,7 @@ export function validateUpdateAction(value) {
   const platformScope = stringList(value.platformScope ?? ["web", "android", "ios"], platforms, "platformScope");
   const targetChannels = stringList(value.channels ?? ["stable"], channels, "channels");
   const minimumVersion = value.minimumVersion == null || value.minimumVersion === "" ? null : plainText(value.minimumVersion, "minimumVersion", 1, 40);
+  if (minimumVersion && !versionPattern.test(minimumVersion)) throw new TypeError("minimumVersion must be a dotted semantic version.");
   const startsAt = date(value.startsAt, "startsAt");
   const expiresAt = date(value.expiresAt, "expiresAt");
   if (startsAt && expiresAt && Date.parse(expiresAt) <= Date.parse(startsAt)) throw new TypeError("expiresAt must be later than startsAt.");
@@ -63,5 +65,6 @@ export function validateUpdateQuery(value) {
   const limitValue = Number(value.limit ?? 5);
   const limit = Number.isSafeInteger(limitValue) ? Math.max(1, Math.min(30, limitValue)) : 5;
   const version = value.version == null || value.version === "" ? null : plainText(value.version, "version", 1, 40);
+  if (version && !versionPattern.test(version)) throw new TypeError("version must be a dotted semantic version.");
   return { platform, channel, limit, version };
 }
