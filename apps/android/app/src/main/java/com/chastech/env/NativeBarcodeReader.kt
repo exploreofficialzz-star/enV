@@ -78,6 +78,22 @@ data class NativeBarcodeScan(
     val scannedAt: Long = System.currentTimeMillis(),
 )
 
+internal fun nativeBarcodeScansCsv(scans: List<NativeBarcodeScan>): String {
+    fun cell(value: String) = "\"${value.replace("\"", "\"\"")}\""
+    val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+    return buildString {
+        appendLine("scanned_at,format,payload")
+        scans.forEach { scan ->
+            append(cell(timestamp.format(Date(scan.scannedAt))))
+            append(',')
+            append(cell(scan.format))
+            append(',')
+            append(cell(scan.text))
+            append("\r\n")
+        }
+    }
+}
+
 /** Return only explicit HTTP(S) destinations with a real host; never auto-open decoded content. */
 internal fun safeBarcodeHttpUrl(value: String): String? {
     val parsed = runCatching { URI(value.trim()) }.getOrNull() ?: return null
@@ -240,6 +256,26 @@ fun NativeBarcodeReaderTool() {
             error = "Camera permission was denied. Allow it in Android settings or use image upload."
         }
     }
+    val saveResultsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri ->
+        if (uri != null) {
+            val csv = nativeBarcodeScansCsv(results.toList())
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val stream = context.contentResolver.openOutputStream(uri)
+                            ?: throw IllegalStateException("Could not open the selected CSV file.")
+                        stream.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                    }
+                }.fold(
+                    onSuccess = { status = "Scan history exported."; error = "" },
+                    onFailure = { failure -> error = failure.message ?: "Could not export scan history." },
+                )
+            }
+        }
+    }
+
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -334,7 +370,12 @@ fun NativeBarcodeReaderTool() {
         if (error.isNotBlank()) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Scan results · ${results.size}", style = MaterialTheme.typography.titleSmall)
-            if (results.isNotEmpty()) TextButtonCompat(onClick = { results.clear(); status = "Scan history cleared." }, label = "Clear")
+            if (results.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { saveResultsLauncher.launch("env-scan-history.csv") }) { Text("Export CSV") }
+                    TextButtonCompat(onClick = { results.clear(); status = "Scan history cleared." }, label = "Clear")
+                }
+            }
         }
         if (results.isEmpty()) {
             Text("Decoded values will appear here. Links are not opened automatically.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
