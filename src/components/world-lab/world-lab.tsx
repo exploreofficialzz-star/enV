@@ -8,7 +8,7 @@ import {
 import { listLocalWorldLabProjects, putLocalWorldLabProject } from "@/lib/world-lab/local-storage";
 import {
   advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
-  type DampedOscillator, type LabRun, type ModelInput, type RCCircuit, type NovelMaterial,
+  HEAT_CELLS, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
 } from "@/lib/world-lab/model";
 
 type SceneHandles = {
@@ -19,6 +19,7 @@ type SceneHandles = {
   deviceMaterial: B.StandardMaterial;
   circuitMaterial: B.StandardMaterial;
   addedShapes: Map<string, B.Mesh>;
+  heatSegments: B.Mesh[];
 };
 const STORAGE_KEY = "env-world-lab-reference-v1";
 const defaultMechanical: DampedOscillator = {
@@ -28,6 +29,10 @@ const defaultMechanical: DampedOscillator = {
 const defaultCircuit: RCCircuit = {
   kind: "rc-circuit", resistanceOhm: 1000,
   capacitanceF: 0.001, supplyVoltageV: 10, initialVoltageV: 0,
+};
+const defaultHeat: HeatRod = {
+  kind: "heat-rod", thermalDiffusivityM2PerS: 0.02, lengthMeters: 2,
+  ambientTemperatureK: 293.15, centerTemperatureK: 373.15,
 };
 function metric(value: number | undefined, unit: string): string {
   return value === undefined ? "Not calculated" : value.toPrecision(5) + " " + unit;
@@ -56,6 +61,7 @@ export default function WorldLab() {
   const [modelKind, setModelKind] = useState<ModelInput["kind"]>("damped-oscillator");
   const [mechanical, setMechanical] = useState(defaultMechanical);
   const [circuit, setCircuit] = useState(defaultCircuit);
+  const [heat, setHeat] = useState(defaultHeat);
   const [runs, setRuns] = useState<LabRun[]>([]);
   const [runId, setRunId] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -91,7 +97,7 @@ export default function WorldLab() {
       if (!saved || typeof saved !== "object") return;
       const record = saved as Record<string, unknown>;
       if (record.format !== "env-world-lab-local" || record.version !== 1) return;
-      if (record.modelKind === "rc-circuit" || record.modelKind === "damped-oscillator") setModelKind(record.modelKind);
+      if (record.modelKind === "rc-circuit" || record.modelKind === "damped-oscillator" || record.modelKind === "heat-rod") setModelKind(record.modelKind);
       if (record.mechanical && typeof record.mechanical === "object") {
         const x = record.mechanical as Partial<DampedOscillator>;
         if (x.kind === "damped-oscillator" && Object.values(x).every((v) => typeof v === "string" || Number.isFinite(v))) {
@@ -102,6 +108,14 @@ export default function WorldLab() {
         const x = record.circuit as Partial<RCCircuit>;
         if (x.kind === "rc-circuit" && Object.values(x).every((v) => typeof v === "string" || Number.isFinite(v))) {
           setCircuit({ ...defaultCircuit, ...x });
+        }
+      }
+      if (record.heat && typeof record.heat === "object") {
+        const proposed = record.heat as Partial<HeatRod>;
+        if (proposed.kind === "heat-rod" &&
+          [proposed.thermalDiffusivityM2PerS, proposed.lengthMeters,
+           proposed.ambientTemperatureK, proposed.centerTemperatureK].every(v=>typeof v==="number" && Number.isFinite(v))) {
+          setHeat({...defaultHeat,...proposed});
         }
       }
       // Legacy shapeCount is migrated only if no structured project already exists.
@@ -180,6 +194,16 @@ export default function WorldLab() {
       circuitMaterial.diffuseColor = B.Color3.FromHexString("#65B7CD");
       circuit.material = circuitMaterial;
       circuit.setEnabled(false);
+      const heatSegments: B.Mesh[] = [];
+      for(let i=0;i<HEAT_CELLS;i++){
+        const segment=B.MeshBuilder.CreateBox("heat-cell-"+i,{width:0.115,height:0.36,depth:0.5},scene);
+        segment.position.set((i-(HEAT_CELLS-1)/2)*0.116,1.05,0);
+        const material=new B.StandardMaterial("heat-legend-cell-"+i,scene);
+        material.diffuseColor=B.Color3.FromHexString("#3B528B");
+        segment.material=material;
+        segment.setEnabled(false);
+        heatSegments.push(segment);
+      }
       engine.runRenderLoop(() => scene?.render());
       observer = new ResizeObserver(() => engine?.resize());
       observer.observe(canvas);
@@ -188,7 +212,7 @@ export default function WorldLab() {
         const id = info.pickInfo?.pickedMesh?.metadata?.worldLabEntityId;
         if (typeof id === "string") setSelectedEntityId(id);
       });
-      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map() };
+      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments };
     } catch (cause) {
       setGraphicsError(cause instanceof Error ? cause.message : "The 3D view could not be opened.");
       observer?.disconnect();
@@ -208,7 +232,24 @@ export default function WorldLab() {
     if (!scene) return;
     const mechanicalVisible = modelKind === "damped-oscillator";
     scene.device.setEnabled(mechanicalVisible);
-    scene.circuit.setEnabled(!mechanicalVisible);
+    scene.circuit.setEnabled(modelKind === "rc-circuit");
+    const heatVisible = modelKind === "heat-rod";
+    const profile = sample?.temperaturesK;
+    const sourceHeat = currentRun?.inputs.kind === "heat-rod" ? currentRun.inputs : heat;
+    const lower=Math.min(sourceHeat.ambientTemperatureK,sourceHeat.centerTemperatureK);
+    const upper=Math.max(sourceHeat.ambientTemperatureK,sourceHeat.centerTemperatureK);
+    scene.heatSegments.forEach((segment,i)=>{
+      segment.setEnabled(heatVisible);
+      const temperature=profile?.[i] ?? (i===Math.floor(HEAT_CELLS/2)?heat.centerTemperatureK:heat.ambientTemperatureK);
+      const normalized = Math.max(0,Math.min(1,(temperature-lower)/Math.max(upper-lower,1e-9)));
+      if(segment.material instanceof B.StandardMaterial){
+        segment.material.diffuseColor=B.Color3.Lerp(
+          B.Color3.FromHexString("#3B528B"),
+          B.Color3.FromHexString("#FDE725"),
+          normalized);
+        segment.material.alpha=seeInside?opacity/100:1;
+      }
+    });
     scene.device.position.x = sample?.positionM ?? mechanical.initialDisplacementM;
     scene.deviceMaterial.alpha = seeInside ? opacity / 100 : 1;
     scene.circuitMaterial.alpha = seeInside ? opacity / 100 : 1;
@@ -240,7 +281,7 @@ export default function WorldLab() {
         mesh.material.alpha = (seeInside ? opacity / 100 : 1) * entity.opacity;
       }
     }
-  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project]);
+  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project, currentRun, heat]);
 
   useEffect(() => {
     if (!playing || !currentRun) return;
@@ -269,10 +310,14 @@ export default function WorldLab() {
     setCircuit((current) => ({ ...current, [key]: value }));
     setDirty(true); setPlaying(false);
   }
+  function changeHeat<K extends keyof HeatRod>(key: K, value: HeatRod[K]) {
+    setHeat(current=>({...current,[key]:value}));
+    setDirty(true);setPlaying(false);
+  }
   function start() {
     setError("");
     try {
-      const input = modelKind === "damped-oscillator" ? mechanical : circuit;
+      const input = modelKind === "damped-oscillator" ? mechanical : modelKind === "heat-rod" ? heat : circuit;
       const next = runExperiment(input, {
         id: window.crypto.randomUUID(), parentRunId: currentRun?.id ?? null,
         worldDateUTC: new Date().toISOString(),
@@ -312,7 +357,7 @@ export default function WorldLab() {
       setWorkspaceDirty(false);
       setSavedProjects(await listLocalWorldLabProjects());
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        format:"env-world-lab-local", version:1,modelKind,mechanical,circuit,
+        format:"env-world-lab-local", version:1,modelKind,mechanical,circuit,heat,
       }));
       setMessage("Saved on this device with revision protection. Cloud synchronization is not yet available.");
     } catch(cause) {
@@ -394,7 +439,7 @@ export default function WorldLab() {
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">enV · Scientific exploration</p>
           <h1 className="text-2xl font-semibold">The World Lab</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Explore a representative 3D environment and run two bounded scientific experiments.
+            Explore a representative 3D environment and run three bounded scientific experiments.
             This reference workspace is not yet the complete World Lab or an engineering safety tool.
           </p>
         </div>
@@ -526,6 +571,7 @@ export default function WorldLab() {
             }}>
             <option value="damped-oscillator">Spring and moving mass</option>
             <option value="rc-circuit">Battery and capacitor (RC)</option>
+            <option value="heat-rod">Heat flowing through a rod</option>
           </select>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {modelKind === "damped-oscillator" ? (
@@ -539,7 +585,7 @@ export default function WorldLab() {
                 <label className="text-sm">Initial position (m)<input className={inputLabel} type="number" min="-10" max="10" step="0.1"
                   value={mechanical.initialDisplacementM} onChange={(event) => changeMechanical("initialDisplacementM", Number(event.target.value))} /></label>
               </>
-            ) : (
+            ) : modelKind === "rc-circuit" ? (
               <>
                 <label className="text-sm">Resistance (Ω)<input className={inputLabel} type="number" min="0.001" step="100"
                   value={circuit.resistanceOhm} onChange={(event) => changeCircuit("resistanceOhm", Number(event.target.value))} /></label>
@@ -549,6 +595,21 @@ export default function WorldLab() {
                   value={circuit.supplyVoltageV} onChange={(event) => changeCircuit("supplyVoltageV", Number(event.target.value))} /></label>
                 <label className="text-sm">Start voltage (V)<input className={inputLabel} type="number" min="-1000" max="1000" step="1"
                   value={circuit.initialVoltageV} onChange={(event) => changeCircuit("initialVoltageV", Number(event.target.value))} /></label>
+              </>
+            ) : (
+              <>
+                <label className="text-sm">Diffusivity (m²/s)<input className={inputLabel} type="number"
+                  min="0.0000001" max="100" step="0.01" value={heat.thermalDiffusivityM2PerS}
+                  onChange={event=>changeHeat("thermalDiffusivityM2PerS",Number(event.target.value))}/></label>
+                <label className="text-sm">Rod length (m)<input className={inputLabel} type="number"
+                  min="0.1" max="100" step="0.1" value={heat.lengthMeters}
+                  onChange={event=>changeHeat("lengthMeters",Number(event.target.value))}/></label>
+                <label className="text-sm">Initial rod temperature (K)<input className={inputLabel} type="number"
+                  min="0" max="2000" step="1" value={heat.ambientTemperatureK}
+                  onChange={event=>changeHeat("ambientTemperatureK",Number(event.target.value))}/></label>
+                <label className="text-sm">Center temperature (K)<input className={inputLabel} type="number"
+                  min="0" max="2000" step="1" value={heat.centerTemperatureK}
+                  onChange={event=>changeHeat("centerTemperatureK",Number(event.target.value))}/></label>
               </>
             )}
           </div>
@@ -601,15 +662,28 @@ export default function WorldLab() {
                     <div><dt>Velocity</dt><dd className="font-medium">{metric(sample.velocityMPerS, "m/s")}</dd></div>
                     <div><dt>Mechanical energy</dt><dd className="font-medium">{metric(sample.mechanicalEnergyJ, "J")}</dd></div>
                   </>
-                ) : (
+                ) : currentRun.modelId === "rc-circuit" ? (
                   <>
                     <div><dt>Capacitor voltage</dt><dd className="font-medium">{metric(sample.capacitorVoltageV, "V")}</dd></div>
                     <div><dt>Current</dt><dd className="font-medium">{metric(sample.currentA, "A")}</dd></div>
                     <div><dt>Resistor heating</dt><dd className="font-medium">{metric(sample.resistorHeatW, "W")}</dd></div>
                     <div><dt>Stored energy</dt><dd className="font-medium">{metric(sample.storedEnergyJ, "J")}</dd></div>
                   </>
+                ) : (
+                  <>
+                    <div><dt>Mean temperature</dt><dd className="font-medium">{metric(sample.meanTemperatureK,"K")}</dd></div>
+                    <div><dt>Hottest cell</dt><dd className="font-medium">{metric(sample.maximumTemperatureK,"K")}</dd></div>
+                    <div className="col-span-2"><dt>Internal field (from left to right)</dt>
+                      <dd className="font-mono text-xs break-words">{sample.temperaturesK?.map(t=>t.toFixed(1)).join(", ") ?? "No computed field"}</dd>
+                    </div>
+                  </>
                 )}
               </dl>
+              {currentRun.modelId === "heat-rod" && <p className="mt-2 text-xs">
+                Color scale: <span className="font-medium">blue = cooler, yellow = warmer</span>.
+                The 3D rod colors encode calculated temperatures, not visible thermal photons.
+                Every color is derived from the selected time sample; inspect numeric temperatures above.
+              </p>}
               <p className="mt-3 text-xs">Model {currentRun.modelId} v{currentRun.modelVersion};
                 solver Δt {currentRun.time.solverStepSeconds.toPrecision(4)} s;
                 simulation date {currentRun.time.worldDateUTC}.</p>
