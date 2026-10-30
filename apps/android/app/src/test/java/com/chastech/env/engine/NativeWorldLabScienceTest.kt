@@ -33,4 +33,32 @@ class NativeWorldLabScienceTest {
                 diffusivityM2S=100.0,lengthM=0.1),12.0)
         }
     }
+
+    @Test fun nativeDropMatchesAnalyticalVacuumFreeFall() {
+        val input=NativeDropInput(massKg=2.0,supportingHalfHeightM=0.5,
+            dropHeightM=50.0,airDensityKgM3=0.0,restitution=0.0,projectedAreaM2=1.0)
+        val run=NativeWorldLabDropScience.evaluate(input)
+        val atOne=run.samples[240]
+        assertEquals(50.0-9.80665/2.0,atOne.heightAboveGroundM,0.03)
+        assertEquals(-9.80665,atOne.velocityMps,1e-8)
+        assertEquals("hypothetical-user-assumed",run.inputEvidence)
+    }
+    @Test fun nativeDropClampsContactAndSettlesWithoutPhantomImpacts() {
+        val run=NativeWorldLabDropScience.evaluate(NativeDropInput(
+            massKg=2.0,supportingHalfHeightM=0.5,dropHeightM=1.0,
+            airDensityKgM3=0.0,restitution=0.0,projectedAreaM2=1.0))
+        assertTrue(run.samples.all { it.heightAboveGroundM>=0.0 && it.kineticEnergyJ.isFinite() })
+        assertEquals(1,run.impactCount)
+        assertTrue(run.samples.last().grounded)
+    }
+    @Test fun nativeDropRejectsInvalidInputs() {
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabDropScience.evaluate(NativeDropInput(
+                massKg=Double.NaN,supportingHalfHeightM=0.5,projectedAreaM2=1.0))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabDropScience.evaluate(NativeDropInput(
+                massKg=1.0,supportingHalfHeightM=0.5,projectedAreaM2=1.0,restitution=1.1))
+        }
+    }
 }
