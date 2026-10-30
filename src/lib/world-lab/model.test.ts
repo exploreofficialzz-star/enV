@@ -94,3 +94,33 @@ test("stiff numerical systems are safely substepped or rejected", () => {
     ...oscillator, massKg: 0.001, springNPerM: 1000000,
   }, { id: "stiff-over-budget", worldDateUTC: "2026-10-30T00:00:00Z" }), /specialized solver/);
 });
+
+test("insulated heat rod conserves summed temperature, smooths gradients and stays nonnegative", () => {
+  const rod = {
+    kind: "heat-rod" as const,
+    thermalDiffusivityM2PerS: 0.02, lengthMeters: 2,
+    ambientTemperatureK: 293.15, centerTemperatureK: 373.15,
+  };
+  const result = runExperiment(rod, {
+    id: "heat-test", worldDateUTC: "2026-10-30T00:00:00Z", durationSeconds: 2,
+  });
+  const first = result.samples[0];
+  const last = result.samples[result.samples.length - 1];
+  assert.equal(first.temperaturesK?.length, 21);
+  assert.ok(Math.abs((first.meanTemperatureK ?? 0) - (last.meanTemperatureK ?? 1)) < 1e-9);
+  assert.ok((last.maximumTemperatureK ?? Infinity) < (first.maximumTemperatureK ?? 0));
+  assert.ok(result.samples.every(sample => sample.temperaturesK?.every(t => Number.isFinite(t) && t >= 0)));
+});
+test("heat solver adapts timestep or rejects over-budget stiff diffusion", () => {
+  const rod = {
+    kind: "heat-rod" as const, thermalDiffusivityM2PerS: 0.5,
+    lengthMeters: 0.5, ambientTemperatureK: 293.15, centerTemperatureK: 400,
+  };
+  const result = runExperiment(rod, {
+    id: "heat-finite", worldDateUTC: "2026-10-30T00:00:00Z", durationSeconds: 0.5,
+  });
+  assert.ok(result.time.solverStepSeconds < 1/240);
+  assert.throws(() => runExperiment({...rod, thermalDiffusivityM2PerS: 100}, {
+    id: "heat-too-stiff", worldDateUTC: "2026-10-30T00:00:00Z",
+  }), /specialized solver/);
+});

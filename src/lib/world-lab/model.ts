@@ -26,7 +26,16 @@ export type RCCircuit = Readonly<{
   initialVoltageV: number;
 }>;
 
-export type ModelInput = DampedOscillator | RCCircuit;
+export type HeatRod = Readonly<{
+  kind: "heat-rod";
+  thermalDiffusivityM2PerS: number;
+  lengthMeters: number;
+  ambientTemperatureK: number;
+  centerTemperatureK: number;
+}>;
+
+export const HEAT_CELLS = 21;
+export type ModelInput = DampedOscillator | RCCircuit | HeatRod;
 
 export type ModelSample = Readonly<{
   simulatedSeconds: number;
@@ -37,6 +46,9 @@ export type ModelSample = Readonly<{
   currentA?: number;
   resistorHeatW?: number;
   storedEnergyJ?: number;
+  temperaturesK?: readonly number[];
+  meanTemperatureK?: number;
+  maximumTemperatureK?: number;
 }>;
 
 export type LabRun = Readonly<{
@@ -83,6 +95,11 @@ export function validateModel(input: ModelInput): void {
     bounded(input.dampingNsPerM, "Damping (N s/m)", 0, 100000);
     bounded(input.initialDisplacementM, "Displacement (m)", -10, 10);
     bounded(input.initialVelocityMPerS, "Velocity (m/s)", -100, 100);
+  } else if (input.kind === "heat-rod") {
+    bounded(input.thermalDiffusivityM2PerS, "Thermal diffusivity (m2/s)", 1e-7, 100);
+    bounded(input.lengthMeters, "Rod length (m)", 0.1, 100);
+    bounded(input.ambientTemperatureK, "Ambient temperature (K)", 0, 2000);
+    bounded(input.centerTemperatureK, "Center temperature (K)", 0, 2000);
   } else if (input.kind === "rc-circuit") {
     bounded(input.resistanceOhm, "Resistance (ohm)", 0.001, 1000000000);
     bounded(input.capacitanceF, "Capacitance (F)", 1e-9, 1000);
@@ -137,13 +154,21 @@ export function runExperiment(input: ModelInput, options: Readonly<{
   const maximumStableH = input.kind === "damped-oscillator"
     ? 0.08 / Math.max(1, Math.sqrt(input.springNPerM / input.massKg),
       input.dampingNsPerM / input.massKg)
-    : h;
+    : input.kind === "heat-rod"
+      ? 0.45 * (input.lengthMeters / HEAT_CELLS) ** 2 / input.thermalDiffusivityM2PerS
+      : h;
   const steps = Math.ceil(duration / Math.min(h, maximumStableH));
   if (steps > 50000) throw new Error("The local reference run exceeds its 50,000-step budget; this stiff model needs a specialized solver.");
   const actualH = duration / steps;
   const frames: ModelSample[] = [];
   let x = input.kind === "damped-oscillator" ? input.initialDisplacementM : 0;
   let v = input.kind === "damped-oscillator" ? input.initialVelocityMPerS : 0;
+  // A finite-volume 1D heat equation with zero flux on both ends.
+  // No conductivity, heat capacity or radiative effects are inferred.
+  let cells = input.kind === "heat-rod"
+    ? Array.from({ length: HEAT_CELLS }, (_, index) =>
+        index === Math.floor(HEAT_CELLS / 2) ? input.centerTemperatureK : input.ambientTemperatureK)
+    : [];
   for (let i = 0; i <= steps; i++) {
     const t = i * actualH;
     if (input.kind === "damped-oscillator") {
@@ -151,6 +176,19 @@ export function runExperiment(input: ModelInput, options: Readonly<{
       frames.push(Object.freeze({ simulatedSeconds: t, positionM: x,
         velocityMPerS: v, mechanicalEnergyJ: e }));
       if (i < steps) [x, v] = oscillatorStep(x, v, actualH, input);
+    } else if (input.kind === "heat-rod") {
+      const mean = cells.reduce((sum, temperature) => sum + temperature, 0) / HEAT_CELLS;
+      frames.push(Object.freeze({ simulatedSeconds: t,
+        temperaturesK: Object.freeze([...cells]), meanTemperatureK: mean,
+        maximumTemperatureK: Math.max(...cells) }));
+      if (i < steps) {
+        const dx = input.lengthMeters / HEAT_CELLS;
+        const r = input.thermalDiffusivityM2PerS * actualH / (dx * dx);
+        // Conservation form: every interior flux has equal/opposite effects.
+        const fluxes = cells.slice(0, -1).map((current, j) => r * (cells[j + 1] - current));
+        cells = cells.map((current, j) => current +
+          (j < fluxes.length ? fluxes[j] : 0) - (j > 0 ? fluxes[j - 1] : 0));
+      }
     } else {
       const tau = input.resistanceOhm * input.capacitanceF;
       const capacitorVoltageV = input.supplyVoltageV +
@@ -175,7 +213,9 @@ export function runExperiment(input: ModelInput, options: Readonly<{
       worldDateUTC: new Date(options.worldDateUTC).toISOString() }),
     validity: input.kind === "damped-oscillator"
       ? "Linear 1D small-displacement spring, constant mass, constant viscous damping; RK4 numerical integration. No contacts or material failure."
-      : "Ideal lumped-element DC series RC circuit, constant R and C, no parasitics or temperature dependence; analytic solution.",
+      : input.kind === "heat-rod"
+        ? "Insulated 1D heat diffusion with constant thermal diffusivity, 21 uniform finite-volume cells and stable explicit flux steps. This model does not predict external heating, conductivity or molecular detail."
+        : "Ideal lumped-element DC series RC circuit, constant R and C, no parasitics or temperature dependence; analytic solution.",
     samples: Object.freeze(frames),
   });
 }
