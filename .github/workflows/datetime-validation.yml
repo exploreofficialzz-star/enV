@@ -1,6 +1,8 @@
 name: Date & Time — focused cross-platform verification
 
 on:
+  push:
+    branches: [feat/datetime-production-ready-benchmark]
   pull_request:
     branches: [main]
     paths:
