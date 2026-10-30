@@ -6,11 +6,14 @@ import { validateFeedbackPayload } from "./protocol.mjs";
 export class FeedbackError extends Error {
   constructor(readonly code: string, message: string, readonly status = 400) { super(message); this.name = "FeedbackError"; }
 }
-function enabled() {
-  if (process.env.FEEDBACK_ENABLED !== "true") throw new FeedbackError("FEEDBACK_DISABLED", "Feedback intake is not enabled on this deployment.", 503);
+function signingSecret() {
   const secret = process.env.FEEDBACK_HASH_SECRET?.trim() ?? "";
   if (secret.length < 32) throw new FeedbackError("FEEDBACK_NOT_CONFIGURED", "Feedback signing is not configured.", 503);
   return secret;
+}
+function enabled() {
+  if (process.env.FEEDBACK_ENABLED !== "true") throw new FeedbackError("FEEDBACK_DISABLED", "Feedback intake is not enabled on this deployment.", 503);
+  return signingSecret();
 }
 function digest(value: string, secret: string) { return createHmac("sha256", secret).update(value).digest("hex"); }
 function bearerMatches(request: Request) {
@@ -68,7 +71,7 @@ export async function createFeedbackTicket(request: Request, input: unknown) {
   });
 }
 function requireAdmin(request: Request) {
-  enabled();
+  signingSecret();
   if (!bearerMatches(request)) throw new FeedbackError("FEEDBACK_ADMIN_UNAUTHORIZED", "Developer feedback access is required.", 401);
 }
 const allowedStatuses = new Set(["open", "triaged", "in_progress", "resolved", "closed"]);
@@ -134,7 +137,7 @@ export async function updateFeedbackTicket(request: Request, input: unknown) {
   });
 }
 export async function runFeedbackRetention(request: Request) {
-  enabled();
+  signingSecret();
   if (!cronMatches(request)) throw new FeedbackError("FEEDBACK_RETENTION_UNAUTHORIZED", "Scheduled job credential is invalid.", 401);
   const configured = Number(process.env.FEEDBACK_RETENTION_DAYS ?? 365);
   const days = Number.isSafeInteger(configured) && configured >= 90 && configured <= 730 ? configured : 365;
