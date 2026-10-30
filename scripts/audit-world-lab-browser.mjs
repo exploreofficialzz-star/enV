@@ -71,6 +71,10 @@ try{
   await page.getByRole("button",{name:"Power this solid"}).click();
   await page.getByRole("button",{name:"Pause motor"}).click();
   await page.getByText(/Computed hypothetical electromechanical system/).waitFor();
+  const numericalStatus=page.getByText(/Numerical self-check: (within internal tolerance|outside internal tolerance|not available)/);
+  await numericalStatus.waitFor();
+  assert.match(await numericalStatus.innerText(),/internal tolerance|not available/,
+    "The user must see the actual result of the bounded numerical self-check");
   const motorBefore=await page.getByText("Height above ground").locator("..").innerText();
   await page.getByLabel("Explore motor time").fill("2");
   const motorAfter=await page.getByText("Height above ground").locator("..").innerText();
@@ -88,6 +92,7 @@ try{
   assert.ok(motor.samples.some(s=>s.motorForceN>0 && s.resistiveHeatW>0));
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.2");
   await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await numericalStatus.waitFor({state:"hidden"});
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
   // A result belongs to its exact test settings, not just its material geometry.
   await page.getByRole("button",{name:"Power this solid"}).click();
