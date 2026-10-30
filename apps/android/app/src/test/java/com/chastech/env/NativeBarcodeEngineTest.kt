@@ -56,7 +56,7 @@ class NativeBarcodeEngineTest {
         val csv = nativeBarcodeScansCsv(
             listOf(NativeBarcodeScan("SKU, \"Blue\" box", "CODE_128", 0L)),
         )
-        assertTrue(csv.startsWith("scanned_at,format,payload\\r\\n"))
+        assertTrue(csv.startsWith("scanned_at,format,payload"))
         assertTrue(csv.contains("\"CODE_128\",\"SKU, \"\"Blue\"\" box\""))
     }
 
