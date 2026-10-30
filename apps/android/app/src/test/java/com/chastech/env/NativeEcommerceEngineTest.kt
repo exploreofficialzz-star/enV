@@ -64,6 +64,18 @@ class NativeEcommerceEngineTest {
         assertTrue(output.contains("Estimated contribution profit: 100.00"))
     }
 
+    @Test fun pricingCalculatorExposesTargetMarginAndCalculatesFeeAwarePrice() {
+        val item = tool("pricing-calculator")
+        val fields = NativeEcommerceEngine.fieldsFor(item.id).map { it.key }
+        assertTrue("targetMargin", fields.contains("targetMargin"))
+        val values = NativeEcommerceEngine.initialValues(item.id) + mapOf(
+            "cost" to "40", "packaging" to "2", "feePercent" to "3", "targetMargin" to "30",
+        )
+        val output = NativeEcommerceEngine.execute(item.id, values).text
+        assertTrue(output.contains("Target margin: 30.00%"))
+        assertTrue(output.contains("Target selling price: 62.69"))
+    }
+
     @Test fun nativeEngineRejectsNegativeAndOutOfRangePercentInputs() {
         val item = tool("discount-calculator")
         val defaults = NativeEcommerceEngine.initialValues(item.id)
