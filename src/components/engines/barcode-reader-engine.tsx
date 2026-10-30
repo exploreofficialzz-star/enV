@@ -217,8 +217,9 @@ export function BarcodeReaderEngine() {
               typeof record.scannedAt === "string" &&
               Number.isFinite(Date.parse(record.scannedAt));
           });
-          setResults(valid.slice(0, 50));
-          recentScansRef.current = new Map(valid.map((record) => [
+          const recent = valid.slice(0, 50);
+          setResults(recent);
+          recentScansRef.current = new Map(recent.map((record) => [
             `${record.format}\u0000${record.value}`,
             Date.parse(record.scannedAt),
           ]));
@@ -327,14 +328,18 @@ export function BarcodeReaderEngine() {
       controlsRef.current = controls;
       const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks()[0] ?? null;
       cameraTrackRef.current = track;
-      if (track) {
-        const capabilities = track.getCapabilities() as ExtendedCameraCapabilities;
-        setTorchAvailable(capabilities.torch === true);
-        const zoom = capabilities.zoom;
-        if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
-          setZoomRange({ min: zoom.min, max: zoom.max, step: zoom.step && zoom.step > 0 ? zoom.step : 0.1 });
-          const currentZoom = (track.getSettings() as MediaTrackSettings & { zoom?: number }).zoom;
-          setZoomValue(currentZoom ?? zoom.min);
+      if (track && typeof track.getCapabilities === "function") {
+        try {
+          const capabilities = track.getCapabilities() as ExtendedCameraCapabilities;
+          setTorchAvailable(capabilities.torch === true);
+          const zoom = capabilities.zoom;
+          if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
+            setZoomRange({ min: zoom.min, max: zoom.max, step: zoom.step && zoom.step > 0 ? zoom.step : 0.1 });
+            const currentZoom = (track.getSettings() as MediaTrackSettings & { zoom?: number }).zoom;
+            setZoomValue(currentZoom ?? zoom.min);
+          }
+        } catch {
+          // Some browsers expose the camera but not its advanced hardware capabilities.
         }
       }
       setCameraActive(true);
