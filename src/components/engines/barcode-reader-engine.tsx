@@ -4,7 +4,6 @@ import {
   BarcodeFormat,
   BinaryBitmap,
   DecodeHintType,
-  GenericMultipleBarcodeReader,
   HybridBinarizer,
   MultiFormatReader,
   RGBLuminanceSource,
@@ -80,23 +79,92 @@ function decodeMultipleImageCodes(image: HTMLImageElement) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Image decoding is unavailable in this browser.");
   context.drawImage(image, 0, 0, width, height);
-  const pixels = context.getImageData(0, 0, width, height);
-  const source = new RGBLuminanceSource(pixels.data, width, height);
-  const bitmap = new BinaryBitmap(new HybridBinarizer(source));
-  const hints = new Map<DecodeHintType, unknown>([[DecodeHintType.TRY_HARDER, true]]);
-  const reader = new MultiFormatReader();
-  reader.setHints(hints);
-  try {
-    return new GenericMultipleBarcodeReader(reader).decodeMultiple(bitmap, hints);
-  } catch {
-    const fallback = new MultiFormatReader();
-    fallback.setHints(hints);
+
+  // RGBLuminanceSource expects one luminance byte per pixel, not RGBA ImageData.
+  const rgba = context.getImageData(0, 0, width, height).data;
+  const luminance = new Uint8ClampedArray(width * height);
+  for (let pixel = 0; pixel < luminance.length; pixel += 1) {
+    const offset = pixel * 4;
+    luminance[pixel] = (rgba[offset] + 2 * rgba[offset + 1] + rgba[offset + 2]) >> 2;
+  }
+
+  const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(luminance, width, height)));
+  const hints = new Map([[DecodeHintType.TRY_HARDER, true]]);
+  const pendingRegions: Array<{ left: number; top: number; width: number; height: number }> = [
+    { left: 0, top: 0, width, height },
+  ];
+  const visitedRegions = new Set<string>();
+  const decoded = new Map<string, ReturnType<MultiFormatReader["decodeWithState"]>>();
+  let attempts = 0;
+
+  // Repeatedly decode the current crop, then search the four areas outside the
+  // detected symbol. This keeps the implementation inside ZXing's public API.
+  while (pendingRegions.length && attempts < 80 && decoded.size < 50) {
+    const region = pendingRegions.shift()!;
+    if (region.width < 16 || region.height < 16) continue;
+    const regionKey = `${region.left}:${region.top}:${region.width}:${region.height}`;
+    if (visitedRegions.has(regionKey)) continue;
+    visitedRegions.add(regionKey);
+    attempts += 1;
+
+    let result: ReturnType<MultiFormatReader["decodeWithState"]>;
     try {
-      return [fallback.decodeWithState(bitmap)];
+      const reader = new MultiFormatReader();
+      reader.setHints(hints);
+      result = reader.decodeWithState(bitmap.crop(region.left, region.top, region.width, region.height));
     } catch {
-      return [];
+      continue;
+    }
+
+    const signature = `${result.getBarcodeFormat()}\u0000${result.getText()}`;
+    if (!decoded.has(signature)) decoded.set(signature, result);
+
+    const points = result.getResultPoints() ?? [];
+    if (!points.length) continue;
+    const minX = Math.min(...points.map((point) => point.getX()));
+    const maxX = Math.max(...points.map((point) => point.getX()));
+    const minY = Math.min(...points.map((point) => point.getY()));
+    const maxY = Math.max(...points.map((point) => point.getY()));
+    const marginX = Math.max(12, Math.round(region.width * 0.02));
+    const marginY = Math.max(12, Math.round(region.height * 0.05));
+    const left = Math.max(0, Math.floor(minX - marginX));
+    const top = Math.max(0, Math.floor(minY - marginY));
+    const right = Math.min(region.width, Math.ceil(maxX + marginX));
+    const bottom = Math.min(region.height, Math.ceil(maxY + marginY));
+    if (right <= left || bottom <= top) continue;
+
+    const middleHeight = bottom - top;
+    const remainingBottom = region.height - bottom;
+    if (top > 0) {
+      pendingRegions.push({ left: region.left, top: region.top, width: region.width, height: top });
+    }
+    if (remainingBottom > 0) {
+      pendingRegions.push({
+        left: region.left,
+        top: region.top + bottom,
+        width: region.width,
+        height: remainingBottom,
+      });
+    }
+    if (left > 0 && middleHeight > 0) {
+      pendingRegions.push({
+        left: region.left,
+        top: region.top + top,
+        width: left,
+        height: middleHeight,
+      });
+    }
+    if (right < region.width && middleHeight > 0) {
+      pendingRegions.push({
+        left: region.left + right,
+        top: region.top + top,
+        width: region.width - right,
+        height: middleHeight,
+      });
     }
   }
+
+  return [...decoded.values()];
 }
 
 export function BarcodeReaderEngine() {
