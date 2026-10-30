@@ -64,6 +64,7 @@ export function BarcodeReaderEngine() {
   const [notice, setNotice] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
+  const [manualPayload, setManualPayload] = useState("");
 
   function addResult(value: string, format: BarcodeFormat | string) {
     if (!value) return;
@@ -280,6 +281,24 @@ export function BarcodeReaderEngine() {
 
       {error ? <p className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger" role="alert">{error}</p> : null}
       {notice ? <p className="text-sm text-muted" role="status" aria-live="polite">{notice}</p> : null}
+
+      <section className="space-y-2" aria-labelledby="reader-manual-heading">
+        <div>
+          <h3 id="reader-manual-heading" className="text-sm font-semibold">Inspect a payload</h3>
+          <p className="mt-0.5 text-xs text-muted">Paste text from a QR code to identify its payload type and length without scanning an image.</p>
+        </div>
+        <textarea
+          aria-label="Paste a QR payload to inspect"
+          value={manualPayload}
+          onChange={(event) => setManualPayload(event.target.value)}
+          rows={3}
+          placeholder="WIFI:T:WPA;S:Network;P:password;; or https://example.com"
+          className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        />
+        {manualPayload.trim() ? (
+          <p className="text-xs text-muted" role="status">{payloadLabel(manualPayload.trim())} · {manualPayload.trim().length} characters</p>
+        ) : null}
+      </section>
 
       <section className="space-y-3" aria-labelledby="reader-results-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
