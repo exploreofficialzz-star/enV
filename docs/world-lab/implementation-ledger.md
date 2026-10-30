@@ -42,6 +42,19 @@ Source SHA-256:
 - Chromium workflow checking actual Web UI creation, numerical model interaction,
   time, transparency, export/reload, offline reference calculation, legacy
   import and responsive narrow-screen layout.
+- Actual hypothetical-mass coupling: selected parametric geometry volume times
+  user-assumed material density becomes a lumped 1D spring model mass, with
+  immutable exported provenance, mismatch rejection, bounded solver checks,
+  and explicit exclusion of deformation/material-strength claims.
+- Custom X/Y/Z transforms and sphere/cylinder dimensional constraints,
+  focus and zoom in the Web viewer, and an accessible visual graph of actual
+  recorded solver samples (not visual-only invented points).
+- Same-model, same-duration recorded branch comparisons with time-aligned
+  observed-value differences; previous runs retain their original inputs.
+- IndexedDB v2 run archive with per-project ownership keys, immutable run
+  IDs, structural/finite/numerical time-grid validation, 8 MB/run and 20
+  runs/project limits, reload recovery and explicit local-run deletion.
+  This is device storage, **not** hosted user authentication or cloud sync.
 - `better-auth` updated to audited patched version 1.7.14, with the
   removed generic OAuth client plugin migrated and build/auth contracts checked.
 
@@ -72,9 +85,10 @@ Record new failures separately from these pre-existing failures.
   Earth subsurface/sky scale or native world camera release.
 - WP-03 parametric construction: **bounded Web geometry editor only**;
   no production CAD constraints, assembly mating, solver meshes or native editing.
-- WP-04 time/recording/branches: **Web reference engine only**; independent
-  playback, immutable recorded runs and parameter-change branching; server
-  checkpoints, long-horizon solvers and persistent run history are missing.
+- WP-04 time/recording/branches: **bounded Web reference engine**; independent
+  playback, immutable recorded runs, numerical plots, branch comparison and
+  validated per-project IndexedDB history with 20-run cap. Server checkpoints,
+  long-horizon solvers and synchronized multi-device history remain missing.
 - WP-05 validated physics: **three bounded educational models only**:
   oscillator, ideal RC and insulated 1D heat. Their known validity envelopes
   and numerical regression tests do not establish general physics coverage.
@@ -85,8 +99,9 @@ Record new failures separately from these pre-existing failures.
 - WP-08 materials/chemistry/biology/digital: **hypothetical material
   properties plus analytic geometry only**; domain solvers remain missing.
 - WP-09 Web/Android/iOS/auth/offline parity: **partial serialization parity**;
-  native Kotlin/Swift scene editing, native visualization/solvers and secure
-  synchronized project ownership are not yet integrated. Existing auth
+  local Web project/run archiving is implemented; native Kotlin/Swift scene
+  editing, native visualization/solvers and secure synchronized project
+  ownership are not yet integrated. Existing auth
   upgrade is not a substitute for authorization integration.
 - WP-10 production hardening/rollout: **blocked by test evidence**.
 

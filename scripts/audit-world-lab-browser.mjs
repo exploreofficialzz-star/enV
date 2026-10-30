@@ -77,9 +77,14 @@ try{
   await page.getByText(/scientific runs saved on this device/).waitFor();
   await page.reload({waitUntil:"domcontentloaded"});
   await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({timeout:90000});
-  await page.getByRole("combobox",{name:"Open recorded run (this session)"}).waitFor({state:"visible"});
-  assert.ok(await page.getByRole("combobox",{name:"Open recorded run (this session)"}).locator("option").count()>=3,
+  await page.getByRole("combobox",{name:"Open recorded run (local device)"}).waitFor({state:"visible"});
+  assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
     "Saved project must restore its scientific run history after reload");
+  page.once("dialog",dialog=>dialog.accept());
+  await page.getByRole("button",{name:"Delete selected run"}).click();
+  await page.getByText(/Deleted the selected local experiment/).waitFor();
+  assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
+    "Removing one run must preserve remaining local scientific history");
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
   await page.getByRole("combobox",{name:"Experiment"}).selectOption("rc-circuit");
   await context.setOffline(true);

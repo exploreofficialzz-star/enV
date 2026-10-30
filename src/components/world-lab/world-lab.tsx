@@ -492,7 +492,8 @@ export default function WorldLab() {
         imported=report.project;
         warnings=report.warnings;
       }else imported=readWorldLabProjectJson(json);
-      if(workspaceDirty && !window.confirm("Discard unsaved local edits and import a different project?")) return;
+      if((workspaceDirty || (savedRevision === null && runs.length > 0)) &&
+         !window.confirm("Discard unsaved local edits or recorded experiments and import a different project?")) return;
       restoreRunsEpoch.current++;
       const now=new Date().toISOString();
       setProject(parseWorldLabProject({...imported,id:crypto.randomUUID(),title:imported.title,
@@ -508,14 +509,16 @@ export default function WorldLab() {
   function openSavedProject(id:string){
     const saved=savedProjects.find(p=>p.id===id);
     if(!saved)return;
-    if(workspaceDirty && !window.confirm("Discard unsaved local edits and open another project?"))return;
+    if((workspaceDirty || (savedRevision === null && runs.length > 0)) &&
+       !window.confirm("Discard unsaved local edits or recorded experiments and open another project?"))return;
     setProject(saved);setSavedRevision(saved.revision);setWorkspaceDirty(false);
     setSelectedEntityId("");setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     restoreRunsForProject(saved.id);
     setMessage("Opened saved project "+saved.title+".");
   }
   function newProject(){
-    if(workspaceDirty && !window.confirm("Discard unsaved local edits and create a new project?"))return;
+    if((workspaceDirty || (savedRevision === null && runs.length > 0)) &&
+       !window.confirm("Discard unsaved local edits or recorded experiments and create a new project?"))return;
     restoreRunsEpoch.current++;
     setProject(blankWorldLabProject(crypto.randomUUID(),new Date().toISOString()));
     setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
@@ -809,7 +812,7 @@ export default function WorldLab() {
           {runs.length > 0 && (
             <div className="mt-4 rounded-lg border border-border p-3 text-sm">
               <label htmlFor="worldlab-run-history" className="block font-medium">
-                Open recorded run (this session)
+                Open recorded run (local device)
               </label>
               <select id="worldlab-run-history" className={inputLabel} value={runId}
                 onChange={event=>{
@@ -821,6 +824,7 @@ export default function WorldLab() {
                   else if(chosen.inputs.kind==="rc-circuit")setCircuit(chosen.inputs);
                   else setHeat(chosen.inputs);
                 }}>
+                <option value="">Select a recorded run</option>
                 {runs.map((run,index)=><option key={run.id} value={run.id}>
                   {index+1}. {run.modelId}{run.assumedMassSource?" · assumed material":""}
                 </option>)}
