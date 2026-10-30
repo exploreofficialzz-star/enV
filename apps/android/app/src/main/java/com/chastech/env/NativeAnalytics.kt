@@ -3,9 +3,6 @@ package com.chastech.env
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
-import android.util.DisplayMetrics
-import android.view.WindowManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -80,16 +77,26 @@ object NativeAnalytics {
         val store = prefs(context)
         val oldSubject = store.getString(SUBJECT_KEY, null)
         val subject = oldSubject ?: UUID.randomUUID().toString()
-        post(
-            "/api/analytics/consent",
-            JSONObject().put("subjectId", subject).put("platform", "android")
-                .put("granted", granted).put("policyVersion", POLICY_VERSION),
-        )
         if (granted) {
+            post(
+                "/api/analytics/consent",
+                JSONObject().put("subjectId", subject).put("platform", "android")
+                    .put("granted", true).put("policyVersion", POLICY_VERSION),
+            )
             store.edit().putString(SUBJECT_KEY, subject).putString(CONSENT_KEY, "granted").remove(REVOKE_KEY).apply()
         } else {
+            // Opt-out takes effect locally even when offline; retry revocation on a later connection.
             store.edit().putString(CONSENT_KEY, "denied").remove(QUEUE_KEY).remove(SESSION_KEY)
-                .remove(SUBJECT_KEY).remove(REVOKE_KEY).apply()
+                .remove(SUBJECT_KEY).apply()
+            if (oldSubject != null) {
+                runCatching {
+                    post("/api/analytics/consent", JSONObject().put("subjectId", oldSubject).put("platform", "android")
+                        .put("granted", false).put("policyVersion", POLICY_VERSION))
+                    store.edit().remove(REVOKE_KEY).apply()
+                }.onFailure {
+                    store.edit().putString(REVOKE_KEY, oldSubject).apply()
+                }
+            }
         }
     }
 
