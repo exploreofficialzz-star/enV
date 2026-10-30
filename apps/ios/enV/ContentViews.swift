@@ -17,6 +17,111 @@ struct Screen: ViewModifier {
     }
 }
 
+
+private struct NativeProductUpdate: Decodable, Identifiable {
+    let id: String
+    let slug: String
+    let title: String
+    let summary: String
+    let body: String
+    let type: String
+    let severity: String
+    let publishedAt: String
+    let expiresAt: String?
+    let minimumVersion: String?
+}
+private struct NativeProductUpdateFeed: Decodable {
+    let platform: String
+    let channel: String
+    let updates: [NativeProductUpdate]
+}
+private struct NativeProductUpdateEnvelope: Decodable {
+    let ok: Bool
+    let data: NativeProductUpdateFeed?
+}
+private enum NativeProductUpdatesClient {
+    private static var baseURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
+              let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else { return nil }
+        return url
+    }
+    static func load() async throws -> [NativeProductUpdate] {
+        guard let base = baseURL else { throw URLError(.badURL) }
+        var components = URLComponents(url: base.appendingPathComponent("api").appendingPathComponent("updates"), resolvingAgainstBaseURL: false)
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        components?.queryItems = [
+            URLQueryItem(name: "platform", value: "ios"),
+            URLQueryItem(name: "channel", value: "stable"),
+            URLQueryItem(name: "version", value: version),
+            URLQueryItem(name: "limit", value: "5")
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return [] }
+        let envelope = try JSONDecoder().decode(NativeProductUpdateEnvelope.self, from: data)
+        return envelope.ok ? (envelope.data?.updates ?? []) : []
+    }
+}
+struct NativeProductUpdatesBanner: View {
+    @AppStorage("env.product-updates.dismissed.v1") private var dismissedIDs = ""
+    @State private var updates: [NativeProductUpdate] = []
+    @State private var expanded = false
+    private var dismissed: Set<String> { Set(dismissedIDs.split(separator: "|").map(String.init)) }
+    private var current: NativeProductUpdate? { updates.first { !dismissed.contains($0.id) } }
+    var body: some View {
+        Group {
+            if let update = current {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "bell.badge")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.envAccent)
+                            .frame(width: 34, height: 34)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                enVCharacterSpacedText(update.type.uppercased()).font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envAccent)
+                                if update.severity == "warning" || update.severity == "critical" {
+                                    enVCharacterSpacedText(update.severity.uppercased()).font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envMuted)
+                                }
+                            }
+                            enVCharacterSpacedText(update.title).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                            enVCharacterSpacedText(update.summary).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        Button {
+                            var next = dismissed
+                            next.insert(update.id)
+                            dismissedIDs = next.sorted().joined(separator: "|")
+                        } label: {
+                            Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted).frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Dismiss product update")
+                    }
+                    if expanded {
+                        enVCharacterSpacedText(update.body).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envInk).fixedSize(horizontal: false, vertical: true).padding(.leading, 44)
+                    }
+                    HStack(spacing: 16) {
+                        Button(expanded ? "Show less" : "Read update") { expanded.toggle() }
+                            .font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        Link("All updates", destination: URL(string: "https://envtools.store/updates")!)
+                            .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
+                    }
+                    .padding(.leading, 44)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            }
+        }
+        .task { updates = (try? await NativeProductUpdatesClient.load()) ?? [] }
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -50,6 +155,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
+                        NativeProductUpdatesBanner()
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 16) {
                             EnVLogo().frame(width: 56, height: 36)
