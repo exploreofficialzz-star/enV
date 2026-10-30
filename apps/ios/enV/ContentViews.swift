@@ -108,7 +108,7 @@ struct NativeProductUpdatesBanner: View {
                     HStack(spacing: 16) {
                         Button(expanded ? "Show less" : "Read update") { expanded.toggle() }
                             .font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
-                        Link("All updates", destination: URL(string: "https://envtools.store/updates")!)
+                        Link("All updates", destination: URL(string: "https://updates.envtools.store")!)
                             .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
                     }
                     .padding(.leading, 44)
@@ -402,6 +402,11 @@ struct HomeView: View {
                     VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
                         NativeAnalyticsConsentPanel()
                         NativeProductUpdatesBanner()
+                        Link(destination: URL(string: "https://feedback.envtools.store")!) {
+                            Label("Send feedback to enV", systemImage: "bubble.left.and.bubble.right")
+                                .font(.envScaled(size: 12, weight: .medium))
+                                .foregroundStyle(Color.envAccent)
+                        }
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 16) {
                             EnVLogo().frame(width: 56, height: 36)
