@@ -9,6 +9,10 @@
     {
       "path": "/api/feedback/retention",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/community/retention",
+      "schedule": "30 3 * * *"
     }
   ],
   "headers": [
