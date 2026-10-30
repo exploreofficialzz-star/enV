@@ -7,6 +7,8 @@ export const PRODUCTION_EXEMPT_CATEGORIES = new Set<CategoryId>([
   "business",
   "calculators",
   "developer",
+  "ecommerce",
+  "qr",
   "video",
 ]);
 
