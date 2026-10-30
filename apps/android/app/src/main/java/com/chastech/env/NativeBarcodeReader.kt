@@ -229,12 +229,17 @@ object NativeBarcodeImageDecoder {
 }
 
 private class NativeBarcodeCameraAnalyzer(
-    private val onResult: (NativeBarcodeScan) -> Unit,
+    private val onResult: (List<NativeBarcodeScan>) -> Unit,
 ) : ImageAnalysis.Analyzer {
     private val reader = MultiFormatReader().apply { setHints(readerHints()) }
+    private val multipleReader = GenericMultipleBarcodeReader(reader)
+    private var lastBatchFrameAt = 0L
 
     override fun analyze(image: ImageProxy) {
         try {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBatchFrameAt < 300L) return
+            lastBatchFrameAt = now
             val plane = image.planes.firstOrNull() ?: return
             val width = image.width
             val height = image.height
@@ -250,8 +255,15 @@ private class NativeBarcodeCameraAnalyzer(
             }
             val rotated = NativeBarcodeImageDecoder.rotateLumaFrame(bytes, width, height, image.imageInfo.rotationDegrees)
             val source = PlanarYUVLuminanceSource(rotated.data, rotated.width, rotated.height, 0, 0, rotated.width, rotated.height, false)
-            val result = reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
-            onResult(NativeBarcodeScan(result.text, result.barcodeFormat.toString()))
+            val binary = BinaryBitmap(HybridBinarizer(source))
+            val decoded = runCatching {
+                multipleReader.decodeMultiple(binary, readerHints()).toList()
+            }.getOrElse {
+                runCatching { listOf(reader.decodeWithState(binary)) }.getOrDefault(emptyList())
+            }
+            val scans = decoded.distinctBy { "${it.barcodeFormat}\u0000${it.text}" }
+                .map { NativeBarcodeScan(it.text, it.barcodeFormat.toString()) }
+            if (scans.isNotEmpty()) onResult(scans)
             reader.reset()
         } catch (_: Exception) {
             // A frame without a code is expected while the user is aiming.
@@ -375,8 +387,8 @@ fun NativeBarcodeReaderTool() {
             val disposed = AtomicBoolean(false)
             var previewUseCase: Preview? = null
             var analysisUseCase: ImageAnalysis? = null
-            val analyzer = NativeBarcodeCameraAnalyzer { scan ->
-                mainHandler.post { accept(scan) }
+            val analyzer = NativeBarcodeCameraAnalyzer { scans ->
+                mainHandler.post { scans.forEach(::accept) }
             }
             providerFuture.addListener({
                 if (disposed.get()) return@addListener
