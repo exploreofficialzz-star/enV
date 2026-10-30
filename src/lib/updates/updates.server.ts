@@ -15,6 +15,19 @@ function adminMatches(request: Request) {
   const a=Buffer.from(actual), b=Buffer.from(expected);
   return a.length===b.length && timingSafeEqual(a,b);
 }
+function versionParts(value: string) {
+  const normalized=value.replace(/^v/,"");
+  const [core,preRelease]=normalized.split("-",2);
+  const parts=core!.split(".").map(Number);
+  while(parts.length<3)parts.push(0);
+  return {parts,preRelease:preRelease??null};
+}
+function versionAtLeast(current: string, minimum: string) {
+  const a=versionParts(current),b=versionParts(minimum);
+  for(let i=0;i<3;i++){if(a.parts[i]!==b.parts[i])return a.parts[i]!>b.parts[i]!;}
+  if(a.preRelease===b.preRelease)return true;
+  return a.preRelease===null;
+}
 function requireAdmin(request: Request) {
   enabled();
   if (!adminMatches(request)) throw new UpdatesError("UPDATES_ADMIN_UNAUTHORIZED","Developer update management access is required.",401);
@@ -34,10 +47,11 @@ export async function listPublicUpdates(rawQuery: unknown) {
        and (starts_at is null or starts_at<=now())
        and (expires_at is null or expires_at>now())
      order by case severity when 'critical' then 0 when 'warning' then 1 else 2 end,published_at desc
-     limit $3`,
-    [query.platform,query.channel,query.limit],
+     limit 200`,
+    [query.platform,query.channel],
   );
-  return { platform:query.platform, channel:query.channel, updates:rows, generatedAt:new Date().toISOString() };
+  const eligible=rows.filter(row=>!row.minimumVersion || !query.version || versionAtLeast(query.version,String(row.minimumVersion))).slice(0,query.limit);
+  return { platform:query.platform, channel:query.channel, updates:eligible, generatedAt:new Date().toISOString() };
 }
 export async function listAdminUpdates(request: Request) {
   requireAdmin(request);
