@@ -294,7 +294,7 @@ struct ToolDetailView: View {
                         : "This tool is available in the Web product and is not executable natively.")
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
-                    if !tool.isPlanned, let webURL = URL(string: "https://envtools.store/tools/\(tool.category)/\(tool.slug)") {
+                    if !tool.isPlanned, let webURL = URL(string: "https://ios.envtools.store/tools/\(tool.category)/\(tool.slug)") {
                         Link("Open in Web", destination: webURL)
                             .font(.envScaled(size: 14, weight: .semibold))
                             .accessibilityHint("Opens this tool in your default web browser")
