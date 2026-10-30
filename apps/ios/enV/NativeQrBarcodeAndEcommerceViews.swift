@@ -5,7 +5,7 @@ import UIKit
 import UniformTypeIdentifiers
 import Vision
 
-struct NativeBarcodeReadRecord: Identifiable, Equatable {
+struct NativeBarcodeReadRecord: Identifiable, Equatable, Sendable {
     let id: UUID
     let value: String
     let format: String
@@ -299,7 +299,9 @@ struct NativeBarcodeReaderView: View {
                 throw NativeBarcodeReaderError.imageUnreadable
             }
             guard data.count <= 20 * 1024 * 1024 else { throw NativeBarcodeReaderError.imageTooLarge }
-            let records = try NativeBarcodeImageDecoder.decode(data)
+            let records = try await Task.detached(priority: .userInitiated) {
+                try NativeBarcodeImageDecoder.decode(data)
+            }.value
             for record in records {
                 scanner.addResult(value: record.value, format: record.format)
             }
