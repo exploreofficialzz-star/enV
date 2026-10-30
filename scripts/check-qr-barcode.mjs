@@ -41,6 +41,7 @@ const androidBackend = read("apps/android/app/src/main/java/com/chastech/env/Nat
 const iosBackend = read("apps/ios/enV/ToolViews.swift");
 const androidTests = read("apps/android/app/src/test/java/com/chastech/env/NativeEcommerceEngineTest.kt");
 const androidReaderTests = read("apps/android/app/src/androidTest/java/com/chastech/env/NativeBarcodeReaderInstrumentedTest.kt");
+const androidUiTests = read("apps/android/app/src/androidTest/java/com/chastech/env/NativeQrBarcodeAndEcommerceUiTest.kt");
 const iosTests = read("apps/ios/enVTests/NativeEcommerceEngineTests.swift");
 const webCommerceUi = read("src/components/engines/ecommerce-engine.tsx");
 const webCommerceTests = read("src/components/engines/ecommerce-engine-utils.test.ts");
@@ -62,6 +63,7 @@ assert.ok(iosProject.includes("NativeEcommerceEngine.swift in Sources") && iosPr
 assert.ok(androidBackend.includes("if (NativeEcommerceEngine.supports(tool)) return false"), "Android local commerce operations never fall through to generic backend routing");
 assert.ok(iosBackend.includes("if NativeEcommerceEngine.supports(tool) { return false }"), "iOS local commerce operations never fall through to generic backend routing");
 assert.ok(androidReaderTests.includes("NativeBarcodeImageDecoder.decode") && androidReaderTests.includes("CODE_128"), "Android emulator test covers local QR and Code 128 decoding");
+assert.ok(androidUiTests.includes("qrBarcodeReaderRendersWithoutRequestingCameraUntilStartIsTapped") && androidUiTests.includes("ecommerceNativeFormRunsAndShowsProductContribution"), "Android instrumentation tests exercise the native QR reader and E-commerce forms");
 assert.ok(androidTests.includes("allNinetyCatalogWorkflowsHaveNativeHandlers") && androidTests.includes("safetyStock"), "Android tests the 90 native commerce workflows and safety-stock calculation");
 assert.ok(iosTests.includes("testAllNinetyEcommerceToolsHaveNativeHandlers") && iosTests.includes("NativeBarcodeImageDecoder.decode"), "iOS tests native commerce workflows and Vision QR decoding");
 assert.ok(webCommerceUi.includes("Advanced costs, stock and shipping") && webCommerceUi.includes("targetMargin") && webCommerceUi.includes("safetyStock"), "Web exposes advanced commerce pricing and inventory fields");
