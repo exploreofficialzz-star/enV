@@ -69,7 +69,7 @@ object NativeEcommerceEngine {
                 )
                 "discount", "coupon" -> common + finance.filter { it.key in setOf("price", "quantity", "discount", "cost", "feePercent", "packaging") }
                 "profit", "margin" -> common + finance.filter { it.key in setOf("cost", "price", "quantity", "discount", "packaging", "feePercent", "advertising") }
-                "pricing" -> common + finance.filter { it.key in setOf("cost", "packaging", "feePercent", "targetMargin") }
+                "pricing" -> common + finance.filter { it.key in setOf("cost", "price", "packaging", "feePercent", "targetMargin") }
                 "shipping" -> common + listOf(
                     NativeEcommerceField("weight", "Package weight (kg)", "1"),
                     NativeEcommerceField("distance", "Distance (km)", "10"),
@@ -177,7 +177,7 @@ object NativeEcommerceEngine {
                         val feeRate = feePercent / 100.0
                         val minimum = if (feeRate < 1) variable / (1 - feeRate) else 0.0
                         val target = if (targetMargin + feePercent < 100) variable / (1 - (targetMargin + feePercent) / 100.0) else Double.POSITIVE_INFINITY
-                        "Unit cost including packaging: ${money(variable)}\nPayment/platform fee: ${money(feePercent)}%\nMinimum break-even price before tax and advertising: ${money(minimum)}\nTarget margin: ${money(targetMargin)}%\nTarget selling price: ${if (target.isFinite()) money(target) else "Not achievable with these fee and margin inputs"}"
+                        "Unit cost including packaging: ${money(variable)}\nPayment/platform fee: ${money(feePercent)}%\nMinimum break-even price before tax and advertising: ${money(minimum)}\nTarget margin: ${money(targetMargin)}%\nTarget selling price: ${if (target.isFinite()) money(target) else "Not achievable with these fee and margin inputs"}\nCurrent selling price: ${money(price)}"
                     }
                     "order" -> buildString {
                         appendLine("Order subtotal: ${money(subtotal)}")
