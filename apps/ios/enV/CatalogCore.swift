@@ -137,7 +137,7 @@ struct Tool: Decodable, Identifiable, Hashable {
             clientSide: clientSide,
             requiresBackend: requiresBackend,
             requiresAuth: requiresAuth,
-            status: status,
+            status: ["qr", "ecommerce"].contains(category.lowercased()) ? "active" : status,
             disclaimer: disclaimer,
             related: related,
             engine: engine
