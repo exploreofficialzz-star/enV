@@ -11,6 +11,7 @@ on:
       - "src/lib/registry.ts"
       - "src/lib/production-notice.ts"
       - "src/lib/production-notice.test.ts"
+      - "src/data/billing-profile-runtime-extensions.json"
       - "scripts/check-datetime.mjs"
       - "scripts/gen-catalog.mjs"
       - "scripts/check-native-coverage.mjs"
@@ -54,9 +55,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
@@ -91,16 +92,16 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: npm ci --no-audit --no-fund
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: "21"
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
       - name: Set up Gradle caching
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
       - name: Run Date & Time Kotlin tests
         run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests "com.chastech.env.engine.NativeDateTimeEngineTest"
       - name: Lint and assemble Android app
