@@ -107,6 +107,14 @@ final class NativeDateTimeEngineTests: XCTestCase {
         ], now: fixedNow))
     }
 
+    func testGregorianCenturyLeapRulesAndLeapYearBounds() throws {
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "2000"], now: fixedNow).output, "2000: Leap year")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "1900"], now: fixedNow).output, "1900: Not a leap year")
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "0"], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "10000"], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-formatter", options: ["value": "2024-02-30"], now: fixedNow))
+    }
+
     func testRelativeDateToolsUseDeviceLocalCalendarDay() throws {
         let now = ISO8601DateFormatter().date(from: "2024-01-15T23:30:00Z")!
         let lagos = TimeZone(secondsFromGMT: 3600)!

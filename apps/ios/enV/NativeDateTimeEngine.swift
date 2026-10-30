@@ -140,7 +140,7 @@ public enum NativeDateTimeEngine {
             var iso = Calendar(identifier: .iso8601); iso.timeZone = utc
             return result(("ISO week", String(iso.component(.weekOfYear, from: date))), ("ISO week-year", String(iso.component(.yearForWeekOfYear, from: date))))
         case "leap":
-            guard let year = Int(options["year"] ?? "") else { throw NativeDateTimeError.invalidOperation("Enter a year.") }
+            guard let year = Int(options["year"] ?? ""), (1...9999).contains(year) else { throw NativeDateTimeError.invalidOperation("Enter a year from 1 to 9999.") }
             let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
             return result((String(year), leap ? "Leap year" : "Not a leap year"))
         case "birthday":
@@ -198,7 +198,7 @@ public enum NativeDateTimeEngine {
         let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a \(label).") }
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.calendar = calendar(.gregorian); f.timeZone = utc; f.dateFormat = "yyyy-MM-dd"; f.isLenient = false
-        guard let date = f.date(from: raw) else { throw NativeDateTimeError.invalidDate(label) }
+        guard let date = f.date(from: raw), f.string(from: date) == raw else { throw NativeDateTimeError.invalidDate(label) }
         return date
     }
 
