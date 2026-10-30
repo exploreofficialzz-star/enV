@@ -51,3 +51,10 @@ A daily Vercel cron calls `GET /api/analytics/retention` at 03:00 UTC with `Auth
 6. Test ingestion, consent denial, revocation, rate limiting, admin authorization and retention against staging PostgreSQL.
 7. Ensure Apple App Store and Google Play privacy disclosures match actual collection and SDK behavior.
 8. Keep analytics disabled until all applicable checks are complete.
+
+
+## Developer feedback is a separate purpose
+
+Developer feedback submissions are not analytics events and are never copied into analytics properties. The ticket API is independently disabled by default with `FEEDBACK_ENABLED=false`. It stores the report title and description, category, platform, optional catalogue tool ID and app version, ticket status/priority, and an optional verified account reference. The API does not ask for an e-mail address. Users must be warned not to include passwords, payment details, authentication tokens, private contact data or other secrets in a report.
+
+Anonymous abuse control uses a keyed HMAC digest of a network identifier; the raw address is not stored. The digest secret must remain server-only. Access to ticket descriptions is restricted to the developer moderation service. Resolved and closed tickets are removed after the configured retention interval (default 365 days); unresolved tickets remain until resolved or deleted under the applicable privacy request process. Public tool discussions must use a distinct service with independent identity, visibility and moderation controls.
