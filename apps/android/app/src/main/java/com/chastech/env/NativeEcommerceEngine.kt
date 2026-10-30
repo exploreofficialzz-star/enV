@@ -175,9 +175,9 @@ object NativeEcommerceEngine {
                         val targetMargin = pct("targetMargin")
                         val variable = cost + packaging
                         val feeRate = feePercent / 100.0
-                        val minimum = if (feeRate < 1) variable / (1 - feeRate) else 0.0
+                        val minimum = if (feeRate < 1) variable / (1 - feeRate) else Double.POSITIVE_INFINITY
                         val target = if (targetMargin + feePercent < 100) variable / (1 - (targetMargin + feePercent) / 100.0) else Double.POSITIVE_INFINITY
-                        "Unit cost including packaging: ${money(variable)}\nPayment/platform fee: ${money(feePercent)}%\nMinimum break-even price before tax and advertising: ${money(minimum)}\nTarget margin: ${money(targetMargin)}%\nTarget selling price: ${if (target.isFinite()) money(target) else "Not achievable with these fee and margin inputs"}\nCurrent selling price: ${money(price)}\nCurrent selling price: ${money(price)}"
+                        "Unit cost including packaging: ${money(variable)}\nPayment/platform fee: ${money(feePercent)}%\nMinimum break-even price before tax and advertising: ${if (minimum.isFinite()) money(minimum) else "Not achievable with these fees"}\nTarget margin: ${money(targetMargin)}%\nTarget selling price: ${if (target.isFinite()) money(target) else "Not achievable with these fee and margin inputs"}\nCurrent selling price: ${money(price)}\nCurrent selling price: ${money(price)}"
                     }
                     "order" -> buildString {
                         appendLine("Order subtotal: ${money(subtotal)}")
