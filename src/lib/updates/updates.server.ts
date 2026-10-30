@@ -50,7 +50,7 @@ export async function listPublicUpdates(rawQuery: unknown) {
      limit 200`,
     [query.platform,query.channel],
   );
-  const eligible=rows.filter(row=>!row.minimumVersion || !query.version || versionAtLeast(query.version,String(row.minimumVersion))).slice(0,query.limit);
+  const eligible=rows.filter(row=>!row.minimumVersion || (query.version !== null && versionAtLeast(query.version,String(row.minimumVersion)))).slice(0,query.limit);
   return { platform:query.platform, channel:query.channel, updates:eligible, generatedAt:new Date().toISOString() };
 }
 export async function listAdminUpdates(request: Request) {
