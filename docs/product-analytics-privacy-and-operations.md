@@ -68,3 +68,8 @@ Comments, replies, selected public display labels, reactions, reports and blocks
 ## Private analytics dashboard access
 
 The `userbehavior.envtools.store` dashboard is protected by a server-side password exchange and a short-lived (8-hour) signed `HttpOnly; Secure; SameSite=Strict` cookie. The dashboard password and cookie signing secret are server-only deployment secrets; neither is exposed through `VITE_*` bundles. Failed sign-ins are rate-limited using a keyed digest of a network identifier. The legacy bearer `ANALYTICS_ADMIN_TOKEN` remains server-only and must never be placed in a browser, mobile bundle, query string or local storage. Sign-out clears the browser session cookie. The dashboard displays aggregate, consented data only; it is not a device-level surveillance feed.
+
+
+## Aggregate history retention
+
+The analytics retention job first snapshots the previous completed day into `product_analytics_daily_snapshots`, then applies the configured raw-event retention (default 90 days, allowed 30–365). Snapshots retain daily counts by platform, tool and event type, failures, distinct installation/session counts and duration totals, without copying user, installation, session, IP, or event identifiers. Snapshots are retained for up to 730 days and are pruned after that. The private dashboard shows a 30-day detailed overview plus up to 365 days of aggregate daily history. Snapshot completeness must be checked after PostgreSQL migration and scheduled-job activation; no historical snapshots can be reconstructed for days before the job is first enabled.
