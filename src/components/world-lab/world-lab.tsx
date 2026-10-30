@@ -953,12 +953,12 @@ export default function WorldLab() {
                       <label className="text-xs">Voltage (V)
                         <input aria-label="Actuator supply voltage" type="number" className={inputLabel}
                           min={0} max={1000} step={1} value={actuatorVoltage}
-                          onChange={e=>{setActuatorPlaying(false);setActuatorVoltage(Number(e.target.value));}} />
+                          onChange={e=>{setActuatorPlaying(false);setActuatorRun(null);setActuatorVoltage(Number(e.target.value));}} />
                       </label>
                       <label className="text-xs">Actuator strength (N/A)
                         <input aria-label="Actuator force constant" type="number" className={inputLabel}
                           min={0} max={10000} step={0.5} value={actuatorConstant}
-                          onChange={e=>{setActuatorPlaying(false);setActuatorConstant(Number(e.target.value));}} />
+                          onChange={e=>{setActuatorPlaying(false);setActuatorRun(null);setActuatorConstant(Number(e.target.value));}} />
                       </label>
                     </div>
                   </details>
@@ -1019,12 +1019,12 @@ export default function WorldLab() {
                       <label className="text-xs">Height (m)
                         <input className={inputLabel} aria-label="Drop release height in metres"
                           type="number" min="0" max="100" step="0.5"
-                          value={dropHeight} onChange={e => {setDropPlaying(false);setDropHeight(Number(e.target.value));}} />
+                          value={dropHeight} onChange={e => {setDropPlaying(false);setDropRun(null);setDropHeight(Number(e.target.value));}} />
                       </label>
                       <label className="text-xs">Bounciness
                         <input className={inputLabel} aria-label="Drop restitution"
                           type="number" min="0" max="1" step="0.05"
-                          value={dropBounce} onChange={e => {setDropPlaying(false);setDropBounce(Number(e.target.value));}} />
+                          value={dropBounce} onChange={e => {setDropPlaying(false);setDropRun(null);setDropBounce(Number(e.target.value));}} />
                       </label>
                     </div>
                   </details>
