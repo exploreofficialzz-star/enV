@@ -88,14 +88,14 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
          and (c.parent_id is null or c.parent_id in
            (select root.id from tool_community_comments root where root.tool_id=$1 and root.parent_id is null and root.moderation_status='visible'))
          and ($2::text is null or not exists(select 1 from tool_community_blocks b where b.blocker_digest=$2 and b.blocked_author_digest=c.author_digest))
-       order by coalesce(c.parent_id,c.id),c.created_at asc limit 100`,
+       order by (select root.created_at from tool_community_comments root where root.id=coalesce(c.parent_id,c.id)) desc,\n         case when c.parent_id is null then 0 else 1 end,c.created_at asc limit 100`,
       [toolId,actorDigest],
     ),
     actorDigest ? sql.query<{reaction_type:string}>(
       "select reaction_type from tool_community_reactions where tool_id=$1 and actor_digest=$2 limit 1",[toolId,actorDigest],
     ) : Promise.resolve([]),
     sql.query(
-      `select count(*) total,count(*) filter(where view_date>=current_date-30) recent
+      `select count(*) total,count(*) filter(where view_date>=current_date-29) recent
        from tool_community_views where tool_id=$1`,[toolId],
     ),
   ]);
