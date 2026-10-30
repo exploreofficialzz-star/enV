@@ -79,3 +79,13 @@ test("rejects unbounded coupling, impossible and unproven material inputs",()=>{
   assert.throws(()=>runActuatorExperiment(d.input,{...d.source,projectId:""}),/source/);
   assert.throws(()=>runActuatorExperiment(d.input,d.source,Number.NaN),/Solver step/);
 });
+
+test("uncoupled coil agrees with closed-form R-L current at one second",()=>{
+  const d=deriveActuatorInput(fixture(),"item",{gravityMps2:0,forceConstantNPerA:0});
+  const r=runActuatorExperiment(d.input,d.source);
+  const expected=(d.input.supplyVoltageV/d.input.resistanceOhm)*
+    (1-Math.exp(-d.input.resistanceOhm/d.input.inductanceH));
+  assert.ok(Math.abs(sampleActuator(r,1).coilCurrentA-expected)<1e-7);
+  assert.equal(sampleActuator(r,1).heightM,0);
+  assert.ok(sampleActuator(r,1).resistiveHeatW>0);
+});
