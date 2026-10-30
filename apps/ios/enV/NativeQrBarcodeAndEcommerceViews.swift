@@ -133,9 +133,20 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
 
 enum NativeBarcodeImageDecoder {
     static func decode(_ data: Data) throws -> [NativeBarcodeReadRecord] {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            throw NativeBarcodeReaderError.imageUnreadable
+        }
+        let thumbnailOptions: CFDictionary = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 2800,
+        ] as CFDictionary
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
+            throw NativeBarcodeReaderError.imageUnreadable
+        }
         let request = VNDetectBarcodesRequest()
         request.symbologies = try request.supportedSymbologies()
-        try VNImageRequestHandler(data: data).perform([request])
+        try VNImageRequestHandler(cgImage: image).perform([request])
         let results = (request.results ?? []).compactMap { observation -> NativeBarcodeReadRecord? in
             guard let payload = observation.payloadStringValue, !payload.isEmpty else { return nil }
             return NativeBarcodeReadRecord(value: payload, format: observation.symbology.rawValue)
