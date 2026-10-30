@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AlertTriangle, CheckCircle2, FileText, Flag, LogOut, MessageSquare, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -162,7 +162,7 @@ function DeveloperWorkspace() {
     );
   }
 
-  const tabs: Array<{ id: Tab; label: string; count: number; icon: React.ReactNode }> = [
+  const tabs: Array<{ id: Tab; label: string; count: number; icon: ReactNode }> = [
     { id: "feedback", label: "Feedback", count: tickets.length, icon: <MessageSquare className="size-4" /> },
     { id: "community", label: "Community reports", count: reports.length, icon: <Flag className="size-4" /> },
     { id: "updates", label: "Product updates", count: updates.length, icon: <FileText className="size-4" /> },
@@ -228,7 +228,7 @@ function DeveloperWorkspace() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => void moderate(report,"keep")}>Keep comment</Button>
                 <Button size="sm" variant="outline" onClick={() => void moderate(report,"hide")}>Hide comment</Button>
-                <Button size="sm" color="danger" onClick={() => void moderate(report,"remove")}>Remove comment</Button>
+                <Button size="sm" variant="danger" onClick={() => void moderate(report,"remove")}>Remove comment</Button>
               </div>
             </article>
           ))}
