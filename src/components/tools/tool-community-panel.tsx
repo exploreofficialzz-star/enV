@@ -52,7 +52,7 @@ function newIdempotencyKey() {
   return window.crypto.randomUUID();
 }
 
-export function ToolCommunityPanel({ toolId }: { toolId: string }) {
+export function ToolCommunityPanel({ toolId }: { toolId: string }) {\n  const featureEnabled = import.meta.env.VITE_COMMUNITY_ENABLED === "true";
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [feed, setFeed] = useState<CommunityFeed | null>(null);
   const [loading, setLoading] = useState(true);
