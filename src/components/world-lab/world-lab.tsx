@@ -263,6 +263,15 @@ export default function WorldLabStudio() {
           {chosen && diagnostics && <section className="world-lab-inspector">
             <h2>Inside: {chosen.name}</h2>
             <p className="world-lab-note">Material properties are user assumptions, not verified measurements.</p>
+            <label htmlFor="lab-material-name">Name your material</label>
+            <input id="lab-material-name" type="text" maxLength={120} value={chosen.material.name}
+              onChange={e => { const name = e.target.value; if (name.trim()) editObject(chosen.id, o => ({ ...o, material: { ...o.material, name, evidence: "hypothetical", source: "User-created material specification" } })); }} />
+            <label htmlFor="lab-color">Appearance</label>
+            <input id="lab-color" type="color" value={chosen.color} onChange={e => editObject(chosen.id, o => ({ ...o, color: e.target.value }))} />
+            <label htmlFor="lab-behavior">How should it move?</label>
+            <select id="lab-behavior" value={chosen.behavior} onChange={e => editObject(chosen.id, o => ({ ...o, behavior: e.target.value === "static" ? "static" : "dynamic" }))}>
+              <option value="dynamic">Move with forces</option><option value="static">Stay fixed in place</option>
+            </select>
             <label htmlFor="lab-material-density">Material density · kg/m³</label>
             <input id="lab-material-density" type="number" min={1} max={50000} step={100} value={chosen.material.densityKgM3}
               onChange={e => { const v = asNumber(e.target.value, 1, 50000); if (v !== null) editObject(chosen.id, o => ({ ...o, material: { ...o.material, densityKgM3: v } })); }} />
@@ -272,6 +281,29 @@ export default function WorldLabStudio() {
             <label htmlFor="lab-force-y">Applied upward force · newtons</label>
             <input id="lab-force-y" type="number" step={100} min={-100000} max={100000} value={chosen.forceN.y}
               onChange={e => { const v = asNumber(e.target.value, -100000, 100000); if (v !== null) editObject(chosen.id, o => ({ ...o, forceN: { ...o.forceN, y: v } })); }} />
+            <details className="world-lab-advanced">
+              <summary>More about this object</summary>
+              <p>All sizes are metres. The simple model uses density to calculate mass.</p>
+              {(["x", "y", "z"] as const).map(axis => (
+                <label key={axis}>Size {axis.toUpperCase()} · m
+                  <input type="number" min={0.05} max={1000} step={0.05} value={chosen.dimensionsM[axis]}
+                    onChange={e => { const n = asNumber(e.target.value, 0.05, 1000); if (n !== null) editObject(chosen.id, o => {
+                      const dims = o.kind === "sphere"
+                        ? { x: n, y: n, z: n }
+                        : { ...o.dimensionsM, [axis]: n };
+                      return { ...o, dimensionsM: dims };
+                    }); }} />
+                </label>
+              ))}
+              <label>Surface grip · {chosen.friction.toFixed(2)}
+                <input type="range" min={0} max={1} step={0.05} value={chosen.friction}
+                  onChange={e => editObject(chosen.id, o => ({ ...o, friction: Number(e.target.value) }))} />
+              </label>
+              <label>Bounciness · {chosen.restitution.toFixed(2)}
+                <input type="range" min={0} max={1} step={0.05} value={chosen.restitution}
+                  onChange={e => editObject(chosen.id, o => ({ ...o, restitution: Number(e.target.value) }))} />
+              </label>
+            </details>
             <div className="world-lab-measurements">
               <span>Mass <strong>{diagnostics.massKg.toFixed(2)} kg</strong></span>
               <span>Speed <strong>{diagnostics.speedMps.toFixed(2)} m/s</strong></span>
