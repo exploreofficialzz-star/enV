@@ -89,6 +89,25 @@ try{
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.2");
   await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
+  // A result belongs to its exact test settings, not just its material geometry.
+  await page.getByRole("button",{name:"Power this solid"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByText("Adjust electrical power and force").click();
+  await page.getByRole("spinbutton",{name:"Actuator supply voltage"}).fill("22");
+  await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await page.getByRole("button",{name:"Power this solid"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByRole("spinbutton",{name:"Actuator force constant"}).fill("6");
+  await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await page.getByRole("button",{name:"Drop this solid"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  await page.getByText("Change test conditions").click();
+  await page.getByRole("spinbutton",{name:"Drop release height in metres"}).fill("6");
+  await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
+  await page.getByRole("button",{name:"Drop this solid"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  await page.getByRole("spinbutton",{name:"Drop restitution"}).fill("0.5");
+  await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
   assert.equal(new URL(page.url()).pathname,currentWorkspacePath,
     "Physical simulation must occur in the same digital world workspace");
   await page.getByRole("button",{name:"Test this solid as spring mass"}).click();
