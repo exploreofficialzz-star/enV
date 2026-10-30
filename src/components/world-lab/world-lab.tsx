@@ -98,8 +98,8 @@ export default function WorldLab() {
   const [actuatorTime, setActuatorTime] = useState(0);
   const [actuatorPlaying, setActuatorPlaying] = useState(false);
   const [actuatorRate, setActuatorRate] = useState(1);
-  const [actuatorVoltage, setActuatorVoltage] = useState(12);
-  const [actuatorConstant, setActuatorConstant] = useState(5);
+  const [actuatorVoltage, setActuatorVoltage] = useState(24);
+  const [actuatorConstant, setActuatorConstant] = useState(8);
   const importInput = useRef<HTMLInputElement>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
