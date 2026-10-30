@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
+import { recordAnalyticsEvent } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { applyViewMode, usePrefs } from "@/lib/storage";
@@ -33,6 +34,8 @@ export function ToolShell({
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
+  const toolStartedRef = useRef(false);
+  const toolViewedAtRef = useRef(Date.now());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
@@ -174,6 +177,24 @@ export function ToolShell({
         role={isFullscreen ? "dialog" : undefined}
         aria-modal={isFullscreen || undefined}
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
+        onClickCapture={(event) => {
+          if (toolStartedRef.current) return;
+          const target = event.target;
+          if (!(target instanceof HTMLElement) || !target.closest("button,input,textarea,select,[role=button],[contenteditable=true]")) return;
+          if (target.closest(".env-tool-fullscreen__toolbar")) return;
+          toolStartedRef.current = true;
+          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_interaction" } });
+        }}
+        onInputCapture={() => {
+          if (toolStartedRef.current) return;
+          toolStartedRef.current = true;
+          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_input" } });
+        }}
+        onSubmitCapture={() => {
+          if (toolStartedRef.current) return;
+          toolStartedRef.current = true;
+          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "form_submit" } });
+        }}
       >
         {isMusicSandbox ? (
           <>
