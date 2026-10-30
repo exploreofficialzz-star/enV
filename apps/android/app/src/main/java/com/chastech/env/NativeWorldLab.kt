@@ -25,6 +25,9 @@ import com.chastech.env.engine.NativeWorldLabScience
 import com.chastech.env.engine.NativeDropInput
 import com.chastech.env.engine.NativeDropResult
 import com.chastech.env.engine.NativeWorldLabDropScience
+import com.chastech.env.engine.NativeActuatorInput
+import com.chastech.env.engine.NativeActuatorResult
+import com.chastech.env.engine.NativeWorldLabActuator
 import kotlin.math.PI
 import java.io.ByteArrayOutputStream
 import java.util.Locale
@@ -61,6 +64,11 @@ fun NativeWorldLabForm() {
     var dropFrame by remember { mutableIntStateOf(0) }
     var dropPlaying by remember { mutableStateOf(false) }
     var dropSpeed by remember { mutableFloatStateOf(1f) }
+    var motorResult by remember { mutableStateOf<NativeActuatorResult?>(null) }
+    var motorEntityId by remember { mutableStateOf<String?>(null) }
+    var motorFrame by remember { mutableIntStateOf(0) }
+    var motorPlaying by remember { mutableStateOf(false) }
+    var motorSpeed by remember { mutableFloatStateOf(1f) }
     var warning by remember { mutableStateOf("") }
     val model=when(kind) {
         "spring"->NativeLabInput.Spring(massKg=mass.toDouble(),springNPerM=spring.toDouble())
@@ -155,6 +163,7 @@ fun NativeWorldLabForm() {
     LaunchedEffect(projectJson) {
         // Edited/imported geometry and materials invalidate earlier hypothetical drop results.
         dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
+        motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0
     }
     LaunchedEffect(requestImport) {
         if(requestImport){
@@ -169,6 +178,15 @@ fun NativeWorldLabForm() {
             val stride=kotlin.math.max(1,kotlin.math.round(0.04f*dropSpeed/result.stepSeconds).toInt())
             dropFrame=(dropFrame+stride).coerceAtMost(result.samples.lastIndex)
             if(dropFrame==result.samples.lastIndex)dropPlaying=false
+        }
+    }
+    LaunchedEffect(motorPlaying,motorSpeed,motorResult) {
+        while(motorPlaying) {
+            delay(40)
+            val result=motorResult?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04f*motorSpeed/result.stepSeconds).toInt())
+            motorFrame=(motorFrame+stride).coerceAtMost(result.samples.lastIndex)
+            if(motorFrame==result.samples.lastIndex)motorPlaying=false
         }
     }
     LaunchedEffect(playing,speed) {
@@ -351,6 +369,44 @@ fun NativeWorldLabForm() {
                             playing=false
                         }.onFailure{warning=it.message?:"This drop test exceeded the supported model."}
                     }) { Text("Drop this solid") }
+                    OutlinedButton(onClick={
+                        runCatching {
+                            val result=NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=derivedMass))
+                            motorResult=result;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                            dropPlaying=false;playing=false;warning=""
+                        }.onFailure{warning=it.message?:"This powered mechanism is outside the local solver limits."}
+                    }) { Text("Power this solid") }
+                    if(motorEntityId==solid.id && motorResult!=null){
+                        val run=checkNotNull(motorResult)
+                        val sample=run.samples[motorFrame.coerceIn(0,run.samples.lastIndex)]
+                        Canvas(Modifier.fillMaxWidth().height(100.dp)
+                            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                            .semantics { contentDescription="Calculated electromechanical lifting scene" }) {
+                            val y=size.height*0.86f
+                            val frac=(sample.heightM/4).coerceIn(0.0,1.0).toFloat()
+                            drawLine(Color.LightGray,Offset(0f,y),Offset(size.width,y),strokeWidth=3f)
+                            drawCircle(Color(0xFF69C3C3),size.minDimension*0.09f,
+                                Offset(size.width/2,y-frac*size.height*0.72f))
+                        }
+                        Text("Electrical current: "+labNumber(sample.currentA)+" A")
+                        Text("Powered height: "+labNumber(sample.heightM)+" m")
+                        Text("Upward force: "+labNumber(sample.motorForceN)+" N")
+                        Text("Back-EMF: "+labNumber(sample.backEmfV)+" V")
+                        Text("Coil heating: "+labNumber(sample.resistiveHeatW)+" W")
+                        Text("Energy balance residual: "+labNumber(sample.energyResidualJ)+" J")
+                        Slider(value=motorFrame.toFloat(),onValueChange={
+                            motorPlaying=false;motorFrame=it.toInt().coerceIn(0,run.samples.lastIndex)
+                        },valueRange=0f..run.samples.lastIndex.toFloat(),
+                            modifier=Modifier.semantics { contentDescription="Motor simulated time" })
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick={motorPlaying=!motorPlaying}) {
+                                Text(if(motorPlaying)"Pause motor" else "Play motor")
+                            }
+                            OutlinedButton(onClick={motorPlaying=false;motorFrame=0}){Text("Reset motor")}
+                        }
+                        Text("Hypothetical values, coupled 1D coil and lift calculation. Not measured or certified.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
                     if(dropEntityId==solid.id && dropRun!=null) {
                         val drop=checkNotNull(dropRun)
                         val sample=drop.samples[dropFrame.coerceIn(0,drop.samples.lastIndex)]
