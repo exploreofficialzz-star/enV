@@ -104,7 +104,8 @@ export default function WorldLab() {
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
   const selectedQuantities = selectedEntity ? solidQuantities(selectedEntity, selectedMaterial) : null;
   const selectedDrop = dropRun && selectedEntity?.id === dropRun.source.entityId
-    && project?.id === dropRun.source.projectId ? dropRun : null;
+    && project?.id === dropRun.source.projectId
+    && project?.revision === dropRun.source.projectRevision ? dropRun : null;
   const dropSample = selectedDrop ? sampleDrop(selectedDrop, Math.min(dropTime, selectedDrop.input.durationSeconds)) : null;
   const [message, setMessage] = useState("Choose an experiment and press Start to calculate a real reference trajectory.");
   const [error, setError] = useState("");
