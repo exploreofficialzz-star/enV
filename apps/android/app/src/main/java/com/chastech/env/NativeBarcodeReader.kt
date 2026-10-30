@@ -62,6 +62,7 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.multi.GenericMultipleBarcodeReader
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.URI
@@ -153,21 +154,30 @@ object NativeBarcodeImageDecoder {
         return NativeBarcodeLumaFrame(output, outputWidth, outputHeight)
     }
 
-    fun decode(bitmap: Bitmap): NativeBarcodeScan? {
-        if (bitmap.width <= 0 || bitmap.height <= 0) return null
-        return runCatching {
-            val pixels = IntArray(bitmap.width * bitmap.height)
-            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-            val source = RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
+    fun decode(bitmap: Bitmap): NativeBarcodeScan? = decodeAll(bitmap).firstOrNull()
+
+    fun decodeAll(bitmap: Bitmap): List<NativeBarcodeScan> {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return emptyList()
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val source = RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
+        val binary = BinaryBitmap(HybridBinarizer(source))
+        val decoded = runCatching {
             val reader = MultiFormatReader().apply { setHints(readerHints()) }
-            val result = reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
-            NativeBarcodeScan(result.text, result.barcodeFormat.toString())
-        }.getOrNull()
+            GenericMultipleBarcodeReader(reader).decodeMultiple(binary).toList()
+        }.getOrElse {
+            val reader = MultiFormatReader().apply { setHints(readerHints()) }
+            runCatching { listOf(reader.decodeWithState(binary)) }.getOrDefault(emptyList())
+        }
+        return decoded.distinctBy { "${it.barcodeFormat}\u0000${it.text}" }
+            .map { NativeBarcodeScan(it.text, it.barcodeFormat.toString()) }
     }
 
-    fun decode(context: Context, uri: Uri): NativeBarcodeScan? {
+    fun decode(context: Context, uri: Uri): NativeBarcodeScan? = decodeAll(context, uri).firstOrNull()
+
+    fun decodeAll(context: Context, uri: Uri): List<NativeBarcodeScan> {
         val imageBytes = context.contentResolver.openInputStream(uri)?.use { input -> readBarcodeImageBytes(input) }
-            ?: return null
+            ?: return emptyList()
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "The selected image could not be read." }
@@ -177,8 +187,8 @@ object NativeBarcodeImageDecoder {
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options) ?: return null
-        return try { decode(bitmap) } finally { bitmap.recycle() }
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options) ?: return emptyList()
+        return try { decodeAll(bitmap) } finally { bitmap.recycle() }
     }
 }
 
@@ -282,12 +292,20 @@ fun NativeBarcodeReaderTool() {
                 error = ""
                 status = "Reading image locally…"
                 val decoded = withContext(Dispatchers.IO) {
-                    runCatching { NativeBarcodeImageDecoder.decode(context, uri) }
+                    runCatching { NativeBarcodeImageDecoder.decodeAll(context, uri) }
                 }
                 decoded.fold(
-                    onSuccess = { scan ->
-                        if (scan != null) accept(scan)
-                        else error = "No supported QR code or barcode was detected in that image. Try a sharper image with the full code visible."
+                    onSuccess = { scans ->
+                        if (scans.isNotEmpty()) {
+                            scans.forEach(::accept)
+                            status = if (scans.size == 1) {
+                                "${scans.size} code decoded from image."
+                            } else {
+                                "${scans.size} codes decoded from image."
+                            }
+                        } else {
+                            error = "No supported QR code or barcode was detected in that image. Try a sharper image with the full code visible."
+                        }
                     },
                     onFailure = { failure -> error = failure.message ?: "Could not read the selected image." },
                 )
