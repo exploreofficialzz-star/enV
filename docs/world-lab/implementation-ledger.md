@@ -262,3 +262,7 @@ release-candidate evidence bundle are unfinished.
 ## World Lab jobs HTTP integration (2026-10-30)
 
 - Added auth-gated same-origin owner-scoped POST submit, GET status and POST cancel endpoints on the durable job ledger. Shared session and bounded-body helper fails closed when jobs/auth/Postgres are not configured. Public response excludes user IDs, raw inputs and internal storage details, and only exposes completed result to its owner. Added the feature activation/run contract. SQL not migrated, worker not deployed and no CI executed per user's integration-first request.
+
+## Remote computation UI activation path (2026-10-30)
+
+- Added Web submit/status polling/cancellation/evidence export for account-owned jobs using the actual documented endpoints. UI is absent unless build-time VITE_WORLD_LAB_JOBS_ENABLED=true. Runtime endpoints separately require verified auth, PostgreSQL, WORLD_LAB_JOBS_ENABLED=true, and a private worker. The interface invalidates stale jobs on project revision changes, keeps locally saved projects untouched, and only reveals completed owned results. Runtime remains disabled pending infrastructure/security/CI acceptance; not marketed as working cloud infrastructure.

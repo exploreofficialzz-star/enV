@@ -22,6 +22,15 @@ import {
   HEAT_CELLS, type AssumedMassSource, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
 } from "@/lib/world-lab/model";
 
+type RemoteWorldLabJob=Readonly<{
+  id:string;status:"queued"|"running"|"succeeded"|"failed"|"cancelled";
+  projectId:string;projectRevision:number;kind:string;
+  result:unknown|null;errorCode:string|null;
+}>;
+type RemoteJobReply=Readonly<{
+  ok?:boolean;code?:string;error?:string;job?:RemoteWorldLabJob;
+}>;
+const remoteJobsEnabled=import.meta.env.VITE_WORLD_LAB_JOBS_ENABLED==="true";
 type SceneHandles = {
   engine: B.Engine;
   scene: B.Scene;
@@ -90,6 +99,10 @@ export default function WorldLab() {
   visualSettings.current = { seeInside, opacity };
   const [project, setProject] = useState<WorldLabProject | null>(null);
   const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor">("hydrostatics");
+  const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
+  const [remoteError,setRemoteError]=useState("");
+  const [remoteBusy,setRemoteBusy]=useState(false);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState("");
@@ -676,9 +689,80 @@ export default function WorldLab() {
     // A changed material, shape, or arrangement invalidates its old scientific results.
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setWiredMotorRun(null);setDcRun(null);
+    setRemoteJob(null);
     setProject(current => current ? transform(current) : current);
     setWorkspaceDirty(true);
   }
+  async function submitRemoteJob(){
+    if(!remoteJobsEnabled||!project||remoteBusy)return;
+    setRemoteBusy(true);setRemoteError("");
+    try{
+      if(remoteKind!=="dc-network"&&!selectedEntityId)
+        throw new Error("Select an invented solid before submitting this experiment.");
+      const body=remoteKind==="dc-network"?{kind:remoteKind,project}:
+        remoteKind==="hydrostatics"?{
+          kind:remoteKind,project,entityId:selectedEntityId,
+          fluidDensityKgM3:fluidDensity,
+          immersionDepthM:Math.min(fluidDepth,selectedEntity?.dimensionsMeters[1]??0),
+        }:{
+          kind:remoteKind,project,entityId:selectedEntityId,
+          forceConstantNPerA:actuatorConstant,thermal:actuatorHeatEnabled,
+        };
+      const response=await fetch("/api/world-lab/jobs",{
+        method:"POST",credentials:"same-origin",
+        headers:{"content-type":"application/json",
+          "idempotency-key":crypto.randomUUID()},
+        body:JSON.stringify(body),
+      });
+      const data=await response.json() as RemoteJobReply;
+      if(!response.ok||!data.job)
+        throw new Error(data.error||data.code||"Server calculation is unavailable.");
+      setRemoteJob(data.job);
+    }catch(cause){
+      setRemoteJob(null);
+      setRemoteError(cause instanceof Error?cause.message:"Could not submit server calculation.");
+    }finally{setRemoteBusy(false);}
+  }
+  async function cancelRemoteJob(){
+    if(!remoteJob||!remoteJobsEnabled)return;
+    setRemoteError("");
+    try{
+      const response=await fetch("/api/world-lab/jobs/"+encodeURIComponent(remoteJob.id)+"/cancel",{
+        method:"POST",credentials:"same-origin",
+      });
+      const data=await response.json() as RemoteJobReply;
+      if(!response.ok||!data.job)throw new Error(data.error||data.code||"Cancellation failed.");
+      setRemoteJob(data.job);
+    }catch(cause){
+      setRemoteError(cause instanceof Error?cause.message:"Cancellation could not be confirmed.");
+    }
+  }
+  useEffect(()=>{
+    const jobId=remoteJob?.id;
+    if(!remoteJobsEnabled||!jobId)return;
+    let disposed=false;
+    let pending:ReturnType<typeof setTimeout>|undefined;
+    const poll=async()=>{
+      let retry=false;
+      try{
+        const response=await fetch("/api/world-lab/jobs/"+encodeURIComponent(jobId),{
+          credentials:"same-origin",cache:"no-store",
+        });
+        const data=await response.json() as RemoteJobReply;
+        if(!response.ok||!data.job)throw new Error(data.error||data.code||"Job status unavailable.");
+        if(disposed)return;
+        setRemoteJob(previous=>previous?.id===jobId?data.job!:previous);
+        retry=data.job.status==="queued"||data.job.status==="running";
+      }catch(cause){
+        if(!disposed){
+          setRemoteError(cause instanceof Error?cause.message:"Job status could not be retrieved.");
+        }
+      }
+      if(!disposed&&retry)pending=setTimeout(()=>{void poll();},2000);
+    };
+    void poll();
+    return ()=>{disposed=true;if(pending)clearTimeout(pending);};
+  },[remoteJob?.id]);
   function runFluidTest(){
     if(!project||!selectedEntity)return;
     setError("");
@@ -902,6 +986,44 @@ export default function WorldLab() {
           </details>}
         </div>
       )}
+      {remoteJobsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
+        aria-label="Authenticated remote World Lab calculations">
+        <h3 className="text-sm font-semibold">Run on your account's science worker</h3>
+        <p className="text-xs text-muted-foreground">
+          Advanced account-owned calculations. Only supported bounded models are submitted;
+          your locally saved projects remain available offline.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <select className={inputLabel} value={remoteKind}
+            aria-label="Remote calculation type"
+            onChange={e=>{setRemoteKind(e.target.value as typeof remoteKind);setRemoteJob(null);setRemoteError("");}}>
+            <option value="hydrostatics">Floating and buoyancy</option>
+            <option value="dc-network">Connected DC circuit</option>
+            <option value="wired-motor">Circuit-powered lifting machine</option>
+          </select>
+          <button type="button" className={buttonClass} disabled={remoteBusy||!project||
+              (remoteKind!=="dc-network"&&!selectedEntity)||
+              (remoteKind!=="hydrostatics"&&!project?.networks?.[0])}
+            onClick={()=>{void submitRemoteJob();}}>
+            {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
+          </button>
+          {remoteJob&&(remoteJob.status==="queued"||remoteJob.status==="running")&&
+            <button type="button" className={buttonClass}
+              onClick={()=>{void cancelRemoteJob();}}>Cancel job</button>}
+        </div>
+        {remoteError&&<p role="alert" className="mt-2 text-xs">{remoteError}</p>}
+        {remoteJob&&remoteJob.projectId===project?.id&&
+          remoteJob.projectRevision===project?.revision&&
+          <div role="status" aria-live="polite" className="mt-2 text-xs">
+            <p>Job {remoteJob.id}: {remoteJob.status}</p>
+            {remoteJob.errorCode&&<p>Solver status: {remoteJob.errorCode}</p>}
+            {remoteJob.status==="succeeded"&&remoteJob.result!==null&&
+              <button type="button" className={buttonClass} onClick={()=>
+                downloadJson("world-lab-owned-computation-evidence.json",remoteJob.result)}>
+                Export authenticated calculation evidence
+              </button>}
+          </div>}
+      </section>}
       <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
         <h3 className="text-sm font-semibold">Connect electricity</h3>
         <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>
