@@ -68,6 +68,7 @@ test("changed parameters form a separate branch with provenance", () => {
     id: "run-two", parentRunId: first.id, worldDateUTC: "2026-10-30T00:00:00Z",
   });
   assert.equal(second.parentRunId, first.id);
+  if (first.inputs.kind !== "damped-oscillator") throw new Error("Unexpected model kind");
   assert.equal(first.inputs.springNPerM, 4);
   assert.notEqual(sampleRun(first, 1).positionM, sampleRun(second, 1).positionM);
   assert.equal(second.evidence, "physics-model-computed");

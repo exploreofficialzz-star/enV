@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
       - name: Verified numerical reference cases
         run: node scripts/check-world-lab.mjs
+      - name: Generate route types and production bundle
+        run: npm run build
       - name: TypeScript contract
         run: npm run typecheck
-      - name: Production bundle
-        run: npm run build
