@@ -100,8 +100,8 @@ function decodeMultipleImageCodes(image: HTMLImageElement) {
   // Repeatedly decode the current crop, then search the four areas outside the
   // detected symbol. This keeps the implementation inside ZXing's public API.
   while (pendingRegions.length && attempts < 80 && decoded.size < 50) {
-    const region = pendingRegions.shift()!;
-    if (region.width < 16 || region.height < 16) continue;
+    const region = pendingRegions.shift();
+    if (!region || region.width < 16 || region.height < 16) continue;
     const regionKey = `${region.left}:${region.top}:${region.width}:${region.height}`;
     if (visitedRegions.has(regionKey)) continue;
     visitedRegions.add(regionKey);
