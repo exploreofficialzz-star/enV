@@ -221,6 +221,9 @@ try {
   assert.equal(tracks[0].lyrics, lyrics);
   assert.equal(tracks[0].custom.custom_note, tags.custom_note);
   await scope.locator(".ms-record-row button").first().click();
+  // Editor hydration restores the audio Blob from IndexedDB asynchronously.
+  // Wait for the actual playable control; fail if audio recovery genuinely breaks.
+  await scope.locator("audio").waitFor({ state: "attached", timeout: 15000 });
   assert.equal(await scope.locator("audio").count(), 1, "Audio remains on screen while tagging");
   await scope.locator("audio").evaluate((audio) => audio.play());
   await page.waitForFunction(() => document.querySelector(".music-sandbox audio")?.currentTime > 0.1);
