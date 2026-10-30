@@ -42,6 +42,17 @@ try{
   await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("50");
   await page.getByRole("button",{name:"Record hypothetical material"}).click();
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("button",{name:"Drop this solid"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  await page.getByText(/Model result.*hypothetical user assumed/).waitFor();
+  await page.getByLabel("Explore drop time").fill("1");
+  await page.getByText(/Height above surface/).waitFor();
+  await page.getByRole("button",{name:"Reset drop"}).click();
+  await page.getByText(/Height above surface/).waitFor();
+  await page.getByRole("button",{name:"Play drop"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  assert.equal(new URL(page.url()).pathname,currentWorkspacePath,
+    "Physical simulation must occur in the same digital world workspace");
   await page.getByRole("button",{name:"Test this solid as spring mass"}).click();
   await page.getByText("Derived from an invented solid").waitFor();
   const evidenceDownload=page.waitForEvent("download");
