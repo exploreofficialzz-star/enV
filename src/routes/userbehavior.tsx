@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Activity, AlertTriangle, BarChart3, Monitor, LogOut, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
@@ -80,7 +80,7 @@ function UserBehaviorDashboard() {
   const [signingIn, setSigningIn] = useState(false);
   const [problem, setProblem] = useState("");
 
-  async function loadSummary() {
+  const loadSummary = useCallback(async () => {
     setLoading(true); setProblem("");
     try {
       const response = await fetch("/api/analytics/summary", { credentials: "same-origin", headers: { accept: "application/json" } });
