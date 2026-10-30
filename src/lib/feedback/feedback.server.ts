@@ -65,11 +65,20 @@ export async function createFeedbackTicket(request: Request, input: unknown) {
     const id = randomUUID();
     const rows = await tx.query<{id:string;status:string;created_at:string}>(
       `insert into product_feedback(id,idempotency_key,reporter_digest,user_id,platform,category,title,description,tool_id,app_version)
-       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id,status,created_at`,
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       on conflict (reporter_digest,idempotency_key) do nothing returning id,status,created_at`,
       [id,body.idempotencyKey,subject,userId,body.platform,body.category,body.title,body.description,body.toolId,body.appVersion],
     );
     await tx.query("delete from product_feedback_rate_limits where window_hour<$1", [hour - 48]);
-    const ticket = rows[0]!;
+    if (!rows[0]) {
+      const duplicate = await tx.query<{id:string;status:string;created_at:string}>(
+        "select id,status,created_at from product_feedback where reporter_digest=$1 and idempotency_key=$2 limit 1",
+        [subject, body.idempotencyKey],
+      );
+      if (duplicate[0]) return { ticketId: duplicate[0].id, status: duplicate[0].status, createdAt: duplicate[0].created_at, duplicate: true };
+      throw new FeedbackError("FEEDBACK_RETRY_CONFLICT", "The report retry could not be reconciled. Retry using the same idempotency key.", 409);
+    }
+    const ticket = rows[0];
     return { ticketId: ticket.id, status: ticket.status, createdAt: ticket.created_at, duplicate: false };
   });
 }
