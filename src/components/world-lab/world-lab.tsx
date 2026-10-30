@@ -12,6 +12,7 @@ import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
+import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
@@ -91,6 +92,9 @@ export default function WorldLab() {
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState("");
+  const [fluidRun,setFluidRun]=useState<HydrostaticResult|null>(null);
+  const [fluidDensity,setFluidDensity]=useState(1000);
+  const [fluidDepth,setFluidDepth]=useState(0.5);
   const [dropRun, setDropRun] = useState<DropRun | null>(null);
   const [dropTime, setDropTime] = useState(0);
   const [dropPlaying, setDropPlaying] = useState(false);
@@ -670,10 +674,23 @@ export default function WorldLab() {
   }
   function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
     // A changed material, shape, or arrangement invalidates its old scientific results.
-    setDropPlaying(false);setDropRun(null);
+    setDropPlaying(false);setDropRun(null);setFluidRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setWiredMotorRun(null);setDcRun(null);
     setProject(current => current ? transform(current) : current);
     setWorkspaceDirty(true);
+  }
+  function runFluidTest(){
+    if(!project||!selectedEntity)return;
+    setError("");
+    try {
+      setFluidRun(calculateHydrostatics(project,selectedEntity.id,{
+        fluidDensityKgM3:fluidDensity,gravityMps2:9.80665,
+        immersionDepthM:Math.min(fluidDepth,selectedEntity.dimensionsMeters[1]),
+      }));
+    }catch(cause){
+      setFluidRun(null);
+      setError(cause instanceof Error?cause.message:"Fluid experiment is outside its limits.");
+    }
   }
   function createCircuit(){
     if(!project || (project.networks?.length??0)>=12)return;
@@ -1063,6 +1080,43 @@ export default function WorldLab() {
                   {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Fluid displacement and buoyancy experiment">
+                  <h3 className="text-sm font-semibold">Try floating an invention</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Calculate liquid displacement, upward force and possible floating depth from this solid's geometry.
+                    An unknown invented density stays unknown.
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="text-xs">Assumed liquid density (kg/m³)
+                      <input type="number" className={inputLabel} aria-label="Liquid density"
+                        min={0.01} max={25000} step={50} value={fluidDensity}
+                        onChange={e=>{setFluidDensity(Number(e.target.value));setFluidRun(null);}} />
+                    </label>
+                    <label className="text-xs">Depth under liquid surface (m)
+                      <input type="number" className={inputLabel} aria-label="Immersion depth"
+                        min={0} max={selectedEntity.dimensionsMeters[1]} step={0.1}
+                        value={fluidDepth} onChange={e=>{setFluidDepth(Number(e.target.value));setFluidRun(null);}} />
+                    </label>
+                  </div>
+                  <button type="button" className={buttonClass+" mt-2"} onClick={runFluidTest}>
+                    Calculate buoyancy
+                  </button>
+                  {fluidRun && fluidRun.projectId===project?.id &&
+                    fluidRun.projectRevision===project?.revision &&
+                    fluidRun.entityId===selectedEntity.id && (
+                    <div className="mt-2 space-y-1 text-xs" aria-label="Calculated buoyancy results">
+                      <p>Displaced liquid: {fluidRun.immersedVolumeM3.toFixed(5)} m³</p>
+                      <p>Upward buoyancy: {fluidRun.buoyancyForceN.toFixed(3)} N</p>
+                      <p>Bottom gauge pressure: {fluidRun.bottomGaugePressurePa.toFixed(1)} Pa</p>
+                      <p>Status: {fluidRun.floatingStatus.replaceAll("-"," ")}</p>
+                      <p>Net upward force: {fluidRun.netUpwardForceN===null?"Unknown material mass":fluidRun.netUpwardForceN.toFixed(3)+" N"}</p>
+                      <p>Equilibrium draft: {fluidRun.equilibriumDraftM===null?"Unknown":fluidRun.equilibriumDraftM.toFixed(4)+" m"}</p>
+                      <button type="button" className={buttonClass} onClick={()=>
+                        downloadJson("world-lab-buoyancy-evidence.json",fluidRun)}>Export fluid evidence</button>
+                      <p className="text-muted-foreground">{fluidRun.validity}</p>
+                    </div>
+                  )}
+                </div>
                 <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Electrical and mechanical actuator experiment">
                   <h3 className="text-sm font-semibold">Power a lifting machine</h3>
                   <p className="mt-1 text-xs text-muted-foreground">

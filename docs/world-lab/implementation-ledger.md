@@ -218,3 +218,8 @@ release-candidate evidence bundle are unfinished.
 ## iOS ideal-source network motor co-simulation (2026-10-30)
 
 - Added native Swift wired DC motor calculation that attaches a dynamic, optionally heated actuator branch to one supported ideal source; source current, passive resistor heat and shared energy balance now reflect the motor's live state. SwiftUI renders the connected output and stale project revisions invalidate it. Added native XCTest coverage. No finite battery behavior or universal multicomponent transient solver is claimed; final CI deferred as directed.
+
+## Fluid-mechanical coupling: static hydrostatics (2026-10-30)
+
+- Added `hydrostatics.ts`: calculates actual submerged box, circular vertical cylinder and spherical-cap volumes; water/fluid mass displacement, buoyancy, bottom hydrostatic gauge pressure, gravitational weight and net vertical force. With assumed material density it solves free-floating upright equilibrium draft via deterministic 64-step bounded bisection. Unknown density yields null net force/draft, not a guessed material. Actual project ID/revision, shape/material references and modeling limitations are preserved in exported evidence.
+- Web has a fluid-density and immersion-depth panel on selected inventions, with calculated numeric results and evidence export. Tests authored for Archimedes/half-sphere exactness, sinking and unknown matter; full CI deferred per request. No hydrodynamics, deformation, stability, weather, surface-tension or physical fluid observations claimed.
