@@ -119,7 +119,7 @@ export async function recordCommunityView(request: Request,input:unknown) {
   const secret=enabled();
   let body; try{body=validateCommunityView(input);}catch(e){throw new CommunityError("INVALID_COMMUNITY_VIEW",e instanceof Error?e.message:"Invalid view event.",400);}
   ensureTool(body.toolId);
-  const {userId,actorDigest}=await actorFor(request,body.visitorId,secret);
+  const {actorDigest}=await actorFor(request,body.visitorId,secret);
   const sql=await getSql();
   const rows=await sql.transaction(async tx=>{
     await enforceRateLimit(tx,request,actorDigest,secret,90);
