@@ -22,6 +22,8 @@ export class WorldLabViewer {
   private strata: B.StandardMaterial[] = [];
   private observer: ResizeObserver | null = null;
   private disposed = false;
+  private touches = new Map<number, { x: number; y: number }>();
+  private pinchDistance = 0;
 
   constructor(private canvas: HTMLCanvasElement, private callbacks: ViewerOptions) {
     if (!B.Engine.isSupported()) throw new Error("WebGL is unavailable. Try a current browser with graphics acceleration.");
@@ -72,6 +74,10 @@ export class WorldLabViewer {
       if (id) this.callbacks.select(id);
     });
     canvas.addEventListener("wheel", this.onWheel, { passive: false });
+    canvas.addEventListener("pointerdown", this.onPointerDown);
+    canvas.addEventListener("pointermove", this.onPointerMove);
+    canvas.addEventListener("pointerup", this.onPointerUp);
+    canvas.addEventListener("pointercancel", this.onPointerUp);
     canvas.addEventListener("webglcontextlost", this.onContextLost);
     if (typeof ResizeObserver !== "undefined") {
       this.observer = new ResizeObserver(() => this.engine.resize());
@@ -86,6 +92,26 @@ export class WorldLabViewer {
   };
 
   /** Wheel/pinch navigation changes the observer's position continuously, even through layers. */
+  private onPointerDown = (event: PointerEvent) => {
+    if (event.pointerType === "touch") this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  };
+  private onPointerMove = (event: PointerEvent) => {
+    if (event.pointerType !== "touch" || !this.touches.has(event.pointerId)) return;
+    this.touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (this.touches.size !== 2) { this.pinchDistance = 0; return; }
+    const [a, b] = [...this.touches.values()];
+    const distance = Math.hypot(a.x - b.x, a.y - b.y);
+    if (this.pinchDistance > 0) {
+      const forward = this.camera.getForwardRay().direction;
+      this.camera.position.addInPlace(forward.scale(Math.max(-2, Math.min(2, (distance - this.pinchDistance) * 0.018))));
+    }
+    this.pinchDistance = distance;
+  };
+  private onPointerUp = (event: PointerEvent) => {
+    this.touches.delete(event.pointerId);
+    this.pinchDistance = 0;
+  };
+
   private onWheel = (event: WheelEvent) => {
     event.preventDefault();
     const direction = this.camera.getForwardRay().direction;
@@ -159,6 +185,11 @@ export class WorldLabViewer {
     this.disposed = true;
     this.observer?.disconnect();
     this.canvas.removeEventListener("wheel", this.onWheel);
+    this.canvas.removeEventListener("pointerdown", this.onPointerDown);
+    this.canvas.removeEventListener("pointermove", this.onPointerMove);
+    this.canvas.removeEventListener("pointerup", this.onPointerUp);
+    this.canvas.removeEventListener("pointercancel", this.onPointerUp);
+    this.touches.clear();
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
     this.camera.detachControl();
     this.scene.dispose();
