@@ -32,6 +32,8 @@ import com.chastech.env.engine.NativeActuatorResult
 import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
+import com.chastech.env.engine.NativeWorldLabNetworkMotor
+import com.chastech.env.engine.NativeLabNetworkMotorRun
 import kotlin.math.PI
 import java.io.ByteArrayOutputStream
 import java.util.Locale
@@ -70,6 +72,7 @@ fun NativeWorldLabForm() {
     var dropPlaying by remember { mutableStateOf(false) }
     var dropSpeed by remember { mutableFloatStateOf(1f) }
     var motorResult by remember { mutableStateOf<NativeActuatorResult?>(null) }
+    var wiredMotor by remember { mutableStateOf<NativeLabNetworkMotorRun?>(null) }
     var motorAudit by remember { mutableStateOf<NativeActuatorNumericalAudit?>(null) }
     var motorEntityId by remember { mutableStateOf<String?>(null) }
     var motorFrame by remember { mutableIntStateOf(0) }
@@ -97,7 +100,7 @@ fun NativeWorldLabForm() {
             val parsed=NativeWorldLabProjectCodec.decode(next)
             projectJson=next
             project=parsed
-            dcRun=null
+            dcRun=null;wiredMotor=null
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
@@ -436,10 +439,28 @@ fun NativeWorldLabForm() {
                                 thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
                             val result=NativeWorldLabActuator.evaluate(input)
                             motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
-                            motorResult=result;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                            motorResult=result;wiredMotor=null;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
                             dropPlaying=false;playing=false;warning=""
                         }.onFailure{warning=it.message?:"This powered mechanism is outside the local solver limits."}
                     }) { Text("Power this solid") }
+                    if(project!!.networks.isNotEmpty()){
+                        OutlinedButton(onClick={
+                            runCatching{
+                                val connected=NativeWorldLabNetworkMotor.evaluate(
+                                    project!!,project!!.networks.first(),solid.id,
+                                    derivedMass,motorThermalEnabled)
+                                val sourceVoltage=project!!.networks.first().components
+                                    .first{it.kind=="dc-source"}.voltageV?:0.0
+                                val input=NativeActuatorInput(massKg=derivedMass,
+                                    supplyVoltageV=sourceVoltage,
+                                    thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
+                                wiredMotor=connected;motorResult=connected.motor
+                                motorAudit=NativeWorldLabActuator.numericalAudit(input,connected.motor)
+                                motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                                dropPlaying=false;playing=false;warning=""
+                            }.onFailure{warning=it.message?:"Connected motor cannot be calculated."}
+                        }){Text("Wire motor to circuit")}
+                    }
                     if(motorEntityId==solid.id && motorResult!=null){
                         val run=checkNotNull(motorResult)
                         val sample=run.samples[motorFrame.coerceIn(0,run.samples.lastIndex)]
@@ -464,6 +485,15 @@ fun NativeWorldLabForm() {
                             Text("Cooling: "+labNumber(sample.coolingPowerW)+" W")
                         }
                         Text("Energy balance residual: "+labNumber(sample.energyResidualJ)+" J")
+                        wiredMotor?.takeIf{it.projectId==project!!.id &&
+                            it.projectRevision==project!!.revision &&
+                            it.entityId==solid.id}?.let{wired->
+                            val observed=wired.samples[motorFrame.coerceIn(0,wired.samples.lastIndex)]
+                            Text("Total DC source current: "+labNumber(observed.totalSourceCurrentA)+" A")
+                            Text("Passive resistor heat: "+labNumber(observed.passiveResistorHeatW)+" W")
+                            Text("Combined energy residual: "+labNumber(observed.combinedEnergyResidualJ)+" J")
+                            Text(wired.validity,style=MaterialTheme.typography.bodySmall)
+                        }
                         motorAudit?.let { audit ->
                             Text("Numerical self-check: "+audit.status+". "+audit.explanation)
                         }

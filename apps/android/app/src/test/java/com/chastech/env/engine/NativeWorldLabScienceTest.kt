@@ -103,6 +103,20 @@ class NativeWorldLabScienceTest {
             NativeWorldLabActuator.evaluate(hot.copy(thermal=NativeActuatorThermal(heatCapacityJPerK=0.0)))
         }
     }
+    @Test fun idealGraphSourceCurrentIncludesTheLiveMotorBranch() {
+        val json=NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.addStarterCircuit(NativeWorldLabEditor.blank()),
+            "box",id="lift")
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val coupled=NativeWorldLabNetworkMotor.evaluate(
+            project,project.networks.first(),"lift",1.0,true)
+        val point=coupled.samples[240]
+        assertTrue(point.totalSourceCurrentA<
+            coupled.dc.branchCurrentsA["source"]!!)
+        assertEquals(point.totalSourcePowerW,
+            9.0*coupled.motor.samples[240].currentA+point.passiveResistorHeatW,1e-8)
+        assertTrue(coupled.samples.all{it.combinedEnergyResidualJ.isFinite()})
+    }
     @Test fun noVoltageDoesNotCreateFictitiousLift() {
         val run=NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=1.0,supplyVoltageV=0.0))
         assertTrue(run.samples.all{it.heightM==0.0 && it.currentA==0.0})

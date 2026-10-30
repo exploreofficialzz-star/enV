@@ -210,3 +210,7 @@ release-candidate evidence bundle are unfinished.
 
 - Added Web `network-motor.ts` integration: one ideal DC voltage source and its passive graph feed an optional thermal 1D motor branch wired across the source. At every motor timestep, KCL source current includes both passive load and dynamic motor current. The combined energy record sums DC passive resistor power/energy with motor source work, thermal/mechanical energy and losses; export includes both provenance-bearing runs. Invalid/hypothetical devices, multiple sources or reverse polarity fail explicitly.
 - Web motor controls can now select an ideal circuit-powered drive and show source current/voltage, calculated passive heating and motor trajectory. This is genuinely interconnected under the **ideal stiff-voltage-source assumption**, not a nonlinear finite-battery or general circuit co-simulator. New regression tests authored, not run; native equivalent integration and full audit remain outstanding.
+
+## Android connected ideal source and actuator implementation (2026-10-30)
+
+- The native Kotlin graph's one ideal source now drives a dynamic electromechanical motor branch in parallel with passive loads. Its source-current and power ledger accounts for both the motor and resistor network at each numerical motor sample; the native UI displays calculated total source current, resistor heat and combined energy residual. No finite battery sag is implied. Added a regression case; deferred CI as requested.

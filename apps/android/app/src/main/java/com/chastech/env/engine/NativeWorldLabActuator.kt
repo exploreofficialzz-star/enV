@@ -216,3 +216,43 @@ object NativeWorldLabActuator {
         )
     }
 }
+
+/** One ideal supply feeding passive DC branches and a dynamic 1D motor. */
+data class NativeLabNetworkMotorSample(
+    val timeSeconds:Double,val totalSourceCurrentA:Double,
+    val totalSourcePowerW:Double,val passiveResistorHeatW:Double,
+    val combinedEnergyResidualJ:Double
+)
+data class NativeLabNetworkMotorRun(
+    val projectId:String,val projectRevision:Int,val networkId:String,
+    val entityId:String,val dc:NativeLabDcResult,
+    val motor:NativeActuatorResult,val samples:List<NativeLabNetworkMotorSample>,
+    val validity:String="Ideal voltage source and parallel motor; no finite battery sag or verified materials."
+)
+object NativeWorldLabNetworkMotor {
+    fun evaluate(p:NativeWorldLabProject,n:NativeLabCircuitNetwork,
+        entityId:String,massKg:Double,thermal:Boolean):NativeLabNetworkMotorRun {
+        val sources=n.components.filter{it.kind=="dc-source"}
+        require(sources.size==1){"Connected motor needs exactly one ideal DC source"}
+        val source=sources.first()
+        val volts=requireNotNull(source.voltageV)
+        require(volts>=0){"Reverse-polarity motor coupling is unsupported"}
+        require(p.entities.any{it.id==entityId}){"Selected invention has been removed"}
+        val dc=NativeWorldLabDc.solve(n,p)
+        val input=NativeActuatorInput(massKg=massKg,supplyVoltageV=volts,
+            thermal=if(thermal)NativeActuatorThermal() else null)
+        val motor=NativeWorldLabActuator.evaluate(input)
+        val passiveSourceCurrent=requireNotNull(dc.branchCurrentsA[source.id])
+        val samples=motor.samples.map{step->
+            val totalCurrent=passiveSourceCurrent-step.currentA
+            val totalPower=-volts*totalCurrent
+            val residual=step.energyResidualJ+dc.powerResidualW*step.timeSeconds
+            require(listOf(totalCurrent,totalPower,residual).all{it.isFinite()}){
+                "Nonfinite connected source or motor energy"
+            }
+            NativeLabNetworkMotorSample(step.timeSeconds,totalCurrent,totalPower,
+                dc.resistorHeatW,residual)
+        }
+        return NativeLabNetworkMotorRun(p.id,p.revision,n.id,entityId,dc,motor,samples)
+    }
+}
