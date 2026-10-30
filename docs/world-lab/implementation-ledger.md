@@ -153,3 +153,10 @@ release-candidate evidence bundle are unfinished.
 ## Latest native import and emulator safeguards
 - Import now asks before replacing unsaved World Lab work on Android and iOS, just like New Project and Open Last Saved; the iOS FileDocument read path also checks the 1 MB cap.
 - The Android game-preview emulator runs with `-gpu swiftshader`, the documented supported SwiftShader backend rather than deprecated `swiftshader_indirect`, preserving real rendered assertions without host-GPU dependency.
+
+## Numerical self-audit and source inventory continuation (2026-10-30)
+
+- Added an independent second-pass, halved-timestep audit for the existing bounded 1D electrical-to-mechanical actuator. Compares actual height and current trajectories at original time samples and checks normalized first-law residuals against documented 1% state-sensitivity and 2% energy tolerances. An uncomputable refinement is **unavailable**, never a pass. Web shows the audit adjacent to live computed fields and uses an accessible warning for exceeded thresholds. Analytic laws and externally measured properties are **not** certified by this internal check.
+- Regression coverage includes zero-power conservation, deterministic computed traces, deliberately altered energy evidence, non-finite recorded data and solver-resolution exhaustion.
+- Indexed the actual user-provided research ZIP in `docs/world-lab/research-source-manifest.json`, including SHA-256 and byte sizes of both PDFs, both Markdown books, calculations CSV and four illustrations. The master has exactly 205 numbered chapters; the supplement repeats/deepens chapters 194–205, **not** 12 additional independent chapters. Source topic inventory is distinct from implemented scientific capability and verified acceptance.
+- This check is implemented on the Web actuator run only. Kotlin/Swift numerical self-audit parity, independently calibrated physical validation, device rendering and WP-06–WP-10 remain open. Keep PR #59 draft and do not replace Artboard Studio yet.

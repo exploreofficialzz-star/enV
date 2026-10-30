@@ -10,6 +10,7 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
+import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
 import {
@@ -95,6 +96,7 @@ export default function WorldLab() {
   const [dropBounce, setDropBounce] = useState(0.3);
   const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
   const [actuatorRun, setActuatorRun] = useState<ActuatorRun | null>(null);
+  const [actuatorAudit, setActuatorAudit] = useState<ActuatorNumericalAudit | null>(null);
   const [actuatorTime, setActuatorTime] = useState(0);
   const [actuatorPlaying, setActuatorPlaying] = useState(false);
   const [actuatorRate, setActuatorRate] = useState(1);
@@ -595,6 +597,8 @@ export default function WorldLab() {
         forceConstantNPerA:actuatorConstant,
       });
       const result=runActuatorExperiment(derived.input,derived.source);
+      const numericalAudit=verifyActuatorNumerics(result);
+      setActuatorAudit(numericalAudit);
       setPlaying(false);
       setDropPlaying(false);
       setDropRun(null);
@@ -979,6 +983,18 @@ export default function WorldLab() {
                         <div><dt>Coil heat</dt><dd>{actuatorSample.resistiveHeatW.toFixed(3)} W</dd></div>
                         <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
                       </dl>
+                      {actuatorAudit && (
+                        <p className="text-xs text-muted-foreground" role={actuatorAudit.status === "outside-internal-tolerance" ? "alert" : undefined}>
+                          Numerical self-check: {actuatorAudit.status === "within-internal-tolerance"
+                            ? "within internal tolerance" : actuatorAudit.status === "unavailable"
+                              ? "not available" : "outside internal tolerance"}.
+                          {" "}{actuatorAudit.explanation}
+                          {actuatorAudit.maximumRelativeStateDifference !== null && (
+                            <> Step-refinement difference: {(100 * actuatorAudit.maximumRelativeStateDifference).toFixed(3)}%.
+                            Energy residual fraction: {(100 * (actuatorAudit.maximumEnergyResidualFraction ?? 0)).toFixed(3)}%.</>
+                          )}
+                        </p>
+                      )}
                       <label className="block text-xs">Explore motor time
                         <input aria-label="Explore motor time" type="range" min={0} className="w-full"
                           max={selectedActuator.input.durationSeconds} step={selectedActuator.solverStepSeconds}
