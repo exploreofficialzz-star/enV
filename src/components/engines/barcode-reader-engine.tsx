@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserCodeReader, BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat } from "@zxing/library";
 import { Button } from "@/components/ui/button";
+import { downloadText } from "@/lib/utils";
 
 type ScanRecord = {
   id: string;
@@ -9,6 +10,16 @@ type ScanRecord = {
   format: string;
   scannedAt: string;
 };
+
+function scanHistoryCsv(records: ScanRecord[]): string {
+  const cell = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  const rows = records.map((record) => [
+    cell(record.scannedAt),
+    cell(record.format),
+    cell(record.value),
+  ].join(","));
+  return ["scanned_at,format,payload", ...rows].join("\r\n") + "\r\n";
+}
 
 const FORMAT_LABELS: Partial<Record<BarcodeFormat, string>> = {
   [BarcodeFormat.AZTEC]: "Aztec",
@@ -307,9 +318,14 @@ export function BarcodeReaderEngine() {
             <p className="mt-0.5 text-xs text-muted">{results.length} result{results.length === 1 ? "" : "s"} in this session</p>
           </div>
           {results.length ? (
-            <Button type="button" size="sm" variant="ghost" onClick={() => { setResults([]); setNotice("Scan history cleared."); }}>
-              Clear results
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => downloadText(scanHistoryCsv(results), "env-scan-history.csv", "text/csv")}>
+                Export CSV
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => { setResults([]); setNotice("Scan history cleared."); }}>
+                Clear results
+              </Button>
+            </div>
           ) : null}
         </div>
 
