@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getOptionalBillingUserId } from "../billing/http.server";
 import { getSql } from "../db";
+import { hasDeveloperAdminSession } from "../developer-admin.server";
 import { getToolById } from "../registry";
 import {
   validateCommunityBlock, validateCommunityComment, validateCommunityDelete, validateCommunityModeration,
@@ -58,7 +59,7 @@ async function enforceRateLimit(tx: Awaited<ReturnType<typeof getSql>>, request:
 }
 function requireAdmin(request: Request) {
   signingSecret();
-  if(!adminMatches(request)) throw new CommunityError("COMMUNITY_ADMIN_UNAUTHORIZED","Developer community moderation access is required.",401);
+  if(!adminMatches(request) && !hasDeveloperAdminSession(request)) throw new CommunityError("COMMUNITY_ADMIN_UNAUTHORIZED","Developer community moderation access is required.",401);
 }
 export async function getCommunityFeed(request: Request, rawToolId: unknown, rawVisitorId?: unknown) {
   enabled();
