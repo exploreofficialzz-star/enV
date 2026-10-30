@@ -37,10 +37,10 @@ export function PrivacyControls() {
         </span>
         {!enabled ? <span className="text-xs text-muted">Analytics is disabled in this Web build.</span> : null}
       </div>
-      {enabled ? (
+      {enabled || choice==="granted" ? (
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={()=>void update(true)} disabled={saving||choice==="granted"}>{saving?"Saving…":"Allow analytics"}</Button>
-          <Button type="button" size="sm" variant="outline" onClick={()=>void update(false)} disabled={saving||choice==="denied"}>Decline / withdraw consent</Button>
+          {enabled ? <Button type="button" size="sm" onClick={()=>void update(true)} disabled={saving||choice==="granted"}>{saving?"Saving…":"Allow analytics"}</Button> : null}
+          {choice!=="denied" ? <Button type="button" size="sm" variant="outline" onClick={()=>void update(false)} disabled={saving}>Decline / withdraw consent</Button> : null}
         </div>
       ) : null}
       {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
