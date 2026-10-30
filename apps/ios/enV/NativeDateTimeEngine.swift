@@ -26,16 +26,17 @@ public enum NativeDateTimeError: LocalizedError {
 /** Pure Swift implementation of the canonical datetime engine; it never uses a backend. */
 public enum NativeDateTimeEngine {
     private static let operations: [String: String] = [
-        "birthday-countdown": "birthday", "business-day-calculator": "business-days", "countdown": "countdown",
+        "age-calculator": "age", "birthday-countdown": "birthday", "business-day-calculator": "business-days", "countdown": "countdown",
+        "date-calculator": "date-add", "duration-calculator": "duration", "meeting-time-planner": "meeting-planner",
         "date-difference": "date-diff", "date-formatter": "format", "deadline-calculator": "deadline",
         "leap-year-checker": "leap", "time-until-calculator": "time-until", "timezone-converter": "timezone",
         "week-number-calculator": "week-number", "weekday-calculator": "weekday", "workday-calculator": "workday",
         "world-clock": "world-clock", "unix-timestamp-converter": "unix"
     ]
     public static let supportedToolIDs = [
-        "birthday-countdown", "business-day-calculator", "countdown", "date-difference", "date-formatter",
+        "age-calculator", "birthday-countdown", "business-day-calculator", "countdown", "date-calculator", "date-difference", "date-formatter", "duration-calculator",
         "deadline-calculator", "leap-year-checker", "time-until-calculator", "timezone-converter",
-        "week-number-calculator", "weekday-calculator", "workday-calculator", "world-clock", "unix-timestamp-converter"
+        "week-number-calculator", "weekday-calculator", "workday-calculator", "meeting-time-planner", "world-clock", "unix-timestamp-converter"
     ]
     private static var utc: TimeZone { TimeZone(secondsFromGMT: 0)! }
     public static func operation(forToolID id: String) -> String? { operations[id] }
@@ -45,37 +46,61 @@ public enum NativeDateTimeEngine {
         switch operation {
         case "age":
             let birth = try dateOnly(options["birth"] ?? input, label: "birth date")
-            let today = calendar(.gregorian).startOfDay(for: now)
-            let years = calendar(.gregorian).dateComponents([.year], from: birth, to: today).year ?? 0
-            let days = calendar(.gregorian).dateComponents([.day], from: birth, to: today).day ?? 0
-            return result(("Age (years)", String(years)), ("Days lived", String(days)), ("Next birthday in", "\(365 - (days % 365)) days (approx.)"))
+            let cal = calendar(.gregorian)
+            let today = cal.startOfDay(for: now)
+            guard birth <= today else { throw NativeDateTimeError.invalidOperation("Birth date cannot be in the future.") }
+            let years = cal.dateComponents([.year], from: birth, to: today).year ?? 0
+            let afterYears = cal.date(byAdding: .year, value: years, to: birth)!
+            let months = cal.dateComponents([.month], from: afterYears, to: today).month ?? 0
+            let afterMonths = cal.date(byAdding: .month, value: months, to: afterYears)!
+            let days = cal.dateComponents([.day], from: afterMonths, to: today).day ?? 0
+            let lived = cal.dateComponents([.day], from: birth, to: today).day ?? 0
+            return result(("Age", "\(years) years, \(months) months, \(days) days"), ("Days lived", String(lived)))
         case "date-diff":
-            let from = try parseDate(options["from"] ?? "", label: "start date")
-            let to = try parseDate(options["to"] ?? "", label: "end date")
-            let days = calendar(.gregorian).dateComponents([.day], from: from, to: to).day ?? 0
-            return result(("Days", String(days)), ("Weeks", String(format: "%.1f", Double(days) / 7)))
+            let from = try dateOnly(options["from"] ?? "", label: "start date")
+            let to = try dateOnly(options["to"] ?? "", label: "end date")
+            let span = calendarSpan(from, to)
+            let sign = span.totalDays < 0 ? "-" : ""
+            return result(("Calendar span", "\(sign)\(span.years) years, \(span.months) months, \(span.days) days"), ("Total days", String(span.totalDays)), ("Weeks", String(format: "%.2f", Double(span.totalDays) / 7)), ("Calendar hours (24-hour days)", String(span.totalDays * 24)))
+        case "date-add":
+            let start = try dateOnly(options["start"] ?? options["value"] ?? "", label: "start date")
+            let unitValues = ["years", "months", "weeks", "days"].map { Int(options[$0] ?? "0") ?? 0 }
+            guard unitValues.contains(where: { $0 != 0 }) else { throw NativeDateTimeError.invalidOperation("Enter at least one date unit to add or subtract.") }
+            let repeatCount = min(100, max(1, Int(options["repeatCount"] ?? "1") ?? 1))
+            if repeatCount > 1 {
+                var cursor = start
+                var rows: [(String, String)] = [("Start date", format(cursor, pattern: "yyyy-MM-dd EEEE"))]
+                for index in 1...repeatCount {
+                    cursor = try addDateSpan(cursor, options: options)
+                    rows.append(("Occurrence \(index)", format(cursor, pattern: "yyyy-MM-dd EEEE")))
+                }
+                return NativeDateTimeResult(rows: rows.map { NativeDateTimeRow(label: $0.0, value: $0.1) })
+            }
+            let calculated = try addDateSpan(start, options: options)
+            return result(("Result", format(calculated, pattern: "yyyy-MM-dd EEEE")), ("Date", format(calculated, pattern: "yyyy-MM-dd")))
         case "workday":
             let start = try dateOnly(options["start"] ?? options["from"] ?? "", label: "start date")
             guard let amount = Double(options["days"] ?? ""), amount.isFinite else { throw NativeDateTimeError.invalidOperation("Enter how many business days to add.") }
-            return result(("Result", format(addBusinessDays(start, amount), pattern: "yyyy-MM-dd EEEE")))
+            return result(("Result", format(addWorkingDays(start, amount, options: options), pattern: "yyyy-MM-dd EEEE")))
         case "business-days":
             let from = try dateOnly(options["from"] ?? "", label: "start date")
             let to = try dateOnly(options["to"] ?? "", label: "end date")
-            return result(("Weekdays", String(businessDaysBetween(from, to))))
+            let includeEnd = options["includeEnd"] != "false"
+            let excluded = try excludedDates(options["excludedDates"] ?? "")
+            let count = try countWorkingDays(from: from, to: to, options: options, includeEnd: includeEnd)
+            return result(("Working days", String(count)), ("Range rule", "Start date excluded; end date \(includeEnd ? "included" : "excluded")."), ("Custom excluded dates", excluded.isEmpty ? "None supplied" : String(excluded.count)))
         case "duration":
-            let from = try parseDate(options["from"] ?? "", label: "start")
-            let to = try parseDate(options["to"] ?? "", label: "end")
+            let from = try parseDate(options["from"] ?? "", label: "start date and time")
+            let to = try parseDate(options["to"] ?? "", label: "end date and time")
             let seconds = abs(to.timeIntervalSince(from))
             let whole = Int(seconds)
-            return result(("Duration", "\(whole / 86400)d \((whole % 86400) / 3600)h \((whole % 3600) / 60)m"), ("Total hours", String(format: "%.2f", seconds / 3600)))
+            return result(("Elapsed duration", "\(whole / 86400)d \((whole % 86400) / 3600)h \((whole % 3600) / 60)m \(whole % 60)s"), ("Total hours", String(format: "%.3f", seconds / 3600)), ("Total seconds", String(format: "%.3f", seconds)))
         case "countdown":
             return try countdown(try parseDate(options["target"] ?? "", label: "target date and time"), now: now)
         case "world-clock":
-            let zones = (options["zones"] ?? "").split(whereSeparator: { $0 == "," || $0 == "\n" || $0 == "\r" }).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(20)
-            guard !zones.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter at least one IANA time zone.") }
-            return NativeDateTimeResult(rows: try zones.map { name in
-                guard let zone = TimeZone(identifier: name) else { throw NativeDateTimeError.invalidOperation("Unknown or unsupported time zone: \(name)") }
-                return NativeDateTimeRow(label: name, value: localizedMedium(now, zone: zone, locale: Locale(identifier: "en_GB")))
+            let zones = try parseZoneList(options["zones"] ?? "", limit: 20)
+            return NativeDateTimeResult(rows: try zones.map { item in
+                NativeDateTimeRow(label: item.label, value: "\(localizedMedium(now, zone: item.zone, locale: Locale(identifier: "en_GB"))) · \(offsetLabel(now, zone: item.zone))")
             })
         case "timezone":
             let fromName = options["fromTz"]?.isEmpty == false ? options["fromTz"]! : "UTC"
@@ -94,9 +119,10 @@ public enum NativeDateTimeEngine {
                 formatter.locale = Locale(identifier: "en_US_POSIX")
                 formatter.timeZone = fromZone
                 formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                formatter.isLenient = false
                 let time = parts[1].count == 5 ? parts[1] + ":00" : parts[1]
                 guard let parsed = formatter.date(from: parts[0] + " " + time),
-                      formatter.string(from: parsed).hasPrefix(parts[0]) else {
+                      formatter.string(from: parsed) == parts[0] + " " + time else {
                     throw NativeDateTimeError.invalidOperation("That local time is invalid or falls in a daylight-saving clock gap.")
                 }
                 instant = parsed
@@ -121,26 +147,44 @@ public enum NativeDateTimeEngine {
         case "week-number":
             let date = try parseDate(options["value"] ?? input, label: "date")
             var iso = Calendar(identifier: .iso8601); iso.timeZone = utc
-            return result(("ISO week", String(iso.component(.weekOfYear, from: date))))
+            return result(("ISO week", String(iso.component(.weekOfYear, from: date))), ("ISO week-year", String(iso.component(.yearForWeekOfYear, from: date))))
         case "leap":
             guard let year = Int(options["year"] ?? "") else { throw NativeDateTimeError.invalidOperation("Enter a year.") }
             let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
             return result((String(year), leap ? "Leap year" : "Not a leap year"))
         case "birthday":
             let birth = try dateOnly(options["birth"] ?? input, label: "birth date")
-            var cal = calendar(.gregorian); let today = cal.startOfDay(for: now)
-            let components = cal.dateComponents([.month, .day], from: birth)
-            var next = cal.date(from: DateComponents(year: cal.component(.year, from: today), month: components.month, day: 1))!
-            next = cal.date(byAdding: .day, value: (components.day ?? 1) - 1, to: next)!
-            if next <= now {
-                next = cal.date(from: DateComponents(year: cal.component(.year, from: today) + 1, month: components.month, day: 1))!
-                next = cal.date(byAdding: .day, value: (components.day ?? 1) - 1, to: next)!
+            let today = calendar(.gregorian).startOfDay(for: now)
+            let parts = calendar(.gregorian).dateComponents([.month, .day], from: birth)
+            var month = parts.month ?? 1
+            var day = parts.day ?? 1
+            let year = calendar(.gregorian).component(.year, from: today)
+            if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(today) && options["leapBirthday"] == "mar-1" {
+                month = 3; day = 1
+            } else if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(today) {
+                day = 28
             }
-            return result(("Days until birthday", String(cal.dateComponents([.day], from: today, to: next).day ?? 0)))
-        case "time-until", "deadline":
+            var next = calendar(.gregorian).date(from: DateComponents(year: year, month: month, day: day))!
+            if next < today {
+                let nextYear = year + 1
+                if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(calendar(.gregorian).date(from: DateComponents(year: nextYear, month: 1, day: 1))!) { day = 28 }
+                next = calendar(.gregorian).date(from: DateComponents(year: nextYear, month: month, day: day))!
+            }
+            return result(("Days until birthday", String(calendar(.gregorian).dateComponents([.day], from: today, to: next).day ?? 0)))
+        case "time-until":
             let target = try dateOnly(options["target"] ?? options["value"] ?? "", label: "target date")
             let today = calendar(.gregorian).startOfDay(for: now)
-            return result(("Calendar days", String(calendar(.gregorian).dateComponents([.day], from: today, to: target).day ?? 0)), ("Weekdays", String(businessDaysBetween(today, target))))
+            let span = calendarSpan(today, target)
+            let sign = span.totalDays < 0 ? "-" : ""
+            return result(("Calendar span", "\(sign)\(span.years) years, \(span.months) months, \(span.days) days"), ("Total days", String(span.totalDays)))
+        case "deadline":
+            let target = try dateOnly(options["target"] ?? options["value"] ?? "", label: "deadline")
+            let today = calendar(.gregorian).startOfDay(for: now)
+            let includeEnd = options["includeEnd"] == "true"
+            let working = try countWorkingDays(from: today, to: target, options: options, includeEnd: includeEnd)
+            return result(("Calendar days remaining", String(calendar(.gregorian).dateComponents([.day], from: today, to: target).day ?? 0)), ("Working days remaining", String(working)), ("Deadline weekday", format(target, pattern: "EEEE")), ("End-date rule", includeEnd ? "Deadline date included" : "Deadline date excluded"))
+        case "meeting-planner":
+            return try meetingSlots(options)
         default: throw NativeDateTimeError.invalidOperation("Unknown date operation.")
         }
     }
@@ -186,15 +230,271 @@ public enum NativeDateTimeEngine {
         let total = Int(difference); return result(("Countdown", "\(total / 86400)d \((total % 86400) / 3600)h \((total % 3600) / 60)m \(total % 60)s"), ("Target", localizedMedium(target, zone: TimeZone.current, locale: Locale.current)), ("Total seconds", String(total)))
     }
     private static func unix(_ value: String) throws -> NativeDateTimeResult {
-        let raw = value.trimmingCharacters(in: .whitespacesAndNewlines); guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a date or timestamp.") }
-        if raw.range(of: "^\\d+$", options: .regularExpression) != nil {
+        let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a date or timestamp.") }
+        let isInteger = raw.range(of: "^-?\d+$", options: .regularExpression) != nil
+        var totalNanos: Int64
+        var precision = "date input"
+        if isInteger {
             guard let number = Int64(raw) else { throw NativeDateTimeError.invalidOperation("That timestamp is out of range.") }
-            let seconds = raw.count > 11 ? Double(number) / 1000 : Double(number); let date = Date(timeIntervalSince1970: seconds); guard date.timeIntervalSince1970.isFinite else { throw NativeDateTimeError.invalidOperation("That timestamp is out of range.") }
-            return result(("ISO", isoString(date)), ("Local", date.description(with: Locale.current)))
+            let digits = raw.replacingOccurrences(of: "-", with: "").count
+            let multiplier: Int64
+            switch digits {
+            case 0...10: multiplier = 1_000_000_000; precision = "seconds"
+            case 11...13: multiplier = 1_000_000; precision = "milliseconds"
+            case 14...16: multiplier = 1_000; precision = "microseconds"
+            case 17...19: multiplier = 1; precision = "nanoseconds"
+            default: throw NativeDateTimeError.invalidOperation("Timestamp is too large.")
+            }
+            let multiplied = number.multipliedReportingOverflow(by: multiplier)
+            guard !multiplied.overflow else { throw NativeDateTimeError.invalidOperation("That timestamp is out of range.") }
+            totalNanos = multiplied.partialValue
+        } else {
+            let date = try parseDate(raw, label: "date")
+            let nanos = date.timeIntervalSince1970 * 1_000_000_000
+            guard nanos.isFinite, nanos >= Double(Int64.min), nanos <= Double(Int64.max) else {
+                throw NativeDateTimeError.invalidOperation("That timestamp is out of range.")
+            }
+            totalNanos = Int64(nanos.rounded())
         }
-        return result(("Unix seconds", String(Int(try parseDate(raw, label: "date").timeIntervalSince1970))))
+        let seconds = Double(totalNanos) / 1_000_000_000
+        let date = Date(timeIntervalSince1970: seconds)
+        let unixSeconds = Int64(floor(seconds))
+        return result(
+            ("Detected precision", precision),
+            ("ISO UTC", isoString(date)),
+            ("Local", date.description(with: Locale.current)),
+            ("Unix seconds", String(unixSeconds)),
+            ("Unix milliseconds", String(totalNanos / 1_000_000)),
+            ("Unix microseconds", String(totalNanos / 1_000)),
+            ("Unix nanoseconds", String(totalNanos))
+        )
     }
     private static func localizedMedium(_ date: Date, zone: TimeZone, locale: Locale) -> String { let f = DateFormatter(); f.locale = locale; f.timeZone = zone; f.dateStyle = .medium; f.timeStyle = .medium; return f.string(from: date) }
     private static func isoString(_ date: Date) -> String { let f = ISO8601DateFormatter(); f.timeZone = utc; f.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]; return f.string(from: date) }
     private static func format(_ date: Date, pattern: String) -> String { let f = DateFormatter(); f.locale = Locale(identifier: "en_GB"); f.calendar = calendar(.gregorian); f.timeZone = utc; f.dateFormat = pattern.replacingOccurrences(of: "do", with: "d"); return f.string(from: date) }
+
+    private struct ZoneChoice {
+        let label: String
+        let zone: TimeZone
+    }
+
+    private static let cityZones: [String: String] = [
+        "accra": "Africa/Accra", "amsterdam": "Europe/Amsterdam", "athens": "Europe/Athens",
+        "auckland": "Pacific/Auckland", "bangkok": "Asia/Bangkok", "beijing": "Asia/Shanghai",
+        "berlin": "Europe/Berlin", "cairo": "Africa/Cairo", "chicago": "America/Chicago",
+        "delhi": "Asia/Kolkata", "dubai": "Asia/Dubai", "dublin": "Europe/Dublin",
+        "hong kong": "Asia/Hong_Kong", "istanbul": "Europe/Istanbul", "jakarta": "Asia/Jakarta",
+        "johannesburg": "Africa/Johannesburg", "lagos": "Africa/Lagos", "lisbon": "Europe/Lisbon",
+        "london": "Europe/London", "los angeles": "America/Los_Angeles", "madrid": "Europe/Madrid",
+        "manila": "Asia/Manila", "melbourne": "Australia/Melbourne", "mumbai": "Asia/Kolkata",
+        "nairobi": "Africa/Nairobi", "new delhi": "Asia/Kolkata", "new york": "America/New_York",
+        "paris": "Europe/Paris", "rio de janeiro": "America/Sao_Paulo", "rome": "Europe/Rome",
+        "san francisco": "America/Los_Angeles", "sao paulo": "America/Sao_Paulo",
+        "seoul": "Asia/Seoul", "singapore": "Asia/Singapore", "sydney": "Australia/Sydney",
+        "tokyo": "Asia/Tokyo", "toronto": "America/Toronto", "kuala lumpur": "Asia/Kuala_Lumpur",
+        "cape town": "Africa/Johannesburg", "utc": "UTC"
+    ]
+
+    private static func resolveZone(_ raw: String) throws -> ZoneChoice {
+        let label = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a city or IANA time zone.") }
+        let identifier = cityZones[label.lowercased()] ?? label
+        guard let zone = TimeZone(identifier: identifier) else {
+            throw NativeDateTimeError.invalidOperation("Unknown city or time zone: \(label). Use a city name or IANA ID such as Africa/Lagos.")
+        }
+        return ZoneChoice(label: label, zone: zone)
+    }
+
+    private static func parseZoneList(_ value: String, limit: Int) throws -> [ZoneChoice] {
+        let raw = value.components(separatedBy: CharacterSet(charactersIn: ",;\n\r"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter at least one city or IANA time zone.") }
+        var seen = Set<String>()
+        var result: [ZoneChoice] = []
+        for item in raw {
+            let zone = try resolveZone(item)
+            if seen.insert(zone.zone.identifier).inserted { result.append(zone) }
+            if result.count >= limit { break }
+        }
+        return result
+    }
+
+    private static func offsetLabel(_ date: Date, zone: TimeZone) -> String {
+        let seconds = zone.secondsFromGMT(for: date)
+        let sign = seconds < 0 ? "-" : "+"
+        let value = abs(seconds)
+        return String(format: "UTC%@%02d:%02d", sign, value / 3600, (value % 3600) / 60)
+    }
+
+    private static func calendarSpan(_ from: Date, _ to: Date) -> (years: Int, months: Int, days: Int, totalDays: Int) {
+        let cal = calendar(.gregorian)
+        let start = min(from, to)
+        let end = max(from, to)
+        let years = cal.dateComponents([.year], from: start, to: end).year ?? 0
+        let afterYears = cal.date(byAdding: .year, value: years, to: start)!
+        let months = cal.dateComponents([.month], from: afterYears, to: end).month ?? 0
+        let afterMonths = cal.date(byAdding: .month, value: months, to: afterYears)!
+        let days = cal.dateComponents([.day], from: afterMonths, to: end).day ?? 0
+        let total = cal.dateComponents([.day], from: from, to: to).day ?? 0
+        return (years, months, days, total)
+    }
+
+    private static func addDateSpan(_ start: Date, options: [String: String]) throws -> Date {
+        let direction = options["direction"] == "subtract" ? -1 : 1
+        let cal = calendar(.gregorian)
+        var result = start
+        for component in [Calendar.Component.year, .month, .weekOfYear, .day] {
+            let key: String
+            switch component {
+            case .year: key = "years"
+            case .month: key = "months"
+            case .weekOfYear: key = "weeks"
+            default: key = "days"
+            }
+            guard let amount = Int(options[key] ?? "0") else {
+                throw NativeDateTimeError.invalidOperation("Enter a whole number for \(key).")
+            }
+            guard let calculated = cal.date(byAdding: component, value: amount * direction, to: result) else {
+                throw NativeDateTimeError.invalidOperation("That date calculation is outside the supported range.")
+            }
+            result = calculated
+        }
+        return result
+    }
+
+    private static func weekendDays(_ options: [String: String]) throws -> Set<Int> {
+        let raw = (options["weekendDays"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.isEmpty { return [1, 7] }
+        let parts = raw.split(whereSeparator: { $0 == "," || $0.isWhitespace })
+        guard !parts.isEmpty else {
+            throw NativeDateTimeError.invalidOperation("Weekend days must be numbers from 0 (Sunday) to 6 (Saturday).")
+        }
+        var days = Set<Int>()
+        for part in parts {
+            guard let value = Int(part), (0...6).contains(value) else {
+                throw NativeDateTimeError.invalidOperation("Weekend days must be numbers from 0 (Sunday) to 6 (Saturday).")
+            }
+            days.insert(value == 0 ? 1 : value + 1)
+        }
+        return days
+    }
+
+    private static func excludedDates(_ raw: String) throws -> Set<Date> {
+        let values = raw.components(separatedBy: CharacterSet(charactersIn: ",;\n\r"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return Set(try values.map { try dateOnly($0, label: "excluded date") })
+    }
+
+    private static func isWorkingDay(_ date: Date, weekends: Set<Int>, excluded: Set<Date>) -> Bool {
+        let cal = calendar(.gregorian)
+        return !weekends.contains(cal.component(.weekday, from: date)) && !excluded.contains(cal.startOfDay(for: date))
+    }
+
+    private static func countWorkingDays(from: Date, to: Date, options: [String: String], includeEnd: Bool) throws -> Int {
+        let cal = calendar(.gregorian)
+        let weekends = try weekendDays(options)
+        let excluded = try excludedDates(options["excludedDates"] ?? "")
+        let direction = to >= from ? 1 : -1
+        var cursor = cal.startOfDay(for: from)
+        let end = cal.startOfDay(for: to)
+        var count = 0
+        for _ in 0..<366_000 {
+            cursor = cal.date(byAdding: .day, value: direction, to: cursor)!
+            if cursor == end && !includeEnd { return count }
+            if direction > 0 ? cursor > end : cursor < end { return count }
+            if isWorkingDay(cursor, weekends: weekends, excluded: excluded) { count += direction }
+        }
+        throw NativeDateTimeError.invalidOperation("That working-day range is too large.")
+    }
+
+    private static func addWorkingDays(_ start: Date, _ amount: Double, options: [String: String]) throws -> Date {
+        guard amount.isFinite else { throw NativeDateTimeError.invalidOperation("Enter a finite number of business days.") }
+        let cal = calendar(.gregorian)
+        let weekends = try weekendDays(options)
+        let excluded = try excludedDates(options["excludedDates"] ?? "")
+        var remaining = Int(abs(amount).rounded(.towardZero))
+        let direction = amount < 0 ? -1 : 1
+        var date = cal.startOfDay(for: start)
+        for _ in 0..<366_000 {
+            if remaining <= 0 { return date }
+            date = cal.date(byAdding: .day, value: direction, to: date)!
+            if isWorkingDay(date, weekends: weekends, excluded: excluded) { remaining -= 1 }
+        }
+        throw NativeDateTimeError.invalidOperation("That workday range is too large.")
+    }
+
+    private static func parseClock(_ raw: String) throws -> Int {
+        let pieces = raw.split(separator: ":").compactMap { Int($0) }
+        guard pieces.count == 2, (0...23).contains(pieces[0]), (0...59).contains(pieces[1]) else {
+            throw NativeDateTimeError.invalidOperation("Enter working hours as HH:mm using a 24-hour clock.")
+        }
+        return pieces[0] * 60 + pieces[1]
+    }
+
+    private static func meetingSlots(_ options: [String: String]) throws -> NativeDateTimeResult {
+        let zones = try parseZoneList(options["zones"] ?? "", limit: 8)
+        guard zones.count >= 2 else { throw NativeDateTimeError.invalidOperation("Add at least two cities or time zones to compare.") }
+        let anchor = try resolveZone(options["sourceTz"]?.isEmpty == false ? options["sourceTz"]! : zones[0].zone.identifier)
+        let date = try dateOnly(options["date"] ?? "", label: "meeting date")
+        let workStart = options["workStart"] ?? "09:00"
+        let workEnd = options["workEnd"] ?? "17:00"
+        let startMinutes = try parseClock(workStart)
+        let endMinutes = try parseClock(workEnd)
+        let duration = min(480, max(5, Int(options["durationMinutes"] ?? "30") ?? 30))
+        let interval = min(120, max(5, Int(options["intervalMinutes"] ?? "30") ?? 30))
+        let dayText = format(date, pattern: "yyyy-MM-dd")
+        let localFormatter = DateFormatter()
+        localFormatter.locale = Locale(identifier: "en_US_POSIX")
+        localFormatter.timeZone = anchor.zone
+        localFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        localFormatter.isLenient = false
+        guard let start = localFormatter.date(from: "\(dayText) \(workStart):00"),
+              localFormatter.string(from: start) == "\(dayText) \(workStart):00" else {
+            throw NativeDateTimeError.invalidOperation("The reference city's work start is not a valid local time.")
+        }
+        guard var end = localFormatter.date(from: "\(dayText) \(workEnd):00"),
+              localFormatter.string(from: end) == "\(dayText) \(workEnd):00" else {
+            throw NativeDateTimeError.invalidOperation("The reference city's work end is not a valid local time.")
+        }
+        if end <= start { end = end.addingTimeInterval(86_400) }
+        var slots: [(Date, String)] = []
+        var cursor = start
+        while cursor.addingTimeInterval(Double(duration * 60)) <= end && slots.count < 500 {
+            let finish = cursor.addingTimeInterval(Double(duration * 60))
+            var localValues: [(String, String)] = []
+            var suitable = true
+            for item in zones {
+                var cal = Calendar(identifier: .gregorian); cal.timeZone = item.zone
+                let a = cal.dateComponents([.year, .month, .day, .hour, .minute], from: cursor)
+                let b = cal.dateComponents([.year, .month, .day, .hour, .minute], from: finish)
+                let sameDay = a.year == b.year && a.month == b.month && a.day == b.day
+                let localStart = (a.hour ?? 0) * 60 + (a.minute ?? 0)
+                let localEnd = (b.hour ?? 0) * 60 + (b.minute ?? 0)
+                if !sameDay || localStart < startMinutes || localEnd > endMinutes { suitable = false; break }
+                let time = String(format: "%02d:%02d", a.hour ?? 0, a.minute ?? 0)
+                localValues.append((item.label, "\(time) (\(offsetLabel(cursor, zone: item.zone)))"))
+            }
+            if suitable {
+                slots.append((cursor, localValues.map { "\($0.0): \($0.1)" }.joined(separator: " | ")))
+            }
+            cursor = cursor.addingTimeInterval(Double(interval * 60))
+        }
+        guard !slots.isEmpty else {
+            return result(("Available slots", "No shared working-hours slots found. This checks working hours, not personal calendar free/busy."))
+        }
+        let shown = Array(slots.prefix(8))
+        var output: [(String, String)] = [
+            ("Available slots", "\(slots.count) matching slots; showing the first \(shown.count). This checks working hours, not personal calendar free/busy.")
+        ]
+        for (index, slot) in shown.enumerated() { output.append(("Option \(index + 1)", slot.1)) }
+        let first = shown[0].0
+        let last = first.addingTimeInterval(Double(duration * 60))
+        let stamp = ISO8601DateFormatter()
+        stamp.timeZone = utc
+        stamp.formatOptions = [.withInternetDateTime]
+        let ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN", "BEGIN:VEVENT", "DTSTART:\(stamp.string(from: first).replacingOccurrences(of: "-", with: "").replacingOccurrences(of: ":", with: ""))", "DTEND:\(stamp.string(from: last).replacingOccurrences(of: "-", with: "").replacingOccurrences(of: ":", with: ""))", "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR"].joined(separator: "\r\n")
+        output.append(("ICS for option 1", ics))
+        return NativeDateTimeResult(rows: output.map { NativeDateTimeRow(label: $0.0, value: $0.1) })
+    }
 }

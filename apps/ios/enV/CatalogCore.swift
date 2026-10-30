@@ -356,7 +356,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingDateTimeExtensions()
     }
 }
 
@@ -696,3 +696,60 @@ extension Catalog {
         return selected
     }
 }
+
+extension Catalog {
+    /// Adds Date & Time tools backed by the local Swift engine while older bundled catalogues roll forward.
+    func includingDateTimeExtensions() -> Catalog {
+        let definitions: [(String, String, String, String, [String], [String], Int, Bool, String, [String])] = [
+            ("age-calculator", "Age Calculator", "age-calculator", "Calculate your age in years, months, and days.", ["age", "calculator", "years", "months", "days", "birthday"], ["age", "calculator", "date"], 83, false, "age", ["birthday-countdown", "date-difference", "time-until-calculator"]),
+            ("date-calculator", "Date Calculator", "date-calculator", "Add or subtract years, months, weeks, and days from a date.", ["date", "calculator", "add", "subtract", "years", "months", "weeks", "days"], ["date", "arithmetic", "add", "subtract"], 84, false, "date-add", ["date-difference", "workday-calculator", "business-day-calculator"]),
+            ("duration-calculator", "Duration Calculator", "duration-calculator", "Calculate exact elapsed time between two date and time values.", ["duration", "elapsed", "time", "hours", "minutes", "seconds"], ["duration", "elapsed-time", "date"], 85, false, "duration", ["date-difference", "countdown", "time-until-calculator"]),
+            ("meeting-time-planner", "Meeting Time Planner", "meeting-time-planner", "Find shared working-hour slots across cities and export an ICS invite.", ["meeting", "planner", "timezone", "working", "hours", "calendar", "ics"], ["meeting", "timezone", "planner", "calendar"], 91, true, "meeting-planner", ["timezone-converter", "world-clock", "countdown"])
+        ]
+        let existing = Set(tools.map(\.id))
+        let additions = definitions.filter { !existing.contains($0.0) }.map { item in
+            Tool(
+                id: item.0,
+                name: item.1,
+                slug: item.2,
+                description: item.3,
+                category: "datetime",
+                subcategory: nil,
+                keywords: item.4,
+                tags: item.5,
+                icon: "Calendar",
+                popularity: item.6,
+                featured: item.7,
+                clientSide: true,
+                requiresBackend: false,
+                requiresAuth: false,
+                status: "active",
+                disclaimer: nil,
+                related: item.9,
+                engine: ToolEngine(type: "datetime", id: nil, op: item.8, configuration: [:])
+            )
+        }
+        guard !additions.isEmpty else { return self }
+        let updated = (tools + additions).sorted {
+            let leftCategory = $0.category.lowercased()
+            let rightCategory = $1.category.lowercased()
+            return leftCategory == rightCategory
+                ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
+                : leftCategory < rightCategory
+        }
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(
+                total: updated.count,
+                active: updated.filter { $0.status == "active" || $0.status == "beta" }.count,
+                planned: updated.filter { $0.isPlanned }.count,
+                categories: categories.count
+            ),
+            categories: categories,
+            tools: updated,
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+}
+

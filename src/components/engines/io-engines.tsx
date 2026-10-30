@@ -332,23 +332,28 @@ const DATE_FIELDS: Record<string, UiField[]> = {
     { name: "to", label: "To", type: "date" },
   ],
   workday: [
-    { name: "start", label: "Start", type: "date" },
-    { name: "days", label: "Business days to add", type: "number", defaultValue: 10 },
+    { name: "start", label: "Start date", type: "date" },
+    { name: "days", label: "Business days to add (negative to subtract)", type: "number", defaultValue: 10 },
+    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },
+    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },
   ],
   "business-days": [
     { name: "from", label: "From", type: "date" },
     { name: "to", label: "To", type: "date" },
+    { name: "includeEnd", label: "Include end date (true/false)", type: "text", defaultValue: "true" },
+    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },
+    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },
   ],
   duration: [
-    { name: "from", label: "From (ISO or date)", type: "text", placeholder: "2026-01-01 09:00" },
-    { name: "to", label: "To", type: "text", placeholder: "2026-01-02 17:30" },
+    { name: "from", label: "From (ISO date/time)", type: "text", placeholder: "2026-01-01T09:00:00Z" },
+    { name: "to", label: "To (ISO date/time)", type: "text", placeholder: "2026-01-02T17:30:00Z" },
   ],
   timezone: [
     { name: "time", label: "Source local time", type: "text", placeholder: "2026-10-30T12:00" },
-    { name: "fromTz", label: "From time zone", type: "text", defaultValue: "UTC" },
-    { name: "toTz", label: "To time zone", type: "text", defaultValue: "America/New_York" },
+    { name: "fromTz", label: "From city / time zone", type: "text", defaultValue: "Africa/Lagos" },
+    { name: "toTz", label: "To city / time zone", type: "text", defaultValue: "America/New_York" },
   ],
-  unix: [{ name: "value", label: "Unix seconds or ISO date", type: "text" }],
+  unix: [{ name: "value", label: "Unix timestamp(s) or ISO date", type: "textarea", placeholder: "Seconds, milliseconds, microseconds, nanoseconds or ISO dates" }],
   format: [
     { name: "value", label: "Date", type: "date" },
     { name: "pattern", label: "Pattern", type: "text", defaultValue: "yyyy-MM-dd" },
@@ -359,8 +364,22 @@ const DATE_FIELDS: Record<string, UiField[]> = {
   birthday: [{ name: "birth", label: "Birth date", type: "date" }],
   "time-until": [{ name: "target", label: "Target date", type: "date" }],
   countdown: [{ name: "target", label: "Target date & time", type: "datetime-local" }],
-  "world-clock": [{ name: "zones", label: "IANA time zones (one per line)", type: "textarea", defaultValue: "Africa/Lagos\\nEurope/London\\nAmerica/New_York\\nAsia/Tokyo" }],
-  deadline: [\n    { name: "target", label: "Deadline", type: "date" },\n    { name: "includeEnd", label: "Include deadline date (true/false)", type: "text", defaultValue: "false" },\n    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },\n    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },\n  ],\n  "meeting-planner": [\n    { name: "date", label: "Meeting date in first city", type: "date" },\n    { name: "zones", label: "Cities or time zones (2–8)", type: "textarea", defaultValue: "Lagos\\nLondon\\nNew York" },\n    { name: "sourceTz", label: "Date / working-hours reference city", type: "text", defaultValue: "Lagos" },\n    { name: "workStart", label: "Working day starts (HH:mm)", type: "text", defaultValue: "09:00" },\n    { name: "workEnd", label: "Working day ends (HH:mm)", type: "text", defaultValue: "17:00" },\n    { name: "durationMinutes", label: "Meeting length in minutes", type: "number", defaultValue: 30 },\n    { name: "intervalMinutes", label: "Slot interval in minutes", type: "number", defaultValue: 30 },\n  ],
+  "world-clock": [{ name: "zones", label: "Cities or IANA time zones (one per line)", type: "textarea", defaultValue: "Lagos\nLondon\nNew York\nTokyo" }],
+  deadline: [
+    { name: "target", label: "Deadline", type: "date" },
+    { name: "includeEnd", label: "Include deadline date (true/false)", type: "text", defaultValue: "false" },
+    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },
+    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },
+  ],
+  "meeting-planner": [
+    { name: "date", label: "Meeting date in reference city", type: "date" },
+    { name: "zones", label: "Cities or IANA time zones (2–8)", type: "textarea", defaultValue: "Lagos\nLondon\nNew York" },
+    { name: "sourceTz", label: "Reference city / time zone", type: "text", defaultValue: "Lagos" },
+    { name: "workStart", label: "Working day starts (HH:mm)", type: "text", defaultValue: "09:00" },
+    { name: "workEnd", label: "Working day ends (HH:mm)", type: "text", defaultValue: "17:00" },
+    { name: "durationMinutes", label: "Meeting length in minutes", type: "number", defaultValue: 30 },
+    { name: "intervalMinutes", label: "Slot interval in minutes", type: "number", defaultValue: 30 },
+  ],
 };
 
 export function DateTimeEngine({ op }: { op: string }) {

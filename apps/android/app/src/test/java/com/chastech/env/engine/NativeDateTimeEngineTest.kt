@@ -7,9 +7,11 @@ import org.junit.Test
 
 class NativeDateTimeEngineTest {
     private val allIds = setOf(
-        "birthday-countdown", "business-day-calculator", "countdown", "date-difference", "date-formatter",
-        "deadline-calculator", "leap-year-checker", "time-until-calculator", "timezone-converter",
-        "week-number-calculator", "weekday-calculator", "workday-calculator", "world-clock", "unix-timestamp-converter"
+        "age-calculator", "birthday-countdown", "business-day-calculator", "countdown",
+        "date-calculator", "date-difference", "date-formatter", "deadline-calculator",
+        "duration-calculator", "leap-year-checker", "meeting-time-planner",
+        "time-until-calculator", "timezone-converter", "week-number-calculator",
+        "weekday-calculator", "workday-calculator", "world-clock", "unix-timestamp-converter"
     )
     private val fixedNow = Instant.parse("2024-01-15T12:00:00Z")
 
@@ -21,13 +23,13 @@ class NativeDateTimeEngineTest {
     @Test fun calendarFormattingWeekAndLeapOperationsMatchWebSemantics() {
         assertEquals("Formatted: 2024-02-29 Thursday", NativeDateTimeEngine.run("date-formatter", options = mapOf("value" to "2024-02-29", "pattern" to "yyyy-MM-dd EEEE"), now = fixedNow).output)
         assertEquals("Weekday: Thursday", NativeDateTimeEngine.run("weekday-calculator", input = "2024-02-29", now = fixedNow).output)
-        assertEquals("ISO week: 9", NativeDateTimeEngine.run("week-number-calculator", input = "2024-02-29", now = fixedNow).output)
+        assertEquals("ISO week: 9\nISO week-year: 2024", NativeDateTimeEngine.run("week-number-calculator", input = "2024-02-29", now = fixedNow).output)
         assertEquals("2024: Leap year", NativeDateTimeEngine.run("leap-year-checker", options = mapOf("year" to "2024"), now = fixedNow).output)
     }
 
     @Test fun businessDayDateDiffDurationAndBirthdayAreOffline() {
-        assertEquals("Days: 4\nWeeks: 0.6", NativeDateTimeEngine.run("date-difference", options = mapOf("from" to "2024-01-01", "to" to "2024-01-05"), now = fixedNow).output)
-        assertEquals("Weekdays: 1", NativeDateTimeEngine.run("business-day-calculator", options = mapOf("from" to "2024-01-05", "to" to "2024-01-08"), now = fixedNow).output)
+        assertEquals("Calendar span: 0 years, 0 months, 4 days\nTotal days: 4\nWeeks: 0.57\nCalendar hours (24-hour days): 96", NativeDateTimeEngine.run("date-difference", options = mapOf("from" to "2024-01-01", "to" to "2024-01-05"), now = fixedNow).output)
+        assertEquals("Working days: 1\nRange rule: Start date excluded; end date included.\nCustom excluded dates: None supplied", NativeDateTimeEngine.run("business-day-calculator", options = mapOf("from" to "2024-01-05", "to" to "2024-01-08"), now = fixedNow).output)
         assertEquals("Result: 2024-01-08 Monday", NativeDateTimeEngine.run("workday-calculator", options = mapOf("start" to "2024-01-05", "days" to "1"), now = fixedNow).output)
         assertEquals("Days until birthday: 17", NativeDateTimeEngine.run("birthday-countdown", input = "1990-02-01", now = fixedNow).output)
     }
@@ -35,15 +37,15 @@ class NativeDateTimeEngineTest {
     @Test fun countdownTimezoneWorldClockAndUnixAreLocal() {
         val countdown = NativeDateTimeEngine.run("countdown", options = mapOf("target" to "2024-01-16T13:00:00Z"), now = fixedNow).output
         assertTrue(countdown.contains("Countdown: 1d 1h 0m 0s")); assertTrue(countdown.contains("Total seconds: 90000"))
-        assertTrue(NativeDateTimeEngine.run("timezone-converter", options = mapOf("time" to "2024-01-01T00:00:00Z", "toTz" to "America/New_York"), now = fixedNow).output.contains("Unix: 1704067200"))
+        assertTrue(NativeDateTimeEngine.run("timezone-converter", options = mapOf("time" to "2024-01-01T00:00:00Z", "fromTz" to "UTC", "toTz" to "America/New_York"), now = fixedNow).output.contains("Unix seconds: 1704067200"))
         assertTrue(NativeDateTimeEngine.run("world-clock", options = mapOf("zones" to "UTC, America/New_York"), now = fixedNow).rows.size == 2)
-        assertTrue(NativeDateTimeEngine.run("unix-timestamp-converter", input = "0", now = fixedNow).output.startsWith("ISO: 1970-01-01T00:00:00Z"))
-        assertEquals("Unix seconds: 1704067200", NativeDateTimeEngine.run("unix-timestamp-converter", input = "2024-01-01", now = fixedNow).output)
+        assertTrue(NativeDateTimeEngine.run("unix-timestamp-converter", input = "0", now = fixedNow).output.contains("ISO UTC: 1970-01-01T00:00:00Z"))
+        assertTrue(NativeDateTimeEngine.run("unix-timestamp-converter", input = "2024-01-01", now = fixedNow).output.contains("Unix seconds: 1704067200"))
     }
 
     @Test fun relativeToolsAndInvalidInputsAreExplicit() {
-        assertEquals("Calendar days: 5\nWeekdays: 4", NativeDateTimeEngine.run("time-until-calculator", options = mapOf("target" to "2024-01-20"), now = fixedNow).output)
-        assertEquals("Calendar days: 5\nWeekdays: 4", NativeDateTimeEngine.run("deadline-calculator", options = mapOf("target" to "2024-01-20"), now = fixedNow).output)
+        assertEquals("Calendar span: 0 years, 0 months, 5 days\nTotal days: 5", NativeDateTimeEngine.run("time-until-calculator", options = mapOf("target" to "2024-01-20"), now = fixedNow).output)
+        assertEquals("Calendar days remaining: 5\nWorking days remaining: 4\nDeadline weekday: Saturday\nEnd-date rule: Deadline date excluded", NativeDateTimeEngine.run("deadline-calculator", options = mapOf("target" to "2024-01-20"), now = fixedNow).output)
         try { NativeDateTimeEngine.run("date-formatter", input = "not-a-date", now = fixedNow); throw AssertionError("invalid date accepted") } catch (_: IllegalArgumentException) { }
     }
     @Test fun sourceTimezoneIsUsedForWallClockConversionAndDayShift() {
@@ -54,5 +56,43 @@ class NativeDateTimeEngineTest {
         )
         assertTrue(result.output.contains("Unix seconds: 1704099600"))
         assertTrue(result.output.contains("Same calendar day"))
+    }
+
+    @Test fun dateMathAndBusinessDayRulesHandleCustomHolidaysAndReverseRanges() {
+        assertEquals(
+            "Working days: 1\nRange rule: Start date excluded; end date included.\nCustom excluded dates: 1",
+            NativeDateTimeEngine.run("business-day-calculator", options = mapOf(
+                "from" to "2024-01-05", "to" to "2024-01-09",
+                "excludedDates" to "2024-01-08", "includeEnd" to "true"
+            ), now = fixedNow).output
+        )
+        assertEquals(
+            "Result: 2024-01-05 Friday",
+            NativeDateTimeEngine.run("workday-calculator", options = mapOf("start" to "2024-01-08", "days" to "-1"), now = fixedNow).output
+        )
+        assertTrue(NativeDateTimeEngine.run("date-difference", options = mapOf("from" to "2024-01-10", "to" to "2024-01-01"), now = fixedNow).output.contains("Total days: -9"))
+        assertTrue(NativeDateTimeEngine.run("week-number-calculator", input = "2021-01-01", now = fixedNow).output.contains("ISO week-year: 2020"))
+    }
+
+    @Test fun cityBasedWorldClockAndDstGapAreExplicit() {
+        assertEquals(2, NativeDateTimeEngine.run("world-clock", options = mapOf("zones" to "Lagos\nLondon"), now = fixedNow).rows.size)
+        try {
+            NativeDateTimeEngine.run("timezone-converter", options = mapOf("time" to "2024-03-10T02:30", "fromTz" to "America/New_York", "toTz" to "UTC"), now = fixedNow)
+            throw AssertionError("DST gap should not be silently accepted")
+        } catch (_: IllegalArgumentException) { }
+    }
+
+
+    @Test fun dateAdditionAgeDurationAndMeetingPlannerAreAvailable() {
+        assertTrue(NativeDateTimeEngine.run("age-calculator", options = mapOf("birth" to "1990-02-01"), now = fixedNow).output.contains("Age: 33 years, 11 months, 14 days"))
+        assertEquals("Result: 2024-02-29 Thursday\nDate: 2024-02-29", NativeDateTimeEngine.run("date-calculator", options = mapOf("start" to "2024-01-31", "months" to "1"), now = fixedNow).output)
+        val duration = NativeDateTimeEngine.run("duration-calculator", options = mapOf("from" to "2024-01-01T09:00:00Z", "to" to "2024-01-02T10:30:00Z"), now = fixedNow).output
+        assertTrue(duration.contains("Elapsed duration: 1d 1h 30m 0s"))
+        val meeting = NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
+            "date" to "2024-01-15", "zones" to "Lagos, London, New York", "sourceTz" to "Lagos",
+            "workStart" to "09:00", "workEnd" to "17:00", "durationMinutes" to "30", "intervalMinutes" to "30"
+        ), now = fixedNow).output
+        assertTrue(meeting.contains("Option 1:"))
+        assertTrue(meeting.contains("ICS for option 1:"))
     }
 }

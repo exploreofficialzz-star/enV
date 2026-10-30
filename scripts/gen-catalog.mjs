@@ -488,13 +488,17 @@ add([
 ]);
 
 add([
-  ["date-difference","Date Difference Calculator","datetime","Days, weeks, and months between two dates.","datetime","date-diff","date difference between",1,90],
-  ["workday-calculator","Workday Calculator","datetime","Add business days, skipping weekends.","datetime","workday","workdays business days",0,82],
-  ["business-day-calculator","Business Day Calculator","datetime","Count weekdays between two dates.","datetime","business-days","business days weekdays",0,80],
+  ["age-calculator","Age Calculator","datetime","Calculate your age in years, months, and days.","datetime","age","age calculator years months days birthday",0,83],
+  ["date-calculator","Date Calculator","datetime","Add or subtract years, months, weeks, and days from a date.","datetime","date-add","date arithmetic add subtract days months repeat",0,84],
+  ["date-difference","Date Difference Calculator","datetime","Calculate calendar years, months, days, weeks, and total hours between dates.","datetime","date-diff","date difference between date span calendar days",1,92],
+  ["duration-calculator","Duration Calculator","datetime","Calculate exact elapsed time between two date and time values.","datetime","duration","date time duration hours minutes seconds",0,85],
+  ["workday-calculator","Workday Calculator","datetime","Add or subtract working days with custom weekends and excluded dates.","datetime","workday","workdays business days holiday custom weekend",0,86],
+  ["business-day-calculator","Business Day Calculator","datetime","Count working days between dates with custom weekend and holiday exclusions.","datetime","business-days","business days weekdays holidays excluded end date",0,86],
   ["countdown","Countdown","datetime","Count down to a date and time.","datetime","countdown","countdown timer event",1,88],
   ["stopwatch","Stopwatch","productivity","A simple stopwatch with laps.","custom","stopwatch","stopwatch lap",1,86],
   ["world-clock","World Clock","datetime","Current time in major cities.","datetime","world-clock","world clock timezone cities",1,87],
   ["timezone-converter","Timezone Converter","datetime","Convert a time between IANA time zones.","datetime","timezone","timezone convert utc",1,89],
+  ["meeting-time-planner","Meeting Time Planner","datetime","Find shared working-hour slots across cities and export an ICS invite.","datetime","meeting-planner","meeting planner time zones work hours shared slots calendar invite",1,91],
   ["date-formatter","Date Formatter","datetime","Format a date with common patterns.","datetime","format","date format iso",0,74],
   ["weekday-calculator","Weekday Calculator","datetime","What day of the week a date falls on.","datetime","weekday","weekday friday",0,72],
   ["week-number-calculator","Week Number Calculator","datetime","ISO week number of a date.","datetime","week-number","iso week",0,70],

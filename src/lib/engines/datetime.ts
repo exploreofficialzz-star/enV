@@ -63,7 +63,7 @@ const CITY_ZONES: Record<string, string> = {
 
 function parseDate(value: string, label = "date"): Date {
   const raw = value?.trim() ?? "";
-  if (!raw) throw new Error(\`Enter a ${label}.\`);
+  if (!raw) throw new Error(`Enter a ${label}.`);
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   if (dateOnly) {
     const result = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
@@ -72,20 +72,20 @@ function parseDate(value: string, label = "date"): Date {
       result.getMonth() === Number(dateOnly[2]) - 1 &&
       result.getDate() === Number(dateOnly[3])
     ) return result;
-    throw new Error(\`Could not read that ${label}. Use a valid YYYY-MM-DD date.\`);
+    throw new Error(`Could not read that ${label}. Use a valid YYYY-MM-DD date.`);
   }
   const parsed = parseISO(raw);
   if (isValid(parsed)) return parsed;
   const fallback = new Date(raw);
   if (isValid(fallback)) return fallback;
-  throw new Error(\`Could not read that ${label}. Use YYYY-MM-DD.\`);
+  throw new Error(`Could not read that ${label}. Use YYYY-MM-DD.`);
 }
 
 function parseInstant(value: string, label = "date and time"): Date {
   const raw = value?.trim() ?? "";
-  if (!raw) throw new Error(\`Enter a ${label}.\`);
+  if (!raw) throw new Error(`Enter a ${label}.`);
   const parsed = new Date(raw);
-  if (!isValid(parsed)) throw new Error(\`Could not read that ${label}. Use an ISO-8601 date/time.\`);
+  if (!isValid(parsed)) throw new Error(`Could not read that ${label}. Use an ISO-8601 date/time.`);
   return parsed;
 }
 
@@ -97,7 +97,7 @@ function resolveZone(raw: string): ZoneChoice {
     new Intl.DateTimeFormat("en", { timeZone: mapped }).format(new Date(0));
     return { label: input, zone: mapped };
   } catch {
-    throw new Error(\`Unknown city or time zone: ${input}. Use a city name or IANA ID such as Africa/Lagos.\`);
+    throw new Error(`Unknown city or time zone: ${input}. Use a city name or IANA ID such as Africa/Lagos.`);
   }
 }
 
@@ -147,7 +147,7 @@ function offsetLabel(instant: Date, zone: string): string {
   const minutes = Math.round(zoneOffsetMilliseconds(instant, zone) / 60_000);
   const sign = minutes < 0 ? "-" : "+";
   const absolute = Math.abs(minutes);
-  return \`UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}\`;
+  return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
 }
 
 function formatInZone(instant: Date, zone: string): string {
@@ -196,7 +196,7 @@ function parseWallTimeInZone(rawValue: string, zone: string): { instant: Date; o
     })
     .sort((a, b) => a.getTime() - b.getTime());
   if (!candidates.length) {
-    throw new Error(\`That local time does not exist in ${zone} because the clock moves forward for daylight saving time. Choose another time.\`);
+    throw new Error(`That local time does not exist in ${zone} because the clock moves forward for daylight saving time. Choose another time.`);
   }
   return { instant: candidates[0], overlap: candidates.length > 1 };
 }
@@ -274,7 +274,7 @@ function addDateSpan(start: Date, options: Record<string, string>, multiplier = 
   const direction = options.direction === "subtract" ? -1 : 1;
   const amount = (key: string) => {
     const parsed = Number(options[key] || 0);
-    if (!Number.isFinite(parsed)) throw new Error(\`Enter a valid number for ${key}.\`);
+    if (!Number.isFinite(parsed)) throw new Error(`Enter a valid number for ${key}.`);
     return Math.trunc(parsed) * direction * multiplier;
   };
   let result = addYears(start, amount("years"));
@@ -316,7 +316,7 @@ function unixTimestampRows(raw: string): DateTimeRow[] {
   const date = new Date(numericMillis);
   if (!isValid(date)) throw new Error("That timestamp is out of range.");
   const base = new Date(Number(seconds) * 1000).toISOString().replace(/\.\d{3}Z$/, "");
-  const iso = \`${base}.${String(nanos).padStart(9, "0")}Z\`;
+  const iso = `${base}.${String(nanos).padStart(9, "0")}Z`;
   return [
     { label: "Detected precision", value: precision },
     { label: "ISO UTC", value: iso },
@@ -337,8 +337,8 @@ function meetingSlots(options: Record<string, string>): DateTimeRow[] {
   const workEnd = options.workEnd || "17:00";
   const duration = Math.max(5, Math.min(480, Math.trunc(Number(options.durationMinutes) || 30)));
   const interval = Math.max(5, Math.min(120, Math.trunc(Number(options.intervalMinutes) || 30)));
-  const startLocal = parseWallTimeInZone(\`${dateKey(date)}T${workStart}\`, anchor.zone).instant;
-  let endLocal = parseWallTimeInZone(\`${dateKey(date)}T${workEnd}\`, anchor.zone).instant;
+  const startLocal = parseWallTimeInZone(`${dateKey(date)}T${workStart}`, anchor.zone).instant;
+  let endLocal = parseWallTimeInZone(`${dateKey(date)}T${workEnd}`, anchor.zone).instant;
   if (endLocal <= startLocal) endLocal = new Date(endLocal.getTime() + 86_400_000);
   const workStartMinutes = clockMinutes(workStart);
   const workEndMinutes = clockMinutes(workEnd);
@@ -361,7 +361,7 @@ function meetingSlots(options: Record<string, string>): DateTimeRow[] {
       slots.push({
         instant,
         value: localTimes.map(({ choice, a }) =>
-          \`${choice.label}: ${String(a.hour).padStart(2, "0")}:${String(a.minute).padStart(2, "0")} (${offsetLabel(instant, choice.zone)})\`
+          `${choice.label}: ${String(a.hour).padStart(2, "0")}:${String(a.minute).padStart(2, "0")} (${offsetLabel(instant, choice.zone)})`
         ).join(" | "),
       });
     }
@@ -369,17 +369,17 @@ function meetingSlots(options: Record<string, string>): DateTimeRow[] {
   if (!slots.length) return [{ label: "Available slots", value: "No shared working-hours slots found for that date and these working-hour settings." }];
   const shown = slots.slice(0, 8);
   const rows: DateTimeRow[] = [
-    { label: "Available slots", value: \`${slots.length} matching slots; showing the first ${shown.length}. This checks working hours, not personal calendar free/busy.\` },
-    ...shown.map((slot, index) => ({ label: \`Option ${index + 1}\`, value: slot.value })),
+    { label: "Available slots", value: `${slots.length} matching slots; showing the first ${shown.length}. This checks working hours, not personal calendar free/busy.` },
+    ...shown.map((slot, index) => ({ label: `Option ${index + 1}`, value: slot.value })),
   ];
   const first = shown[0].instant;
   const end = new Date(first.getTime() + duration * 60_000);
   const stamp = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const ics = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//enV//Date Time Planner//EN",
-    "BEGIN:VEVENT", \`DTSTART:${stamp(first)}\`, \`DTEND:${stamp(end)}\`,
+    "BEGIN:VEVENT", `DTSTART:${stamp(first)}`, `DTEND:${stamp(end)}`,
     "SUMMARY:Meeting", "END:VEVENT", "END:VCALENDAR",
-  ].join("\\r\\n");
+  ].join("\r\n");
   rows.push({ label: "ICS for option 1", value: ics });
   return rows;
 }
@@ -402,7 +402,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       const months = differenceInMonths(today, addYears(birth, years));
       const days = differenceInCalendarDays(today, addMonths(addYears(birth, years), months));
       return [
-        { label: "Age", value: \`${years} years, ${months} months, ${days} days\` },
+        { label: "Age", value: `${years} years, ${months} months, ${days} days` },
         { label: "Days lived", value: String(differenceInCalendarDays(today, birth)) },
       ];
     }
@@ -412,7 +412,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       const span = calendarSpan(from, to);
       const sign = span.direction < 0 ? "-" : "";
       return [
-        { label: "Calendar span", value: \`${sign}${span.years} years, ${span.months} months, ${span.days} days\` },
+        { label: "Calendar span", value: `${sign}${span.years} years, ${span.months} months, ${span.days} days` },
         { label: "Total days", value: String(span.totalDays) },
         { label: "Weeks", value: (span.totalDays / 7).toFixed(2) },
         { label: "Calendar hours (24-hour days)", value: String(span.totalDays * 24) },
@@ -431,7 +431,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
         let cursor = start;
         for (let i = 1; i <= repeat; i++) {
           cursor = addDateSpan(cursor, opts);
-          rows.push({ label: \`Occurrence ${i}\`, value: format(cursor, "yyyy-MM-dd EEEE") });
+          rows.push({ label: `Occurrence ${i}`, value: format(cursor, "yyyy-MM-dd EEEE") });
         }
         return rows;
       }
@@ -454,7 +454,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       const result = countWorkingDays(from, to, opts, includeEnd);
       return [
         { label: "Working days", value: String(result) },
-        { label: "Range rule", value: \`Start date excluded; end date ${includeEnd ? "included" : "excluded"}.\` },
+        { label: "Range rule", value: `Start date excluded; end date ${includeEnd ? "included" : "excluded"}.` },
         { label: "Custom excluded dates", value: parseExcludedDates(opts.excludedDates).size ? String(parseExcludedDates(opts.excludedDates).size) : "None supplied" },
       ];
     }
@@ -468,7 +468,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       const minutes = Math.floor((totalSeconds % 3_600) / 60);
       const seconds = totalSeconds % 60;
       return [
-        { label: "Elapsed duration", value: \`${days}d ${hours}h ${minutes}m ${seconds}s\` },
+        { label: "Elapsed duration", value: `${days}d ${hours}h ${minutes}m ${seconds}s` },
         { label: "Total hours", value: (milliseconds / 3_600_000).toFixed(3) },
         { label: "Total seconds", value: (milliseconds / 1000).toFixed(3) },
       ];
@@ -479,12 +479,12 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       if (diff <= 0) {
         return [
           { label: "Status", value: "The target time has arrived." },
-          { label: "Difference", value: \`${Math.abs(diff / 1000).toFixed(0)} seconds ago\` },
+          { label: "Difference", value: `${Math.abs(diff / 1000).toFixed(0)} seconds ago` },
         ];
       }
       const totalSeconds = Math.floor(diff / 1000);
       return [
-        { label: "Countdown", value: \`${Math.floor(totalSeconds / 86400)}d ${Math.floor((totalSeconds % 86400) / 3600)}h ${Math.floor((totalSeconds % 3600) / 60)}m ${totalSeconds % 60}s\` },
+        { label: "Countdown", value: `${Math.floor(totalSeconds / 86400)}d ${Math.floor((totalSeconds % 86400) / 3600)}h ${Math.floor((totalSeconds % 3600) / 60)}m ${totalSeconds % 60}s` },
         { label: "Target", value: target.toLocaleString() },
         { label: "Total seconds", value: String(totalSeconds) },
       ];
@@ -494,7 +494,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       const now = new Date();
       return zones.map(({ label, zone }) => ({
         label,
-        value: \`${formatInZone(now, zone)} · ${offsetLabel(now, zone)}\`,
+        value: `${formatInZone(now, zone)} · ${offsetLabel(now, zone)}`,
       }));
     }
     case "timezone": {
@@ -509,9 +509,9 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
         Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day);
       const dayShift = Math.round(dateChange / 86_400_000);
       const rows: DateTimeRow[] = [
-        { label: \`In ${from.label}\`, value: \`${formatInZone(source, from.zone)} · ${offsetLabel(source, from.zone)}\` },
-        { label: \`In ${to.label}\`, value: \`${destination} · ${offsetLabel(source, to.zone)}\` },
-        { label: "Date change", value: dayShift === 0 ? "Same calendar day" : dayShift > 0 ? \`${dayShift} day(s) later\` : \`${Math.abs(dayShift)} day(s) earlier\` },
+        { label: `In ${from.label}`, value: `${formatInZone(source, from.zone)} · ${offsetLabel(source, from.zone)}` },
+        { label: `In ${to.label}`, value: `${destination} · ${offsetLabel(source, to.zone)}` },
+        { label: "Date change", value: dayShift === 0 ? "Same calendar day" : dayShift > 0 ? `${dayShift} day(s) later` : `${Math.abs(dayShift)} day(s) earlier` },
         { label: "Unix seconds", value: String(Math.floor(source.getTime() / 1000)) },
       ];
       if (converted.overlap) rows.push({ label: "DST note", value: "This local time occurs twice; the earlier occurrence was selected." });
@@ -525,7 +525,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       if (inputs.length > 100) throw new Error("Batch conversion is limited to 100 timestamps.");
       return inputs.map((item, index) => {
         const rows = unixTimestampRows(item);
-        return { label: \`Timestamp ${index + 1}\`, value: \`${rows[1].value} | ${rows[6].value} ns\` };
+        return { label: `Timestamp ${index + 1}`, value: `${rows[1].value} | ${rows[6].value} ns` };
       });
     }
     case "format": {
@@ -568,7 +568,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
       const span = calendarSpan(start, target);
       const sign = span.direction < 0 ? "-" : "";
       return [
-        { label: "Calendar span", value: \`${sign}${span.years} years, ${span.months} months, ${span.days} days\` },
+        { label: "Calendar span", value: `${sign}${span.years} years, ${span.months} months, ${span.days} days` },
         { label: "Total days", value: String(span.totalDays) },
       ];
     }

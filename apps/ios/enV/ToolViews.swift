@@ -5749,21 +5749,25 @@ struct NativeDateTimeToolView: View {
 
     private var fields: [String] {
         switch tool.id {
-        case "date-difference", "business-day-calculator": return ["from", "to"]
-        case "workday-calculator": return ["start", "days"]
+        case "age-calculator", "birthday-countdown": return ["birth"]
+        case "date-calculator": return ["start", "years", "months", "weeks", "days", "direction", "repeatCount"]
+        case "date-difference": return ["from", "to"]
+        case "business-day-calculator": return ["from", "to", "includeEnd", "weekendDays", "excludedDates"]
+        case "workday-calculator": return ["start", "days", "weekendDays", "excludedDates"]
+        case "duration-calculator": return ["from", "to"]
         case "countdown": return ["target"]
         case "world-clock": return ["zones"]
         case "timezone-converter": return ["time", "fromTz", "toTz"]
+        case "meeting-time-planner": return ["date", "zones", "sourceTz", "workStart", "workEnd", "durationMinutes", "intervalMinutes"]
         case "unix-timestamp-converter": return ["value"]
         case "date-formatter": return ["value", "pattern"]
         case "weekday-calculator", "week-number-calculator": return ["value"]
         case "leap-year-checker": return ["year"]
-        case "birthday-countdown": return ["birth"]
-        case "time-until-calculator", "deadline-calculator": return ["target"]
+        case "time-until-calculator": return ["target"]
+        case "deadline-calculator": return ["target", "includeEnd", "weekendDays", "excludedDates"]
         default: return []
         }
     }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(fields, id: \.self) { key in
@@ -5782,14 +5786,39 @@ struct NativeDateTimeToolView: View {
     }
 
     private func reset() { values = [:]; output = ""; error = nil }
-    private func label(for key: String) -> String { ["from": "From date (YYYY-MM-DD)", "to": "To date (YYYY-MM-DD)", "start": "Start date (YYYY-MM-DD)", "days": "Business days", "target": "Target (ISO date/time)", "zones": "IANA zones (comma separated)", "time": "Source local time", "fromTz": "From city / time zone", "toTz": "To city / time zone", "value": "Value or date", "pattern": "Date format pattern", "year": "Year", "birth": "Birth date (YYYY-MM-DD)"][key] ?? key.capitalized }
+    private func label(for key: String) -> String {
+        [
+            "from": "From date / time (ISO-8601)", "to": "To date / time (ISO-8601)",
+            "start": "Start date (YYYY-MM-DD)", "days": "Business days (negative to subtract)",
+            "target": "Target (ISO date/time)", "zones": "Cities or IANA zones (comma separated)",
+            "time": "Source local time (YYYY-MM-DDTHH:mm)", "fromTz": "From city / time zone",
+            "toTz": "To city / time zone", "value": "Value or date", "pattern": "Date format pattern",
+            "year": "Year", "birth": "Birth date (YYYY-MM-DD)", "includeEnd": "Include end date (true/false)",
+            "weekendDays": "Weekend days (0=Sun…6=Sat)", "excludedDates": "Extra holidays (one YYYY-MM-DD per line)",
+            "years": "Years", "months": "Months", "weeks": "Weeks", "direction": "Direction (add/subtract)",
+            "repeatCount": "Repeat count", "date": "Meeting date (reference city)", "sourceTz": "Reference city / time zone",
+            "workStart": "Working day starts (HH:mm)", "workEnd": "Working day ends (HH:mm)",
+            "durationMinutes": "Meeting length in minutes", "intervalMinutes": "Slot interval in minutes"
+        ][key] ?? key.capitalized
+    }
     private func defaultValue(for key: String) -> String {
         switch key {
-        case "zones": return "UTC, America/New_York"
-        case "fromTz": return "UTC"
+        case "zones": return tool.id == "meeting-time-planner" ? "Lagos, London, New York" : "Lagos, London, New York, Tokyo"
+        case "fromTz", "sourceTz": return "Africa/Lagos"
         case "toTz": return "America/New_York"
         case "pattern": return "yyyy-MM-dd EEEE"
         case "days": return "1"
+        case "years", "months", "weeks": return "0"
+        case "direction": return "add"
+        case "repeatCount": return "1"
+        case "includeEnd": return tool.id == "deadline-calculator" ? "false" : "true"
+        case "weekendDays": return "0,6"
+        case "excludedDates": return ""
+        case "date", "start": return ISO8601DateFormatter().string(from: Date()).prefix(10).description
+        case "workStart": return "09:00"
+        case "workEnd": return "17:00"
+        case "durationMinutes": return "30"
+        case "intervalMinutes": return "30"
         case "time": return "2026-10-30T12:00"
         default: return ""
         }

@@ -217,7 +217,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer() }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withDateTimeExtensions() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
@@ -251,7 +251,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "developer", "video")
+private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "datetime", "developer", "video")
 
 private fun ToolRecord.isUnderProduction(): Boolean = !productionExemptCategories.contains(category.lowercase(Locale.ROOT))
 
@@ -2334,11 +2334,23 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var to by rememberSaveable(toolId) { mutableStateOf(today) }
     var start by rememberSaveable(toolId) { mutableStateOf(today) }
     var days by rememberSaveable(toolId) { mutableStateOf("5") }
+    var years by rememberSaveable(toolId) { mutableStateOf("0") }
+    var months by rememberSaveable(toolId) { mutableStateOf("0") }
+    var weeks by rememberSaveable(toolId) { mutableStateOf("0") }
+    var direction by rememberSaveable(toolId) { mutableStateOf("add") }
+    var repeatCount by rememberSaveable(toolId) { mutableStateOf("1") }
+    var includeEnd by rememberSaveable(toolId) { mutableStateOf(if (op == "deadline") "false" else "true") }
+    var weekendDays by rememberSaveable(toolId) { mutableStateOf("0,6") }
+    var excludedDates by rememberSaveable(toolId) { mutableStateOf("") }
     var target by rememberSaveable(toolId) { mutableStateOf(now.plusSeconds(3600).toString()) }
-    var zones by rememberSaveable(toolId) { mutableStateOf("UTC\nAmerica/New_York\nAsia/Tokyo") }
-    var time by rememberSaveable(toolId) { mutableStateOf(now.toString()) }
+    var zones by rememberSaveable(toolId) { mutableStateOf("Lagos\nLondon\nNew York\nTokyo") }
+    var time by rememberSaveable(toolId) { mutableStateOf("2026-10-30T12:00") }
     var fromTz by rememberSaveable(toolId) { mutableStateOf("UTC") }
     var toTz by rememberSaveable(toolId) { mutableStateOf("America/New_York") }
+    var workStart by rememberSaveable(toolId) { mutableStateOf("09:00") }
+    var workEnd by rememberSaveable(toolId) { mutableStateOf("17:00") }
+    var meetingDuration by rememberSaveable(toolId) { mutableStateOf("30") }
+    var intervalMinutes by rememberSaveable(toolId) { mutableStateOf("30") }
     var value by rememberSaveable(toolId) { mutableStateOf(now.epochSecond.toString()) }
     var pattern by rememberSaveable(toolId) { mutableStateOf("yyyy-MM-dd") }
     var year by rememberSaveable(toolId) { mutableStateOf("2024") }
@@ -2348,35 +2360,88 @@ private fun NativeDateTimeToolForm(toolId: String) {
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (op) {
-            "date-diff", "business-days" -> { InputField(from, { from = it }, "From", placeholder = "YYYY-MM-DD"); InputField(to, { to = it }, "To", placeholder = "YYYY-MM-DD") }
-            "workday" -> { InputField(start, { start = it }, "Workday start", placeholder = "YYYY-MM-DD"); InputField(days, { days = it }, "Business days to add", singleLine = true) }
+            "age", "birthday" -> InputField(birth, { birth = it }, "Birth date", placeholder = "YYYY-MM-DD")
+            "date-add" -> {
+                InputField(start, { start = it }, "Start date", placeholder = "YYYY-MM-DD")
+                InputField(years, { years = it }, "Years", singleLine = true)
+                InputField(months, { months = it }, "Months", singleLine = true)
+                InputField(weeks, { weeks = it }, "Weeks", singleLine = true)
+                InputField(days, { days = it }, "Days", singleLine = true)
+                InputField(direction, { direction = it }, "Direction (add / subtract)", singleLine = true)
+                InputField(repeatCount, { repeatCount = it }, "Repeat count", singleLine = true)
+            }
+            "date-diff" -> { InputField(from, { from = it }, "From", placeholder = "YYYY-MM-DD"); InputField(to, { to = it }, "To", placeholder = "YYYY-MM-DD") }
+            "business-days" -> {
+                InputField(from, { from = it }, "From", placeholder = "YYYY-MM-DD")
+                InputField(to, { to = it }, "To", placeholder = "YYYY-MM-DD")
+                InputField(includeEnd, { includeEnd = it }, "Include end date (true / false)", singleLine = true)
+                InputField(weekendDays, { weekendDays = it }, "Weekend days (0=Sun … 6=Sat)", singleLine = true)
+                InputField(excludedDates, { excludedDates = it }, "Extra holidays / excluded dates", placeholder = "YYYY-MM-DD, one per line", minLines = 2, tall = true)
+            }
+            "workday" -> {
+                InputField(start, { start = it }, "Workday start", placeholder = "YYYY-MM-DD")
+                InputField(days, { days = it }, "Business days to add (negative to subtract)", singleLine = true)
+                InputField(weekendDays, { weekendDays = it }, "Weekend days (0=Sun … 6=Sat)", singleLine = true)
+                InputField(excludedDates, { excludedDates = it }, "Extra holidays / excluded dates", placeholder = "YYYY-MM-DD, one per line", minLines = 2, tall = true)
+            }
+            "duration" -> { InputField(from, { from = it }, "From date / time", placeholder = "ISO-8601"); InputField(to, { to = it }, "To date / time", placeholder = "ISO-8601") }
             "countdown" -> InputField(target, { target = it }, "Target date and time", placeholder = "ISO-8601")
-            "world-clock" -> InputField(zones, { zones = it }, "IANA time zones", placeholder = "UTC, Europe/London", minLines = 3, tall = true)
-            "timezone" -> { InputField(time, { time = it }, "Source local time", placeholder = "YYYY-MM-DDTHH:mm"); InputField(fromTz, { fromTz = it }, "From city / time zone", placeholder = "Africa/Lagos"); InputField(toTz, { toTz = it }, "To city / time zone", placeholder = "America/New_York") }
-            "unix" -> InputField(value, { value = it }, "Date or Unix timestamp", placeholder = "1710000000 or ISO-8601")
+            "world-clock" -> InputField(zones, { zones = it }, "Cities or IANA time zones", placeholder = "Lagos, London, New York", minLines = 3, tall = true)
+            "timezone" -> {
+                InputField(time, { time = it }, "Source local time", placeholder = "YYYY-MM-DDTHH:mm")
+                InputField(fromTz, { fromTz = it }, "From city / time zone", placeholder = "Africa/Lagos")
+                InputField(toTz, { toTz = it }, "To city / time zone", placeholder = "America/New_York")
+            }
+            "meeting-planner" -> {
+                InputField(start, { start = it }, "Meeting date in reference city", placeholder = "YYYY-MM-DD")
+                InputField(zones, { zones = it }, "Cities or IANA time zones", placeholder = "Lagos, London, New York", minLines = 3, tall = true)
+                InputField(fromTz, { fromTz = it }, "Reference city / time zone", placeholder = "Africa/Lagos")
+                InputField(workStart, { workStart = it }, "Working day starts (HH:mm)", singleLine = true)
+                InputField(workEnd, { workEnd = it }, "Working day ends (HH:mm)", singleLine = true)
+                InputField(meetingDuration, { meetingDuration = it }, "Meeting length in minutes", singleLine = true)
+                InputField(intervalMinutes, { intervalMinutes = it }, "Slot interval in minutes", singleLine = true)
+            }
+            "unix" -> InputField(value, { value = it }, "Timestamp(s) or date", placeholder = "Seconds / ms / μs / ns or ISO-8601", minLines = 2, tall = true)
             "format" -> { InputField(value, { value = it }, "Date", placeholder = "ISO-8601"); InputField(pattern, { pattern = it }, "Pattern", placeholder = "yyyy-MM-dd") }
             "weekday", "week-number" -> InputField(value, { value = it }, "Date", placeholder = "ISO-8601")
             "leap" -> InputField(year, { year = it }, "Year", singleLine = true)
-            "birthday" -> InputField(birth, { birth = it }, "Birth date", placeholder = "YYYY-MM-DD")
-            "time-until", "deadline" -> InputField(target, { target = it }, "Target date", placeholder = "YYYY-MM-DD")
-            else -> InputField(input, { input = it }, "Input", placeholder = "YYYY-MM-DD")
+            "time-until" -> InputField(target, { target = it }, "Target date", placeholder = "YYYY-MM-DD")
+            "deadline" -> {
+                InputField(target, { target = it }, "Deadline", placeholder = "YYYY-MM-DD")
+                InputField(includeEnd, { includeEnd = it }, "Include deadline date (true / false)", singleLine = true)
+                InputField(weekendDays, { weekendDays = it }, "Weekend days (0=Sun … 6=Sat)", singleLine = true)
+                InputField(excludedDates, { excludedDates = it }, "Extra holidays / excluded dates", placeholder = "YYYY-MM-DD, one per line", minLines = 2, tall = true)
+            }
         }
         ActionRow(
             onRun = {
                 val options = when (op) {
-                    "date-diff", "business-days" -> mapOf("from" to from, "to" to to)
-                    "workday" -> mapOf("start" to start, "days" to days)
-                    "countdown", "time-until", "deadline" -> mapOf("target" to target)
+                    "age", "birthday" -> mapOf("birth" to birth)
+                    "date-add" -> mapOf("start" to start, "years" to years, "months" to months, "weeks" to weeks, "days" to days, "direction" to direction, "repeatCount" to repeatCount)
+                    "date-diff" -> mapOf("from" to from, "to" to to)
+                    "business-days" -> mapOf("from" to from, "to" to to, "includeEnd" to includeEnd, "weekendDays" to weekendDays, "excludedDates" to excludedDates)
+                    "workday" -> mapOf("start" to start, "days" to days, "weekendDays" to weekendDays, "excludedDates" to excludedDates)
+                    "duration" -> mapOf("from" to from, "to" to to)
+                    "countdown", "time-until" -> mapOf("target" to target)
+                    "deadline" -> mapOf("target" to target, "includeEnd" to includeEnd, "weekendDays" to weekendDays, "excludedDates" to excludedDates)
                     "world-clock" -> mapOf("zones" to zones)
                     "timezone" -> mapOf("time" to time, "fromTz" to fromTz, "toTz" to toTz)
+                    "meeting-planner" -> mapOf("date" to start, "zones" to zones, "sourceTz" to fromTz, "workStart" to workStart, "workEnd" to workEnd, "durationMinutes" to meetingDuration, "intervalMinutes" to intervalMinutes)
                     "unix", "weekday", "week-number", "format" -> if (op == "format") mapOf("value" to value, "pattern" to pattern) else mapOf("value" to value)
                     "leap" -> mapOf("year" to year)
-                    "birthday" -> mapOf("birth" to birth)
                     else -> emptyMap()
                 }
                 runCatching { NativeDateTimeEngine.run(toolId, input, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run date/time tool" })
             },
-            onReset = { input = today; from = today; to = today; start = today; days = "5"; target = now.plusSeconds(3600).toString(); zones = "UTC\nAmerica/New_York\nAsia/Tokyo"; time = now.toString(); fromTz = "UTC"; toTz = "America/New_York"; value = now.epochSecond.toString(); pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = "" }
+            onReset = {
+                input = today; from = today; to = today; start = today; days = "5"
+                years = "0"; months = "0"; weeks = "0"; direction = "add"; repeatCount = "1"
+                includeEnd = if (op == "deadline") "false" else "true"; weekendDays = "0,6"; excludedDates = ""
+                target = now.plusSeconds(3600).toString(); zones = "Lagos\nLondon\nNew York\nTokyo"; time = "2026-10-30T12:00"
+                fromTz = "UTC"; toTz = "America/New_York"; workStart = "09:00"; workEnd = "17:00"
+                meetingDuration = "30"; intervalMinutes = "30"; value = now.epochSecond.toString()
+                pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = ""
+            }
         )
         ResultBox(output, error, ::copy)
     }
