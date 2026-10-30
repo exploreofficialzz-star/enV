@@ -165,7 +165,7 @@ object NativeBarcodeImageDecoder {
         val binary = BinaryBitmap(HybridBinarizer(source))
         val decoded = runCatching {
             val reader = MultiFormatReader().apply { setHints(readerHints()) }
-            GenericMultipleBarcodeReader(reader).decodeMultiple(binary).toList()
+            GenericMultipleBarcodeReader(reader).decodeMultiple(binary, readerHints()).toList()
         }.getOrElse {
             val reader = MultiFormatReader().apply { setHints(readerHints()) }
             runCatching { listOf(reader.decodeWithState(binary)) }.getOrDefault(emptyList())
@@ -251,7 +251,7 @@ fun NativeBarcodeReaderTool() {
         if (now - previousScanAt < 1800L) return
         recentScans[signature] = now
         if (recentScans.size > 200) {
-            recentScans.filterValues { now - it > 10_000L }.keys.forEach(recentScans::remove)
+            recentScans.filterValues { now - it > 10_000L }.keys.forEach { key -> recentScans.remove(key) }
         }
         results.add(0, scan.copy(scannedAt = now))
         while (results.size > 50) results.removeAt(results.lastIndex)
