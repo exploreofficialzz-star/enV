@@ -11,6 +11,7 @@ export type DcNetworkResult=Readonly<{
   evidence:"physics-model-computed";
   inputEvidence:"hypothetical-user-assumed";
   networkId:string;
+  networkSnapshot:WorldLabCircuitNetwork;
   projectId:string;
   projectRevision:number;
   nodeVoltagesV:Readonly<Record<string,number>>;
@@ -127,12 +128,18 @@ export function solveDcNetwork(network:WorldLabCircuitNetwork,
   if(!Number.isFinite(delivered)||!Number.isFinite(heat)||
     Math.abs(residual)>1e-8*Math.max(1,Math.abs(delivered),heat))
     throw new Error("Computed DC circuit failed its power-conservation check.");
+  // An immutable copy makes the exported current and power calculations
+  // reproducible even after the author rewires or deletes the live project.
+  const snapshot=JSON.parse(JSON.stringify(network)) as WorldLabCircuitNetwork;
+  snapshot.nodes.forEach(node=>Object.freeze(node));
+  snapshot.components.forEach(component=>Object.freeze(component));
+  Object.freeze(snapshot.nodes);Object.freeze(snapshot.components);Object.freeze(snapshot);
   return Object.freeze({
     format:"env-world-lab-dc-network-run" as const,
     modelVersion:"1.0.0" as const,
     evidence:"physics-model-computed" as const,
     inputEvidence:"hypothetical-user-assumed" as const,
-    networkId:network.id,projectId:project.id,projectRevision:project.revision,
+    networkId:network.id,networkSnapshot:snapshot,projectId:project.id,projectRevision:project.revision,
     nodeVoltagesV:Object.freeze(voltages),
     branchCurrentsA:Object.freeze(currents),
     assumedOhmicDeviceIds:Object.freeze(network.components.filter(c=>

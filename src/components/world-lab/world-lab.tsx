@@ -11,6 +11,7 @@ import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
+import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
 import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
@@ -906,6 +907,9 @@ export default function WorldLab() {
         <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>
         {(project?.networks?.length??0)===0 && <button className={buttonClass+" mt-2"} type="button" onClick={createCircuit}>Build first circuit</button>}
         {project?.networks?.[0] && <>
+          <WorldLabCircuitDiagram network={project.networks[0]}
+            result={dcRun?.projectId===project.id &&
+              dcRun.projectRevision===project.revision?dcRun:null}/>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {project.networks[0].components.filter(c=>c.kind==="dc-source" || c.kind==="resistor").map(c=>
               <label key={c.id} className="text-xs">

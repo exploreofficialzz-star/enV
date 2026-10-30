@@ -65,3 +65,16 @@ test("invented component can be explored only after user supplies an explicitly 
   network.components[2]={...network.components[2],assumedResistanceOhm:0} as typeof network.components[number];
   assert.throws(()=>solveDcNetwork(network,{id:"world",revision:4}),/Resistance/);
 });
+
+
+test("exported DC evidence retains immutable inputs after an inventor changes the live circuit",()=>{
+  const network=starterDcNetwork("stable-evidence");
+  const r=solveDcNetwork(network,{id:"lab",revision:9});
+  network.components[0]={...network.components[0],voltageV:20} as typeof network.components[number];
+  assert.equal(r.networkSnapshot.components[0].kind,"dc-source");
+  if(r.networkSnapshot.components[0].kind==="dc-source")
+    assert.equal(r.networkSnapshot.components[0].voltageV,9);
+  assert.ok(Object.isFrozen(r.networkSnapshot));
+  assert.ok(Object.isFrozen(r.networkSnapshot.components));
+  assert.equal(r.projectRevision,9);
+});

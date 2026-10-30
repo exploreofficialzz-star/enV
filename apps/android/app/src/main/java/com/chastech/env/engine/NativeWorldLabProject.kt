@@ -196,6 +196,7 @@ object NativeWorldLabProjectCodec {
 data class NativeLabDcResult(
     val projectId:String,val projectRevision:Int,val networkId:String,
     val nodeVoltagesV:Map<String,Double>,val branchCurrentsA:Map<String,Double>,
+    val networkSnapshot:NativeLabCircuitNetwork,
     val deliveredPowerW:Double,val resistorHeatW:Double,val powerResidualW:Double,
     val evidence:String="physics-model-computed",
     val validity:String="Ideal bounded linear DC sources and ohmic resistors; no transient or real material inference."
@@ -276,8 +277,10 @@ object NativeWorldLabDc {
             kotlin.math.abs(residual)<=1e-8*maxOf(1.0,kotlin.math.abs(delivered),heat)){
             "DC circuit failed power-conservation requirements"
         }
+        // Project decoder constructs fresh immutable data classes/lists;
+        // reference this specific parsed network in the evidence record.
         return NativeLabDcResult(project.id,project.revision,network.id,
-            voltages.toMap(),currents.toMap(),delivered,heat,residual)
+            voltages.toMap(),currents.toMap(),network,delivered,heat,residual)
     }
 }
 

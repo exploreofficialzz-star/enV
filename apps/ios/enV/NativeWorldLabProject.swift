@@ -295,6 +295,7 @@ struct NativeLabDcResult {
     let networkId:String
     let nodeVoltagesV:[String:Double]
     let branchCurrentsA:[String:Double]
+    let networkSnapshot:NativeLabCircuitNetwork
     let deliveredPowerW:Double
     let resistorHeatW:Double
     let powerResidualW:Double
@@ -413,7 +414,8 @@ enum NativeWorldLabDc {
         }
         return NativeLabDcResult(projectId:project.id,projectRevision:project.revision,
             networkId:network.id,nodeVoltagesV:voltages,branchCurrentsA:currents,
-            deliveredPowerW:delivered,resistorHeatW:heat,powerResidualW:residual)
+            networkSnapshot:network,deliveredPowerW:delivered,
+            resistorHeatW:heat,powerResidualW:residual)
     }
 }
 
