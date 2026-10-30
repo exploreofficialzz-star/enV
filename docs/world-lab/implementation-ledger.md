@@ -140,3 +140,7 @@ release-candidate evidence bundle are unfinished.
 - Android Compose provides offline experiment controls, timeline/slow motion, numeric computed states, heat-cell schematic, strict portable project import/inspection and optional hypothetical density-derived spring mass. Android canvas is not a volumetric renderer.
 - iOS SwiftUI provides SceneKit illustrative 3D solids and solver-linked heat colors, offline experiment controls/time scrub, strict project import, volume and hypothetical mass, without claiming any coupled 3D physics.
 - Three platform catalogs list World Lab independently alongside existing Artboard and UX/UI Studios. Native authoring/export and full multi-physics parity remain production gaps.
+
+## 2026-10-30 native CI hardening
+- The native Swift project editor now explicitly rejects NaN, Infinity, out-of-envelope hypothetical density/modulus, and invalid solid dimension vectors before Foundation JSON serialization; corresponding iOS XCTest negative cases cover these failures. This prevents Foundation's Objective-C NaN serialization exception from escaping the UI error boundary.
+- The Android native game-preview workflow retains emulator instrumentation and graphics test coverage but changes emulator GPU mode from host GL to SwiftShader GLES after a host-GPU run completed all tests then lost ADB connection during test-apk cleanup. The replacement emulator mode is a stability experiment, not an assertion of device coverage.

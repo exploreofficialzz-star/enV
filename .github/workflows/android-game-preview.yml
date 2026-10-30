@@ -58,7 +58,10 @@ jobs:
           profile: pixel_2
           disable-linux-hw-accel: false
           emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu host -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
+          # The host-GPU emulator disconnected after tests passed, during ADB test-apk
+          # cleanup (2026-10-30 run 41088295512). Preserve GPU-backed rendering
+          # coverage with deterministic software GLES instead of disabling tests.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
           script: bash scripts/test-android-game-preview.sh
       - name: Upload test evidence
         if: always()

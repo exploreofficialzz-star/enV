@@ -24,9 +24,26 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.addSolid(data,shape:"freeform"))
         XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
                                                                                densityKgM3:Double.nan))
+        XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
+                                                                               densityKgM3:Double.infinity))
+        XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
+                                                                               densityKgM3:Double.negativeInfinity))
+        XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
+                                                                               densityKgM3:1,
+                                                                               youngModulusPa:Double.nan))
+        XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
+                                                                               densityKgM3:-1))
+        XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"",
+                                                                               densityKgM3:1))
         let withSphere=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"sphere")
         XCTAssertThrowsError(try NativeWorldLabEditor.resizeSolid(withSphere,id:"sphere",
                                                                     dimensionsMeters:[2,1,2]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.resizeSolid(withSphere,id:"sphere",
+                                                                    dimensionsMeters:[Double.nan,1,1]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.resizeSolid(withSphere,id:"sphere",
+                                                                    dimensionsMeters:[Double.infinity,1,1]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.resizeSolid(withSphere,id:"sphere",
+                                                                    dimensionsMeters:[1,1]))
         XCTAssertThrowsError(try NativeWorldLabEditor.assignMaterial(withSphere,solidId:"sphere",
                                                                       materialId:"missing"))
     }

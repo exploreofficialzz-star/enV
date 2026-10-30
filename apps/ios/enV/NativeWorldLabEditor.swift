@@ -4,6 +4,12 @@ import Foundation
 /// mutation. Unknown matter remains a user assumption, not observed science.
 enum NativeWorldLabEditor {
     private static func encode(_ root:[String:Any]) throws -> Data {
+        // JSONSerialization can raise an Objective-C exception, rather than a
+        // Swift Error, when an NSNumber holds NaN/Infinity. Always reject
+        // invalid JSON objects before attempting to serialize user input.
+        guard JSONSerialization.isValidJSONObject(root) else {
+            throw NativeWorldLabError.invalid("Project contains unsupported JSON or nonfinite numbers")
+        }
         let data=try JSONSerialization.data(withJSONObject:root,options:[.sortedKeys,.prettyPrinted])
         _ = try NativeWorldLabProject.decode(data)
         return data
@@ -55,6 +61,12 @@ enum NativeWorldLabEditor {
                                         youngModulusPa:Double?=nil,
                                         id:String=UUID().uuidString) throws -> Data {
         try mutate(data){root in
+            guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  name.count <= 120,
+                  (densityKgM3.map { $0.isFinite && $0 >= 0.001 && $0 <= 1e9 } ?? true),
+                  (youngModulusPa.map { $0.isFinite && $0 >= 0 && $0 <= 1e15 } ?? true) else {
+                throw NativeWorldLabError.invalid("Hypothetical properties must be finite values inside their documented SI limits")
+            }
             guard var materials=root["materials"] as? [[String:Any]],
                   materials.count<100,
                   !materials.contains(where:{$0["id"] as? String==id}) else {
@@ -83,7 +95,11 @@ enum NativeWorldLabEditor {
         try editSolid(data,id:id){$0["name"]=name}
     }
     static func resizeSolid(_ data:Data,id:String,dimensionsMeters:[Double]) throws -> Data {
-        try editSolid(data,id:id){$0["dimensionsMeters"]=dimensionsMeters}
+        guard dimensionsMeters.count == 3,
+              dimensionsMeters.allSatisfy({ $0.isFinite && $0 >= 0.001 && $0 <= 10000 }) else {
+            throw NativeWorldLabError.invalid("Dimensions must be three finite SI measurements between 0.001 and 10,000 m")
+        }
+        return try editSolid(data,id:id){$0["dimensionsMeters"]=dimensionsMeters}
     }
     static func assignMaterial(_ data:Data,solidId:String,materialId:String?) throws -> Data {
         try editSolid(data,id:solidId){$0["materialId"]=materialId.map{$0 as Any} ?? NSNull()}
