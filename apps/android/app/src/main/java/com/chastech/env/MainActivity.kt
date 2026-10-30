@@ -461,6 +461,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         item {
             Box(Modifier.fillMaxWidth().zIndex(if (homeSearchFocused && homeQuery.isNotBlank()) 1f else 0f), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 20.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
+                NativeAnalyticsConsentPanel()
                 NativeProductUpdatesBanner()
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -1021,6 +1022,12 @@ private fun ToolDetail(
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
     val context = LocalContext.current
+    LaunchedEffect(tool.id) {
+        if (BuildConfig.ANALYTICS_ENABLED) {
+            NativeAnalytics.record(context, "tool_viewed", tool.id)
+            runCatching { NativeAnalytics.flush(context) }
+        }
+    }
     val related = remember(catalog, tool) { catalog.relatedTools(tool, Int.MAX_VALUE) }
     val parentDeveloperStudio = remember(catalog, tool) { catalog.developerStudioForLegacyTool(tool) }
     var visibleRelatedCount by remember(tool.id) { mutableIntStateOf(6) }
