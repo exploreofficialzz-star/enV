@@ -215,11 +215,14 @@ export async function blockCommunityAuthor(request: Request,input:unknown) {
   let body; try{body=validateCommunityBlock(input);}catch(e){throw new CommunityError("INVALID_COMMUNITY_BLOCK",e instanceof Error?e.message:"Invalid block request.",400);}
   const {actorDigest}=await actorFor(request,body.visitorId,secret);
   const sql=await getSql();
-  const comment=await sql.query<{author_digest:string}>("select author_digest from tool_community_comments where id=$1 and moderation_status='visible' limit 1",[body.commentId]);
-  if(!comment[0])throw new CommunityError("COMMUNITY_COMMENT_NOT_FOUND","The comment is no longer available.",404);
-  if(comment[0].author_digest===actorDigest)throw new CommunityError("COMMUNITY_SELF_BLOCK","You cannot block your own identity.",400);
-  await sql.query("insert into tool_community_blocks(blocker_digest,blocked_author_digest) values($1,$2) on conflict do nothing",[actorDigest,comment[0].author_digest]);
-  return {blocked:true};
+  return sql.transaction(async tx=>{
+    await enforceRateLimit(tx,request,actorDigest,secret,30);
+    const comment=await tx.query<{author_digest:string}>("select author_digest from tool_community_comments where id=$1 and moderation_status='visible' limit 1",[body.commentId]);
+    if(!comment[0])throw new CommunityError("COMMUNITY_COMMENT_NOT_FOUND","The comment is no longer available.",404);
+    if(comment[0].author_digest===actorDigest)throw new CommunityError("COMMUNITY_SELF_BLOCK","You cannot block your own identity.",400);
+    await tx.query("insert into tool_community_blocks(blocker_digest,blocked_author_digest) values($1,$2) on conflict do nothing",[actorDigest,comment[0].author_digest]);
+    return {blocked:true};
+  });
 }
 export async function listCommunityReports(request: Request) {
   requireAdmin(request);
