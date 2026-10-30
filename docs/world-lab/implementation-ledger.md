@@ -205,3 +205,8 @@ release-candidate evidence bundle are unfinished.
 
 - Parallel resistor wiring now derives its positive/negative ports from the source component, rather than hard-coded node identifiers. Native Kotlin and Swift interfaces can adjust bounded source voltage and resistance, remove resistors, and recompute on changed project revisions. Web users can remove hypothetical components (which otherwise would permanently prevent DC solving) and also remove passive loads. The source voltage display follows the source's actual positive node.
 - Platform changes retain all unrelated studio behavior. Audits remain deferred as requested; the committed source is not yet described as a released production platform.
+
+## Ideal-source electrical-network-to-motor coupling (2026-10-30)
+
+- Added Web `network-motor.ts` integration: one ideal DC voltage source and its passive graph feed an optional thermal 1D motor branch wired across the source. At every motor timestep, KCL source current includes both passive load and dynamic motor current. The combined energy record sums DC passive resistor power/energy with motor source work, thermal/mechanical energy and losses; export includes both provenance-bearing runs. Invalid/hypothetical devices, multiple sources or reverse polarity fail explicitly.
+- Web motor controls can now select an ideal circuit-powered drive and show source current/voltage, calculated passive heating and motor trajectory. This is genuinely interconnected under the **ideal stiff-voltage-source assumption**, not a nonlinear finite-battery or general circuit co-simulator. New regression tests authored, not run; native equivalent integration and full audit remain outstanding.

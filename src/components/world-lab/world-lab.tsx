@@ -11,6 +11,7 @@ import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
+import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
@@ -97,6 +98,7 @@ export default function WorldLab() {
   const [dropBounce, setDropBounce] = useState(0.3);
   const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
   const [dcRun,setDcRun]=useState<DcNetworkResult|null>(null);
+  const [wiredMotorRun,setWiredMotorRun]=useState<NetworkMotorRun|null>(null);
   const [inventedDeviceName,setInventedDeviceName]=useState("");
   const [inventedDeviceAssumption,setInventedDeviceAssumption]=useState("");
   const [actuatorRun, setActuatorRun] = useState<ActuatorRun | null>(null);
@@ -595,18 +597,25 @@ export default function WorldLab() {
     }
   }
 
-  function startActuatorWithSelectedSolid() {
+  function startActuatorWithSelectedSolid(wired=false) {
     if(!project || !selectedEntity)return;
     setError("");
     try {
-      const derived=deriveActuatorInput(project,selectedEntity.id,{
-        supplyVoltageV:actuatorVoltage,
-        forceConstantNPerA:actuatorConstant,
-        ...(actuatorHeatEnabled?{thermal:{initialTemperatureK:293.15,
-          ambientTemperatureK:293.15,heatCapacityJPerK:coilHeatCapacity,
-          coolingWPerK:coilCooling,resistanceTemperatureCoefficientPerK:0.004}}:{}),
-      });
-      const result=runActuatorExperiment(derived.input,derived.source);
+      const thermal=actuatorHeatEnabled?{thermal:{
+        initialTemperatureK:293.15,ambientTemperatureK:293.15,
+        heatCapacityJPerK:coilHeatCapacity,coolingWPerK:coilCooling,
+        resistanceTemperatureCoefficientPerK:0.004}}:{};
+      const wiredRun=wired?runNetworkMotorExperiment(project,selectedEntity.id,{
+        forceConstantNPerA:actuatorConstant,...thermal,
+      }):null;
+      const result=wiredRun?.motor??runActuatorExperiment(
+        deriveActuatorInput(project,selectedEntity.id,{
+          supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,
+        }).input,
+        deriveActuatorInput(project,selectedEntity.id,{
+          supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,
+        }).source);
+      setWiredMotorRun(wiredRun);
       const numericalAudit=verifyActuatorNumerics(result);
       setActuatorAudit(numericalAudit);
       setPlaying(false);
@@ -662,7 +671,7 @@ export default function WorldLab() {
   function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
     // A changed material, shape, or arrangement invalidates its old scientific results.
     setDropPlaying(false);setDropRun(null);
-    setActuatorPlaying(false);setActuatorRun(null);setDcRun(null);
+    setActuatorPlaying(false);setActuatorRun(null);setWiredMotorRun(null);setDcRun(null);
     setProject(current => current ? transform(current) : current);
     setWorkspaceDirty(true);
   }
@@ -1098,9 +1107,14 @@ export default function WorldLab() {
                     </div>
                   </details>
                   <button type="button" className={buttonClass+" mt-2"}
-                    disabled={selectedQuantities.massKg===null} onClick={startActuatorWithSelectedSolid}>
+                    disabled={selectedQuantities.massKg===null} onClick={()=>startActuatorWithSelectedSolid(false)}>
                     Power this solid
                   </button>
+                  {project?.networks?.[0] && <button type="button" className={buttonClass+" mt-2 ml-2"}
+                    disabled={selectedQuantities.massKg===null}
+                    onClick={()=>startActuatorWithSelectedSolid(true)}>
+                    Wire motor to circuit
+                  </button>}
                   {selectedActuator && actuatorSample && (
                     <div className="mt-3 space-y-2" aria-label="Coupled electromechanical results">
                       <p className="text-xs text-muted-foreground">
@@ -1120,6 +1134,21 @@ export default function WorldLab() {
                         </>}
                         <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
                       </dl>
+                      {wiredMotorRun && wiredMotorRun.projectRevision===project?.revision &&
+                        wiredMotorRun.entityId===selectedEntity?.id && (
+                        <div className="text-xs" aria-label="Connected motor and source results">
+                          <p>Connected source voltage: {wiredMotorRun.motor.input.supplyVoltageV.toFixed(3)} V</p>
+                          <p>Total source current: {wiredMotorRun.samples[
+                            Math.min(wiredMotorRun.samples.length-1,Math.round(actuatorTime/wiredMotorRun.motor.solverStepSeconds))
+                          ].sourceBranchCurrentA.toFixed(4)} A (source convention)</p>
+                          <p>Parallel resistor heating: {wiredMotorRun.dc.resistivePowerW.toFixed(3)} W</p>
+                          <p>This motor is wired across an ideal voltage source; its dynamic current is counted alongside the passive loads.</p>
+                          <button type="button" className={buttonClass} onClick={()=>
+                            downloadJson("world-lab-wired-motor-evidence.json",wiredMotorRun)}>
+                            Export connected evidence
+                          </button>
+                        </div>
+                      )}
                       {actuatorAudit && (
                         <p className="text-xs text-muted-foreground" role={actuatorAudit.status === "outside-internal-tolerance" ? "alert" : undefined}>
                           Numerical self-check: {actuatorAudit.status === "within-internal-tolerance"
