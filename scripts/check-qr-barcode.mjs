@@ -50,6 +50,7 @@ const androidBackend = read("apps/android/app/src/main/java/com/chastech/env/Nat
 const iosBackend = read("apps/ios/enV/ToolViews.swift");
 const androidTests = read("apps/android/app/src/test/java/com/chastech/env/NativeEcommerceEngineTest.kt");
 const androidReaderTests = read("apps/android/app/src/androidTest/java/com/chastech/env/NativeBarcodeReaderInstrumentedTest.kt");
+const androidBarcodeTests = read("apps/android/app/src/test/java/com/chastech/env/NativeBarcodeEngineTest.kt");
 const androidUiTests = read("apps/android/app/src/androidTest/java/com/chastech/env/NativeQrBarcodeAndEcommerceUiTest.kt");
 const iosTests = read("apps/ios/enVTests/NativeEcommerceEngineTests.swift");
 const webCommerceUi = read("src/components/engines/ecommerce-engine.tsx");
@@ -62,6 +63,8 @@ assert.ok(androidCatalog.includes('category in setOf("qr", "ecommerce")') && and
 assert.ok(iosCatalog.includes('["qr", "ecommerce"].contains(category.lowercased()) ? "active" : status'), "iOS catalog activates QR and E-commerce records");
 assert.ok(androidReader.includes("ProcessCameraProvider") && androidReader.includes("NativeBarcodeCameraAnalyzer") && androidReader.includes("NativeBarcodeImageDecoder"), "Android QR/barcode reader uses CameraX, ZXing and local image decoding");
 assert.ok(androidReader.includes("safeBarcodeHttpUrl") && androidReader.includes("Intent.ACTION_VIEW") && androidTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts"), "Android decoded links require an explicit safe HTTP(S) action");
+assert.ok(androidReader.includes("MAX_BARCODE_IMAGE_BYTES") && androidReader.includes("readBarcodeImageBytes") && androidBarcodeTests.includes("localImageImportsAreBoundedEvenWhenAProviderCannotReportFileSize"), "Android local image decoding enforces a strict byte ceiling");
+assert.ok(androidBarcodeTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts"), "Android tests safe HTTP(S) scan links");
 assert.ok(androidCommerce.includes("fun supports(tool: ToolRecord)") && androidCommerce.includes("fun execute("), "Android has its own native E-commerce engine");
 assert.ok(androidCommerce.includes("safetyStock") && androidCommerce.includes("feePercent") && androidCommerce.includes("targetMargin"), "Android commerce engine includes inventory safety and pricing economics");
 assert.ok(androidCommerce.includes('"pricing" -> common + finance.filter') && androidCommerce.includes('targetMargin + feePercent < 100'), "Android pricing exposes target margin and rejects impossible fee/margin combinations");
