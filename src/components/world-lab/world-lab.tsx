@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as B from "babylonjs";
 import {
+  blankWorldLabProject, importLegacyGameScene, newSolid, parseWorldLabProject,
+  readWorldLabProjectJson, serializeWorldLabProject, solidQuantities,
+  type WorldLabEntity, type WorldLabProject,
+} from "@/lib/world-lab/project";
+import { listLocalWorldLabProjects, putLocalWorldLabProject } from "@/lib/world-lab/local-storage";
+import {
   advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
   type DampedOscillator, type LabRun, type ModelInput, type RCCircuit, type NovelMaterial,
 } from "@/lib/world-lab/model";
@@ -12,7 +18,7 @@ type SceneHandles = {
   circuit: B.Mesh;
   deviceMaterial: B.StandardMaterial;
   circuitMaterial: B.StandardMaterial;
-  addedShapes: B.Mesh[];
+  addedShapes: Map<string, B.Mesh>;
 };
 const STORAGE_KEY = "env-world-lab-reference-v1";
 const defaultMechanical: DampedOscillator = {
@@ -58,10 +64,20 @@ export default function WorldLab() {
   const [playing, setPlaying] = useState(false);
   const [seeInside, setSeeInside] = useState(false);
   const [opacity, setOpacity] = useState(55);
-  const [shapeCount, setShapeCount] = useState(0);
+  const [project, setProject] = useState<WorldLabProject | null>(null);
+  const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
+  const [savedRevision, setSavedRevision] = useState<number | null>(null);
+  const [workspaceDirty, setWorkspaceDirty] = useState(false);
+  const [selectedEntityId, setSelectedEntityId] = useState("");
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const shapeCount = project?.entities.length ?? 0;
   const [materialName, setMaterialName] = useState("");
   const [density, setDensity] = useState("");
-  const [materials, setMaterials] = useState<NovelMaterial[]>([]);
+  const materials = project?.materials ?? [];
+  const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
+  const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
+  const selectedQuantities = selectedEntity ? solidQuantities(selectedEntity, selectedMaterial) : null;
   const [message, setMessage] = useState("Choose an experiment and press Start to calculate a real reference trajectory.");
   const [error, setError] = useState("");
   const currentRun = useMemo(() => runs.find((run) => run.id === runId) ?? null, [runs, runId]);
@@ -88,12 +104,39 @@ export default function WorldLab() {
           setCircuit({ ...defaultCircuit, ...x });
         }
       }
-      if (typeof record.shapeCount === "number" && Number.isInteger(record.shapeCount) && record.shapeCount >= 0 && Number(record.shapeCount) <= 20) {
-        setShapeCount(Number(record.shapeCount));
-      }
+      // Legacy shapeCount is migrated only if no structured project already exists.
     } catch {
       setMessage("The old local workspace was unreadable; a fresh workspace opened without overwriting it.");
     }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void listLocalWorldLabProjects().then(items => {
+      if (!active) return;
+      setSavedProjects(items);
+      const latest = [...items].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+      if (latest) {
+        setProject(latest);
+        setSavedRevision(latest.revision);
+        setMessage("Opened the most recently saved local World Lab project.");
+      } else {
+        const fresh = blankWorldLabProject(crypto.randomUUID(), new Date().toISOString());
+        try {
+          const old = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as {shapeCount?:unknown};
+          const count = typeof old.shapeCount === "number" && Number.isInteger(old.shapeCount)
+            ? Math.min(Math.max(old.shapeCount,0),20) : 0;
+          for (let i = 0; i < count; i++) fresh.entities.push(newSolid(crypto.randomUUID(), "box", i));
+          if (count) setMessage("Restored your older visual shapes as a new portable local project.");
+        } catch { /* Invalid legacy browser data must not prevent a new project. */ }
+        setProject(fresh);
+      }
+    }).catch(() => {
+      if (!active) return;
+      setProject(blankWorldLabProject(crypto.randomUUID(), new Date().toISOString()));
+      setMessage("Browser project storage is unavailable. You can still export a portable project JSON backup.");
+    });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -140,7 +183,12 @@ export default function WorldLab() {
       engine.runRenderLoop(() => scene?.render());
       observer = new ResizeObserver(() => engine?.resize());
       observer.observe(canvas);
-      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: [] };
+      scene.onPointerObservable.add(info => {
+        if (info.type !== B.PointerEventTypes.POINTERDOWN) return;
+        const id = info.pickInfo?.pickedMesh?.metadata?.worldLabEntityId;
+        if (typeof id === "string") setSelectedEntityId(id);
+      });
+      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map() };
     } catch (cause) {
       setGraphicsError(cause instanceof Error ? cause.message : "The 3D view could not be opened.");
       observer?.disconnect();
@@ -164,21 +212,35 @@ export default function WorldLab() {
     scene.device.position.x = sample?.positionM ?? mechanical.initialDisplacementM;
     scene.deviceMaterial.alpha = seeInside ? opacity / 100 : 1;
     scene.circuitMaterial.alpha = seeInside ? opacity / 100 : 1;
-    while (scene.addedShapes.length < shapeCount) {
-      const index = scene.addedShapes.length;
-      const block = B.MeshBuilder.CreateBox("visual-shape-" + index, { size: 0.65 }, scene.scene);
-      block.position = new B.Vector3(-2.5 + (index % 5) * 0.85, 0.5, 1.8 + Math.floor(index / 5) * 0.85);
-      const material = new B.StandardMaterial("visual-material-" + index, scene.scene);
-      material.diffuseColor = B.Color3.FromHexString("#CFD7D6");
-      block.material = material;
-      scene.addedShapes.push(block);
+    for (const [id, mesh] of scene.addedShapes) {
+      if (!project?.entities.some(entity => entity.id === id)) {
+        mesh.material?.dispose();
+        mesh.dispose();
+        scene.addedShapes.delete(id);
+      }
     }
-    while (scene.addedShapes.length > shapeCount) {
-      const block = scene.addedShapes.pop();
-      block?.material?.dispose();
-      block?.dispose();
+    for (const entity of project?.entities ?? []) {
+      let mesh = scene.addedShapes.get(entity.id);
+      if (!mesh || mesh.metadata?.worldLabShape !== entity.shape) {
+        if (mesh) { mesh.material?.dispose(); mesh.dispose(); }
+        mesh = entity.shape === "box"
+          ? B.MeshBuilder.CreateBox(entity.id, { size: 1 }, scene.scene)
+          : entity.shape === "sphere"
+            ? B.MeshBuilder.CreateSphere(entity.id, { diameter: 1, segments: 18 }, scene.scene)
+            : B.MeshBuilder.CreateCylinder(entity.id, { diameter: 1, height: 1, tessellation: 24 }, scene.scene);
+        const material = new B.StandardMaterial("visual-material-" + entity.id, scene.scene);
+        mesh.material = material;
+        mesh.metadata = { worldLabEntityId: entity.id, worldLabShape: entity.shape };
+        scene.addedShapes.set(entity.id, mesh);
+      }
+      mesh.position.copyFromFloats(...entity.positionMeters);
+      mesh.scaling.copyFromFloats(...entity.dimensionsMeters);
+      if (mesh.material instanceof B.StandardMaterial) {
+        mesh.material.diffuseColor = B.Color3.FromHexString(entity.color);
+        mesh.material.alpha = (seeInside ? opacity / 100 : 1) * entity.opacity;
+      }
     }
-  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, shapeCount]);
+  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project]);
 
   useEffect(() => {
     if (!playing || !currentRun) return;
@@ -225,15 +287,85 @@ export default function WorldLab() {
       setError(cause instanceof Error ? cause.message : "This experiment could not be calculated.");
     }
   }
-  function save() {
+  function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
+    setProject(current => current ? transform(current) : current);
+    setWorkspaceDirty(true);
+  }
+  function addShape(shape: WorldLabEntity["shape"]) {
+    if (!project || shapeCount >= 200) return;
+    const item = newSolid(crypto.randomUUID(),shape,shapeCount);
+    mutateProject(current=>({...current,entities:[...current.entities,item]}));
+    setSelectedEntityId(item.id);
+  }
+  function editSelected(patch: Partial<WorldLabEntity>) {
+    if (!selectedEntity) return;
+    mutateProject(current=>({...current, entities:current.entities.map(e=>
+      e.id===selectedEntity.id?{...e,...patch}:e)}));
+  }
+  async function save() {
+    if (!project) return;
+    setError("");
     try {
+      const saved=await putLocalWorldLabProject(project,savedRevision);
+      setProject(saved);
+      setSavedRevision(saved.revision);
+      setWorkspaceDirty(false);
+      setSavedProjects(await listLocalWorldLabProjects());
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        format: "env-world-lab-local", version: 1, modelKind, mechanical, circuit, shapeCount,
+        format:"env-world-lab-local", version:1,modelKind,mechanical,circuit,
       }));
-      setMessage("Workspace saved on this device only. Cloud synchronization is not available.");
-    } catch {
-      setError("Unable to save on this device. Export the run JSON instead.");
+      setMessage("Saved on this device with revision protection. Cloud synchronization is not yet available.");
+    } catch(cause) {
+      setError(cause instanceof Error?cause.message:"Could not save this project. Export a JSON backup.");
     }
+  }
+  function exportProject() {
+    if (!project) return;
+    try {
+      downloadJson("the-world-lab-project.json",JSON.parse(serializeWorldLabProject(project)));
+      setMessage("Portable project exported. Run history is a separate scientific result export.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Could not export this project.");}
+  }
+  async function importProject(file: File | undefined) {
+    if (!file) return;
+    setError("");setImportWarnings([]);
+    try{
+      if (file.size>1024*1024) throw new Error("Import files must be no larger than 1 MB.");
+      const json=await file.text();
+      const data:unknown=JSON.parse(json);
+      let imported:WorldLabProject;
+      let warnings:string[]=[];
+      if(data && typeof data==="object" && "format" in data && data.format==="env-3d-game"){
+        const report=importLegacyGameScene(data,crypto.randomUUID(),new Date().toISOString());
+        imported=report.project;
+        warnings=report.warnings;
+      }else imported=readWorldLabProjectJson(json);
+      if(workspaceDirty && !window.confirm("Discard unsaved local edits and import a different project?")) return;
+      const now=new Date().toISOString();
+      setProject(parseWorldLabProject({...imported,id:crypto.randomUUID(),title:imported.title,
+        revision:0,createdAt:now,updatedAt:now}));
+      setSavedRevision(null);
+      setWorkspaceDirty(true);
+      setSelectedEntityId("");
+      setRuns([]);setRunId("");setPlaying(false);setTimeSeconds(0);
+      setImportWarnings(warnings);
+      setMessage("Imported a local project copy. Save it to keep it on this device.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"This file could not be imported.");}
+  }
+  function openSavedProject(id:string){
+    const saved=savedProjects.find(p=>p.id===id);
+    if(!saved)return;
+    if(workspaceDirty && !window.confirm("Discard unsaved local edits and open another project?"))return;
+    setProject(saved);setSavedRevision(saved.revision);setWorkspaceDirty(false);
+    setSelectedEntityId("");setRuns([]);setRunId("");setPlaying(false);setTimeSeconds(0);
+    setMessage("Opened saved project "+saved.title+".");
+  }
+  function newProject(){
+    if(workspaceDirty && !window.confirm("Discard unsaved local edits and create a new project?"))return;
+    setProject(blankWorldLabProject(crypto.randomUUID(),new Date().toISOString()));
+    setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
+    setRuns([]);setRunId("");setPlaying(false);setTimeSeconds(0);
+    setMessage("New local World Lab project created.");
   }
   function addMaterial() {
     try {
@@ -241,7 +373,11 @@ export default function WorldLab() {
         name: materialName.trim(), densityKgM3: density.trim() === "" ? null : Number(density),
         youngModulusPa: null, provenance: "hypothetical-user-assumed",
       });
-      setMaterials((existing) => [...existing.slice(-9), proposed]);
+      mutateProject(current=>({...current,materials:[...current.materials,{
+        id:crypto.randomUUID(),name:proposed.name,
+        densityKgM3:proposed.densityKgM3,youngModulusPa:proposed.youngModulusPa,
+        evidence:proposed.provenance,
+      }]}));
       setMaterialName(""); setDensity("");
       setMessage("Material proposal recorded as hypothetical. It is not connected to the solver.");
       setError("");
@@ -262,8 +398,39 @@ export default function WorldLab() {
             This reference workspace is not yet the complete World Lab or an engineering safety tool.
           </p>
         </div>
-        <button type="button" className={buttonClass} onClick={save}>Save on this device</button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={buttonClass} onClick={newProject}>New project</button>
+          <button type="button" className={buttonClass} onClick={() => void save()} disabled={!project}>Save on device</button>
+          <button type="button" className={buttonClass} onClick={exportProject} disabled={!project}>Export project</button>
+          <input ref={importInput} className="sr-only" type="file" accept=".json,application/json"
+            aria-label="Import World Lab or legacy 3D project" onChange={event=>{
+              void importProject(event.target.files?.[0]);event.target.value="";
+            }}/>
+          <button type="button" className={buttonClass} onClick={()=>importInput.current?.click()}>Import JSON</button>
+        </div>
       </header>
+      {project && (
+        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-border p-3">
+          <label className="min-w-[200px] flex-1 text-sm">Project name
+            <input className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2"
+              value={project.title} maxLength={120}
+              onChange={event=>mutateProject(current=>({...current,title:event.target.value}))}/>
+          </label>
+          <label className="min-w-[180px] text-sm">Saved local projects
+            <select className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2"
+              value={savedProjects.some(p=>p.id===project.id)?project.id:""}
+              onChange={event=>openSavedProject(event.target.value)}>
+              <option value="">Unsaved / imported copy</option>
+              {savedProjects.map(item=><option key={item.id} value={item.id}>{item.title} (rev {item.revision})</option>)}
+            </select>
+          </label>
+          <p role="status" className="text-xs text-muted-foreground">{workspaceDirty?"Unsaved project changes":"Local-only workspace"}</p>
+          {importWarnings.length>0 && <details className="w-full text-xs">
+            <summary>Legacy import notices ({importWarnings.length})</summary>
+            <ul className="list-disc pl-5">{importWarnings.map((x,i)=><li key={i}>{x}</li>)}</ul>
+          </details>}
+        </div>
+      )}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <div className="min-w-0">
           <div className="relative overflow-hidden rounded-xl border border-border bg-slate-200">
@@ -282,10 +449,15 @@ export default function WorldLab() {
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
               onClick={() => setSeeInside((value) => !value)}>See Inside</button>
-            <button type="button" className={buttonClass} disabled={shapeCount >= 20}
-              onClick={() => setShapeCount((value) => Math.min(20, value + 1))}>Add visual shape</button>
-            <button type="button" className={buttonClass} disabled={shapeCount === 0}
-              onClick={() => setShapeCount((value) => Math.max(0, value - 1))}>Undo visual shape</button>
+            <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
+              onClick={() => addShape("box")}>Add cube</button>
+            <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
+              onClick={() => addShape("sphere")}>Add sphere</button>
+            <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
+              onClick={() => addShape("cylinder")}>Add cylinder</button>
+            <button type="button" className={buttonClass} disabled={!selectedEntity}
+              onClick={() => {if(selectedEntity)mutateProject(p=>({...p,entities:p.entities.filter(e=>e.id!==selectedEntity.id)}));
+                setSelectedEntityId("");}}>Remove selected</button>
           </div>
           {seeInside && (
             <div className="mt-2 rounded-lg border border-border p-3">
@@ -299,9 +471,51 @@ export default function WorldLab() {
             </div>
           )}
           <p className="mt-2 text-xs text-muted-foreground">
-            Drag to look around; keyboard W/A/S/D or arrows to move. The scene is illustrative.
-            Added shapes have no physical components and do not change solver results.
+            Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
+            Added solids are visual geometry with analytic volume. Without material density, mass is unknown;
+            none of these objects is coupled to the demo solvers.
           </p>
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <h2 className="text-base font-medium">Build and inspect</h2>
+            <label className="mt-2 block text-sm">Select a shape
+              <select className="mt-1 w-full rounded border border-border bg-bg p-2"
+                value={selectedEntityId} onChange={event=>setSelectedEntityId(event.target.value)}>
+                <option value="">None selected</option>
+                {project?.entities.map(entity=><option key={entity.id} value={entity.id}>{entity.name}</option>)}
+              </select>
+            </label>
+            {selectedEntity && selectedQuantities && (
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <label>Object name
+                  <input className={inputLabel} value={selectedEntity.name}
+                    onChange={event=>editSelected({name:event.target.value})}/>
+                </label>
+                <label>Color
+                  <input className="mt-1 h-10 w-full" type="color" value={selectedEntity.color}
+                    onChange={event=>editSelected({color:event.target.value})}/>
+                </label>
+                <label>Size (metres, uniform)
+                  <input className={inputLabel} type="number" min="0.001" max="10000" step="0.1"
+                    value={selectedEntity.dimensionsMeters[0]}
+                    onChange={event=>{const n=Number(event.target.value);if(n>0 && n<=10000)
+                      editSelected({dimensionsMeters:[n,n,n]});}}/>
+                </label>
+                <label>Material assumption
+                  <select className={inputLabel} value={selectedEntity.materialId??""}
+                    onChange={event=>editSelected({materialId:event.target.value||null})}>
+                    <option value="">No material: mass unknown</option>
+                    {materials.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+                <p>Volume: <strong>{metric(selectedQuantities.volumeM3,"m³")}</strong></p>
+                <p>Mass: <strong>{selectedQuantities.massKg===null?"Unknown":metric(selectedQuantities.massKg,"kg")}</strong></p>
+                <p className="sm:col-span-2 text-xs text-muted-foreground">
+                  {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
+                    "Computed from geometry × user-assumed density. Not measured or structurally validated."}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
         <aside className="rounded-xl border border-border p-4" aria-label="Experiment controls">
           <label htmlFor="worldlab-model" className="mb-1 block text-sm font-medium">Experiment</label>
@@ -421,7 +635,7 @@ export default function WorldLab() {
           <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>Record hypothetical material</button>
           {materials.length > 0 && (
             <ul className="mt-3 list-inside list-disc text-sm">
-              {materials.map((material, index) => <li key={index}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
+              {materials.map((material) => <li key={material.id}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
                 elasticity unknown · Hypothetical / User-assumed</li>)}
             </ul>
           )}
