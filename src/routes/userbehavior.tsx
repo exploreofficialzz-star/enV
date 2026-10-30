@@ -125,7 +125,7 @@ function UserBehaviorDashboard() {
     }
   }
 
-  const maxDaily = useMemo(() => Math.max(1, ...(summary?.daily ?? []).map(row => row.events)), [summary]);
+  const dailyChart = summary.daily.slice(-90);\n  const maxDaily = Math.max(1, ...dailyChart.map(row => row.events));
   if (!enabled) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
@@ -160,7 +160,7 @@ function UserBehaviorDashboard() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-accent">Private developer view</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-fg">User behavior</h1>
-          <p className="mt-2 text-sm text-muted">Consent-based product activity across Web, Android and iOS · Last {summary.windowDays} days</p>
+          <p className="mt-2 text-sm text-muted">Consent-based product activity across Web, Android and iOS · Last {summary.windowDays} days for overview · {summary.historyDays}-day aggregate history</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => void loadSummary()} disabled={loading}><RefreshCw className="mr-2 size-4" /> Refresh</Button>
@@ -181,9 +181,9 @@ function UserBehaviorDashboard() {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-fg">Daily activity</h2>
+          <h2 className="text-sm font-semibold text-fg">Daily activity · 90-day trend</h2>
           <div className="mt-5 flex h-40 items-end gap-1.5">
-            {summary.daily.map(row => (
+            {dailyChart.map(row => (
               <div key={row.day} className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${row.day}: ${row.events} events, ${row.failures} failures`}>
                 <div className="w-full rounded-t bg-accent/80" style={{ height: `${Math.max(2, row.events / maxDaily * 100)}%` }} />
                 <span className="text-[8px] text-muted">{row.day.slice(8)}</span>
