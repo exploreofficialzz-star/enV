@@ -1149,6 +1149,9 @@ private fun ToolDetail(
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(28.dp))
+            NativeToolCommunityPanel(tool.id)
+            Spacer(Modifier.height(28.dp))
             TextButton(
                 onClick = {
                     CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(
