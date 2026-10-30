@@ -208,7 +208,7 @@ enum NativeEcommerceEngine {
                 return """
                 Unit cost including packaging: \(money(variable))
                 Payment / platform fee: \(money(feePercent))%
-                Minimum break-even price before tax and advertising: \(money(minimum))
+                Minimum break-even price before tax and advertising: \(minimum.isFinite ? money(minimum) : "Not achievable with these fees")
                 Target margin: \(money(target))%
                 Target selling price: \(targetPrice.isFinite ? money(targetPrice) : "Not achievable with these fee and margin inputs")
                 Current selling price: \(money(price))
