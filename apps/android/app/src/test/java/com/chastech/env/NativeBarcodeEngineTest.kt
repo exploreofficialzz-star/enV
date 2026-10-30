@@ -52,6 +52,14 @@ class NativeBarcodeEngineTest {
         }
     }
 
+    @Test fun scanHistoryCsvEscapesCommasAndQuotesWithoutLosingPayload() {
+        val csv = nativeBarcodeScansCsv(
+            listOf(NativeBarcodeScan("SKU, \"Blue\" box", "CODE_128", 0L)),
+        )
+        assertTrue(csv.startsWith("scanned_at,format,payload\\r\\n"))
+        assertTrue(csv.contains("\"CODE_128\",\"SKU, \"\"Blue\"\" box\""))
+    }
+
     @Test fun decodedLinksAllowOnlyHttpAndHttpsHosts() {
         assertEquals("https://example.com/path", safeBarcodeHttpUrl("https://example.com/path"))
         assertEquals("http://example.com", safeBarcodeHttpUrl("http://example.com"))
