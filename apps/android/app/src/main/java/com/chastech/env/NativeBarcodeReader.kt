@@ -79,7 +79,30 @@ private fun readerHints(): Map<DecodeHintType, Any> = mapOf(
     ),
 )
 
+data class NativeBarcodeLumaFrame(val data: ByteArray, val width: Int, val height: Int)
+
 object NativeBarcodeImageDecoder {
+    internal fun rotateLumaFrame(data: ByteArray, width: Int, height: Int, degrees: Int): NativeBarcodeLumaFrame {
+        require(width > 0 && height > 0 && data.size >= width * height) { "Invalid camera luminance frame." }
+        val rotation = ((degrees % 360) + 360) % 360
+        if (rotation == 0) return NativeBarcodeLumaFrame(data.copyOf(width * height), width, height)
+        require(rotation == 90 || rotation == 180 || rotation == 270) { "Unsupported camera frame rotation: $degrees" }
+        val outputWidth = if (rotation == 180) width else height
+        val outputHeight = if (rotation == 180) height else width
+        val output = ByteArray(outputWidth * outputHeight)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val (targetX, targetY) = when (rotation) {
+                    90 -> height - 1 - y to x
+                    180 -> width - 1 - x to height - 1 - y
+                    else -> y to width - 1 - x
+                }
+                output[targetY * outputWidth + targetX] = data[y * width + x]
+            }
+        }
+        return NativeBarcodeLumaFrame(output, outputWidth, outputHeight)
+    }
+
     fun decode(bitmap: Bitmap): NativeBarcodeScan? {
         if (bitmap.width <= 0 || bitmap.height <= 0) return null
         return runCatching {
@@ -132,7 +155,8 @@ private class NativeBarcodeCameraAnalyzer(
                     if (index < buffer.limit()) bytes[row * width + column] = buffer.get(index)
                 }
             }
-            val source = PlanarYUVLuminanceSource(bytes, width, height, 0, 0, width, height, false)
+            val rotated = NativeBarcodeImageDecoder.rotateLumaFrame(bytes, width, height, image.imageInfo.rotationDegrees)
+            val source = PlanarYUVLuminanceSource(rotated.data, rotated.width, rotated.height, 0, 0, rotated.width, rotated.height, false)
             val result = reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
             onResult(NativeBarcodeScan(result.text, result.barcodeFormat.toString()))
             reader.reset()
