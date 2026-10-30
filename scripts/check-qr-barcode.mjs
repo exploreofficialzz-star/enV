@@ -70,11 +70,14 @@ assert.ok(androidCommerce.includes("safetyStock") && androidCommerce.includes("f
 assert.ok(androidCommerce.includes('"pricing" -> common + finance.filter') && androidCommerce.includes('targetMargin + feePercent < 100'), "Android pricing exposes target margin and rejects impossible fee/margin combinations");
 assert.ok(androidCommerceForm.includes("ActivityResultContracts.CreateDocument") && androidCommerceForm.includes("openOutputStream(uri)") && androidCommerceForm.includes('Text("Save")'), "Android E-commerce results can be saved through the system document picker");
 assert.ok(androidTests.includes("pricingCalculatorExposesTargetMarginAndCalculatesFeeAwarePrice"), "Android tests target-margin pricing and form fields");
+assert.ok(androidTests.includes("Current selling price: 75.00"), "Android pricing test verifies current selling-price comparison");
 assert.ok(iosViews.includes('tool.id == "qr-payload-inspector" { NativeBarcodeReaderView() }') && iosViews.includes("NativeEcommerceEngine.supports(tool)"), "iOS native dispatch routes reader and E-commerce tools");
 assert.ok(iosReader.includes("AVCaptureMetadataOutput") && iosReader.includes("VNDetectBarcodesRequest") && iosReader.includes("PhotosPicker"), "iOS reader uses AVFoundation and Vision for camera and image scanning");
 assert.ok(iosReader.includes("quiet zone") && iosTests.includes("testVisionReaderDecodesLocallyGeneratedQrImage"), "iOS image reader pads cropped codes and tests Vision QR decoding");
 assert.ok(iosCommerce.includes("static func supports(_ tool: Tool)") && iosCommerce.includes("static func run("), "iOS has an independent native E-commerce engine");
 assert.ok(iosCommerce.includes("safetyStock") && iosCommerce.includes("feePercent") && iosCommerce.includes("targetMargin"), "iOS commerce engine includes inventory safety and pricing economics");
+assert.ok(iosCommerce.includes("Current selling price:") && iosTests.includes("testPricingCalculatorComparesCurrentAndTargetSellingPrice"), "iOS pricing exposes and tests current selling-price comparison");
+assert.ok(iosTests.includes("testAllFiftyTwoQrAndBarcodeCatalogEntriesHaveNativeHandlers"), "iOS tests all 52 QR and barcode catalog handlers");
 assert.ok(iosProject.includes("NativeEcommerceEngine.swift in Sources") && iosProject.includes("NativeQrBarcodeAndEcommerceViews.swift in Sources") && iosProject.includes("NativeEcommerceEngineTests.swift in Sources"), "iOS native engine and test files are registered in Xcode");
 
 assert.ok(androidBackend.includes("if (NativeEcommerceEngine.supports(tool)) return false"), "Android local commerce operations never fall through to generic backend routing");
