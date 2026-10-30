@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getOptionalBillingUserId } from "../billing/http.server";
 import { getSql } from "../db";
 import { validateFeedbackPayload } from "./protocol.mjs";
+import { getToolById } from "../registry";
 
 export class FeedbackError extends Error {
   constructor(readonly code: string, message: string, readonly status = 400) { super(message); this.name = "FeedbackError"; }
@@ -42,6 +43,7 @@ export async function createFeedbackTicket(request: Request, input: unknown) {
   try { body = validateFeedbackPayload(input); }
   catch (error) { throw new FeedbackError("INVALID_FEEDBACK", error instanceof Error ? error.message : "Invalid feedback.", 400); }
   const userId = await getOptionalBillingUserId(request);
+  if (body.toolId && !getToolById(body.toolId)) throw new FeedbackError("FEEDBACK_TOOL_NOT_FOUND", "The selected tool is not in the enV catalogue.", 400);
   const subject = reporterDigest(request, userId, secret);
   const sql = await getSql();
   const hour = Math.floor(Date.now() / 3600000);
