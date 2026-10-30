@@ -62,11 +62,16 @@ fun JSONObject.toToolRecord(): ToolRecord {
     val knownEngineKeys = setOf("type", "id")
     val extras = engineJson.keys().asSequence().filterNot(knownEngineKeys::contains).associateWith { engineJson.optString(it) }
     return ToolRecord(
-        id = stringOrEmpty("id"), name = stringOrEmpty("name"), slug = stringOrEmpty("slug"),
-        description = NativeCopy.text(stringOrEmpty("description")), category = stringOrEmpty("category"),
+        id = stringOrEmpty("id"),
+        name = if (stringOrEmpty("id") == "qr-payload-inspector") "QR & Barcode Reader" else stringOrEmpty("name"),
+        slug = stringOrEmpty("slug"),
+        description = NativeCopy.text(if (stringOrEmpty("id") == "qr-payload-inspector") "Scan QR codes and 1D/2D barcodes using your camera or an image file. Decode results locally on this device." else stringOrEmpty("description")),
+        category = stringOrEmpty("category"),
         subcategory = optString("subcategory").takeIf { it.isNotBlank() },
         disclaimer = optString("disclaimer").takeIf { it.isNotBlank() },
-        keywords = stringList("keywords"), tags = stringList("tags"), icon = stringOrEmpty("icon"),
+        keywords = if (stringOrEmpty("id") == "qr-payload-inspector") (stringList("keywords") + listOf("scan", "scanner", "reader", "barcode", "camera", "image", "decode")).distinct() else stringList("keywords"),
+        tags = if (stringOrEmpty("id") == "qr-payload-inspector") (stringList("tags") + listOf("scan", "reader", "barcode")).distinct() else stringList("tags"),
+        icon = stringOrEmpty("icon"),
         popularity = optInt("popularity", 0), featured = optBoolean("featured", false),
         clientSide = optBoolean("clientSide", false), requiresBackend = optBoolean("requiresBackend", false),
         requiresAuth = optBoolean("requiresAuth", false), status = if (stringOrEmpty("category") in setOf("qr", "ecommerce")) "active" else stringOrEmpty("status"),
