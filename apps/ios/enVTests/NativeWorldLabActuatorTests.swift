@@ -29,8 +29,9 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         input.forceConstantNPerA=0
         let run=try NativeWorldLabActuator.evaluate(input)
         let atOne=try XCTUnwrap(run.samples.first(where:{$0.timeSeconds>=1-1e-10}))
-        let expected=input.supplyVoltageV/input.resistanceOhm*
-            (1-exp(-input.resistanceOhm/input.inductanceH))
+        let timeConstant = input.resistanceOhm / input.inductanceH
+        let steadyCurrent = input.supplyVoltageV / input.resistanceOhm
+        let expected = steadyCurrent * (1 - exp(-timeConstant))
         XCTAssertEqual(atOne.currentA,expected,accuracy:1e-7)
         XCTAssertEqual(atOne.heightM,0)
     }
