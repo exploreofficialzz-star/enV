@@ -27,6 +27,19 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         XCTAssertTrue(result.maximumEnergyResidualFraction.isFinite)
         XCTAssertNotNil(result.maximumRelativeStateDifference)
     }
+    func testCoilThermalFeedbackChangesCurrent() throws {
+        var hot=NativeActuatorInput(massKg:1)
+        hot.thermal=NativeActuatorThermalInput()
+        let base=try NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg:1))
+        let result=try NativeWorldLabActuator.evaluate(hot)
+        XCTAssertEqual(result.modelVersion,"1.1.0")
+        XCTAssertGreaterThan(try XCTUnwrap(result.samples.last?.coilTemperatureK),293.15)
+        XCTAssertGreaterThan(try XCTUnwrap(result.samples.last?.coilResistanceOhm),2)
+        XCTAssertGreaterThan(try XCTUnwrap(result.samples.last?.thermalEnergyJ),0)
+        XCTAssertNotEqual(result.samples.last?.currentA,base.samples.last?.currentA)
+        hot.thermal?.heatCapacityJPerK=0
+        XCTAssertThrowsError(try NativeWorldLabActuator.evaluate(hot))
+    }
     func testUnpoweredActuatorCannotInventMotion() throws {
         var input=NativeActuatorInput(massKg:1)
         input.supplyVoltageV=0

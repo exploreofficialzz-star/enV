@@ -50,6 +50,7 @@ struct NativeWorldLabView:View {
     @State private var motorEntityId:String?
     @State private var motorTime=0.0
     @State private var motorPlaying=false
+    @State private var motorThermalEnabled=false
     @State private var motorSpeed=1.0
     @State private var scene=SCNScene()
     @State private var lastTick=Date()
@@ -247,9 +248,14 @@ struct NativeWorldLabView:View {
                                     problem="";applyDropPosition()
                                 }catch{problem=error.localizedDescription}
                             }.buttonStyle(.bordered)
+                            Button(motorThermalEnabled ? "Coil heating: on" : "Coil heating: off"){
+                                motorThermalEnabled.toggle()
+                                motorRun=nil;motorAudit=nil;motorPlaying=false
+                            }.buttonStyle(.bordered)
                             Button("Power this solid"){
                                 do {
-                                    let input=NativeActuatorInput(massKg:derived)
+                                    var input=NativeActuatorInput(massKg:derived)
+                                    if motorThermalEnabled {input.thermal=NativeActuatorThermalInput()}
                                     let result=try NativeWorldLabActuator.evaluate(input)
                                     motorAudit=try NativeWorldLabActuator.numericalAudit(input,result)
                                     motorRun=result
@@ -267,6 +273,13 @@ struct NativeWorldLabView:View {
                                 value("Upward force",sample.motorForceN,"N")
                                 value("Back-EMF",sample.backEmfV,"V")
                                 value("Resistance heating",sample.resistiveHeatW,"W")
+                                if let temperature=sample.coilTemperatureK,
+                                    let r=sample.coilResistanceOhm {
+                                    value("Coil temperature",temperature,"K")
+                                    value("Hot coil resistance",r,"Ω")
+                                    value("Stored coil heat",sample.thermalEnergyJ,"J")
+                                    value("Cooling loss",sample.coolingPowerW,"W")
+                                }
                                 value("Energy balance residual",sample.energyResidualJ,"J")
                                 if let audit=motorAudit {
                                     Text("Numerical self-check: \(audit.status). \(audit.explanation)")

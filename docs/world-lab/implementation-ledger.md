@@ -177,3 +177,7 @@ release-candidate evidence bundle are unfinished.
 
 - Kotlin's four-state RK4 now models current, height, velocity and coil temperature in one timestep; resistance is computed from temperature and feeds back into lifting force. Cooling and stored thermal energy enter the first-law ledger rather than pretending all resistance heat is environmental loss.
 - An opt-in Android native control and solver-based temperature/resistance/cooling readouts preserve the original motor mode; numerical self-check includes thermal energy. Native invalid-assumption and feedback tests authored; CI deferred to requested combined audit.
+
+## iOS native electrothermal integration (2026-10-30)
+
+- Swift's native 1D RK4 now evolves coil temperature, resistance, voltage/current and mechanical height together, keeping the energy balance through stored thermal energy and cooling. The native UI offers an opt-in thermal mechanism and calculated temperature/resistance/cooling results. Native audit supports 1.1.0; XCTest coverage authored. Exact-head build and simulator audit are intentionally deferred to the consolidated verification pass.
