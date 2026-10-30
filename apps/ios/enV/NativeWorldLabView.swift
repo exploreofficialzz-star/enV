@@ -1,0 +1,224 @@
+import SwiftUI
+import SceneKit
+import UniformTypeIdentifiers
+
+/// Native 3D *illustrative* scene with real, bounded local reference solvers.
+/// Imported solids are never silently coupled to the scientific equations.
+struct NativeWorldLabView:View {
+    @State private var mode=0
+    @State private var seconds=0.0
+    @State private var speed=1.0
+    @State private var playing=false
+    @State private var mass=1.0
+    @State private var resistance=1000.0
+    @State private var diffusivity=0.02
+    @State private var seeInside=false
+    @State private var importing=false
+    @State private var problem=""
+    @State private var project:NativeWorldLabProject?
+    @State private var selected=0
+    @State private var scene=SCNScene()
+    @State private var lastTick=Date()
+    private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
+    private var input:NativeLabInput {
+        if mode==0 {return .spring(massKg:mass)}
+        if mode==1 {return .rc(resistanceOhm:resistance)}
+        return .heat(diffusivityM2S:diffusivity)
+    }
+    private var values:NativeLabResult? {
+        try? NativeWorldLabScience.evaluate(input,atSeconds:seconds)
+    }
+    private var solid:NativeLabSolid? {
+        guard let project,project.entities.indices.contains(selected) else{return nil}
+        return project.entities[selected]
+    }
+    private var material:NativeLabMaterial? {
+        guard let solid else{return nil}
+        return project?.materials.first(where:{$0.id==solid.materialId})
+    }
+    private var assumedMass:Double? {
+        guard let solid,let density=material?.densityKgM3 else{return nil}
+        return solid.volumeMetersCubed*density
+    }
+    var body:some View {
+        ScrollView{
+            VStack(alignment:.leading,spacing:12) {
+                Text("The World Lab").font(.title2.bold())
+                Text("Real bounded science models in a representative 3D scene. Not measured or certified.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                SceneView(scene:scene,options:[.allowsCameraControl,.autoenablesDefaultLighting])
+                    .frame(height:260).clipShape(RoundedRectangle(cornerRadius:12))
+                    .accessibilityLabel("Illustrative 3D scene; model values are displayed below.")
+                Picker("Experiment",selection:$mode){
+                    Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
+                }.pickerStyle(.segmented)
+                HStack{
+                    Button(playing ? "Pause":"Play"){playing.toggle()}
+                        .buttonStyle(.borderedProminent)
+                    Button("Reset"){playing=false;seconds=0}.buttonStyle(.bordered)
+                    Button("Step"){playing=false;seconds=min(12,seconds+1.0/240)}
+                        .buttonStyle(.bordered)
+                    Toggle("See inside",isOn:$seeInside).labelsHidden()
+                    Text("See inside").font(.caption)
+                }
+                Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
+                Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in
+                    if editing{playing=false}
+                }).accessibilityLabel("Simulated elapsed time")
+                Picker("Playback speed",selection:$speed){
+                    Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("10×").tag(10.0)
+                }.pickerStyle(.segmented)
+                if mode==0 {
+                    Text("Assumed mass: "+String(format:"%.2f",mass)+" kg")
+                    Slider(value:$mass,in:0.1...100)
+                }else if mode==1 {
+                    Text("Resistance: "+String(format:"%.0f",resistance)+" Ω")
+                    Slider(value:$resistance,in:100...10000)
+                }else{
+                    Text("Thermal diffusivity: "+String(format:"%.4f",diffusivity)+" m²/s")
+                    Slider(value:$diffusivity,in:0.001...0.08)
+                }
+                Text("Computed observations").font(.headline)
+                if let reading=values {
+                    if mode==0 {
+                        value("Position",reading.xMeters,"m")
+                        value("Velocity",reading.velocityMPerS,"m/s")
+                        value("Mechanical energy",reading.mechanicalEnergyJ,"J")
+                    }else if mode==1 {
+                        value("Capacitor voltage",reading.voltageV,"V")
+                        value("Current",reading.currentA,"A")
+                        value("Resistor heating",reading.resistorHeatW,"W")
+                    }else{
+                        value("Mean temperature",reading.meanTemperatureK,"K")
+                        value("Hottest cell",reading.peakTemperatureK,"K")
+                        if seeInside,let temps=reading.temperatureK {
+                            Text("21 computed internal temperatures in kelvin:")
+                                .font(.caption)
+                            Text(temps.map{String(format:"%.1f",$0)}.joined(separator:", "))
+                                .font(.caption.monospaced()).textSelection(.enabled)
+                        }
+                    }
+                }else{Text("Model exceeds its supported numerical limits.").foregroundStyle(.red)}
+                if seeInside && mode != 2 {
+                    Text("See inside is visual transparency, not an X-ray or molecular measurement.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Divider()
+                Button("Inspect World Lab project JSON"){importing=true}.buttonStyle(.bordered)
+                if let project {
+                    Text(project.title+" · "+String(project.entities.count)+" solids")
+                        .font(.headline)
+                    if let solid {
+                        HStack {
+                            Button("Previous"){selected=max(0,selected-1)}.disabled(selected==0)
+                            Spacer()
+                            Text(String(selected+1)+" / "+String(project.entities.count))
+                            Spacer()
+                            Button("Next"){selected=min(project.entities.count-1,selected+1)}
+                                .disabled(selected==project.entities.count-1)
+                        }
+                        Text("Selected: "+solid.name+" ("+solid.shape+")")
+                        value("Ideal volume",solid.volumeMetersCubed,"m³")
+                        Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
+                        value("Assumed mass",assumedMass,"kg")
+                        if let derived=assumedMass,derived>=0.001,derived<=10000 {
+                            Button("Test assumed mass in spring model"){
+                                mass=derived;mode=0;seconds=0;playing=false
+                            }.buttonStyle(.borderedProminent)
+                        }
+                    }
+                    Text("Imported geometry is not structurally or chemically simulated. The spring uses only a separately assumed lumped mass.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !problem.isEmpty {Text(problem).foregroundStyle(.red)}
+                Text("Model 1.0.0 · computed with assumed parameters · not a safety assessment.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }.padding(14)
+        }
+        .onAppear{redraw();lastTick=Date()}
+        .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
+        .onChange(of:seconds){_ in redraw()}
+        .onChange(of:seeInside){_ in redraw()}
+        .onChange(of:mass){_ in redraw()}
+        .onChange(of:resistance){_ in redraw()}
+        .onChange(of:diffusivity){_ in redraw()}
+        .onReceive(timer){now in
+            let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
+            lastTick=now
+            if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
+        }
+        .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
+            do {
+                let url=try response.get()
+                let accessed=url.startAccessingSecurityScopedResource()
+                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
+                let length=try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0
+                guard length<=NativeWorldLabProject.maxBytes else {
+                    throw NativeWorldLabError.invalid("Project files must be 1 MB or smaller.")
+                }
+                project=try NativeWorldLabProject.decode(Data(contentsOf:url))
+                selected=0;problem="";redraw()
+            }catch{problem=error.localizedDescription}
+        }
+    }
+    private func value(_ name:String,_ amount:Double?,_ unit:String)->some View{
+        Text(name+": "+(amount.map{String(format:"%.5g",$0)} ?? "Unknown")+" "+unit)
+            .font(.subheadline)
+    }
+    private func redraw(){
+        let next=SCNScene()
+        let floor=SCNNode(geometry:SCNFloor())
+        floor.geometry?.firstMaterial?.diffuse.contents=UIColor.systemGreen
+        next.rootNode.addChildNode(floor)
+        if let project {
+            for item in project.entities.prefix(200){
+                let xyz=item.dimensionsMeters
+                let geometry:SCNGeometry
+                switch item.shape{
+                case "sphere":geometry=SCNSphere(radius:CGFloat(xyz[0]/2))
+                case "cylinder":geometry=SCNCylinder(radius:CGFloat(xyz[0]/2),height:CGFloat(xyz[1]))
+                default:geometry=SCNBox(width:CGFloat(xyz[0]),height:CGFloat(xyz[1]),
+                                         length:CGFloat(xyz[2]),chamferRadius:0)
+                }
+                let node=SCNNode(geometry:geometry)
+                node.position=SCNVector3(Float(item.positionMeters[0]),
+                    Float(item.positionMeters[1]),Float(item.positionMeters[2]))
+                if let hex=UInt64(item.color.dropFirst(),radix:16){
+                    geometry.firstMaterial?.diffuse.contents=UIColor(
+                        red:CGFloat((hex>>16)&255)/255,
+                        green:CGFloat((hex>>8)&255)/255,
+                        blue:CGFloat(hex&255)/255,alpha:1)
+                }
+                geometry.firstMaterial?.transparency=(seeInside ? 0.4:1)*CGFloat(item.opacity)
+                next.rootNode.addChildNode(node)
+            }
+        }
+        if mode==0 {
+            let orb=SCNNode(geometry:SCNSphere(radius:0.4))
+            orb.geometry?.firstMaterial?.diffuse.contents=UIColor.systemOrange
+            orb.position=SCNVector3(Float((values?.xMeters ?? 0)*1.5),1.2,0)
+            next.rootNode.addChildNode(orb)
+        }else if mode==1 {
+            let box=SCNNode(geometry:SCNBox(width:1.2,height:1,length:0.5,chamferRadius:0))
+            box.position=SCNVector3(0,1,0)
+            box.geometry?.firstMaterial?.diffuse.contents=UIColor.cyan
+            next.rootNode.addChildNode(box)
+        }else if let field=values?.temperatureK{
+            for (i,kelvin) in field.enumerated(){
+                let cell=SCNNode(geometry:SCNBox(width:0.115,height:0.36,
+                                                 length:0.5,chamferRadius:0))
+                let t=max(0,min(1,(kelvin-293.15)/80))
+                cell.geometry?.firstMaterial?.diffuse.contents=UIColor(
+                    red:0.2+0.8*t,green:0.3+0.55*t,blue:0.55,alpha:1)
+                cell.position=SCNVector3(Float((Double(i)-10)*0.116),1.05,0)
+                next.rootNode.addChildNode(cell)
+            }
+        }
+        let camera=SCNNode()
+        camera.camera=SCNCamera()
+        camera.position=SCNVector3(0,3,-8)
+        camera.look(at:SCNVector3(0,1,0))
+        next.rootNode.addChildNode(camera)
+        scene=next
+    }
+}

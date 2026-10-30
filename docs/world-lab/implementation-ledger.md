@@ -134,3 +134,9 @@ production-ready under the master PDF: remote advanced physics and coupled
 solvers, Earth/space observational datasets, full native editors, security
 isolation for user code, scientific validity ledgers and a multi-device
 release-candidate evidence bundle are unfinished.
+
+## Native experiment surfaces (2026-10-30)
+- Kotlin and Swift have independently tested bounded native spring, RC and insulated heat computations, matching Web scientific model 1.0.0 equations.
+- Android Compose provides offline experiment controls, timeline/slow motion, numeric computed states, heat-cell schematic, strict portable project import/inspection and optional hypothetical density-derived spring mass. Android canvas is not a volumetric renderer.
+- iOS SwiftUI provides SceneKit illustrative 3D solids and solver-linked heat colors, offline experiment controls/time scrub, strict project import, volume and hypothetical mass, without claiming any coupled 3D physics.
+- Three platform catalogs list World Lab independently alongside existing Artboard and UX/UI Studios. Native authoring/export and full multi-physics parity remain production gaps.

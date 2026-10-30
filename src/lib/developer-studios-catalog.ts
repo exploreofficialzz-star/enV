@@ -18,6 +18,13 @@ export type DeveloperStudioDefinition = {
  */
 export const DEVELOPER_STUDIOS: DeveloperStudioDefinition[] = [
   {
+    id: "the-world-lab", slug: "the-world-lab", name: "The World Lab",
+    description: "Explore invented solids and run bounded scientific reference experiments. Full multiphysics is still in development.",
+    sourceId: "javascript-formatter", icon: "Orbit",
+    keywords: ["world lab", "science", "experiments", "hypothetical", "physics", "3d", "materials"],
+    modes: [{ key: "workspace", label: "Workspace", op: "the-world-lab" }],
+  },
+  {
     id: "json-studio", slug: "json-studio", name: "JSON Studio",
     description: "Format, validate, compare, inspect, query, and convert structured data locally while preserving large integer tokens and explaining parser caveats.",
     sourceId: "json-formatter", icon: "Braces", keywords: ["json", "format", "minify", "validate", "diff", "path", "tree", "csv", "schema", "large integer", "duplicate key", "offline", "privacy"],

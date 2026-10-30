@@ -10,6 +10,10 @@ data class NativeDeveloperStudioSpec(
 
 object NativeDeveloperStudios {
     val specs = listOf(
+        NativeDeveloperStudioSpec("the-world-lab","javascript-formatter","the-world-lab",
+            "The World Lab","Native offline scientific reference experiments and portable solid inspection.",
+            "Orbit",listOf("world lab","science","physics","materials","3d"),
+            listOf(NativeDeveloperStudioMode("workspace","Workspace","the-world-lab"))),
         NativeDeveloperStudioSpec("json-studio", "json-formatter", "json-studio", "JSON Studio", "Format, validate, compare, inspect, and query JSON locally while preserving large integer tokens and explaining parser caveats.", "Braces", listOf("json", "format", "minify", "validate", "diff", "path", "tree", "large integer", "privacy"), listOf(
             NativeDeveloperStudioMode("format", "Format", "json-formatter"), NativeDeveloperStudioMode("minify", "Minify", "json-minifier"), NativeDeveloperStudioMode("validate", "Validate", "json-validator"), NativeDeveloperStudioMode("diff", "Diff", "json-diff"), NativeDeveloperStudioMode("path", "Path / Search", "json-path-query"), NativeDeveloperStudioMode("tree", "Tree / Inspect", "json-inspector"), NativeDeveloperStudioMode("schema", "Schema", "developer-json-schema-generator"), NativeDeveloperStudioMode("convert", "Convert to CSV", "json-to-csv"), NativeDeveloperStudioMode("csv", "CSV tools", "csv-formatter"))),
         NativeDeveloperStudioSpec("jwt-studio", "jwt-decoder", "jwt-studio", "JWT Studio", "Decode tokens and inspect registered claims locally. Decoding never proves trust or signature validity.", "ShieldCheck", listOf("jwt", "token", "claims", "expiration", "privacy"), listOf(NativeDeveloperStudioMode("decode", "Decode", "jwt-decoder"), NativeDeveloperStudioMode("expiration", "Expiration", "jwt-expiration-checker"), NativeDeveloperStudioMode("claims", "Claims inspector", "jwt-inspector"), NativeDeveloperStudioMode("payload", "Payload builder", "developer-jwt-payload-generator"))),
