@@ -237,7 +237,11 @@ export function BarcodeEngine({ format }: { format: string }) {
       const JsBarcode = (await import("jsbarcode")).default;
       const doc = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       const fmt = ({ean13:"EAN13",ean8:"EAN8",upca:"UPC",code128:"CODE128",code39:"CODE39",itf14:"ITF14",msi:"MSI",pharmacode:"pharmacode",codabar:"codabar",isbn:"EAN13",["isbn-barcode"]:"EAN13",["barcode-label-generator"]:"CODE128",["barcode-svg-generator"]:"CODE128"} as Record<string,string>)[format] || "CODE128";
-      const clean = value.replace(/[- ]/g, "");
+      // Keep Code 128 / Code 39 payloads byte-for-byte (after trimming):
+      // hyphens and internal spaces are valid data, not visual separators.
+      // Only retail numeric standards use separator removal before validation.
+      const separatorInsensitiveFormats = new Set(["ean13", "ean8", "upca", "itf14", "msi", "pharmacode", "isbn", "isbn-barcode"]);
+      const clean = separatorInsensitiveFormats.has(format) ? value.replace(/[\\s-]/g, "") : value.trim();
       JsBarcode(doc, format === "isbn" ? clean.replace(/^ISBN(?:-13)?:?/i, "") : clean, { format: fmt, displayValue: true, font: "monospace", height: 80, margin: 8, width: 2 });
       const markup = new XMLSerializer().serializeToString(doc);
       setSvg(markup);
