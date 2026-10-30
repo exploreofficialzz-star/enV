@@ -23,9 +23,10 @@ class NativeWorldLabProjectTest {
                 "\"schemaVersion\": 1","\"schemaVersion\": 2"))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            NativeWorldLabProjectCodec.decode(fixture().replace(
-                "\"dimensionsMeters\": [\\n        1,\\n        1,\\n        1\\n      ]",
-                "\"dimensionsMeters\": [2,1,1]"))
+            val json=org.json.JSONObject(fixture())
+            json.getJSONArray("entities").getJSONObject(1)
+                .put("dimensionsMeters",org.json.JSONArray(listOf(2,1,1)))
+            NativeWorldLabProjectCodec.decode(json.toString())
         }
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(
