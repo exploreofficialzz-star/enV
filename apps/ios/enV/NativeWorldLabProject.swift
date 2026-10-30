@@ -404,3 +404,85 @@ enum NativeWorldLabDc {
             deliveredPowerW:delivered,resistorHeatW:heat,powerResidualW:residual)
     }
 }
+
+/// Bounded native Swift Archimedes reference with hypothetical solids and fluid.
+struct NativeLabHydroResult {
+    let projectId:String
+    let projectRevision:Int
+    let entityId:String
+    let fluidDensityKgM3:Double
+    let immersionDepthM:Double
+    let displacedVolumeM3:Double
+    let buoyancyForceN:Double
+    let bottomGaugePressurePa:Double
+    let netUpwardForceN:Double?
+    let equilibriumDraftM:Double?
+    let status:String
+    let validity="Static level fluid, ideal upright geometry, hypothetical density; " +
+        "no dynamic flow, instability, melting, waves or physical material validation."
+}
+enum NativeWorldLabHydrostatics {
+    static func displacedVolume(_ solid:NativeLabSolid,depth:Double)throws->Double {
+        let y=solid.dimensionsMeters[1]
+        guard depth.isFinite,depth>=0,depth<=y else {
+            throw NativeWorldLabError.invalid("Immersion must fit within the selected solid")
+        }
+        let x=solid.dimensionsMeters[0]
+        let z=solid.dimensionsMeters[2]
+        switch solid.shape {
+        case "box":return x*z*depth
+        case "cylinder":return Double.pi*x*z*depth/4
+        case "sphere":
+            let radius=y/2
+            return Double.pi*depth*depth*(3*radius-depth)/3
+        default:throw NativeWorldLabError.invalid("Unsupported fluid shape")
+        }
+    }
+    static func evaluate(_ project:NativeWorldLabProject,entityId:String,
+                         fluidDensityKgM3:Double,immersionDepthM:Double,
+                         gravityMps2:Double=9.80665)throws->NativeLabHydroResult {
+        guard fluidDensityKgM3.isFinite,fluidDensityKgM3>=0.01,
+              fluidDensityKgM3<=25000,gravityMps2.isFinite,
+              gravityMps2>=0,gravityMps2<=100 else {
+            throw NativeWorldLabError.invalid("Invalid fluid density or gravity")
+        }
+        guard let solid=project.entities.first(where:{$0.id==entityId}) else {
+            throw NativeWorldLabError.invalid("Select a solid for immersion")
+        }
+        let displacement=try displacedVolume(solid,depth:immersionDepthM)
+        let density=project.materials.first(where:{$0.id==solid.materialId})?.densityKgM3
+        let mass=density.map{solid.volumeMetersCubed*$0}
+        let full=solid.volumeMetersCubed*fluidDensityKgM3
+        let buoyancy=displacement*fluidDensityKgM3*gravityMps2
+        let net=mass.map{buoyancy-$0*gravityMps2}
+        let status:String
+        let draft:Double?
+        if let mass {
+            if mass>full {status="sinking"}
+            else if mass==full {status="neutrally-buoyant"}
+            else {status="floating"}
+            if mass>=full {draft=solid.dimensionsMeters[1]}
+            else {
+                let target=mass/fluidDensityKgM3
+                var lo=0.0
+                var hi=solid.dimensionsMeters[1]
+                for _ in 0..<64 {
+                    let mid=(lo+hi)/2
+                    if try displacedVolume(solid,depth:mid)<target {lo=mid}
+                    else {hi=mid}
+                }
+                draft=(lo+hi)/2
+            }
+        }else {status="unknown-mass";draft=nil}
+        let pressure=fluidDensityKgM3*gravityMps2*immersionDepthM
+        guard [displacement,buoyancy,pressure,net ?? 0,draft ?? 0].allSatisfy({$0.isFinite}) else {
+            throw NativeWorldLabError.invalid("Fluid experiment exceeded finite precision")
+        }
+        return NativeLabHydroResult(
+            projectId:project.id,projectRevision:project.revision,entityId:entityId,
+            fluidDensityKgM3:fluidDensityKgM3,immersionDepthM:immersionDepthM,
+            displacedVolumeM3:displacement,buoyancyForceN:buoyancy,
+            bottomGaugePressurePa:pressure,netUpwardForceN:net,
+            equilibriumDraftM:draft,status:status)
+    }
+}

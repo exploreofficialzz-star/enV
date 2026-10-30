@@ -50,6 +50,25 @@ final class NativeWorldLabProjectTests: XCTestCase {
             XCTUnwrap(parallel.networks?.first),project:parallel)
         XCTAssertEqual(second.resistorHeatW/9,0.135,accuracy:1e-12)
     }
+    func testNativeArchimedesFluidWithUnknownMass() throws {
+        let base=try NativeWorldLabEditor.blank()
+        let solid=try NativeWorldLabEditor.addSolid(base,shape:"box",id:"float")
+        let withMat=try NativeWorldLabEditor.addHypotheticalMaterial(
+            solid,name:"Assumed foam",densityKgM3:500,id:"foam")
+        let data=try NativeWorldLabEditor.assignMaterial(
+            withMat,solidId:"float",materialId:"foam")
+        let p=try NativeWorldLabProject.decode(data)
+        let result=try NativeWorldLabHydrostatics.evaluate(
+            p,entityId:"float",fluidDensityKgM3:1000,immersionDepthM:0.5)
+        XCTAssertEqual(result.displacedVolumeM3,0.5,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(result.equilibriumDraftM),0.5,accuracy:1e-10)
+        XCTAssertEqual(try XCTUnwrap(result.netUpwardForceN),0,accuracy:1e-9)
+        let unknown=try NativeWorldLabProject.decode(solid)
+        let notMeasured=try NativeWorldLabHydrostatics.evaluate(
+            unknown,entityId:"float",fluidDensityKgM3:1000,immersionDepthM:0.5)
+        XCTAssertNil(notMeasured.equilibriumDraftM)
+        XCTAssertEqual(notMeasured.status,"unknown-mass")
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))

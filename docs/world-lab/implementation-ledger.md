@@ -227,3 +227,7 @@ release-candidate evidence bundle are unfinished.
 ## Android fluid/Archimedes experiment (2026-10-30)
 
 - Implemented native Kotlin static buoyancy for upright boxes, cylinders, spherical caps using exact immersion geometry; source project material assumptions, pressure, gravitational net force and 64-step draft balancing. Compose gives child-friendly fluid density, immersion slider, calculated results and unknown-mass disclosure, retaining native styling. Regression authored, consolidated audit deferred.
+
+## iOS fluid-mechanical reference (2026-10-30)
+
+- Implemented independent Swift Archimedes solver for ideal immersed boxes, spheres (spherical caps) and upright cylinders, with numerical equilibrium draft, fluid pressure and explicit unknown-mass status. SwiftUI exposes an accessible density/immersion control and scientific readouts. Added platform-native XCTest source; comprehensive audit deferred as directed. This closes source-level hydrostatics parity, not verified native execution.

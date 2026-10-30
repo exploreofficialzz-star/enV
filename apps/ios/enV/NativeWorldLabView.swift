@@ -41,6 +41,9 @@ struct NativeWorldLabView:View {
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
     @State private var selected=0
+    @State private var hydroRun:NativeLabHydroResult?
+    @State private var fluidDensity=1000.0
+    @State private var fluidFraction=0.5
     @State private var dropRun:NativeDropResult?
     @State private var dropEntityId:String?
     @State private var dropTime=0.0
@@ -118,7 +121,7 @@ struct NativeWorldLabView:View {
             }
             let data=try work(old)
             project=try NativeWorldLabProject.decode(data)
-            projectData=data;dcRun=nil;wiredMotor=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            projectData=data;dcRun=nil;wiredMotor=nil;hydroRun=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -287,6 +290,34 @@ struct NativeWorldLabView:View {
                         }.buttonStyle(.bordered)
                         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
                         value("Assumed mass",assumedMass,"kg")
+                        Text("Try floating your invention").font(.headline)
+                        value("Assumed fluid density",fluidDensity,"kg/m³")
+                        Slider(value:$fluidDensity,in:100...2500) { editing in
+                            if editing {hydroRun=nil}
+                        }.accessibilityLabel("Fluid density")
+                        Text("Immersion depth: \(Int(fluidFraction*100))% of height")
+                            .font(.caption)
+                        Slider(value:$fluidFraction,in:0...1) { editing in
+                            if editing {hydroRun=nil}
+                        }.accessibilityLabel("Fraction of solid submerged")
+                        Button("Calculate buoyancy"){
+                            do {
+                                hydroRun=try NativeWorldLabHydrostatics.evaluate(
+                                    project,entityId:solid.id,fluidDensityKgM3:fluidDensity,
+                                    immersionDepthM:solid.dimensionsMeters[1]*fluidFraction)
+                                problem=""
+                            }catch {hydroRun=nil;problem=error.localizedDescription}
+                        }.buttonStyle(.bordered)
+                        if let liquid=hydroRun,liquid.projectId==project.id,
+                           liquid.projectRevision==project.revision,liquid.entityId==solid.id {
+                            value("Displaced fluid",liquid.displacedVolumeM3,"m³")
+                            value("Upward buoyancy",liquid.buoyancyForceN,"N")
+                            value("Bottom gauge pressure",liquid.bottomGaugePressurePa,"Pa")
+                            Text("Floating status: "+liquid.status)
+                            value("Net upward force",liquid.netUpwardForceN,"N")
+                            value("Equilibrium draft",liquid.equilibriumDraftM,"m")
+                            Text(liquid.validity).font(.caption).foregroundStyle(.secondary)
+                        }
                         if let derived=assumedMass,derived>=0.001,derived<=10000 {
                             Button("Test assumed mass in spring model"){
                                 mass=derived;mode=0;seconds=0;playing=false
