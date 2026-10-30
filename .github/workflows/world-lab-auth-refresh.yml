@@ -25,7 +25,7 @@ jobs:
         run: |
           npm ci
           npm audit --audit-level=moderate
-      - name: Compile and verify existing authentication contracts
+      - name: Compile and verify migrated authentication contracts
         run: |
           npm run build
           npm run typecheck
