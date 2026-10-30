@@ -301,7 +301,10 @@ struct NativeWorldLabView:View {
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
-        .onChange(of:projectData){_ in redraw()}
+        .onChange(of:projectData){_ in
+            // Never reuse a prior computed trajectory after geometry/material edits.
+            dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0;redraw()
+        }
         .onReceive(timer){now in
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
             lastTick=now
