@@ -80,6 +80,41 @@ data class NativeBarcodeScan(
     val scannedAt: Long = System.currentTimeMillis(),
 )
 
+internal const val NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES = "env.barcodeReader.history"
+private const val NATIVE_BARCODE_SCAN_HISTORY_KEY = "records"
+
+internal fun loadNativeBarcodeScanHistory(context: Context): List<NativeBarcodeScan> {
+    val stored = context.getSharedPreferences(NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES, Context.MODE_PRIVATE)
+        .getString(NATIVE_BARCODE_SCAN_HISTORY_KEY, null) ?: return emptyList()
+    return runCatching {
+        val array = org.json.JSONArray(stored)
+        (0 until array.length()).mapNotNull { index ->
+            val entry = array.optJSONObject(index) ?: return@mapNotNull null
+            val text = entry.optString("text")
+            val format = entry.optString("format")
+            val scannedAt = entry.optLong("scannedAt", 0L)
+            if (text.isBlank() || format.isBlank() || scannedAt <= 0L) null
+            else NativeBarcodeScan(text, format, scannedAt)
+        }.take(50)
+    }.getOrDefault(emptyList())
+}
+
+internal fun saveNativeBarcodeScanHistory(context: Context, scans: List<NativeBarcodeScan>) {
+    val array = org.json.JSONArray()
+    scans.take(50).forEach { scan ->
+        array.put(
+            org.json.JSONObject()
+                .put("text", scan.text)
+                .put("format", scan.format)
+                .put("scannedAt", scan.scannedAt),
+        )
+    }
+    context.getSharedPreferences(NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES, Context.MODE_PRIVATE)
+        .edit()
+        .putString(NATIVE_BARCODE_SCAN_HISTORY_KEY, array.toString())
+        .apply()
+}
+
 internal fun nativeBarcodeScansCsv(scans: List<NativeBarcodeScan>): String {
     fun cell(value: String) = "\"${value.replace("\"", "\"\"")}\""
     val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
@@ -235,7 +270,11 @@ fun NativeBarcodeReaderTool() {
     val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
     val scope = rememberCoroutineScope()
     val previewView = remember(context) { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
-    val results = remember { mutableStateListOf<NativeBarcodeScan>() }
+    val results = remember(context) {
+        mutableStateListOf<NativeBarcodeScan>().apply {
+            addAll(loadNativeBarcodeScanHistory(context))
+        }
+    }
     var cameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
@@ -255,6 +294,7 @@ fun NativeBarcodeReaderTool() {
         }
         results.add(0, scan.copy(scannedAt = now))
         while (results.size > 50) results.removeAt(results.lastIndex)
+        saveNativeBarcodeScanHistory(context, results)
         status = "${scan.format} detected."
         error = ""
     }
@@ -394,7 +434,7 @@ fun NativeBarcodeReaderTool() {
             if (results.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { saveResultsLauncher.launch("env-scan-history.csv") }) { Text("Export CSV") }
-                    TextButtonCompat(onClick = { results.clear(); status = "Scan history cleared." }, label = "Clear")
+                    TextButtonCompat(onClick = { results.clear(); saveNativeBarcodeScanHistory(context, results); status = "Scan history cleared." }, label = "Clear")
                 }
             }
         }
