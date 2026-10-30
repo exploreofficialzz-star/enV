@@ -196,3 +196,7 @@ release-candidate evidence bundle are unfinished.
 ## Android connected DC solver and UI (2026-10-30)
 
 - Android Kotlin now solves the same typed grounded DC node graph with modified nodal analysis and power-conservation rejection. Native editor creates a starter source/resistor circuit and adds parallel resistors; native UI calculates node/branch power and shows numeric currents without fabricated animations. Project revision invalidates stale circuit results. Tests are authored, not yet run per requested integration-first sequence.
+
+## Native Swift DC circuits and UI integration (2026-10-30)
+
+- Swift's portable network graph is now solved with a native modified-nodal-analysis DC circuit solver, including ideal voltage constraints, passive ohmic currents, rank rejection, and an energy-power conservation ledger. Swift native editors create a first circuit and parallel resistors with revision-safe project mutations. SwiftUI presents calculated currents and power, rejects unknown inventions instead of guessing properties, and invalidates results after edits. The XCTest cases are authored; consolidated verification is deliberately deferred.

@@ -39,6 +39,7 @@ struct NativeWorldLabView:View {
     @State private var inventedDensity=""
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
+    @State private var dcRun:NativeLabDcResult?
     @State private var selected=0
     @State private var dropRun:NativeDropResult?
     @State private var dropEntityId:String?
@@ -116,7 +117,7 @@ struct NativeWorldLabView:View {
             }
             let data=try work(old)
             project=try NativeWorldLabProject.decode(data)
-            projectData=data;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            projectData=data;dcRun=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -202,6 +203,38 @@ struct NativeWorldLabView:View {
                 if let project {
                     Text(project.title+" · "+String(project.entities.count)+" solids")
                         .font(.headline)
+                    Text("Connected DC circuits").font(.headline)
+                    if let circuit=project.networks?.first {
+                        Text(circuit.name+" · "+String(circuit.components.count)+" wired parts")
+                            .font(.caption)
+                        HStack {
+                            Button("Add parallel resistor") {
+                                applyProject{try NativeWorldLabEditor.addParallelResistor($0)}
+                            }.disabled(circuit.components.count>=48)
+                            Button("Calculate circuit") {
+                                do {
+                                    dcRun=try NativeWorldLabDc.solve(circuit,project:project)
+                                    problem=""
+                                }catch {
+                                    dcRun=nil;problem=error.localizedDescription
+                                }
+                            }
+                        }.buttonStyle(.bordered)
+                        if let run=dcRun,run.projectId==project.id,
+                           run.projectRevision==project.revision,run.networkId==circuit.id {
+                            value("Power delivered",run.deliveredPowerW,"W")
+                            value("Resistor heating",run.resistorHeatW,"W")
+                            value("Power residual",run.powerResidualW,"W")
+                            ForEach(run.branchCurrentsA.keys.sorted(),id:\.self){id in
+                                value(id+" current",run.branchCurrentsA[id],"A")
+                            }
+                            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }else {
+                        Button("Build first circuit"){
+                            applyProject{try NativeWorldLabEditor.starterCircuit($0)}
+                        }.buttonStyle(.bordered)
+                    }
                     HStack(spacing:8){
                         Button("Add cube"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"box")}}
                         Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}

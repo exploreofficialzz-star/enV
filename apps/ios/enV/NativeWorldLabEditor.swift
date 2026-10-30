@@ -40,6 +40,42 @@ enum NativeWorldLabEditor {
             "entities":[],"materials":[],"networks":[],
         ])
     }
+    static func starterCircuit(_ data:Data,id:String=UUID().uuidString) throws -> Data {
+        try mutate(data){root in
+            var networks=(root["networks"] as? [[String:Any]]) ?? []
+            guard networks.count<12 else {
+                throw NativeWorldLabError.invalid("Too many electrical networks")
+            }
+            let nodes:[[String:Any]]=[
+                ["id":"ground","label":"Ground"],
+                ["id":"supply","label":"Powered rail"]
+            ]
+            let components:[[String:Any]]=[
+                ["id":"source","kind":"dc-source","positiveNodeId":"supply",
+                 "negativeNodeId":"ground","voltageV":9.0],
+                ["id":"load","kind":"resistor","positiveNodeId":"supply",
+                 "negativeNodeId":"ground","resistanceOhm":100.0]
+            ]
+            networks.append(["id":id,"name":"My first circuit",
+                "groundNodeId":"ground","nodes":nodes,"components":components])
+            root["networks"]=networks
+        }
+    }
+    static func addParallelResistor(_ data:Data) throws -> Data {
+        try mutate(data){root in
+            guard var networks=root["networks"] as? [[String:Any]],
+                  !networks.isEmpty,
+                  var parts=networks[0]["components"] as? [[String:Any]],
+                  parts.count<48 else {
+                throw NativeWorldLabError.invalid("Create a circuit before adding resistors")
+            }
+            parts.append(["id":UUID().uuidString,"kind":"resistor",
+                "positiveNodeId":"supply","negativeNodeId":"ground",
+                "resistanceOhm":200.0])
+            networks[0]["components"]=parts
+            root["networks"]=networks
+        }
+    }
     static func addSolid(_ data:Data,shape:String,id:String=UUID().uuidString) throws -> Data {
         try mutate(data){root in
             guard ["box","sphere","cylinder"].contains(shape),

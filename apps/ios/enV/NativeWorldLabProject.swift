@@ -276,3 +276,131 @@ struct NativeWorldLabProject: Decodable {
         }
     }
 }
+
+/// Native Swift solution of bounded ideal DC node networks (MNA).
+/// New hypothetical parts are rejected until their behavior is supported.
+struct NativeLabDcResult {
+    let projectId:String
+    let projectRevision:Int
+    let networkId:String
+    let nodeVoltagesV:[String:Double]
+    let branchCurrentsA:[String:Double]
+    let deliveredPowerW:Double
+    let resistorHeatW:Double
+    let powerResidualW:Double
+    let evidence="physics-model-computed"
+    let validity="Bounded ideal linear DC sources and ohmic resistors. Not measured electronics or transients."
+}
+enum NativeWorldLabDc {
+    static func solve(_ network:NativeLabCircuitNetwork,
+                      project:NativeWorldLabProject) throws -> NativeLabDcResult {
+        let ground=network.groundNodeId
+        let nodes=network.nodes.map(\.id).filter{$0 != ground}
+        let sources=network.components.filter{$0.kind=="dc-source"}
+        guard (1...12).contains(sources.count) else {
+            throw NativeWorldLabError.invalid("Circuit needs 1–12 voltage sources")
+        }
+        let count=nodes.count+sources.count
+        guard (1...36).contains(count) else {
+            throw NativeWorldLabError.invalid("Circuit exceeds the local numerical budget")
+        }
+        let nodeIndex=Dictionary(uniqueKeysWithValues:nodes.enumerated().map{($0.element,$0.offset)})
+        func position(_ id:String) throws -> Int {
+            if id==ground {return -1}
+            guard let index=nodeIndex[id] else {
+                throw NativeWorldLabError.invalid("Unconnected circuit node")
+            }
+            return index
+        }
+        var matrix=Array(repeating:Array(repeating:0.0,count:count+1),count:count)
+        for component in network.components {
+            let positive=try position(component.positiveNodeId)
+            let negative=try position(component.negativeNodeId)
+            if component.kind=="resistor" {
+                guard let ohms=component.resistanceOhm,ohms>=0.01 else {
+                    throw NativeWorldLabError.invalid("Missing bounded resistance")
+                }
+                let g=1.0/ohms
+                if positive>=0 {matrix[positive][positive]+=g}
+                if negative>=0 {matrix[negative][negative]+=g}
+                if positive>=0 && negative>=0 {
+                    matrix[positive][negative]-=g
+                    matrix[negative][positive]-=g
+                }
+            }else if component.kind=="dc-source" {
+                guard let sourceIndex=sources.firstIndex(where:{$0.id==component.id}),
+                      let voltage=component.voltageV else {
+                    throw NativeWorldLabError.invalid("Unknown ideal voltage source")
+                }
+                let column=nodes.count+sourceIndex
+                if positive>=0 {
+                    matrix[positive][column]+=1
+                    matrix[column][positive]+=1
+                }
+                if negative>=0 {
+                    matrix[negative][column]-=1
+                    matrix[column][negative]-=1
+                }
+                matrix[column][count]=voltage
+            }else{
+                throw NativeWorldLabError.invalid(
+                    "Hypothetical device cannot be solved without a supported physical law")
+            }
+        }
+        let scale=max(1.0,matrix.flatMap{$0}.map{abs($0)}.max() ?? 0)
+        for col in 0..<count {
+            var pivot=col
+            if col+1<count {
+                for row in (col+1)..<count {
+                    if abs(matrix[row][col])>abs(matrix[pivot][col]) {pivot=row}
+                }
+            }
+            guard abs(matrix[pivot][col])>1e-12*scale else {
+                throw NativeWorldLabError.invalid(
+                    "DC network has floating nodes or contradictory voltage constraints")
+            }
+            matrix.swapAt(col,pivot)
+            let divisor=matrix[col][col]
+            for j in col...count {matrix[col][j]/=divisor}
+            for row in 0..<count where row != col {
+                let multiplier=matrix[row][col]
+                for j in col...count {matrix[row][j]-=multiplier*matrix[col][j]}
+            }
+        }
+        var voltages:[String:Double]=[ground:0]
+        for (index,id) in nodes.enumerated() {voltages[id]=matrix[index][count]}
+        var currents:[String:Double]=[:]
+        var delivered=0.0
+        var heat=0.0
+        for c in network.components {
+            let current:Double
+            if c.kind=="dc-source" {
+                guard let index=sources.firstIndex(where:{$0.id==c.id}),
+                      let voltage=c.voltageV else {
+                    throw NativeWorldLabError.invalid("Missing source")
+                }
+                current=matrix[nodes.count+index][count]
+                delivered-=voltage*current
+            }else {
+                guard let r=c.resistanceOhm,let positive=voltages[c.positiveNodeId],
+                      let negative=voltages[c.negativeNodeId] else {
+                    throw NativeWorldLabError.invalid("Unconnected resistor")
+                }
+                current=(positive-negative)/r
+                heat+=current*current*r
+            }
+            guard current.isFinite,abs(current)<=1e6 else {
+                throw NativeWorldLabError.invalid("Current exceeds bounded solver limits")
+            }
+            currents[c.id]=current
+        }
+        let residual=delivered-heat
+        guard delivered.isFinite,heat.isFinite,residual.isFinite,
+              abs(residual)<=1e-8*max(1.0,max(abs(delivered),heat)) else {
+            throw NativeWorldLabError.invalid("Kirchhoff circuit power balance failed")
+        }
+        return NativeLabDcResult(projectId:project.id,projectRevision:project.revision,
+            networkId:network.id,nodeVoltagesV:voltages,branchCurrentsA:currents,
+            deliveredPowerW:delivered,resistorHeatW:heat,powerResidualW:residual)
+    }
+}

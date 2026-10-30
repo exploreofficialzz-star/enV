@@ -34,6 +34,22 @@ final class NativeWorldLabProjectTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabProject.decode(
             JSONSerialization.data(withJSONObject:root)))
     }
+    func testNativeConnectedDcPowerAndParallelResistors() throws {
+        let initial=try NativeWorldLabEditor.blank()
+        let source=try NativeWorldLabEditor.starterCircuit(initial)
+        let project=try NativeWorldLabProject.decode(source)
+        let circuit=try XCTUnwrap(project.networks?.first)
+        let result=try NativeWorldLabDc.solve(circuit,project:project)
+        XCTAssertEqual(result.nodeVoltagesV["supply"],9)
+        XCTAssertEqual(result.branchCurrentsA["load"],0.09,accuracy:1e-12)
+        XCTAssertEqual(result.branchCurrentsA["source"],-0.09,accuracy:1e-12)
+        XCTAssertEqual(result.powerResidualW,0,accuracy:1e-10)
+        let updated=try NativeWorldLabEditor.addParallelResistor(source)
+        let parallel=try NativeWorldLabProject.decode(updated)
+        let second=try NativeWorldLabDc.solve(
+            XCTUnwrap(parallel.networks?.first),project:parallel)
+        XCTAssertEqual(second.resistorHeatW/9,0.135,accuracy:1e-12)
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))
