@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getOptionalBillingUserId } from "../billing/http.server";
 import { getSql } from "../db";
+import { hasDeveloperAdminSession } from "../developer-admin.server";
 import { validateFeedbackPayload } from "./protocol.mjs";
 import { getToolById } from "../registry";
 
@@ -74,7 +75,7 @@ export async function createFeedbackTicket(request: Request, input: unknown) {
 }
 function requireAdmin(request: Request) {
   signingSecret();
-  if (!bearerMatches(request)) throw new FeedbackError("FEEDBACK_ADMIN_UNAUTHORIZED", "Developer feedback access is required.", 401);
+  if (!bearerMatches(request) && !hasDeveloperAdminSession(request)) throw new FeedbackError("FEEDBACK_ADMIN_UNAUTHORIZED", "Developer feedback access is required.", 401);
 }
 const allowedStatuses = new Set(["open", "triaged", "in_progress", "resolved", "closed"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
