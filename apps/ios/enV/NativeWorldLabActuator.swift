@@ -162,8 +162,8 @@ enum NativeWorldLabActuator {
                 throw NativeWorldLabError.invalid("Non-finite actuator energy evidence")
             }
             let inputMagnitude=abs(initial)+abs(s.suppliedEnergyJ)
-            let outputMagnitude=abs(s.kineticEnergyJ)+abs(s.gravityEnergyJ)+
-                abs(s.magneticEnergyJ)+abs(s.dissipatedEnergyJ)
+            let kineticAndGravity=abs(s.kineticEnergyJ)+abs(s.gravityEnergyJ)
+            let outputMagnitude=kineticAndGravity+abs(s.magneticEnergyJ)+abs(s.dissipatedEnergyJ)
             let scale=max(1.0,max(inputMagnitude,outputMagnitude))
             worstEnergy=max(worstEnergy,abs(s.energyResidualJ)/scale)
         }
