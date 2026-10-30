@@ -103,8 +103,11 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
       "select reaction_type from tool_community_reactions where tool_id=$1 and actor_digest=$2 limit 1",[toolId,actorDigest],
     ) : Promise.resolve([]),
     sql.query(
-      `select count(*) total,count(*) filter(where view_date>=current_date-29) recent
-       from tool_community_views where tool_id=$1`,[toolId],
+      `select
+        coalesce((select sum(view_count) from tool_community_daily_view_snapshots where tool_id=$1),0)
+          + (select count(*) from tool_community_views where tool_id=$1) total,
+        coalesce((select sum(view_count) from tool_community_daily_view_snapshots where tool_id=$1 and snapshot_day>=current_date-29),0)
+          + (select count(*) from tool_community_views where tool_id=$1 and view_date>=current_date-29) recent`,[toolId],
     ),
   ]);
   const num=(value:unknown)=>{const n=Number(value??0);return Number.isSafeInteger(n)&&n>=0?n:0;};
@@ -232,6 +235,48 @@ export async function blockCommunityAuthor(request: Request,input:unknown) {
     return {blocked:true};
   });
 }
+
+function cronMatches(request: Request) {
+  const actual=/^Bearer ([A-Za-z0-9._~-]{32,512})$/.exec(request.headers.get("authorization")??"")?.[1];
+  const expected=process.env.CRON_SECRET?.trim()??"";
+  if(!actual||expected.length<32)return false;
+  const a=Buffer.from(actual),b=Buffer.from(expected);
+  return a.length===b.length&&timingSafeEqual(a,b);
+}
+export async function runCommunityRetention(request: Request) {
+  signingSecret();
+  if(!cronMatches(request))throw new CommunityError("COMMUNITY_RETENTION_UNAUTHORIZED","Scheduled community retention credential is invalid.",401);
+  const sql=await getSql();
+  // Snapshot old daily unique view counts before deleting per-visitor digests.
+  const snapshots=await sql.query(
+    `insert into tool_community_daily_view_snapshots(snapshot_day,tool_id,view_count,captured_at)
+     select view_date,tool_id,count(*)::bigint,now()
+     from tool_community_views
+     where view_date<current_date-29
+     group by view_date,tool_id
+     on conflict(snapshot_day,tool_id) do update set view_count=excluded.view_count,captured_at=now()
+     returning snapshot_day`,
+  );
+  const rawViews=await sql.query("delete from tool_community_views where view_date<current_date-29 returning tool_id");
+  const reports=await sql.query(
+    "delete from tool_community_reports where status in ('reviewed','dismissed','actioned') and updated_at<now()-interval '365 days' returning id",
+  );
+  const comments=await sql.query(
+    "delete from tool_community_comments where moderation_status in ('hidden','removed') and updated_at<now()-interval '365 days' returning id",
+  );
+  const blocks=await sql.query("delete from tool_community_blocks where created_at<now()-interval '730 days' returning blocker_digest");
+  const rateLimits=await sql.query("delete from tool_community_rate_limits where window_minute<$1 returning subject_digest",[Math.floor(Date.now()/60000)-2880]);
+  return {
+    rawViewDigestsDeleted:rawViews.length,
+    dailyViewSnapshotsCaptured:snapshots.length,
+    reviewedReportsDeleted:reports.length,
+    removedCommentsDeleted:comments.length,
+    expiredBlocksDeleted:blocks.length,
+    oldRateLimitRowsDeleted:rateLimits.length,
+    completedAt:new Date().toISOString(),
+  };
+}
+
 export async function listCommunityReports(request: Request) {
   requireAdmin(request);
   const url=new URL(request.url);
