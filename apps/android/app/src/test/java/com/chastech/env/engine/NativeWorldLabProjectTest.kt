@@ -74,6 +74,23 @@ class NativeWorldLabProjectTest {
         assertNull(r.netUpwardForceN)
         assertNull(r.equilibriumDraftM)
     }
+    @Test fun inventedElectricalDeviceRequiresExplicitFiniteOhmicAssumption(){
+        val blank=NativeWorldLabEditor.addStarterCircuit(NativeWorldLabEditor.blank())
+        val unknown=NativeWorldLabEditor.inventOhmicDevice(blank,
+            "Imagined conductor","Behavior undetermined")
+        val p1=NativeWorldLabProjectCodec.decode(unknown)
+        assertThrows(IllegalStateException::class.java){
+            NativeWorldLabDc.solve(p1.networks.first(),p1)
+        }
+        val source=NativeWorldLabEditor.inventOhmicDevice(blank,
+            "Invented filament","Assume Ohmic behavior at 20 Ω",20.0)
+        val p2=NativeWorldLabProjectCodec.decode(source)
+        val result=NativeWorldLabDc.solve(p2.networks.first(),p2)
+        val invented=p2.networks.first().components.first{it.kind=="hypothetical-device"}
+        assertEquals(20.0,invented.assumedResistanceOhm!!,0.0)
+        assertEquals(0.45,result.branchCurrentsA[invented.id]!!,1e-10)
+        assertEquals(0.0,result.powerResidualW,1e-8)
+    }
     @Test fun rejectsUntrustedAttributesAndInvalidGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(

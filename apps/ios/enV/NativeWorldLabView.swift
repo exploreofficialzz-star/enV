@@ -37,6 +37,9 @@ struct NativeWorldLabView:View {
     @State private var pendingReplacement=""
     @State private var inventedName=""
     @State private var inventedDensity=""
+    @State private var deviceName=""
+    @State private var deviceAssumption=""
+    @State private var deviceResistance=""
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
@@ -224,6 +227,43 @@ struct NativeWorldLabView:View {
                                 }
                             }
                         }.buttonStyle(.bordered)
+                        TextField("Invented component name",text:$deviceName)
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel("Invented electrical component name")
+                        TextField("Unverified behavior assumption",text:$deviceAssumption)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Optional equivalent resistance Ω",text:$deviceResistance)
+                            .textFieldStyle(.roundedBorder)
+                            .keyboardType(.decimalPad)
+                        Button("Add hypothetical component"){
+                            do {
+                                let ohms:Double?
+                                if deviceResistance.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+                                    ohms=nil
+                                }else {
+                                    guard let parsed=Double(deviceResistance) else {
+                                        throw NativeWorldLabError.invalid("Assumed resistance must be numerical")
+                                    }
+                                    ohms=parsed
+                                }
+                                applyProject{try NativeWorldLabEditor.inventOhmicDevice(
+                                    $0,name:deviceName,assumption:deviceAssumption,
+                                    assumedResistanceOhm:ohms)}
+                                deviceName="";deviceAssumption="";deviceResistance=""
+                            }catch{problem=error.localizedDescription}
+                        }.buttonStyle(.bordered)
+                            .disabled(deviceName.isEmpty || deviceAssumption.isEmpty ||
+                                circuit.components.count>=48)
+                        Text("Unverified inventions require explicit assumed electrical behavior.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(circuit.components.filter{$0.kind=="hypothetical-device"},id:\.id){part in
+                            Text(part.name ?? "Unknown component")
+                                .font(.caption)
+                            Text(part.assumedResistanceOhm.map{
+                                "Equivalent resistance assumed: "+String($0)+" Ω"
+                            } ?? "No supported electrical law")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         ForEach(circuit.components.filter{$0.kind=="dc-source"||$0.kind=="resistor"},
                             id:\.id){part in
                             HStack {

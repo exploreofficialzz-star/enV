@@ -69,6 +69,24 @@ final class NativeWorldLabProjectTests: XCTestCase {
         XCTAssertNil(notMeasured.equilibriumDraftM)
         XCTAssertEqual(notMeasured.status,"unknown-mass")
     }
+    func testInventedOhmicAssumptionIsNotAssignedWithoutConsent() throws {
+        let initial=try NativeWorldLabEditor.starterCircuit(
+            NativeWorldLabEditor.blank())
+        let unknown=try NativeWorldLabEditor.inventOhmicDevice(initial,
+            name:"Novel conductor",assumption:"Not yet characterized")
+        let p1=try NativeWorldLabProject.decode(unknown)
+        XCTAssertThrowsError(try NativeWorldLabDc.solve(
+            XCTUnwrap(p1.networks?.first),project:p1))
+        let supported=try NativeWorldLabEditor.inventOhmicDevice(initial,
+            name:"Novel filament",assumption:"Assume Ohmic 20 Ω",assumedResistanceOhm:20)
+        let p2=try NativeWorldLabProject.decode(supported)
+        let graph=try XCTUnwrap(p2.networks?.first)
+        let component=try XCTUnwrap(graph.components.first(where:{$0.kind=="hypothetical-device"}))
+        XCTAssertEqual(component.assumedResistanceOhm,20)
+        let run=try NativeWorldLabDc.solve(graph,project:p2)
+        XCTAssertEqual(try XCTUnwrap(run.branchCurrentsA[component.id]),0.45,accuracy:1e-10)
+        XCTAssertEqual(run.powerResidualW,0,accuracy:1e-8)
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))

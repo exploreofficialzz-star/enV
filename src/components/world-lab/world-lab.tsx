@@ -613,13 +613,11 @@ export default function WorldLab() {
       const wiredRun=wired?runNetworkMotorExperiment(project,selectedEntity.id,{
         forceConstantNPerA:actuatorConstant,...thermal,
       }):null;
+      const derived=wiredRun?null:deriveActuatorInput(project,selectedEntity.id,{
+        supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,
+      });
       const result=wiredRun?.motor??runActuatorExperiment(
-        deriveActuatorInput(project,selectedEntity.id,{
-          supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,
-        }).input,
-        deriveActuatorInput(project,selectedEntity.id,{
-          supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,
-        }).source);
+        derived!.input,derived!.source);
       setWiredMotorRun(wiredRun);
       const numericalAudit=verifyActuatorNumerics(result);
       setActuatorAudit(numericalAudit);

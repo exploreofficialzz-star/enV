@@ -239,3 +239,7 @@ release-candidate evidence bundle are unfinished.
 ## Native inventor-defined electrical assumptions (2026-10-30)
 
 - Native Kotlin and Swift portable decoders now accept an optional finite user-assumed Ohmic equivalent for invented devices, preserving optional absence and rejecting unknown keys and invalid values. Their MNA solvers include such components in true branch-current and Joule-heat balances only when the assumption is supplied; otherwise the circuit fails closed. Native validated editors can append independently invented devices to existing source terminals. No claim that the invented substance is physically characterized.
+
+## Native invented-device authoring and cross-domain preservation (2026-10-30)
+
+- Android Compose and SwiftUI now let users create a named, explicitly hypothetical electrical component, enter a descriptive assumption, and optionally supply equivalent resistance. Native project editors validate bounds and preserve owner-local portable records; platform-native solver tests cover absent/assumed laws and conservation. Web motor path also avoids deriving identical source assumptions twice. No scientific certification, platform CI or release readiness is claimed.

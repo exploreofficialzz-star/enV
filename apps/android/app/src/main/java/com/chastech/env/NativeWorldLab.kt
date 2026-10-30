@@ -67,6 +67,9 @@ fun NativeWorldLabForm() {
     var requestImport by remember { mutableStateOf(false) }
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
+    var deviceName by remember { mutableStateOf("") }
+    var deviceAssumption by remember { mutableStateOf("") }
+    var deviceResistance by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
     var hydroRun by remember { mutableStateOf<NativeLabHydroResult?>(null) }
     var fluidDensity by remember { mutableStateOf(1000.0) }
@@ -355,6 +358,26 @@ fun NativeWorldLabForm() {
                             .onFailure{dcRun=null;warning=it.message?:"Circuit not solvable"}
                     }){Text("Calculate circuit")}
                 }
+                OutlinedTextField(value=deviceName,onValueChange={deviceName=it},
+                    label={Text("Invented electrical component name")},singleLine=true)
+                OutlinedTextField(value=deviceAssumption,onValueChange={deviceAssumption=it},
+                    label={Text("Unverified behavior assumption")},singleLine=true)
+                OutlinedTextField(value=deviceResistance,onValueChange={deviceResistance=it},
+                    label={Text("Optional assumed resistance Ω")},singleLine=true)
+                OutlinedButton(onClick={
+                    runCatching{
+                        val ohms=if(deviceResistance.isBlank())null else
+                            deviceResistance.toDoubleOrNull()?:error("Enter a valid assumed resistance")
+                        applyProjectEdit{NativeWorldLabEditor.inventOhmicDevice(
+                            it,deviceName,deviceAssumption,ohms)}
+                        deviceName="";deviceAssumption="";deviceResistance=""
+                    }.onFailure{warning=it.message?:"Device cannot be added"}
+                },enabled=net.components.size<48&&deviceName.isNotBlank()&&
+                    deviceAssumption.isNotBlank()){
+                    Text("Add hypothetical component")
+                }
+                Text("A new material has no electrical law unless you explicitly assume one.",
+                    style=MaterialTheme.typography.bodySmall)
                 net.components.filter{it.kind=="dc-source"||it.kind=="resistor"}.forEach{part->
                     Text((if(part.kind=="dc-source")"Voltage: " else "Resistance: ")+
                         labNumber(part.voltageV?:part.resistanceOhm)+
@@ -373,6 +396,12 @@ fun NativeWorldLabForm() {
                             }}){Text("Remove")}
                         }
                     }
+                }
+                net.components.filter{it.kind=="hypothetical-device"}.forEach{invented->
+                    Text(invented.name.orEmpty()+
+                        (invented.assumedResistanceOhm?.let{" — assumed "+labNumber(it)+" Ω"}
+                            ?:" — unknown electrical law"),
+                        style=MaterialTheme.typography.bodySmall)
                 }
                 dcRun?.takeIf{it.projectId==project!!.id &&
                     it.projectRevision==project!!.revision && it.networkId==net.id}?.let{result->
