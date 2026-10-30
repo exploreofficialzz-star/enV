@@ -304,7 +304,7 @@ private struct NativeAnalyticsConsentPanel: View {
 
     var body: some View {
         Group {
-            if NativeAnalyticsClient.isEnabled || choice == "granted" {
+            if NativeAnalyticsClient.isEnabled || choice != "unset" {
                 VStack(alignment: .leading, spacing: 9) {
                     if choice == "unset" || expanded {
                         enVCharacterSpacedText(NativeAnalyticsClient.isEnabled ? "Help improve enV" : "Analytics is disabled in this app version")
