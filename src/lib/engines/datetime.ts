@@ -152,8 +152,13 @@ function offsetLabel(instant: Date, zone: string): string {
 function formatInZone(instant: Date, zone: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: zone,
-    dateStyle: "medium",
-    timeStyle: "medium",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
     timeZoneName: "shortOffset",
   }).format(instant);
 }
