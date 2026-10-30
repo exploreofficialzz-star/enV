@@ -149,7 +149,7 @@ object NativeAnalytics {
                 store.edit().remove(REVOKE_KEY).apply()
             }
         }
-        if (store.getString(CONSENT_KEY, "unset") != "granted") return@withContext
+        if (!BuildConfig.ANALYTICS_ENABLED || store.getString(CONSENT_KEY, "unset") != "granted") return@withContext
         val subject = store.getString(SUBJECT_KEY, null) ?: return@withContext
         val queue = runCatching { JSONArray(store.getString(QUEUE_KEY, "[]")) }.getOrElse { JSONArray() }
         if (queue.length() == 0) return@withContext
