@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, AlertTriangle, BarChart3, Browser, LogOut, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Monitor, LogOut, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/userbehavior")({ component: UserBehaviorDashboard });
@@ -34,7 +34,7 @@ async function readPayload<T>(response: Response): Promise<T> {
   return payload.data;
 }
 
-function Metric({ label, value, detail, icon }: { label: string; value: number; detail: string; icon: React.ReactNode }) {
+function Metric({ label, value, detail, icon }: { label: string; value: number; detail: string; icon: ReactNode }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-3 text-muted">
@@ -174,7 +174,7 @@ function UserBehaviorDashboard() {
         <Metric label="Events received" value={o.totalEvents} detail="Opt-in events" icon={<Activity className="size-4" />} />
         <Metric label="Opted-in installs" value={o.optedInInstallations} detail="Pseudonymous installations" icon={<Smartphone className="size-4" />} />
         <Metric label="Sessions" value={o.sessions} detail="Analytics sessions" icon={<BarChart3 className="size-4" />} />
-        <Metric label="Tools used" value={o.toolsUsed} detail="Distinct tools with activity" icon={<Browser className="size-4" />} />
+        <Metric label="Tools used" value={o.toolsUsed} detail="Distinct tools with activity" icon={<Monitor className="size-4" />} />
         <Metric label="Failures" value={o.failures} detail="Recorded failure outcomes" icon={<AlertTriangle className="size-4" />} />
         <Metric label="Signed-in users" value={o.signedInUsers} detail="Verified account association where available" icon={<ShieldCheck className="size-4" />} />
       </div>
