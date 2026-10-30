@@ -74,6 +74,17 @@ final class NativeEcommerceEngineTests: XCTestCase {
         XCTAssertTrue(output.contains("Estimated contribution profit: 100.00"))
     }
 
+    func testPricingCalculatorComparesCurrentAndTargetSellingPrice() throws {
+        let item = tool("pricing-calculator")
+        let values = NativeEcommerceEngine.initialValues(for: item).merging([
+            "cost": "40", "price": "75", "packaging": "2",
+            "feePercent": "3", "targetMargin": "30"
+        ]) { _, new in new }
+        let output = try NativeEcommerceEngine.run(item, values: values)
+        XCTAssertTrue(output.contains("Target selling price: 62.69"))
+        XCTAssertTrue(output.contains("Current selling price: 75.00"))
+    }
+
     func testNegativeAndOutOfRangeInputsAreRejected() {
         let item = tool("discount-calculator")
         var values = NativeEcommerceEngine.initialValues(for: item)
@@ -82,6 +93,30 @@ final class NativeEcommerceEngineTests: XCTestCase {
         values["price"] = "100"
         values["discount"] = "150"
         XCTAssertThrowsError(try NativeEcommerceEngine.run(item, values: values))
+    }
+}
+
+final class NativeBarcodeCatalogCoverageTests: XCTestCase {
+    func testAllFiftyTwoQrAndBarcodeCatalogEntriesHaveNativeHandlers() {
+        let qr = [
+            "app-store-qr-generator", "bitcoin-qr-generator", "calendar-qr-generator", "crypto-wallet-qr-generator",
+            "discord-invite-qr-generator", "email-qr-generator", "ethereum-qr-generator", "event-qr-generator",
+            "facebook-link-qr-generator", "google-play-qr-generator", "instagram-link-qr-generator",
+            "linkedin-link-qr-generator", "location-qr-generator", "mecard-qr-generator", "phone-qr-generator",
+            "qr-batch-generator", "qr-capacity-helper", "qr-code-high-error-correction", "qr-code-low-error-correction",
+            "qr-code-styled", "qr-data-url-generator", "qr-generator", "qr-payload-encoder", "qr-payload-inspector",
+            "qr-size-calculator", "qr-svg-generator", "qr-version-helper", "sms-qr-generator", "telegram-link-qr-generator",
+            "text-qr-generator", "url-qr-generator", "vcard-qr-generator", "whatsapp-qr-generator", "wifi-qr-generator",
+            "x-link-qr-generator", "youtube-link-qr-generator"
+        ]
+        let barcodes = [
+            "barcode-label-generator", "barcode-svg-generator", "codabar-barcode", "code128-barcode",
+            "code39-barcode", "ean13-barcode", "ean13-check-digit", "ean8-barcode", "gtin-validator",
+            "isbn-check-digit", "isbn-barcode", "itf14-barcode", "msi-barcode", "pharmacode-barcode",
+            "upc-barcode", "upc-check-digit"
+        ]
+        XCTAssertEqual(qr.count + barcodes.count, 52)
+        XCTAssertEqual(Set(qr + barcodes), NativeBarcodeEngine.supportedToolIDs)
     }
 }
 
