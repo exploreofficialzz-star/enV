@@ -54,15 +54,47 @@ async function makeCode128Image(value) {
   return Buffer.from(svg, "utf8");
 }
 
-async function scanFile(name, mimeType, buffer, expectedText, expectedFormat) {
+async function scanFile(name, mimeType, buffer, expectedItems) {
   await openTool("qr-payload-inspector");
   await page.locator('input[aria-label="Upload QR or barcode image"]').setInputFiles({ name, mimeType, buffer });
-  const result = page.locator('section[aria-labelledby="reader-results-heading"] article').first();
-  await result.waitFor({ state: "visible", timeout: 12000 });
-  const content = await result.innerText();
-  if (!content.includes(expectedText)) throw new Error(`${name}: decoded content did not contain the expected payload.`);
-  if (!content.includes(expectedFormat)) throw new Error(`${name}: expected format ${expectedFormat}, received: ${content.slice(0, 160)}`);
-  return { file: name, expectedText, expectedFormat, passed: true };
+  const results = page.locator('section[aria-labelledby="reader-results-heading"] article');
+  await results.first().waitFor({ state: "visible", timeout: 12000 });
+  const content = (await results.allInnerTexts()).join("\\n");
+  for (const expected of expectedItems) {
+    if (!content.includes(expected.text)) throw new Error(`${name}: decoded content did not contain ${expected.text}.`);
+    if (!content.includes(expected.format)) throw new Error(`${name}: expected format ${expected.format}, received: ${content.slice(0, 200)}`);
+  }
+  return { file: name, expectedItems, passed: true };
+}
+
+async function combineQrAndBarcode(qrBytes, barcodeSvgBytes) {
+  const base64 = await page.evaluate(async ({ qrDataUrl, svgMarkup }) => {
+    const load = (src) => new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Could not render a fixture code."));
+      image.src = src;
+    });
+    const [qr, barcode] = await Promise.all([
+      load(qrDataUrl),
+      load(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`),
+    ]);
+    const gap = 24;
+    const canvas = document.createElement("canvas");
+    canvas.width = qr.naturalWidth + barcode.naturalWidth + gap;
+    canvas.height = Math.max(qr.naturalHeight, barcode.naturalHeight) + gap * 2;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not create a combined barcode fixture.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(qr, gap, gap);
+    context.drawImage(barcode, qr.naturalWidth + gap * 2, gap);
+    return canvas.toDataURL("image/png").split(",")[1];
+  }, {
+    qrDataUrl: `data:image/png;base64,${qrBytes.toString("base64")}`,
+    svgMarkup: barcodeSvgBytes.toString("utf8"),
+  });
+  return Buffer.from(base64, "base64");
 }
 
 let outcomes = [];
@@ -70,11 +102,25 @@ let failure = null;
 try {
   const qrPayload = "https://example.com/env-qr-reader-audit?source=browser";
   const qrBytes = await makeQrImage(qrPayload);
-  outcomes.push(await scanFile("env-reader-qr.png", "image/png", qrBytes, qrPayload, "QR Code"));
+  outcomes.push(await scanFile("env-reader-qr.png", "image/png", qrBytes, [
+    { text: qrPayload, format: "QR Code" },
+  ]));
 
   const barcodeValue = "ENV-CODE128-READER-2026";
   const barcodeBytes = await makeCode128Image(barcodeValue);
-  outcomes.push(await scanFile("env-reader-code128.svg", "image/svg+xml", barcodeBytes, barcodeValue, "Code 128"));
+  outcomes.push(await scanFile("env-reader-code128.svg", "image/svg+xml", barcodeBytes, [
+    { text: barcodeValue, format: "Code 128" },
+  ]));
+
+  const batchQrPayload = "https://example.com/env-qr-reader-batch?source=browser";
+  const batchQrBytes = await makeQrImage(batchQrPayload);
+  const batchBarcodeValue = "ENV-BATCH-CODE128-2026";
+  const batchBarcodeBytes = await makeCode128Image(batchBarcodeValue);
+  const combinedBytes = await combineQrAndBarcode(batchQrBytes, batchBarcodeBytes);
+  outcomes.push(await scanFile("env-reader-multiple-codes.png", "image/png", combinedBytes, [
+    { text: batchQrPayload, format: "QR Code" },
+    { text: batchBarcodeValue, format: "Code 128" },
+  ]));
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(
@@ -86,7 +132,7 @@ try {
   await page.getByText(barcodeValue, { exact: true }).waitFor({ state: "visible", timeout: 8000 });
   outcomes.push({
     file: "browser-local-history",
-    expectedText: [qrPayload, barcodeValue],
+    expectedText: [qrPayload, barcodeValue, batchQrPayload, batchBarcodeValue],
     expectedFormat: "restored after reload",
     passed: true,
   });
@@ -107,7 +153,7 @@ const report = {
   failed: failure ? 1 : 0,
   pageErrors,
   error: failure,
-  ok: !failure && outcomes.length === 2,
+  ok: !failure && outcomes.length === 4,
 };
 fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ ok: report.ok, passed: report.passed, failed: report.failed, reportPath, error: report.error }, null, 2));
