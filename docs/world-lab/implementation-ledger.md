@@ -253,3 +253,8 @@ release-candidate evidence bundle are unfinished.
 
 - DC solver results now contain the full network component/node input snapshot as well as revision IDs on Web, Android and iOS. Web deep-copies and freezes nested nodes/components, protecting exported evidence against later rewiring. Native value-type/decoder-built models retain corresponding snapshots with source and assumption metadata.
 - Added a responsive, read-only, accessible two-node rail schematic derived from actual node IDs, with branch current labels from solver output, explicit hypothetical outlines and sign conventions. Multi-node imports use a conservative textual connection graph instead of falsely inventing wire crossings. Existing enV fonts and unrelated UX are unchanged. All new source remains unverified until the requested consolidated audit.
+
+## Durable user-owned World Lab computation queue (2026-10-30)
+
+- Added migration 0009 with user foreign key, idempotency, bounded JSON, queued/running/succeeded/failed/cancelled statuses, worker leases, indexes and RLS without direct Data API policies. Source-only SQL: not yet applied to live Supabase.
+- Implemented per-owner transactional submission (3 active, 30 hourly), user-scoped lookups/cancellation, compare-and-set lease claim/retry with 3-attempt cap and stale-worker result protection. A dedicated process worker evaluates only the existing constrained science dispatcher; not started/deployed. Feature remains gated behind real authentication, DATABASE_URL and WORLD_LAB_JOBS_ENABLED=true. The end-to-end lifecycle and hosting must be independently verified in a later audit.
