@@ -30,7 +30,7 @@ fun NativeAnalyticsConsentPanel() {
     if (!BuildConfig.ANALYTICS_ENABLED) return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var choice by remember { mutableStateOf(NativeAnalytics.consentChoice(context)) }
+    var choice by remember { mutableStateOf(NativeAnalytics.consentChoice(context)) }\n    if (!BuildConfig.ANALYTICS_ENABLED && choice != "granted") return
     var expanded by remember { mutableStateOf(choice == "unset") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -50,7 +50,7 @@ fun NativeAnalyticsConsentPanel() {
     ) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (choice == "unset" || expanded) {
-                Text("Help improve enV", style = MaterialTheme.typography.titleSmall)
+                Text(if (BuildConfig.ANALYTICS_ENABLED) "Help improve enV" else "Analytics is disabled in this app version", style = MaterialTheme.typography.titleSmall)
                 Text(
                     "Optional analytics records tool activity, outcomes and approximate device and network categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow.",
                     style = MaterialTheme.typography.bodySmall,
@@ -58,7 +58,7 @@ fun NativeAnalyticsConsentPanel() {
                 )
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(enabled = !busy, onClick = {
+                    if (BuildConfig.ANALYTICS_ENABLED) Button(enabled = !busy, onClick = {
                         busy = true; error = null
                         scope.launch {
                             try {
