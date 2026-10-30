@@ -35,6 +35,10 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     @Published private(set) var status = "Camera is off."
     @Published private(set) var error: String?
     @Published private(set) var results: [NativeBarcodeReadRecord] = []
+    @Published private(set) var hasTorch = false
+    @Published private(set) var torchEnabled = false
+    @Published private(set) var zoomFactor: CGFloat = 1
+    @Published private(set) var maxZoomFactor: CGFloat = 1
 
     override init() {
         super.init()
@@ -98,9 +102,16 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
                 }
                 if !session.isRunning { session.startRunning() }
                 let running = session.isRunning
+                let supportsTorch = device.hasTorch && device.isTorchModeSupported(.on)
+                let maximumZoom = max(1, min(device.activeFormat.videoMaxZoomFactor, 6))
+                let initialZoom = min(maximumZoom, max(1, device.videoZoomFactor))
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     isRunning = running
+                    hasTorch = supportsTorch
+                    torchEnabled = device.torchMode == .on
+                    maxZoomFactor = maximumZoom
+                    zoomFactor = initialZoom
                     status = running ? "Scanner ready. Hold a code inside the camera frame." : "Camera did not start."
                 }
             } catch {
@@ -118,11 +129,61 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     func stop() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
+            if let device = AVCaptureDevice.default(for: .video),
+               device.hasTorch, device.torchMode == .on,
+               (try? device.lockForConfiguration()) != nil {
+                device.torchMode = .off
+                device.unlockForConfiguration()
+            }
             if session.isRunning { session.stopRunning() }
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 isRunning = false
+                torchEnabled = false
                 status = "Camera stopped."
+            }
+        }
+    }
+
+    func toggleTorch() {
+        let enabled = !torchEnabled
+        sessionQueue.async { [weak self] in
+            guard let self, let device = AVCaptureDevice.default(for: .video),
+                  device.hasTorch, device.isTorchModeSupported(enabled ? .on : .off) else { return }
+            do {
+                try device.lockForConfiguration()
+                defer { device.unlockForConfiguration() }
+                if enabled {
+                    try device.setTorchModeOn(level: device.maxAvailableTorchLevel)
+                } else {
+                    device.torchMode = .off
+                }
+                Task { @MainActor [weak self] in
+                    self?.torchEnabled = enabled
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.setFailure("Could not change the camera light: \\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    func setZoom(_ requested: CGFloat) {
+        let target = min(maxZoomFactor, max(1, requested))
+        sessionQueue.async { [weak self] in
+            guard let self, let device = AVCaptureDevice.default(for: .video) else { return }
+            do {
+                try device.lockForConfiguration()
+                defer { device.unlockForConfiguration() }
+                device.videoZoomFactor = min(device.activeFormat.videoMaxZoomFactor, max(1, target))
+                Task { @MainActor [weak self] in
+                    self?.zoomFactor = target
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.setFailure("Could not adjust camera zoom: \\(error.localizedDescription)")
+                }
             }
         }
     }
@@ -342,6 +403,28 @@ struct NativeBarcodeReaderView: View {
                             .frame(width: 230, height: 112)
                             .allowsHitTesting(false)
                     }
+                HStack(spacing: 12) {
+                    if scanner.hasTorch {
+                        Button {
+                            scanner.toggleTorch()
+                        } label: {
+                            Label(scanner.torchEnabled ? "Light on" : "Light", systemImage: scanner.torchEnabled ? "flashlight.on.fill" : "flashlight.off.fill")
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel(scanner.torchEnabled ? "Turn torch off" : "Turn torch on")
+                    }
+                    if scanner.maxZoomFactor > 1 {
+                        Text("Zoom").font(.caption.weight(.semibold))
+                        Slider(
+                            value: Binding(get: { scanner.zoomFactor }, set: { scanner.setZoom($0) }),
+                            in: 1...scanner.maxZoomFactor
+                        )
+                        .accessibilityLabel("Camera zoom")
+                        Text(String(format: "%.1fx", scanner.zoomFactor))
+                            .font(.caption.monospacedDigit())
+                            .frame(minWidth: 38, alignment: .trailing)
+                    }
+                }
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "qrcode.viewfinder").font(.system(size: 34))
