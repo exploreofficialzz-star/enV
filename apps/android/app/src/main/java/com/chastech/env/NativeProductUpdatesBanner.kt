@@ -116,12 +116,32 @@ fun NativeProductUpdatesBanner() {
                 TextButton(onClick = {
                     runCatching {
                         CustomTabsIntent.Builder().setShowTitle(true).build()
-                            .launchUrl(context, android.net.Uri.parse("https://envtools.store/updates"))
+                            .launchUrl(context, android.net.Uri.parse("https://updates.envtools.store"))
                     }.onFailure {
                         context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://envtools.store/updates")))
                     }
                 }) { Text("All updates") }
             }
         }
+    }
+}
+
+
+@Composable
+fun NativeFeedbackEntry() {
+    val context = LocalContext.current
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = {
+            val uri = android.net.Uri.parse("https://feedback.envtools.store")
+            runCatching {
+                CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, uri)
+            }.onFailure {
+                context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+            }
+        },
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Text("Send feedback to enV")
     }
 }
