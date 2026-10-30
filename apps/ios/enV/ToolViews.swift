@@ -268,7 +268,7 @@ struct ToolDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isToolFullscreen ? .hidden : .visible, for: .navigationBar)
         .statusBarHidden(isToolFullscreen)
-        .onAppear { store.recordRecent(tool.id) }
+        .onAppear {\n            store.recordRecent(tool.id)\n            NativeAnalyticsClient.record("tool_viewed", toolID: tool.id)\n            Task { try? await NativeAnalyticsClient.flush() }\n        }
         .fullScreenCover(isPresented: $isToolFullscreen) {
             ToolFullscreenContainer(toolName: tool.name) {
                 toolInterface.environment(\.musicSandboxFullscreen, true)
