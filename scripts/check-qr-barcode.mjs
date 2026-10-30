@@ -27,4 +27,34 @@ assert.ok(reader.includes('url.protocol === "http:" || url.protocol === "https:"
 assert.ok(browserAudit.includes("Code 128") && browserAudit.includes("QR Code"), "Browser audit exercises both QR and 1D barcode decoding");
 assert.ok(ecommerce.includes("parseEcommerceToolId") && ecommerce.includes("buildEcommerceOutput"), "E-commerce workflow engine remains wired to its family/workflow contract");
 
+const androidGate = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
+const androidCatalog = read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt");
+const androidReader = read("apps/android/app/src/main/java/com/chastech/env/NativeBarcodeReader.kt");
+const androidCommerce = read("apps/android/app/src/main/java/com/chastech/env/NativeEcommerceEngine.kt");
+const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
+const iosViews = read("apps/ios/enV/ToolViews.swift");
+const iosReader = read("apps/ios/enV/NativeQrBarcodeAndEcommerceViews.swift");
+const iosCommerce = read("apps/ios/enV/NativeEcommerceEngine.swift");
+const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
+const executionPolicy = JSON.parse(read("apps/shared/execution-policy.json"));
+
+assert.ok(androidGate.includes('"ecommerce"') && androidGate.includes('"qr"'), "Android production gate exempts QR and E-commerce");
+assert.ok(iosCatalog.includes('"ecommerce", "qr"'), "iOS production gate exempts QR and E-commerce");
+assert.ok(androidCatalog.includes('category in setOf("qr", "ecommerce")') && androidCatalog.includes('"active"'), "Android catalog activates QR and E-commerce records");
+assert.ok(iosCatalog.includes('["qr", "ecommerce"].contains(category.lowercased()) ? "active" : status'), "iOS catalog activates QR and E-commerce records");
+assert.ok(androidReader.includes("ProcessCameraProvider") && androidReader.includes("NativeBarcodeCameraAnalyzer") && androidReader.includes("NativeBarcodeImageDecoder"), "Android QR/barcode reader uses CameraX, ZXing and local image decoding");
+assert.ok(androidCommerce.includes("fun supports(tool: ToolRecord)") && androidCommerce.includes("fun execute("), "Android has its own native E-commerce engine");
+assert.ok(androidCommerce.includes("safetyStock") && androidCommerce.includes("feePercent") && androidCommerce.includes("targetMargin"), "Android commerce engine includes inventory safety and pricing economics");
+assert.ok(iosViews.includes('tool.id == "qr-payload-inspector" { NativeBarcodeReaderView() }') && iosViews.includes("NativeEcommerceEngine.supports(tool)"), "iOS native dispatch routes reader and E-commerce tools");
+assert.ok(iosReader.includes("AVCaptureMetadataOutput") && iosReader.includes("VNDetectBarcodesRequest") && iosReader.includes("PhotosPicker"), "iOS reader uses AVFoundation and Vision for camera and image scanning");
+assert.ok(iosCommerce.includes("static func supports(_ tool: Tool)") && iosCommerce.includes("static func run("), "iOS has an independent native E-commerce engine");
+assert.ok(iosCommerce.includes("safetyStock") && iosCommerce.includes("feePercent") && iosCommerce.includes("targetMargin"), "iOS commerce engine includes inventory safety and pricing economics");
+assert.ok(iosProject.includes("NativeEcommerceEngine.swift in Sources") && iosProject.includes("NativeQrBarcodeAndEcommerceViews.swift in Sources") && iosProject.includes("NativeEcommerceEngineTests.swift in Sources"), "iOS native engine and test files are registered in Xcode");
+for (const family of ["barcode", "qr", "ecommerce"]) {
+  assert.equal(executionPolicy.families[family]?.web?.mode, "local", `${family} web mode is local`);
+  assert.equal(executionPolicy.families[family]?.android?.mode, "local", `${family} Android mode is local`);
+  assert.equal(executionPolicy.families[family]?.ios?.mode, "local", `${family} iOS mode is local`);
+}
+
+
 console.log("QR/barcode and E-commerce checks passed: browser production gating, active routing, local QR/1D/2D reader and commerce engine are wired.");
