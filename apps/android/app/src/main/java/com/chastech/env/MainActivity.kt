@@ -1209,7 +1209,7 @@ private fun NativeToolInterfaceContent(
             StatusPill("Web only")
             Text("This tool is available in the Web product and is not executable natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(onClick = {
-                val url = Uri.Builder().scheme("https").authority("envtools.store")
+                val url = Uri.Builder().scheme("https").authority("android.envtools.store")
                     .appendPath("tools").appendPath(tool.category).appendPath(tool.slug).build()
                 context.startActivity(Intent(Intent.ACTION_VIEW, url))
             }) { Text("Open in Web") }
