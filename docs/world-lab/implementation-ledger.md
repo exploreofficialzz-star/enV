@@ -192,3 +192,7 @@ release-candidate evidence bundle are unfinished.
 
 - Kotlin and Swift strict decoders now accept the optional connected electrical networks field, reject unknown component fields, dangling ports, duplicate IDs, missing ground and nonfinite/out-of-range source/resistance assumptions. Existing network-less v1 fixtures remain accepted, and native editors now create projects with an empty networks collection. Native raw JSON editor roundtrips retain uploaded circuit records instead of dropping them.
 - Platform-specific tests authored for valid network ports and corrupt networks. This does not mean a native circuit solver or graphical wire authoring is implemented; both remain separate work. Full verification deferred to requested audit phase.
+
+## Android connected DC solver and UI (2026-10-30)
+
+- Android Kotlin now solves the same typed grounded DC node graph with modified nodal analysis and power-conservation rejection. Native editor creates a starter source/resistor circuit and adds parallel resistors; native UI calculates node/branch power and shows numeric currents without fabricated animations. Project revision invalidates stale circuit results. Tests are authored, not yet run per requested integration-first sequence.

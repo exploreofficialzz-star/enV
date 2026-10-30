@@ -20,6 +20,8 @@ import com.chastech.env.engine.NativeLabInput
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabDc
+import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
 import com.chastech.env.engine.NativeWorldLabScience
 import com.chastech.env.engine.NativeDropInput
@@ -55,6 +57,7 @@ fun NativeWorldLabForm() {
     var inside by remember { mutableStateOf(false) }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
     var projectJson by remember { mutableStateOf<String?>(null) }
+    var dcRun by remember { mutableStateOf<NativeLabDcResult?>(null) }
     var savedSnapshot by remember { mutableStateOf<String?>(null) }
     var confirmation by remember { mutableStateOf<String?>(null) }
     var requestImport by remember { mutableStateOf(false) }
@@ -94,6 +97,7 @@ fun NativeWorldLabForm() {
             val parsed=NativeWorldLabProjectCodec.decode(next)
             projectJson=next
             project=parsed
+            dcRun=null
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
@@ -324,6 +328,36 @@ fun NativeWorldLabForm() {
                 style=MaterialTheme.typography.bodySmall)
         if(project!=null){
             Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            Text("Connected DC circuits",style=MaterialTheme.typography.titleSmall)
+            if(project!!.networks.isEmpty()){
+                OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.addStarterCircuit(it)}}){
+                    Text("Build first circuit")
+                }
+            }else{
+                val net=project!!.networks.first()
+                Text(net.name+" · "+net.components.size+" wired parts")
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={applyProjectEdit{
+                        NativeWorldLabEditor.addParallelCircuitResistor(it)
+                    }},enabled=net.components.size<48){
+                        Text("Add parallel resistor")
+                    }
+                    OutlinedButton(onClick={
+                        runCatching{dcRun=NativeWorldLabDc.solve(net,project!!);warning=""}
+                            .onFailure{dcRun=null;warning=it.message?:"Circuit not solvable"}
+                    }){Text("Calculate circuit")}
+                }
+                dcRun?.takeIf{it.projectId==project!!.id &&
+                    it.projectRevision==project!!.revision && it.networkId==net.id}?.let{result->
+                    Text("Delivered DC power: "+labNumber(result.deliveredPowerW)+" W")
+                    Text("Resistor heat: "+labNumber(result.resistorHeatW)+" W")
+                    Text("Power residual: "+labNumber(result.powerResidualW)+" W")
+                    result.branchCurrentsA.forEach{(id,current)->
+                        Text(id+": "+labNumber(current)+" A")
+                    }
+                    Text(result.validity,style=MaterialTheme.typography.bodySmall)
+                }
+            }
             Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
                     .forEach { (shape,label) ->

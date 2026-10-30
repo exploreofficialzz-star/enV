@@ -42,6 +42,20 @@ class NativeWorldLabProjectTest {
             NativeWorldLabProjectCodec.decode(corrupted.toString())
         }
     }
+    @Test fun nativeDcGraphSolverRespectsPowerAndRejectsUnknownParts() {
+        val root=NativeWorldLabEditor.addStarterCircuit(NativeWorldLabEditor.blank())
+        val parsed=NativeWorldLabProjectCodec.decode(root)
+        val circuit=parsed.networks.first()
+        val run=NativeWorldLabDc.solve(circuit,parsed)
+        assertEquals(9.0,run.nodeVoltagesV["supply"]!!,1e-12)
+        assertEquals(0.09,run.branchCurrentsA["load"]!!,1e-12)
+        assertEquals(-0.09,run.branchCurrentsA["source"]!!,1e-12)
+        assertEquals(0.0,run.powerResidualW,1e-10)
+        val extended=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.addParallelCircuitResistor(root))
+        val next=NativeWorldLabDc.solve(extended.networks.first(),extended)
+        assertEquals(0.135,next.resistorHeatW/9.0,1e-12)
+    }
     @Test fun rejectsUntrustedAttributesAndInvalidGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(

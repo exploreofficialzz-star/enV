@@ -48,6 +48,32 @@ object NativeWorldLabEditor {
         NativeWorldLabProjectCodec.decode(json)
         return json
     }
+    fun addStarterCircuit(source:String,id:String=UUID.randomUUID().toString()):String =
+        edit(source){root->
+            val networks=root.optJSONArray("networks")?:JSONArray().also{root.put("networks",it)}
+            require(networks.length()<12){"Too many electrical networks"}
+            networks.put(JSONObject().put("id",id).put("name","My first circuit")
+                .put("groundNodeId","ground")
+                .put("nodes",JSONArray()
+                    .put(JSONObject().put("id","ground").put("label","Ground"))
+                    .put(JSONObject().put("id","supply").put("label","Powered rail")))
+                .put("components",JSONArray()
+                    .put(JSONObject().put("id","source").put("kind","dc-source")
+                        .put("positiveNodeId","supply").put("negativeNodeId","ground")
+                        .put("voltageV",9.0))
+                    .put(JSONObject().put("id","load").put("kind","resistor")
+                        .put("positiveNodeId","supply").put("negativeNodeId","ground")
+                        .put("resistanceOhm",100.0))))
+        }
+    fun addParallelCircuitResistor(source:String):String=edit(source){root->
+        val networks=root.getJSONArray("networks")
+        require(networks.length()>0)
+        val components=networks.getJSONObject(0).getJSONArray("components")
+        require(components.length()<48)
+        components.put(JSONObject().put("id",UUID.randomUUID().toString())
+            .put("kind","resistor").put("positiveNodeId","supply")
+            .put("negativeNodeId","ground").put("resistanceOhm",200.0))
+    }
     fun addSolid(source: String,shape: String,id: String=UUID.randomUUID().toString()): String =
         edit(source){project->
             require(shape in setOf("box","sphere","cylinder")){"Unsupported solid type"}

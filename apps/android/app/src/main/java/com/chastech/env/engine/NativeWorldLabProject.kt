@@ -183,3 +183,90 @@ object NativeWorldLabProjectCodec {
             vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks)
     }
 }
+
+/**
+ * Native Kotlin nodal DC circuit solution with grounded nodes and ideal sources.
+ * Internal units are SI. Does not claim to model any hypothetical device.
+ */
+data class NativeLabDcResult(
+    val projectId:String,val projectRevision:Int,val networkId:String,
+    val nodeVoltagesV:Map<String,Double>,val branchCurrentsA:Map<String,Double>,
+    val deliveredPowerW:Double,val resistorHeatW:Double,val powerResidualW:Double,
+    val evidence:String="physics-model-computed",
+    val validity:String="Ideal bounded linear DC sources and ohmic resistors; no transient or real material inference."
+)
+object NativeWorldLabDc {
+    fun solve(network:NativeLabCircuitNetwork,project:NativeWorldLabProject):NativeLabDcResult {
+        val ground=network.groundNodeId
+        val nodes=network.nodes.map{it.id}.filter{it!=ground}
+        val sources=network.components.filter{it.kind=="dc-source"}
+        require(sources.isNotEmpty()&&sources.size<=12){"1–12 DC voltage sources are required"}
+        val m=nodes.size+sources.size
+        require(m in 1..36){"Circuit matrix exceeds local resource limits"}
+        val index=nodes.withIndex().associate{it.value to it.index}
+        fun node(id:String):Int=if(id==ground)-1 else index[id]?:error("Missing DC node")
+        val a=Array(m){DoubleArray(m+1)}
+        network.components.forEach{component->
+            val positive=node(component.positiveNodeId)
+            val negative=node(component.negativeNodeId)
+            when(component.kind){
+                "resistor"->{
+                    val conductance=1.0/requireNotNull(component.resistanceOhm)
+                    if(positive>=0)a[positive][positive]+=conductance
+                    if(negative>=0)a[negative][negative]+=conductance
+                    if(positive>=0&&negative>=0){
+                        a[positive][negative]-=conductance
+                        a[negative][positive]-=conductance
+                    }
+                }
+                "dc-source"->{
+                    val col=nodes.size+sources.indexOfFirst{it.id==component.id}
+                    if(positive>=0){a[positive][col]+=1.0;a[col][positive]+=1.0}
+                    if(negative>=0){a[negative][col]-=1.0;a[col][negative]-=1.0}
+                    a[col][m]=requireNotNull(component.voltageV)
+                }
+                else->error("Hypothetical component has no verified DC behavior")
+            }
+        }
+        val scale=maxOf(1.0,a.maxOf{row->row.maxOf{kotlin.math.abs(it)}})
+        for(col in 0 until m){
+            var pivot=col
+            for(row in col+1 until m)
+                if(kotlin.math.abs(a[row][col])>kotlin.math.abs(a[pivot][col]))pivot=row
+            require(kotlin.math.abs(a[pivot][col])>1e-12*scale){
+                "DC circuit contains floating or contradictory nodes"
+            }
+            val tmp=a[col];a[col]=a[pivot];a[pivot]=tmp
+            val divisor=a[col][col]
+            for(j in col..m)a[col][j]/=divisor
+            for(row in 0 until m){
+                if(row==col)continue
+                val coefficient=a[row][col]
+                for(j in col..m)a[row][j]-=coefficient*a[col][j]
+            }
+        }
+        val voltages=mutableMapOf(ground to 0.0)
+        nodes.forEachIndexed{j,id->voltages[id]=a[j][m]}
+        val currents=mutableMapOf<String,Double>()
+        var delivered=0.0;var heat=0.0
+        for(c in network.components){
+            val current=if(c.kind=="dc-source"){
+                a[nodes.size+sources.indexOfFirst{it.id==c.id}][m]
+            }else{
+                (requireNotNull(voltages[c.positiveNodeId])-
+                    requireNotNull(voltages[c.negativeNodeId]))/requireNotNull(c.resistanceOhm)
+            }
+            require(current.isFinite()&&kotlin.math.abs(current)<=1e6){"DC current outside solver bounds"}
+            currents[c.id]=current
+            if(c.kind=="dc-source")delivered-=requireNotNull(c.voltageV)*current
+            else heat+=current*current*requireNotNull(c.resistanceOhm)
+        }
+        val residual=delivered-heat
+        require(delivered.isFinite()&&heat.isFinite()&&residual.isFinite()&&
+            kotlin.math.abs(residual)<=1e-8*maxOf(1.0,kotlin.math.abs(delivered),heat)){
+            "DC circuit failed power-conservation requirements"
+        }
+        return NativeLabDcResult(project.id,project.revision,network.id,
+            voltages.toMap(),currents.toMap(),delivered,heat,residual)
+    }
+}
