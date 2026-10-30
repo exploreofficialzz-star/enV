@@ -124,13 +124,13 @@ struct Tool: Decodable, Identifiable, Hashable {
     func nativeFacing() -> Tool {
         Tool(
             id: id,
-            name: name,
+            name: id == "qr-payload-inspector" ? "QR & Barcode Reader" : name,
             slug: slug,
-            description: NativeCopy.text(description),
+            description: NativeCopy.text(id == "qr-payload-inspector" ? "Scan QR codes and 1D/2D barcodes using your camera or an image file. Decode results locally on this device." : description),
             category: category,
             subcategory: subcategory,
-            keywords: keywords,
-            tags: tags,
+            keywords: id == "qr-payload-inspector" ? Array(NSOrderedSet(array: keywords + ["scan", "scanner", "reader", "barcode", "camera", "image", "decode"])) as? [String] ?? keywords : keywords,
+            tags: id == "qr-payload-inspector" ? Array(NSOrderedSet(array: tags + ["scan", "reader", "barcode"])) as? [String] ?? tags : tags,
             icon: icon,
             popularity: popularity,
             featured: featured,
