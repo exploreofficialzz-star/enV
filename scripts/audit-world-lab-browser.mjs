@@ -86,7 +86,7 @@ try{
   await page.getByRole("combobox",{name:"Compare to run"}).selectOption({index:1});
   await page.getByText("Difference at selected time").waitFor();
   await page.getByRole("button",{name:"Pause"}).click();
-  await page.getByRole("combobox",{name:"Playback speed"}).selectOption("0.1");
+  await page.getByRole("combobox",{name:"Playback speed",exact:true}).selectOption("0.1");
   await page.getByRole("button",{name:"Step",exact:true}).click();
   await page.getByRole("combobox",{name:"Experiment"}).selectOption("heat-rod");
   await page.getByRole("button",{name:"Start / Recalculate"}).click();
