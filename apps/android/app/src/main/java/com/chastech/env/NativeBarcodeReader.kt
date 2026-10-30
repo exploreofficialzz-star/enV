@@ -281,7 +281,13 @@ fun NativeBarcodeReaderTool() {
     var cameraActive by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Choose Start camera or Read image. Decoding stays on this device.") }
     var error by remember { mutableStateOf("") }
-    val recentScans = remember { mutableStateMapOf<String, Long>() }
+    val recentScans = remember(context) {
+        mutableStateMapOf<String, Long>().apply {
+            results.forEach { scan ->
+                put("${scan.format}\u0000${scan.text}", scan.scannedAt)
+            }
+        }
+    }
 
     fun accept(scan: NativeBarcodeScan) {
         val signature = "${scan.format}\u0000${scan.text}"
@@ -434,7 +440,7 @@ fun NativeBarcodeReaderTool() {
             if (results.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { saveResultsLauncher.launch("env-scan-history.csv") }) { Text("Export CSV") }
-                    TextButtonCompat(onClick = { results.clear(); saveNativeBarcodeScanHistory(context, results); status = "Scan history cleared." }, label = "Clear")
+                    TextButtonCompat(onClick = { results.clear(); recentScans.clear(); saveNativeBarcodeScanHistory(context, results); status = "Scan history cleared." }, label = "Clear")
                 }
             }
         }
