@@ -57,26 +57,25 @@ function DeveloperWorkspace() {
 
   const loadAll = useCallback(async () => {
     setLoading(true); setProblem("");
+    try {
+      await api<{ authenticated: true }>("/api/developer/session");
+    } catch {
+      setAuthenticated(false);
+      setTickets([]); setReports([]); setUpdates([]);
+      setLoading(false);
+      return;
+    }
     const results = await Promise.allSettled([
       api<{ tickets: Ticket[] }>("/api/feedback/admin?limit=50"),
       api<{ reports: CommunityReport[] }>("/api/community/admin?status=open&limit=50"),
       api<{ updates: ProductUpdate[] }>("/api/updates/admin"),
     ]);
-    let unauthorized = 0;
     if (results[0].status === "fulfilled") setTickets(results[0].value.tickets ?? []);
-    else if (results[0].reason instanceof Error && results[0].reason.message.toLowerCase().includes("access is required")) unauthorized++;
     if (results[1].status === "fulfilled") setReports(results[1].value.reports ?? []);
-    else if (results[1].reason instanceof Error && results[1].reason.message.toLowerCase().includes("access is required")) unauthorized++;
     if (results[2].status === "fulfilled") setUpdates(results[2].value.updates ?? []);
-    else if (results[2].reason instanceof Error && results[2].reason.message.toLowerCase().includes("access is required")) unauthorized++;
     const errors = results.filter((item): item is PromiseRejectedResult => item.status === "rejected");
-    if (unauthorized > 0 && unauthorized === results.length) {
-      setAuthenticated(false);
-      setProblem("");
-    } else {
-      setAuthenticated(true);
-      if (errors.length) setProblem(errors.map(item => item.reason instanceof Error ? item.reason.message : "A workspace area could not be loaded.").join(" "));
-    }
+    setAuthenticated(true);
+    if (errors.length) setProblem(errors.map(item => item.reason instanceof Error ? item.reason.message : "A workspace area could not be loaded.").join(" "));
     setLoading(false);
   }, []);
 
