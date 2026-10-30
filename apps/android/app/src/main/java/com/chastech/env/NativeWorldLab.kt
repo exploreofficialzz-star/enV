@@ -152,6 +152,10 @@ fun NativeWorldLabForm() {
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
     }
+    LaunchedEffect(projectJson) {
+        // Edited/imported geometry and materials invalidate earlier hypothetical drop results.
+        dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
+    }
     LaunchedEffect(requestImport) {
         if(requestImport){
             requestImport=false
