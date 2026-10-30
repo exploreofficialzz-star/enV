@@ -78,7 +78,6 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
                     self.status = self.isRunning ? "Scanner ready. Hold a code inside the camera frame." : "Camera did not start."
                 }
             } catch {
-                if self.session.isConfiguring { self.session.commitConfiguration() }
                 DispatchQueue.main.async {
                     self.isRunning = false
                     self.error = error.localizedDescription
