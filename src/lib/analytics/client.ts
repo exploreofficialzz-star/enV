@@ -35,7 +35,7 @@ export function recordAnalyticsEvent(event:Omit<AnalyticsEventInput,"eventId"|"o
 async function retryRevoke(){const pending=get(KEYS.revoke);if(!pending||navigator.onLine===false)return;try{await postConsent(pending,false);remove(KEYS.revoke);}catch{}}
 export async function flushAnalyticsEvents(){
  if(typeof window==="undefined"||navigator.onLine===false)return;if(flush)return flush;
- flush=(async()=>{await retryRevoke();if(getAnalyticsConsent()!=="granted")return;const subjectId=subject(),sessionId=session();if(!subjectId||!sessionId)return;
+ flush=(async()=>{await retryRevoke();if(import.meta.env.VITE_ANALYTICS_ENABLED!=="true"||getAnalyticsConsent()!=="granted")return;const subjectId=subject(),sessionId=session();if(!subjectId||!sessionId)return;
  const batch=queue().slice(0,25);if(!batch.length)return;
  const response=await fetch("/api/analytics/events",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json","x-env-analytics-session":sessionId},body:JSON.stringify({subjectId,platform:"web",policyVersion:ANALYTICS_POLICY_VERSION,events:batch})});
  if(response.ok){const sent=new Set(batch.map(e=>e.eventId));save(queue().filter(e=>!sent.has(e.eventId)));}
