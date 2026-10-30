@@ -40,6 +40,11 @@ struct NativeWorldLabView:View {
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var selected=0
+    @State private var dropRun:NativeDropResult?
+    @State private var dropEntityId:String?
+    @State private var dropTime=0.0
+    @State private var dropPlaying=false
+    @State private var dropSpeed=1.0
     @State private var scene=SCNScene()
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
@@ -224,6 +229,33 @@ struct NativeWorldLabView:View {
                             Button("Test assumed mass in spring model"){
                                 mass=derived;mode=0;seconds=0;playing=false
                             }.buttonStyle(.borderedProminent)
+                            Button("Drop this solid"){
+                                do {
+                                    let d=solid.dimensionsMeters
+                                    let area=solid.shape=="box" ? d[0]*d[2] : Double.pi*d[0]*d[2]/4
+                                    var input=NativeDropInput(massKg:derived,
+                                        supportingHalfHeightM:d[1]/2,projectedAreaM2:area)
+                                    input.dragCoefficient=solid.shape=="sphere" ? 0.47 : 1.05
+                                    dropRun=try NativeWorldLabDropScience.evaluate(input)
+                                    dropEntityId=solid.id;dropTime=0;dropPlaying=true;playing=false
+                                    problem="";applyDropPosition()
+                                }catch{problem=error.localizedDescription}
+                            }.buttonStyle(.bordered)
+                            if let run=dropRun,dropEntityId==solid.id {
+                                let index=max(0,min(run.samples.count-1,Int((dropTime/run.stepSeconds).rounded())))
+                                let sample=run.samples[index]
+                                value("Computed drop height",sample.heightAboveGroundM,"m")
+                                value("Computed vertical speed",abs(sample.velocityMps),"m/s")
+                                Text("Estimated surface impacts: \(run.impactCount)").font(.caption)
+                                Slider(value:$dropTime,in:0...(run.samples.last?.timeSeconds ?? 6))
+                                    .accessibilityLabel("Drop simulated time")
+                                HStack {
+                                    Button(dropPlaying ? "Pause drop":"Play drop"){dropPlaying.toggle()}
+                                    Button("Reset drop"){dropPlaying=false;dropTime=0}
+                                }.buttonStyle(.bordered)
+                                Text("Gravity, drag and contact are simplified. Invented material density is an assumption, not verified strength.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
                     TextField("Invented material name",text:$inventedName)
@@ -264,6 +296,7 @@ struct NativeWorldLabView:View {
         .onAppear{redraw();lastTick=Date()}
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
+        .onChange(of:dropTime){_ in applyDropPosition()}
         .onChange(of:seeInside){_ in redraw()}
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
@@ -273,6 +306,10 @@ struct NativeWorldLabView:View {
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
             lastTick=now
             if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
+            if dropPlaying,let run=dropRun {
+                dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
+                if dropTime >= (run.samples.last?.timeSeconds ?? 6){dropPlaying=false}
+            }
         }
         .confirmationDialog("Discard unsaved changes?",isPresented:$confirmation,
                             titleVisibility:.visible) {
@@ -321,6 +358,14 @@ struct NativeWorldLabView:View {
         let caption = name + ": " + displayed + " " + unit
         return Text(verbatim: caption).font(.subheadline)
     }
+    private func applyDropPosition() {
+        guard let run=dropRun,let id=dropEntityId,
+              let solid=project?.entities.first(where:{$0.id==id}),
+              let node=scene.rootNode.childNode(withName:"lab-solid-"+id,recursively:false),
+              !run.samples.isEmpty else{return}
+        let index=max(0,min(run.samples.count-1,Int((dropTime/run.stepSeconds).rounded())))
+        node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightAboveGroundM)
+    }
     private func redraw(){
         let next=SCNScene()
         let floor=SCNNode(geometry:SCNFloor())
@@ -337,6 +382,7 @@ struct NativeWorldLabView:View {
                                          length:CGFloat(xyz[2]),chamferRadius:0)
                 }
                 let node=SCNNode(geometry:geometry)
+                node.name="lab-solid-"+item.id
                 node.position=SCNVector3(Float(item.positionMeters[0]),
                     Float(item.positionMeters[1]),Float(item.positionMeters[2]))
                 if let hex=UInt64(item.color.dropFirst(),radix:16){
@@ -376,5 +422,6 @@ struct NativeWorldLabView:View {
         camera.look(at:SCNVector3(0,1,0))
         next.rootNode.addChildNode(camera)
         scene=next
+        applyDropPosition()
     }
 }
