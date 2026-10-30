@@ -266,3 +266,7 @@ release-candidate evidence bundle are unfinished.
 ## Remote computation UI activation path (2026-10-30)
 
 - Added Web submit/status polling/cancellation/evidence export for account-owned jobs using the actual documented endpoints. UI is absent unless build-time VITE_WORLD_LAB_JOBS_ENABLED=true. Runtime endpoints separately require verified auth, PostgreSQL, WORLD_LAB_JOBS_ENABLED=true, and a private worker. The interface invalidates stale jobs on project revision changes, keeps locally saved projects untouched, and only reveals completed owned results. Runtime remains disabled pending infrastructure/security/CI acceptance; not marketed as working cloud infrastructure.
+
+## Solver-driven fluid cutaway (2026-10-30)
+
+- Added a read-only accessible Web fluid surface cross-section following the actual user-selected immersion depth (0–100% vertical extent), tied to the numerical Archimedes result of the selected invented primitive. Waterline and legend clearly identify this as a 2D illustrative cutaway; volumetric buoyancy remains independently computed from exact primitive geometry and unknown material properties are never invented. Native platforms continue their numeric readouts; full visual/solver acceptance deferred.

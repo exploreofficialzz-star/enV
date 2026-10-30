@@ -14,6 +14,7 @@ import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/wo
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
 import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
+import { WorldLabFluidCutaway } from "./fluid-cutaway";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
@@ -1247,6 +1248,7 @@ export default function WorldLab() {
                     fluidRun.projectRevision===project?.revision &&
                     fluidRun.entityId===selectedEntity.id && (
                     <div className="mt-2 space-y-1 text-xs" aria-label="Calculated buoyancy results">
+                      <WorldLabFluidCutaway entity={selectedEntity} result={fluidRun}/>
                       <p>Displaced liquid: {fluidRun.immersedVolumeM3.toFixed(5)} m³</p>
                       <p>Upward buoyancy: {fluidRun.buoyancyForceN.toFixed(3)} N</p>
                       <p>Bottom gauge pressure: {fluidRun.bottomGaugePressurePa.toFixed(1)} Pa</p>
