@@ -59,10 +59,10 @@ const webCommerceTests = read("src/components/engines/ecommerce-engine-utils.tes
 
 assert.ok(androidGate.includes('"ecommerce"') && androidGate.includes('"qr"'), "Android production gate exempts QR and E-commerce");
 assert.ok(iosCatalog.includes('"ecommerce", "qr"'), "iOS production gate exempts QR and E-commerce");
-assert.ok(androidCatalog.includes('category in setOf("qr", "ecommerce")') && androidCatalog.includes('"active"'), "Android catalog activates QR and E-commerce records");
+assert.ok(androidCatalog.includes('stringOrEmpty("category") in setOf("qr", "ecommerce")') && androidCatalog.includes('"active"'), "Android catalog activates QR and E-commerce records");
 assert.ok(iosCatalog.includes('["qr", "ecommerce"].contains(category.lowercased()) ? "active" : status'), "iOS catalog activates QR and E-commerce records");
 assert.ok(androidReader.includes("ProcessCameraProvider") && androidReader.includes("NativeBarcodeCameraAnalyzer") && androidReader.includes("NativeBarcodeImageDecoder"), "Android QR/barcode reader uses CameraX, ZXing and local image decoding");
-assert.ok(androidReader.includes("safeBarcodeHttpUrl") && androidReader.includes("Intent.ACTION_VIEW") && androidTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts"), "Android decoded links require an explicit safe HTTP(S) action");
+assert.ok(androidReader.includes("safeBarcodeHttpUrl") && androidReader.includes("Intent.ACTION_VIEW") && androidBarcodeTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts"), "Android decoded links require an explicit safe HTTP(S) action");
 assert.ok(androidReader.includes("MAX_BARCODE_IMAGE_BYTES") && androidReader.includes("readBarcodeImageBytes") && androidBarcodeTests.includes("localImageImportsAreBoundedEvenWhenAProviderCannotReportFileSize"), "Android local image decoding enforces a strict byte ceiling");
 assert.ok(androidBarcodeTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts"), "Android tests safe HTTP(S) scan links");
 assert.ok(androidCommerce.includes("fun supports(tool: ToolRecord)") && androidCommerce.includes("fun execute("), "Android has its own native E-commerce engine");
