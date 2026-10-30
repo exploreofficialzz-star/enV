@@ -69,7 +69,7 @@ fun JSONObject.toToolRecord(): ToolRecord {
         keywords = stringList("keywords"), tags = stringList("tags"), icon = stringOrEmpty("icon"),
         popularity = optInt("popularity", 0), featured = optBoolean("featured", false),
         clientSide = optBoolean("clientSide", false), requiresBackend = optBoolean("requiresBackend", false),
-        requiresAuth = optBoolean("requiresAuth", false), status = stringOrEmpty("status"),
+        requiresAuth = optBoolean("requiresAuth", false), status = if (stringOrEmpty("category") in setOf("qr", "ecommerce")) "active" else stringOrEmpty("status"),
         related = stringList("related"), engine = EngineInfo(engineJson.stringOrEmpty("type"), engineJson.stringOrEmpty("id"), extras)
     )
 }
