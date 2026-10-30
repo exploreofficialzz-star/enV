@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserCodeReader, BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat } from "@zxing/library";
+import {
+  BarcodeFormat,
+  BinaryBitmap,
+  DecodeHintType,
+  GenericMultipleBarcodeReader,
+  HybridBinarizer,
+  MultiFormatReader,
+  RGBLuminanceSource,
+} from "@zxing/library";
 import { Button } from "@/components/ui/button";
 import { downloadText } from "@/lib/utils";
 
@@ -59,6 +67,36 @@ function payloadLabel(value: string): string {
   if (/^geo:/i.test(value)) return "Location";
   if (safeHttpUrl(value)) return "Web link";
   return "Text or structured data";
+}
+
+function decodeMultipleImageCodes(image: HTMLImageElement) {
+  const maxDimension = 2800;
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("Image decoding is unavailable in this browser.");
+  context.drawImage(image, 0, 0, width, height);
+  const pixels = context.getImageData(0, 0, width, height);
+  const source = new RGBLuminanceSource(pixels.data, width, height);
+  const bitmap = new BinaryBitmap(new HybridBinarizer(source));
+  const hints = new Map<DecodeHintType, unknown>([[DecodeHintType.TRY_HARDER, true]]);
+  const reader = new MultiFormatReader();
+  reader.setHints(hints);
+  try {
+    return new GenericMultipleBarcodeReader(reader).decodeMultiple(bitmap, hints);
+  } catch {
+    const fallback = new MultiFormatReader();
+    fallback.setHints(hints);
+    try {
+      return [fallback.decodeWithState(bitmap)];
+    } catch {
+      return [];
+    }
+  }
 }
 
 export function BarcodeReaderEngine() {
@@ -218,10 +256,14 @@ export function BarcodeReaderEngine() {
       const image = new Image();
       image.src = objectUrl;
       await image.decode();
-      const reader = new BrowserMultiFormatReader();
-      const result = await reader.decodeFromImageElement(image);
-      addResult(result.getText(), result.getBarcodeFormat());
-      setNotice(`Decoded ${file.name} locally.`);
+      const decoded = decodeMultipleImageCodes(image);
+      if (!decoded.length) throw new Error("No supported code was found.");
+      decoded.forEach((result) => addResult(result.getText(), result.getBarcodeFormat()));
+      setNotice(
+        decoded.length === 1
+          ? `Decoded one code from ${file.name} locally.`
+          : `Decoded ${decoded.length} codes from ${file.name} locally.`,
+      );
     } catch {
       setError("No supported QR code or barcode was detected. Try a sharper, well-lit image with the full code visible.");
     } finally {
