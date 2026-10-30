@@ -45,6 +45,11 @@ struct NativeWorldLabView:View {
     @State private var dropTime=0.0
     @State private var dropPlaying=false
     @State private var dropSpeed=1.0
+    @State private var motorRun:NativeActuatorResult?
+    @State private var motorEntityId:String?
+    @State private var motorTime=0.0
+    @State private var motorPlaying=false
+    @State private var motorSpeed=1.0
     @State private var scene=SCNScene()
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
@@ -241,6 +246,34 @@ struct NativeWorldLabView:View {
                                     problem="";applyDropPosition()
                                 }catch{problem=error.localizedDescription}
                             }.buttonStyle(.bordered)
+                            Button("Power this solid"){
+                                do {
+                                    motorRun=try NativeWorldLabActuator.evaluate(
+                                        NativeActuatorInput(massKg:derived))
+                                    motorEntityId=solid.id;motorTime=0;motorPlaying=true
+                                    dropPlaying=false;playing=false;problem=""
+                                    applyMotorPosition()
+                                }catch{problem=error.localizedDescription}
+                            }.buttonStyle(.bordered)
+                            if let run=motorRun,motorEntityId==solid.id {
+                                let index=max(0,min(run.samples.count-1,
+                                    Int((motorTime/run.stepSeconds).rounded())))
+                                let sample=run.samples[index]
+                                value("Computed powered height",sample.heightM,"m")
+                                value("Coil current",sample.currentA,"A")
+                                value("Upward force",sample.motorForceN,"N")
+                                value("Back-EMF",sample.backEmfV,"V")
+                                value("Resistance heating",sample.resistiveHeatW,"W")
+                                value("Energy balance residual",sample.energyResidualJ,"J")
+                                Slider(value:$motorTime,in:0...(run.samples.last?.timeSeconds ?? 4))
+                                    .accessibilityLabel("Motor simulated time")
+                                HStack {
+                                    Button(motorPlaying ? "Pause motor":"Play motor"){motorPlaying.toggle()}
+                                    Button("Reset motor"){motorPlaying=false;motorTime=0}
+                                }.buttonStyle(.bordered)
+                                Text("Electricity and physical motion are coupled in one 1D solver. Material and actuator parameters are hypothetical, not measurements.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             if let run=dropRun,dropEntityId==solid.id {
                                 let index=max(0,min(run.samples.count-1,Int((dropTime/run.stepSeconds).rounded())))
                                 let sample=run.samples[index]
@@ -297,18 +330,24 @@ struct NativeWorldLabView:View {
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
         .onChange(of:dropTime){_ in applyDropPosition()}
+        .onChange(of:motorTime){_ in applyMotorPosition()}
         .onChange(of:seeInside){_ in redraw()}
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
         .onChange(of:projectData){_ in
             // Never reuse a prior computed trajectory after geometry/material edits.
-            dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0;redraw()
+            dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
+            motorPlaying=false;motorRun=nil;motorEntityId=nil;motorTime=0;redraw()
         }
         .onReceive(timer){now in
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
             lastTick=now
             if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
+            if motorPlaying,let run=motorRun {
+                motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
+                if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
+            }
             if dropPlaying,let run=dropRun {
                 dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
                 if dropTime >= (run.samples.last?.timeSeconds ?? 6){dropPlaying=false}
@@ -360,6 +399,14 @@ struct NativeWorldLabView:View {
         }
         let caption = name + ": " + displayed + " " + unit
         return Text(verbatim: caption).font(.subheadline)
+    }
+    private func applyMotorPosition(){
+        guard let run=motorRun,let id=motorEntityId,
+              let solid=project?.entities.first(where:{$0.id==id}),
+              let node=scene.rootNode.childNode(withName:"lab-solid-"+id,recursively:false),
+              !run.samples.isEmpty else{return}
+        let index=max(0,min(run.samples.count-1,Int((motorTime/run.stepSeconds).rounded())))
+        node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightM)
     }
     private func applyDropPosition() {
         guard let run=dropRun,let id=dropEntityId,
@@ -426,5 +473,6 @@ struct NativeWorldLabView:View {
         next.rootNode.addChildNode(camera)
         scene=next
         applyDropPosition()
+        applyMotorPosition()
     }
 }
