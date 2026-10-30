@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
+import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 
@@ -200,6 +201,7 @@ export function ToolShell({
       </section>
 
       <AiAssistPanel toolId={tool.id} />
+      <ToolCommunityPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
