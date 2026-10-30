@@ -203,7 +203,7 @@ export default function WorldLabStudio() {
       {error && <div className="world-lab-error" role="alert">{error}<button type="button" onClick={() => setError("")} aria-label="Dismiss error">×</button></div>}
       <div className="world-lab-layout">
         <section className="world-lab-stage" aria-label="Interactive 3D world">
-          <canvas ref={canvas} aria-label="3D observer camera world viewport" tabIndex={0} />
+          <canvas ref={canvas} data-renderer-ready={ready} aria-label="3D observer camera world viewport" tabIndex={0} />
           {!ready && !error && <div className="world-lab-loading">Opening 3D world…</div>}
           <div className="world-lab-stage-top">
             <span className="world-lab-location">Earth-like test site · illustrative</span>
