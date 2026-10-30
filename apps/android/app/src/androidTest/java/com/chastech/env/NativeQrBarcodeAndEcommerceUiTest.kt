@@ -5,7 +5,8 @@ import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.core.content.ContextCompat
@@ -14,7 +15,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class NativeQrBarcodeAndEcommerceUiTest {
-    @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
+    @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun qrBarcodeReaderRendersWithoutRequestingCameraUntilStartIsTapped() {
@@ -30,7 +31,7 @@ class NativeQrBarcodeAndEcommerceUiTest {
         composeRule.onNodeWithText("Scan results · 0").assertIsDisplayed()
 
         val permission = ContextCompat.checkSelfPermission(
-            composeRule.activity,
+            InstrumentationRegistry.getInstrumentation().targetContext,
             Manifest.permission.CAMERA,
         )
         assertEquals(PackageManager.PERMISSION_DENIED, permission)

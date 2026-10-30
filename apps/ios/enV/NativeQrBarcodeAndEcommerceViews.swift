@@ -34,9 +34,11 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     @Published private(set) var error: String?
     @Published private(set) var results: [NativeBarcodeReadRecord] = []
 
-    let session = AVCaptureSession()
+    // AVCaptureSession is mutated only on sessionQueue. The preview reads this stable
+    // session reference on MainActor; all capture lifecycle operations stay serialized.
+    nonisolated(unsafe) let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "com.chastech.env.barcode-camera")
-    private var configured = false
+    nonisolated(unsafe) private var configured = false
     private var lastSignature = ""
     private var lastScanAt = Date.distantPast
 
@@ -46,48 +48,52 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
         sessionQueue.async { [weak self] in
             guard let self else { return }
             do {
-                if !self.configured {
+                if !configured {
                     guard let device = AVCaptureDevice.default(for: .video) else {
                         throw NativeBarcodeReaderError.cameraUnavailable
                     }
                     let input = try AVCaptureDeviceInput(device: device)
                     let output = AVCaptureMetadataOutput()
-                    self.session.beginConfiguration()
-                    self.session.sessionPreset = .high
+                    session.beginConfiguration()
+                    session.sessionPreset = .high
                     do {
-                        guard self.session.canAddInput(input) else {
+                        guard session.canAddInput(input) else {
                             throw NativeBarcodeReaderError.cameraUnavailable
                         }
-                        self.session.addInput(input)
-                        guard self.session.canAddOutput(output) else {
+                        session.addInput(input)
+                        guard session.canAddOutput(output) else {
                             throw NativeBarcodeReaderError.cameraUnavailable
                         }
-                        self.session.addOutput(output)
+                        session.addOutput(output)
                         output.setMetadataObjectsDelegate(self, queue: .main)
                         let supported: [AVMetadataObject.ObjectType] = [
                             .qr, .ean13, .ean8, .upce, .code128, .code39, .code93,
                             .pdf417, .aztec, .dataMatrix, .interleaved2of5, .itf14
                         ]
                         output.metadataObjectTypes = supported.filter { output.availableMetadataObjectTypes.contains($0) }
-                        self.session.commitConfiguration()
-                        self.configured = true
+                        session.commitConfiguration()
+                        configured = true
                     } catch {
-                        if self.session.inputs.contains(input) { self.session.removeInput(input) }
-                        if self.session.outputs.contains(output) { self.session.removeOutput(output) }
-                        self.session.commitConfiguration()
+                        if session.inputs.contains(input) { session.removeInput(input) }
+                        if session.outputs.contains(output) { session.removeOutput(output) }
+                        session.commitConfiguration()
                         throw error
                     }
                 }
-                if !self.session.isRunning { self.session.startRunning() }
-                DispatchQueue.main.async {
-                    self.isRunning = self.session.isRunning
-                    self.status = self.isRunning ? "Scanner ready. Hold a code inside the camera frame." : "Camera did not start."
+                if !session.isRunning { session.startRunning() }
+                let running = session.isRunning
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    isRunning = running
+                    status = running ? "Scanner ready. Hold a code inside the camera frame." : "Camera did not start."
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.isRunning = false
-                    self.error = error.localizedDescription
-                    self.status = "Camera scanner unavailable."
+                let message = error.localizedDescription
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    isRunning = false
+                    self.error = message
+                    status = "Camera scanner unavailable."
                 }
             }
         }
@@ -96,12 +102,22 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     func stop() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            if self.session.isRunning { self.session.stopRunning() }
-            DispatchQueue.main.async {
-                self.isRunning = false
-                self.status = "Camera stopped."
+            if session.isRunning { session.stopRunning() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                isRunning = false
+                status = "Camera stopped."
             }
         }
+    }
+
+    func setStatus(_ message: String) {
+        status = message
+    }
+
+    func setFailure(_ message: String) {
+        error = message
+        status = message
     }
 
     func addResult(value: String, format: String) {
@@ -122,15 +138,17 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
         status = "Scan history cleared."
     }
 
-    func metadataOutput(_ output: AVCaptureMetadataOutput,
-                        didOutput metadataObjects: [AVMetadataObject],
-                        from connection: AVCaptureConnection) {
+    nonisolated func metadataOutput(_ output: AVCaptureMetadataOutput,
+                                    didOutput metadataObjects: [AVMetadataObject],
+                                    from connection: AVCaptureConnection) {
         guard let object = metadataObjects.compactMap({ $0 as? AVMetadataMachineReadableCodeObject }).first,
               let value = object.stringValue else { return }
-        addResult(value: value, format: object.type.rawValue)
+        let format = object.type.rawValue
+        Task { @MainActor [weak self] in
+            self?.addResult(value: value, format: format)
+        }
     }
 }
-
 enum NativeBarcodeImageDecoder {
     static func decode(_ data: Data) throws -> [NativeBarcodeReadRecord] {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
@@ -291,13 +309,13 @@ struct NativeBarcodeReaderView: View {
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     if granted { scanner.start() }
-                    else { scanner.status = "Camera permission was denied."; }
+                    else { scanner.setFailure("Camera permission was denied.") }
                 }
             }
         case .denied, .restricted:
-            scanner.status = NativeBarcodeReaderError.permissionDenied.localizedDescription
+            scanner.setFailure(NativeBarcodeReaderError.permissionDenied.localizedDescription)
         @unknown default:
-            scanner.status = "Camera access is unavailable on this device."
+            scanner.setFailure("Camera access is unavailable on this device.")
         }
     }
 
@@ -317,7 +335,7 @@ struct NativeBarcodeReaderView: View {
                 scanner.addResult(value: record.value, format: record.format)
             }
         } catch {
-            scanner.status = error.localizedDescription
+            scanner.setFailure(error.localizedDescription)
         }
     }
 }

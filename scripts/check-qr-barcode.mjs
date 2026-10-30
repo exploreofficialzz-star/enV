@@ -16,7 +16,13 @@ assert.equal(pkg.dependencies?.["@zxing/library"], "0.21.3", "ZXing core is pinn
 assert.ok(productionPolicy.includes('"ecommerce"') && productionPolicy.includes('"qr"'), "Web QR and E-commerce categories are production-exempt");
 assert.ok(registry.includes('catalogTool.category === "qr"') && registry.includes('catalogTool.category === "ecommerce"'), "Browser registry promotes implemented QR and E-commerce records");
 assert.ok(registry.includes('name: "QR & Barcode Reader"'), "QR payload inspector is presented as the code reader");
-assert.ok(generator.includes("const isEcommerceTool = cat === \"ecommerce\"") && generator.includes("|| isEcommerceTool ? \"active\""), "Generated E-commerce tools are active");
+assert.ok(
+  generator.includes('const localCategoryEngines = new Set([') &&
+    generator.includes('"career", "ecommerce"') &&
+    generator.includes('if (tool.status !== "planned" || !localCategoryEngines.has(tool.category)) continue;') &&
+    generator.includes('tool.status = "active";'),
+  "Generated E-commerce tools are activated through the local category engine",
+);
 assert.ok(generator.includes('"QR & Barcode Reader"'), "Catalog generator exposes the reader label");
 assert.ok(toolEngine.includes("if (tool.id === \"qr-payload-inspector\") return <BarcodeReaderEngine />;"), "Reader route reaches the scanner engine");
 assert.ok(toolEngine.includes('if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;'), "E-commerce tools bypass planned fallback and reach their engine");
