@@ -37,6 +37,14 @@ const iosReader = read("apps/ios/enV/NativeQrBarcodeAndEcommerceViews.swift");
 const iosCommerce = read("apps/ios/enV/NativeEcommerceEngine.swift");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 const executionPolicy = JSON.parse(read("apps/shared/execution-policy.json"));
+const androidBackend = read("apps/android/app/src/main/java/com/chastech/env/NativeBackendEngine.kt");
+const iosBackend = read("apps/ios/enV/ToolViews.swift");
+const androidTests = read("apps/android/app/src/test/java/com/chastech/env/NativeEcommerceEngineTest.kt");
+const androidReaderTests = read("apps/android/app/src/androidTest/java/com/chastech/env/NativeBarcodeReaderInstrumentedTest.kt");
+const iosTests = read("apps/ios/enVTests/NativeEcommerceEngineTests.swift");
+const webCommerceUi = read("src/components/engines/ecommerce-engine.tsx");
+const webCommerceTests = read("src/components/engines/ecommerce-engine-utils.test.ts");
+
 
 assert.ok(androidGate.includes('"ecommerce"') && androidGate.includes('"qr"'), "Android production gate exempts QR and E-commerce");
 assert.ok(iosCatalog.includes('"ecommerce", "qr"'), "iOS production gate exempts QR and E-commerce");
@@ -50,6 +58,15 @@ assert.ok(iosReader.includes("AVCaptureMetadataOutput") && iosReader.includes("V
 assert.ok(iosCommerce.includes("static func supports(_ tool: Tool)") && iosCommerce.includes("static func run("), "iOS has an independent native E-commerce engine");
 assert.ok(iosCommerce.includes("safetyStock") && iosCommerce.includes("feePercent") && iosCommerce.includes("targetMargin"), "iOS commerce engine includes inventory safety and pricing economics");
 assert.ok(iosProject.includes("NativeEcommerceEngine.swift in Sources") && iosProject.includes("NativeQrBarcodeAndEcommerceViews.swift in Sources") && iosProject.includes("NativeEcommerceEngineTests.swift in Sources"), "iOS native engine and test files are registered in Xcode");
+
+assert.ok(androidBackend.includes("if (NativeEcommerceEngine.supports(tool)) return false"), "Android local commerce operations never fall through to generic backend routing");
+assert.ok(iosBackend.includes("if NativeEcommerceEngine.supports(tool) { return false }"), "iOS local commerce operations never fall through to generic backend routing");
+assert.ok(androidReaderTests.includes("NativeBarcodeImageDecoder.decode") && androidReaderTests.includes("CODE_128"), "Android emulator test covers local QR and Code 128 decoding");
+assert.ok(androidTests.includes("allNinetyCatalogWorkflowsHaveNativeHandlers") && androidTests.includes("safetyStock"), "Android tests the 90 native commerce workflows and safety-stock calculation");
+assert.ok(iosTests.includes("testAllNinetyEcommerceToolsHaveNativeHandlers") && iosTests.includes("NativeBarcodeImageDecoder.decode"), "iOS tests native commerce workflows and Vision QR decoding");
+assert.ok(webCommerceUi.includes("Advanced costs, stock and shipping") && webCommerceUi.includes("targetMargin") && webCommerceUi.includes("safetyStock"), "Web exposes advanced commerce pricing and inventory fields");
+assert.ok(webCommerceTests.includes("safety stock") && webCommerceTests.includes("payment fees") && webCommerceTests.includes("target-margin"), "Web tests advanced commerce calculations");
+
 for (const family of ["barcode", "qr", "ecommerce"]) {
   assert.equal(executionPolicy.families[family]?.web?.mode, "local", `${family} web mode is local`);
   assert.equal(executionPolicy.families[family]?.android?.mode, "local", `${family} Android mode is local`);
