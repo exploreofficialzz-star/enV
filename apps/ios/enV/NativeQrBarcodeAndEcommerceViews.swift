@@ -47,30 +47,34 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
             guard let self else { return }
             do {
                 if !self.configured {
-                    self.session.beginConfiguration()
-                    self.session.sessionPreset = .high
                     guard let device = AVCaptureDevice.default(for: .video) else {
                         throw NativeBarcodeReaderError.cameraUnavailable
                     }
                     let input = try AVCaptureDeviceInput(device: device)
-                    guard self.session.canAddInput(input) else {
-                        throw NativeBarcodeReaderError.cameraUnavailable
-                    }
-                    self.session.addInput(input)
-
                     let output = AVCaptureMetadataOutput()
-                    guard self.session.canAddOutput(output) else {
-                        throw NativeBarcodeReaderError.cameraUnavailable
+                    self.session.beginConfiguration()
+                    self.session.sessionPreset = .high
+                    do {
+                        guard self.session.canAddInput(input) else {
+                            throw NativeBarcodeReaderError.cameraUnavailable
+                        }
+                        self.session.addInput(input)
+                        guard self.session.canAddOutput(output) else {
+                            throw NativeBarcodeReaderError.cameraUnavailable
+                        }
+                        self.session.addOutput(output)
+                        output.setMetadataObjectsDelegate(self, queue: .main)
+                        let supported: [AVMetadataObject.ObjectType] = [
+                            .qr, .ean13, .ean8, .upce, .code128, .code39, .code93,
+                            .pdf417, .aztec, .dataMatrix, .interleaved2of5, .itf14
+                        ]
+                        output.metadataObjectTypes = supported.filter { output.availableMetadataObjectTypes.contains($0) }
+                        self.session.commitConfiguration()
+                        self.configured = true
+                    } catch {
+                        self.session.commitConfiguration()
+                        throw error
                     }
-                    self.session.addOutput(output)
-                    output.setMetadataObjectsDelegate(self, queue: .main)
-                    let supported: [AVMetadataObject.ObjectType] = [
-                        .qr, .ean13, .ean8, .upce, .code128, .code39, .code93,
-                        .pdf417, .aztec, .dataMatrix, .interleaved2of5, .itf14
-                    ]
-                    output.metadataObjectTypes = supported.filter { output.availableMetadataObjectTypes.contains($0) }
-                    self.session.commitConfiguration()
-                    self.configured = true
                 }
                 if !self.session.isRunning { self.session.startRunning() }
                 DispatchQueue.main.async {
@@ -277,7 +281,7 @@ struct NativeBarcodeReaderView: View {
                 throw NativeBarcodeReaderError.imageUnreadable
             }
             let request = VNDetectBarcodesRequest()
-            request.symbologies = [.qr, .ean13, .ean8, .upce, .code128, .code39, .pdf417, .aztec, .dataMatrix, .i2of5]
+            request.symbologies = try request.supportedSymbologies()
             try VNImageRequestHandler(data: data).perform([request])
             let observations = request.results ?? []
             guard !observations.isEmpty else { throw NativeBarcodeReaderError.imageUnreadable }
