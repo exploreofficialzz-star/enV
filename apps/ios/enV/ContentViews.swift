@@ -304,13 +304,13 @@ private struct NativeAnalyticsConsentPanel: View {
 
     var body: some View {
         Group {
-            if NativeAnalyticsClient.isEnabled {
+            if NativeAnalyticsClient.isEnabled || choice == "granted" {
                 VStack(alignment: .leading, spacing: 9) {
                     if choice == "unset" || expanded {
                         enVCharacterSpacedText(NativeAnalyticsClient.isEnabled ? "Help improve enV" : "Analytics is disabled in this app version")
                             .font(.envScaled(size: 14, weight: .semibold))
                             .foregroundStyle(Color.envInk)
-                        enVCharacterSpacedText("Optional analytics records tool activity, outcomes and approximate device categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow.")
+                        enVCharacterSpacedText(NativeAnalyticsClient.isEnabled ? "Optional analytics records tool activity, outcomes and approximate device categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow." : "Analytics collection is disabled in this app version. You can withdraw a previously saved analytics choice here.")
                             .font(.envScaled(size: 11, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -318,14 +318,16 @@ private struct NativeAnalyticsConsentPanel: View {
                             enVCharacterSpacedText(errorMessage).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(.red)
                         }
                         HStack(spacing: 8) {
-                            if NativeAnalyticsClient.isEnabled { Button { Task { await decide(true) } } label: {
+                            if NativeAnalyticsClient.isEnabled {
+                                Button { Task { await decide(true) } } label: {
                                 enVCharacterSpacedText(busy ? "Saving…" : "Allow analytics")
                                     .font(.envScaled(size: 11, weight: .semibold))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 13).padding(.vertical, 9)
                                     .background(Color.envAccent, in: Capsule())
                             }
-                            .disabled(busy)
+                                .disabled(busy)
+                            }
                             Button { Task { await decide(false) } } label: {
                                 enVCharacterSpacedText("No thanks").font(.envScaled(size: 11, weight: .semibold))
                                     .foregroundStyle(Color.envInk).padding(.horizontal, 13).padding(.vertical, 9)
@@ -338,7 +340,7 @@ private struct NativeAnalyticsConsentPanel: View {
                         }
                     } else {
                         HStack {
-                            enVCharacterSpacedText(choice == "granted" ? "Analytics is enabled" : "Analytics is disabled")
+                            enVCharacterSpacedText(!NativeAnalyticsClient.isEnabled ? "Analytics collection is disabled" : choice == "granted" ? "Analytics is enabled" : "Analytics is disabled")
                                 .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
                             Spacer()
                             Button("Privacy choices") { expanded = true }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
