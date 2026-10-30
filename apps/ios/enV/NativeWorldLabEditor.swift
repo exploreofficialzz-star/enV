@@ -121,6 +121,35 @@ enum NativeWorldLabEditor {
             root["networks"]=networks
         }
     }
+    static func inventOhmicDevice(_ data:Data,name:String,assumption:String,
+                                  assumedResistanceOhm:Double?=nil) throws ->Data {
+        try mutate(data){root in
+            guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+                  name.count<=120,
+                  !assumption.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+                  assumption.count<=500,
+                  assumedResistanceOhm.map({$0.isFinite && $0>=0.01 && $0<=1e9}) ?? true,
+                  var networks=root["networks"] as? [[String:Any]],
+                  !networks.isEmpty,
+                  var components=networks[0]["components"] as? [[String:Any]],
+                  components.count<48,
+                  let source=components.first(where:{$0["kind"] as? String=="dc-source"}),
+                  let positive=source["positiveNodeId"] as? String,
+                  let negative=source["negativeNodeId"] as? String else {
+                throw NativeWorldLabError.invalid("Invented circuit devices need valid source ports and explicit assumptions")
+            }
+            var invented:[String:Any]=[
+                "id":UUID().uuidString,"kind":"hypothetical-device",
+                "name":name,"assumption":assumption,
+                "evidence":"hypothetical-user-assumed",
+                "positiveNodeId":positive,"negativeNodeId":negative
+            ]
+            if let ohms=assumedResistanceOhm {invented["assumedResistanceOhm"]=ohms}
+            components.append(invented)
+            networks[0]["components"]=components
+            root["networks"]=networks
+        }
+    }
     static func addSolid(_ data:Data,shape:String,id:String=UUID().uuidString) throws -> Data {
         try mutate(data){root in
             guard ["box","sphere","cylinder"].contains(shape),

@@ -109,6 +109,26 @@ object NativeWorldLabEditor {
         require(removed){"Circuit component does not exist"}
         root.getJSONArray("networks").getJSONObject(0).put("components",remaining)
     }
+    fun inventOhmicDevice(source:String,name:String,description:String,
+        assumedOhms:Double?=null,id:String=UUID.randomUUID().toString()):String=edit(source){root->
+        require(name.isNotBlank()&&name.length<=120&&description.isNotBlank()&&description.length<=500)
+        require(assumedOhms==null||assumedOhms.isFinite()&&assumedOhms in 0.01..1e9){
+            "Assumed equivalent resistance must be a positive finite number"
+        }
+        val network=root.getJSONArray("networks").getJSONObject(0)
+        val components=network.getJSONArray("components")
+        require(components.length()<48){"Circuit is at its component limit"}
+        val sourcePart=(0 until components.length()).map{components.getJSONObject(it)}
+            .firstOrNull{it.getString("kind")=="dc-source"}
+            ?:error("Wire an electrical source before inventing a device")
+        val device=JSONObject().put("id",id).put("kind","hypothetical-device")
+            .put("name",name).put("assumption",description)
+            .put("evidence","hypothetical-user-assumed")
+            .put("positiveNodeId",sourcePart.getString("positiveNodeId"))
+            .put("negativeNodeId",sourcePart.getString("negativeNodeId"))
+        if(assumedOhms!=null)device.put("assumedResistanceOhm",assumedOhms)
+        components.put(device)
+    }
     fun addSolid(source: String,shape: String,id: String=UUID.randomUUID().toString()): String =
         edit(source){project->
             require(shape in setOf("box","sphere","cylinder")){"Unsupported solid type"}

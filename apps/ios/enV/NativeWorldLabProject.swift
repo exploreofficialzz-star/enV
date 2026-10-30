@@ -57,6 +57,7 @@ struct NativeLabCircuitComponent:Decodable {
     let name:String?
     let assumption:String?
     let evidence:String?
+    let assumedResistanceOhm:Double?
 }
 struct NativeLabCircuitNetwork:Decodable {
     let id:String
@@ -164,7 +165,9 @@ struct NativeWorldLabProject: Decodable {
                 case "hypothetical-device": extras=["name","assumption","evidence"]
                 default: throw NativeWorldLabError.invalid("Unsupported circuit component kind")
                 }
-                try requireKeys(component,common.union(extras))
+                if kind=="hypothetical-device" && component.keys.contains("assumedResistanceOhm") {
+                    try requireKeys(component,common.union(extras).union(["assumedResistanceOhm"]))
+                }else {try requireKeys(component,common.union(extras))}
                 try validateId(id);try validateId(from);try validateId(to)
                 guard componentIds.insert(id).inserted,from != to,
                       nodeIds.contains(from),nodeIds.contains(to) else {
@@ -189,6 +192,13 @@ struct NativeWorldLabProject: Decodable {
                         throw NativeWorldLabError.invalid("Unknown device needs explicit assumptions")
                     }
                     try validateName(title);try validateName(assumption)
+                    if component.keys.contains("assumedResistanceOhm"){
+                        guard let ohms=component["assumedResistanceOhm"] as? Double,
+                              ohms.isFinite,ohms>=0.01,ohms<=1e9 else {
+                            throw NativeWorldLabError.invalid(
+                                "An invented component needs a bounded assumed Ohmic law")
+                        }
+                    }
                 }
             }
         }
@@ -316,8 +326,9 @@ enum NativeWorldLabDc {
         for component in network.components {
             let positive=try position(component.positiveNodeId)
             let negative=try position(component.negativeNodeId)
-            if component.kind=="resistor" {
-                guard let ohms=component.resistanceOhm,ohms>=0.01 else {
+            if component.kind=="resistor" || component.kind=="hypothetical-device" {
+                guard let ohms=component.resistanceOhm ?? component.assumedResistanceOhm,
+                      ohms>=0.01 else {
                     throw NativeWorldLabError.invalid("Missing bounded resistance")
                 }
                 let g=1.0/ohms
@@ -382,7 +393,8 @@ enum NativeWorldLabDc {
                 current=matrix[nodes.count+index][count]
                 delivered-=voltage*current
             }else {
-                guard let r=c.resistanceOhm,let positive=voltages[c.positiveNodeId],
+                guard let r=c.resistanceOhm ?? c.assumedResistanceOhm,
+                      let positive=voltages[c.positiveNodeId],
                       let negative=voltages[c.negativeNodeId] else {
                     throw NativeWorldLabError.invalid("Unconnected resistor")
                 }

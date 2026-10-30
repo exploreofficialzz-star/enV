@@ -31,7 +31,8 @@ data class NativeLabCircuitNode(val id:String,val label:String)
 data class NativeLabCircuitComponent(
     val id:String,val kind:String,val positiveNodeId:String,val negativeNodeId:String,
     val voltageV:Double?=null,val resistanceOhm:Double?=null,
-    val name:String?=null,val assumption:String?=null,val evidence:String?=null
+    val name:String?=null,val assumption:String?=null,val evidence:String?=null,
+    val assumedResistanceOhm:Double?=null
 )
 data class NativeLabCircuitNetwork(
     val id:String,val name:String,val groundNodeId:String,
@@ -159,7 +160,9 @@ object NativeWorldLabProjectCodec {
                     "hypothetical-device"->setOf("name","assumption","evidence")
                     else->error("Unsupported electrical component type")
                 }
-                keys(comp,common+extras)
+                if(kind=="hypothetical-device" && comp.has("assumedResistanceOhm"))
+                    keys(comp,common+extras+setOf("assumedResistanceOhm"))
+                else keys(comp,common+extras)
                 val from=id(comp,"positiveNodeId")
                 val to=id(comp,"negativeNodeId")
                 require(from in nodeIds && to in nodeIds && from!=to) {
@@ -171,8 +174,10 @@ object NativeWorldLabProjectCodec {
                 val assumption=if(kind=="hypothetical-device")name(comp,"assumption",500) else null
                 val evidence=if(kind=="hypothetical-device")name(comp,"evidence") else null
                 require(evidence==null||evidence=="hypothetical-user-assumed")
+                val assumed=if(kind=="hypothetical-device" && comp.has("assumedResistanceOhm"))
+                    number(comp,"assumedResistanceOhm",0.01,1e9) else null
                 NativeLabCircuitComponent(id(comp,"id"),kind,from,to,
-                    voltage,resistance,inventName,assumption,evidence)
+                    voltage,resistance,inventName,assumption,evidence,assumed)
             }
             require(components.map{it.id}.toSet().size==components.size)
             NativeLabCircuitNetwork(id(net,"id"),name(net,"name"),ground,nodes,components)
@@ -210,8 +215,10 @@ object NativeWorldLabDc {
             val positive=node(component.positiveNodeId)
             val negative=node(component.negativeNodeId)
             when(component.kind){
-                "resistor"->{
-                    val conductance=1.0/requireNotNull(component.resistanceOhm)
+                "resistor","hypothetical-device"->{
+                    val ohms=component.resistanceOhm?:component.assumedResistanceOhm
+                        ?:error("Unknown invention needs an explicit supported Ohmic law")
+                    val conductance=1.0/ohms
                     if(positive>=0)a[positive][positive]+=conductance
                     if(negative>=0)a[negative][negative]+=conductance
                     if(positive>=0&&negative>=0){
@@ -225,7 +232,7 @@ object NativeWorldLabDc {
                     if(negative>=0){a[negative][col]-=1.0;a[col][negative]-=1.0}
                     a[col][m]=requireNotNull(component.voltageV)
                 }
-                else->error("Hypothetical component has no verified DC behavior")
+                else->error("Unsupported DC component")
             }
         }
         val scale=maxOf(1.0,a.maxOf{row->row.copyOfRange(0,m).maxOf{kotlin.math.abs(it)}})
@@ -253,13 +260,16 @@ object NativeWorldLabDc {
             val current=if(c.kind=="dc-source"){
                 a[nodes.size+sources.indexOfFirst{it.id==c.id}][m]
             }else{
+                val ohms=c.resistanceOhm?:c.assumedResistanceOhm
+                    ?:error("Invented device is missing its assumed Ohmic law")
                 (requireNotNull(voltages[c.positiveNodeId])-
-                    requireNotNull(voltages[c.negativeNodeId]))/requireNotNull(c.resistanceOhm)
+                    requireNotNull(voltages[c.negativeNodeId]))/ohms
             }
             require(current.isFinite()&&kotlin.math.abs(current)<=1e6){"DC current outside solver bounds"}
             currents[c.id]=current
             if(c.kind=="dc-source")delivered-=requireNotNull(c.voltageV)*current
-            else heat+=current*current*requireNotNull(c.resistanceOhm)
+            else heat+=current*current*requireNotNull(
+                c.resistanceOhm?:c.assumedResistanceOhm)
         }
         val residual=delivered-heat
         require(delivered.isFinite()&&heat.isFinite()&&residual.isFinite()&&

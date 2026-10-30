@@ -235,3 +235,7 @@ release-candidate evidence bundle are unfinished.
 ## Hypothetical component model assumptions — source implementation (2026-10-30)
 
 - Portable Web network schema now accepts an optional explicit assumed Ohmic-equivalent resistance for invented components. Previously unmodelled inventions still fail closed; components with user-supplied positive bounded resistance enter actual MNA current and Joule heat accounting while remaining tagged hypothetical, and evidence lists their exact IDs. Web UI lets inventors opt into this assumption without presenting it as discovered conductivity. Native decoder/solver parity for this optional field is the next source batch. Full audits remain deferred by request.
+
+## Native inventor-defined electrical assumptions (2026-10-30)
+
+- Native Kotlin and Swift portable decoders now accept an optional finite user-assumed Ohmic equivalent for invented devices, preserving optional absence and rejecting unknown keys and invalid values. Their MNA solvers include such components in true branch-current and Joule-heat balances only when the assumption is supplied; otherwise the circuit fails closed. Native validated editors can append independently invented devices to existing source terminals. No claim that the invented substance is physically characterized.
