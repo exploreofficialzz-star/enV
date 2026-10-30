@@ -985,7 +985,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
 
 private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
-    "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id)
+    "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
     "file-converter", "document-backend" -> NativeFileConverterEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
@@ -1313,7 +1313,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
         "codec" -> NativeCodecToolForm(tool.id)
         "color" -> NativeColorToolForm(tool.id)
         "datetime" -> NativeDateTimeToolForm(tool.id)
-        "barcode", "qr" -> NativeBarcodeToolForm(tool.id)
+        "barcode", "qr" -> if (tool.id == "qr-payload-inspector") NativeBarcodeReaderTool() else NativeBarcodeToolForm(tool.id)
         "image" -> NativeImageToolForm(tool)
         "mime" -> NativeMimeToolForm(tool.id)
         "converter" -> NativeConverterToolForm(tool)
@@ -1334,6 +1334,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
         NativeProductivityEngine.supports(tool.id) -> NativeProductivityToolForm(tool.id)
         NativeAccessibilityEngine.supports(tool.id, tool.category) -> NativeAccessibilityToolForm(tool)
         NativeEventEngine.supports(tool.id) -> NativeEventToolForm(tool.id)
+        NativeEcommerceEngine.supports(tool) -> NativeEcommerceToolForm(tool.id)
         else -> Text("This native custom engine is not available offline.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
         else -> Text("This tool is not yet implemented natively.", color = MaterialTheme.colorScheme.onSurfaceVariant)
