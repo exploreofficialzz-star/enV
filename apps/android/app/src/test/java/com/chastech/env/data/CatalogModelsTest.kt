@@ -81,6 +81,7 @@ class CatalogModelsTest {
              ]}
         """.trimIndent())
         assertEquals("active", catalog.tools.first { it.id == "qr-payload-inspector" }.status)
+        assertEquals("QR & Barcode Reader", catalog.tools.first { it.id == "qr-payload-inspector" }.name)
         assertEquals("active", catalog.tools.first { it.id == "product-generator" }.status)
         assertEquals("planned", catalog.tools.first { it.id == "other-tool" }.status)
         assertEquals(2, catalog.counts.active)
