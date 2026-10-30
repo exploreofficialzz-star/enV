@@ -10,6 +10,7 @@ type Breakdown = { name: string; events: number };
 type Summary = {
   generatedAt: string;
   windowDays: number;
+  historyDays: number;
   overview: {
     totalEvents: number;
     optedInInstallations: number;
