@@ -7,6 +7,7 @@ on:
       - "src/components/world-lab/**"
       - "src/routes/tools/**"
       - "scripts/check-world-lab.mjs"
+      - "scripts/audit-world-lab-browser.mjs"
       - ".github/workflows/world-lab-validation.yml"
   pull_request:
     paths:
@@ -14,6 +15,7 @@ on:
       - "src/components/world-lab/**"
       - "src/routes/tools/**"
       - "scripts/check-world-lab.mjs"
+      - "scripts/audit-world-lab-browser.mjs"
       - ".github/workflows/world-lab-validation.yml"
   workflow_dispatch:
 permissions:
@@ -35,3 +37,24 @@ jobs:
         run: npm run build
       - name: TypeScript contract
         run: npm run typecheck
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered World Lab browser acceptance
+        shell: bash
+        run: |
+          npm run dev > /tmp/world-lab-dev.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/tools/developer/the-world-lab > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != 1 ]; then
+            cat /tmp/world-lab-dev.log
+            exit 1
+          fi
+          node scripts/audit-world-lab-browser.mjs
