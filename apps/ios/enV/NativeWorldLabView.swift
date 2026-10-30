@@ -2,6 +2,18 @@ import SwiftUI
 import SceneKit
 import UniformTypeIdentifiers
 
+private struct NativeWorldLabJsonFile: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    var content: Data
+    init(content: Data){self.content=content}
+    init(configuration: ReadConfiguration) throws {
+        content=configuration.file.regularFileContents ?? Data()
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents:content)
+    }
+}
+
 /// Native 3D *illustrative* scene with real, bounded local reference solvers.
 /// Imported solids are never silently coupled to the scientific equations.
 struct NativeWorldLabView:View {
@@ -14,6 +26,10 @@ struct NativeWorldLabView:View {
     @State private var diffusivity=0.02
     @State private var seeInside=false
     @State private var importing=false
+    @State private var exporting=false
+    @State private var projectData:Data?
+    @State private var inventedName=""
+    @State private var inventedDensity=""
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var selected=0
@@ -39,6 +55,17 @@ struct NativeWorldLabView:View {
     private var assumedMass:Double? {
         guard let solid,let density=material?.densityKgM3 else{return nil}
         return solid.volumeMetersCubed*density
+    }
+    private func applyProject(_ work:(Data)throws->Data){
+        do {
+            guard let old=projectData else {
+                throw NativeWorldLabError.invalid("Create or import a project first.")
+            }
+            let data=try work(old)
+            project=try NativeWorldLabProject.decode(data)
+            projectData=data;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            problem="";redraw()
+        }catch{problem=error.localizedDescription}
     }
     var body:some View {
         ScrollView{
@@ -104,10 +131,26 @@ struct NativeWorldLabView:View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Divider()
+                HStack {
+                    Button("New project"){
+                        do {
+                            let data=try NativeWorldLabEditor.blank()
+                            project=try NativeWorldLabProject.decode(data)
+                            projectData=data;selected=0;problem="";redraw()
+                        }catch{problem=error.localizedDescription}
+                    }.buttonStyle(.borderedProminent)
+                    Button("Export JSON"){exporting=true}
+                        .buttonStyle(.bordered).disabled(projectData==nil)
+                }
                 Button("Inspect World Lab project JSON"){importing=true}.buttonStyle(.bordered)
                 if let project {
                     Text(project.title+" · "+String(project.entities.count)+" solids")
                         .font(.headline)
+                    HStack(spacing:8){
+                        Button("Add cube"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"box")}}
+                        Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}
+                        Button("Add cylinder"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"cylinder")}}
+                    }.buttonStyle(.bordered).disabled(project.entities.count>=200)
                     if let solid {
                         HStack {
                             Button("Previous"){selected=max(0,selected-1)}.disabled(selected==0)
@@ -119,6 +162,18 @@ struct NativeWorldLabView:View {
                         }
                         Text("Selected: "+solid.name+" ("+solid.shape+")")
                         value("Ideal volume",solid.volumeMetersCubed,"m³")
+                        HStack {
+                            Button("Smaller"){
+                                let scaled=solid.dimensionsMeters.map{max(0.001,$0*0.9)}
+                                applyProject{try NativeWorldLabEditor.resizeSolid(
+                                    $0,id:solid.id,dimensionsMeters:scaled)}
+                            }
+                            Button("Larger"){
+                                let scaled=solid.dimensionsMeters.map{min(10000,$0*1.1)}
+                                applyProject{try NativeWorldLabEditor.resizeSolid(
+                                    $0,id:solid.id,dimensionsMeters:scaled)}
+                            }
+                        }.buttonStyle(.bordered)
                         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
                         value("Assumed mass",assumedMass,"kg")
                         if let derived=assumedMass,derived>=0.001,derived<=10000 {
@@ -127,6 +182,33 @@ struct NativeWorldLabView:View {
                             }.buttonStyle(.borderedProminent)
                         }
                     }
+                    TextField("Invented material name",text:$inventedName)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Assumed density in kg/m³ (optional)",text:$inventedDensity)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    Button("Save invented material") {
+                        do {
+                            guard !inventedName.trimmingCharacters(in:.whitespaces).isEmpty else{
+                                throw NativeWorldLabError.invalid("Name your invented material.")
+                            }
+                            let density:Double?
+                            if inventedDensity.trimmingCharacters(in:.whitespaces).isEmpty{
+                                density=nil
+                            }else if let number=Double(inventedDensity){density=number}
+                            else {throw NativeWorldLabError.invalid("Density must be a finite number.")}
+                            let id=UUID().uuidString
+                            applyProject {old in
+                                let first=try NativeWorldLabEditor.addHypotheticalMaterial(
+                                    old,name:inventedName,densityKgM3:density,id:id)
+                                if let solid {
+                                    return try NativeWorldLabEditor.assignMaterial(
+                                        first,solidId:solid.id,materialId:id)
+                                }
+                                return first
+                            }
+                            if problem.isEmpty {inventedName="";inventedDensity=""}
+                        }catch{problem=error.localizedDescription}
+                    }.buttonStyle(.borderedProminent)
                     Text("Imported geometry is not structurally or chemically simulated. The spring uses only a separately assumed lumped mass.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -147,6 +229,11 @@ struct NativeWorldLabView:View {
             lastTick=now
             if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
         }
+        .fileExporter(isPresented:$exporting,
+            document:projectData.map{NativeWorldLabJsonFile(content:$0)},
+            contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
             do {
                 let url=try response.get()
@@ -156,7 +243,9 @@ struct NativeWorldLabView:View {
                 guard length<=NativeWorldLabProject.maxBytes else {
                     throw NativeWorldLabError.invalid("Project files must be 1 MB or smaller.")
                 }
-                project=try NativeWorldLabProject.decode(Data(contentsOf:url))
+                let data=try Data(contentsOf:url)
+                project=try NativeWorldLabProject.decode(data)
+                projectData=data
                 selected=0;problem="";redraw()
             }catch{problem=error.localizedDescription}
         }

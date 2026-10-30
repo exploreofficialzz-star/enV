@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.NativeLabInput
 import com.chastech.env.engine.NativeWorldLabProject
+import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabProjectCodec
 import com.chastech.env.engine.NativeWorldLabScience
 import java.io.ByteArrayOutputStream
@@ -42,6 +43,9 @@ fun NativeWorldLabForm() {
     var diffusivity by remember { mutableFloatStateOf(0.02f) }
     var inside by remember { mutableStateOf(false) }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
+    var projectJson by remember { mutableStateOf<String?>(null) }
+    var proposedName by remember { mutableStateOf("") }
+    var proposedDensity by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
     var warning by remember { mutableStateOf("") }
     val model=when(kind) {
@@ -57,6 +61,35 @@ fun NativeWorldLabForm() {
     val material=project?.materials?.firstOrNull { it.id==solid?.materialId }
     val derivedMass=if(solid!=null && material?.densityKgM3!=null)
         solid.volumeMetersCubed()*material.densityKgM3 else null
+    fun applyProjectEdit(transform:(String)->String){
+        runCatching {
+            val previous=projectJson?:error("Create or import a project first.")
+            val next=transform(previous)
+            val parsed=NativeWorldLabProjectCodec.decode(next)
+            projectJson=next
+            project=parsed
+            selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
+            warning=""
+        }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
+    }
+    val exportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if(uri!=null){
+            val json=projectJson
+            if(json!=null)scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO){
+                        val bytes=json.toByteArray(Charsets.UTF_8)
+                        require(bytes.size<=NativeWorldLabProjectCodec.MAX_BYTES)
+                        context.contentResolver.openOutputStream(uri,"wt")?.use{
+                            it.write(bytes);it.flush()
+                        }?:error("Could not open an export destination.")
+                    }
+                }.onSuccess{warning=""}
+                    .onFailure{warning=it.message?:"Project export failed."}
+            }
+        }
+    }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if(uri!=null)scope.launch {
             runCatching { withContext(Dispatchers.IO) {
@@ -72,8 +105,9 @@ fun NativeWorldLabForm() {
                         out.write(buffer,0,read)
                     }
                 }?:error("File could not be opened.")
-                NativeWorldLabProjectCodec.decode(out.toString(Charsets.UTF_8.name()))
-            } }.onSuccess { project=it;selected=0;warning="" }
+                val json=out.toString(Charsets.UTF_8.name())
+                Pair(json,NativeWorldLabProjectCodec.decode(json))
+            } }.onSuccess { projectJson=it.first;project=it.second;selected=0;warning="" }
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
     }
@@ -170,11 +204,31 @@ fun NativeWorldLabForm() {
         if(inside && kind!="heat") Text("This is a model illustration, not X-ray imaging.",
             style=MaterialTheme.typography.bodySmall)
         HorizontalDivider()
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            Button(onClick={
+                runCatching {
+                    val data=NativeWorldLabEditor.blank()
+                    project=NativeWorldLabProjectCodec.decode(data)
+                    projectJson=data;selected=0;warning=""
+                }.onFailure{warning=it.message?:"Could not create project."}
+            }){Text("New project")}
+            OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
+                enabled=projectJson!=null){Text("Export JSON")}
+        }
         OutlinedButton(onClick={picker.launch(arrayOf("application/json","text/plain","*/*"))}) {
             Text("Inspect World Lab project JSON")
         }
         if(project!=null){
             Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
+                    .forEach { (shape,label) ->
+                        OutlinedButton(onClick={applyProjectEdit { NativeWorldLabEditor.addSolid(it,shape) }},
+                            enabled=project!!.entities.size<200,modifier=Modifier.weight(1f)){
+                            Text(label)
+                        }
+                    }
+            }
             if(solid!=null) {
                 Row {
                     TextButton(onClick={selected=(selected-1+project!!.entities.size)%project!!.entities.size}) {
@@ -186,6 +240,16 @@ fun NativeWorldLabForm() {
                     }
                 }
                 Text("Ideal "+solid.shape+" volume: "+labNumber(solid.volumeMetersCubed())+" m³")
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={
+                        val scaled=solid.dimensionsMeters.let{listOf(it.x,it.y,it.z)}.map{(it*0.9).coerceAtLeast(0.001)}
+                        applyProjectEdit{NativeWorldLabEditor.resizeSolid(it,solid.id,scaled)}
+                    }){Text("Smaller")}
+                    OutlinedButton(onClick={
+                        val scaled=solid.dimensionsMeters.let{listOf(it.x,it.y,it.z)}.map{(it*1.1).coerceAtMost(10000.0)}
+                        applyProjectEdit{NativeWorldLabEditor.resizeSolid(it,solid.id,scaled)}
+                    }){Text("Larger")}
+                }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
                 if(derivedMass!=null && derivedMass in 0.001..10000.0){
@@ -194,6 +258,25 @@ fun NativeWorldLabForm() {
                     }
                 }
             }
+            OutlinedTextField(value=proposedName,onValueChange={proposedName=it},
+                label={Text("Invented material name")},singleLine=true,
+                modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedDensity,onValueChange={proposedDensity=it},
+                label={Text("Hypothetical density (kg/m³), or blank")},singleLine=true,
+                modifier=Modifier.fillMaxWidth())
+            Button(onClick={
+                runCatching {
+                    require(proposedName.isNotBlank()){"Name your invented material first."}
+                    val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val id=java.util.UUID.randomUUID().toString()
+                    val edited=NativeWorldLabEditor.addHypotheticalMaterial(
+                        requireNotNull(projectJson),proposedName,density,id=id)
+                    val linked=solid?.let{NativeWorldLabEditor.assignMaterial(edited,it.id,id)}?:edited
+                    projectJson=linked
+                    project=NativeWorldLabProjectCodec.decode(linked)
+                    proposedName="";proposedDensity="";warning=""
+                }.onFailure{warning=it.message?:"Hypothetical material was not saved."}
+            }){Text("Save invented material")}
             Text("Objects are inspected numerically. Collisions, deformation, and unknown material properties are not simulated.",
                 style=MaterialTheme.typography.bodySmall)
         }
