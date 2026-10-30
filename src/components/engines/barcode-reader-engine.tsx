@@ -76,6 +76,41 @@ export function BarcodeReaderEngine() {
   const [copyState, setCopyState] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const [manualPayload, setManualPayload] = useState("");
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("env.qrBarcodeReader.history.v1");
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((entry): entry is ScanRecord =>
+            entry !== null &&
+            typeof entry === "object" &&
+            typeof entry.id === "string" &&
+            typeof entry.value === "string" &&
+            typeof entry.format === "string" &&
+            typeof entry.scannedAt === "string" &&
+            Number.isFinite(Date.parse(entry.scannedAt))
+          );
+          setResults(valid.slice(0, 50));
+        }
+      }
+    } catch {
+      // A blocked or corrupt local history must never prevent scanning.
+    } finally {
+      setHistoryLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!historyLoaded) return;
+    try {
+      window.localStorage.setItem("env.qrBarcodeReader.history.v1", JSON.stringify(results.slice(0, 50)));
+    } catch {
+      // Storage quotas / private browsing restrictions do not block scan results.
+    }
+  }, [historyLoaded, results]);
 
   function addResult(value: string, format: BarcodeFormat | string) {
     if (!value) return;
@@ -315,7 +350,7 @@ export function BarcodeReaderEngine() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 id="reader-results-heading" className="text-sm font-semibold">Scan results</h3>
-            <p className="mt-0.5 text-xs text-muted">{results.length} result{results.length === 1 ? "" : "s"} in this session</p>
+            <p className="mt-0.5 text-xs text-muted">{results.length} saved result{results.length === 1 ? "" : "s"} on this device</p>
           </div>
           {results.length ? (
             <div className="flex flex-wrap gap-2">
