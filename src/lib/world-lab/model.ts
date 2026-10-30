@@ -51,6 +51,22 @@ export type ModelSample = Readonly<{
   maximumTemperatureK?: number;
 }>;
 
+/** Hypothetical density times analytic geometry converted into a lumped test mass. */
+export type AssumedMassSource = Readonly<{
+  kind: "material-geometry-mass";
+  evidence: "hypothetical-user-assumed";
+  projectId: string;
+  projectRevision: number;
+  entityId: string;
+  entityName: string;
+  materialId: string;
+  materialName: string;
+  volumeM3: number;
+  assumedDensityKgM3: number;
+  derivedMassKg: number;
+  assumption: string;
+}>;
+
 export type LabRun = Readonly<{
   format: "env-world-lab-run";
   schemaVersion: 1;
@@ -60,6 +76,8 @@ export type LabRun = Readonly<{
   modelVersion: string;
   evidence: "physics-model-computed";
   illustrativeGeometry: true;
+  inputEvidence: "hypothetical-user-assumed";
+  assumedMassSource: AssumedMassSource | null;
   inputs: ModelInput;
   time: Readonly<{
     simulatedDurationSeconds: number;
@@ -138,10 +156,31 @@ export function runExperiment(input: ModelInput, options: Readonly<{
   id: string;
   worldDateUTC: string;
   parentRunId?: string | null;
+  assumedMassSource?: AssumedMassSource | null;
   durationSeconds?: number;
   solverStepSeconds?: number;
 }>): LabRun {
   validateModel(input);
+  if (options.assumedMassSource) {
+    const s = options.assumedMassSource;
+    if (input.kind !== "damped-oscillator" || s.kind !== "material-geometry-mass" ||
+        s.evidence !== "hypothetical-user-assumed" ||
+        !s.projectId || !s.entityId || !s.materialId ||
+        !s.entityName || !s.materialName ||
+        !Number.isInteger(s.projectRevision) || s.projectRevision < 0 ||
+        typeof s.assumption !== "string" || s.assumption.length < 20 ||
+        s.assumption.length > 500) {
+      throw new Error("A derived-mass source must identify a valid hypothetical material and oscillator.");
+    }
+    bounded(s.volumeM3, "Source solid volume (m3)", 1e-9, 1e12);
+    bounded(s.assumedDensityKgM3, "Source assumed density (kg/m3)", 0.001, 1e9);
+    bounded(s.derivedMassKg, "Derived mass (kg)", 0.001, 10000);
+    const computed = s.volumeM3 * s.assumedDensityKgM3;
+    if (Math.abs(computed - s.derivedMassKg) > 1e-9 * Math.max(1, computed) ||
+        Math.abs(input.massKg - s.derivedMassKg) > 1e-9 * Math.max(1, computed)) {
+      throw new Error("Derived run mass does not match its solid geometry and assumed density.");
+    }
+  }
   if (!options.id || options.id.length > 120 || !Number.isFinite(Date.parse(options.worldDateUTC))) {
     throw new Error("A valid run ID and UTC world date are required.");
   }
@@ -208,6 +247,9 @@ export function runExperiment(input: ModelInput, options: Readonly<{
     modelVersion: MODEL_VERSION,
     evidence: "physics-model-computed" as const,
     illustrativeGeometry: true as const,
+    inputEvidence: "hypothetical-user-assumed" as const,
+    assumedMassSource: options.assumedMassSource
+      ? Object.freeze({ ...options.assumedMassSource }) : null,
     inputs: Object.freeze({ ...input }),
     time: Object.freeze({ simulatedDurationSeconds: duration, solverStepSeconds: actualH,
       worldDateUTC: new Date(options.worldDateUTC).toISOString() }),
