@@ -26,6 +26,14 @@ struct NativeActuatorSample {
     let gravityEnergyJ:Double
     let magneticEnergyJ:Double
     let energyResidualJ:Double
+    let suppliedEnergyJ:Double
+    let dissipatedEnergyJ:Double
+}
+struct NativeActuatorNumericalAudit {
+    let status:String
+    let maximumRelativeStateDifference:Double?
+    let maximumEnergyResidualFraction:Double
+    let explanation:String
 }
 struct NativeActuatorResult {
     let samples:[NativeActuatorSample]
@@ -118,7 +126,8 @@ enum NativeWorldLabActuator {
                 resistiveHeatW:i.resistanceOhm*current*current,
                 sourcePowerW:i.supplyVoltageV*current,
                 kineticEnergyJ:ke,gravityEnergyJ:pe,magneticEnergyJ:magnetic,
-                energyResidualJ:supplied+initial-ke-pe-magnetic-dissipated))
+                energyResidualJ:supplied+initial-ke-pe-magnetic-dissipated,
+                suppliedEnergyJ:supplied,dissipatedEnergyJ:dissipated))
             if n==steps {break}
             let next=step(state,i,dt,clamp:true)
             let current2=next[2];let velocity2=next[1]
@@ -134,5 +143,62 @@ enum NativeWorldLabActuator {
             state=next
         }
         return NativeActuatorResult(samples:output,stepSeconds:dt)
+    }
+
+    /// Internal 1D numerical consistency only. Does not verify motor parameters.
+    static func numericalAudit(_ input:NativeActuatorInput,
+                               _ run:NativeActuatorResult)throws->NativeActuatorNumericalAudit {
+        guard run.modelVersion=="1.0.0",run.samples.count>=2,
+            run.stepSeconds.isFinite,run.stepSeconds>0 else {
+            throw NativeWorldLabError.invalid("Completed actuator trajectory required")
+        }
+        let first=run.samples[0]
+        let initial=first.kineticEnergyJ+first.gravityEnergyJ+first.magneticEnergyJ
+        var worstEnergy=0.0
+        for s in run.samples {
+            let terms=[s.energyResidualJ,s.suppliedEnergyJ,s.dissipatedEnergyJ,
+                s.kineticEnergyJ,s.gravityEnergyJ,s.magneticEnergyJ]
+            guard terms.allSatisfy({$0.isFinite}) else {
+                throw NativeWorldLabError.invalid("Non-finite actuator energy evidence")
+            }
+            let inputMagnitude=abs(initial)+abs(s.suppliedEnergyJ)
+            let outputMagnitude=abs(s.kineticEnergyJ)+abs(s.gravityEnergyJ)+
+                abs(s.magneticEnergyJ)+abs(s.dissipatedEnergyJ)
+            let scale=max(1.0,max(inputMagnitude,outputMagnitude))
+            worstEnergy=max(worstEnergy,abs(s.energyResidualJ)/scale)
+        }
+        let half=run.stepSeconds/2
+        if half<0.0001 {
+            return NativeActuatorNumericalAudit(status:"unavailable",
+                maximumRelativeStateDifference:nil,
+                maximumEnergyResidualFraction:worstEnergy,
+                explanation:"Half-step resolution exceeds local solver limits.")
+        }
+        guard let fine=try? evaluate(input,requestedStepSeconds:half) else {
+            return NativeActuatorNumericalAudit(status:"unavailable",
+                maximumRelativeStateDifference:nil,
+                maximumEnergyResidualFraction:worstEnergy,
+                explanation:"The bounded half-step solver could not complete.")
+        }
+        var worstState=0.0
+        for s in run.samples {
+            let n=Int((s.timeSeconds/fine.stepSeconds).rounded())
+            let index=min(max(n,0),fine.samples.count-1)
+            let f=fine.samples[index]
+            let dHeight=abs(s.heightM-f.heightM)/max(1.0,max(abs(s.heightM),abs(f.heightM)))
+            let dCurrent=abs(s.currentA-f.currentA)/max(1.0,max(abs(s.currentA),abs(f.currentA)))
+            guard dHeight.isFinite,dCurrent.isFinite else {
+                throw NativeWorldLabError.invalid("Non-finite actuator step comparison")
+            }
+            worstState=max(worstState,max(dHeight,dCurrent))
+        }
+        let pass=worstState<=0.01 && worstEnergy<=0.02
+        return NativeActuatorNumericalAudit(
+            status:pass ? "within-internal-tolerance" : "outside-internal-tolerance",
+            maximumRelativeStateDifference:worstState,
+            maximumEnergyResidualFraction:worstEnergy,
+            explanation:pass ?
+                "Internal numerical thresholds met; assumed materials are not verified." :
+                "Numerical thresholds exceeded; this trajectory needs review.")
     }
 }

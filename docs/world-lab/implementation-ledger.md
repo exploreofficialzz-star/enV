@@ -160,3 +160,9 @@ release-candidate evidence bundle are unfinished.
 - Regression coverage includes zero-power conservation, deterministic computed traces, deliberately altered energy evidence, non-finite recorded data and solver-resolution exhaustion.
 - Indexed the actual user-provided research ZIP in `docs/world-lab/research-source-manifest.json`, including SHA-256 and byte sizes of both PDFs, both Markdown books, calculations CSV and four illustrations. The master has exactly 205 numbered chapters; the supplement repeats/deepens chapters 194–205, **not** 12 additional independent chapters. Source topic inventory is distinct from implemented scientific capability and verified acceptance.
 - This check is implemented on the Web actuator run only. Kotlin/Swift numerical self-audit parity, independently calibrated physical validation, device rendering and WP-06–WP-10 remain open. Keep PR #59 draft and do not replace Artboard Studio yet.
+
+## Native parity extension: actuator numerical diagnostics (2026-10-30)
+
+- Android Kotlin and iOS Swift independently track supplied Joule energy and dissipated Joule energy in each native actuator sample, matching the existing Web solver's balance quantities. Each native solver implements its own halved-timestep consistency check against its own trajectory with bounded numerical budgets and explicit `unavailable` results. Native unit/XCTest coverage includes the powered case and exact zero-power conservation.
+- Native Compose and SwiftUI actuator readouts now show an internal numerical self-check status and explanation. This is only numerical self-consistency of the bounded R-L/1D assumed model; it does **not** demonstrate calibrated science, physical motor certification or generic multiphysics.
+- All platform-specific code stays in Kotlin, Swift and TypeScript, respectively; no renderer, font, branding or unrelated tool is changed. Device acceptance and native accessibility must still be proven on this exact SHA.

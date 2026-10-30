@@ -72,6 +72,23 @@ class NativeWorldLabScienceTest {
         assertTrue(run.samples.any{it.resistiveHeatW>0 && it.motorForceN>0})
         assertTrue(run.samples.all{it.heightM>=0 && it.energyResidualJ.isFinite()})
     }
+    @Test fun nativeActuatorAuditChecksConservationAndRefinement() {
+        val zero=NativeActuatorInput(massKg=1.0,supplyVoltageV=0.0)
+        val run=NativeWorldLabActuator.evaluate(zero)
+        val audit=NativeWorldLabActuator.numericalAudit(zero,run)
+        assertEquals("within-internal-tolerance",audit.status)
+        assertEquals(0.0,audit.maximumEnergyResidualFraction,0.0)
+        assertEquals(0.0,audit.maximumRelativeStateDifference!!,0.0)
+
+        val powered=NativeActuatorInput(massKg=1.0)
+        val first=NativeWorldLabActuator.numericalAudit(powered,
+            NativeWorldLabActuator.evaluate(powered))
+        val second=NativeWorldLabActuator.numericalAudit(powered,
+            NativeWorldLabActuator.evaluate(powered))
+        assertEquals(first,second)
+        assertTrue(first.maximumEnergyResidualFraction.isFinite())
+        assertNotEquals("unavailable",first.status)
+    }
     @Test fun noVoltageDoesNotCreateFictitiousLift() {
         val run=NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=1.0,supplyVoltageV=0.0))
         assertTrue(run.samples.all{it.heightM==0.0 && it.currentA==0.0})

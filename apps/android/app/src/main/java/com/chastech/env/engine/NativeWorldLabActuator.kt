@@ -30,7 +30,15 @@ data class NativeActuatorSample(
     val kineticEnergyJ:Double,
     val gravityEnergyJ:Double,
     val magneticEnergyJ:Double,
-    val energyResidualJ:Double
+    val energyResidualJ:Double,
+    val suppliedEnergyJ:Double,
+    val dissipatedEnergyJ:Double
+)
+data class NativeActuatorNumericalAudit(
+    val status:String,
+    val maximumRelativeStateDifference:Double?,
+    val maximumEnergyResidualFraction:Double,
+    val explanation:String
 )
 data class NativeActuatorResult(
     val samples:List<NativeActuatorSample>,val stepSeconds:Double,
@@ -93,7 +101,7 @@ object NativeWorldLabActuator {
             output.add(NativeActuatorSample(
                 n*dt,h,v,a,i.forceConstantNPerA*a,i.forceConstantNPerA*v,
                 i.resistanceOhm*a*a,i.supplyVoltageV*a,ke,pe,magnetic,
-                supplied+initialEnergy-ke-pe-magnetic-dissipated))
+                supplied+initialEnergy-ke-pe-magnetic-dissipated,supplied,dissipated))
             if(n==steps)break
             val next=step(state,i,dt,true)
             val c2=next[2];val v2=next[1]
@@ -106,5 +114,60 @@ object NativeWorldLabActuator {
             state=next
         }
         return NativeActuatorResult(output,dt)
+    }
+
+    /**
+     * Step-halving and energy bookkeeping audit of this specific local 1D
+     * reference model. Internal numerical consistency is not measured proof.
+     */
+    fun numericalAudit(input:NativeActuatorInput,run:NativeActuatorResult):NativeActuatorNumericalAudit {
+        require(run.modelVersion=="1.0.0" && run.samples.size>=2 &&
+            run.stepSeconds.isFinite() && run.stepSeconds>0) {
+            "A completed native actuator trajectory is required"
+        }
+        val start=run.samples.first()
+        val initial=start.kineticEnergyJ+start.gravityEnergyJ+start.magneticEnergyJ
+        var worstEnergy=0.0
+        for(s in run.samples) {
+            require(listOf(s.energyResidualJ,s.suppliedEnergyJ,s.dissipatedEnergyJ,
+                s.kineticEnergyJ,s.gravityEnergyJ,s.magneticEnergyJ).all{it.isFinite()}) {
+                "Non-finite native actuator energy evidence"
+            }
+            val scale=maxOf(1.0,abs(initial)+abs(s.suppliedEnergyJ),
+                abs(s.kineticEnergyJ)+abs(s.gravityEnergyJ)+abs(s.magneticEnergyJ)+
+                    abs(s.dissipatedEnergyJ))
+            worstEnergy=max(worstEnergy,abs(s.energyResidualJ)/scale)
+        }
+        val half=run.stepSeconds/2
+        if(half<0.0001) return NativeActuatorNumericalAudit(
+            "unavailable",null,worstEnergy,
+            "The local solver cannot verify a halved step at this resolution."
+        )
+        val refined=try {evaluate(input,half)}
+            catch(_:IllegalArgumentException) {
+                return NativeActuatorNumericalAudit(
+                    "unavailable",null,worstEnergy,
+                    "The reference solver cannot complete a bounded half-step run."
+                )
+            }
+        var worstState=0.0
+        for(s in run.samples) {
+            val index=(s.timeSeconds/refined.stepSeconds).roundToInt()
+                .coerceIn(0,refined.samples.lastIndex)
+            val f=refined.samples[index]
+            val dHeight=abs(s.heightM-f.heightM)/maxOf(1.0,abs(s.heightM),abs(f.heightM))
+            val dCurrent=abs(s.currentA-f.currentA)/maxOf(1.0,abs(s.currentA),abs(f.currentA))
+            require(dHeight.isFinite()&&dCurrent.isFinite()) {
+                "Non-finite native actuator step comparison"
+            }
+            worstState=maxOf(worstState,dHeight,dCurrent)
+        }
+        val okay=worstState<=0.01 && worstEnergy<=0.02
+        return NativeActuatorNumericalAudit(
+            if(okay)"within-internal-tolerance" else "outside-internal-tolerance",
+            worstState,worstEnergy,
+            if(okay)"Internal numerical thresholds met; assumed materials are not verified."
+            else "Numerical thresholds exceeded; this trajectory needs review."
+        )
     }
 }

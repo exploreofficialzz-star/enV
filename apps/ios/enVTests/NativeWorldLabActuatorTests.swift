@@ -11,6 +11,22 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         XCTAssertTrue(result.samples.contains(where:{$0.resistiveHeatW>0 && $0.motorForceN>0}))
         XCTAssertTrue(result.samples.allSatisfy({$0.heightM>=0 && $0.energyResidualJ.isFinite}))
     }
+    func testNativeActuatorSelfAuditHasReproducibleEnergyChecks() throws {
+        var zero=NativeActuatorInput(massKg:1)
+        zero.supplyVoltageV=0
+        let stationary=try NativeWorldLabActuator.evaluate(zero)
+        let audit=try NativeWorldLabActuator.numericalAudit(zero,stationary)
+        XCTAssertEqual(audit.status,"within-internal-tolerance")
+        XCTAssertEqual(audit.maximumEnergyResidualFraction,0)
+        XCTAssertEqual(audit.maximumRelativeStateDifference,0)
+
+        let powered=NativeActuatorInput(massKg:1)
+        let run=try NativeWorldLabActuator.evaluate(powered)
+        let result=try NativeWorldLabActuator.numericalAudit(powered,run)
+        XCTAssertNotEqual(result.status,"unavailable")
+        XCTAssertTrue(result.maximumEnergyResidualFraction.isFinite)
+        XCTAssertNotNil(result.maximumRelativeStateDifference)
+    }
     func testUnpoweredActuatorCannotInventMotion() throws {
         var input=NativeActuatorInput(massKg:1)
         input.supplyVoltageV=0

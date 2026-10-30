@@ -27,6 +27,7 @@ import com.chastech.env.engine.NativeDropResult
 import com.chastech.env.engine.NativeWorldLabDropScience
 import com.chastech.env.engine.NativeActuatorInput
 import com.chastech.env.engine.NativeActuatorResult
+import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
 import kotlin.math.PI
 import java.io.ByteArrayOutputStream
@@ -65,6 +66,7 @@ fun NativeWorldLabForm() {
     var dropPlaying by remember { mutableStateOf(false) }
     var dropSpeed by remember { mutableFloatStateOf(1f) }
     var motorResult by remember { mutableStateOf<NativeActuatorResult?>(null) }
+    var motorAudit by remember { mutableStateOf<NativeActuatorNumericalAudit?>(null) }
     var motorEntityId by remember { mutableStateOf<String?>(null) }
     var motorFrame by remember { mutableIntStateOf(0) }
     var motorPlaying by remember { mutableStateOf(false) }
@@ -371,7 +373,9 @@ fun NativeWorldLabForm() {
                     }) { Text("Drop this solid") }
                     OutlinedButton(onClick={
                         runCatching {
-                            val result=NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=derivedMass))
+                            val input=NativeActuatorInput(massKg=derivedMass)
+                            val result=NativeWorldLabActuator.evaluate(input)
+                            motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
                             motorResult=result;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
                             dropPlaying=false;playing=false;warning=""
                         }.onFailure{warning=it.message?:"This powered mechanism is outside the local solver limits."}
@@ -394,6 +398,9 @@ fun NativeWorldLabForm() {
                         Text("Back-EMF: "+labNumber(sample.backEmfV)+" V")
                         Text("Coil heating: "+labNumber(sample.resistiveHeatW)+" W")
                         Text("Energy balance residual: "+labNumber(sample.energyResidualJ)+" J")
+                        motorAudit?.let { audit ->
+                            Text("Numerical self-check: "+audit.status+". "+audit.explanation)
+                        }
                         Slider(value=motorFrame.toFloat(),onValueChange={
                             motorPlaying=false;motorFrame=it.toInt().coerceIn(0,run.samples.lastIndex)
                         },valueRange=0f..run.samples.lastIndex.toFloat(),

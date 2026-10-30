@@ -46,6 +46,7 @@ struct NativeWorldLabView:View {
     @State private var dropPlaying=false
     @State private var dropSpeed=1.0
     @State private var motorRun:NativeActuatorResult?
+    @State private var motorAudit:NativeActuatorNumericalAudit?
     @State private var motorEntityId:String?
     @State private var motorTime=0.0
     @State private var motorPlaying=false
@@ -248,8 +249,10 @@ struct NativeWorldLabView:View {
                             }.buttonStyle(.bordered)
                             Button("Power this solid"){
                                 do {
-                                    motorRun=try NativeWorldLabActuator.evaluate(
-                                        NativeActuatorInput(massKg:derived))
+                                    let input=NativeActuatorInput(massKg:derived)
+                                    let result=try NativeWorldLabActuator.evaluate(input)
+                                    motorAudit=try NativeWorldLabActuator.numericalAudit(input,result)
+                                    motorRun=result
                                     motorEntityId=solid.id;motorTime=0;motorPlaying=true
                                     dropPlaying=false;playing=false;problem=""
                                     applyMotorPosition()
@@ -265,6 +268,10 @@ struct NativeWorldLabView:View {
                                 value("Back-EMF",sample.backEmfV,"V")
                                 value("Resistance heating",sample.resistiveHeatW,"W")
                                 value("Energy balance residual",sample.energyResidualJ,"J")
+                                if let audit=motorAudit {
+                                    Text("Numerical self-check: \(audit.status). \(audit.explanation)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                                 Slider(value:$motorTime,in:0...(run.samples.last?.timeSeconds ?? 4))
                                     .accessibilityLabel("Motor simulated time")
                                 HStack {
