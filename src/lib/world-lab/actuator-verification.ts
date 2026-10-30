@@ -39,29 +39,30 @@ function energyResidualFraction(sample: ActuatorSample, initialEnergyJ: number):
   const kinetic = sample.kineticEnergyJ;
   const potential = sample.gravitationalEnergyJ;
   const magnetic = sample.magneticEnergyJ;
+  const thermal = sample.thermalEnergyJ ?? 0;
   const supply = sample.suppliedEnergyJ;
   const dissipation = sample.dissipatedEnergyJ;
   const residual = sample.energyResidualJ;
-  if (![kinetic, potential, magnetic, supply, dissipation, residual]
+  if (![kinetic, potential, magnetic, thermal, supply, dissipation, residual]
     .every(Number.isFinite)) {
     throw new Error("The actuator numerical audit found a non-finite energy value.");
   }
   const scale = Math.max(1, Math.abs(initialEnergyJ) + Math.abs(supply),
-    Math.abs(kinetic) + Math.abs(potential) + Math.abs(magnetic) +
+    Math.abs(kinetic) + Math.abs(potential) + Math.abs(magnetic) + Math.abs(thermal) +
       Math.abs(dissipation));
   return Math.abs(residual) / scale;
 }
 
 export function verifyActuatorNumerics(run: ActuatorRun): ActuatorNumericalAudit {
   if (run?.format !== "env-world-lab-actuator-run" ||
-      run.modelVersion !== "1.0.0" ||
+      (run.modelVersion !== "1.0.0" && run.modelVersion !== "1.1.0") ||
       !Array.isArray(run.samples) || run.samples.length < 2 ||
       !(Number.isFinite(run.solverStepSeconds) && run.solverStepSeconds > 0)) {
     throw new Error("A completed, versioned actuator calculation is required.");
   }
   const initial = run.samples[0];
   const initialEnergyJ = initial.kineticEnergyJ +
-    initial.gravitationalEnergyJ + initial.magneticEnergyJ;
+    initial.gravitationalEnergyJ + initial.magneticEnergyJ + (initial.thermalEnergyJ ?? 0);
   let maximumEnergyResidualFraction = 0;
   for (const point of run.samples) {
     maximumEnergyResidualFraction = Math.max(maximumEnergyResidualFraction,

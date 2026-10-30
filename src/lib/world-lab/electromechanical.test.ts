@@ -89,3 +89,30 @@ test("uncoupled coil agrees with closed-form R-L current at one second",()=>{
   assert.equal(sampleActuator(r,1).heightM,0);
   assert.ok(sampleActuator(r,1).resistiveHeatW>0);
 });
+
+
+test("electrical heating drives resistance and current feedback with energy bookkeeping",()=>{
+  const d=deriveActuatorInput(fixture(),"item",{
+    supplyVoltageV:24, forceConstantNPerA:8,
+    thermal:{initialTemperatureK:293.15,ambientTemperatureK:293.15,
+      heatCapacityJPerK:80,coolingWPerK:0.3,resistanceTemperatureCoefficientPerK:0.004},
+  });
+  const hot=runActuatorExperiment(d.input,d.source);
+  const reference=runActuatorExperiment({...d.input,thermal:undefined},d.source);
+  assert.equal(hot.modelVersion,"1.1.0");
+  assert.equal(reference.modelVersion,"1.0.0");
+  assert.equal(hot.samples[0].coilTemperatureK,293.15);
+  assert.ok(hot.samples.at(-1)!.coilTemperatureK!>293.15);
+  assert.ok(hot.samples.at(-1)!.coilResistanceOhm!>d.input.resistanceOhm);
+  assert.ok(hot.samples.some(x=>(x.thermalEnergyJ??0)>0&&(x.coolingPowerW??0)>0));
+  assert.notEqual(hot.samples.at(-1)!.coilCurrentA,reference.samples.at(-1)!.coilCurrentA);
+  assert.ok(hot.samples.every(x=>Number.isFinite(x.energyResidualJ)));
+});
+test("inventor thermal assumptions reject missing or impossible values",()=>{
+  const d=deriveActuatorInput(fixture(),"item");
+  const t={initialTemperatureK:293.15,ambientTemperatureK:293.15,
+    heatCapacityJPerK:80,coolingWPerK:0.3,resistanceTemperatureCoefficientPerK:0.004};
+  assert.throws(()=>runActuatorExperiment({...d.input,thermal:{...t,heatCapacityJPerK:0}},d.source),/Heat capacity/);
+  assert.throws(()=>runActuatorExperiment({...d.input,thermal:{...t,initialTemperatureK:NaN}},d.source),/Initial coil/);
+  assert.throws(()=>runActuatorExperiment({...d.input,thermal:{...t,resistanceTemperatureCoefficientPerK:-0.01}},d.source),/Temperature coefficient/);
+});

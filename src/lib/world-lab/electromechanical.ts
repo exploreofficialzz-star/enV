@@ -6,6 +6,13 @@ import { parseWorldLabProject, solidQuantities, type WorldLabProject } from "./p
  * Coupling uses k [N/A] == [V s/m] in SI, so electrical and mechanical power
  * exchange k*i*v, not separate invented forces or animations.
  */
+export type ActuatorThermalInput = Readonly<{
+  initialTemperatureK: number;
+  ambientTemperatureK: number;
+  heatCapacityJPerK: number;
+  coolingWPerK: number;
+  resistanceTemperatureCoefficientPerK: number;
+}>;
 export type ActuatorInput = Readonly<{
   massKg: number;
   gravityMps2: number;
@@ -16,6 +23,7 @@ export type ActuatorInput = Readonly<{
   forceConstantNPerA: number;
   dampingNsPerM: number;
   durationSeconds: number;
+  thermal?: ActuatorThermalInput;
 }>;
 export type ActuatorSource = Readonly<{
   projectId: string;
@@ -34,6 +42,10 @@ export type ActuatorSample = Readonly<{
   motorForceN: number;
   sourcePowerW: number;
   resistiveHeatW: number;
+  coilResistanceOhm?: number;
+  coilTemperatureK?: number | null;
+  thermalEnergyJ?: number;
+  coolingPowerW?: number;
   kineticEnergyJ: number;
   gravitationalEnergyJ: number;
   magneticEnergyJ: number;
@@ -45,7 +57,7 @@ export type ActuatorSample = Readonly<{
 export type ActuatorRun = Readonly<{
   format: "env-world-lab-actuator-run";
   schemaVersion: 1;
-  modelVersion: "1.0.0";
+  modelVersion: "1.0.0" | "1.1.0";
   evidence: "physics-model-computed";
   validity: string;
   source: ActuatorSource;
@@ -68,6 +80,18 @@ export function validateActuatorInput(i: ActuatorInput): void {
   finiteRange(i.forceConstantNPerA,"Actuator constant",0,10000);
   finiteRange(i.dampingNsPerM,"Mechanical damping",0,100000);
   finiteRange(i.durationSeconds,"Duration",0.1,12);
+  if(i.thermal!==undefined){
+    const t=i.thermal;
+    if(!t || typeof t!=="object")throw new Error("Missing thermal parameters.");
+    finiteRange(t.initialTemperatureK,"Initial coil temperature",1,1500);
+    finiteRange(t.ambientTemperatureK,"Ambient temperature",1,1500);
+    finiteRange(t.heatCapacityJPerK,"Heat capacity",1,1000000);
+    finiteRange(t.coolingWPerK,"Cooling conductance",0,10000);
+    finiteRange(t.resistanceTemperatureCoefficientPerK,"Temperature coefficient",0,0.02);
+    if(i.resistanceOhm*(1+t.resistanceTemperatureCoefficientPerK*
+      (t.initialTemperatureK-t.ambientTemperatureK))<0.01)
+      throw new Error("Initial temperature-dependent resistance is too low.");
+  }
 }
 export function deriveActuatorInput(
   raw: WorldLabProject, entityId: string,
@@ -94,35 +118,43 @@ export function deriveActuatorInput(
     inputEvidence:"hypothetical-user-assumed",
   }};
 }
-type State=readonly [height:number,velocity:number,current:number];
+type State=readonly [height:number,velocity:number,current:number,temperature:number];
+const resistanceAt=(input:ActuatorInput,t:number):number=>input.resistanceOhm*
+  (1+(input.thermal?.resistanceTemperatureCoefficientPerK??0)*
+    (t-(input.thermal?.ambientTemperatureK??293.15)));
 function derivative(s:State,i:ActuatorInput):State {
-  const [height,velocity,current]=s;
-  // A resting solid at the unilateral ground stop cannot penetrate into
-  // negative height and generate fictitious motion-induced electrical current.
-  if(height<=0 && velocity<=0 && i.forceConstantNPerA*current<=i.massKg*i.gravityMps2)
-    return [0,0,(i.supplyVoltageV-i.resistanceOhm*current)/i.inductanceH];
-  return [velocity,
-    (i.forceConstantNPerA*current-i.dampingNsPerM*velocity)/i.massKg-i.gravityMps2,
-    (i.supplyVoltageV-i.resistanceOhm*current-i.forceConstantNPerA*velocity)/i.inductanceH];
+  const [h,v,c,t]=s;
+  const r=resistanceAt(i,t);
+  const heat=r*c*c;
+  const cooling=i.thermal?i.thermal.coolingWPerK*(t-i.thermal.ambientTemperatureK):0;
+  const thermalRate=i.thermal?(heat-cooling)/i.thermal.heatCapacityJPerK:0;
+  if(h<=0&&v<=0&&i.forceConstantNPerA*c<=i.massKg*i.gravityMps2)
+    return [0,0,(i.supplyVoltageV-r*c)/i.inductanceH,thermalRate];
+  return [v,
+    (i.forceConstantNPerA*c-i.dampingNsPerM*v)/i.massKg-i.gravityMps2,
+    (i.supplyVoltageV-r*c-i.forceConstantNPerA*v)/i.inductanceH,thermalRate];
 }
-function advance(s:State,i:ActuatorInput,dt:number):State {
+function rkAdvance(s:State,i:ActuatorInput,dt:number):State {
   const k1=derivative(s,i);
   const mid=(k:State,f:number):State=>[
-    s[0]+dt*k[0]*f,s[1]+dt*k[1]*f,s[2]+dt*k[2]*f,
+    s[0]+dt*k[0]*f,s[1]+dt*k[1]*f,s[2]+dt*k[2]*f,s[3]+dt*k[3]*f,
   ];
-  const k2=derivative(mid(k1,0.5),i);
-  const k3=derivative(mid(k2,0.5),i);
+  const k2=derivative(mid(k1,0.5),i),k3=derivative(mid(k2,0.5),i);
   const k4=derivative(mid(k3,1),i);
-  let h=s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6;
-  let v=s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6;
-  const c=s[2]+dt*(k1[2]+2*k2[2]+2*k3[2]+k4[2])/6;
-  // Resting contact is unilateral; the flat stop absorbs downward energy.
-  if(h<0 || (h===0 && v<0)){h=0;v=0;}
-  return [h,v,c];
+  return [
+    s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
+    s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6,
+    s[2]+dt*(k1[2]+2*k2[2]+2*k3[2]+k4[2])/6,
+    s[3]+dt*(k1[3]+2*k2[3]+2*k3[3]+k4[3])/6,
+  ];
+}
+function advance(s:State,i:ActuatorInput,dt:number):State {
+  const raw=rkAdvance(s,i,dt);
+  if(raw[0]<0 || (raw[0]===0&&raw[1]<0))return [0,0,raw[2],raw[3]];
+  return raw;
 }
 export function runActuatorExperiment(
-  input:ActuatorInput,source:ActuatorSource,
-  requestedStepSeconds=1/240,
+  input:ActuatorInput,source:ActuatorSource,requestedStepSeconds=1/240,
 ):ActuatorRun {
   validateActuatorInput(input);
   if(!source || source.inputEvidence!=="hypothetical-user-assumed" ||
@@ -134,73 +166,73 @@ export function runActuatorExperiment(
     throw new Error("A valid, revisioned inventor/material source is required.");
   finiteRange(requestedStepSeconds,"Solver step",0.0001,0.05);
   const frequency=Math.abs(input.forceConstantNPerA)/Math.sqrt(input.inductanceH*input.massKg);
+  const thermalRate=input.thermal?input.thermal.coolingWPerK/input.thermal.heatCapacityJPerK:0;
   const rate=Math.max(1,input.resistanceOhm/input.inductanceH,
-    input.dampingNsPerM/input.massKg,frequency);
+    input.dampingNsPerM/input.massKg,frequency,thermalRate);
   const n=Math.ceil(input.durationSeconds/Math.min(requestedStepSeconds,0.06/rate));
   if(n>50000)throw new Error("The model requires a specialized stiff solver; reduce the coupling or change parameters.");
   const dt=input.durationSeconds/n;
-  const samples:ActuatorSample[]=[];
-  let state:State=[input.initialHeightM,0,0];
-  let supplyEnergy=0;
-  let dissipatedEnergy=0;
+  const initialTemp=input.thermal?.initialTemperatureK??293.15;
+  let state:State=[input.initialHeightM,0,0,initialTemp];
+  let supplied=0,dissipated=0;
   const initialEnergy=input.massKg*input.gravityMps2*state[0];
+  const samples:ActuatorSample[]=[];
   for(let j=0;j<=n;j++){
-    const [h,v,c]=state;
+    const [h,v,c,t]=state;
+    const r=resistanceAt(input,t);
     const sourcePower=input.supplyVoltageV*c;
-    const heat=input.resistanceOhm*c*c;
-    const dissipative=input.dampingNsPerM*v*v;
-    const ke=0.5*input.massKg*v*v;
-    const pe=input.massKg*input.gravityMps2*h;
+    const heat=r*c*c;
+    const cooling=input.thermal?input.thermal.coolingWPerK*(t-input.thermal.ambientTemperatureK):0;
+    const ke=0.5*input.massKg*v*v,pe=input.massKg*input.gravityMps2*h;
     const magnetic=0.5*input.inductanceH*c*c;
-    const e=ke+pe+magnetic;
-    const error=supplyEnergy+initialEnergy-e-dissipatedEnergy;
-    if(![h,v,c,e,supplyEnergy,dissipatedEnergy].every(Number.isFinite) ||
-      Math.abs(c)>1e7 || Math.abs(v)>1e5 || h>1e5)
-      throw new Error("The actuator left the supported numerical stability envelope.");
+    const thermalEnergy=input.thermal?input.thermal.heatCapacityJPerK*(t-initialTemp):0;
+    const energy=ke+pe+magnetic+thermalEnergy;
+    const residual=supplied+initialEnergy-energy-dissipated;
+    if(![h,v,c,t,r,energy,supplied,dissipated,residual].every(Number.isFinite) ||
+      r<0.01||r>1e6||t<1||t>2000||Math.abs(c)>1e7||Math.abs(v)>1e5||h>1e5)
+      throw new Error("The coupled actuator left its supported numerical or thermal envelope.");
     samples.push(Object.freeze({
       timeSeconds:j*dt,heightM:h,velocityMps:v,coilCurrentA:c,
       backEmfV:input.forceConstantNPerA*v,motorForceN:input.forceConstantNPerA*c,
       sourcePowerW:sourcePower,resistiveHeatW:heat,
+      ...(input.thermal?{coilResistanceOhm:r,coilTemperatureK:t,
+        thermalEnergyJ:thermalEnergy,coolingPowerW:cooling}:{}),
       kineticEnergyJ:ke,gravitationalEnergyJ:pe,magneticEnergyJ:magnetic,
-      suppliedEnergyJ:supplyEnergy,dissipatedEnergyJ:dissipatedEnergy,
-      energyResidualJ:error,grounded:h===0 && v===0,
+      suppliedEnergyJ:supplied,dissipatedEnergyJ:dissipated,
+      energyResidualJ:residual,grounded:h===0&&v===0,
     }));
     if(j===n)break;
     const next=advance(state,input,dt);
-    const [h2,v2,c2]=next;
-    supplyEnergy+=0.5*dt*input.supplyVoltageV*(c+c2);
-    dissipatedEnergy+=0.5*dt*(heat+input.resistanceOhm*c2*c2+
-      dissipative+input.dampingNsPerM*v2*v2);
-    // Ground stop is perfectly inelastic. Its impact losses are non-recoverable.
-    if(h2===0 && v2===0 && (h>0 || v<0)) {
-      // Estimate unprojected end-of-step kinetic energy (may include
-      // a tiny discretization error near contact).
-      const raw=advanceUnclamped(state,input,dt);
-      if(raw[1]<0)dissipatedEnergy+=0.5*input.massKg*raw[1]*raw[1];
+    const [h2,v2,c2,t2]=next;
+    const r2=resistanceAt(input,t2);
+    const heat2=r2*c2*c2;
+    const cooling2=input.thermal?input.thermal.coolingWPerK*(t2-input.thermal.ambientTemperatureK):0;
+    supplied+=0.5*dt*input.supplyVoltageV*(c+c2);
+    const loss1=input.dampingNsPerM*v*v+(input.thermal?cooling:heat);
+    const loss2=input.dampingNsPerM*v2*v2+(input.thermal?cooling2:heat2);
+    dissipated+=0.5*dt*(loss1+loss2);
+    if(h2===0&&v2===0&&(h>0||v<0)){
+      const raw=rkAdvance(state,input,dt);
+      if(raw[1]<0)dissipated+=0.5*input.massKg*raw[1]*raw[1];
     }
     state=next;
   }
   return Object.freeze({
     format:"env-world-lab-actuator-run" as const,schemaVersion:1 as const,
-    modelVersion:"1.0.0" as const,evidence:"physics-model-computed" as const,
-    source:Object.freeze({...source}),input:Object.freeze({...input}),
+    modelVersion:input.thermal?"1.1.0" as const:"1.0.0" as const,
+    evidence:"physics-model-computed" as const,
+    source:Object.freeze({...source}),input:Object.freeze({...input,
+      ...(input.thermal?{thermal:Object.freeze({...input.thermal})}:{})}),
     samples:Object.freeze(samples),solverStepSeconds:dt,
-    validity:"Bounded 1D R-L electromagnetic actuator with speed-induced back-EMF, " +
-      "gravity, linear damping and flat inelastic ground. Force constant, material density, " +
-      "electrical parameters and geometry are user assumptions. No motor saturation, " +
-      "thermal material change, rotating parts, 3D stability, certified performance or flight.",
+    validity:input.thermal
+      ?"Bounded 1D voltage-current-motion-temperature coupling. Coil heat raises a " +
+        "single assumed thermal mass, cooling removes energy, and temperature changes " +
+        "electrical resistance and therefore force. No thermal gradients, insulation " +
+        "breakdown, real material identification, melting, motor saturation or certification."
+      :"Bounded 1D R-L actuator with speed-induced back-EMF, gravity, damping and flat " +
+        "inelastic ground. All values are user assumptions. No thermal material " +
+        "change, rotating parts, structural certification, 3D stability or flight.",
   });
-}
-function advanceUnclamped(s:State,i:ActuatorInput,dt:number):State {
-  const k1=derivative(s,i);
-  const mid=(k:State,f:number):State=>[s[0]+dt*k[0]*f,s[1]+dt*k[1]*f,s[2]+dt*k[2]*f];
-  const k2=derivative(mid(k1,0.5),i),k3=derivative(mid(k2,0.5),i);
-  const k4=derivative(mid(k3,1),i);
-  return [
-    s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
-    s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6,
-    s[2]+dt*(k1[2]+2*k2[2]+2*k3[2]+k4[2])/6,
-  ];
 }
 export function sampleActuator(run:ActuatorRun,t:number):ActuatorSample {
   finiteRange(t,"Actuator time",0,run.input.durationSeconds);

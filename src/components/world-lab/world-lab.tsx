@@ -102,6 +102,9 @@ export default function WorldLab() {
   const [actuatorRate, setActuatorRate] = useState(1);
   const [actuatorVoltage, setActuatorVoltage] = useState(24);
   const [actuatorConstant, setActuatorConstant] = useState(8);
+  const [actuatorHeatEnabled,setActuatorHeatEnabled] = useState(false);
+  const [coilHeatCapacity,setCoilHeatCapacity] = useState(80);
+  const [coilCooling,setCoilCooling] = useState(0.3);
   const importInput = useRef<HTMLInputElement>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
@@ -595,6 +598,9 @@ export default function WorldLab() {
       const derived=deriveActuatorInput(project,selectedEntity.id,{
         supplyVoltageV:actuatorVoltage,
         forceConstantNPerA:actuatorConstant,
+        ...(actuatorHeatEnabled?{thermal:{initialTemperatureK:293.15,
+          ambientTemperatureK:293.15,heatCapacityJPerK:coilHeatCapacity,
+          coolingWPerK:coilCooling,resistanceTemperatureCoefficientPerK:0.004}}:{}),
       });
       const result=runActuatorExperiment(derived.input,derived.source);
       const numericalAudit=verifyActuatorNumerics(result);
@@ -951,6 +957,27 @@ export default function WorldLab() {
                     moves your object and generates back-EMF and resistance heat. The same equations exchange
                     energy between the electrical and physical systems.
                   </p>
+                  <label className="mt-2 flex items-center gap-2 text-xs">
+                    <input aria-label="Include coil heating feedback" type="checkbox"
+                      checked={actuatorHeatEnabled} onChange={e=>{setActuatorHeatEnabled(e.target.checked);setActuatorRun(null);setActuatorPlaying(false);setActuatorAudit(null);}} />
+                    Include calculated coil heating and resistance feedback
+                  </label>
+                  {actuatorHeatEnabled && <details className="mt-2">
+                    <summary className="cursor-pointer text-xs">Adjust thermal assumptions</summary>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs">Coil heat capacity (J/K)
+                        <input aria-label="Coil heat capacity" type="number" className={inputLabel}
+                          min={1} max={1000000} value={coilHeatCapacity}
+                          onChange={e=>{setCoilHeatCapacity(Number(e.target.value));setActuatorRun(null);setActuatorPlaying(false);}} />
+                      </label>
+                      <label className="text-xs">Cooling (W/K)
+                        <input aria-label="Coil cooling conductance" type="number" className={inputLabel}
+                          min={0} max={10000} step={0.1} value={coilCooling}
+                          onChange={e=>{setCoilCooling(Number(e.target.value));setActuatorRun(null);setActuatorPlaying(false);}} />
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">These are hypothetical thermal properties, not measurements.</p>
+                  </details>}
                   <details className="mt-2">
                     <summary className="cursor-pointer text-xs">Adjust electrical power and force</summary>
                     <div className="mt-2 grid grid-cols-2 gap-2">
@@ -981,6 +1008,12 @@ export default function WorldLab() {
                         <div><dt>Upward force</dt><dd>{actuatorSample.motorForceN.toFixed(3)} N</dd></div>
                         <div><dt>Back-EMF</dt><dd>{actuatorSample.backEmfV.toFixed(3)} V</dd></div>
                         <div><dt>Coil heat</dt><dd>{actuatorSample.resistiveHeatW.toFixed(3)} W</dd></div>
+                        {actuatorSample.coilTemperatureK !== undefined && actuatorSample.coilTemperatureK !== null && <>
+                          <div><dt>Coil temperature</dt><dd>{actuatorSample.coilTemperatureK.toFixed(2)} K</dd></div>
+                          <div><dt>Hot resistance</dt><dd>{actuatorSample.coilResistanceOhm?.toFixed(3)} Ω</dd></div>
+                          <div><dt>Stored coil heat</dt><dd>{actuatorSample.thermalEnergyJ?.toFixed(3)} J</dd></div>
+                          <div><dt>Cooling loss</dt><dd>{actuatorSample.coolingPowerW?.toFixed(3)} W</dd></div>
+                        </>}
                         <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
                       </dl>
                       {actuatorAudit && (
