@@ -9,7 +9,10 @@ const arg = (name, fallback) => process.argv.find((value) => value.startsWith(`-
 const baseUrl = arg("base-url", "http://127.0.0.1:8080").replace(/\/$/, "");
 const reportPath = arg("report", path.join(root, "qa-results/qr-barcode-reader-audit.json"));
 const browserPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || "/usr/bin/chromium";
-const browser = await chromium.launch({ headless: true, executablePath: browserPath, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+const launchOptions = { headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] };
+if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+else if (fs.existsSync(browserPath)) launchOptions.executablePath = browserPath;
+const browser = await chromium.launch(launchOptions);
 const page = await browser.newPage({ viewport: { width: 412, height: 915 }, permissions: [] });
 const pageErrors = [];
 page.on("pageerror", (error) => pageErrors.push(error.message));
