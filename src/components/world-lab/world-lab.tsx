@@ -11,6 +11,7 @@ import {
   type WorldLabObject, type WorldLabProject,
 } from "@/lib/world-lab/model";
 import { loadWorldLabProjects, saveWorldLabProject } from "@/lib/world-lab/storage";
+import { convertLegacyScene } from "@/lib/world-lab/legacy";
 import { WorldLabViewer } from "./viewer";
 import "./world-lab.css";
 
@@ -157,13 +158,21 @@ export default function WorldLabStudio() {
     if (!file) return;
     if (file.size > 1024 * 1024) { setError("Project file exceeds the 1 MB safety limit."); return; }
     try {
-      const imported = validateWorldLabProject(JSON.parse(await file.text()));
+      const input = JSON.parse(await file.text()) as unknown;
+      const imported = (input !== null && typeof input === "object" && "format" in input && input.format === "env-3d-game")
+        ? (() => {
+            const converted = convertLegacyScene(input);
+            if (!window.confirm("This is an old Artboard scene. Imported models, gameplay and unsupported details cannot be silently converted. Review:\n\n" + converted.warnings.join("\n") + "\n\nImport the supported shapes as static objects? Your original remains unchanged.")) return null;
+            return converted.project;
+          })()
+        : validateWorldLabProject(input);
+      if (!imported) return;
       setPlaying(false);
       setProject(imported);
       baseline.current = imported;
       history.current = [];
       setSelected("");
-      setNotice("World Lab project imported. Review all assumed parameters before testing.");
+      setNotice("Project imported without modifying its source. Review the assumed material properties before testing.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The file is not a valid World Lab project.");
     }
