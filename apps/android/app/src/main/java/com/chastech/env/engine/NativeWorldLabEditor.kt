@@ -67,6 +67,13 @@ object NativeWorldLabEditor {
         source:String,name:String,densityKgM3:Double?,youngModulusPa:Double?=null,
         id:String=UUID.randomUUID().toString()
     ):String = edit(source){project->
+        require(name.isNotBlank() && name.length<=120){"Hypothetical material needs a name."}
+        require(densityKgM3==null || densityKgM3.isFinite() && densityKgM3 in 0.001..1e9){
+            "Assumed density is outside the supported finite domain."
+        }
+        require(youngModulusPa==null || youngModulusPa.isFinite() && youngModulusPa in 0.0..1e15){
+            "Assumed modulus is outside the supported finite domain."
+        }
         val array=project.getJSONArray("materials")
         require(array.length()<100){"Only 100 materials can be stored."}
         require((0 until array.length()).none {array.getJSONObject(it).getString("id")==id}){"Duplicate material ID"}
