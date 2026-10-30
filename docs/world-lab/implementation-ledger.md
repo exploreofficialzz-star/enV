@@ -243,3 +243,8 @@ release-candidate evidence bundle are unfinished.
 ## Native invented-device authoring and cross-domain preservation (2026-10-30)
 
 - Android Compose and SwiftUI now let users create a named, explicitly hypothetical electrical component, enter a descriptive assumption, and optionally supply equivalent resistance. Native project editors validate bounds and preserve owner-local portable records; platform-native solver tests cover absent/assumed laws and conservation. Web motor path also avoids deriving identical source assumptions twice. No scientific certification, platform CI or release readiness is claimed.
+
+## Auth-gated server calculation entry point (2026-10-30)
+
+- Added a disabled-by-default `POST /api/world-lab/calculate` Nitro endpoint requiring **real better-auth session**; never uses shared `dev-user` fallback. Requires configured auth and `WORLD_LAB_SERVER_COMPUTE_ENABLED=true`, canonical same-origin request, 64KB streamed JSON budget and <=2MB output. Handles supported hydrostatics, DC network and at most 2-second wired-motor reference calculation with strict bounded dispatch; project data is provided by owner each call and is not persisted, shared or loaded by guessed project IDs.
+- No persistent job queue, distributed quota, cancellation, retries, billing, streamed telemetry, solver isolation, durability, server observability, customer deployment or external advanced solver adapter exists. **This is not completed WP-06** and must remain disabled until security/performance/deployment checks and durable quota infrastructure are delivered. Unit/regression source is authored but not run per the explicit integration-first request.
