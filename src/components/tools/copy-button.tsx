@@ -20,9 +20,9 @@ export function CopyButton({
       size="sm"
       disabled={!text}
       onClick={async (event: MouseEvent<HTMLButtonElement>) => {
+        const root = event.currentTarget.closest<HTMLElement>("[data-env-tool-id]");
         const success = await copyToClipboard(text);
         if (success) {
-          const root = event.currentTarget.closest<HTMLElement>("[data-env-tool-id]");
           const toolId = root?.dataset.envToolId;
           const startedAt = Number(root?.dataset.envToolStartedAt);
           if (toolId) {
