@@ -29,6 +29,7 @@ export function validateCommunityComment(value) {
   const visitorId = uuid(value.visitorId, "visitorId");
   const idempotencyKey = uuid(value.idempotencyKey, "idempotencyKey");
   const body = requiredText(value.body, "body", 1, 2000);
+  if (value.identityMode != null && value.identityMode !== "public" && value.identityMode !== "anonymous") throw new TypeError("identityMode must be public or anonymous.");
   const identityMode = value.identityMode === "public" ? "public" : "anonymous";
   let displayName = null;
   if (identityMode === "public") {
