@@ -57,6 +57,7 @@ object NativeEcommerceEngine {
             NativeEcommerceField("packaging", "Packaging / handling cost", "0"),
             NativeEcommerceField("feePercent", "Payment / platform fee (%)", "0"),
             NativeEcommerceField("advertising", "Advertising cost", "0"),
+            NativeEcommerceField("targetMargin", "Target margin (%)", "30"),
         )
         return when (parsed.workflow) {
             "calculator" -> when (parsed.family) {
@@ -90,6 +91,8 @@ object NativeEcommerceEngine {
             else -> common + listOf(NativeEcommerceField("notes", "What are you trying to do?", multiline = true))
         }
     }
+
+    fun initialValues(toolId: String): Map<String, String> = fieldsFor(toolId).associate { it.key to it.defaultValue }
 
     fun execute(toolId: String, values: Map<String, String>): NativeEcommerceResult {
         val parsed = parse(toolId)
