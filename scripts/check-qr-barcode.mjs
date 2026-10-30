@@ -68,6 +68,7 @@ assert.ok(androidBarcodeTests.includes("decodedLinksAllowOnlyHttpAndHttpsHosts")
 assert.ok(androidCommerce.includes("fun supports(tool: ToolRecord)") && androidCommerce.includes("fun execute("), "Android has its own native E-commerce engine");
 assert.ok(androidCommerce.includes("safetyStock") && androidCommerce.includes("feePercent") && androidCommerce.includes("targetMargin"), "Android commerce engine includes inventory safety and pricing economics");
 assert.ok(androidCommerce.includes('"pricing" -> common + finance.filter') && androidCommerce.includes('targetMargin + feePercent < 100'), "Android pricing exposes target margin and rejects impossible fee/margin combinations");
+assert.ok(androidCommerce.includes("minimum.isFinite()") && androidTests.includes("pricingCalculatorRejectsBreakEvenAtOneHundredPercentFees"), "Android pricing rejects an impossible break-even at 100% fees");
 assert.ok(androidCommerceForm.includes("ActivityResultContracts.CreateDocument") && androidCommerceForm.includes("openOutputStream(uri)") && androidCommerceForm.includes('Text("Save")'), "Android E-commerce results can be saved through the system document picker");
 assert.ok(androidTests.includes("pricingCalculatorExposesTargetMarginAndCalculatesFeeAwarePrice"), "Android tests target-margin pricing and form fields");
 assert.ok(androidTests.includes("Current selling price: 75.00"), "Android pricing test verifies current selling-price comparison");
@@ -77,6 +78,7 @@ assert.ok(iosReader.includes("quiet zone") && iosTests.includes("testVisionReade
 assert.ok(iosCommerce.includes("static func supports(_ tool: Tool)") && iosCommerce.includes("static func run("), "iOS has an independent native E-commerce engine");
 assert.ok(iosCommerce.includes("safetyStock") && iosCommerce.includes("feePercent") && iosCommerce.includes("targetMargin"), "iOS commerce engine includes inventory safety and pricing economics");
 assert.ok(iosCommerce.includes("Current selling price:") && iosTests.includes("testPricingCalculatorComparesCurrentAndTargetSellingPrice"), "iOS pricing exposes and tests current selling-price comparison");
+assert.ok(iosCommerce.includes("minimum.isFinite ? money(minimum)") && iosTests.includes("testPricingCalculatorReportsBreakEvenImpossibleAtOneHundredPercentFees"), "iOS pricing reports impossible break-even at 100% fees");
 assert.ok(iosTests.includes("testAllFiftyTwoQrAndBarcodeCatalogEntriesHaveNativeHandlers"), "iOS tests all 52 QR and barcode catalog handlers");
 assert.ok(iosProject.includes("NativeEcommerceEngine.swift in Sources") && iosProject.includes("NativeQrBarcodeAndEcommerceViews.swift in Sources") && iosProject.includes("NativeEcommerceEngineTests.swift in Sources"), "iOS native engine and test files are registered in Xcode");
 
