@@ -161,9 +161,15 @@ struct NativeWorldLabView:View {
             }catch{problem=error.localizedDescription}
         }
     }
-    private func value(_ name:String,_ amount:Double?,_ unit:String)->some View{
-        Text(name+": "+(amount.map{String(format:"%.5g",$0)} ?? "Unknown")+" "+unit)
-            .font(.subheadline)
+    private func value(_ name: String, _ amount: Double?, _ unit: String) -> some View {
+        let displayed: String
+        if let amount = amount {
+            displayed = String(format: "%.5g", amount)
+        } else {
+            displayed = "Unknown"
+        }
+        let caption = name + ": " + displayed + " " + unit
+        return Text(verbatim: caption).font(.subheadline)
     }
     private func redraw(){
         let next=SCNScene()
