@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
+import { hasDeveloperAdminSession } from "../developer-admin.server";
 import { validateUpdateAction, validateUpdateQuery } from "./protocol.mjs";
 
 export class UpdatesError extends Error {
@@ -29,7 +30,7 @@ function versionAtLeast(current: string, minimum: string) {
   return a.preRelease===null;
 }
 function requireAdmin(request: Request) {
-  if (!adminMatches(request)) throw new UpdatesError("UPDATES_ADMIN_UNAUTHORIZED","Developer update management access is required.",401);
+  if (!adminMatches(request) && !hasDeveloperAdminSession(request)) throw new UpdatesError("UPDATES_ADMIN_UNAUTHORIZED","Developer update management access is required.",401);
 }
 export async function listPublicUpdates(rawQuery: unknown) {
   enabled();
