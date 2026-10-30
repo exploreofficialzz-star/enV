@@ -150,7 +150,6 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
       if (tool.category === "streaming") return <StreamingEngine toolId={tool.id} />;
       if (tool.category === "marketing") return <MarketingEngine toolId={tool.id} />;
       if (tool.category === "webdesign") return <WebDesignEngine toolId={tool.id} />;
-      if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;
       if (tool.category === "career") return <CareerEngine toolId={tool.id} />;
       if (tool.category === "relationships") return <RelationshipEngine toolId={tool.id} />;
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
