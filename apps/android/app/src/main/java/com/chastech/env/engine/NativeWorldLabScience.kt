@@ -98,3 +98,83 @@ object NativeWorldLabScience {
         }
     }
 }
+
+
+/**
+ * Native Kotlin reference for an object dropped under gravity with quadratic
+ * air resistance and a flat-ground coefficient of restitution.
+ * Hypothetical material mass must be supplied from a separately validated project.
+ * This is NOT an object-object collision, rotation or fracture solver.
+ */
+data class NativeDropInput(
+    val massKg:Double,
+    val supportingHalfHeightM:Double,
+    val dropHeightM:Double=5.0,
+    val initialVelocityMps:Double=0.0,
+    val gravityMps2:Double=9.80665,
+    val airDensityKgM3:Double=1.225,
+    val projectedAreaM2:Double,
+    val dragCoefficient:Double=0.47,
+    val restitution:Double=0.3,
+    val durationSeconds:Double=6.0
+)
+data class NativeDropSample(
+    val timeSeconds:Double,
+    val heightAboveGroundM:Double,
+    val velocityMps:Double,
+    val kineticEnergyJ:Double,
+    val gravitationalEnergyJ:Double,
+    val grounded:Boolean
+)
+data class NativeDropResult(
+    val samples:List<NativeDropSample>,
+    val impactCount:Int,
+    val stepSeconds:Double,
+    val modelVersion:String="1.0.0",
+    val evidence:String="physics-model-computed",
+    val inputEvidence:String="hypothetical-user-assumed",
+    val validity:String="Bounded 1D centre-of-mass gravity, quadratic drag and flat-ground contact; no rotation or material failure."
+)
+object NativeWorldLabDropScience {
+    private fun valid(n:Double,min:Double,max:Double,label:String) {
+        require(n.isFinite()&&n>=min&&n<=max){"$label outside bounded scientific domain"}
+    }
+    fun evaluate(i:NativeDropInput, stepSeconds:Double=1.0/240):NativeDropResult {
+        valid(i.massKg,0.001,10000.0,"Mass")
+        valid(i.supportingHalfHeightM,0.0005,5000.0,"Half-height")
+        valid(i.dropHeightM,0.0,100.0,"Release height")
+        valid(i.initialVelocityMps,-100.0,100.0,"Velocity")
+        valid(i.gravityMps2,0.0,100.0,"Gravity")
+        valid(i.airDensityKgM3,0.0,100.0,"Air density")
+        valid(i.projectedAreaM2,0.000001,100000.0,"Projected area")
+        valid(i.dragCoefficient,0.0,3.0,"Drag coefficient")
+        valid(i.restitution,0.0,1.0,"Restitution")
+        valid(i.durationSeconds,0.01,20.0,"Duration")
+        valid(stepSeconds,0.001,1.0/30,"Step")
+        val steps=ceil(i.durationSeconds/stepSeconds).toInt()
+        require(steps<=20000){"Drop experiment exceeds local solver budget"}
+        val dt=i.durationSeconds/steps
+        val k=0.5*i.airDensityKgM3*i.dragCoefficient*i.projectedAreaM2/i.massKg
+        var height=i.dropHeightM
+        var v=i.initialVelocityMps
+        var impacts=0
+        val data=ArrayList<NativeDropSample>(steps+1)
+        for (n in 0..steps) {
+            data.add(NativeDropSample(n*dt,height,v,0.5*i.massKg*v*v,
+                i.massKg*i.gravityMps2*height,height==0.0&&v==0.0))
+            if(n==steps || (height==0.0&&v==0.0))continue
+            v+=(-i.gravityMps2-k*v*abs(v))*dt
+            require(v.isFinite()&&abs(v)<=10000.0){"Drop model exceeded stability envelope"}
+            height+=v*dt
+            if(height<=0.0) {
+                height=0.0
+                if(v<0.0) {
+                    impacts++
+                    v= -v*i.restitution
+                    if(v<max(0.025,i.gravityMps2*dt))v=0.0
+                }
+            }
+        }
+        return NativeDropResult(data,impacts,dt)
+    }
+}
