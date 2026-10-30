@@ -288,8 +288,11 @@ struct NativeWorldLabView:View {
                 let url=try response.get()
                 let accessed=url.startAccessingSecurityScopedResource()
                 defer{if accessed{url.stopAccessingSecurityScopedResource()}}
-                let length=try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0
-                guard length<=NativeWorldLabProject.maxBytes else {
+                // File-size metadata must be available and bounded before
+                // allocating memory for untrusted imported project contents.
+                let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+                guard let length=(attributes[.size] as? NSNumber)?.intValue,
+                      length<=NativeWorldLabProject.maxBytes else {
                     throw NativeWorldLabError.invalid("Project files must be 1 MB or smaller.")
                 }
                 let data=try Data(contentsOf:url)

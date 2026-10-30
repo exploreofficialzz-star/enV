@@ -49,7 +49,10 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
             require(previousBytes.size <= NativeWorldLabProjectCodec.MAX_BYTES) { "Existing local project is oversized." }
             val previousJson = String(previousBytes, StandardCharsets.UTF_8)
             val previous = NativeWorldLabProjectCodec.decode(previousJson)
-            require(project.revision > previous.revision || (project.revision == previous.revision && json == previousJson)) {
+            // Require the exact next revision: accepting a skipped revision would
+            // silently overwrite divergent, independently edited histories.
+            require(project.revision.toLong() == previous.revision.toLong() + 1 ||
+                (project.revision == previous.revision && json == previousJson)) {
                 "This project has a newer local revision. Export or resolve the conflict before replacing it."
             }
         } else {

@@ -25,10 +25,17 @@ struct NativeWorldLabProjectStore {
         try manager.createDirectory(at:directory,withIntermediateDirectories:true)
         let destination=try file(project.id)
         if manager.fileExists(atPath:destination.path) {
+            let attrs=try manager.attributesOfItem(atPath:destination.path)
+            guard let byteSize=(attrs[.size] as? NSNumber)?.intValue,
+                  byteSize <= NativeWorldLabProject.maxBytes else {
+                throw NativeWorldLabError.invalid("Existing local World Lab project exceeds the 1 MB limit")
+            }
             let previousData=try Data(contentsOf:destination)
             let previous=try NativeWorldLabProject.decode(previousData)
-            guard project.revision>previous.revision ||
-                    (project.revision==previous.revision && previousData==data) else {
+            // Skipping revision numbers may hide a divergent edit history;
+            // fail closed rather than silently replacing local work.
+            guard project.revision == previous.revision + 1 ||
+                    (project.revision == previous.revision && previousData == data) else {
                 throw NativeWorldLabError.invalid("A newer local revision exists. Export or resolve the conflict first.")
             }
         }else{
@@ -43,7 +50,13 @@ struct NativeWorldLabProjectStore {
         return project
     }
     func read(_ id:String) throws -> (Data,NativeWorldLabProject) {
-        let data=try Data(contentsOf:file(id))
+        let url=try file(id)
+        let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+        guard let size=(attributes[.size] as? NSNumber)?.intValue,
+              size <= NativeWorldLabProject.maxBytes else {
+            throw NativeWorldLabError.invalid("Saved World Lab project exceeds the 1 MB limit")
+        }
+        let data=try Data(contentsOf:url)
         let project=try NativeWorldLabProject.decode(data)
         guard project.id==id else {
             throw NativeWorldLabError.invalid("Saved project ID does not match its filename")

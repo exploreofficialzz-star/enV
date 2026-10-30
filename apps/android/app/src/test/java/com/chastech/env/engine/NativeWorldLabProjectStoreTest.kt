@@ -35,6 +35,18 @@ class NativeWorldLabProjectStoreTest {
             assertThrows(Exception::class.java){store.save(file)}
         }finally{root.deleteRecursively()}
     }
+    @Test fun rejectsSkippedRevisionsAsAmbiguousConflict() {
+        val root=Files.createTempDirectory("world-lab-android-skipped").toFile()
+        try {
+            val store=NativeWorldLabProjectStore(root)
+            val initial=NativeWorldLabEditor.blank()
+            val initialProject=store.save(initial)
+            val future=JSONObject(initial)
+            future.put("revision",10)
+            assertThrows(IllegalArgumentException::class.java){store.save(future.toString())}
+            assertEquals(initial,store.read(initialProject.id).json)
+        }finally{root.deleteRecursively()}
+    }
     @Test fun rejectsSameRevisionDifferentContentWithoutErasingPrevious(){
         val root=Files.createTempDirectory("world-lab-android-conflict").toFile()
         try {

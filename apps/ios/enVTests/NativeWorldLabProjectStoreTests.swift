@@ -34,6 +34,17 @@ final class NativeWorldLabProjectStoreTests:XCTestCase {
         XCTAssertThrowsError(try store.loadLatest())
         XCTAssertThrowsError(try store.save(a))
     }
+    func testSkippedRevisionCannotEraseDivergentProjectHistory() throws {
+        let store=try temporaryStore()
+        defer{try? FileManager.default.removeItem(at:store.directory)}
+        let initial=try NativeWorldLabEditor.blank()
+        let project=try store.save(initial)
+        var tampered=try XCTUnwrap(JSONSerialization.jsonObject(with:initial) as? [String:Any])
+        tampered["revision"]=10
+        let skipped=try JSONSerialization.data(withJSONObject:tampered)
+        XCTAssertThrowsError(try store.save(skipped))
+        XCTAssertEqual(try store.read(project.id).0,initial)
+    }
     func testSameRevisionDifferentPayloadIsExplicitConflict() throws {
         let store=try temporaryStore()
         defer{try? FileManager.default.removeItem(at:store.directory)}
