@@ -93,8 +93,22 @@ object NativeBarcodeImageDecoder {
     }
 
     fun decode(context: Context, uri: Uri): NativeBarcodeScan? {
-        val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
-        return decode(bitmap)
+        val resolver = context.contentResolver
+        val declaredSize = resolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+        require(declaredSize <= 20L * 1024L * 1024L || declaredSize < 0L) {
+            "Image is larger than 20 MB. Resize it before scanning."
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "The selected image could not be read." }
+        var sampleSize = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > 2800) sampleSize *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+        return try { decode(bitmap) } finally { bitmap.recycle() }
     }
 }
 
@@ -123,7 +137,8 @@ private class NativeBarcodeCameraAnalyzer(
             onResult(NativeBarcodeScan(result.text, result.barcodeFormat.toString()))
             reader.reset()
         } catch (_: Exception) {
-            // A frame without a code is an expected condition while the user is aiming.
+            // A frame without a code is expected while the user is aiming.
+            reader.reset()
         } finally {
             image.close()
         }
