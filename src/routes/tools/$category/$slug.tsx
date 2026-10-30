@@ -2,6 +2,7 @@ import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
 const WorldLab = lazy(() => import("@/components/world-lab/world-lab"));
+const LegacyArtboardStudio = lazy(() => import("@/components/game-studio/game-studio"));
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolShell } from "@/components/tools/tool-shell";
 import { ToolEngine } from "@/components/tools/tool-engine";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/tools/$category/$slug")({
 function Tool() {
   const { category, slug } = Route.useParams();
   const { mode, action, op } = Route.useSearch();
-  if (category === "developer" && slug === "artboard-studio") return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: "the-world-lab" }} search={{ mode: undefined, action: undefined, op: undefined }} replace />;
+  if (category === "developer" && slug === "artboard-studio") return <AppShell><Suspense fallback={<p>Opening legacy Artboard Studio…</p>}><LegacyArtboardStudio /></Suspense></AppShell>;
   if (category === "developer" && slug === "the-world-lab") return <AppShell><Suspense fallback={<p>Opening The World Lab…</p>}><WorldLab /></Suspense></AppShell>;
   // Dedicated Studio entry URLs reuse existing catalog tools as their engine anchors.
   // The legacy break-even URL remains a real redirect rather than a duplicate mode.
