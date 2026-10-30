@@ -53,3 +53,16 @@ Feedback for developers is separate from public tool discussions. Community comm
 ## Offline and tokens
 
 The existing offline wallet schema is a foundation, not authorization to launch offline token spending. Preserve its production lock, device binding, allowance limits, pricing approval, replay protection, idempotency and unresolved-finalization safeguards until native integrity verification and recovery are independently implemented and reviewed. Tools may work offline without token billing only when their actual dependencies and local execution are available on that platform. A web-only tool is not automatically offline-capable.
+
+
+## Developer feedback service — first backend slice
+
+The feedback API is separate from tool-page community discussions:
+
+- `POST /api/feedback` accepts public reports for Web, Android or iOS with a stable catalogue tool ID where applicable.
+- Reports are bounded to 120-character titles and 4,000-character descriptions, use client idempotency keys, and are throttled to five submissions per pseudonymous reporter per hour.
+- Anonymous abuse-control identifiers are keyed HMAC digests. Raw IP addresses, e-mail addresses and user-agent strings are not stored. Signed-in association is added only from a verified server session.
+- `GET /api/feedback/admin` and `POST /api/feedback/admin/update` require the server-only developer bearer credential. Never ship this credential to a browser or mobile app; a private feedback dashboard must proxy its requests server-side and apply developer identity / deployment protection.
+- Status changes are audited. Resolved/closed tickets are eligible for scheduled removal after the configured retention period; open work is not automatically deleted.
+
+The backend is disabled by default. A public feedback form, native forms, private moderation dashboard, reply/contact workflow, attachments, and Vercel/DNS host attachment remain separate implementation/release tasks. Do not treat this API as the public social comment system.
