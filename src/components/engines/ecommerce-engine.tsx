@@ -42,21 +42,16 @@ export function EcommerceEngine({ toolId }: { toolId: string }) {
     safetyStock: Number(safetyStock), weight: Number(weight), distance: Number(distance),
   };
 
-  const dependencies = [
-    parsed.value, parsed.error, name, code, customer, cost, price, quantity, tax, discount,
-    stock, dailySales, leadTime, shipping, packaging, feePercent, advertising, targetMargin,
-    safetyStock, weight, distance,
-  ];
   const result = useMemo(() => {
     if (!parsed.value) return "";
     try { return buildEcommerceOutput(parsed.value.family, parsed.value.workflow, values); }
     catch { return ""; }
-  }, dependencies);
+  }, [parsed.value, name, code, customer, cost, price, quantity, tax, discount, stock, dailySales, leadTime, shipping, packaging, feePercent, advertising, targetMargin, safetyStock, weight, distance]);
   const error = useMemo(() => {
     if (!parsed.value) return parsed.error;
     try { buildEcommerceOutput(parsed.value.family, parsed.value.workflow, values); return null; }
     catch (cause) { return cause instanceof Error ? cause.message : "Invalid E-commerce inputs."; }
-  }, dependencies);
+  }, [parsed.value, parsed.error, name, code, customer, cost, price, quantity, tax, discount, stock, dailySales, leadTime, shipping, packaging, feePercent, advertising, targetMargin, safetyStock, weight, distance]);
 
   const reset = () => {
     setName("Sample Product"); setCode("SKU-001"); setCustomer("Customer");
