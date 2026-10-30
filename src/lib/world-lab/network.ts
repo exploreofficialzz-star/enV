@@ -85,7 +85,7 @@ export function solveDcNetwork(network:WorldLabCircuitNetwork,
   }
   // Partial pivoting and explicit rank rejection: never silently ground a
   // floating node or force inconsistent ideal voltage sources to agree.
-  const scale=Math.max(1,...matrix.map(row=>Math.max(...Array.from(row).map(Math.abs))));
+  const scale=Math.max(1,...matrix.map(row=>Math.max(...Array.from(row.subarray(0,unknowns)).map(Math.abs))));
   for(let col=0;col<unknowns;col++){
     let pivot=col;
     for(let row=col+1;row<unknowns;row++)

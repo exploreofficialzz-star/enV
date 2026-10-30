@@ -228,7 +228,7 @@ object NativeWorldLabDc {
                 else->error("Hypothetical component has no verified DC behavior")
             }
         }
-        val scale=maxOf(1.0,a.maxOf{row->row.maxOf{kotlin.math.abs(it)}})
+        val scale=maxOf(1.0,a.maxOf{row->row.copyOfRange(0,m).maxOf{kotlin.math.abs(it)}})
         for(col in 0 until m){
             var pivot=col
             for(row in col+1 until m)

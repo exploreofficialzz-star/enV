@@ -347,7 +347,7 @@ enum NativeWorldLabDc {
                     "Hypothetical device cannot be solved without a supported physical law")
             }
         }
-        let scale=max(1.0,matrix.flatMap{$0}.map{abs($0)}.max() ?? 0)
+        let scale=max(1.0,matrix.flatMap{Array($0.prefix(count))}.map{abs($0)}.max() ?? 0)
         for col in 0..<count {
             var pivot=col
             if col+1<count {
