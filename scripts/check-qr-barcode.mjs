@@ -21,6 +21,7 @@ assert.ok(generator.includes('"QR & Barcode Reader"'), "Catalog generator expose
 assert.ok(toolEngine.includes("if (tool.id === \"qr-payload-inspector\") return <BarcodeReaderEngine />;"), "Reader route reaches the scanner engine");
 assert.ok(toolEngine.includes('if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;'), "E-commerce tools bypass planned fallback and reach their engine");
 assert.ok(reader.includes("BrowserMultiFormatReader") && reader.includes("decodeFromVideoDevice") && reader.includes("decodeFromImageElement"), "Reader decodes camera streams and uploaded images");
+assert.ok(reader.includes("Inspect a payload") && reader.includes("Paste a QR payload to inspect"), "Reader preserves manual QR payload inspection");
 assert.ok(reader.includes("navigator.mediaDevices?.getUserMedia") && reader.includes("URL.createObjectURL"), "Camera access and local image handling are implemented");
 assert.ok(reader.includes('url.protocol === "http:" || url.protocol === "https:"'), "Decoded links are restricted to HTTP(S)");
 assert.ok(browserAudit.includes("Code 128") && browserAudit.includes("QR Code"), "Browser audit exercises both QR and 1D barcode decoding");
