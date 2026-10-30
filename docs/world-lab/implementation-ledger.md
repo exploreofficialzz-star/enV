@@ -181,3 +181,9 @@ release-candidate evidence bundle are unfinished.
 ## iOS native electrothermal integration (2026-10-30)
 
 - Swift's native 1D RK4 now evolves coil temperature, resistance, voltage/current and mechanical height together, keeping the energy balance through stored thermal energy and cooling. The native UI offers an opt-in thermal mechanism and calculated temperature/resistance/cooling results. Native audit supports 1.1.0; XCTest coverage authored. Exact-head build and simulator audit are intentionally deferred to the consolidated verification pass.
+
+## Typed portable DC circuit graph and connected reference solver (2026-10-30)
+
+- World Lab project v1 accepts an optional, strictly bounded `networks` graph with explicit nodes, ground, source/resistor terminals, and genuinely unknown hypothetical devices; older projects without `networks` remain valid. Existing local saving and JSON portability retain network data. Created a connected modified-nodal-analysis (MNA) DC reference solver with source-current variables, Gaussian partial pivoting, floating/contradictory circuit rejection, SI bounds, and Kirchhoff first-law power residual checks. No imaginary physics is assigned to an unknown device.
+- Web adds first circuit creation, editable voltage/resistance, parallel resistor wiring, invented unknown device entries, solver outputs, and evidence JSON. The new network regression suite covers parallel current conservation, floating nodes, inconsistent voltage sources, v1 portability and unsupported inventions; tests are written but the requested consolidated audit has not been run.
+- **Cross-platform acceptance pending:** native Kotlin/Swift strict portable project decoders currently reject optional network JSON; synchronize their codecs and editing roundtrips before treating network portability as platform-wide.

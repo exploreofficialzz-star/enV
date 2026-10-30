@@ -59,3 +59,10 @@ test("legacy importer rejects unsupported projects, preserves safe primitives an
   assert.ok(warnings.some(x=>x.includes("visual-only")));
   assert.throws(()=>importLegacyGameScene({...legacy,version:2},"x",now));
 });
+
+test("networks are optional for v1 legacy projects and strict when supplied",()=>{
+  const p=blankWorldLabProject("old",now);
+  const {networks,...legacy}=p;
+  assert.equal(parseWorldLabProject(legacy).networks,undefined);
+  assert.throws(()=>parseWorldLabProject({...p,networks:[{id:"bad"}]}),/Invalid/);
+});

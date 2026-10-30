@@ -10,6 +10,7 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
+import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
@@ -95,6 +96,9 @@ export default function WorldLab() {
   const [dropHeight, setDropHeight] = useState(5);
   const [dropBounce, setDropBounce] = useState(0.3);
   const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
+  const [dcRun,setDcRun]=useState<DcNetworkResult|null>(null);
+  const [inventedDeviceName,setInventedDeviceName]=useState("");
+  const [inventedDeviceAssumption,setInventedDeviceAssumption]=useState("");
   const [actuatorRun, setActuatorRun] = useState<ActuatorRun | null>(null);
   const [actuatorAudit, setActuatorAudit] = useState<ActuatorNumericalAudit | null>(null);
   const [actuatorTime, setActuatorTime] = useState(0);
@@ -658,9 +662,39 @@ export default function WorldLab() {
   function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
     // A changed material, shape, or arrangement invalidates its old scientific results.
     setDropPlaying(false);setDropRun(null);
-    setActuatorPlaying(false);setActuatorRun(null);
+    setActuatorPlaying(false);setActuatorRun(null);setDcRun(null);
     setProject(current => current ? transform(current) : current);
     setWorkspaceDirty(true);
+  }
+  function createCircuit(){
+    if(!project || (project.networks?.length??0)>=12)return;
+    mutateProject(p=>({...p,networks:[...(p.networks??[]),starterDcNetwork(crypto.randomUUID())]}));
+    setMessage("Circuit added. Change the source and resistor, then calculate its connected current.");
+  }
+  function updateCircuitValue(componentId:string,value:number){
+    if(!Number.isFinite(value))return;
+    mutateProject(p=>({...p,networks:(p.networks??[]).map((net,index)=>index!==0?net:{
+      ...net,components:net.components.map(c=>c.id!==componentId?c:
+        c.kind==="dc-source"?{...c,voltageV:value}:
+        c.kind==="resistor"?{...c,resistanceOhm:value}:c),
+    })}));
+  }
+  function calculateCircuit(){
+    if(!project?.networks?.[0])return;
+    setError("");
+    try{setDcRun(solveDcNetwork(project.networks[0],project));}
+    catch(cause){setDcRun(null);setError(cause instanceof Error?cause.message:"Cannot calculate this circuit.");}
+  }
+  function inventDevice(){
+    if(!project?.networks?.[0] || !inventedDeviceName.trim() || !inventedDeviceAssumption.trim())return;
+    mutateProject(p=>({...p,networks:(p.networks??[]).map((net,index)=>index!==0?net:{
+      ...net,components:[...net.components,{id:crypto.randomUUID(),kind:"hypothetical-device" as const,
+        name:inventedDeviceName.trim(),assumption:inventedDeviceAssumption.trim(),
+        positiveNodeId:"supply",negativeNodeId:"ground",
+        evidence:"hypothetical-user-assumed" as const}],
+    })}));
+    setInventedDeviceName("");setInventedDeviceAssumption("");
+    setMessage("Invented device added without fabricated electrical properties; numerical solving requires a supported behavior law.");
   }
   function addShape(shape: WorldLabEntity["shape"]) {
     if (!project || shapeCount >= 200) return;
@@ -837,6 +871,60 @@ export default function WorldLab() {
           </details>}
         </div>
       )}
+      <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
+        <h3 className="text-sm font-semibold">Connect electricity</h3>
+        <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>
+        {(project?.networks?.length??0)===0 && <button className={buttonClass+" mt-2"} type="button" onClick={createCircuit}>Build first circuit</button>}
+        {project?.networks?.[0] && <>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {project.networks[0].components.filter(c=>c.kind==="dc-source" || c.kind==="resistor").map(c=>
+              <label key={c.id} className="text-xs">
+                {c.kind==="dc-source"?"Battery voltage (V)":"Resistor ("+c.id+") (Ω)"}
+                <input className={inputLabel} type="number" aria-label={c.kind==="dc-source"?"Battery voltage":"Resistance "+c.id}
+                  min={c.kind==="dc-source"?-1000:0.01} max={c.kind==="dc-source"?1000:1000000000}
+                  step={c.kind==="dc-source"?1:10}
+                  value={c.kind==="dc-source"?c.voltageV:c.kind==="resistor"?c.resistanceOhm:0}
+                  onChange={e=>updateCircuitValue(c.id,Number(e.target.value))}/>
+              </label>)}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className={buttonClass} onClick={()=>{
+              const net=project.networks?.[0];
+              if(!net||net.components.length>=48)return;
+              mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i? n:{
+                ...n,components:[...n.components,{id:crypto.randomUUID(),kind:"resistor" as const,
+                  positiveNodeId:"supply",negativeNodeId:"ground",resistanceOhm:200}],
+              })}));
+            }}>Add parallel resistor</button>
+            <button type="button" className={buttonClass} onClick={calculateCircuit}>Calculate circuit</button>
+          </div>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs">Invent an unknown electrical device</summary>
+            <label className="block text-xs">Name
+              <input className={inputLabel} maxLength={120} aria-label="Invented device name"
+                value={inventedDeviceName} onChange={e=>setInventedDeviceName(e.target.value)}/>
+            </label>
+            <label className="block text-xs">Assumed behavior or unknown property
+              <input className={inputLabel} maxLength={500} aria-label="Invented device assumption"
+                value={inventedDeviceAssumption} onChange={e=>setInventedDeviceAssumption(e.target.value)}/>
+            </label>
+            <button type="button" className={buttonClass} onClick={inventDevice}
+              disabled={!inventedDeviceName.trim()||!inventedDeviceAssumption.trim()||
+                project.networks[0].components.length>=48}>Add hypothetical device</button>
+            <p className="text-xs text-muted-foreground">Unknown parts remain editable, but cannot be simulated as verified electronics.</p>
+          </details>
+          {dcRun && dcRun.projectId===project.id&&dcRun.projectRevision===project.revision&&
+            dcRun.networkId===project.networks[0].id && <div className="mt-2 text-xs" aria-label="Calculated circuit results">
+              <p>Supply rail: {dcRun.nodeVoltagesV.supply?.toFixed(3)} V</p>
+              <p>Delivered power: {dcRun.sourcePowerSuppliedW.toFixed(4)} W</p>
+              <p>Resistor heating: {dcRun.resistivePowerW.toFixed(4)} W</p>
+              <p>Conservation residual: {dcRun.powerResidualW.toExponential(2)} W</p>
+              {Object.entries(dcRun.branchCurrentsA).map(([id,current])=><p key={id}>{id}: {current.toFixed(5)} A</p>)}
+              <button type="button" className={buttonClass} onClick={()=>downloadJson("world-lab-dc-evidence.json",dcRun)}>Export DC evidence</button>
+              <p className="text-muted-foreground">{dcRun.validity}</p>
+            </div>}
+        </>}
+      </section>
       <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <div className="min-w-0">
           <div className="relative overflow-hidden rounded-xl border border-border bg-slate-200">

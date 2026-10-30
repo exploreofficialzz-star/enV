@@ -41,6 +41,42 @@ const entitySchema = z.object({
   }
 });
 
+
+const circuitNodeSchema=z.object({
+  id:uid,label:z.string().trim().min(1).max(80),
+}).strict();
+const circuitComponentSchema=z.discriminatedUnion("kind",[
+  z.object({id:uid,kind:z.literal("dc-source"),positiveNodeId:uid,
+    negativeNodeId:uid,voltageV:scalar.min(-1000).max(1000)}).strict(),
+  z.object({id:uid,kind:z.literal("resistor"),positiveNodeId:uid,
+    negativeNodeId:uid,resistanceOhm:scalar.min(0.01).max(1000000000)}).strict(),
+  z.object({id:uid,kind:z.literal("hypothetical-device"),
+    name:z.string().trim().min(1).max(120),
+    assumption:z.string().trim().min(1).max(500),
+    positiveNodeId:uid,negativeNodeId:uid,
+    evidence:z.literal("hypothetical-user-assumed")}).strict(),
+]);
+const circuitNetworkSchema=z.object({
+  id:uid,name:z.string().trim().min(1).max(120),groundNodeId:uid,
+  nodes:z.array(circuitNodeSchema).min(2).max(24),
+  components:z.array(circuitComponentSchema).min(1).max(48),
+}).strict().superRefine((n,ctx)=>{
+  if(new Set(n.nodes.map(x=>x.id)).size!==n.nodes.length)
+    ctx.addIssue({code:"custom",message:"Duplicate circuit node IDs."});
+  if(new Set(n.components.map(x=>x.id)).size!==n.components.length)
+    ctx.addIssue({code:"custom",message:"Duplicate circuit component IDs."});
+  const ids=new Set(n.nodes.map(x=>x.id));
+  if(!ids.has(n.groundNodeId))
+    ctx.addIssue({code:"custom",message:"Circuit ground node is missing."});
+  for(const c of n.components){
+    if(!ids.has(c.positiveNodeId)||!ids.has(c.negativeNodeId)||
+      c.positiveNodeId===c.negativeNodeId)
+      ctx.addIssue({code:"custom",message:"Circuit ports must connect two distinct existing nodes."});
+  }
+});
+export type WorldLabCircuitNetwork=z.infer<typeof circuitNetworkSchema>;
+export type WorldLabCircuitComponent=WorldLabCircuitNetwork["components"][number];
+
 export const worldLabProjectSchema = z.object({
   format: z.literal("env-world-lab"),
   schemaVersion: z.literal(1),
@@ -61,6 +97,7 @@ export const worldLabProjectSchema = z.object({
   }).strict(),
   entities: z.array(entitySchema).max(200),
   materials: z.array(materialSchema).max(100),
+  networks: z.array(circuitNetworkSchema).max(12).optional(),
 }).strict().superRefine((p, ctx) => {
   if (new Set(p.entities.map(x => x.id)).size !== p.entities.length) {
     ctx.addIssue({ code: "custom", message: "Duplicate entity IDs." });
@@ -68,6 +105,8 @@ export const worldLabProjectSchema = z.object({
   if (new Set(p.materials.map(x => x.id)).size !== p.materials.length) {
     ctx.addIssue({ code: "custom", message: "Duplicate material IDs." });
   }
+  if(new Set((p.networks??[]).map(x=>x.id)).size!==(p.networks??[]).length)
+    ctx.addIssue({code:"custom",message:"Duplicate circuit network IDs."});
   const materials = new Set(p.materials.map(x => x.id));
   for (const entity of p.entities) {
     if (entity.materialId !== null && !materials.has(entity.materialId)) {
@@ -113,7 +152,7 @@ export function blankWorldLabProject(id: string, now: string): WorldLabProject {
     world: { frame: "LOCAL_ENU", origin: [0, 0, 0],
       representation: "representative-not-measured", terrainSource: null },
     camera: { positionMeters: [0, 1.65, -8], lookingAtMeters: [0, 1.2, 0] },
-    entities: [], materials: [],
+    entities: [], materials: [], networks: [],
   });
 }
 export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number): WorldLabEntity {
