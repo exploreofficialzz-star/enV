@@ -6,7 +6,7 @@ assert.ok(catalogMatch, "catalog JSON literal is present");
 const tools = JSON.parse(JSON.parse(`[${catalogMatch[1]}]`).join(""));
 
 const expectedWebExempt = ["accessibility", "audio", "business", "calculators", "developer", "ecommerce", "qr", "video"];
-const expectedNativeExempt = ["accessibility", "audio", "business", "calculators", "developer", "video"];
+const expectedNativeExempt = ["accessibility", "audio", "business", "calculators", "developer", "ecommerce", "qr", "video"];
 const webPolicy = fs.readFileSync(new URL("../src/lib/production-notice.ts", import.meta.url), "utf8");
 const android = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
 const ios = fs.readFileSync(new URL("../apps/ios/enV/CatalogCore.swift", import.meta.url), "utf8");
@@ -28,8 +28,8 @@ const webExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_CATEGORIES\s*=\s*ne
 const androidExempt = quotedValues(android, /productionExemptCategories\s*=\s*setOf\(([^)]*)\)/, "Android");
 const iosExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(category\.lowercased\(\)\)/, "iOS");
 assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the eight implemented categories");
-assert.deepEqual(androidExempt, expectedNativeExempt, "Android policy remains independently controlled by its native implementation lane");
-assert.deepEqual(iosExempt, expectedNativeExempt, "iOS policy remains independently controlled by its native implementation lane");
+assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented QR and E-commerce categories");
+assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented QR and E-commerce categories");
 
 assert.ok(Array.isArray(tools) && tools.length > 0, "catalog tools load");
 const categories = new Set(tools.map((tool) => tool.category));
@@ -45,4 +45,4 @@ assert.ok(android.includes("candidate?.isUnderProduction() == true") && android.
 assert.ok(android.includes('Text("Under production"') && android.includes('if (tool.isUnderProduction()) Text("Under production"'), "Android card and search surfaces are labeled");
 assert.ok(ios.includes("var isUnderProduction: Bool") && iosCards.includes("if tool.isUnderProduction") && iosDestinations.includes("ToolDestinationView(tool: $0)"), "iOS cards and destinations apply production policy");
 
-console.log(`Production-gating audit PASS: ${tools.length} catalog tools scanned; Web exposes 8 categories and restricts ${restricted.length} tools; Android/iOS retain their 6-category native policy.`);
+console.log(`Production-gating audit PASS: ${tools.length} catalog tools scanned; Web, Android and iOS expose the same 8 implemented categories; ${restricted.length} other tools remain restricted.`);
