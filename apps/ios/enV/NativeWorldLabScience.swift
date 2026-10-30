@@ -113,3 +113,87 @@ enum NativeWorldLabScience {
         return result
     }
 }
+
+
+/// Native Swift reference for gravity, quadratic drag, and contact against a flat plane.
+/// Material mass must originate from a validated hypothetical assumption; not a certified analysis.
+struct NativeDropInput {
+    let massKg:Double
+    let supportingHalfHeightM:Double
+    var dropHeightM:Double=5
+    var initialVelocityMps:Double=0
+    var gravityMps2:Double=9.80665
+    var airDensityKgM3:Double=1.225
+    let projectedAreaM2:Double
+    var dragCoefficient:Double=0.47
+    var restitution:Double=0.3
+    var durationSeconds:Double=6
+}
+struct NativeDropSample {
+    let timeSeconds:Double
+    let heightAboveGroundM:Double
+    let velocityMps:Double
+    let kineticEnergyJ:Double
+    let gravitationalEnergyJ:Double
+    let grounded:Bool
+}
+struct NativeDropResult {
+    let samples:[NativeDropSample]
+    let impactCount:Int
+    let stepSeconds:Double
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let inputEvidence="hypothetical-user-assumed"
+    let validity="Bounded 1D centre-of-mass gravity, quadratic drag and flat-ground contact; no rotation or material failure."
+}
+enum NativeWorldLabDropScience {
+    private static func valid(_ n:Double,_ low:Double,_ high:Double,_ label:String)throws{
+        guard n.isFinite && n >= low && n <= high else {
+            throw NativeWorldLabError.invalid("\(label) outside bounded scientific domain")
+        }
+    }
+    static func evaluate(_ i:NativeDropInput,stepSeconds:Double=1.0/240)throws->NativeDropResult {
+        try valid(i.massKg,0.001,10000,"Mass")
+        try valid(i.supportingHalfHeightM,0.0005,5000,"Half-height")
+        try valid(i.dropHeightM,0,100,"Release height")
+        try valid(i.initialVelocityMps,-100,100,"Velocity")
+        try valid(i.gravityMps2,0,100,"Gravity")
+        try valid(i.airDensityKgM3,0,100,"Air density")
+        try valid(i.projectedAreaM2,0.000001,100000,"Projected area")
+        try valid(i.dragCoefficient,0,3,"Drag coefficient")
+        try valid(i.restitution,0,1,"Restitution")
+        try valid(i.durationSeconds,0.01,20,"Duration")
+        try valid(stepSeconds,0.001,1.0/30,"Step")
+        let steps=Int(ceil(i.durationSeconds/stepSeconds))
+        guard steps<=20000 else { throw NativeWorldLabError.invalid("Drop exceeds local solver budget") }
+        let dt=i.durationSeconds/Double(steps)
+        let k=0.5*i.airDensityKgM3*i.dragCoefficient*i.projectedAreaM2/i.massKg
+        var height=i.dropHeightM
+        var v=i.initialVelocityMps
+        var impacts=0
+        var samples:[NativeDropSample]=[]
+        samples.reserveCapacity(steps+1)
+        for n in 0...steps {
+            samples.append(NativeDropSample(
+                timeSeconds:Double(n)*dt,heightAboveGroundM:height,velocityMps:v,
+                kineticEnergyJ:0.5*i.massKg*v*v,
+                gravitationalEnergyJ:i.massKg*i.gravityMps2*height,
+                grounded:height==0 && v==0))
+            if n==steps || (height==0 && v==0) {continue}
+            v+=(-i.gravityMps2-k*v*abs(v))*dt
+            guard v.isFinite && abs(v)<=10000 else {
+                throw NativeWorldLabError.invalid("Drop model exceeded stability envelope")
+            }
+            height+=v*dt
+            if height<=0 {
+                height=0
+                if v<0 {
+                    impacts+=1
+                    v = -v*i.restitution
+                    if v<max(0.025,i.gravityMps2*dt) {v=0}
+                }
+            }
+        }
+        return NativeDropResult(samples:samples,impactCount:impacts,stepSeconds:dt)
+    }
+}
