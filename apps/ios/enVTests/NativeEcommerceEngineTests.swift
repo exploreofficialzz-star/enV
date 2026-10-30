@@ -152,6 +152,17 @@ final class NativeBarcodeReadRecordTests: XCTestCase {
         XCTAssertTrue(decoded.contains { $0.value == payload })
     }
 
+    @MainActor
+    func testLiveCameraScannerKeepsDistinctCodesFromOneFrame() {
+        let scanner = NativeBarcodeCameraScanner()
+        scanner.addResult(value: "https://example.com/item-a", format: "QR")
+        scanner.addResult(value: "SKU-002", format: "Code128")
+        scanner.addResult(value: "https://example.com/item-a", format: "QR")
+
+        XCTAssertEqual(scanner.results.count, 2)
+        XCTAssertEqual(Set(scanner.results.map(\.value)), Set(["https://example.com/item-a", "SKU-002"]))
+    }
+
     func testCodeReaderResultRetainsDetectedValueAndFormat() {
         let record = NativeBarcodeReadRecord(value: "ENV-CODE-123", format: "org.iso.Code128")
         XCTAssertEqual(record.value, "ENV-CODE-123")
