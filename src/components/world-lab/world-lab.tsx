@@ -8,6 +8,7 @@ import {
 import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRuns,
   putLocalWorldLabProject, saveLocalWorldLabRun } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
+import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
 import {
@@ -86,6 +87,12 @@ export default function WorldLab() {
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState("");
+  const [dropRun, setDropRun] = useState<DropRun | null>(null);
+  const [dropTime, setDropTime] = useState(0);
+  const [dropPlaying, setDropPlaying] = useState(false);
+  const [dropHeight, setDropHeight] = useState(5);
+  const [dropBounce, setDropBounce] = useState(0.3);
+  const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
   const importInput = useRef<HTMLInputElement>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
@@ -96,6 +103,9 @@ export default function WorldLab() {
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
   const selectedQuantities = selectedEntity ? solidQuantities(selectedEntity, selectedMaterial) : null;
+  const selectedDrop = dropRun && selectedEntity?.id === dropRun.source.entityId
+    && project?.id === dropRun.source.projectId ? dropRun : null;
+  const dropSample = selectedDrop ? sampleDrop(selectedDrop, Math.min(dropTime, selectedDrop.input.durationSeconds)) : null;
   const [message, setMessage] = useState("Choose an experiment and press Start to calculate a real reference trajectory.");
   const [error, setError] = useState("");
   const currentRun = useMemo(() => runs.find((run) => run.id === runId) ?? null, [runs, runId]);
@@ -397,6 +407,34 @@ export default function WorldLab() {
   }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project, currentRun, heat]);
 
   useEffect(() => {
+    if (!dropPlaying || !dropRun) return;
+    let frame = 0;
+    let previous = 0;
+    const tick = (now: number) => {
+      if (previous) {
+        const elapsed = Math.min(0.05, (now - previous) / 1000);
+        setDropTime(t => Math.min(dropRun.input.durationSeconds, t + elapsed * dropPlaybackRate));
+      }
+      previous = now;
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [dropPlaying, dropRun, dropPlaybackRate]);
+  useEffect(() => {
+    if (dropRun && dropTime >= dropRun.input.durationSeconds) setDropPlaying(false);
+  }, [dropRun, dropTime]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !selectedDrop || !dropSample) return;
+    const mesh = scene.addedShapes.get(selectedDrop.source.entityId);
+    if (mesh) {
+      mesh.position.y = selectedDrop.input.supportingHalfHeightM + dropSample.heightAboveGroundM;
+    }
+  }, [selectedDrop, dropSample, project]);
+
+  useEffect(() => {
     if (!playing || !currentRun) return;
     let frame = 0;
     lastFrame.current = null;
@@ -483,6 +521,25 @@ export default function WorldLab() {
       setError(cause instanceof Error ? cause.message : "This shape cannot be used as a mass yet.");
     }
   }
+  function startDropWithSelectedSolid() {
+    if (!project || !selectedEntity) return;
+    setError("");
+    try {
+      const derived = deriveDropInput(project, selectedEntity.id, {
+        heightM: dropHeight, restitution: dropBounce,
+      });
+      const result = runDropExperiment(derived.input, derived.source);
+      setDropRun(result);
+      setDropTime(0);
+      setDropPlaying(true);
+      setMessage("Calculated a free-fall and flat-ground contact experiment using assumed density. " +
+        "The 3D motion is a solver visualization, not proof of material strength.");
+    } catch (cause) {
+      setDropPlaying(false);
+      setError(cause instanceof Error ? cause.message : "This solid cannot yet be tested.");
+    }
+  }
+
   function focusSelected() {
     const camera = sceneRef.current?.scene.activeCamera;
     if (!(camera instanceof B.UniversalCamera) || !selectedEntity) return;
@@ -531,6 +588,8 @@ export default function WorldLab() {
   }
   function editSelected(patch: Partial<WorldLabEntity>) {
     if (!selectedEntity) return;
+    setDropPlaying(false);
+    setDropRun(null);
     mutateProject(current=>({...current, entities:current.entities.map(e=>
       e.id===selectedEntity.id?{...e,...patch}:e)}));
   }
@@ -809,6 +868,61 @@ export default function WorldLab() {
                   {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Physical drop experiment">
+                  <h3 className="text-sm font-semibold">Drop & bounce experiment</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Release this object, predict gravity and contact, and watch its modeled motion.
+                    Density is your assumption; air drag and the ground are simplified.
+                  </p>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs">Change test conditions</summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <label className="text-xs">Height (m)
+                        <input className={inputLabel} aria-label="Drop release height in metres"
+                          type="number" min="0" max="100" step="0.5"
+                          value={dropHeight} onChange={e => {setDropPlaying(false);setDropHeight(Number(e.target.value));}} />
+                      </label>
+                      <label className="text-xs">Bounciness
+                        <input className={inputLabel} aria-label="Drop restitution"
+                          type="number" min="0" max="1" step="0.05"
+                          value={dropBounce} onChange={e => {setDropPlaying(false);setDropBounce(Number(e.target.value));}} />
+                      </label>
+                    </div>
+                  </details>
+                  <button type="button" className={buttonClass + " mt-2"}
+                    disabled={selectedQuantities.massKg === null} onClick={startDropWithSelectedSolid}>
+                    Drop this solid
+                  </button>
+                  {selectedDrop && dropSample && (
+                    <div className="mt-3 space-y-2" aria-label="Computed drop results">
+                      <p className="text-xs">Model result · {selectedDrop.inputEvidence.replaceAll("-", " ")} · not measured</p>
+                      <dl className="grid grid-cols-2 gap-2 text-xs">
+                        <div><dt>Time</dt><dd>{dropSample.timeSeconds.toFixed(2)} s</dd></div>
+                        <div><dt>Height above surface</dt><dd>{dropSample.heightAboveGroundM.toFixed(2)} m</dd></div>
+                        <div><dt>Vertical speed</dt><dd>{dropSample.speedMps.toFixed(2)} m/s</dd></div>
+                        <div><dt>Estimated impacts</dt><dd>{selectedDrop.impactCount}</dd></div>
+                      </dl>
+                      <label className="block text-xs">Explore drop time
+                        <input type="range" aria-label="Explore drop time" className="w-full" min="0"
+                          max={selectedDrop.input.durationSeconds} step={selectedDrop.stepSeconds}
+                          value={dropTime} onChange={e=>{setDropPlaying(false);setDropTime(Number(e.target.value));}} />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={buttonClass}
+                          onClick={()=>setDropPlaying(v=>!v)}>{dropPlaying ? "Pause drop" : "Play drop"}</button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setDropPlaying(false);setDropTime(0);}}>Reset drop</button>
+                        <select className={inputLabel} aria-label="Drop playback speed" value={dropPlaybackRate}
+                          onChange={e=>setDropPlaybackRate(Number(e.target.value))}>
+                          <option value={0.1}>0.1× slow</option>
+                          <option value={1}>1× normal</option>
+                          <option value={4}>4× fast</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{selectedDrop.validity}</p>
+                    </div>
+                  )}
+                </div>
                 <div className="sm:col-span-2">
                   <button type="button" className={buttonClass}
                     disabled={selectedQuantities.massKg === null}
