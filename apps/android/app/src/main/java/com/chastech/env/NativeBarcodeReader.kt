@@ -3,6 +3,7 @@ package com.chastech.env
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Intent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -61,6 +62,7 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,6 +75,14 @@ data class NativeBarcodeScan(
     val format: String,
     val scannedAt: Long = System.currentTimeMillis(),
 )
+
+/** Return only explicit HTTP(S) destinations with a real host; never auto-open decoded content. */
+internal fun safeBarcodeHttpUrl(value: String): String? {
+    val parsed = runCatching { URI(value.trim()) }.getOrNull() ?: return null
+    val scheme = parsed.scheme?.lowercase(Locale.ROOT)
+    if (scheme !in setOf("http", "https") || parsed.host.isNullOrBlank()) return null
+    return parsed.toASCIIString()
+}
 
 private fun readerHints(): Map<DecodeHintType, Any> = mapOf(
     DecodeHintType.TRY_HARDER to true,
@@ -320,10 +330,21 @@ fun NativeBarcodeReaderTool() {
                             Text(result.format, style = MaterialTheme.typography.labelLarge)
                             Text(result.text, style = MaterialTheme.typography.bodyMedium)
                             Text(SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(result.scannedAt)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            OutlinedButton(onClick = {
-                                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Decoded code", result.text))
-                                status = "Result copied."
-                            }) { Text("Copy result") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Decoded code", result.text))
+                                    status = "Result copied."
+                                }) { Text("Copy result") }
+                                safeBarcodeHttpUrl(result.text)?.let { safeUrl ->
+                                    OutlinedButton(onClick = {
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)))
+                                        }.onFailure {
+                                            error = "No installed app could open this link."
+                                        }
+                                    }) { Text("Open link") }
+                                }
+                            }
                         }
                     }
                 }
