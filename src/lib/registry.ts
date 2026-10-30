@@ -50,13 +50,29 @@ const songMetadataAnalyzerTool: ToolMeta = {
 };
 
 const allTools: ToolMeta[] = [
-  // Web aliases share the sandbox; the source catalogue also serves native apps,
-  // whose independent analyzer screens retain their existing descriptions.
-  ...catalogTools.map((tool) => tool.id === songMetadataAnalyzerTool.id
-    ? songMetadataAnalyzerTool
-    : tool.id === "audio-analyze-studio"
-      ? { ...tool, name: songMetadataAnalyzerTool.name, description: songMetadataAnalyzerTool.description, keywords: [...tool.keywords, "dataset", "sandbox", "drafts", "folders"] }
-      : tool),
+  // The browser has real dispatchers for both families. The generated catalogue is
+  // shared with native clients, so expose these web-ready records as active here
+  // without changing the independent Android/iOS catalogues in this browser task.
+  ...catalogTools.map((catalogTool) => {
+    const webTool: ToolMeta = (catalogTool.category === "qr" || (catalogTool.category === "ecommerce" && catalogTool.engine.type === "custom"))
+      && catalogTool.status === "planned"
+      ? { ...catalogTool, status: "active" }
+      : catalogTool;
+    if (webTool.id === songMetadataAnalyzerTool.id) return songMetadataAnalyzerTool;
+    if (webTool.id === "qr-payload-inspector") {
+      return {
+        ...webTool,
+        name: "QR & Barcode Reader",
+        description: "Scan QR codes and 1D/2D barcodes using your camera or an image file. Decode results locally on this device.",
+        keywords: [...webTool.keywords, "scan", "scanner", "reader", "barcode", "qr", "camera", "image"],
+        tags: [...webTool.tags, "scan", "reader", "barcode"],
+      };
+    }
+    if (webTool.id === "audio-analyze-studio") {
+      return { ...webTool, name: songMetadataAnalyzerTool.name, description: songMetadataAnalyzerTool.description, keywords: [...webTool.keywords, "dataset", "sandbox", "drafts", "folders"] };
+    }
+    return webTool;
+  }),
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
 ];
