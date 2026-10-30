@@ -2337,7 +2337,8 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var target by rememberSaveable(toolId) { mutableStateOf(now.plusSeconds(3600).toString()) }
     var zones by rememberSaveable(toolId) { mutableStateOf("UTC\nAmerica/New_York\nAsia/Tokyo") }
     var time by rememberSaveable(toolId) { mutableStateOf(now.toString()) }
-    var toTz by rememberSaveable(toolId) { mutableStateOf("America/Los_Angeles") }
+    var fromTz by rememberSaveable(toolId) { mutableStateOf("UTC") }
+    var toTz by rememberSaveable(toolId) { mutableStateOf("America/New_York") }
     var value by rememberSaveable(toolId) { mutableStateOf(now.epochSecond.toString()) }
     var pattern by rememberSaveable(toolId) { mutableStateOf("yyyy-MM-dd") }
     var year by rememberSaveable(toolId) { mutableStateOf("2024") }
@@ -2351,7 +2352,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
             "workday" -> { InputField(start, { start = it }, "Workday start", placeholder = "YYYY-MM-DD"); InputField(days, { days = it }, "Business days to add", singleLine = true) }
             "countdown" -> InputField(target, { target = it }, "Target date and time", placeholder = "ISO-8601")
             "world-clock" -> InputField(zones, { zones = it }, "IANA time zones", placeholder = "UTC, Europe/London", minLines = 3, tall = true)
-            "timezone" -> { InputField(time, { time = it }, "Time", placeholder = "ISO-8601"); InputField(toTz, { toTz = it }, "Convert to time zone", placeholder = "UTC") }
+            "timezone" -> { InputField(time, { time = it }, "Source local time", placeholder = "YYYY-MM-DDTHH:mm"); InputField(fromTz, { fromTz = it }, "From city / time zone", placeholder = "Africa/Lagos"); InputField(toTz, { toTz = it }, "To city / time zone", placeholder = "America/New_York") }
             "unix" -> InputField(value, { value = it }, "Date or Unix timestamp", placeholder = "1710000000 or ISO-8601")
             "format" -> { InputField(value, { value = it }, "Date", placeholder = "ISO-8601"); InputField(pattern, { pattern = it }, "Pattern", placeholder = "yyyy-MM-dd") }
             "weekday", "week-number" -> InputField(value, { value = it }, "Date", placeholder = "ISO-8601")
@@ -2367,7 +2368,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
                     "workday" -> mapOf("start" to start, "days" to days)
                     "countdown", "time-until", "deadline" -> mapOf("target" to target)
                     "world-clock" -> mapOf("zones" to zones)
-                    "timezone" -> mapOf("time" to time, "toTz" to toTz)
+                    "timezone" -> mapOf("time" to time, "fromTz" to fromTz, "toTz" to toTz)
                     "unix", "weekday", "week-number", "format" -> if (op == "format") mapOf("value" to value, "pattern" to pattern) else mapOf("value" to value)
                     "leap" -> mapOf("year" to year)
                     "birthday" -> mapOf("birth" to birth)
@@ -2375,7 +2376,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
                 }
                 runCatching { NativeDateTimeEngine.run(toolId, input, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run date/time tool" })
             },
-            onReset = { input = today; from = today; to = today; start = today; days = "5"; target = now.plusSeconds(3600).toString(); zones = "UTC\nAmerica/New_York\nAsia/Tokyo"; time = now.toString(); toTz = "America/Los_Angeles"; value = now.epochSecond.toString(); pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = "" }
+            onReset = { input = today; from = today; to = today; start = today; days = "5"; target = now.plusSeconds(3600).toString(); zones = "UTC\nAmerica/New_York\nAsia/Tokyo"; time = now.toString(); fromTz = "UTC"; toTz = "America/New_York"; value = now.epochSecond.toString(); pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = "" }
         )
         ResultBox(output, error, ::copy)
     }

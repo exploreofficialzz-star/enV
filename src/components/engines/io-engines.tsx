@@ -318,6 +318,15 @@ export function GeneratorEngine({ op }: { op: string }) {
 
 const DATE_FIELDS: Record<string, UiField[]> = {
   age: [{ name: "birth", label: "Birth date", type: "date" }],
+  "date-add": [
+    { name: "start", label: "Start date", type: "date" },
+    { name: "years", label: "Years", type: "number", defaultValue: 0 },
+    { name: "months", label: "Months", type: "number", defaultValue: 0 },
+    { name: "weeks", label: "Weeks", type: "number", defaultValue: 0 },
+    { name: "days", label: "Days", type: "number", defaultValue: 0 },
+    { name: "direction", label: "Direction (add or subtract)", type: "text", defaultValue: "add" },
+    { name: "repeatCount", label: "Repeat count", type: "number", defaultValue: 1 },
+  ],
   "date-diff": [
     { name: "from", label: "From", type: "date" },
     { name: "to", label: "To", type: "date" },
@@ -335,7 +344,7 @@ const DATE_FIELDS: Record<string, UiField[]> = {
     { name: "to", label: "To", type: "text", placeholder: "2026-01-02 17:30" },
   ],
   timezone: [
-    { name: "time", label: "Local time (ISO)", type: "text", placeholder: "2026-09-27T12:00" },
+    { name: "time", label: "Source local time", type: "text", placeholder: "2026-10-30T12:00" },
     { name: "fromTz", label: "From time zone", type: "text", defaultValue: "UTC" },
     { name: "toTz", label: "To time zone", type: "text", defaultValue: "America/New_York" },
   ],
@@ -351,7 +360,7 @@ const DATE_FIELDS: Record<string, UiField[]> = {
   "time-until": [{ name: "target", label: "Target date", type: "date" }],
   countdown: [{ name: "target", label: "Target date & time", type: "datetime-local" }],
   "world-clock": [{ name: "zones", label: "IANA time zones (one per line)", type: "textarea", defaultValue: "Africa/Lagos\\nEurope/London\\nAmerica/New_York\\nAsia/Tokyo" }],
-  deadline: [{ name: "target", label: "Deadline", type: "date" }],
+  deadline: [\n    { name: "target", label: "Deadline", type: "date" },\n    { name: "includeEnd", label: "Include deadline date (true/false)", type: "text", defaultValue: "false" },\n    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },\n    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },\n  ],\n  "meeting-planner": [\n    { name: "date", label: "Meeting date in first city", type: "date" },\n    { name: "zones", label: "Cities or time zones (2–8)", type: "textarea", defaultValue: "Lagos\\nLondon\\nNew York" },\n    { name: "sourceTz", label: "Date / working-hours reference city", type: "text", defaultValue: "Lagos" },\n    { name: "workStart", label: "Working day starts (HH:mm)", type: "text", defaultValue: "09:00" },\n    { name: "workEnd", label: "Working day ends (HH:mm)", type: "text", defaultValue: "17:00" },\n    { name: "durationMinutes", label: "Meeting length in minutes", type: "number", defaultValue: 30 },\n    { name: "intervalMinutes", label: "Slot interval in minutes", type: "number", defaultValue: 30 },\n  ],
 };
 
 export function DateTimeEngine({ op }: { op: string }) {

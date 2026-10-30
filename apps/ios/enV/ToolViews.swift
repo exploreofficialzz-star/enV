@@ -5753,7 +5753,7 @@ struct NativeDateTimeToolView: View {
         case "workday-calculator": return ["start", "days"]
         case "countdown": return ["target"]
         case "world-clock": return ["zones"]
-        case "timezone-converter": return ["time", "toTz"]
+        case "timezone-converter": return ["time", "fromTz", "toTz"]
         case "unix-timestamp-converter": return ["value"]
         case "date-formatter": return ["value", "pattern"]
         case "weekday-calculator", "week-number-calculator": return ["value"]
@@ -5782,14 +5782,15 @@ struct NativeDateTimeToolView: View {
     }
 
     private func reset() { values = [:]; output = ""; error = nil }
-    private func label(for key: String) -> String { ["from": "From date (YYYY-MM-DD)", "to": "To date (YYYY-MM-DD)", "start": "Start date (YYYY-MM-DD)", "days": "Business days", "target": "Target (ISO date/time)", "zones": "IANA zones (comma separated)", "time": "Time (ISO date/time)", "toTz": "To time zone", "value": "Value or date", "pattern": "Date format pattern", "year": "Year", "birth": "Birth date (YYYY-MM-DD)"][key] ?? key.capitalized }
+    private func label(for key: String) -> String { ["from": "From date (YYYY-MM-DD)", "to": "To date (YYYY-MM-DD)", "start": "Start date (YYYY-MM-DD)", "days": "Business days", "target": "Target (ISO date/time)", "zones": "IANA zones (comma separated)", "time": "Source local time", "fromTz": "From city / time zone", "toTz": "To city / time zone", "value": "Value or date", "pattern": "Date format pattern", "year": "Year", "birth": "Birth date (YYYY-MM-DD)"][key] ?? key.capitalized }
     private func defaultValue(for key: String) -> String {
         switch key {
         case "zones": return "UTC, America/New_York"
-        case "toTz": return "UTC"
+        case "fromTz": return "UTC"
+        case "toTz": return "America/New_York"
         case "pattern": return "yyyy-MM-dd EEEE"
         case "days": return "1"
-        case "time": return ISO8601DateFormatter().string(from: Date())
+        case "time": return "2026-10-30T12:00"
         default: return ""
         }
     }

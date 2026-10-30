@@ -78,10 +78,39 @@ public enum NativeDateTimeEngine {
                 return NativeDateTimeRow(label: name, value: localizedMedium(now, zone: zone, locale: Locale(identifier: "en_GB")))
             })
         case "timezone":
-            let date = try parseDate(options["time"] ?? isoString(Date()), label: "time")
-            let toName = options["toTz"]?.isEmpty == false ? options["toTz"]! : "UTC"
-            guard let zone = TimeZone(identifier: toName) else { throw NativeDateTimeError.invalidOperation("Unknown or unsupported time zone: \(toName)") }
-            return result(("In \(toName)", localizedMedium(date, zone: zone, locale: Locale(identifier: "en_GB"))), ("Unix", String(Int(date.timeIntervalSince1970))))
+            let fromName = options["fromTz"]?.isEmpty == false ? options["fromTz"]! : "UTC"
+            let toName = options["toTz"]?.isEmpty == false ? options["toTz"]! : "America/New_York"
+            guard let fromZone = TimeZone(identifier: fromName), let toZone = TimeZone(identifier: toName) else {
+                throw NativeDateTimeError.invalidOperation("Unknown or unsupported time zone.")
+            }
+            let raw = options["time"] ?? ""
+            let instant: Date
+            if raw.hasSuffix("Z") || raw.range(of: "[+-]\\d{2}:\\d{2}$", options: .regularExpression) != nil {
+                instant = try parseDate(raw, label: "time")
+            } else {
+                let parts = raw.split(separator: "T", maxSplits: 1).map(String.init)
+                guard parts.count == 2 else { throw NativeDateTimeError.invalidOperation("Enter source local time as YYYY-MM-DDTHH:mm.") }
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.timeZone = fromZone
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                let time = parts[1].count == 5 ? parts[1] + ":00" : parts[1]
+                guard let parsed = formatter.date(from: parts[0] + " " + time),
+                      formatter.string(from: parsed).hasPrefix(parts[0]) else {
+                    throw NativeDateTimeError.invalidOperation("That local time is invalid or falls in a daylight-saving clock gap.")
+                }
+                instant = parsed
+            }
+            var sourceCalendar = Calendar(identifier: .gregorian); sourceCalendar.timeZone = fromZone
+            var destinationCalendar = Calendar(identifier: .gregorian); destinationCalendar.timeZone = toZone
+            let source = sourceCalendar.dateComponents([.year, .month, .day], from: instant)
+            let destination = destinationCalendar.dateComponents([.year, .month, .day], from: instant)
+            var utcCalendar = Calendar(identifier: .gregorian); utcCalendar.timeZone = utc
+            let sourceDay = utcCalendar.date(from: source)!
+            let destinationDay = utcCalendar.date(from: destination)!
+            let dayShift = calendar(.gregorian).dateComponents([.day], from: sourceDay, to: destinationDay).day ?? 0
+            let dayText = dayShift == 0 ? "Same calendar day" : dayShift > 0 ? "\(dayShift) day(s) later" : "\(-dayShift) day(s) earlier"
+            return result(("In \(fromName)", localizedMedium(instant, zone: fromZone, locale: Locale(identifier: "en_GB"))), ("In \(toName)", localizedMedium(instant, zone: toZone, locale: Locale(identifier: "en_GB"))), ("Date change", dayText), ("Unix seconds", String(Int(instant.timeIntervalSince1970))))
         case "unix":
             return try unix(options["value"] ?? input)
         case "format":

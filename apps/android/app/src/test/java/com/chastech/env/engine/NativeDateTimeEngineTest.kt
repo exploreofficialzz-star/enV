@@ -46,4 +46,13 @@ class NativeDateTimeEngineTest {
         assertEquals("Calendar days: 5\nWeekdays: 4", NativeDateTimeEngine.run("deadline-calculator", options = mapOf("target" to "2024-01-20"), now = fixedNow).output)
         try { NativeDateTimeEngine.run("date-formatter", input = "not-a-date", now = fixedNow); throw AssertionError("invalid date accepted") } catch (_: IllegalArgumentException) { }
     }
+    @Test fun sourceTimezoneIsUsedForWallClockConversionAndDayShift() {
+        val result = NativeDateTimeEngine.run(
+            "timezone-converter",
+            options = mapOf("time" to "2024-01-01T09:00", "fromTz" to "UTC", "toTz" to "America/New_York"),
+            now = fixedNow
+        )
+        assertTrue(result.output.contains("Unix seconds: 1704099600"))
+        assertTrue(result.output.contains("Same calendar day"))
+    }
 }

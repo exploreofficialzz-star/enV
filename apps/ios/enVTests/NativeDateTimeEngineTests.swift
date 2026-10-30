@@ -43,4 +43,13 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "deadline-calculator", options: ["target": "2024-01-20"], now: fixedNow).output, "Calendar days: 5\nWeekdays: 4")
         XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-formatter", input: "not-a-date", now: fixedNow))
     }
+    func testSourceTimezoneIsUsedForWallClockConversionAndDayShift() throws {
+        let result = try NativeDateTimeEngine.run(
+            toolID: "timezone-converter",
+            options: ["time": "2024-01-01T09:00", "fromTz": "UTC", "toTz": "America/New_York"],
+            now: fixedNow
+        )
+        XCTAssertTrue(result.output.contains("Unix seconds: 1704099600"))
+        XCTAssertTrue(result.output.contains("Same calendar day"))
+    }
 }
