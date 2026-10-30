@@ -22,6 +22,10 @@ import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabProjectCodec
 import com.chastech.env.engine.NativeWorldLabProjectStore
 import com.chastech.env.engine.NativeWorldLabScience
+import com.chastech.env.engine.NativeDropInput
+import com.chastech.env.engine.NativeDropResult
+import com.chastech.env.engine.NativeWorldLabDropScience
+import kotlin.math.PI
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +56,11 @@ fun NativeWorldLabForm() {
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
+    var dropRun by remember { mutableStateOf<NativeDropResult?>(null) }
+    var dropEntityId by remember { mutableStateOf<String?>(null) }
+    var dropFrame by remember { mutableIntStateOf(0) }
+    var dropPlaying by remember { mutableStateOf(false) }
+    var dropSpeed by remember { mutableFloatStateOf(1f) }
     var warning by remember { mutableStateOf("") }
     val model=when(kind) {
         "spring"->NativeLabInput.Spring(massKg=mass.toDouble(),springNPerM=spring.toDouble())
@@ -147,6 +156,15 @@ fun NativeWorldLabForm() {
         if(requestImport){
             requestImport=false
             picker.launch(arrayOf("application/json","text/plain","*/*"))
+        }
+    }
+    LaunchedEffect(dropPlaying,dropSpeed,dropRun) {
+        while(dropPlaying) {
+            delay(40)
+            val result=dropRun?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04f*dropSpeed/result.stepSeconds).toInt())
+            dropFrame=(dropFrame+stride).coerceAtMost(result.samples.lastIndex)
+            if(dropFrame==result.samples.lastIndex)dropPlaying=false
         }
     }
     LaunchedEffect(playing,speed) {
@@ -315,6 +333,38 @@ fun NativeWorldLabForm() {
                 if(derivedMass!=null && derivedMass in 0.001..10000.0){
                     OutlinedButton(onClick={mass=derivedMass.toFloat();kind="spring";time=0f;playing=false}) {
                         Text("Test assumed mass as spring mass")
+                    }
+                    OutlinedButton(onClick={
+                        runCatching {
+                            val dimensions=solid.dimensionsMeters
+                            val area=if(solid.shape=="box")dimensions.x*dimensions.z
+                                else PI*dimensions.x*dimensions.z/4.0
+                            val result=NativeWorldLabDropScience.evaluate(NativeDropInput(
+                                massKg=derivedMass,supportingHalfHeightM=dimensions.y/2,
+                                projectedAreaM2=area,
+                                dragCoefficient=if(solid.shape=="sphere")0.47 else 1.05))
+                            dropRun=result;dropEntityId=solid.id;dropFrame=0;dropPlaying=true;warning=""
+                            playing=false
+                        }.onFailure{warning=it.message?:"This drop test exceeded the supported model."}
+                    }) { Text("Drop this solid") }
+                    if(dropEntityId==solid.id && dropRun!=null) {
+                        val drop=checkNotNull(dropRun)
+                        val sample=drop.samples[dropFrame.coerceIn(0,drop.samples.lastIndex)]
+                        Text("Computed drop height: "+labNumber(sample.heightAboveGroundM)+" m")
+                        Text("Computed vertical speed: "+labNumber(kotlin.math.abs(sample.velocityMps))+" m/s")
+                        Text("Estimated surface impacts: "+drop.impactCount)
+                        Slider(value=dropFrame.toFloat(),onValueChange={
+                            dropPlaying=false;dropFrame=it.toInt().coerceIn(0,drop.samples.lastIndex)
+                        },valueRange=0f..drop.samples.lastIndex.toFloat(),
+                            modifier=Modifier.semantics { contentDescription="Drop simulated time" })
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick={dropPlaying=!dropPlaying}){
+                                Text(if(dropPlaying)"Pause drop" else "Play drop")
+                            }
+                            OutlinedButton(onClick={dropPlaying=false;dropFrame=0}){Text("Reset drop")}
+                        }
+                        Text("Simplified gravity, drag and flat-ground contact; assumed density, not verified strength.",
+                            style=MaterialTheme.typography.bodySmall)
                     }
                 }
             }
