@@ -70,9 +70,44 @@ object NativeWorldLabEditor {
         require(networks.length()>0)
         val components=networks.getJSONObject(0).getJSONArray("components")
         require(components.length()<48)
+        val sourcePart=(0 until components.length()).map{components.getJSONObject(it)}
+            .firstOrNull{it.getString("kind")=="dc-source"}
+            ?:error("Circuit needs a voltage source before adding a parallel load")
         components.put(JSONObject().put("id",UUID.randomUUID().toString())
-            .put("kind","resistor").put("positiveNodeId","supply")
-            .put("negativeNodeId","ground").put("resistanceOhm",200.0))
+            .put("kind","resistor")
+            .put("positiveNodeId",sourcePart.getString("positiveNodeId"))
+            .put("negativeNodeId",sourcePart.getString("negativeNodeId"))
+            .put("resistanceOhm",200.0))
+    }
+    fun adjustCircuitComponent(source:String,id:String,delta:Double):String=edit(source){root->
+        require(delta.isFinite()){"Circuit adjustment must be finite"}
+        val components=root.getJSONArray("networks").getJSONObject(0).getJSONArray("components")
+        val index=(0 until components.length()).firstOrNull{
+            components.getJSONObject(it).getString("id")==id
+        }?:error("Selected circuit part no longer exists")
+        val component=components.getJSONObject(index)
+        when(component.getString("kind")){
+            "dc-source"->component.put("voltageV",
+                (component.getDouble("voltageV")+delta).coerceIn(-1000.0,1000.0))
+            "resistor"->component.put("resistanceOhm",
+                (component.getDouble("resistanceOhm")+delta).coerceIn(0.01,1e9))
+            else->error("Unknown device has no supported electrical parameter to adjust")
+        }
+    }
+    fun removeCircuitComponent(source:String,id:String):String=edit(source){root->
+        val components=root.getJSONArray("networks").getJSONObject(0).getJSONArray("components")
+        require(components.length()>1){"Cannot remove the final circuit part"}
+        val remaining=JSONArray()
+        var removed=false
+        for(index in 0 until components.length()){
+            val part=components.getJSONObject(index)
+            if(part.getString("id")==id){
+                require(part.getString("kind")!="dc-source"){"Keep the circuit's voltage source"}
+                removed=true
+            }else remaining.put(part)
+        }
+        require(removed){"Circuit component does not exist"}
+        root.getJSONArray("networks").getJSONObject(0).put("components",remaining)
     }
     fun addSolid(source: String,shape: String,id: String=UUID.randomUUID().toString()): String =
         edit(source){project->

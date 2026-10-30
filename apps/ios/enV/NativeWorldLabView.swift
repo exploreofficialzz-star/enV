@@ -220,6 +220,27 @@ struct NativeWorldLabView:View {
                                 }
                             }
                         }.buttonStyle(.bordered)
+                        ForEach(circuit.components.filter{$0.kind=="dc-source"||$0.kind=="resistor"},
+                            id:\.id){part in
+                            HStack {
+                                let isSource=part.kind=="dc-source"
+                                let value=part.voltageV ?? part.resistanceOhm ?? 0
+                                Text(String(format:"%.2f",value)+(isSource ? " V" : " Ω"))
+                                Button("−"){
+                                    applyProject{try NativeWorldLabEditor.adjustCircuitComponent(
+                                        $0,id:part.id,delta:isSource ? -1 : -10)}
+                                }
+                                Button("+"){
+                                    applyProject{try NativeWorldLabEditor.adjustCircuitComponent(
+                                        $0,id:part.id,delta:isSource ? 1 : 10)}
+                                }
+                                if !isSource {
+                                    Button("Remove"){
+                                        applyProject{try NativeWorldLabEditor.removeCircuitComponent($0,id:part.id)}
+                                    }
+                                }
+                            }.buttonStyle(.bordered)
+                        }
                         if let run=dcRun,run.projectId==project.id,
                            run.projectRevision==project.revision,run.networkId==circuit.id {
                             value("Power delivered",run.deliveredPowerW,"W")

@@ -347,6 +347,25 @@ fun NativeWorldLabForm() {
                             .onFailure{dcRun=null;warning=it.message?:"Circuit not solvable"}
                     }){Text("Calculate circuit")}
                 }
+                net.components.filter{it.kind=="dc-source"||it.kind=="resistor"}.forEach{part->
+                    Text((if(part.kind=="dc-source")"Voltage: " else "Resistance: ")+
+                        labNumber(part.voltageV?:part.resistanceOhm)+
+                        (if(part.kind=="dc-source")" V" else " Ω"))
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        val step=if(part.kind=="dc-source")1.0 else 10.0
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.adjustCircuitComponent(it,part.id,-step)
+                        }}){Text("−")}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.adjustCircuitComponent(it,part.id,step)
+                        }}){Text("+")}
+                        if(part.kind=="resistor"){
+                            OutlinedButton(onClick={applyProjectEdit{
+                                NativeWorldLabEditor.removeCircuitComponent(it,part.id)
+                            }}){Text("Remove")}
+                        }
+                    }
+                }
                 dcRun?.takeIf{it.projectId==project!!.id &&
                     it.projectRevision==project!!.revision && it.networkId==net.id}?.let{result->
                     Text("Delivered DC power: "+labNumber(result.deliveredPowerW)+" W")

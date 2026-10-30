@@ -200,3 +200,8 @@ release-candidate evidence bundle are unfinished.
 ## Native Swift DC circuits and UI integration (2026-10-30)
 
 - Swift's portable network graph is now solved with a native modified-nodal-analysis DC circuit solver, including ideal voltage constraints, passive ohmic currents, rank rejection, and an energy-power conservation ledger. Swift native editors create a first circuit and parallel resistors with revision-safe project mutations. SwiftUI presents calculated currents and power, rejects unknown inventions instead of guessing properties, and invalidates results after edits. The XCTest cases are authored; consolidated verification is deliberately deferred.
+
+## Cross-platform circuit editing continuation (2026-10-30)
+
+- Parallel resistor wiring now derives its positive/negative ports from the source component, rather than hard-coded node identifiers. Native Kotlin and Swift interfaces can adjust bounded source voltage and resistance, remove resistors, and recompute on changed project revisions. Web users can remove hypothetical components (which otherwise would permanently prevent DC solving) and also remove passive loads. The source voltage display follows the source's actual positive node.
+- Platform changes retain all unrelated studio behavior. Audits remain deferred as requested; the committed source is not yet described as a released production platform.

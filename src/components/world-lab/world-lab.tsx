@@ -686,11 +686,13 @@ export default function WorldLab() {
     catch(cause){setDcRun(null);setError(cause instanceof Error?cause.message:"Cannot calculate this circuit.");}
   }
   function inventDevice(){
-    if(!project?.networks?.[0] || !inventedDeviceName.trim() || !inventedDeviceAssumption.trim())return;
+    if(!project?.networks?.[0] || !project.networks[0].components.some(c=>c.kind==="dc-source") ||
+      !inventedDeviceName.trim() || !inventedDeviceAssumption.trim())return;
     mutateProject(p=>({...p,networks:(p.networks??[]).map((net,index)=>index!==0?net:{
       ...net,components:[...net.components,{id:crypto.randomUUID(),kind:"hypothetical-device" as const,
         name:inventedDeviceName.trim(),assumption:inventedDeviceAssumption.trim(),
-        positiveNodeId:"supply",negativeNodeId:"ground",
+        positiveNodeId:net.components.find(c=>c.kind==="dc-source")?.positiveNodeId??net.groundNodeId,
+        negativeNodeId:net.components.find(c=>c.kind==="dc-source")?.negativeNodeId??net.groundNodeId,
         evidence:"hypothetical-user-assumed" as const}],
     })}));
     setInventedDeviceName("");setInventedDeviceAssumption("");
@@ -890,10 +892,13 @@ export default function WorldLab() {
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} onClick={()=>{
               const net=project.networks?.[0];
-              if(!net||net.components.length>=48)return;
+              if(!net||net.components.length>=48||
+                !net.components.some(c=>c.kind==="dc-source"))return;
               mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i? n:{
                 ...n,components:[...n.components,{id:crypto.randomUUID(),kind:"resistor" as const,
-                  positiveNodeId:"supply",negativeNodeId:"ground",resistanceOhm:200}],
+                  positiveNodeId:n.components.find(c=>c.kind==="dc-source")?.positiveNodeId??n.groundNodeId,
+                  negativeNodeId:n.components.find(c=>c.kind==="dc-source")?.negativeNodeId??n.groundNodeId,
+                  resistanceOhm:200}],
               })}));
             }}>Add parallel resistor</button>
             <button type="button" className={buttonClass} onClick={calculateCircuit}>Calculate circuit</button>
@@ -911,11 +916,22 @@ export default function WorldLab() {
             <button type="button" className={buttonClass} onClick={inventDevice}
               disabled={!inventedDeviceName.trim()||!inventedDeviceAssumption.trim()||
                 project.networks[0].components.length>=48}>Add hypothetical device</button>
-            <p className="text-xs text-muted-foreground">Unknown parts remain editable, but cannot be simulated as verified electronics.</p>
+            <p className="text-xs text-muted-foreground">Unknown parts do not receive fabricated electronic behavior.</p>
+            {project.networks[0].components.filter(c=>c.kind==="hypothetical-device"||c.kind==="resistor").map(c=>
+              <div key={c.id} className="mt-2 flex items-center justify-between gap-2 text-xs">
+                <span>{c.kind==="hypothetical-device"?c.name:"Resistor ("+c.id+")"}</span>
+                <button type="button" className={buttonClass}
+                  aria-label={"Remove circuit part "+c.id}
+                  onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:{
+                    ...n,components:n.components.filter(x=>x.id!==c.id),
+                  })}))}>Remove</button>
+              </div>)}
           </details>
           {dcRun && dcRun.projectId===project.id&&dcRun.projectRevision===project.revision&&
             dcRun.networkId===project.networks[0].id && <div className="mt-2 text-xs" aria-label="Calculated circuit results">
-              <p>Supply rail: {dcRun.nodeVoltagesV.supply?.toFixed(3)} V</p>
+              <p>Positive source node: {dcRun.nodeVoltagesV[
+                project.networks[0].components.find(c=>c.kind==="dc-source")?.positiveNodeId??project.networks[0].groundNodeId
+              ]?.toFixed(3)} V</p>
               <p>Delivered power: {dcRun.sourcePowerSuppliedW.toFixed(4)} W</p>
               <p>Resistor heating: {dcRun.resistivePowerW.toFixed(4)} W</p>
               <p>Conservation residual: {dcRun.powerResidualW.toExponential(2)} W</p>

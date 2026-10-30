@@ -69,10 +69,55 @@ enum NativeWorldLabEditor {
                   parts.count<48 else {
                 throw NativeWorldLabError.invalid("Create a circuit before adding resistors")
             }
+            guard let source=parts.first(where:{$0["kind"] as? String=="dc-source"}),
+                  let positive=source["positiveNodeId"] as? String,
+                  let negative=source["negativeNodeId"] as? String else {
+                throw NativeWorldLabError.invalid("A voltage source is required")
+            }
             parts.append(["id":UUID().uuidString,"kind":"resistor",
-                "positiveNodeId":"supply","negativeNodeId":"ground",
+                "positiveNodeId":positive,"negativeNodeId":negative,
                 "resistanceOhm":200.0])
             networks[0]["components"]=parts
+            root["networks"]=networks
+        }
+    }
+    static func adjustCircuitComponent(_ data:Data,id:String,delta:Double) throws ->Data {
+        try mutate(data){root in
+            guard delta.isFinite,var networks=root["networks"] as? [[String:Any]],
+                  !networks.isEmpty,
+                  var parts=networks[0]["components"] as? [[String:Any]],
+                  let index=parts.firstIndex(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Selected circuit component does not exist")
+            }
+            let kind=parts[index]["kind"] as? String
+            if kind=="dc-source" {
+                guard let current=parts[index]["voltageV"] as? Double else {
+                    throw NativeWorldLabError.invalid("Invalid source voltage")
+                }
+                parts[index]["voltageV"]=min(1000,max(-1000,current+delta))
+            }else if kind=="resistor" {
+                guard let current=parts[index]["resistanceOhm"] as? Double else {
+                    throw NativeWorldLabError.invalid("Invalid resistance")
+                }
+                parts[index]["resistanceOhm"]=min(1e9,max(0.01,current+delta))
+            }else {
+                throw NativeWorldLabError.invalid("Unknown devices have no verified electrical parameter")
+            }
+            networks[0]["components"]=parts
+            root["networks"]=networks
+        }
+    }
+    static func removeCircuitComponent(_ data:Data,id:String) throws ->Data {
+        try mutate(data){root in
+            guard var networks=root["networks"] as? [[String:Any]],
+                  !networks.isEmpty,
+                  let parts=networks[0]["components"] as? [[String:Any]],
+                  parts.count>1,
+                  let part=parts.first(where:{$0["id"] as? String==id}),
+                  part["kind"] as? String != "dc-source" else {
+                throw NativeWorldLabError.invalid("Only removable, existing circuit loads can be deleted")
+            }
+            networks[0]["components"]=parts.filter{$0["id"] as? String != id}
             root["networks"]=networks
         }
     }
