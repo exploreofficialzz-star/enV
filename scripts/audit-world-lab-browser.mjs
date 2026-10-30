@@ -68,6 +68,27 @@ try{
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.1");
   await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
+  await page.getByRole("button",{name:"Power this solid"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByText(/Computed hypothetical electromechanical system/).waitFor();
+  const motorBefore=await page.getByText("Height above ground").locator("..").innerText();
+  await page.getByLabel("Explore motor time").fill("2");
+  const motorAfter=await page.getByText("Height above ground").locator("..").innerText();
+  assert.notEqual(motorAfter,motorBefore,"Electrical power must change modeled vertical motion");
+  const motorExportEvent=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export motor evidence"}).click();
+  const motorStream=await (await motorExportEvent).createReadStream();
+  let motorJson="";
+  for await(const part of motorStream)motorJson+=part.toString();
+  const motor=JSON.parse(motorJson);
+  assert.equal(motor.format,"env-world-lab-actuator-run");
+  assert.equal(motor.source.materialName,"Invented foam");
+  assert.equal(motor.source.inputEvidence,"hypothetical-user-assumed");
+  assert.ok(motor.samples.length>500);
+  assert.ok(motor.samples.some(s=>s.motorForceN>0 && s.resistiveHeatW>0));
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.2");
+  await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
   assert.equal(new URL(page.url()).pathname,currentWorkspacePath,
     "Physical simulation must occur in the same digital world workspace");
   await page.getByRole("button",{name:"Test this solid as spring mass"}).click();
