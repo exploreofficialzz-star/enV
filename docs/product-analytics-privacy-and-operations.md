@@ -73,3 +73,8 @@ The `userbehavior.envtools.store` dashboard is protected by a server-side passwo
 ## Aggregate history retention
 
 The analytics retention job first snapshots the previous completed day into `product_analytics_daily_snapshots`, then applies the configured raw-event retention (default 90 days, allowed 30–365). Snapshots retain daily counts by platform, tool and event type, failures, distinct installation/session counts and duration totals, without copying user, installation, session, IP, or event identifiers. Snapshots are retained for up to 730 days and are pruned after that. The private dashboard shows a 30-day detailed overview plus up to 365 days of aggregate daily history. Snapshot completeness must be checked after PostgreSQL migration and scheduled-job activation; no historical snapshots can be reconstructed for days before the job is first enabled.
+
+
+## Community retention and pseudonymous view counts
+
+The daily community retention job snapshots unique views by tool and day into a table containing only the day, tool ID and aggregate count. It then removes the per-visitor view rows after 30 days. Lifetime page-view counts are read from the snapshot plus the unsnapshotted recent rows. Reviewed/dismissed/actioned reports are retained for up to 365 days; hidden/removed comments are eligible for deletion 365 days after their last update; block records are pruned after 730 days; short-lived rate-limit digests are pruned after 48 hours. Open reports and visible user comments are not automatically deleted by this job. A published community-specific deletion/appeal procedure is still required before enabling public discussions.
