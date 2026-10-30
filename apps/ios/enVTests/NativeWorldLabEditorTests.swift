@@ -27,7 +27,7 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
                                                                                densityKgM3:Double.infinity))
         XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
-                                                                               densityKgM3:Double.negativeInfinity))
+                                                                               densityKgM3:-Double.infinity))
         XCTAssertThrowsError(try NativeWorldLabEditor.addHypotheticalMaterial(data,name:"Impossible",
                                                                                densityKgM3:1,
                                                                                youngModulusPa:Double.nan))
