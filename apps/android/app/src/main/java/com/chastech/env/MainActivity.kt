@@ -463,6 +463,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 20.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
                 NativeAnalyticsConsentPanel()
                 NativeProductUpdatesBanner()
+                NativeFeedbackEntry()
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val suggestionWidth = maxWidth
