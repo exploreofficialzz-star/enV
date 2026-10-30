@@ -83,3 +83,14 @@ test("unknown novel-material properties stay unknown instead of made-up values",
   assert.equal(material.youngModulusPa, null);
   assert.throws(() => validateNovelMaterial({ ...material, densityKgM3: -1 }));
 });
+
+test("stiff numerical systems are safely substepped or rejected", () => {
+  const integrated = runExperiment({ ...oscillator, springNPerM: 900 }, {
+    id: "stiff-valid", worldDateUTC: "2026-10-30T00:00:00Z", durationSeconds: 1,
+  });
+  assert.ok(integrated.time.solverStepSeconds < 1 / 240);
+  assert.ok(integrated.samples.every(sample => Number.isFinite(sample.mechanicalEnergyJ)));
+  assert.throws(() => runExperiment({
+    ...oscillator, massKg: 0.001, springNPerM: 1000000,
+  }, { id: "stiff-over-budget", worldDateUTC: "2026-10-30T00:00:00Z" }), /specialized solver/);
+});

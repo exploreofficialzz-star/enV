@@ -132,8 +132,14 @@ export function runExperiment(input: ModelInput, options: Readonly<{
   const h = options.solverStepSeconds ?? DEFAULT_SOLVER_STEP_SECONDS;
   bounded(duration, "Duration (s)", 0.01, 30);
   bounded(h, "Solver time step (s)", 0.0001, 0.05);
-  const steps = Math.ceil(duration / h);
-  if (steps > 50000) throw new Error("The local reference run exceeds its 50,000-step budget.");
+  // RK4 is not A-stable. Resolve the natural frequency and viscous decay
+  // before integrating, so extreme stiffness never becomes fictitious energy.
+  const maximumStableH = input.kind === "damped-oscillator"
+    ? 0.08 / Math.max(1, Math.sqrt(input.springNPerM / input.massKg),
+      input.dampingNsPerM / input.massKg)
+    : h;
+  const steps = Math.ceil(duration / Math.min(h, maximumStableH));
+  if (steps > 50000) throw new Error("The local reference run exceeds its 50,000-step budget; this stiff model needs a specialized solver.");
   const actualH = duration / steps;
   const frames: ModelSample[] = [];
   let x = input.kind === "damped-oscillator" ? input.initialDisplacementM : 0;

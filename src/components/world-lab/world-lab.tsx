@@ -88,7 +88,7 @@ export default function WorldLab() {
           setCircuit({ ...defaultCircuit, ...x });
         }
       }
-      if (Number.isInteger(record.shapeCount) && Number(record.shapeCount) >= 0 && Number(record.shapeCount) <= 20) {
+      if (typeof record.shapeCount === "number" && Number.isInteger(record.shapeCount) && record.shapeCount >= 0 && Number(record.shapeCount) <= 20) {
         setShapeCount(Number(record.shapeCount));
       }
     } catch {
