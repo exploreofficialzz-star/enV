@@ -74,9 +74,12 @@ try{
   assert.deepEqual(data.entities[0].dimensionsMeters,[2,1,1]);
   assert.equal(data.entities[0].positionMeters[0],3);
   await page.getByRole("button",{name:"Save on device"}).click();
-  await page.getByText(/Saved on this device with revision protection/).waitFor();
+  await page.getByText(/scientific runs saved on this device/).waitFor();
   await page.reload({waitUntil:"domcontentloaded"});
   await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({timeout:90000});
+  await page.getByRole("combobox",{name:"Open recorded run (this session)"}).waitFor({state:"visible"});
+  assert.ok(await page.getByRole("combobox",{name:"Open recorded run (this session)"}).locator("option").count()>=3,
+    "Saved project must restore its scientific run history after reload");
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
   await page.getByRole("combobox",{name:"Experiment"}).selectOption("rc-circuit");
   await context.setOffline(true);

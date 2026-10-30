@@ -5,7 +5,8 @@ import {
   readWorldLabProjectJson, serializeWorldLabProject, solidQuantities,
   type WorldLabEntity, type WorldLabProject,
 } from "@/lib/world-lab/project";
-import { listLocalWorldLabProjects, putLocalWorldLabProject } from "@/lib/world-lab/local-storage";
+import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRuns,
+  putLocalWorldLabProject, saveLocalWorldLabRun } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import {
@@ -59,6 +60,7 @@ export default function WorldLab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<SceneHandles | null>(null);
   const lastFrame = useRef<number | null>(null);
+  const restoreRunsEpoch = useRef(0);
   const [graphicsError, setGraphicsError] = useState("");
   const [modelKind, setModelKind] = useState<ModelInput["kind"]>("damped-oscillator");
   const [mechanical, setMechanical] = useState(defaultMechanical);
@@ -149,6 +151,7 @@ export default function WorldLab() {
       if (latest) {
         setProject(latest);
         setSavedRevision(latest.revision);
+        restoreRunsForProject(latest.id);
         setMessage("Opened the most recently saved local World Lab project.");
       } else {
         const fresh = blankWorldLabProject(crypto.randomUUID(), new Date().toISOString());
@@ -318,6 +321,23 @@ export default function WorldLab() {
     if (currentRun && timeSeconds >= currentRun.time.simulatedDurationSeconds) setPlaying(false);
   }, [currentRun, timeSeconds]);
 
+  function restoreRunsForProject(projectId: string) {
+    const epoch=++restoreRunsEpoch.current;
+    void listLocalWorldLabRuns(projectId).then(saved=>{
+      if(epoch!==restoreRunsEpoch.current)return;
+      setRuns(saved);
+      const last=saved.at(-1);
+      if(!last) {setRunId("");return;}
+      setRunId(last.id);
+      setTimeSeconds(0);setPlaying(false);setDirty(false);
+      setModelKind(last.inputs.kind);
+      if(last.inputs.kind==="damped-oscillator")setMechanical(last.inputs);
+      else if(last.inputs.kind==="rc-circuit")setCircuit(last.inputs);
+      else setHeat(last.inputs);
+    }).catch(cause=>{
+      if(epoch===restoreRunsEpoch.current)setError(cause instanceof Error?cause.message:"Saved experiment history is unreadable.");
+    });
+  }
   function changeMechanical<K extends keyof DampedOscillator>(key: K, value: DampedOscillator[K]) {
     setMechanical((current) => ({ ...current, [key]: value }));
     setDirty(true); setPlaying(false);
@@ -337,7 +357,12 @@ export default function WorldLab() {
         id: window.crypto.randomUUID(), parentRunId: currentRun?.id ?? null,
         worldDateUTC: new Date().toISOString(), assumedMassSource: source,
       });
-      setRuns((previous) => [...previous.slice(-6), next]);
+      setRuns((previous) => [...previous.slice(-19), next]);
+      if (project && savedRevision !== null) {
+        void saveLocalWorldLabRun(project.id,next).catch(cause=>
+          setError((cause instanceof Error?cause.message:"Could not archive the experiment.")+
+            " Export the run JSON to keep it."));
+      }
       setRunId(next.id);
       setComparisonRunId("");
       setTimeSeconds(0);
@@ -424,10 +449,24 @@ export default function WorldLab() {
       setSavedRevision(saved.revision);
       setWorkspaceDirty(false);
       setSavedProjects(await listLocalWorldLabProjects());
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        format:"env-world-lab-local", version:1,modelKind,mechanical,circuit,heat,
-      }));
-      setMessage("Saved on this device with revision protection. Cloud synchronization is not yet available.");
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          format:"env-world-lab-local", version:1,modelKind,mechanical,circuit,heat,
+        }));
+      } catch {
+        // Project and scientific histories are in IndexedDB even if preferences storage is unavailable.
+      }
+      const archival=await Promise.allSettled(runs.map(run=>saveLocalWorldLabRun(saved.id,run)));
+      const rejected=archival.filter(item=>item.status==="rejected");
+      if(rejected.length) {
+        setMessage("The project was saved locally, but some experiment history could not be archived.");
+        setError("Export any missing run JSON before closing this tab. "+
+          rejected.map(item=>item.status==="rejected" && item.reason instanceof Error
+            ? item.reason.message : "Local storage failed.").join(" "));
+      }else{
+        setMessage("Project and "+archival.length+
+          " scientific runs saved on this device. Cloud synchronization is not yet available.");
+      }
     } catch(cause) {
       setError(cause instanceof Error?cause.message:"Could not save this project. Export a JSON backup.");
     }
@@ -454,6 +493,7 @@ export default function WorldLab() {
         warnings=report.warnings;
       }else imported=readWorldLabProjectJson(json);
       if(workspaceDirty && !window.confirm("Discard unsaved local edits and import a different project?")) return;
+      restoreRunsEpoch.current++;
       const now=new Date().toISOString();
       setProject(parseWorldLabProject({...imported,id:crypto.randomUUID(),title:imported.title,
         revision:0,createdAt:now,updatedAt:now}));
@@ -471,14 +511,28 @@ export default function WorldLab() {
     if(workspaceDirty && !window.confirm("Discard unsaved local edits and open another project?"))return;
     setProject(saved);setSavedRevision(saved.revision);setWorkspaceDirty(false);
     setSelectedEntityId("");setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+    restoreRunsForProject(saved.id);
     setMessage("Opened saved project "+saved.title+".");
   }
   function newProject(){
     if(workspaceDirty && !window.confirm("Discard unsaved local edits and create a new project?"))return;
+    restoreRunsEpoch.current++;
     setProject(blankWorldLabProject(crypto.randomUUID(),new Date().toISOString()));
     setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
     setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     setMessage("New local World Lab project created.");
+  }
+  async function deleteSelectedRun() {
+    if(!project || !currentRun)return;
+    if(!window.confirm("Delete this recorded experiment from local history? Export its JSON first if you want a backup."))return;
+    try {
+      if(savedRevision!==null)await deleteLocalWorldLabRun(project.id,currentRun.id);
+      setRuns(previous=>previous.filter(item=>item.id!==currentRun.id));
+      setRunId("");
+      setComparisonRunId("");
+      setPlaying(false);setTimeSeconds(0);
+      setMessage("Deleted the selected local experiment. Other saved runs were not changed.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Could not delete the local experiment.");}
   }
   function addMaterial() {
     try {
@@ -786,9 +840,12 @@ export default function WorldLab() {
                 </>
               )}
               <p className="mt-1 text-xs text-muted-foreground">
-                Historical runs retain their original inputs. This short session history
-                is not yet cloud synced; export a run to keep it independently.
+                Up to 20 recorded runs can be stored per project on this device.
+                Historical input values and assumptions are kept unchanged.
+                Cloud synchronization is not available; export JSON for an independent backup.
               </p>
+              {currentRun && <button type="button" className={buttonClass + " mt-2"}
+                onClick={() => void deleteSelectedRun()}>Delete selected run</button>}
             </div>
           )}
           {dirty && currentRun && <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
