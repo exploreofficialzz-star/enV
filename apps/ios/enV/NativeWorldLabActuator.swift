@@ -43,6 +43,11 @@ enum NativeWorldLabActuator {
     }
     private static func derivative(_ s:[Double],_ i:NativeActuatorInput)->[Double] {
         let v=s[1];let c=s[2]
+        // Constrained ground contact is enforced inside intermediate stages,
+        // otherwise an unpowered resting coil falsely generates back-EMF.
+        if s[0]<=0 && v<=0 && i.forceConstantNPerA*c<=i.massKg*i.gravityMps2 {
+            return [0,0,(i.supplyVoltageV-i.resistanceOhm*c)/i.inductanceH]
+        }
         return [v,
             (i.forceConstantNPerA*c-i.dampingNsPerM*v)/i.massKg-i.gravityMps2,
             (i.supplyVoltageV-i.resistanceOhm*c-i.forceConstantNPerA*v)/i.inductanceH]
