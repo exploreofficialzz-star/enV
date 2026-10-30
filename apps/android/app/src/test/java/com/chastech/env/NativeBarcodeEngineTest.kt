@@ -2,6 +2,7 @@ package com.chastech.env
 
 import com.chastech.env.data.EngineInfo
 import com.chastech.env.data.ToolRecord
+import java.io.ByteArrayInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
@@ -37,6 +38,18 @@ class NativeBarcodeEngineTest {
         assertTrue(NativeBarcodeEngine.supports(tool("code128-barcode")))
         assertTrue(NativeBarcodeEngine.supports(tool("isbn-check-digit")))
         assertTrue(NativeBarcodeEngine.run("isbn-check-digit", "9780143127741").startsWith("Valid"))
+    }
+
+    @Test fun localImageImportsAreBoundedEvenWhenAProviderCannotReportFileSize() {
+        val content = byteArrayOf(1, 2, 3, 4)
+        ByteArrayInputStream(content).use { input ->
+            assertArrayEquals(content, readBarcodeImageBytes(input, maxBytes = 4))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ByteArrayInputStream(content + byteArrayOf(5)).use { input ->
+                readBarcodeImageBytes(input, maxBytes = 4)
+            }
+        }
     }
 
     @Test fun decodedLinksAllowOnlyHttpAndHttpsHosts() {
