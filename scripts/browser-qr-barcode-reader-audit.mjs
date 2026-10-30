@@ -27,7 +27,7 @@ async function makeQrImage(payload) {
   const image = page.getByRole("img", { name: "Generated QR code" });
   await image.waitFor({ state: "visible", timeout: 12000 });
   const bytes = await image.evaluate(async (element) => {
-    const response = await fetch((element as HTMLImageElement).src);
+    const response = await fetchelement.src;
     return Array.from(new Uint8Array(await response.arrayBuffer()));
   });
   return Buffer.from(bytes);
@@ -40,7 +40,7 @@ async function makeCode128Image(value) {
   const barcode = page.locator("div.overflow-x-auto svg").first();
   await barcode.waitFor({ state: "visible", timeout: 12000 });
   const svg = await barcode.evaluate((element) => {
-    const clone = element.cloneNode(true) as SVGSVGElement;
+    const clone = element.cloneNode(true);
     const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     background.setAttribute("width", "100%");
     background.setAttribute("height", "100%");
