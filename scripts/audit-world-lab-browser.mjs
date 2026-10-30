@@ -18,7 +18,7 @@ try {
   page.on("pageerror", error => errors.push(error.message));
   await page.goto(origin + "/tools/developer/the-world-lab", { waitUntil: "domcontentloaded", timeout: 90000 });
   await page.getByRole("main", { name: "The World Lab" }).waitFor({ timeout: 90000 });
-  await page.locator(".world-lab-stage canvas").waitFor();
+  await page.locator(".world-lab-stage canvas[data-renderer-ready=true]").waitFor({ timeout: 90000 });
   await page.getByRole("button", { name: "Build", exact: true }).click();
   await page.getByRole("button", { name: "Block", exact: true }).click();
   await page.getByRole("button", { name: "Ball", exact: true }).click();
