@@ -4,6 +4,7 @@ export const OBSERVER_BOUNDS_METRES = { minHeight: -12, maxRadius: 1000 } as con
 /** Normalize wheel/pinch input into a bounded displacement along the view ray. */
 export function observerTravelMetres(delta: number, mode: "wheel" | "pinch"): number {
   if (!Number.isFinite(delta)) throw new Error("Invalid observer navigation input.");
+  if (delta === 0) return 0;
   const scaled = mode === "wheel" ? -delta * 0.012 : delta * 0.022;
   return Math.max(-5, Math.min(5, scaled));
 }
