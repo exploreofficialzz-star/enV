@@ -1,0 +1,43 @@
+name: One-time Better Auth security lockfile refresh
+on:
+  push:
+    branches: [feat/world-lab-foundation-20261030]
+    paths:
+      - ".github/workflows/world-lab-auth-refresh.yml"
+permissions:
+  contents: write
+jobs:
+  refresh:
+    if: github.repository == 'exploreofficialzz-star/enV'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Refresh Better Auth only, without running package scripts
+        run: npm install --package-lock-only --ignore-scripts --save-exact better-auth@1.7.14
+      - name: Reproducible install and security audit
+        run: |
+          npm ci
+          npm audit --audit-level=moderate
+      - name: Compile and verify existing authentication contracts
+        run: |
+          npm run build
+          npm run typecheck
+          npm run check:auth
+          npm run check:auth-providers
+      - name: Commit reviewed dependency manifest and lockfile
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No lockfile changes"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Security: upgrade Better Auth to patched 1.7.14"
+          git push origin HEAD:feat/world-lab-foundation-20261030
