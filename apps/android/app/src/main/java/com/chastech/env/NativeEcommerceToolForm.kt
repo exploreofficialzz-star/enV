@@ -2,7 +2,10 @@ package com.chastech.env
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +38,20 @@ fun NativeEcommerceToolForm(toolId: String) {
     var output by rememberSaveable(toolId) { mutableStateOf("") }
     var error by rememberSaveable(toolId) { mutableStateOf("") }
     var outputFileName by rememberSaveable(toolId) { mutableStateOf("") }
+    val saveOutputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                val stream = context.contentResolver.openOutputStream(uri)
+                    ?: throw IllegalStateException("Could not open the selected file for writing.")
+                stream.use { it.write(output.toByteArray(Charsets.UTF_8)) }
+            }.fold(
+                onSuccess = { Toast.makeText(context, "Saved $outputFileName", Toast.LENGTH_SHORT).show() },
+                onFailure = { failure -> error = failure.message ?: "Could not save the output file." },
+            )
+        }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
@@ -71,6 +88,9 @@ fun NativeEcommerceToolForm(toolId: String) {
                     context.getSystemService(ClipboardManager::class.java)
                         ?.setPrimaryClip(ClipData.newPlainText("enV E-commerce output", output))
                 }) { Text("Copy") }
+                OutlinedButton(onClick = { saveOutputLauncher.launch(outputFileName.ifBlank { "env-$toolId.txt" }) }) {
+                    Text("Save")
+                }
             }
         }
         if (error.isNotBlank()) {
