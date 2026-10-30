@@ -24,8 +24,6 @@ assert.ok(
   "Generated E-commerce tools are activated through the local category engine",
 );
 assert.ok(generator.includes('["qr-payload-inspector","QR Payload Inspector"'), "Catalog generator retains the canonical QR reader record");
-assert.ok(androidCatalog.includes('name = if (stringOrEmpty("id") == "qr-payload-inspector") "QR & Barcode Reader"'), "Android catalog presents the QR reader label");
-assert.ok(iosCatalog.includes('name: id == "qr-payload-inspector" ? "QR & Barcode Reader" : name'), "iOS catalog presents the QR reader label");
 assert.ok(toolEngine.includes("if (tool.id === \"qr-payload-inspector\") return <BarcodeReaderEngine />;"), "Reader route reaches the scanner engine");
 assert.ok(toolEngine.includes('if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;'), "E-commerce tools bypass planned fallback and reach their engine");
 assert.ok(reader.includes("BrowserMultiFormatReader") && reader.includes("decodeFromVideoDevice") && reader.includes("decodeFromImageElement"), "Reader decodes camera streams and uploaded images");
@@ -40,6 +38,8 @@ const androidCatalog = read("apps/android/app/src/main/java/com/chastech/env/dat
 const androidReader = read("apps/android/app/src/main/java/com/chastech/env/NativeBarcodeReader.kt");
 const androidCommerce = read("apps/android/app/src/main/java/com/chastech/env/NativeEcommerceEngine.kt");
 const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
+assert.ok(androidCatalog.includes('name = if (stringOrEmpty("id") == "qr-payload-inspector") "QR & Barcode Reader"'), "Android catalog presents the QR reader label");
+assert.ok(iosCatalog.includes('name: id == "qr-payload-inspector" ? "QR & Barcode Reader" : name'), "iOS catalog presents the QR reader label");
 const iosViews = read("apps/ios/enV/ToolViews.swift");
 const iosReader = read("apps/ios/enV/NativeQrBarcodeAndEcommerceViews.swift");
 const iosCommerce = read("apps/ios/enV/NativeEcommerceEngine.swift");
