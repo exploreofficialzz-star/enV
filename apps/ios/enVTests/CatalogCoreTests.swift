@@ -33,6 +33,21 @@ final class CatalogCoreTests: XCTestCase {
         super.tearDown()
     }
 
+    func testNativeCatalogActivatesQRAndEcommerceAndNamesTheReader() {
+        let tools = [
+            Tool(id: "qr-payload-inspector", name: "QR Payload Inspector", slug: "qr-payload-inspector", description: "Inspect a QR payload", category: "qr", subcategory: nil, keywords: ["payload"], tags: [], icon: "QrCode", popularity: 10, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "qr", id: "inspect", op: nil)),
+            Tool(id: "product-generator", name: "Product Generator", slug: "product-generator", description: "Create product records", category: "ecommerce", subcategory: nil, keywords: [], tags: [], icon: "ShoppingCart", popularity: 10, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "planned", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: "product-generator", op: nil)),
+            Tool(id: "future-tool", name: "Future Tool", slug: "future-tool", description: "Still planned", category: "marketing", subcategory: nil, keywords: [], tags: [], icon: "Megaphone", popularity: 1, featured: false, clientSide: false, requiresBackend: true, requiresAuth: false, status: "planned", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: "future-tool", op: nil))
+        ]
+        let native = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 1, planned: 2, categories: 3), categories: [], tools: tools, relatedReferenceTools: nil).nativeFacing()
+        XCTAssertEqual(native.tools.first { $0.id == "qr-payload-inspector" }?.name, "QR & Barcode Reader")
+        XCTAssertEqual(native.tools.first { $0.id == "qr-payload-inspector" }?.status, "active")
+        XCTAssertEqual(native.tools.first { $0.id == "product-generator" }?.status, "active")
+        XCTAssertEqual(native.tools.first { $0.id == "future-tool" }?.status, "planned")
+        XCTAssertEqual(native.counts.active, 2)
+        XCTAssertEqual(native.counts.planned, 1)
+    }
+
     func testSearchIncludesDescriptionKeywordsAndTags() {
         let store = CatalogStore(catalog: catalog)
         XCTAssertEqual(store.tools(matching: "characters").first?.id, "word-count")
