@@ -27,17 +27,17 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun NativeAnalyticsConsentPanel() {
-    if (!BuildConfig.ANALYTICS_ENABLED) return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var choice by remember { mutableStateOf(NativeAnalytics.consentChoice(context)) }\n    if (!BuildConfig.ANALYTICS_ENABLED && choice != "granted") return
+    var choice by remember { mutableStateOf(NativeAnalytics.consentChoice(context)) }
+    if (!BuildConfig.ANALYTICS_ENABLED && choice != "granted") return
     var expanded by remember { mutableStateOf(choice == "unset") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         NativeAnalytics.startNewSession(context)
-        if (choice == "granted") NativeAnalytics.record(context, "app_opened")
+        if (choice == "granted" && BuildConfig.ANALYTICS_ENABLED) NativeAnalytics.record(context, "app_opened")
         // Also retries a pending opt-out revocation after an offline session.
         runCatching { NativeAnalytics.flush(context) }
     }
@@ -52,7 +52,7 @@ fun NativeAnalyticsConsentPanel() {
             if (choice == "unset" || expanded) {
                 Text(if (BuildConfig.ANALYTICS_ENABLED) "Help improve enV" else "Analytics is disabled in this app version", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Optional analytics records tool activity, outcomes and approximate device and network categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow.",
+                    if (BuildConfig.ANALYTICS_ENABLED) "Optional analytics records tool activity, outcomes and approximate device and network categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow." else "Analytics collection is disabled in this app version. You can withdraw a previously saved analytics choice here.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -86,7 +86,7 @@ fun NativeAnalyticsConsentPanel() {
                 }
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(if (choice == "granted") "Analytics is enabled" else "Analytics is disabled", style = MaterialTheme.typography.bodySmall)
+                    Text(if (!BuildConfig.ANALYTICS_ENABLED) "Analytics collection is disabled" else if (choice == "granted") "Analytics is enabled" else "Analytics is disabled", style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { expanded = true }) { Text("Privacy choices") }
                 }
             }
