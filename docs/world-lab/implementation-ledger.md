@@ -258,3 +258,7 @@ release-candidate evidence bundle are unfinished.
 
 - Added migration 0009 with user foreign key, idempotency, bounded JSON, queued/running/succeeded/failed/cancelled statuses, worker leases, indexes and RLS without direct Data API policies. Source-only SQL: not yet applied to live Supabase.
 - Implemented per-owner transactional submission (3 active, 30 hourly), user-scoped lookups/cancellation, compare-and-set lease claim/retry with 3-attempt cap and stale-worker result protection. A dedicated process worker evaluates only the existing constrained science dispatcher; not started/deployed. Feature remains gated behind real authentication, DATABASE_URL and WORLD_LAB_JOBS_ENABLED=true. The end-to-end lifecycle and hosting must be independently verified in a later audit.
+
+## World Lab jobs HTTP integration (2026-10-30)
+
+- Added auth-gated same-origin owner-scoped POST submit, GET status and POST cancel endpoints on the durable job ledger. Shared session and bounded-body helper fails closed when jobs/auth/Postgres are not configured. Public response excludes user IDs, raw inputs and internal storage details, and only exposes completed result to its owner. Added the feature activation/run contract. SQL not migrated, worker not deployed and no CI executed per user's integration-first request.
