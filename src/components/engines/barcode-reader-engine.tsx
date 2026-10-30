@@ -68,11 +68,14 @@ function payloadLabel(value: string): string {
   return "Text or structured data";
 }
 
-function decodeMultipleImageCodes(image: HTMLImageElement) {
-  const maxDimension = 2800;
-  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+function decodeMultipleImageCodes(image: HTMLImageElement | HTMLVideoElement) {
+  const sourceWidth = "videoWidth" in image ? image.videoWidth : image.naturalWidth;
+  const sourceHeight = "videoHeight" in image ? image.videoHeight : image.naturalHeight;
+  if (!sourceWidth || !sourceHeight) return [];
+  const maxDimension = 1800;
+  const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -172,6 +175,7 @@ export function BarcodeReaderEngine() {
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const scanGeneration = useRef(0);
   const recentScansRef = useRef<Map<string, number>>(new Map());
+  const lastCameraMultiScanAtRef = useRef(0);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraStarting, setCameraStarting] = useState(false);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
@@ -271,6 +275,28 @@ export function BarcodeReaderEngine() {
         (result) => {
           if (generation !== scanGeneration.current || !result) return;
           addResult(result.getText(), result.getBarcodeFormat());
+
+          // ZXing's video callback returns one symbol. At a controlled cadence,
+          // inspect the same live frame for additional codes without running a
+          // second continuous camera reader.
+          const video = videoRef.current;
+          const now = Date.now();
+          if (
+            video &&
+            video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+            now - lastCameraMultiScanAtRef.current >= 700
+          ) {
+            lastCameraMultiScanAtRef.current = now;
+            try {
+              const frameResults = decodeMultipleImageCodes(video);
+              if (frameResults.length > 1) {
+                frameResults.forEach((item) => addResult(item.getText(), item.getBarcodeFormat()));
+                setNotice(`Detected ${frameResults.length} codes in the camera frame.`);
+              }
+            } catch {
+              // The standard live callback remains available if a frame cannot be batch-decoded.
+            }
+          }
         },
       );
 
