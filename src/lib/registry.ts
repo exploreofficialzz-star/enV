@@ -97,6 +97,7 @@ export function getToolById(id: string): ToolMeta | undefined {
 }
 
 export function getToolByPath(category: string, slug: string): ToolMeta | undefined {
+  if (category === "developer" && slug === "artboard-studio") return byPath.get("developer/the-world-lab");
   if (category === "audio" && ["song-metadata-analyzer", "audio-analyze-studio", "ai-music-data-sandbox"].includes(slug)) return songMetadataAnalyzerTool;
   return byPath.get(`${category}/${slug}`);
 }
