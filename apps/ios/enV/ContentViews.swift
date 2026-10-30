@@ -189,10 +189,9 @@ enum NativeAnalyticsClient {
 
     static func start() async {
         guard isEnabled else { return }
-        if choice == "granted" {
-            record("app_opened")
-            try? await flush()
-        }
+        if choice == "granted" { record("app_opened") }
+        // A pending opt-out revocation must retry even while consent is now denied.
+        try? await flush()
     }
 
     static func chooseConsent(granted: Bool) async throws {
