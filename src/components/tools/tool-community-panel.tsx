@@ -221,7 +221,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {\n  const fe
     );
   }
 
-  return (
+  if (!featureEnabled) return null;\n\n  return (
     <section className="mt-10 border-t border-border pt-7" aria-labelledby="tool-community-heading">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
