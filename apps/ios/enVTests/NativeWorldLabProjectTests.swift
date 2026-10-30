@@ -10,7 +10,7 @@ final class NativeWorldLabProjectTests: XCTestCase {
         let project=try NativeWorldLabProject.decode(sharedFixture())
         XCTAssertEqual(project.entities.count,2)
         XCTAssertEqual(project.materials.count,1)
-        XCTAssertEqual(project.entities.first?.volumeMetersCubed,24,accuracy:1e-10)
+        XCTAssertEqual(try XCTUnwrap(project.entities.first).volumeMetersCubed,24,accuracy:1e-10)
         XCTAssertEqual(project.entities.first?.materialId,"mat-1")
         XCTAssertNil(project.entities.last?.materialId)
     }
