@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -61,6 +65,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
 data class NativeBarcodeScan(
@@ -175,6 +180,7 @@ fun NativeBarcodeReaderTool() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
+    val scope = rememberCoroutineScope()
     val previewView = remember(context) { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     val results = remember { mutableStateListOf<NativeBarcodeScan>() }
     var cameraPermission by remember {
@@ -210,8 +216,20 @@ fun NativeBarcodeReaderTool() {
     }
     val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            val scan = runCatching { NativeBarcodeImageDecoder.decode(context, uri) }.getOrNull()
-            if (scan != null) accept(scan) else error = "No supported QR code or barcode was detected in that image. Try a sharper image with the full code visible."
+            scope.launch {
+                error = ""
+                status = "Reading image locally…"
+                val decoded = withContext(Dispatchers.IO) {
+                    runCatching { NativeBarcodeImageDecoder.decode(context, uri) }
+                }
+                decoded.fold(
+                    onSuccess = { scan ->
+                        if (scan != null) accept(scan)
+                        else error = "No supported QR code or barcode was detected in that image. Try a sharper image with the full code visible."
+                    },
+                    onFailure = { failure -> error = failure.message ?: "Could not read the selected image." },
+                )
+            }
         }
     }
 
@@ -225,14 +243,14 @@ fun NativeBarcodeReaderTool() {
         } else {
             val providerFuture = ProcessCameraProvider.getInstance(context)
             var cameraProvider: ProcessCameraProvider? = null
-            var disposed = false
+            val disposed = AtomicBoolean(false)
             var previewUseCase: Preview? = null
             var analysisUseCase: ImageAnalysis? = null
             val analyzer = NativeBarcodeCameraAnalyzer { scan ->
                 mainHandler.post { accept(scan) }
             }
             providerFuture.addListener({
-                if (disposed) return@addListener
+                if (disposed.get()) return@addListener
                 runCatching {
                     val provider = providerFuture.get()
                     cameraProvider = provider
@@ -254,7 +272,7 @@ fun NativeBarcodeReaderTool() {
                 }
             }, ContextCompat.getMainExecutor(context))
             onDispose {
-                disposed = true
+                disposed.set(true)
                 runCatching { analysisUseCase?.clearAnalyzer() }
                 runCatching {
                     val provider = cameraProvider ?: if (providerFuture.isDone) providerFuture.get() else null
