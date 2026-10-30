@@ -164,13 +164,13 @@ public enum NativeDateTimeEngine {
             return result(("Days until birthday", String(calendar(.gregorian).dateComponents([.day], from: today, to: next).day ?? 0)))
         case "time-until":
             let target = try dateOnly(options["target"] ?? options["value"] ?? "", label: "target date")
-            let today = calendar(.gregorian).startOfDay(for: now)
+            let today = deviceToday(now, in: localTimeZone)
             let span = calendarSpan(today, target)
             let sign = span.totalDays < 0 ? "-" : ""
             return result(("Calendar span", "\(sign)\(span.years) years, \(span.months) months, \(span.days) days"), ("Total days", String(span.totalDays)))
         case "deadline":
             let target = try dateOnly(options["target"] ?? options["value"] ?? "", label: "deadline")
-            let today = calendar(.gregorian).startOfDay(for: now)
+            let today = deviceToday(now, in: localTimeZone)
             let includeEnd = options["includeEnd"] == "true"
             let working = try countWorkingDays(from: today, to: target, options: options, includeEnd: includeEnd)
             return result(("Calendar days remaining", String(calendar(.gregorian).dateComponents([.day], from: today, to: target).day ?? 0)), ("Working days remaining", String(working)), ("Deadline weekday", format(target, pattern: "EEEE")), ("End-date rule", includeEnd ? "Deadline date included" : "Deadline date excluded"))
