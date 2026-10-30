@@ -94,6 +94,10 @@ export function BarcodeReaderEngine() {
               Number.isFinite(Date.parse(record.scannedAt));
           });
           setResults(valid.slice(0, 50));
+          recentScansRef.current = new Map(valid.map((record) => [
+            `${record.format}\u0000${record.value}`,
+            Date.parse(record.scannedAt),
+          ]));
         }
       }
     } catch {
@@ -363,7 +367,7 @@ export function BarcodeReaderEngine() {
               <Button type="button" size="sm" variant="outline" onClick={() => downloadText(scanHistoryCsv(results), "env-scan-history.csv", "text/csv")}>
                 Export CSV
               </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => { setResults([]); setNotice("Scan history cleared."); }}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => { setResults([]); recentScansRef.current.clear(); setNotice("Scan history cleared."); }}>
                 Clear results
               </Button>
             </div>
