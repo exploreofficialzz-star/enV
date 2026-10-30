@@ -52,3 +52,13 @@ comment on table product_feedback is
   'Private developer feedback tickets. Not public comments or community discussions. Avoid collecting secrets or payment details.';
 comment on column product_feedback.reporter_digest is
   'Keyed HMAC digest for abuse controls; never a raw IP address or device identifier.';
+
+
+-- Application data is accessed through the trusted server connection only.
+-- No anon/authenticated client policies are created.
+alter table public.product_analytics_consents enable row level security;
+alter table public.product_analytics_events enable row level security;
+alter table public.product_analytics_rate_limits enable row level security;
+alter table public.product_feedback enable row level security;
+alter table public.product_feedback_rate_limits enable row level security;
+alter table public.product_feedback_status_events enable row level security;
