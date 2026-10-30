@@ -188,6 +188,12 @@ enum NativeBarcodeImageDecoder {
         }
 
         let request = VNDetectBarcodesRequest()
+        #if targetEnvironment(simulator)
+        // Vision revision 3 uses an on-device ML network that may not compile inside
+        // hosted iOS simulator VMs. Revision 2 keeps deterministic barcode decoding
+        // available in CI simulators; physical devices retain the latest Vision revision.
+        request.revision = VNDetectBarcodesRequestRevision2
+        #endif
         request.symbologies = try request.supportedSymbologies()
         try VNImageRequestHandler(cgImage: scanImage, orientation: .up).perform([request])
         let results = (request.results ?? []).compactMap { observation -> NativeBarcodeReadRecord? in
