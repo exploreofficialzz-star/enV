@@ -84,7 +84,7 @@ internal fun nativeBarcodeScansCsv(scans: List<NativeBarcodeScan>): String {
     fun cell(value: String) = "\"${value.replace("\"", "\"\"")}\""
     val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
     return buildString {
-        appendLine("scanned_at,format,payload")
+        append("scanned_at,format,payload\r\n")
         scans.forEach { scan ->
             append(cell(timestamp.format(Date(scan.scannedAt))))
             append(',')
