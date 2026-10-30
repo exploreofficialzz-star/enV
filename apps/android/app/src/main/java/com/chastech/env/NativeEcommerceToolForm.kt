@@ -53,7 +53,10 @@ fun NativeEcommerceToolForm(toolId: String) {
         }
     }
 
-    Column(\n        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),\n        verticalArrangement = Arrangement.spacedBy(12.dp),\n    ) {
+    Column(
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(
             "Runs on this Android device. No store or carrier account is connected by this local tool.",
             style = MaterialTheme.typography.bodySmall,
