@@ -135,7 +135,8 @@
     "axe-core": "^4.14.0",
     "babylonjs": "9.32.1",
     "babylonjs-loaders": "9.32.1",
-    "better-auth": "~1.6.30",
+    "babylonjs-serializers": "9.32.1",
+    "better-auth": "1.7.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -170,8 +171,7 @@
     "vaul": "^1.1.2",
     "vite": "^8.3.3",
     "zod": "^4.4.0",
-    "zustand": "^5.0.0",
-    "babylonjs-serializers": "9.32.1"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
