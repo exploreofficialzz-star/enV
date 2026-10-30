@@ -1,4 +1,6 @@
 import XCTest
+import CoreImage
+import UIKit
 @testable import enV
 
 final class NativeEcommerceEngineTests: XCTestCase {
@@ -90,6 +92,19 @@ final class NativeBarcodeReadRecordTests: XCTestCase {
         XCTAssertNil(NativeBarcodeReadRecord(value: "javascript:alert(1)", format: "QR").safeHTTPURL)
         XCTAssertNil(NativeBarcodeReadRecord(value: "file:///private/data", format: "QR").safeHTTPURL)
         XCTAssertNil(NativeBarcodeReadRecord(value: "plain text", format: "QR").safeHTTPURL)
+    }
+
+    func testVisionReaderDecodesLocallyGeneratedQrImage() throws {
+        let payload = "https://example.com/env-ios-qr-reader"
+        let filter = CIFilter(name: "CIQRCodeGenerator")!
+        filter.setValue(Data(payload.utf8), forKey: "inputMessage")
+        filter.setValue("H", forKey: "inputCorrectionLevel")
+        let generated = try XCTUnwrap(filter.outputImage)
+        let scaled = generated.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
+        let cgImage = try XCTUnwrap(CIContext().createCGImage(scaled, from: scaled.extent))
+        let png = try XCTUnwrap(UIImage(cgImage: cgImage).pngData())
+        let decoded = try NativeBarcodeImageDecoder.decode(png)
+        XCTAssertTrue(decoded.contains { $0.value == payload && $0.format == "qr" })
     }
 
     func testCodeReaderResultRetainsDetectedValueAndFormat() {
