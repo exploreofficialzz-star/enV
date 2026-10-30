@@ -36,6 +36,22 @@ class NativeBarcodeReaderInstrumentedTest {
         barcode.recycle()
     }
 
+    @Test fun scanHistoryPersistsAcrossScannerRecreation() {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val preferences = context.getSharedPreferences(NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES, android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        try {
+            val expected = listOf(
+                NativeBarcodeScan("SKU, \"Blue\" box", "CODE_128", 1_800_000_000_000L),
+                NativeBarcodeScan("https://example.com/item", "QR_CODE", 1_800_000_000_001L),
+            )
+            saveNativeBarcodeScanHistory(context, expected)
+            assertEquals(expected, loadNativeBarcodeScanHistory(context))
+        } finally {
+            preferences.edit().clear().commit()
+        }
+    }
+
     @Test fun readsGeneratedQrAndCode128ImagesOnDevice() {
         val qrPayload = "https://example.com/env-android-qr-reader"
         val qrBitmap = NativeBarcodeEngine.execute("qr-generator", mapOf("text" to qrPayload)).images.single()
