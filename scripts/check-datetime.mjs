@@ -10,7 +10,7 @@ const dt = tools.filter((t) => t.category === "datetime");
 const missing = dt.filter((t) => t.status !== "active" || t.engine?.type !== "datetime");
 console.log(`Date & Time audit: ${dt.length} tools; ${dt.length - missing.length} active; ${missing.length} missing`);
 if (missing.length) {
-  console.error(missing.map((t) => `${t.id}: ${t.status}/${t.engine?.type}`).join("\\n"));
+  console.error(missing.map((t) => `${t.id}: ${t.status}/${t.engine?.type}`).join("\n"));
   process.exit(1);
 }
 
@@ -26,6 +26,10 @@ for (const platform of ["android", "ios"]) {
     .trim().split(/\r?\n/).sort();
   assert.deepEqual(coverage, expectedNative, `${platform} Date & Time native coverage matches all supported operations`);
 }
+
+const fixedNow = new Date("2025-01-15T12:00:00Z");
+const age = runDateTime("age", { birth: "1990-02-01" }, fixedNow);
+assert.match(age.find((row) => row.label === "Age")?.value ?? "", /^\d+ years, \d+ months, \d+ days$/);
 
 const birthdayDefault = runDateTime("birthday", { birth: "2000-02-29" }, fixedNow);
 assert.equal(birthdayDefault[0].value, "44");
