@@ -31,6 +31,12 @@ try{
   await page.getByRole("button",{name:"Zoom out"}).click();
   assert.equal(new URL(page.url()).pathname, currentWorkspacePath,
     "Camera movement must stay inside the same World Lab workspace");
+  // A real camera displacement must reveal lower strata without switching views.
+  await page.locator('canvas[aria-label^="Interactive 3D illustrative environment"]').focus();
+  for (let n = 0; n < 4; n++) await page.keyboard.press("PageDown");
+  await page.getByText(/Illustrative subsurface sediment.*not measured/).waitFor({ timeout: 10000 });
+  for (let n = 0; n < 4; n++) await page.keyboard.press("PageUp");
+  await page.getByText(/Surface \/ atmosphere .*not measured/).waitFor({ timeout: 10000 });
   await page.getByRole("textbox",{name:"Material name"}).fill("Invented foam");
   await page.getByRole("spinbutton",{name:/Assumed density/}).fill("2");
   await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("50");
