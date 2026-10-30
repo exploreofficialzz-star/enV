@@ -241,7 +241,7 @@ export function BarcodeEngine({ format }: { format: string }) {
       // hyphens and internal spaces are valid data, not visual separators.
       // Only retail numeric standards use separator removal before validation.
       const separatorInsensitiveFormats = new Set(["ean13", "ean8", "upca", "itf14", "msi", "pharmacode", "isbn", "isbn-barcode"]);
-      const clean = separatorInsensitiveFormats.has(format) ? value.replace(/[\\s-]/g, "") : value.trim();
+      const clean = separatorInsensitiveFormats.has(format) ? value.replace(/[\s-]/g, "") : value.trim();
       JsBarcode(doc, format === "isbn" ? clean.replace(/^ISBN(?:-13)?:?/i, "") : clean, { format: fmt, displayValue: true, font: "monospace", height: 80, margin: 8, width: 2 });
       const markup = new XMLSerializer().serializeToString(doc);
       setSvg(markup);
