@@ -96,8 +96,11 @@ export function deriveActuatorInput(
 }
 type State=readonly [height:number,velocity:number,current:number];
 function derivative(s:State,i:ActuatorInput):State {
-  const [,,current]=s;
-  const velocity=s[1];
+  const [height,velocity,current]=s;
+  // A resting solid at the unilateral ground stop cannot penetrate into
+  // negative height and generate fictitious motion-induced electrical current.
+  if(height<=0 && velocity<=0 && i.forceConstantNPerA*current<=i.massKg*i.gravityMps2)
+    return [0,0,(i.supplyVoltageV-i.resistanceOhm*current)/i.inductanceH];
   return [velocity,
     (i.forceConstantNPerA*current-i.dampingNsPerM*velocity)/i.massKg-i.gravityMps2,
     (i.supplyVoltageV-i.resistanceOhm*current-i.forceConstantNPerA*velocity)/i.inductanceH];
