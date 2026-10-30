@@ -149,3 +149,7 @@ release-candidate evidence bundle are unfinished.
 - App-private Android and iOS project stores support portable v1 read/save, strict revalidation on disk, atomic file writes, guarded 1 MB/50-project limits, and optimistic revision conflict rejection without silent last-write-wins.
 - Android Compose and iOS SwiftUI expose **Save locally** and **Open saved**, display unsaved status, and require explicit confirmation before replacing unsaved work with a new or saved project. Exports remain available. The saved project stays on the local device; **account-backed sync and automatic recovery of unsaved edits remain missing**.
 - Unit tests cover save/reopen, stale revision refusal, path traversal and corrupted on-disk state. Backend storage, multi-device merge and authentication are separate release work packages.
+
+## Latest native import and emulator safeguards
+- Import now asks before replacing unsaved World Lab work on Android and iOS, just like New Project and Open Last Saved; the iOS FileDocument read path also checks the 1 MB cap.
+- The Android game-preview emulator runs with `-gpu swiftshader`, the documented supported SwiftShader backend rather than deprecated `swiftshader_indirect`, preserving real rendered assertions without host-GPU dependency.

@@ -7,7 +7,11 @@ private struct NativeWorldLabJsonFile: FileDocument {
     var content: Data
     init(content: Data){self.content=content}
     init(configuration: ReadConfiguration) throws {
-        content=configuration.file.regularFileContents ?? Data()
+        let bytes=configuration.file.regularFileContents ?? Data()
+        guard bytes.count <= NativeWorldLabProject.maxBytes else {
+            throw NativeWorldLabError.invalid("World Lab JSON must be 1 MB or smaller")
+        }
+        content=bytes
     }
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents:content)
@@ -60,7 +64,9 @@ struct NativeWorldLabView:View {
     }
     private func askToReplace(_ action:String){
         if hasUnsavedWork {pendingReplacement=action;confirmation=true}
-        else if action=="new" {newProject()} else {loadSavedProject()}
+        else if action=="new" {newProject()}
+        else if action=="open" {loadSavedProject()}
+        else if action=="import" {importing=true}
     }
     private func saveLocally(){
         do {
@@ -171,11 +177,11 @@ struct NativeWorldLabView:View {
                     Button("Export JSON"){exporting=true}
                         .buttonStyle(.bordered).disabled(projectData==nil)
                 }
-                Button("Inspect World Lab project JSON"){importing=true}.buttonStyle(.bordered)
+                Button("Import World Lab project JSON"){askToReplace("import")}.buttonStyle(.bordered)
                 HStack {
                     Button("Save locally"){saveLocally()}
                         .buttonStyle(.borderedProminent).disabled(projectData==nil)
-                    Button("Open saved"){askToReplace("open")}.buttonStyle(.bordered)
+                    Button("Open last saved"){askToReplace("open")}.buttonStyle(.bordered)
                 }
                 if hasUnsavedWork {
                     Text("Unsaved on this device. Save locally or export JSON to preserve these changes.")
@@ -271,7 +277,9 @@ struct NativeWorldLabView:View {
         .confirmationDialog("Discard unsaved changes?",isPresented:$confirmation,
                             titleVisibility:.visible) {
             Button("Discard and continue",role:.destructive){
-                if pendingReplacement=="new" {newProject()} else {loadSavedProject()}
+                if pendingReplacement=="new" {newProject()}
+                else if pendingReplacement=="open" {loadSavedProject()}
+                else if pendingReplacement=="import" {importing=true}
                 pendingReplacement=""
             }
             Button("Keep editing",role:.cancel){pendingReplacement=""}

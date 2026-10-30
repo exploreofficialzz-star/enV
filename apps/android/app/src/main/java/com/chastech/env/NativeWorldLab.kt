@@ -48,6 +48,7 @@ fun NativeWorldLabForm() {
     var projectJson by remember { mutableStateOf<String?>(null) }
     var savedSnapshot by remember { mutableStateOf<String?>(null) }
     var confirmation by remember { mutableStateOf<String?>(null) }
+    var requestImport by remember { mutableStateOf(false) }
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
@@ -97,7 +98,11 @@ fun NativeWorldLabForm() {
     }
     fun askReplace(action:String){
         if(projectJson!=null && savedSnapshot!=projectJson) confirmation=action
-        else if(action=="new")newProject() else loadSavedProject()
+        else when(action){
+            "new"->newProject()
+            "open"->loadSavedProject()
+            "import"->requestImport=true
+        }
     }
     val exportPicker=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -138,6 +143,12 @@ fun NativeWorldLabForm() {
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
     }
+    LaunchedEffect(requestImport) {
+        if(requestImport){
+            requestImport=false
+            picker.launch(arrayOf("application/json","text/plain","*/*"))
+        }
+    }
     LaunchedEffect(playing,speed) {
         while(playing) {
             delay(40)
@@ -151,7 +162,11 @@ fun NativeWorldLabForm() {
         text={Text("Your current unsaved project will be replaced. Save locally or export JSON first if you want to keep it.")},
         confirmButton={TextButton(onClick={
             val choice=confirmation;confirmation=null
-            if(choice=="new")newProject() else loadSavedProject()
+            when(choice){
+                "new"->newProject()
+                "open"->loadSavedProject()
+                "import"->requestImport=true
+            }
         }){Text("Discard and continue")}},
         dismissButton={TextButton(onClick={confirmation=null}){Text("Keep editing")}}
     )
@@ -246,8 +261,8 @@ fun NativeWorldLabForm() {
             OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
                 enabled=projectJson!=null){Text("Export JSON")}
         }
-        OutlinedButton(onClick={picker.launch(arrayOf("application/json","text/plain","*/*"))}) {
-            Text("Inspect World Lab project JSON")
+        OutlinedButton(onClick={askReplace("import")}) {
+            Text("Import World Lab project JSON")
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             Button(onClick={
@@ -258,7 +273,7 @@ fun NativeWorldLabForm() {
                         .onFailure{warning=it.message?:"Could not save the project locally."}
                 }
             },enabled=projectJson!=null){Text("Save locally")}
-            OutlinedButton(onClick={askReplace("open")}){Text("Open saved")}
+            OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
         }
         if(projectJson!=null && savedSnapshot!=projectJson)
             Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
