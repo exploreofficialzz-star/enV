@@ -2,7 +2,8 @@
   "installCommand": "npm ci --no-audit --no-fund",
   "buildCommand": "npm run build",
   "crons": [
-    { "path": "/api/analytics/retention", "schedule": "0 3 * * *" }
+    { "path": "/api/analytics/retention", "schedule": "0 3 * * *" },
+    { "path": "/api/feedback/retention", "schedule": "15 3 * * *" }
   ],
   "headers": [
     {
