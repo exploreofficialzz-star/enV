@@ -9,6 +9,7 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
   putLocalWorldLabProject, saveLocalWorldLabRun } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
+import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
 import {
@@ -93,6 +94,12 @@ export default function WorldLab() {
   const [dropHeight, setDropHeight] = useState(5);
   const [dropBounce, setDropBounce] = useState(0.3);
   const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
+  const [actuatorRun, setActuatorRun] = useState<ActuatorRun | null>(null);
+  const [actuatorTime, setActuatorTime] = useState(0);
+  const [actuatorPlaying, setActuatorPlaying] = useState(false);
+  const [actuatorRate, setActuatorRate] = useState(1);
+  const [actuatorVoltage, setActuatorVoltage] = useState(12);
+  const [actuatorConstant, setActuatorConstant] = useState(5);
   const importInput = useRef<HTMLInputElement>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
@@ -107,6 +114,11 @@ export default function WorldLab() {
     && project?.id === dropRun.source.projectId
     && project?.revision === dropRun.source.projectRevision ? dropRun : null;
   const dropSample = selectedDrop ? sampleDrop(selectedDrop, Math.min(dropTime, selectedDrop.input.durationSeconds)) : null;
+  const selectedActuator = actuatorRun && selectedEntity?.id === actuatorRun.source.entityId
+    && project?.id === actuatorRun.source.projectId
+    && project?.revision === actuatorRun.source.projectRevision ? actuatorRun : null;
+  const actuatorSample = selectedActuator
+    ? sampleActuator(selectedActuator, Math.min(actuatorTime, selectedActuator.input.durationSeconds)) : null;
   const [message, setMessage] = useState("Choose an experiment and press Start to calculate a real reference trajectory.");
   const [error, setError] = useState("");
   const currentRun = useMemo(() => runs.find((run) => run.id === runId) ?? null, [runs, runId]);
@@ -408,6 +420,34 @@ export default function WorldLab() {
   }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project, currentRun, heat]);
 
   useEffect(() => {
+    if (!actuatorPlaying || !actuatorRun) return;
+    let frame=0;
+    let previous=0;
+    const tick=(now:number)=>{
+      if(previous) {
+        const elapsed=Math.min(0.05,(now-previous)/1000);
+        setActuatorTime(t=>Math.min(actuatorRun.input.durationSeconds,t+elapsed*actuatorRate));
+      }
+      previous=now;
+      frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(frame);
+  },[actuatorPlaying,actuatorRun,actuatorRate]);
+  useEffect(()=>{
+    if(actuatorRun && actuatorTime>=actuatorRun.input.durationSeconds)setActuatorPlaying(false);
+  },[actuatorRun,actuatorTime]);
+  useEffect(()=>{
+    const scene=sceneRef.current;
+    if(!scene || !selectedActuator || !actuatorSample)return;
+    const mesh=scene.addedShapes.get(selectedActuator.source.entityId);
+    const entity=project?.entities.find(x=>x.id===selectedActuator.source.entityId);
+    if(mesh && entity) {
+      mesh.position.y=entity.dimensionsMeters[1]/2+actuatorSample.heightM;
+    }
+  },[selectedActuator,actuatorSample,project]);
+
+  useEffect(() => {
     if (!dropPlaying || !dropRun) return;
     let frame = 0;
     let previous = 0;
@@ -485,6 +525,7 @@ export default function WorldLab() {
   }
   function runModel(input: ModelInput, source: AssumedMassSource | null = null) {
     setDropPlaying(false);
+    setActuatorPlaying(false);
     setError("");
     try {
       const next = runExperiment(input, {
@@ -532,6 +573,8 @@ export default function WorldLab() {
       });
       const result = runDropExperiment(derived.input, derived.source);
       setPlaying(false);
+      setActuatorPlaying(false);
+      setActuatorRun(null);
       setDropRun(result);
       setDropTime(0);
       setDropPlaying(true);
@@ -540,6 +583,29 @@ export default function WorldLab() {
     } catch (cause) {
       setDropPlaying(false);
       setError(cause instanceof Error ? cause.message : "This solid cannot yet be tested.");
+    }
+  }
+
+  function startActuatorWithSelectedSolid() {
+    if(!project || !selectedEntity)return;
+    setError("");
+    try {
+      const derived=deriveActuatorInput(project,selectedEntity.id,{
+        supplyVoltageV:actuatorVoltage,
+        forceConstantNPerA:actuatorConstant,
+      });
+      const result=runActuatorExperiment(derived.input,derived.source);
+      setPlaying(false);
+      setDropPlaying(false);
+      setDropRun(null);
+      setActuatorRun(result);
+      setActuatorTime(0);
+      setActuatorPlaying(true);
+      setMessage("Calculated electrical energy, coil current, back-EMF, gravity and actuator motion together. " +
+        "All material and motor values remain hypothetical user assumptions.");
+    } catch(cause) {
+      setActuatorPlaying(false);
+      setError(cause instanceof Error?cause.message:"The electromechanical model cannot run with these parameters.");
     }
   }
 
@@ -580,6 +646,9 @@ export default function WorldLab() {
     camera.position.copyFrom(next);
   }
   function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
+    // A changed material, shape, or arrangement invalidates its old scientific results.
+    setDropPlaying(false);setDropRun(null);
+    setActuatorPlaying(false);setActuatorRun(null);
     setProject(current => current ? transform(current) : current);
     setWorkspaceDirty(true);
   }
@@ -871,6 +940,73 @@ export default function WorldLab() {
                   {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Electrical and mechanical actuator experiment">
+                  <h3 className="text-sm font-semibold">Power a lifting machine</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Design a simple electric actuator. Electricity builds coil current, creates lifting force,
+                    moves your object and generates back-EMF and resistance heat. The same equations exchange
+                    energy between the electrical and physical systems.
+                  </p>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs">Adjust electrical power and force</summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <label className="text-xs">Voltage (V)
+                        <input aria-label="Actuator supply voltage" type="number" className={inputLabel}
+                          min={0} max={1000} step={1} value={actuatorVoltage}
+                          onChange={e=>{setActuatorPlaying(false);setActuatorVoltage(Number(e.target.value));}} />
+                      </label>
+                      <label className="text-xs">Actuator strength (N/A)
+                        <input aria-label="Actuator force constant" type="number" className={inputLabel}
+                          min={0} max={10000} step={0.5} value={actuatorConstant}
+                          onChange={e=>{setActuatorPlaying(false);setActuatorConstant(Number(e.target.value));}} />
+                      </label>
+                    </div>
+                  </details>
+                  <button type="button" className={buttonClass+" mt-2"}
+                    disabled={selectedQuantities.massKg===null} onClick={startActuatorWithSelectedSolid}>
+                    Power this solid
+                  </button>
+                  {selectedActuator && actuatorSample && (
+                    <div className="mt-3 space-y-2" aria-label="Coupled electromechanical results">
+                      <p className="text-xs text-muted-foreground">
+                        Computed hypothetical electromechanical system · not measured
+                      </p>
+                      <dl className="grid grid-cols-2 gap-2 text-xs">
+                        <div><dt>Height above ground</dt><dd>{actuatorSample.heightM.toFixed(3)} m</dd></div>
+                        <div><dt>Coil current</dt><dd>{actuatorSample.coilCurrentA.toFixed(3)} A</dd></div>
+                        <div><dt>Upward force</dt><dd>{actuatorSample.motorForceN.toFixed(3)} N</dd></div>
+                        <div><dt>Back-EMF</dt><dd>{actuatorSample.backEmfV.toFixed(3)} V</dd></div>
+                        <div><dt>Coil heat</dt><dd>{actuatorSample.resistiveHeatW.toFixed(3)} W</dd></div>
+                        <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
+                      </dl>
+                      <label className="block text-xs">Explore motor time
+                        <input aria-label="Explore motor time" type="range" min={0} className="w-full"
+                          max={selectedActuator.input.durationSeconds} step={selectedActuator.solverStepSeconds}
+                          value={actuatorTime}
+                          onChange={e=>{setActuatorPlaying(false);setActuatorTime(Number(e.target.value));}} />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={buttonClass}
+                          onClick={()=>setActuatorPlaying(v=>!v)}>
+                          {actuatorPlaying?"Pause motor":"Play motor"}
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setActuatorPlaying(false);setActuatorTime(0);}}>Reset motor</button>
+                        <select className={inputLabel} aria-label="Motor playback speed"
+                          value={actuatorRate} onChange={e=>setActuatorRate(Number(e.target.value))}>
+                          <option value={0.1}>0.1× slow</option>
+                          <option value={1}>1× normal</option>
+                          <option value={4}>4× fast</option>
+                        </select>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>downloadJson("world-lab-electric-actuator-evidence.json",selectedActuator)}>
+                          Export motor evidence
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{selectedActuator.validity}</p>
+                    </div>
+                  )}
+                </div>
                 <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Physical drop experiment">
                   <h3 className="text-sm font-semibold">Drop & bounce experiment</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
