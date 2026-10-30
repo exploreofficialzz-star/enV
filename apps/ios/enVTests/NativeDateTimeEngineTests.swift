@@ -104,4 +104,15 @@ final class NativeDateTimeEngineTests: XCTestCase {
             "from": "2024-01-05", "to": "2024-01-09", "excludedDates": "2024-02-30"
         ], now: fixedNow))
     }
+
+    func testRelativeDateToolsUseDeviceLocalCalendarDay() throws {
+        let now = ISO8601DateFormatter().date(from: "2024-01-15T23:30:00Z")!
+        let lagos = TimeZone(secondsFromGMT: 3600)!
+        let age = try NativeDateTimeEngine.run(toolID: "age-calculator", options: ["birth": "2020-01-16"], now: now, localTimeZone: lagos)
+        XCTAssertTrue(age.output.contains("Age: 4 years, 0 months, 0 days"))
+        let until = try NativeDateTimeEngine.run(toolID: "time-until-calculator", options: ["target": "2024-01-17"], now: now, localTimeZone: lagos)
+        XCTAssertTrue(until.output.contains("Calendar span: 0 years, 0 months, 1 days"))
+        let deadline = try NativeDateTimeEngine.run(toolID: "deadline-calculator", options: ["target": "2024-01-17", "includeEnd": "true"], now: now, localTimeZone: lagos)
+        XCTAssertTrue(deadline.output.contains("Calendar days remaining: 1"))
+    }
 }

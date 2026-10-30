@@ -41,13 +41,13 @@ public enum NativeDateTimeEngine {
     private static var utc: TimeZone { TimeZone(secondsFromGMT: 0)! }
     public static func operation(forToolID id: String) -> String? { operations[id] }
 
-    public static func run(toolID: String, input: String = "", options: [String: String] = [:], now: Date = Date()) throws -> NativeDateTimeResult {
+    public static func run(toolID: String, input: String = "", options: [String: String] = [:], now: Date = Date(), localTimeZone: TimeZone = .current) throws -> NativeDateTimeResult {
         guard let operation = operations[toolID] else { throw NativeDateTimeError.unknownTool }
         switch operation {
         case "age":
             let birth = try dateOnly(options["birth"] ?? input, label: "birth date")
             let cal = calendar(.gregorian)
-            let today = cal.startOfDay(for: now)
+            let today = deviceToday(now, in: localTimeZone)
             guard birth <= today else { throw NativeDateTimeError.invalidOperation("Birth date cannot be in the future.") }
             let years = cal.dateComponents([.year], from: birth, to: today).year ?? 0
             let afterYears = cal.date(byAdding: .year, value: years, to: birth)!
@@ -145,7 +145,7 @@ public enum NativeDateTimeEngine {
             return result((String(year), leap ? "Leap year" : "Not a leap year"))
         case "birthday":
             let birth = try dateOnly(options["birth"] ?? input, label: "birth date")
-            let today = calendar(.gregorian).startOfDay(for: now)
+            let today = deviceToday(now, in: localTimeZone)
             let parts = calendar(.gregorian).dateComponents([.month, .day], from: birth)
             var month = parts.month ?? 1
             var day = parts.day ?? 1
@@ -181,6 +181,13 @@ public enum NativeDateTimeEngine {
     }
 
     private static func result(_ pairs: (String, String)...) -> NativeDateTimeResult { NativeDateTimeResult(rows: pairs.map { NativeDateTimeRow(label: $0.0, value: $0.1) }) }
+    private static func deviceToday(_ instant: Date, in timeZone: TimeZone) -> Date {
+        var localCalendar = Calendar(identifier: .gregorian)
+        localCalendar.timeZone = timeZone
+        let parts = localCalendar.dateComponents([.year, .month, .day], from: instant)
+        return calendar(.gregorian).date(from: parts)!
+    }
+
     private static func isLeapYear(_ year: Int) -> Bool {
         year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
     }

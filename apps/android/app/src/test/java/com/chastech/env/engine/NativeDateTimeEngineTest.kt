@@ -112,4 +112,15 @@ class NativeDateTimeEngineTest {
             throw AssertionError("invalid excluded date should not be ignored")
         } catch (_: IllegalArgumentException) { }
     }
+
+    @Test fun relativeDateToolsUseDeviceLocalCalendarDay() {
+        val now = Instant.parse("2024-01-15T23:30:00Z")
+        val lagos = java.time.ZoneId.of("Africa/Lagos")
+        val age = NativeDateTimeEngine.run("age-calculator", options = mapOf("birth" to "2020-01-16"), now = now, localTimeZone = lagos)
+        assertTrue(age.output.contains("Age: 4 years, 0 months, 0 days"))
+        val until = NativeDateTimeEngine.run("time-until-calculator", options = mapOf("target" to "2024-01-17"), now = now, localTimeZone = lagos)
+        assertTrue(until.output.contains("Calendar span: 0 years, 0 months, 1 days"))
+        val deadline = NativeDateTimeEngine.run("deadline-calculator", options = mapOf("target" to "2024-01-17", "includeEnd" to "true"), now = now, localTimeZone = lagos)
+        assertTrue(deadline.output.contains("Calendar days remaining: 1"))
+    }
 }

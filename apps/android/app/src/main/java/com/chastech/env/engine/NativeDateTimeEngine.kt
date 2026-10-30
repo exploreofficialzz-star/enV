@@ -64,11 +64,12 @@ object NativeDateTimeEngine {
         toolId: String,
         input: String = "",
         options: Map<String, String> = emptyMap(),
-        now: Instant = Instant.now()
+        now: Instant = Instant.now(),
+        localTimeZone: ZoneId = ZoneId.systemDefault()
     ): Result {
         val op = idToOperation[toolId] ?: throw IllegalArgumentException("Unknown datetime tool: $toolId")
         return when (op) {
-            "age" -> age(options["birth"] ?: options["value"] ?: input, now)
+            "age" -> age(options["birth"] ?: options["value"] ?: input, now, localTimeZone)
             "date-diff" -> {
                 val from = parseDate(options["from"], "start date")
                 val to = parseDate(options["to"], "end date")
@@ -179,10 +180,10 @@ object NativeDateTimeEngine {
                     ?: throw IllegalArgumentException("Enter a year from 1 to 9999.")
                 rows(year.toString() to if (Year.isLeap(year.toLong())) "Leap year" else "Not a leap year")
             }
-            "birthday" -> birthday(options["birth"] ?: input, now, options)
+            "birthday" -> birthday(options["birth"] ?: input, now, options, localTimeZone)
             "time-until" -> {
                 val target = parseDate(options["target"] ?: options["value"], "target date")
-                val today = now.atZone(UTC).toLocalDate()
+                val today = now.atZone(localTimeZone).toLocalDate()
                 val span = calendarSpan(today, target)
                 val sign = if (span.totalDays < 0) "-" else ""
                 rows(
@@ -192,7 +193,7 @@ object NativeDateTimeEngine {
             }
             "deadline" -> {
                 val target = parseDate(options["target"] ?: options["value"], "deadline")
-                val today = now.atZone(UTC).toLocalDate()
+                val today = now.atZone(localTimeZone).toLocalDate()
                 val includeEnd = options["includeEnd"] == "true"
                 rows(
                     "Calendar days remaining" to ChronoUnit.DAYS.between(today, target).toString(),
@@ -218,9 +219,9 @@ object NativeDateTimeEngine {
         return CalendarSpan(years, months, days, ChronoUnit.DAYS.between(from, to))
     }
 
-    private fun age(value: String, now: Instant): Result {
+    private fun age(value: String, now: Instant, localTimeZone: ZoneId): Result {
         val birth = parseDate(value, "birth date")
-        val today = now.atZone(UTC).toLocalDate()
+        val today = now.atZone(localTimeZone).toLocalDate()
         if (birth > today) throw IllegalArgumentException("Birth date cannot be in the future.")
         val years = ChronoUnit.YEARS.between(birth, today)
         val afterYears = birth.plusYears(years)
@@ -229,9 +230,9 @@ object NativeDateTimeEngine {
         return rows("Age" to "$years years, $months months, $days days", "Days lived" to ChronoUnit.DAYS.between(birth, today).toString())
     }
 
-    private fun birthday(value: String, now: Instant, options: Map<String, String>): Result {
+    private fun birthday(value: String, now: Instant, options: Map<String, String>, localTimeZone: ZoneId): Result {
         val birth = parseDate(value, "birth date")
-        val today = now.atZone(UTC).toLocalDate()
+        val today = now.atZone(localTimeZone).toLocalDate()
         var month = birth.monthValue
         var day = birth.dayOfMonth
         if (month == 2 && day == 29 && !Year.isLeap(today.year.toLong()) && options["leapBirthday"] == "mar-1") {
