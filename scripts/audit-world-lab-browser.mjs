@@ -25,8 +25,12 @@ try{
   await page.getByText("Volume:").waitFor();
   assert.match(await page.getByText("Volume:").locator("..").innerText(),/2\.0000 m³/);
   await page.getByRole("button",{name:"See Inside"}).click();
+  await page.getByText(/Surface \/ atmosphere .* not measured/).waitFor();
+  const currentWorkspacePath = new URL(page.url()).pathname;
   await page.getByRole("button",{name:"Zoom in"}).click();
   await page.getByRole("button",{name:"Zoom out"}).click();
+  assert.equal(new URL(page.url()).pathname, currentWorkspacePath,
+    "Camera movement must stay inside the same World Lab workspace");
   await page.getByRole("textbox",{name:"Material name"}).fill("Invented foam");
   await page.getByRole("spinbutton",{name:/Assumed density/}).fill("2");
   await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("50");
