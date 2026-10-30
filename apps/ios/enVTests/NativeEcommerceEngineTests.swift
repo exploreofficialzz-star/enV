@@ -153,6 +153,20 @@ final class NativeBarcodeReadRecordTests: XCTestCase {
     }
 
     @MainActor
+    func testScanHistoryRestoresFromLocalUserDefaults() {
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: NativeBarcodeCameraScanner.historyDefaultsKey)
+        defer { defaults.removeObject(forKey: NativeBarcodeCameraScanner.historyDefaultsKey) }
+
+        let original = NativeBarcodeCameraScanner()
+        original.addResult(value: "SKU-100", format: "Code128")
+        original.addResult(value: "https://example.com/item", format: "QR")
+
+        let reopened = NativeBarcodeCameraScanner()
+        XCTAssertEqual(reopened.results.map(\.value), ["https://example.com/item", "SKU-100"])
+    }
+
+    @MainActor
     func testLiveCameraScannerKeepsDistinctCodesFromOneFrame() {
         let scanner = NativeBarcodeCameraScanner()
         scanner.addResult(value: "https://example.com/item-a", format: "QR")
