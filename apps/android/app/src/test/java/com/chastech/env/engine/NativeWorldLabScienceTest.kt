@@ -84,4 +84,13 @@ class NativeWorldLabScienceTest {
             NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=1.0,inductanceH=0.0))
         }
     }
+    @Test fun uncoupledActuatorMatchesAnalyticRlCircuit() {
+        val input=NativeActuatorInput(massKg=1.0,gravityMps2=0.0,forceConstantNPerA=0.0)
+        val run=NativeWorldLabActuator.evaluate(input)
+        val atOne=run.samples.first{it.timeSeconds>=1.0-1e-10}
+        val reference=input.supplyVoltageV/input.resistanceOhm*
+            (1-exp(-input.resistanceOhm/input.inductanceH))
+        assertEquals(reference,atOne.currentA,1e-7)
+        assertEquals(0.0,atOne.heightM,0.0)
+    }
 }
