@@ -72,6 +72,8 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
                         self.session.commitConfiguration()
                         self.configured = true
                     } catch {
+                        if self.session.inputs.contains(input) { self.session.removeInput(input) }
+                        if self.session.outputs.contains(output) { self.session.removeOutput(output) }
                         self.session.commitConfiguration()
                         throw error
                     }
@@ -147,12 +149,14 @@ private enum NativeBarcodeReaderError: LocalizedError {
     case cameraUnavailable
     case permissionDenied
     case imageUnreadable
+    case imageTooLarge
 
     var errorDescription: String? {
         switch self {
         case .cameraUnavailable: return "No compatible camera is available."
         case .permissionDenied: return "Camera permission is denied. Allow access in Settings or read an image instead."
         case .imageUnreadable: return "No supported QR code or barcode was detected in this image."
+        case .imageTooLarge: return "This image is larger than 20 MB. Resize it and try again."
         }
     }
 }
@@ -294,6 +298,7 @@ struct NativeBarcodeReaderView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 throw NativeBarcodeReaderError.imageUnreadable
             }
+            guard data.count <= 20 * 1024 * 1024 else { throw NativeBarcodeReaderError.imageTooLarge }
             let records = try NativeBarcodeImageDecoder.decode(data)
             for record in records {
                 scanner.addResult(value: record.value, format: record.format)
