@@ -76,6 +76,21 @@ try {
   const barcodeBytes = await makeCode128Image(barcodeValue);
   outcomes.push(await scanFile("env-reader-code128.svg", "image/svg+xml", barcodeBytes, barcodeValue, "Code 128"));
 
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(
+    () => document.documentElement.dataset.envToolHydrated === "qr-payload-inspector",
+    null,
+    { timeout: 12000 },
+  );
+  await page.getByText(qrPayload, { exact: true }).waitFor({ state: "visible", timeout: 8000 });
+  await page.getByText(barcodeValue, { exact: true }).waitFor({ state: "visible", timeout: 8000 });
+  outcomes.push({
+    file: "browser-local-history",
+    expectedText: [qrPayload, barcodeValue],
+    expectedFormat: "restored after reload",
+    passed: true,
+  });
+
   if (pageErrors.length) throw new Error(`Browser runtime errors: ${pageErrors.join(" | ")}`);
 } catch (error) {
   failure = error instanceof Error ? error.message : String(error);
