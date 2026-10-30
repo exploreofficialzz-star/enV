@@ -20,6 +20,7 @@ import com.chastech.env.engine.NativeLabInput
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabProjectStore
 import com.chastech.env.engine.NativeWorldLabScience
 import java.io.ByteArrayOutputStream
 import java.util.Locale
@@ -33,6 +34,7 @@ import kotlinx.coroutines.withContext
 fun NativeWorldLabForm() {
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    val localProjects=remember(context){NativeWorldLabProjectStore(context.filesDir)}
     var kind by remember { mutableStateOf("spring") }
     var time by remember { mutableFloatStateOf(0f) }
     var speed by remember { mutableFloatStateOf(1f) }
@@ -44,6 +46,8 @@ fun NativeWorldLabForm() {
     var inside by remember { mutableStateOf(false) }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
     var projectJson by remember { mutableStateOf<String?>(null) }
+    var savedSnapshot by remember { mutableStateOf<String?>(null) }
+    var confirmation by remember { mutableStateOf<String?>(null) }
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
@@ -71,6 +75,29 @@ fun NativeWorldLabForm() {
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
+    }
+    fun newProject(){
+        runCatching {
+            val json=NativeWorldLabEditor.blank()
+            val parsed=NativeWorldLabProjectCodec.decode(json)
+            project=parsed;projectJson=json;savedSnapshot=null;selected=0;warning=""
+        }.onFailure{warning=it.message?:"Could not create a World Lab project."}
+    }
+    fun loadSavedProject(){
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO){localProjects.loadLatest()} }
+                .onSuccess { stored->
+                    if(stored==null) warning="There is no saved World Lab project on this device."
+                    else {
+                        projectJson=stored.json;project=NativeWorldLabProjectCodec.decode(stored.json)
+                        savedSnapshot=stored.json;selected=0;warning=""
+                    }
+                }.onFailure{warning=it.message?:"The saved project could not be recovered safely."}
+        }
+    }
+    fun askReplace(action:String){
+        if(projectJson!=null && savedSnapshot!=projectJson) confirmation=action
+        else if(action=="new")newProject() else loadSavedProject()
     }
     val exportPicker=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -118,6 +145,16 @@ fun NativeWorldLabForm() {
             if(time>=12f)playing=false
         }
     }
+    if(confirmation!=null) AlertDialog(
+        onDismissRequest={confirmation=null},
+        title={Text("Discard unsaved changes?")},
+        text={Text("Your current unsaved project will be replaced. Save locally or export JSON first if you want to keep it.")},
+        confirmButton={TextButton(onClick={
+            val choice=confirmation;confirmation=null
+            if(choice=="new")newProject() else loadSavedProject()
+        }){Text("Discard and continue")}},
+        dismissButton={TextButton(onClick={confirmation=null}){Text("Keep editing")}}
+    )
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("The World Lab",style=MaterialTheme.typography.titleLarge)
         Text("Native offline reference models. Ground and shapes are illustrative, not measured or certified.",
@@ -205,19 +242,27 @@ fun NativeWorldLabForm() {
             style=MaterialTheme.typography.bodySmall)
         HorizontalDivider()
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            Button(onClick={
-                runCatching {
-                    val data=NativeWorldLabEditor.blank()
-                    project=NativeWorldLabProjectCodec.decode(data)
-                    projectJson=data;selected=0;warning=""
-                }.onFailure{warning=it.message?:"Could not create project."}
-            }){Text("New project")}
+            Button(onClick={askReplace("new")}){Text("New project")}
             OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
                 enabled=projectJson!=null){Text("Export JSON")}
         }
         OutlinedButton(onClick={picker.launch(arrayOf("application/json","text/plain","*/*"))}) {
             Text("Inspect World Lab project JSON")
         }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Button(onClick={
+                val json=projectJson
+                if(json!=null)scope.launch{
+                    runCatching { withContext(Dispatchers.IO){localProjects.save(json)} }
+                        .onSuccess{savedSnapshot=json;warning=""}
+                        .onFailure{warning=it.message?:"Could not save the project locally."}
+                }
+            },enabled=projectJson!=null){Text("Save locally")}
+            OutlinedButton(onClick={askReplace("open")}){Text("Open saved")}
+        }
+        if(projectJson!=null && savedSnapshot!=projectJson)
+            Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
+                style=MaterialTheme.typography.bodySmall)
         if(project!=null){
             Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {

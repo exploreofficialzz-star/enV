@@ -144,3 +144,8 @@ release-candidate evidence bundle are unfinished.
 ## 2026-10-30 native CI hardening
 - The native Swift project editor now explicitly rejects NaN, Infinity, out-of-envelope hypothetical density/modulus, and invalid solid dimension vectors before Foundation JSON serialization; corresponding iOS XCTest negative cases cover these failures. This prevents Foundation's Objective-C NaN serialization exception from escaping the UI error boundary.
 - The Android native game-preview workflow retains emulator instrumentation and graphics test coverage but changes emulator GPU mode from host GL to SwiftShader GLES after a host-GPU run completed all tests then lost ADB connection during test-apk cleanup. The replacement emulator mode is a stability experiment, not an assertion of device coverage.
+
+## Offline native project recovery (2026-10-30)
+- App-private Android and iOS project stores support portable v1 read/save, strict revalidation on disk, atomic file writes, guarded 1 MB/50-project limits, and optimistic revision conflict rejection without silent last-write-wins.
+- Android Compose and iOS SwiftUI expose **Save locally** and **Open saved**, display unsaved status, and require explicit confirmation before replacing unsaved work with a new or saved project. Exports remain available. The saved project stays on the local device; **account-backed sync and automatic recovery of unsaved edits remain missing**.
+- Unit tests cover save/reopen, stale revision refusal, path traversal and corrupted on-disk state. Backend storage, multi-device merge and authentication are separate release work packages.

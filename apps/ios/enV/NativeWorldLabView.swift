@@ -28,6 +28,9 @@ struct NativeWorldLabView:View {
     @State private var importing=false
     @State private var exporting=false
     @State private var projectData:Data?
+    @State private var savedSnapshot:Data?
+    @State private var confirmation=false
+    @State private var pendingReplacement=""
     @State private var inventedName=""
     @State private var inventedDensity=""
     @State private var problem=""
@@ -36,6 +39,38 @@ struct NativeWorldLabView:View {
     @State private var scene=SCNScene()
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
+    private let localProjects=NativeWorldLabProjectStore()
+    private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private func newProject(){
+        do {
+            let data=try NativeWorldLabEditor.blank()
+            project=try NativeWorldLabProject.decode(data)
+            projectData=data;savedSnapshot=nil;selected=0;problem="";redraw()
+        }catch{problem=error.localizedDescription}
+    }
+    private func loadSavedProject(){
+        do {
+            guard let saved=try localProjects.loadLatest() else {
+                problem="There is no saved World Lab project on this device."
+                return
+            }
+            projectData=saved.0;project=saved.1;savedSnapshot=saved.0
+            selected=0;problem="";redraw()
+        }catch{problem=error.localizedDescription}
+    }
+    private func askToReplace(_ action:String){
+        if hasUnsavedWork {pendingReplacement=action;confirmation=true}
+        else if action=="new" {newProject()} else {loadSavedProject()}
+    }
+    private func saveLocally(){
+        do {
+            guard let data=projectData else {
+                throw NativeWorldLabError.invalid("Create or import a project before saving.")
+            }
+            _ = try localProjects.save(data)
+            savedSnapshot=data;problem=""
+        }catch{problem=error.localizedDescription}
+    }
     private var input:NativeLabInput {
         if mode==0 {return .spring(massKg:mass)}
         if mode==1 {return .rc(resistanceOhm:resistance)}
@@ -132,17 +167,20 @@ struct NativeWorldLabView:View {
                 }
                 Divider()
                 HStack {
-                    Button("New project"){
-                        do {
-                            let data=try NativeWorldLabEditor.blank()
-                            project=try NativeWorldLabProject.decode(data)
-                            projectData=data;selected=0;problem="";redraw()
-                        }catch{problem=error.localizedDescription}
-                    }.buttonStyle(.borderedProminent)
+                    Button("New project"){askToReplace("new")}.buttonStyle(.borderedProminent)
                     Button("Export JSON"){exporting=true}
                         .buttonStyle(.bordered).disabled(projectData==nil)
                 }
                 Button("Inspect World Lab project JSON"){importing=true}.buttonStyle(.bordered)
+                HStack {
+                    Button("Save locally"){saveLocally()}
+                        .buttonStyle(.borderedProminent).disabled(projectData==nil)
+                    Button("Open saved"){askToReplace("open")}.buttonStyle(.bordered)
+                }
+                if hasUnsavedWork {
+                    Text("Unsaved on this device. Save locally or export JSON to preserve these changes.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if let project {
                     Text(project.title+" · "+String(project.entities.count)+" solids")
                         .font(.headline)
@@ -224,10 +262,21 @@ struct NativeWorldLabView:View {
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
+        .onChange(of:projectData){_ in redraw()}
         .onReceive(timer){now in
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
             lastTick=now
             if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
+        }
+        .confirmationDialog("Discard unsaved changes?",isPresented:$confirmation,
+                            titleVisibility:.visible) {
+            Button("Discard and continue",role:.destructive){
+                if pendingReplacement=="new" {newProject()} else {loadSavedProject()}
+                pendingReplacement=""
+            }
+            Button("Keep editing",role:.cancel){pendingReplacement=""}
+        } message: {
+            Text("Save locally or export JSON first if you want to keep the current changes.")
         }
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
@@ -246,6 +295,7 @@ struct NativeWorldLabView:View {
                 let data=try Data(contentsOf:url)
                 project=try NativeWorldLabProject.decode(data)
                 projectData=data
+                savedSnapshot=nil
                 selected=0;problem="";redraw()
             }catch{problem=error.localizedDescription}
         }
