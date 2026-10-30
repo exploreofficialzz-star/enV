@@ -20,6 +20,8 @@ import com.chastech.env.engine.NativeLabInput
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabHydrostatics
+import com.chastech.env.engine.NativeLabHydroResult
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
@@ -66,6 +68,9 @@ fun NativeWorldLabForm() {
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
+    var hydroRun by remember { mutableStateOf<NativeLabHydroResult?>(null) }
+    var fluidDensity by remember { mutableStateOf(1000.0) }
+    var immersionFraction by remember { mutableFloatStateOf(0.5f) }
     var dropRun by remember { mutableStateOf<NativeDropResult?>(null) }
     var dropEntityId by remember { mutableStateOf<String?>(null) }
     var dropFrame by remember { mutableIntStateOf(0) }
@@ -100,7 +105,7 @@ fun NativeWorldLabForm() {
             val parsed=NativeWorldLabProjectCodec.decode(next)
             projectJson=next
             project=parsed
-            dcRun=null;wiredMotor=null
+            dcRun=null;wiredMotor=null;hydroRun=null
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
@@ -412,6 +417,34 @@ fun NativeWorldLabForm() {
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
+                Text("Try floating your invention",style=MaterialTheme.typography.titleSmall)
+                Text("Assumed fluid density: "+labNumber(fluidDensity)+" kg/m³")
+                Slider(value=fluidDensity.toFloat(),onValueChange={
+                    fluidDensity=it.toDouble();hydroRun=null
+                },valueRange=100f..2500f,
+                    modifier=Modifier.semantics {contentDescription="Fluid density"})
+                Text("Immersion: "+labNumber(immersionFraction.toDouble()*100)+"% of height")
+                Slider(value=immersionFraction,onValueChange={
+                    immersionFraction=it;hydroRun=null
+                },valueRange=0f..1f,
+                    modifier=Modifier.semantics {contentDescription="Fraction of solid submerged"})
+                OutlinedButton(onClick={
+                    runCatching{
+                        hydroRun=NativeWorldLabHydrostatics.evaluate(project!!,solid.id,
+                            fluidDensity,solid.dimensionsMeters.y*immersionFraction.toDouble())
+                        warning=""
+                    }.onFailure{hydroRun=null;warning=it.message?:"Fluid experiment failed"}
+                }){Text("Calculate buoyancy")}
+                hydroRun?.takeIf{it.projectId==project!!.id &&
+                    it.projectRevision==project!!.revision && it.entityId==solid.id}?.let{fluid->
+                    Text("Displaced liquid: "+labNumber(fluid.displacedVolumeM3)+" m³")
+                    Text("Buoyancy force: "+labNumber(fluid.buoyancyForceN)+" N")
+                    Text("Bottom pressure: "+labNumber(fluid.bottomGaugePressurePa)+" Pa")
+                    Text("Status: "+fluid.status)
+                    Text("Net upward force: "+labNumber(fluid.netUpwardForceN)+" N")
+                    Text("Equilibrium draft: "+labNumber(fluid.equilibriumDraftM)+" m")
+                    Text(fluid.validity,style=MaterialTheme.typography.bodySmall)
+                }
                 if(derivedMass!=null && derivedMass in 0.001..10000.0){
                     OutlinedButton(onClick={mass=derivedMass.toFloat();kind="spring";time=0f;playing=false}) {
                         Text("Test assumed mass as spring mass")

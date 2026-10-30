@@ -223,3 +223,7 @@ release-candidate evidence bundle are unfinished.
 
 - Added `hydrostatics.ts`: calculates actual submerged box, circular vertical cylinder and spherical-cap volumes; water/fluid mass displacement, buoyancy, bottom hydrostatic gauge pressure, gravitational weight and net vertical force. With assumed material density it solves free-floating upright equilibrium draft via deterministic 64-step bounded bisection. Unknown density yields null net force/draft, not a guessed material. Actual project ID/revision, shape/material references and modeling limitations are preserved in exported evidence.
 - Web has a fluid-density and immersion-depth panel on selected inventions, with calculated numeric results and evidence export. Tests authored for Archimedes/half-sphere exactness, sinking and unknown matter; full CI deferred per request. No hydrodynamics, deformation, stability, weather, surface-tension or physical fluid observations claimed.
+
+## Android fluid/Archimedes experiment (2026-10-30)
+
+- Implemented native Kotlin static buoyancy for upright boxes, cylinders, spherical caps using exact immersion geometry; source project material assumptions, pressure, gravitational net force and 64-step draft balancing. Compose gives child-friendly fluid density, immersion slider, calculated results and unknown-mass disclosure, retaining native styling. Regression authored, consolidated audit deferred.

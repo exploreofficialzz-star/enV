@@ -56,6 +56,24 @@ class NativeWorldLabProjectTest {
         val next=NativeWorldLabDc.solve(extended.networks.first(),extended)
         assertEquals(0.135,next.resistorHeatW/9.0,1e-12)
     }
+    @Test fun nativeHydrostaticsRespectsArchimedesAndUnknownInventions(){
+        val project=NativeWorldLabEditor.addHypotheticalMaterial(
+            NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="float"),
+            name="Assumed foam",densityKgM3=500.0,id="foam")
+        val linked=NativeWorldLabEditor.assignMaterial(project,"float","foam")
+        val parsed=NativeWorldLabProjectCodec.decode(linked)
+        val result=NativeWorldLabHydrostatics.evaluate(parsed,"float",1000.0,0.5)
+        assertEquals(0.5,result.displacedVolumeM3,1e-12)
+        assertEquals(0.5,result.equilibriumDraftM!!,1e-10)
+        assertEquals(0.0,result.netUpwardForceN!!,1e-9)
+        assertEquals("floating",result.status)
+        val unknown=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"sphere",id="unknown"))
+        val r=NativeWorldLabHydrostatics.evaluate(unknown,"unknown",1000.0,0.5)
+        assertEquals("unknown-mass",r.status)
+        assertNull(r.netUpwardForceN)
+        assertNull(r.equilibriumDraftM)
+    }
     @Test fun rejectsUntrustedAttributesAndInvalidGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(

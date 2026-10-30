@@ -270,3 +270,72 @@ object NativeWorldLabDc {
             voltages.toMap(),currents.toMap(),delivered,heat,residual)
     }
 }
+
+/** Upright primitive immersion in a static, incompressible fluid; no fluid-flow dynamics. */
+data class NativeLabHydroResult(
+    val projectId:String,val projectRevision:Int,val entityId:String,
+    val fluidDensityKgM3:Double,val immersionDepthM:Double,
+    val displacedVolumeM3:Double,val buoyancyForceN:Double,
+    val bottomGaugePressurePa:Double,val netUpwardForceN:Double?,
+    val equilibriumDraftM:Double?,val status:String,
+    val validity:String="Static liquid, ideal upright primitive and user-assumed density; "+
+        "no waves, stability, flow or certified material behavior."
+)
+object NativeWorldLabHydrostatics {
+    fun displacedVolume(solid:NativeLabSolid,depthM:Double):Double {
+        require(depthM.isFinite()&&depthM in 0.0..solid.dimensionsMeters.y){
+            "Immersion must be between zero and the solid's vertical extent"
+        }
+        val d=depthM
+        val x=solid.dimensionsMeters.x
+        val z=solid.dimensionsMeters.z
+        return when(solid.shape){
+            "box"->x*z*d
+            "cylinder"->PI*x*z*d/4.0
+            "sphere"->{
+                val r=solid.dimensionsMeters.y/2.0
+                PI*d*d*(3.0*r-d)/3.0
+            }
+            else->error("Hydrostatics supports only the three ideal primitive solids")
+        }
+    }
+    fun evaluate(project:NativeWorldLabProject,solidId:String,
+        fluidDensityKgM3:Double,immersionDepthM:Double,gravityMps2:Double=9.80665
+    ):NativeLabHydroResult {
+        require(fluidDensityKgM3.isFinite()&&fluidDensityKgM3 in 0.01..25000.0){
+            "Fluid density is outside supported bounds"
+        }
+        require(gravityMps2.isFinite()&&gravityMps2 in 0.0..100.0){"Gravity outside model bounds"}
+        val solid=project.entities.firstOrNull{it.id==solidId}
+            ?:error("Select an invention for the buoyancy experiment")
+        val volume=displacedVolume(solid,immersionDepthM)
+        val density=project.materials.firstOrNull{it.id==solid.materialId}?.densityKgM3
+        val mass=density?.let{solid.volumeMetersCubed()*it}
+        val force=volume*fluidDensityKgM3*gravityMps2
+        val net=mass?.let{force-it*gravityMps2}
+        val full=solid.volumeMetersCubed()*fluidDensityKgM3
+        val status=when{
+            mass==null->"unknown-mass"
+            mass>full->"sinking"
+            mass==full->"neutrally-buoyant"
+            else->"floating"
+        }
+        val draft=mass?.let{
+            if(it>=full)solid.dimensionsMeters.y else {
+                var lower=0.0;var upper=solid.dimensionsMeters.y
+                val displacement=it/fluidDensityKgM3
+                repeat(64){
+                    val mid=(lower+upper)/2.0
+                    if(displacedVolume(solid,mid)<displacement)lower=mid else upper=mid
+                }
+                (lower+upper)/2.0
+            }
+        }
+        val pressure=fluidDensityKgM3*gravityMps2*immersionDepthM
+        require(listOf(volume,force,pressure,net?:0.0,draft?:0.0).all{it.isFinite()}){
+            "Buoyancy computation left its numerical domain"
+        }
+        return NativeLabHydroResult(project.id,project.revision,solidId,
+            fluidDensityKgM3,immersionDepthM,volume,force,pressure,net,draft,status)
+    }
+}
