@@ -39,8 +39,7 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     nonisolated(unsafe) let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "com.chastech.env.barcode-camera")
     nonisolated(unsafe) private var configured = false
-    private var lastSignature = ""
-    private var lastScanAt = Date.distantPast
+    private var lastScanAtBySignature: [String: Date] = [:]
 
     func start() {
         error = nil
@@ -124,9 +123,12 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
         guard !value.isEmpty else { return }
         let signature = format + "\u{0}" + value
         let now = Date()
-        guard signature != lastSignature || now.timeIntervalSince(lastScanAt) > 1.8 else { return }
-        lastSignature = signature
-        lastScanAt = now
+        if let previousScanAt = lastScanAtBySignature[signature],
+           now.timeIntervalSince(previousScanAt) < 1.8 { return }
+        lastScanAtBySignature[signature] = now
+        if lastScanAtBySignature.count > 200 {
+            lastScanAtBySignature = lastScanAtBySignature.filter { now.timeIntervalSince($0.value) < 10 }
+        }
         results.insert(NativeBarcodeReadRecord(value: value, format: format, scannedAt: now), at: 0)
         if results.count > 50 { results = Array(results.prefix(50)) }
         status = "\(format) detected."
@@ -141,11 +143,16 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     nonisolated func metadataOutput(_ output: AVCaptureMetadataOutput,
                                     didOutput metadataObjects: [AVMetadataObject],
                                     from connection: AVCaptureConnection) {
-        guard let object = metadataObjects.compactMap({ $0 as? AVMetadataMachineReadableCodeObject }).first,
-              let value = object.stringValue else { return }
-        let format = object.type.rawValue
+        let decoded = metadataObjects.compactMap { object -> (value: String, format: String)? in
+            guard let code = object as? AVMetadataMachineReadableCodeObject,
+                  let value = code.stringValue, !value.isEmpty else { return nil }
+            return (value, code.type.rawValue)
+        }
+        guard !decoded.isEmpty else { return }
         Task { @MainActor [weak self] in
-            self?.addResult(value: value, format: format)
+            for item in decoded {
+                self?.addResult(value: item.value, format: item.format)
+            }
         }
     }
 }
