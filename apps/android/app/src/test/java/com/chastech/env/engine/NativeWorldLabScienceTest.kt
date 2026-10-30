@@ -61,4 +61,27 @@ class NativeWorldLabScienceTest {
                 massKg=1.0,supportingHalfHeightM=0.5,projectedAreaM2=1.0,restitution=1.1))
         }
     }
+
+    @Test fun nativeActuatorCouplesCurrentForceAndMotion() {
+        val input=NativeActuatorInput(massKg=1.0)
+        val run=NativeWorldLabActuator.evaluate(input)
+        assertEquals("hypothetical-user-assumed",run.inputEvidence)
+        assertTrue(run.samples[240].currentA>0)
+        assertTrue(run.samples[480].heightM>0)
+        assertTrue(run.samples[480].backEmfV>0)
+        assertTrue(run.samples.any{it.resistiveHeatW>0 && it.motorForceN>0})
+        assertTrue(run.samples.all{it.heightM>=0 && it.energyResidualJ.isFinite()})
+    }
+    @Test fun noVoltageDoesNotCreateFictitiousLift() {
+        val run=NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=1.0,supplyVoltageV=0.0))
+        assertTrue(run.samples.all{it.heightM==0.0 && it.currentA==0.0})
+    }
+    @Test fun invalidCoilAndMassAreRejected() {
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=Double.NaN))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=1.0,inductanceH=0.0))
+        }
+    }
 }
