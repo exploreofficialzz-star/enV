@@ -8,7 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performClick\nimport androidx.compose.ui.test.performScrollTo
 import androidx.core.content.ContextCompat
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -48,8 +48,8 @@ class NativeQrBarcodeAndEcommerceUiTest {
         composeRule.onNodeWithText("Unit cost").assertIsDisplayed()
         composeRule.onNodeWithText("Selling price").assertIsDisplayed()
         composeRule.onNodeWithText("Run").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Estimated contribution profit: 35.00", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Copy").assertIsDisplayed()
-        composeRule.onNodeWithText("Save").assertIsDisplayed()
+        composeRule.onNodeWithText("Estimated contribution profit: 35.00", substring = true).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Copy").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Save").performScrollTo().assertIsDisplayed()
     }
 }
