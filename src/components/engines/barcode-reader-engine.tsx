@@ -18,6 +18,15 @@ type ScanRecord = {
   scannedAt: string;
 };
 
+type ExtendedCameraCapabilities = MediaTrackCapabilities & {
+  torch?: boolean;
+  zoom?: { min: number; max: number; step?: number };
+};
+
+type ExtendedCameraConstraints = MediaTrackConstraints & {
+  advanced?: Array<MediaTrackConstraintSet & { torch?: boolean; zoom?: number }>;
+};
+
 function scanHistoryCsv(records: ScanRecord[]): string {
   const cell = (value: string) => `"${value.replaceAll('"', '""')}"`;
   const rows = records.map((record) => [
@@ -176,10 +185,15 @@ export function BarcodeReaderEngine() {
   const scanGeneration = useRef(0);
   const recentScansRef = useRef<Map<string, number>>(new Map());
   const lastCameraMultiScanAtRef = useRef(0);
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraStarting, setCameraStarting] = useState(false);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCamera, setSelectedCamera] = useState("");
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [zoomValue, setZoomValue] = useState(1);
   const [results, setResults] = useState<ScanRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -251,6 +265,11 @@ export function BarcodeReaderEngine() {
     scanGeneration.current += 1;
     controlsRef.current?.stop();
     controlsRef.current = null;
+    cameraTrackRef.current = null;
+    setTorchAvailable(false);
+    setTorchEnabled(false);
+    setZoomRange(null);
+    setZoomValue(1);
     setCameraActive(false);
     setCameraStarting(false);
   }
@@ -306,6 +325,18 @@ export function BarcodeReaderEngine() {
       }
 
       controlsRef.current = controls;
+      const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks()[0] ?? null;
+      cameraTrackRef.current = track;
+      if (track) {
+        const capabilities = track.getCapabilities() as ExtendedCameraCapabilities;
+        setTorchAvailable(capabilities.torch === true);
+        const zoom = capabilities.zoom;
+        if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
+          setZoomRange({ min: zoom.min, max: zoom.max, step: zoom.step && zoom.step > 0 ? zoom.step : 0.1 });
+          const currentZoom = (track.getSettings() as MediaTrackSettings & { zoom?: number }).zoom;
+          setZoomValue(currentZoom ?? zoom.min);
+        }
+      }
       setCameraActive(true);
       setNotice("Camera is ready. Hold a QR code or barcode inside the camera view.");
       try {
@@ -326,6 +357,36 @@ export function BarcodeReaderEngine() {
       setNotice(null);
     } finally {
       if (generation === scanGeneration.current) setCameraStarting(false);
+    }
+  }
+
+  async function setTorch(enabled: boolean) {
+    const track = cameraTrackRef.current;
+    if (!track || !torchAvailable) return;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: enabled } as MediaTrackConstraintSet],
+      } as ExtendedCameraConstraints);
+      setTorchEnabled(enabled);
+      setError(null);
+    } catch {
+      setError("This camera could not change its light. The device may restrict torch access while scanning.");
+    }
+  }
+
+  async function setCameraZoom(requested: number) {
+    const track = cameraTrackRef.current;
+    if (!track || !zoomRange) return;
+    const next = Math.min(zoomRange.max, Math.max(zoomRange.min, requested));
+    try {
+      await track.applyConstraints({
+        advanced: [{ zoom: next } as MediaTrackConstraintSet],
+      } as ExtendedCameraConstraints);
+      const actual = (track.getSettings() as MediaTrackSettings & { zoom?: number }).zoom;
+      setZoomValue(actual ?? next);
+      setError(null);
+    } catch {
+      setError("This camera does not support the requested zoom level.");
     }
   }
 
@@ -443,6 +504,26 @@ export function BarcodeReaderEngine() {
             )}
           </div>
           {cameras.length > 1 ? <p className="text-xs text-muted">Choose another available camera to switch between front and rear lenses.</p> : null}
+          {cameraActive && (torchAvailable || zoomRange) ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {torchAvailable ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => void setTorch(!torchEnabled)}>
+                  {torchEnabled ? "Turn light off" : "Turn light on"}
+                </Button>
+              ) : null}
+              {zoomRange ? (
+                <>
+                  <Button type="button" size="sm" variant="outline" disabled={zoomValue <= zoomRange.min} onClick={() => void setCameraZoom(zoomValue - zoomRange.step)}>
+                    − Zoom
+                  </Button>
+                  <span className="min-w-12 text-center text-xs text-muted" aria-live="polite">{zoomValue.toFixed(1)}×</span>
+                  <Button type="button" size="sm" variant="outline" disabled={zoomValue >= zoomRange.max} onClick={() => void setCameraZoom(zoomValue + zoomRange.step)}>
+                    + Zoom
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <section className="space-y-3" aria-labelledby="reader-upload-heading">
