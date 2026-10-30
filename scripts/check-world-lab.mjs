@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 const r = spawnSync(process.execPath, [
-  "--experimental-strip-types", "--test", "src/lib/world-lab/model.test.ts",
+  "--experimental-strip-types", "--test", "src/lib/world-lab/model.test.ts", "src/lib/world-lab/project.test.ts",
 ], { stdio: "inherit" });
 if (r.error) throw r.error;
 process.exitCode = r.status ?? 1;
