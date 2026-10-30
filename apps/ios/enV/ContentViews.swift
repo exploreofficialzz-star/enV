@@ -252,7 +252,7 @@ enum NativeAnalyticsClient {
                 defaults.removeObject(forKey: revokeKey)
             } catch { /* Retry the revocation next time the app becomes active. */ }
         }
-        guard choice == "granted", let subject = NativeAnalyticsKeychain.read() else { return }
+        guard isEnabled, choice == "granted", let subject = NativeAnalyticsKeychain.read() else { return }
         let queue = defaults.array(forKey: queueKey) as? [[String: Any]] ?? []
         guard !queue.isEmpty else { return }
         let batch = Array(queue.prefix(maxQueue))
@@ -307,7 +307,7 @@ private struct NativeAnalyticsConsentPanel: View {
             if NativeAnalyticsClient.isEnabled {
                 VStack(alignment: .leading, spacing: 9) {
                     if choice == "unset" || expanded {
-                        enVCharacterSpacedText("Help improve enV")
+                        enVCharacterSpacedText(NativeAnalyticsClient.isEnabled ? "Help improve enV" : "Analytics is disabled in this app version")
                             .font(.envScaled(size: 14, weight: .semibold))
                             .foregroundStyle(Color.envInk)
                         enVCharacterSpacedText("Optional analytics records tool activity, outcomes and approximate device categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow.")
@@ -318,7 +318,7 @@ private struct NativeAnalyticsConsentPanel: View {
                             enVCharacterSpacedText(errorMessage).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(.red)
                         }
                         HStack(spacing: 8) {
-                            Button { Task { await decide(true) } } label: {
+                            if NativeAnalyticsClient.isEnabled { Button { Task { await decide(true) } } label: {
                                 enVCharacterSpacedText(busy ? "Saving…" : "Allow analytics")
                                     .font(.envScaled(size: 11, weight: .semibold))
                                     .foregroundStyle(.white)
