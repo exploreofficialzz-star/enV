@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { MessageCircle, ThumbsDown, ThumbsUp, Flag, Ban, Trash2, Send, RefreshCw } from "lucide-react";
+import { MessageCircle, ThumbsDown, ThumbsUp, Ban, Trash2, Send, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type CommunityComment = {
@@ -21,7 +21,6 @@ type CommunityFeed = {
 type ApiResult<T> = { ok?: boolean; data?: T; message?: string; error?: string };
 
 const VISITOR_KEY = "env.community.visitor.v1";
-const ANONYMOUS_LABEL = "Anonymous";
 const reportReasons = [
   ["spam", "Spam"],
   ["harassment", "Harassment"],
