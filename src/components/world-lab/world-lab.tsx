@@ -6,9 +6,10 @@ import {
   type WorldLabEntity, type WorldLabProject,
 } from "@/lib/world-lab/project";
 import { listLocalWorldLabProjects, putLocalWorldLabProject } from "@/lib/world-lab/local-storage";
+import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import {
   advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
-  HEAT_CELLS, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
+  HEAT_CELLS, type AssumedMassSource, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
 } from "@/lib/world-lab/model";
 
 type SceneHandles = {
@@ -80,6 +81,7 @@ export default function WorldLab() {
   const shapeCount = project?.entities.length ?? 0;
   const [materialName, setMaterialName] = useState("");
   const [density, setDensity] = useState("");
+  const [youngModulus, setYoungModulus] = useState("");
   const materials = project?.materials ?? [];
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
@@ -314,23 +316,48 @@ export default function WorldLab() {
     setHeat(current=>({...current,[key]:value}));
     setDirty(true);setPlaying(false);
   }
-  function start() {
+  function runModel(input: ModelInput, source: AssumedMassSource | null = null) {
     setError("");
     try {
-      const input = modelKind === "damped-oscillator" ? mechanical : modelKind === "heat-rod" ? heat : circuit;
       const next = runExperiment(input, {
         id: window.crypto.randomUUID(), parentRunId: currentRun?.id ?? null,
-        worldDateUTC: new Date().toISOString(),
+        worldDateUTC: new Date().toISOString(), assumedMassSource: source,
       });
       setRuns((previous) => [...previous.slice(-6), next]);
       setRunId(next.id);
       setTimeSeconds(0);
       setDirty(false);
       setPlaying(true);
-      setMessage("Computed locally with a bounded scientific model. The 3D object is an illustration of solver output.");
+      setMessage(source
+        ? "Simulation uses the selected invented solid's assumed density as a lumped mass. It does not prove real material behavior."
+        : "Computed locally with a bounded scientific model. The 3D object is an illustration of solver output.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "This experiment could not be calculated.");
     }
+  }
+  function start() {
+    runModel(modelKind === "damped-oscillator" ? mechanical : modelKind === "heat-rod" ? heat : circuit);
+  }
+  function startWithSelectedSolid() {
+    if (!project || !selectedEntity) return;
+    try {
+      const derived = deriveOscillatorFromSolid(project, selectedEntity.id, mechanical);
+      setModelKind("damped-oscillator");
+      setMechanical(derived.input);
+      runModel(derived.input, derived.source);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "This shape cannot be used as a mass yet.");
+    }
+  }
+  function zoomView(direction: 1 | -1) {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const camera = scene.scene.activeCamera;
+    if (!(camera instanceof B.UniversalCamera)) return;
+    const move = camera.getForwardRay().direction.scale(direction * 0.8);
+    const next = camera.position.add(move);
+    if (next.length() > 1000 || next.y < 0.08) return;
+    camera.position.copyFrom(next);
   }
   function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
     setProject(current => current ? transform(current) : current);
@@ -416,15 +443,16 @@ export default function WorldLab() {
     try {
       const proposed = validateNovelMaterial({
         name: materialName.trim(), densityKgM3: density.trim() === "" ? null : Number(density),
-        youngModulusPa: null, provenance: "hypothetical-user-assumed",
+        youngModulusPa: youngModulus.trim() === "" ? null : Number(youngModulus),
+        provenance: "hypothetical-user-assumed",
       });
       mutateProject(current=>({...current,materials:[...current.materials,{
         id:crypto.randomUUID(),name:proposed.name,
         densityKgM3:proposed.densityKgM3,youngModulusPa:proposed.youngModulusPa,
         evidence:proposed.provenance,
       }]}));
-      setMaterialName(""); setDensity("");
-      setMessage("Material proposal recorded as hypothetical. It is not connected to the solver.");
+      setMaterialName(""); setDensity(""); setYoungModulus("");
+      setMessage("Hypothetical material saved in the project. Its density can supply an assumed mass to the spring model; other physical behavior is not simulated.");
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Invalid material proposal.");
@@ -494,6 +522,10 @@ export default function WorldLab() {
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
               onClick={() => setSeeInside((value) => !value)}>See Inside</button>
+            <button type="button" className={buttonClass} onClick={() => zoomView(1)}
+              aria-label="Zoom in">Zoom in</button>
+            <button type="button" className={buttonClass} onClick={() => zoomView(-1)}
+              aria-label="Zoom out">Zoom out</button>
             <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
               onClick={() => addShape("box")}>Add cube</button>
             <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
@@ -518,7 +550,8 @@ export default function WorldLab() {
           <p className="mt-2 text-xs text-muted-foreground">
             Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
             Added solids are visual geometry with analytic volume. Without material density, mass is unknown;
-            none of these objects is coupled to the demo solvers.
+            an assigned density can be used as an assumed mass in the spring model.
+            Shape geometry is not a collision or deformation simulation.
           </p>
           <div className="mt-3 rounded-xl border border-border p-3">
             <h2 className="text-base font-medium">Build and inspect</h2>
@@ -558,6 +591,16 @@ export default function WorldLab() {
                   {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
+                <div className="sm:col-span-2">
+                  <button type="button" className={buttonClass}
+                    disabled={selectedQuantities.massKg === null}
+                    onClick={startWithSelectedSolid}>Test this solid as spring mass</button>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Treat this object's geometry and your invented density as one lumped mass.
+                    The spring stiffness remains a separate assumption. This is not deformation,
+                    collision or material certification.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -567,7 +610,7 @@ export default function WorldLab() {
           <select id="worldlab-model" className={inputLabel} value={modelKind}
             onChange={(event) => {
               setModelKind(event.target.value as ModelInput["kind"]);
-              setPlaying(false); setDirty(true);
+              setPlaying(false); setDirty(true); setRunId(""); setTimeSeconds(0);
             }}>
             <option value="damped-oscillator">Spring and moving mass</option>
             <option value="rc-circuit">Battery and capacitor (RC)</option>
@@ -687,6 +730,16 @@ export default function WorldLab() {
               <p className="mt-3 text-xs">Model {currentRun.modelId} v{currentRun.modelVersion};
                 solver Δt {currentRun.time.solverStepSeconds.toPrecision(4)} s;
                 simulation date {currentRun.time.worldDateUTC}.</p>
+              {currentRun.assumedMassSource && (
+                <div className="mt-2 rounded-lg border border-border p-3 text-xs" aria-label="Hypothetical material provenance">
+                  <p className="font-medium">Derived from an invented solid · user-assumed</p>
+                  <p>Object: {currentRun.assumedMassSource.entityName}; material: {currentRun.assumedMassSource.materialName}.</p>
+                  <p>Volume {metric(currentRun.assumedMassSource.volumeM3,"m³")} ×
+                    assumed density {metric(currentRun.assumedMassSource.assumedDensityKgM3,"kg/m³")} =
+                    mass {metric(currentRun.assumedMassSource.derivedMassKg,"kg")}.</p>
+                  <p>{currentRun.assumedMassSource.assumption}</p>
+                </div>
+              )}
               <p className="mt-2 text-xs text-muted-foreground">Valid only within: {currentRun.validity}</p>
               <button type="button" className={buttonClass + " mt-3"}
                 onClick={() => downloadJson("world-lab-experiment.json", currentRun)}>Export recorded run JSON</button>
@@ -705,12 +758,15 @@ export default function WorldLab() {
             <label className="text-sm">Assumed density (kg/m³), optional<input className={inputLabel}
               type="number" min="0.001" value={density}
               onChange={(event) => setDensity(event.target.value)} /></label>
+            <label className="text-sm">Assumed Young's modulus (Pa), optional<input className={inputLabel}
+              type="number" min="0" max="1000000000000000" step="any" value={youngModulus}
+              onChange={(event) => setYoungModulus(event.target.value)} /></label>
           </div>
           <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>Record hypothetical material</button>
           {materials.length > 0 && (
             <ul className="mt-3 list-inside list-disc text-sm">
               {materials.map((material) => <li key={material.id}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
-                elasticity unknown · Hypothetical / User-assumed</li>)}
+                modulus {material.youngModulusPa === null ? "Unknown" : metric(material.youngModulusPa,"Pa")} · Hypothetical / User-assumed</li>)}
             </ul>
           )}
         </section>
