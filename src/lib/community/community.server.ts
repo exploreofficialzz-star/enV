@@ -261,7 +261,7 @@ export async function moderateCommunityReport(request: Request,input:unknown) {
        join tool_community_comments c on c.id=r.comment_id where r.id=$1 for update`,[body.reportId],
     );
     const row=rows[0];if(!row)throw new CommunityError("COMMUNITY_REPORT_NOT_FOUND","The moderation report was not found.",404);
-    const commentStatus=body.commentAction==="hide"?"hidden":body.commentAction==="remove"?"removed":row.moderation_status;
+    const commentStatus=body.commentAction==="hide"?"hidden":body.commentAction==="remove"?"removed":"visible";
     await tx.query("update tool_community_reports set status=$2,updated_at=now() where id=$1",[body.reportId,body.status]);
     await tx.query("update tool_community_comments set moderation_status=$2,updated_at=now() where id=$1",[row.comment_id,commentStatus]);
     await tx.query(
