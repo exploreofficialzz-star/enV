@@ -215,11 +215,11 @@ function parseExcludedDates(value?: string): Set<string> {
   const excluded = new Set<string>();
   for (const item of items) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(item)) {
-      throw new Error(`Invalid excluded date: \${item}. Use YYYY-MM-DD.`);
+      throw new Error(`Invalid excluded date: ${item}. Use YYYY-MM-DD.`);
     }
     const parsed = parseDate(item, "excluded date");
     if (dateKey(parsed) !== item) {
-      throw new Error(`Invalid excluded date: \${item}. Use a real calendar date in YYYY-MM-DD format.`);
+      throw new Error(`Invalid excluded date: ${item}. Use a real calendar date in YYYY-MM-DD format.`);
     }
     excluded.add(item);
   }
