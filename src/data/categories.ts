@@ -43,8 +43,8 @@ export const CATEGORIES: CategoryMeta[] = [
   {
     id: "datetime",
     name: "Date & time",
-    description: "Date arithmetic, age, durations, time zones, workdays, calendars, and meeting planning.",
-    blurb: "Date math, deadlines, and world clocks.",
+    description: "Age, duration, timezones, timestamps, countdowns, and calendars.",
+    blurb: "Workdays, Unix time, and world clocks.",
     icon: "Calendar",
   },
   {

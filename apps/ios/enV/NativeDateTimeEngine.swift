@@ -232,7 +232,7 @@ public enum NativeDateTimeEngine {
     private static func unix(_ value: String) throws -> NativeDateTimeResult {
         let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a date or timestamp.") }
-        let isInteger = raw.range(of: "^-?\d+$", options: .regularExpression) != nil
+        let isInteger = raw.range(of: "^-?\\d+$", options: .regularExpression) != nil
         var totalNanos: Int64
         var precision = "date input"
         if isInteger {
