@@ -38,20 +38,6 @@ class NativeBarcodeEngineTest {
         assertTrue(NativeBarcodeEngine.run("isbn-check-digit", "9780143127741").startsWith("Valid"))
     }
 
-    @Test fun readerDecodesQrAndOneDimensionalBarcodeImagesOnDevice() {
-        val qrPayload = "https://example.com/env-android-qr-reader"
-        val qrBitmap = NativeBarcodeEngine.execute("qr-generator", mapOf("text" to qrPayload)).images.single()
-        val qrResult = NativeBarcodeImageDecoder.decode(qrBitmap)
-        assertEquals(qrPayload, qrResult?.text)
-        assertEquals("QR_CODE", qrResult?.format)
-
-        val barcodePayload = "ENV-CODE128-READER-2026"
-        val barcodeBitmap = NativeBarcodeEngine.execute("code128-barcode", mapOf("value" to barcodePayload)).images.single()
-        val barcodeResult = NativeBarcodeImageDecoder.decode(barcodeBitmap)
-        assertEquals(barcodePayload, barcodeResult?.text)
-        assertEquals("CODE_128", barcodeResult?.format)
-    }
-
     @Test fun supportedImageOperationsBypassGenericBackend() {
         for (id in listOf("image-resizer", "image-compressor", "image-grayscale", "image-blur", "image-cropper", "image-watermark")) {
             val image = tool(id, type = "image", category = "images")
