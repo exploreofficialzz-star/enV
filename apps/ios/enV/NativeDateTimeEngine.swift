@@ -81,7 +81,7 @@ public enum NativeDateTimeEngine {
         case "workday":
             let start = try dateOnly(options["start"] ?? options["from"] ?? "", label: "start date")
             guard let amount = Double(options["days"] ?? ""), amount.isFinite else { throw NativeDateTimeError.invalidOperation("Enter how many business days to add.") }
-            return result(("Result", format(addWorkingDays(start, amount, options: options), pattern: "yyyy-MM-dd EEEE")))
+            return result(("Result", format(try addWorkingDays(start, amount, options: options), pattern: "yyyy-MM-dd EEEE")))
         case "business-days":
             let from = try dateOnly(options["from"] ?? "", label: "start date")
             let to = try dateOnly(options["to"] ?? "", label: "end date")
@@ -150,7 +150,7 @@ public enum NativeDateTimeEngine {
             var month = parts.month ?? 1
             var day = parts.day ?? 1
             let year = calendar(.gregorian).component(.year, from: today)
-            if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(today) && options["leapBirthday"] == "mar-1" {
+            if month == 2 && day == 29 && !isLeapYear(year) && options["leapBirthday"] == "mar-1" {
                 month = 3; day = 1
             } else if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(today) {
                 day = 28
@@ -158,7 +158,7 @@ public enum NativeDateTimeEngine {
             var next = calendar(.gregorian).date(from: DateComponents(year: year, month: month, day: day))!
             if next < today {
                 let nextYear = year + 1
-                if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(calendar(.gregorian).date(from: DateComponents(year: nextYear, month: 1, day: 1))!) { day = 28 }
+                if month == 2 && day == 29 && !isLeapYear(nextYear) { day = 28 }
                 next = calendar(.gregorian).date(from: DateComponents(year: nextYear, month: month, day: day))!
             }
             return result(("Days until birthday", String(calendar(.gregorian).dateComponents([.day], from: today, to: next).day ?? 0)))
@@ -181,6 +181,10 @@ public enum NativeDateTimeEngine {
     }
 
     private static func result(_ pairs: (String, String)...) -> NativeDateTimeResult { NativeDateTimeResult(rows: pairs.map { NativeDateTimeRow(label: $0.0, value: $0.1) }) }
+    private static func isLeapYear(_ year: Int) -> Bool {
+        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    }
+
     private static func calendar(_ identifier: Calendar.Identifier) -> Calendar { var c = Calendar(identifier: identifier); c.timeZone = utc; c.locale = Locale(identifier: "en_GB"); return c }
 
     private static func dateOnly(_ value: String, label: String) throws -> Date {
