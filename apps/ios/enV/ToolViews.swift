@@ -5822,7 +5822,7 @@ struct NativeDateTimeToolView: View {
     private func defaultValue(for key: String) -> String {
         switch key {
         case "zones": return tool.id == "meeting-time-planner" ? "Lagos, London, New York" : "Lagos, London, New York, Tokyo"
-        case "fromTz", "sourceTz": return "Africa/Lagos"
+        case "fromTz", "sourceTz": return TimeZone.current.identifier
         case "toTz": return "America/New_York"
         case "pattern": return "yyyy-MM-dd EEEE"
         case "days": return "1"
@@ -5832,12 +5832,22 @@ struct NativeDateTimeToolView: View {
         case "includeEnd": return tool.id == "deadline-calculator" ? "false" : "true"
         case "weekendDays": return "0,6"
         case "excludedDates": return ""
-        case "date", "start": return ISO8601DateFormatter().string(from: Date()).prefix(10).description
+        case "date", "start":
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter.string(from: Date())
         case "workStart": return "09:00"
         case "workEnd": return "17:00"
         case "durationMinutes": return "30"
         case "intervalMinutes": return "30"
-        case "time": return "2026-10-30T12:00"
+        case "time":
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+            return formatter.string(from: Date())
         case "target": return tool.id == "countdown" ? ISO8601DateFormatter().string(from: Date().addingTimeInterval(3600)) : ""
         default: return ""
         }

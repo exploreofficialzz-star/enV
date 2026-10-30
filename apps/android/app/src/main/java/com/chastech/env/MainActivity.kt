@@ -2345,8 +2345,8 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var excludedDates by rememberSaveable(toolId) { mutableStateOf("") }
     var target by rememberSaveable(toolId) { mutableStateOf(now.plusSeconds(3600).toString()) }
     var zones by rememberSaveable(toolId) { mutableStateOf("Lagos\nLondon\nNew York\nTokyo") }
-    var time by rememberSaveable(toolId) { mutableStateOf("2026-10-30T12:00") }
-    var fromTz by rememberSaveable(toolId) { mutableStateOf("UTC") }
+    var time by rememberSaveable(toolId) { mutableStateOf(java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()) }
+    var fromTz by rememberSaveable(toolId) { mutableStateOf(java.time.ZoneId.systemDefault().id) }
     var toTz by rememberSaveable(toolId) { mutableStateOf("America/New_York") }
     var workStart by rememberSaveable(toolId) { mutableStateOf("09:00") }
     var workEnd by rememberSaveable(toolId) { mutableStateOf("17:00") }
@@ -2448,8 +2448,8 @@ private fun NativeDateTimeToolForm(toolId: String) {
                 input = today; from = today; to = today; start = today; days = "5"
                 years = "0"; months = "0"; weeks = "0"; direction = "add"; repeatCount = "1"
                 includeEnd = if (op == "deadline") "false" else "true"; weekendDays = "0,6"; excludedDates = ""
-                target = now.plusSeconds(3600).toString(); zones = "Lagos\nLondon\nNew York\nTokyo"; time = "2026-10-30T12:00"
-                fromTz = "UTC"; toTz = "America/New_York"; workStart = "09:00"; workEnd = "17:00"
+                target = now.plusSeconds(3600).toString(); zones = "Lagos\nLondon\nNew York\nTokyo"; time = java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()
+                fromTz = java.time.ZoneId.systemDefault().id; toTz = "America/New_York"; workStart = "09:00"; workEnd = "17:00"
                 meetingDuration = "30"; intervalMinutes = "30"; value = now.epochSecond.toString()
                 pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = ""
             }

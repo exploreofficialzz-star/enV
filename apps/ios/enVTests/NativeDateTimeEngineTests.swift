@@ -115,4 +115,12 @@ final class NativeDateTimeEngineTests: XCTestCase {
         let deadline = try NativeDateTimeEngine.run(toolID: "deadline-calculator", options: ["target": "2024-01-17", "includeEnd": "true"], now: now, localTimeZone: lagos)
         XCTAssertTrue(deadline.output.contains("Calendar days remaining: 1"))
     }
+    func testLeapDayBirthdayDefaultsToFebruary28WithMarchFirstOption() throws {
+        let now = ISO8601DateFormatter().date(from: "2025-01-15T12:00:00Z")!
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "birthday-countdown", input: "2000-02-29", now: now).output, "Days until birthday: 44")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29", "leapBirthday": "mar-1"
+        ], now: now).output, "Days until birthday: 45")
+    }
+
 }

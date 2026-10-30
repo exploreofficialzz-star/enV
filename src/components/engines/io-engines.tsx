@@ -291,6 +291,25 @@ function genFieldsFor(op: string): UiField[] {
 export function GeneratorEngine({ op }: { op: string }) {
   const fields = genFieldsFor(op);
   const [opts, setOpts] = useState(() => initialValues(fields));
+
+  useEffect(() => {
+    if (op !== "timezone" && op !== "meeting-planner" && op !== "countdown") return;
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const toLocalInput = (value: Date) => {
+      const date = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+      return `${date}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+    };
+    const date = toLocalInput(now).slice(0, 10);
+    const localDateTime = toLocalInput(now);
+    const countdownTarget = toLocalInput(new Date(now.getTime() + 60 * 60 * 1000));
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    setOpts((current) => {
+      if (op === "timezone") return { ...current, time: current.time || localDateTime, fromTz: current.fromTz || localZone };
+      if (op === "meeting-planner") return { ...current, date: current.date || date, sourceTz: current.sourceTz || localZone };
+      return { ...current, target: current.target || countdownTarget };
+    });
+  }, [op]);
   const { error, out, wrap, setOut, setError } = useRunner();
   return (
     <div className="space-y-4">
@@ -350,7 +369,7 @@ const DATE_FIELDS: Record<string, UiField[]> = {
   ],
   timezone: [
     { name: "time", label: "Source local time", type: "text", placeholder: "2026-10-30T12:00" },
-    { name: "fromTz", label: "From city / time zone", type: "text", defaultValue: "Africa/Lagos" },
+    { name: "fromTz", label: "From city / time zone", type: "text", placeholder: "Auto: your device time zone" },
     { name: "toTz", label: "To city / time zone", type: "text", defaultValue: "America/New_York" },
   ],
   unix: [{ name: "value", label: "Unix timestamp(s) or ISO date", type: "textarea", placeholder: "Seconds, milliseconds, microseconds, nanoseconds or ISO dates" }],
@@ -374,7 +393,7 @@ const DATE_FIELDS: Record<string, UiField[]> = {
   "meeting-planner": [
     { name: "date", label: "Meeting date in reference city", type: "date" },
     { name: "zones", label: "Cities or IANA time zones (2–8)", type: "textarea", defaultValue: "Lagos\nLondon\nNew York" },
-    { name: "sourceTz", label: "Reference city / time zone", type: "text", defaultValue: "Lagos" },
+    { name: "sourceTz", label: "Reference city / time zone", type: "text", placeholder: "Auto: your device time zone" },
     { name: "workStart", label: "Working day starts (HH:mm)", type: "text", defaultValue: "09:00" },
     { name: "workEnd", label: "Working day ends (HH:mm)", type: "text", defaultValue: "17:00" },
     { name: "durationMinutes", label: "Meeting length in minutes", type: "number", defaultValue: 30 },

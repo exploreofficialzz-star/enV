@@ -404,11 +404,11 @@ function clockMinutes(value: string): number {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-export function runDateTime(op: string, opts: Record<string, string>): DateTimeRow[] {
+export function runDateTime(op: string, opts: Record<string, string>, now = new Date()): DateTimeRow[] {
   switch (op) {
     case "age": {
       const birth = parseDate(opts.birth || opts.value, "birth date");
-      const today = new Date();
+      const today = now;
       if (birth > today) throw new Error("Birth date cannot be in the future.");
       const years = differenceInYears(today, birth);
       const months = differenceInMonths(today, addYears(birth, years));
@@ -487,7 +487,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
     }
     case "countdown": {
       const target = parseInstant(opts.target, "target date and time");
-      const diff = target.getTime() - Date.now();
+      const diff = target.getTime() - now.getTime();
       if (diff <= 0) {
         return [
           { label: "Status", value: "The target time has arrived." },
@@ -503,7 +503,6 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
     }
     case "world-clock": {
       const zones = parseZoneList(opts.zones, 20);
-      const now = new Date();
       return zones.map(({ label, zone }) => ({
         label,
         value: `${formatInZone(now, zone)} · ${offsetLabel(now, zone)}`,
@@ -562,12 +561,13 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
     }
     case "birthday": {
       const birth = parseDate(opts.birth || opts.value, "birth date");
-      const now = new Date();
+      
       const thisYear = now.getFullYear();
       let month = birth.getMonth();
       let day = birth.getDate();
-      if (month === 1 && day === 29 && !isLeapYear(new Date(thisYear, 5, 1)) && opts.leapBirthday === "mar-1") {
-        month = 2; day = 1;
+      if (month === 1 && day === 29 && !isLeapYear(new Date(thisYear, 5, 1))) {
+        if (opts.leapBirthday === "mar-1") { month = 2; day = 1; }
+        else day = 28;
       }
       const next = new Date(thisYear, month, day);
       if (next < new Date(now.getFullYear(), now.getMonth(), now.getDate())) next.setFullYear(thisYear + 1);
@@ -575,7 +575,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
     }
     case "time-until": {
       const target = parseDate(opts.target || opts.value, "target date");
-      const today = new Date();
+      const today = now;
       const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const span = calendarSpan(start, target);
       const sign = span.direction < 0 ? "-" : "";
@@ -586,7 +586,7 @@ export function runDateTime(op: string, opts: Record<string, string>): DateTimeR
     }
     case "deadline": {
       const target = parseDate(opts.target || opts.value, "deadline");
-      const today = new Date();
+      const today = now;
       const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const includeEnd = opts.includeEnd === "true";
       return [

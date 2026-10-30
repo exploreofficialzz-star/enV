@@ -123,4 +123,12 @@ class NativeDateTimeEngineTest {
         val deadline = NativeDateTimeEngine.run("deadline-calculator", options = mapOf("target" to "2024-01-17", "includeEnd" to "true"), now = now, localTimeZone = lagos)
         assertTrue(deadline.output.contains("Calendar days remaining: 1"))
     }
+    @Test fun leapDayBirthdayDefaultsToFebruary28WithMarchFirstOption() {
+        val now = Instant.parse("2025-01-15T12:00:00Z")
+        assertEquals("Days until birthday: 44", NativeDateTimeEngine.run("birthday-countdown", input = "2000-02-29", now = now).output)
+        assertEquals("Days until birthday: 45", NativeDateTimeEngine.run("birthday-countdown", options = mapOf(
+            "birth" to "2000-02-29", "leapBirthday" to "mar-1"
+        ), now = now).output)
+    }
+
 }

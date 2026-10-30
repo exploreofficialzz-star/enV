@@ -27,6 +27,14 @@ for (const platform of ["android", "ios"]) {
   assert.deepEqual(coverage, expectedNative, `${platform} Date & Time native coverage matches all supported operations`);
 }
 
+const birthdayDefault = runDateTime("birthday", { birth: "2000-02-29" }, fixedNow);
+assert.equal(birthdayDefault[0].value, "44");
+const birthdayMarchFirst = runDateTime("birthday", { birth: "2000-02-29", leapBirthday: "mar-1" }, fixedNow);
+assert.equal(birthdayMarchFirst[0].value, "45");
+
+const countdown = runDateTime("countdown", { target: "2025-01-15T13:00:00Z" }, fixedNow);
+assert.equal(countdown.find((row) => row.label === "Total seconds")?.value, "3600");
+
 const dateDifference = runDateTime("date-diff", { from: "2024-01-01", to: "2024-01-05" });
 assert.equal(dateDifference.find((row) => row.label === "Total days")?.value, "4");
 assert.match(dateDifference.find((row) => row.label === "Calendar span")?.value ?? "", /0 years, 0 months, 4 days/);
