@@ -90,10 +90,18 @@ enum NativeWorldLabScience {
             cells[heatCells/2]=center
             let dx=length/Double(heatCells),ratio=alpha*h/(dx*dx)
             for _ in 0..<steps {
-                let flux=(0..<(heatCells-1)).map{i in ratio*(cells[i+1]-cells[i])}
-                cells=(0..<heatCells).map{i in
-                    cells[i]+(i<heatCells-1 ? flux[i]:0)-(i>0 ? flux[i-1]:0)
+                var flux = [Double](repeating: 0, count: heatCells - 1)
+                for cell in 0..<(heatCells - 1) {
+                    let difference = cells[cell + 1] - cells[cell]
+                    flux[cell] = ratio * difference
                 }
+                var next = cells
+                for cell in 0..<heatCells {
+                    let outgoing: Double = cell < heatCells - 1 ? flux[cell] : 0
+                    let incoming: Double = cell > 0 ? flux[cell - 1] : 0
+                    next[cell] = cells[cell] + outgoing - incoming
+                }
+                cells = next
             }
             guard cells.allSatisfy({$0.isFinite && $0>=0 && $0<=2000}) else {
                 throw NativeWorldLabError.invalid("Invalid heat profile")
