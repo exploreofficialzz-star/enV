@@ -65,7 +65,7 @@ export function BarcodeReaderEngine() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const scanGeneration = useRef(0);
-  const lastScanRef = useRef<{ signature: string; at: number } | null>(null);
+  const recentScansRef = useRef<Map<string, number>>(new Map());
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraStarting, setCameraStarting] = useState(false);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
@@ -84,15 +84,15 @@ export function BarcodeReaderEngine() {
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          const valid = parsed.filter((entry): entry is ScanRecord =>
-            entry !== null &&
-            typeof entry === "object" &&
-            typeof entry.id === "string" &&
-            typeof entry.value === "string" &&
-            typeof entry.format === "string" &&
-            typeof entry.scannedAt === "string" &&
-            Number.isFinite(Date.parse(entry.scannedAt))
-          );
+          const valid = parsed.filter((entry): entry is ScanRecord => {
+            if (entry === null || typeof entry !== "object") return false;
+            const record = entry as Record<string, unknown>;
+            return typeof record.id === "string" &&
+              typeof record.value === "string" &&
+              typeof record.format === "string" &&
+              typeof record.scannedAt === "string" &&
+              Number.isFinite(Date.parse(record.scannedAt));
+          });
           setResults(valid.slice(0, 50));
         }
       }
@@ -117,8 +117,14 @@ export function BarcodeReaderEngine() {
     const formatLabel = FORMAT_LABELS[format as BarcodeFormat] ?? String(format).replaceAll("_", " ");
     const signature = `${formatLabel}\u0000${value}`;
     const now = Date.now();
-    if (lastScanRef.current?.signature === signature && now - lastScanRef.current.at < 1800) return;
-    lastScanRef.current = { signature, at: now };
+    const previousScanAt = recentScansRef.current.get(signature) ?? 0;
+    if (now - previousScanAt < 1800) return;
+    recentScansRef.current.set(signature, now);
+    if (recentScansRef.current.size > 200) {
+      for (const [key, scannedAt] of recentScansRef.current) {
+        if (now - scannedAt > 10_000) recentScansRef.current.delete(key);
+      }
+    }
     setResults((current) => [
       { id: `${now}-${Math.random().toString(36).slice(2, 8)}`, value, format: formatLabel, scannedAt: new Date(now).toISOString() },
       ...current,
