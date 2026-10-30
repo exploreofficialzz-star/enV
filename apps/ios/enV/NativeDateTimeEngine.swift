@@ -152,7 +152,7 @@ public enum NativeDateTimeEngine {
             let year = calendar(.gregorian).component(.year, from: today)
             if month == 2 && day == 29 && !isLeapYear(year) && options["leapBirthday"] == "mar-1" {
                 month = 3; day = 1
-            } else if month == 2 && day == 29 && !Calendar(identifier: .gregorian).isDateInLeapYear(today) {
+            } else if month == 2 && day == 29 && !isLeapYear(calendar(.gregorian).component(.year, from: today)) {
                 day = 28
             }
             var next = calendar(.gregorian).date(from: DateComponents(year: year, month: month, day: day))!

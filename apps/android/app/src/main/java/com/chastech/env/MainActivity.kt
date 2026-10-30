@@ -1474,16 +1474,6 @@ private fun NativeBarcodeToolForm(toolId: String) {
     var images by remember(toolId) { mutableStateOf(emptyList<android.graphics.Bitmap>()) }
     var exportText by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
-    LaunchedEffect(op, target, zones) {
-        if (op == "countdown" || op == "world-clock") {
-            while (true) {
-                val liveOptions = if (op == "countdown") mapOf("target" to target) else mapOf("zones" to zones)
-                runCatching { NativeDateTimeEngine.run(toolId, input, liveOptions) }
-                    .fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to refresh date/time" })
-                kotlinx.coroutines.delay(1_000)
-            }
-        }
-    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         fields.forEach { field ->
             val hint = if (field.options.isEmpty()) field.label else "${field.label} · ${field.options.joinToString(" / ")}"
@@ -2369,6 +2359,16 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var output by rememberSaveable(toolId) { mutableStateOf("") }
     var error by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
+    LaunchedEffect(op, target, zones) {
+        if (op == "countdown" || op == "world-clock") {
+            while (true) {
+                val liveOptions = if (op == "countdown") mapOf("target" to target) else mapOf("zones" to zones)
+                runCatching { NativeDateTimeEngine.run(toolId, input, liveOptions) }
+                    .fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to refresh date/time" })
+                kotlinx.coroutines.delay(1_000)
+            }
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when (op) {
             "age", "birthday" -> InputField(birth, { birth = it }, "Birth date", placeholder = "YYYY-MM-DD")
