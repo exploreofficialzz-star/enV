@@ -16,8 +16,14 @@ try{
   await page.getByRole("button",{name:"Add cube"}).click();
   await page.getByRole("button",{name:"Add sphere"}).click();
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Cube"});
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
+  await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("1");
+  await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("1");
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("3");
+  assert.equal(await page.getByRole("spinbutton",{name:"Position X (m)"}).inputValue(),"3");
+  await page.getByRole("button",{name:"Focus selected object"}).click();
   await page.getByText("Volume:").waitFor();
-  assert.match(await page.getByText("Volume:").locator("..").innerText(),/1\.0000 m³/);
+  assert.match(await page.getByText("Volume:").locator("..").innerText(),/2\.0000 m³/);
   await page.getByRole("button",{name:"See Inside"}).click();
   await page.getByRole("button",{name:"Zoom in"}).click();
   await page.getByRole("button",{name:"Zoom out"}).click();
@@ -34,7 +40,7 @@ try{
   let evidenceJson="";
   for await(const chunk of evidenceStream)evidenceJson+=chunk.toString();
   const evidence=JSON.parse(evidenceJson);
-  assert.equal(evidence.inputs.massKg,2);
+  assert.equal(evidence.inputs.massKg,4);
   assert.equal(evidence.assumedMassSource.materialName,"Invented foam");
   assert.equal(evidence.inputEvidence,"hypothetical-user-assumed");
   assert.equal(evidence.assumedMassSource.assumedDensityKgM3,2);
@@ -43,6 +49,7 @@ try{
   assert.equal(await page.getByLabel(/Object opacity:/).inputValue(),"35");
   await page.getByRole("button",{name:"Start / Recalculate"}).click();
   await page.getByText("Mechanical energy",{exact:true}).waitFor();
+  await page.getByText("Position over simulated time").waitFor();
   await page.getByRole("button",{name:"Pause"}).click();
   await page.getByRole("combobox",{name:"Playback speed"}).selectOption("0.1");
   await page.getByRole("button",{name:"Step",exact:true}).click();
@@ -62,6 +69,8 @@ try{
   assert.equal(data.entities.length,2);
   assert.equal(data.world.representation,"representative-not-measured");
   assert.equal(data.entities[0].scientificRole,"visual-only");
+  assert.deepEqual(data.entities[0].dimensionsMeters,[2,1,1]);
+  assert.equal(data.entities[0].positionMeters[0],3);
   await page.getByRole("button",{name:"Save on device"}).click();
   await page.getByText(/Saved on this device with revision protection/).waitFor();
   await page.reload({waitUntil:"domcontentloaded"});

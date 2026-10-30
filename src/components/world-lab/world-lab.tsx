@@ -7,6 +7,7 @@ import {
 } from "@/lib/world-lab/project";
 import { listLocalWorldLabProjects, putLocalWorldLabProject } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
+import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import {
   advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
   HEAT_CELLS, type AssumedMassSource, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
@@ -90,6 +91,7 @@ export default function WorldLab() {
   const [error, setError] = useState("");
   const currentRun = useMemo(() => runs.find((run) => run.id === runId) ?? null, [runs, runId]);
   const sample = currentRun ? sampleRun(currentRun, timeSeconds) : null;
+  const trace = useMemo(() => currentRun ? buildScientificTimeTrace(currentRun) : null, [currentRun]);
 
   useEffect(() => {
     try {
@@ -349,6 +351,32 @@ export default function WorldLab() {
       setError(cause instanceof Error ? cause.message : "This shape cannot be used as a mass yet.");
     }
   }
+  function focusSelected() {
+    const camera = sceneRef.current?.scene.activeCamera;
+    if (!(camera instanceof B.UniversalCamera) || !selectedEntity) return;
+    const [x,y,z] = selectedEntity.positionMeters;
+    const distance = Math.max(2, Math.max(...selectedEntity.dimensionsMeters) * 3);
+    camera.position.copyFromFloats(x, y + 1, z - distance);
+    camera.setTarget(new B.Vector3(x,y,z));
+  }
+  function editPosition(axis: 0 | 1 | 2, numberValue: number) {
+    if (!selectedEntity || !Number.isFinite(numberValue) ||
+        numberValue < -100000 || numberValue > 100000) return;
+    const next = [...selectedEntity.positionMeters] as [number, number, number];
+    next[axis] = numberValue;
+    editSelected({positionMeters: next});
+  }
+  function editDimension(axis: 0 | 1 | 2, numberValue: number) {
+    if (!selectedEntity || !Number.isFinite(numberValue) ||
+        numberValue < 0.001 || numberValue > 10000) return;
+    const next = [...selectedEntity.dimensionsMeters] as [number, number, number];
+    if (selectedEntity.shape === "sphere") next.fill(numberValue);
+    else if (selectedEntity.shape === "cylinder" && axis !== 1) {
+      next[0] = numberValue;
+      next[2] = numberValue;
+    } else next[axis] = numberValue;
+    editSelected({dimensionsMeters: next});
+  }
   function zoomView(direction: 1 | -1) {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -572,12 +600,38 @@ export default function WorldLab() {
                   <input className="mt-1 h-10 w-full" type="color" value={selectedEntity.color}
                     onChange={event=>editSelected({color:event.target.value})}/>
                 </label>
-                <label>Size (metres, uniform)
-                  <input className={inputLabel} type="number" min="0.001" max="10000" step="0.1"
-                    value={selectedEntity.dimensionsMeters[0]}
-                    onChange={event=>{const n=Number(event.target.value);if(n>0 && n<=10000)
-                      editSelected({dimensionsMeters:[n,n,n]});}}/>
-                </label>
+                <div className="sm:col-span-2 grid grid-cols-3 gap-2" aria-label="Solid dimensions in metres">
+                  {(selectedEntity.shape === "box" ? ([0,1,2] as const) :
+                    selectedEntity.shape === "cylinder" ? ([0,1] as const) : ([0] as const)).map(axis=>(
+                    <label key={axis} className="text-xs">
+                      {selectedEntity.shape === "sphere" ? "Diameter" :
+                        selectedEntity.shape === "cylinder" ? (axis === 0 ? "Diameter" : "Height") :
+                        "Size "+["X","Y","Z"][axis]} (m)
+                      <input className={inputLabel} aria-label={selectedEntity.shape === "box"
+                        ? "Size "+["X","Y","Z"][axis]+" (m)" :
+                        selectedEntity.shape === "sphere" ? "Diameter (m)" :
+                        (axis === 0 ? "Diameter (m)" : "Height (m)")}
+                        type="number" min="0.001" max="10000" step="0.1"
+                        value={selectedEntity.dimensionsMeters[axis]}
+                        onChange={event=>editDimension(axis,Number(event.target.value))}/>
+                    </label>
+                  ))}
+                </div>
+                <div className="sm:col-span-2 grid grid-cols-3 gap-2" aria-label="Solid position in metres">
+                  {([0,1,2] as const).map(axis=>(
+                    <label key={axis} className="text-xs">Position {["X","Y","Z"][axis]} (m)
+                      <input className={inputLabel} aria-label={"Position "+["X","Y","Z"][axis]+" (m)"}
+                        type="number" min="-100000" max="100000" step="0.1"
+                        value={selectedEntity.positionMeters[axis]}
+                        onChange={event=>editPosition(axis,Number(event.target.value))}/>
+                    </label>
+                  ))}
+                </div>
+                <div className="sm:col-span-2">
+                  <button type="button" className={buttonClass} onClick={focusSelected}>
+                    Focus selected object
+                  </button>
+                </div>
                 <label>Material assumption
                   <select className={inputLabel} value={selectedEntity.materialId??""}
                     onChange={event=>editSelected({materialId:event.target.value||null})}>
@@ -727,6 +781,37 @@ export default function WorldLab() {
                 The 3D rod colors encode calculated temperatures, not visible thermal photons.
                 Every color is derived from the selected time sample; inspect numeric temperatures above.
               </p>}
+              {trace && (
+                <figure className="mt-4" aria-label="Calculated scientific time trace">
+                  <figcaption className="mb-1 text-sm font-medium">
+                    {trace.label} over simulated time
+                  </figcaption>
+                  <svg viewBox="0 0 700 200" role="img" className="h-auto w-full max-w-full"
+                    aria-label={trace.label+" ("+trace.unit+") between "+trace.minimum.toPrecision(4)+
+                      " and "+trace.maximum.toPrecision(4)+" over "+
+                      currentRun.time.simulatedDurationSeconds+" seconds"}>
+                    <line x1={trace.x0} y1={trace.y1} x2={trace.x1} y2={trace.y1}
+                      stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.5"/>
+                    <line x1={trace.x0} y1={trace.y0} x2={trace.x0} y2={trace.y1}
+                      stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.5"/>
+                    <polyline points={trace.points} fill="none" stroke="#267F9C" strokeWidth="2.6"
+                      strokeLinejoin="round" strokeLinecap="round"/>
+                    <line x1={trace.x0+(trace.x1-trace.x0)*(timeSeconds/currentRun.time.simulatedDurationSeconds)}
+                      y1={trace.y0}
+                      x2={trace.x0+(trace.x1-trace.x0)*(timeSeconds/currentRun.time.simulatedDurationSeconds)}
+                      y2={trace.y1} stroke="currentColor" strokeOpacity="0.8" strokeDasharray="4 4"/>
+                    <text x={trace.x0} y="185" fontSize="13" fill="currentColor">0 s</text>
+                    <text x={trace.x1} y="185" fontSize="13" fill="currentColor" textAnchor="end">
+                      {currentRun.time.simulatedDurationSeconds} s
+                    </text>
+                  </svg>
+                  <p className="text-xs text-muted-foreground">
+                    {trace.label} ({trace.unit}): {trace.minimum.toPrecision(4)} to {trace.maximum.toPrecision(4)}.
+                    Plotted {trace.samplesPlotted} recorded samples. Dashed line shows selected time.
+                    This is computed state, not a measurement.
+                  </p>
+                </figure>
+              )}
               <p className="mt-3 text-xs">Model {currentRun.modelId} v{currentRun.modelVersion};
                 solver Δt {currentRun.time.solverStepSeconds.toPrecision(4)} s;
                 simulation date {currentRun.time.worldDateUTC}.</p>
