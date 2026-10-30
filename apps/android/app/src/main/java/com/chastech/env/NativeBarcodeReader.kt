@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -241,15 +242,17 @@ fun NativeBarcodeReaderTool() {
     var cameraActive by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Choose Start camera or Read image. Decoding stays on this device.") }
     var error by remember { mutableStateOf("") }
-    var lastSignature by remember { mutableStateOf("") }
-    var lastScanAt by remember { mutableStateOf(0L) }
+    val recentScans = remember { mutableStateMapOf<String, Long>() }
 
     fun accept(scan: NativeBarcodeScan) {
         val signature = "${scan.format}\u0000${scan.text}"
         val now = System.currentTimeMillis()
-        if (signature == lastSignature && now - lastScanAt < 1800L) return
-        lastSignature = signature
-        lastScanAt = now
+        val previousScanAt = recentScans[signature] ?: 0L
+        if (now - previousScanAt < 1800L) return
+        recentScans[signature] = now
+        if (recentScans.size > 200) {
+            recentScans.filterValues { now - it > 10_000L }.keys.forEach(recentScans::remove)
+        }
         results.add(0, scan.copy(scannedAt = now))
         while (results.size > 50) results.removeAt(results.lastIndex)
         status = "${scan.format} detected."
