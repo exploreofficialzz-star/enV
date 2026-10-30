@@ -87,6 +87,8 @@ fun NativeProductUpdatesBanner() {
 
     LaunchedEffect(Unit) {
         updates = runCatching { withContext(Dispatchers.IO) { NativeProductUpdatesClient.load() } }.getOrDefault(emptyList())
+        if (updates.isNotEmpty() && BuildConfig.ANALYTICS_ENABLED) NativeAnalytics.record(context, "update_viewed")
+        if (BuildConfig.ANALYTICS_ENABLED) runCatching { NativeAnalytics.flush(context) }
     }
 
     val item = current ?: return
