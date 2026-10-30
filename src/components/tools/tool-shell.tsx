@@ -56,6 +56,8 @@ export function ToolShell({
   useEffect(() => {
     recordRecent(tool.id);
     setVisibleRelatedCount(6);
+    toolStartedRef.current = false;
+    toolViewedAtRef.current = Date.now();
   }, [tool.id, recordRecent]);
 
   useEffect(() => {
@@ -171,6 +173,7 @@ export function ToolShell({
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
+        data-env-tool-id={tool.id}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
           : ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id) ? "env-tool-interface relative mt-6" : "env-tool-interface relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
@@ -183,16 +186,19 @@ export function ToolShell({
           if (!(target instanceof HTMLElement) || !target.closest("button,input,textarea,select,[role=button],[contenteditable=true]")) return;
           if (target.closest(".env-tool-fullscreen__toolbar")) return;
           toolStartedRef.current = true;
+          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(Date.now());
           recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_interaction" } });
         }}
         onInputCapture={() => {
           if (toolStartedRef.current) return;
           toolStartedRef.current = true;
+          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(Date.now());
           recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_input" } });
         }}
         onSubmitCapture={() => {
           if (toolStartedRef.current) return;
           toolStartedRef.current = true;
+          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(Date.now());
           recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "form_submit" } });
         }}
       >
