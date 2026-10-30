@@ -63,3 +63,8 @@ Anonymous abuse control uses a keyed HMAC digest of a network identifier; the ra
 ## Public community content and counters
 
 Comments, replies, selected public display labels, reactions, reports and blocks are community features, not analytics. Comment content is visible to other visitors and should be accompanied by clear posting/visibility terms. Choosing **Anonymous** hides the public display label; it does not mean the service has no private abuse-control record. The service retains a keyed HMAC actor digest so users can block/report abuse and moderators can enforce rules. Raw IP addresses are not stored by this community schema. A **Public** display label is user-selected and is not a verified real-world identity. Community view counters are deduplicated once per pseudonymous actor/tool/day and do not store full page URLs. Users can remove their own comments; moderators can hide or remove reported content. Publish retention, deletion, reporting and appeal processes before enabling the feature.
+
+
+## Private analytics dashboard access
+
+The `userbehavior.envtools.store` dashboard is protected by a server-side password exchange and a short-lived (8-hour) signed `HttpOnly; Secure; SameSite=Strict` cookie. The dashboard password and cookie signing secret are server-only deployment secrets; neither is exposed through `VITE_*` bundles. Failed sign-ins are rate-limited using a keyed digest of a network identifier. The legacy bearer `ANALYTICS_ADMIN_TOKEN` remains server-only and must never be placed in a browser, mobile bundle, query string or local storage. Sign-out clears the browser session cookie. The dashboard displays aggregate, consented data only; it is not a device-level surveillance feed.
