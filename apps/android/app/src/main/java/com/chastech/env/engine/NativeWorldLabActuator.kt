@@ -45,6 +45,10 @@ object NativeWorldLabActuator {
     }
     private fun derivative(s:DoubleArray,i:NativeActuatorInput):DoubleArray{
         val v=s[1];val current=s[2]
+        // At a resting unilateral stop the object cannot move downward or
+        // induce a generator current until the coil can lift its weight.
+        if(s[0]<=0.0 && v<=0.0 && i.forceConstantNPerA*current<=i.massKg*i.gravityMps2)
+            return doubleArrayOf(0.0,0.0,(i.supplyVoltageV-i.resistanceOhm*current)/i.inductanceH)
         return doubleArrayOf(v,
             (i.forceConstantNPerA*current-i.dampingNsPerM*v)/i.massKg-i.gravityMps2,
             (i.supplyVoltageV-i.resistanceOhm*current-i.forceConstantNPerA*v)/i.inductanceH)
