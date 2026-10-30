@@ -5,7 +5,7 @@ import UIKit
 import UniformTypeIdentifiers
 import Vision
 
-struct NativeBarcodeReadRecord: Identifiable, Equatable, Sendable {
+struct NativeBarcodeReadRecord: Identifiable, Equatable, Codable, Sendable {
     let id: UUID
     let value: String
     let format: String
@@ -29,10 +29,24 @@ struct NativeBarcodeReadRecord: Identifiable, Equatable, Sendable {
 
 @MainActor
 final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMetadataOutputObjectsDelegate {
+    static let historyDefaultsKey = "env.barcodeReader.history.v1"
+
     @Published private(set) var isRunning = false
     @Published private(set) var status = "Camera is off."
     @Published private(set) var error: String?
     @Published private(set) var results: [NativeBarcodeReadRecord] = []
+
+    override init() {
+        super.init()
+        guard let data = UserDefaults.standard.data(forKey: Self.historyDefaultsKey),
+              let stored = try? JSONDecoder().decode([NativeBarcodeReadRecord].self, from: data) else { return }
+        results = Array(stored.prefix(50))
+    }
+
+    private func persistResults() {
+        guard let data = try? JSONEncoder().encode(results) else { return }
+        UserDefaults.standard.set(data, forKey: Self.historyDefaultsKey)
+    }
 
     // AVCaptureSession is mutated only on sessionQueue. The preview reads this stable
     // session reference on MainActor; all capture lifecycle operations stay serialized.
@@ -131,12 +145,14 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
         }
         results.insert(NativeBarcodeReadRecord(value: value, format: format, scannedAt: now), at: 0)
         if results.count > 50 { results = Array(results.prefix(50)) }
+        persistResults()
         status = "\(format) detected."
         error = nil
     }
 
     func clearResults() {
         results.removeAll()
+        persistResults()
         status = "Scan history cleared."
     }
 
