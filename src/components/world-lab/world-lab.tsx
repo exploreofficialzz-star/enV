@@ -232,6 +232,15 @@ export default function WorldLab() {
       canvas.addEventListener("pointermove", onTouchMove);
       canvas.addEventListener("pointerup", onTouchEnd);
       canvas.addEventListener("pointercancel", onTouchEnd);
+      const onObserverKey = (event: KeyboardEvent) => {
+        // Accessible alternative to pointing down and pinching. No scene change.
+        if (event.key !== "PageDown" && event.key !== "PageUp") return;
+        event.preventDefault();
+        const nextY = camera.position.y + (event.key === "PageDown" ? -0.8 : 0.8);
+        if (nextY >= OBSERVER_BOUNDS_METRES.minHeight && Math.hypot(camera.position.x, nextY, camera.position.z) <= OBSERVER_BOUNDS_METRES.maxRadius)
+          camera.position.y = nextY;
+      };
+      canvas.addEventListener("keydown", onObserverKey);
       const ambient = new B.HemisphericLight("daylight", new B.Vector3(0, 1, 0), scene);
       ambient.intensity = 0.85;
       const sunlight = new B.DirectionalLight("sunlight", new B.Vector3(-0.4, -1, 0.6), scene);
@@ -312,6 +321,7 @@ export default function WorldLab() {
         canvas.removeEventListener("pointermove", onTouchMove);
         canvas.removeEventListener("pointerup", onTouchEnd);
         canvas.removeEventListener("pointercancel", onTouchEnd);
+        canvas.removeEventListener("keydown", onObserverKey);
         touches.clear();
       };
     } catch (cause) {
