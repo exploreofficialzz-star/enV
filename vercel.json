@@ -97,6 +97,26 @@
         }
       ],
       "destination": "/userbehavior"
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "feedback.envtools.store"
+        }
+      ],
+      "destination": "/developer"
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "updates.envtools.store"
+        }
+      ],
+      "destination": "/developer"
     }
   ]
 }
