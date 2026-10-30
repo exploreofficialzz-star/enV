@@ -81,3 +81,10 @@ The server-side community service is isolated from private developer feedback:
 Comment text is plain text and bounded; rendering clients must always render it as text, never inject it as HTML. Community actor IDs are pseudonymous HMAC digests for safety controls. They are not exposed publicly. The feature remains disabled until `COMMUNITY_ENABLED`, `COMMUNITY_HASH_SECRET` and the separate admin credential are configured. Public Web/native UI, privacy controls, moderation dashboard/host, anti-abuse monitoring and real platform testing are still required before launch.
 
 The Web product now has a dedicated `/feedback` page. The public build flag `VITE_FEEDBACK_ENABLED` controls the form only; the backend remains independently gated by `FEEDBACK_ENABLED`. The form does not request an e-mail address, keeps an idempotency key for safe retry, and displays a ticket reference after accepted submission. A separate Vercel domain attachment and developer-facing dashboard are still needed for the planned `feedback.envtools.store` experience.
+
+
+## Product updates and release announcements — first service slice
+
+The release feed is a separate content service from analytics and community. Developers create drafts and publish/archive announcements through `POST /api/updates/admin`; `GET /api/updates/admin` returns the protected management list. Both require the server-only `UPDATES_ADMIN_TOKEN` and same-origin requests. Public clients read `GET /api/updates?platform=web|android|ios&channel=stable|preview|beta`. Published rows are filtered by platform, channel, start time and expiry, with optional minimum-version gating. All mutations are recorded in an audit table.
+
+Web now has a dismissible, non-blocking home-page update banner and a `/updates` release-notes page. Public build visibility (`VITE_UPDATES_ENABLED`) is separate from server collection/serving (`UPDATES_ENABLED`). No announcement UI or notification may be enabled until a real admin workflow, update content, platform UI, deployment configuration and release channel policy are ready. Android/iOS home UI and the `updates.envtools.store` custom-domain attachment remain outstanding.
