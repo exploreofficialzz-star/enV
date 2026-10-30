@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { recordAnalyticsEvent } from "@/lib/analytics/client";
 import { Link } from "@tanstack/react-router";
 import { Bell, ChevronRight, X } from "lucide-react";
 
@@ -41,7 +42,9 @@ export function ProductUpdatesBanner() {
     }).then(async response => {
       const payload = await response.json() as { ok?: boolean; data?: { updates?: ProductUpdate[] } };
       if (!response.ok || payload.ok !== true) return;
-      setItems(Array.isArray(payload.data?.updates) ? payload.data.updates : []);
+      const next = Array.isArray(payload.data?.updates) ? payload.data.updates : [];
+      setItems(next);
+      if (next.length) recordAnalyticsEvent({ name: "update_viewed", outcome: "success", properties: { feature: "product_updates" } });
     }).catch(error => {
       if (!(error instanceof DOMException && error.name === "AbortError")) setItems([]);
     });
