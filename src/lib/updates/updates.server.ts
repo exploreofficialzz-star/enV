@@ -29,7 +29,6 @@ function versionAtLeast(current: string, minimum: string) {
   return a.preRelease===null;
 }
 function requireAdmin(request: Request) {
-  enabled();
   if (!adminMatches(request)) throw new UpdatesError("UPDATES_ADMIN_UNAUTHORIZED","Developer update management access is required.",401);
 }
 export async function listPublicUpdates(rawQuery: unknown) {
