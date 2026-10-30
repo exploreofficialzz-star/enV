@@ -78,6 +78,16 @@ class NativeEcommerceEngineTest {
         assertTrue(output.contains("Current selling price: 75.00"))
     }
 
+    @Test fun pricingCalculatorRejectsBreakEvenAtOneHundredPercentFees() {
+        val item = tool("pricing-calculator")
+        val values = NativeEcommerceEngine.initialValues(item.id) + mapOf(
+            "cost" to "40", "packaging" to "2", "feePercent" to "100", "targetMargin" to "0",
+        )
+        val output = NativeEcommerceEngine.execute(item.id, values).text
+        assertTrue(output.contains("Minimum break-even price before tax and advertising: Not achievable with these fees"))
+        assertTrue(output.contains("Target selling price: Not achievable with these fee and margin inputs"))
+    }
+
     @Test fun nativeEngineRejectsNegativeAndOutOfRangePercentInputs() {
         val item = tool("discount-calculator")
         val defaults = NativeEcommerceEngine.initialValues(item.id)
