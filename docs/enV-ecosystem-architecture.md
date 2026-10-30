@@ -66,3 +66,16 @@ The feedback API is separate from tool-page community discussions:
 - Status changes are audited. Resolved/closed tickets are eligible for scheduled removal after the configured retention period; open work is not automatically deleted.
 
 The backend is disabled by default. A public feedback form, native forms, private moderation dashboard, reply/contact workflow, attachments, and Vercel/DNS host attachment remain separate implementation/release tasks. Do not treat this API as the public social comment system.
+
+
+## Tool-page community — first backend slice
+
+The server-side community service is isolated from private developer feedback:
+
+- `GET /api/community?toolId=...` returns public visible comments/replies, public counts and the current actor's reaction. It returns no account IDs or internal digests.
+- `POST /api/community/comments` creates top-level comments or one-level replies. Users can choose a public display label or post as **Anonymous**; a public label is user-selected and is not identity verification.
+- `POST /api/community/reactions` toggles one like/dislike per actor and tool. `POST /api/community/view` deduplicates a page view per pseudonymous actor per tool per day.
+- `POST /api/community/reports`, `/api/community/blocks` and `/api/community/comments/delete` support reporting, blocking an author and removing one's own visible comment.
+- `GET /api/community/admin` and `POST /api/community/admin/update` provide a bearer-protected developer moderation queue and audited actions.
+
+Comment text is plain text and bounded; rendering clients must always render it as text, never inject it as HTML. Community actor IDs are pseudonymous HMAC digests for safety controls. They are not exposed publicly. The feature remains disabled until `COMMUNITY_ENABLED`, `COMMUNITY_HASH_SECRET` and the separate admin credential are configured. Public Web/native UI, privacy controls, moderation dashboard/host, anti-abuse monitoring and real platform testing are still required before launch.
