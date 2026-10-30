@@ -350,6 +350,15 @@ fun NativeWorldLabForm() {
                     if(dropEntityId==solid.id && dropRun!=null) {
                         val drop=checkNotNull(dropRun)
                         val sample=drop.samples[dropFrame.coerceIn(0,drop.samples.lastIndex)]
+                        Canvas(Modifier.fillMaxWidth().height(100.dp)
+                            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                            .semantics { contentDescription="Calculated vertical drop and ground contact" }) {
+                            val floorY=size.height*0.85f
+                            val fraction=(sample.heightAboveGroundM/5.0).coerceIn(0.0,1.0).toFloat()
+                            drawLine(Color.LightGray,Offset(0f,floorY),Offset(size.width,floorY),strokeWidth=3f)
+                            drawCircle(Color(0xFFF2B877),size.minDimension*0.08f,
+                                Offset(size.width/2,floorY-fraction*size.height*0.7f))
+                        }
                         Text("Computed drop height: "+labNumber(sample.heightAboveGroundM)+" m")
                         Text("Computed vertical speed: "+labNumber(kotlin.math.abs(sample.velocityMps))+" m/s")
                         Text("Estimated surface impacts: "+drop.impactCount)
