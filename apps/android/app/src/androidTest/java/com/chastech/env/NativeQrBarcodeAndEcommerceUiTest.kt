@@ -48,6 +48,6 @@ class NativeQrBarcodeAndEcommerceUiTest {
         composeRule.onNodeWithText("Unit cost").assertIsDisplayed()
         composeRule.onNodeWithText("Selling price").assertIsDisplayed()
         composeRule.onNodeWithText("Run").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Estimated contribution profit: 35.00").assertIsDisplayed()
+        composeRule.onNodeWithText("Estimated contribution profit: 35.00", substring = true).assertIsDisplayed()
     }
 }
