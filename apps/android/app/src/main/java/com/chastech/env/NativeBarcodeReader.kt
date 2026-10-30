@@ -201,12 +201,14 @@ fun NativeBarcodeReaderTool() {
         } else {
             val providerFuture = ProcessCameraProvider.getInstance(context)
             var cameraProvider: ProcessCameraProvider? = null
+            var disposed = false
             var previewUseCase: Preview? = null
             var analysisUseCase: ImageAnalysis? = null
             val analyzer = NativeBarcodeCameraAnalyzer { scan ->
                 mainHandler.post { accept(scan) }
             }
             providerFuture.addListener({
+                if (disposed) return@addListener
                 runCatching {
                     val provider = providerFuture.get()
                     cameraProvider = provider
@@ -228,6 +230,7 @@ fun NativeBarcodeReaderTool() {
                 }
             }, ContextCompat.getMainExecutor(context))
             onDispose {
+                disposed = true
                 runCatching { analysisUseCase?.clearAnalyzer() }
                 runCatching {
                     val provider = cameraProvider ?: if (providerFuture.isDone) providerFuture.get() else null
