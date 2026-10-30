@@ -39,6 +39,14 @@ class NativeBarcodeEngineTest {
         assertTrue(NativeBarcodeEngine.run("isbn-check-digit", "9780143127741").startsWith("Valid"))
     }
 
+    @Test fun decodedLinksAllowOnlyHttpAndHttpsHosts() {
+        assertEquals("https://example.com/path", safeBarcodeHttpUrl("https://example.com/path"))
+        assertEquals("http://example.com", safeBarcodeHttpUrl("http://example.com"))
+        assertEquals(null, safeBarcodeHttpUrl("javascript:alert(1)"))
+        assertEquals(null, safeBarcodeHttpUrl("file:///private/data"))
+        assertEquals(null, safeBarcodeHttpUrl("plain text"))
+    }
+
     @Test fun cameraLuminanceFramesRotateForPortraitAndUpsideDownDevices() {
         val source = byteArrayOf(1, 2, 3, 4, 5, 6)
         val clockwise = NativeBarcodeImageDecoder.rotateLumaFrame(source, 2, 3, 90)
