@@ -189,26 +189,32 @@ export function developerStudioBySlug(slug: string): DeveloperStudioDefinition |
   return DEVELOPER_STUDIOS.find((studio) => studio.slug === slug || studio.id === slug);
 }
 
+function requiredDeveloperStudio(id: string): DeveloperStudioDefinition {
+  const studio = DEVELOPER_STUDIOS.find(candidate => candidate.id === id);
+  if (!studio) throw new Error("Required Developer Studio is missing: " + id);
+  return studio;
+}
+
 /** Family routing keeps long-tail URL aliases inside the closest useful parent Studio. */
 export function developerStudioForLegacySlug(rawSlug: string): DeveloperStudioDefinition {
   const slug = rawSlug.toLowerCase().replace(/^developer-/, "");
   const starts = (prefixes: string[]) => prefixes.some((prefix) => slug === prefix || slug.startsWith(`${prefix}-`));
   // Diff is checked before JSON/markup families so cross-format comparisons stay grouped.
-  if (["yaml-diff", "text-diff", "csv-diff"].includes(slug) || /^(?:yaml|text|csv|xml|html|css|sql|base64|url|hex|binary|ascii|unicode|uuid|jwt|regex)-diff$/.test(slug)) return DEVELOPER_STUDIOS[11];
-  if (starts(["jwt"])) return DEVELOPER_STUDIOS[1];
-  if (starts(["regex"])) return DEVELOPER_STUDIOS[2];
-  if (starts(["hash", "md5", "file-hash", "sha1", "sha256", "sha384", "sha512"]) || /^sha(?:1|256|384|512)-hash$/.test(slug)) return DEVELOPER_STUDIOS[3];
-  if (starts(["query-string", "url-query", "cookie", "cors", "csp", "ip-header", "status-code", "user-agent", "content-type", "mime", "http"])) return DEVELOPER_STUDIOS[9];
-  if (starts(["base64", "url", "uri", "hex", "binary", "ascii", "unicode", "data-uri"]) || /^(?:json-decoder|json-encoder)$/.test(slug) || /^(?:html-decoder|html-encoder)$/.test(slug)) return DEVELOPER_STUDIOS[4];
-  if (starts(["cron", "unix-timestamp", "timestamp", "epoch"])) return DEVELOPER_STUDIOS[5];
-  if (starts(["uuid"])) return DEVELOPER_STUDIOS[6];
-  if (starts(["sql"])) return DEVELOPER_STUDIOS[7];
-  if (starts(["csv"])) return DEVELOPER_STUDIOS[0];
-  if (starts(["json", "dummy-json"])) return DEVELOPER_STUDIOS[0];
-  if (starts(["html", "css", "javascript", "typescript", "xml", "svg", "yaml", "markdown", "lorem-ipsum"]) || slug === "markdown-to-html") return DEVELOPER_STUDIOS[8];
-  if (starts(["developer-gitignore", "gitignore", "git", "docker", "dockerfile", "kubernetes", "nginx", "openapi", "graphql", "license", "readme", "editorconfig", "environment-variable", "semantic-version", "branch-name", "commit-message", "changelog", "webhook", "api-mock", "sql-query-builder", "sql-schema-generator"])) return DEVELOPER_STUDIOS[10];
-  if (/-diff$/.test(slug) || /-(inspector|parser|preview|tester|explainer)$/.test(slug)) return DEVELOPER_STUDIOS[11];
-  return DEVELOPER_STUDIOS[11];
+  if (["yaml-diff", "text-diff", "csv-diff"].includes(slug) || /^(?:yaml|text|csv|xml|html|css|sql|base64|url|hex|binary|ascii|unicode|uuid|jwt|regex)-diff$/.test(slug)) return requiredDeveloperStudio("diff-inspect-studio");
+  if (starts(["jwt"])) return requiredDeveloperStudio("jwt-studio");
+  if (starts(["regex"])) return requiredDeveloperStudio("regex-studio");
+  if (starts(["hash", "md5", "file-hash", "sha1", "sha256", "sha384", "sha512"]) || /^sha(?:1|256|384|512)-hash$/.test(slug)) return requiredDeveloperStudio("hash-studio");
+  if (starts(["query-string", "url-query", "cookie", "cors", "csp", "ip-header", "status-code", "user-agent", "content-type", "mime", "http"])) return requiredDeveloperStudio("http-api-studio");
+  if (starts(["base64", "url", "uri", "hex", "binary", "ascii", "unicode", "data-uri"]) || /^(?:json-decoder|json-encoder)$/.test(slug) || /^(?:html-decoder|html-encoder)$/.test(slug)) return requiredDeveloperStudio("encoding-studio");
+  if (starts(["cron", "unix-timestamp", "timestamp", "epoch"])) return requiredDeveloperStudio("time-cron-studio");
+  if (starts(["uuid"])) return requiredDeveloperStudio("uuid-studio");
+  if (starts(["sql"])) return requiredDeveloperStudio("sql-studio");
+  if (starts(["csv"])) return requiredDeveloperStudio("json-studio");
+  if (starts(["json", "dummy-json"])) return requiredDeveloperStudio("json-studio");
+  if (starts(["html", "css", "javascript", "typescript", "xml", "svg", "yaml", "markdown", "lorem-ipsum"]) || slug === "markdown-to-html") return requiredDeveloperStudio("markup-studio");
+  if (starts(["developer-gitignore", "gitignore", "git", "docker", "dockerfile", "kubernetes", "nginx", "openapi", "graphql", "license", "readme", "editorconfig", "environment-variable", "semantic-version", "branch-name", "commit-message", "changelog", "webhook", "api-mock", "sql-query-builder", "sql-schema-generator"])) return requiredDeveloperStudio("devops-studio");
+  if (/-diff$/.test(slug) || /-(inspector|parser|preview|tester|explainer)$/.test(slug)) return requiredDeveloperStudio("diff-inspect-studio");
+  return requiredDeveloperStudio("diff-inspect-studio");
 }
 
 /** Translate every legacy URL into a visible Studio mode rather than an unrelated first tab. */

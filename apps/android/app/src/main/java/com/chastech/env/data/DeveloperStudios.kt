@@ -38,23 +38,26 @@ object NativeDeveloperStudios {
 
     fun forToolId(id: String): NativeDeveloperStudioSpec? = specs.firstOrNull { it.id == id || it.slug == id }
 
+    private fun requiredStudio(id: String): NativeDeveloperStudioSpec =
+        specs.first { it.id == id }
+
     /** Route a historical tool into its native parent Studio without changing the legacy tool itself. */
     fun forLegacySlug(rawSlug: String): NativeDeveloperStudioSpec {
         val slug = rawSlug.lowercase().removePrefix("developer-")
         fun starts(vararg prefixes: String) = prefixes.any { slug == it || slug.startsWith("$it-") }
-        if (slug in setOf("yaml-diff", "text-diff", "csv-diff") || Regex("^(yaml|text|csv|xml|html|css|sql|base64|url|hex|binary|ascii|unicode|uuid|jwt|regex)-diff$").matches(slug)) return specs[11]
-        if (starts("jwt")) return specs[1]
-        if (starts("regex")) return specs[2]
-        if (starts("hash", "md5", "file-hash", "sha1", "sha256", "sha384", "sha512") || Regex("^sha(1|256|384|512)-hash$").matches(slug)) return specs[3]
-        if (starts("query-string", "url-query", "cookie", "cors", "csp", "ip-header", "status-code", "user-agent", "content-type", "mime", "http")) return specs[9]
-        if (starts("base64", "url", "uri", "hex", "binary", "ascii", "unicode", "data-uri") || slug in setOf("json-decoder", "json-encoder", "html-decoder", "html-encoder")) return specs[4]
-        if (starts("cron", "unix-timestamp", "timestamp", "epoch")) return specs[5]
-        if (starts("uuid")) return specs[6]
-        if (starts("sql")) return specs[7]
-        if (starts("csv", "json", "dummy-json")) return specs[0]
-        if (starts("html", "css", "javascript", "typescript", "xml", "svg", "yaml", "markdown", "lorem-ipsum")) return specs[8]
-        if (starts("gitignore", "git", "docker", "dockerfile", "kubernetes", "nginx", "openapi", "graphql", "license", "readme", "editorconfig", "environment-variable", "semantic-version", "branch-name", "commit-message", "changelog", "webhook", "api-mock")) return specs[10]
-        return specs[11]
+        if (slug in setOf("yaml-diff", "text-diff", "csv-diff") || Regex("^(yaml|text|csv|xml|html|css|sql|base64|url|hex|binary|ascii|unicode|uuid|jwt|regex)-diff$").matches(slug)) return requiredStudio("diff-inspect-studio")
+        if (starts("jwt")) return requiredStudio("jwt-studio")
+        if (starts("regex")) return requiredStudio("regex-studio")
+        if (starts("hash", "md5", "file-hash", "sha1", "sha256", "sha384", "sha512") || Regex("^sha(1|256|384|512)-hash$").matches(slug)) return requiredStudio("hash-studio")
+        if (starts("query-string", "url-query", "cookie", "cors", "csp", "ip-header", "status-code", "user-agent", "content-type", "mime", "http")) return requiredStudio("http-api-studio")
+        if (starts("base64", "url", "uri", "hex", "binary", "ascii", "unicode", "data-uri") || slug in setOf("json-decoder", "json-encoder", "html-decoder", "html-encoder")) return requiredStudio("encoding-studio")
+        if (starts("cron", "unix-timestamp", "timestamp", "epoch")) return requiredStudio("time-cron-studio")
+        if (starts("uuid")) return requiredStudio("uuid-studio")
+        if (starts("sql")) return requiredStudio("sql-studio")
+        if (starts("csv", "json", "dummy-json")) return requiredStudio("json-studio")
+        if (starts("html", "css", "javascript", "typescript", "xml", "svg", "yaml", "markdown", "lorem-ipsum")) return requiredStudio("markup-studio")
+        if (starts("gitignore", "git", "docker", "dockerfile", "kubernetes", "nginx", "openapi", "graphql", "license", "readme", "editorconfig", "environment-variable", "semantic-version", "branch-name", "commit-message", "changelog", "webhook", "api-mock")) return requiredStudio("devops-studio")
+        return requiredStudio("diff-inspect-studio")
     }
 
     /** Resolve an old tool slug to the matching visible mode inside its canonical Studio. */
