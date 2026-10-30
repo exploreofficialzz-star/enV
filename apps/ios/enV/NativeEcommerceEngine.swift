@@ -211,6 +211,7 @@ enum NativeEcommerceEngine {
                 Minimum break-even price before tax and advertising: \(money(minimum))
                 Target margin: \(money(target))%
                 Target selling price: \(targetPrice.isFinite ? money(targetPrice) : "Not achievable with these fee and margin inputs")
+                Current selling price: \(money(price))
                 """
             case "order":
                 return """
