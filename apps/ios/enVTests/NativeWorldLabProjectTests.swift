@@ -14,6 +14,26 @@ final class NativeWorldLabProjectTests: XCTestCase {
         XCTAssertEqual(project.entities.first?.materialId,"mat-1")
         XCTAssertNil(project.entities.last?.materialId)
     }
+    func testOptionalCircuitNetworkRoundTripsWithPortValidation() throws {
+        let base=try NativeWorldLabEditor.blank()
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:base) as? [String:Any])
+        let nodes:[[String:Any]]=[
+            ["id":"ground","label":"Ground"],["id":"supply","label":"Power rail"]]
+        let components:[[String:Any]]=[
+            ["id":"battery","kind":"dc-source","positiveNodeId":"supply",
+             "negativeNodeId":"ground","voltageV":9.0],
+            ["id":"load","kind":"resistor","positiveNodeId":"supply",
+             "negativeNodeId":"ground","resistanceOhm":100.0]]
+        root["networks"]=[["id":"power","name":"DC network",
+            "groundNodeId":"ground","nodes":nodes,"components":components]]
+        let encoded=try JSONSerialization.data(withJSONObject:root)
+        let decoded=try NativeWorldLabProject.decode(encoded)
+        XCTAssertEqual(decoded.networks?.first?.components.count,2)
+        root["networks"]=[["id":"power","name":"DC network",
+            "groundNodeId":"missing","nodes":nodes,"components":components]]
+        XCTAssertThrowsError(try NativeWorldLabProject.decode(
+            JSONSerialization.data(withJSONObject:root)))
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))

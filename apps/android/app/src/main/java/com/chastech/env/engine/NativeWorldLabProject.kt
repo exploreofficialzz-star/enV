@@ -27,11 +27,22 @@ data class NativeLabSolid(
         else -> error("Unsupported solid geometry")
     }
 }
+data class NativeLabCircuitNode(val id:String,val label:String)
+data class NativeLabCircuitComponent(
+    val id:String,val kind:String,val positiveNodeId:String,val negativeNodeId:String,
+    val voltageV:Double?=null,val resistanceOhm:Double?=null,
+    val name:String?=null,val assumption:String?=null,val evidence:String?=null
+)
+data class NativeLabCircuitNetwork(
+    val id:String,val name:String,val groundNodeId:String,
+    val nodes:List<NativeLabCircuitNode>,val components:List<NativeLabCircuitComponent>
+)
 data class NativeWorldLabProject(
     val id: String, val title: String, val revision: Int, val createdAt: String,
     val updatedAt: String, val cameraPositionMeters: NativeLabVector,
     val cameraLookingAtMeters: NativeLabVector, val entities: List<NativeLabSolid>,
     val materials: List<NativeLabMaterial>,
+    val networks: List<NativeLabCircuitNetwork> = emptyList(),
 )
 object NativeWorldLabProjectCodec {
     const val MAX_BYTES=1024*1024
@@ -69,8 +80,12 @@ object NativeWorldLabProjectCodec {
     fun decode(json: String): NativeWorldLabProject {
         require(json.toByteArray(StandardCharsets.UTF_8).size<=MAX_BYTES) { "World Lab project exceeds 1 MB" }
         val p=JSONObject(json)
-        keys(p,setOf("format","schemaVersion","id","title","revision","createdAt","updatedAt",
-            "world","camera","entities","materials"))
+        val essential=setOf("format","schemaVersion","id","title","revision","createdAt","updatedAt",
+            "world","camera","entities","materials")
+        val supplied=p.keys().asSequence().toSet()
+        require(supplied==essential || supplied==essential+setOf("networks")) {
+            "Unexpected World Lab project keys"
+        }
         require(p.getString("format")=="env-world-lab" && p.getInt("schemaVersion")==1)
         val projectId=id(p,"id")
         val title=name(p,"title")
@@ -117,8 +132,54 @@ object NativeWorldLabProjectCodec {
         require(entities.map { it.id }.toSet().size==entities.size)
         val materialIds=materials.map { it.id }.toSet()
         require(entities.all { it.materialId==null || it.materialId in materialIds })
+        val networkArray=if(p.has("networks"))p.getJSONArray("networks") else JSONArray()
+        require(networkArray.length()<=12){"Too many portable circuits"}
+        val networks=(0 until networkArray.length()).map{i->
+            val net=networkArray.getJSONObject(i)
+            keys(net,setOf("id","name","groundNodeId","nodes","components"))
+            val nodeArray=net.getJSONArray("nodes")
+            val componentArray=net.getJSONArray("components")
+            require(nodeArray.length() in 2..24 && componentArray.length() in 1..48)
+            val nodes=(0 until nodeArray.length()).map{j->
+                val o=nodeArray.getJSONObject(j)
+                keys(o,setOf("id","label"))
+                NativeLabCircuitNode(id(o,"id"),name(o,"label",80))
+            }
+            val nodeIds=nodes.map{it.id}.toSet()
+            require(nodeIds.size==nodes.size)
+            val ground=id(net,"groundNodeId")
+            require(ground in nodeIds)
+            val components=(0 until componentArray.length()).map{j->
+                val comp=componentArray.getJSONObject(j)
+                val kind=name(comp,"kind")
+                val common=setOf("id","kind","positiveNodeId","negativeNodeId")
+                val extras=when(kind){
+                    "dc-source"->setOf("voltageV")
+                    "resistor"->setOf("resistanceOhm")
+                    "hypothetical-device"->setOf("name","assumption","evidence")
+                    else->error("Unsupported electrical component type")
+                }
+                keys(comp,common+extras)
+                val from=id(comp,"positiveNodeId")
+                val to=id(comp,"negativeNodeId")
+                require(from in nodeIds && to in nodeIds && from!=to) {
+                    "Circuit ports must reference two distinct existing nodes"
+                }
+                val voltage=if(kind=="dc-source")number(comp,"voltageV",-1000.0,1000.0) else null
+                val resistance=if(kind=="resistor")number(comp,"resistanceOhm",0.01,1e9) else null
+                val inventName=if(kind=="hypothetical-device")name(comp,"name") else null
+                val assumption=if(kind=="hypothetical-device")name(comp,"assumption",500) else null
+                val evidence=if(kind=="hypothetical-device")name(comp,"evidence") else null
+                require(evidence==null||evidence=="hypothetical-user-assumed")
+                NativeLabCircuitComponent(id(comp,"id"),kind,from,to,
+                    voltage,resistance,inventName,assumption,evidence)
+            }
+            require(components.map{it.id}.toSet().size==components.size)
+            NativeLabCircuitNetwork(id(net,"id"),name(net,"name"),ground,nodes,components)
+        }
+        require(networks.map{it.id}.toSet().size==networks.size)
         return NativeWorldLabProject(projectId,title,revision.toInt(),created,updated,
             vector(camera.getJSONArray("positionMeters")),
-            vector(camera.getJSONArray("lookingAtMeters")),entities,materials)
+            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks)
     }
 }

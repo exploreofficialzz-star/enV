@@ -37,7 +37,7 @@ enum NativeWorldLabEditor {
             "world":["frame":"LOCAL_ENU","representation":"representative-not-measured",
                      "origin":[0,0,0],"terrainSource":NSNull()],
             "camera":["positionMeters":[0,1.65,-8],"lookingAtMeters":[0,1.2,0]],
-            "entities":[],"materials":[],
+            "entities":[],"materials":[],"networks":[],
         ])
     }
     static func addSolid(_ data:Data,shape:String,id:String=UUID().uuidString) throws -> Data {
