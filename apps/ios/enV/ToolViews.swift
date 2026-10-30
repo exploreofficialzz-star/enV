@@ -6257,6 +6257,7 @@ enum NativeBackendEngine {
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }
         if tool.engine.type=="datetime" && NativeDateTimeEngine.operation(forToolID: tool.id) != nil { return false }
         if NativeBarcodeEngine.supports(tool) { return false }
+        if NativeEcommerceEngine.supports(tool) { return false }
         if NativeFileConverterEngine.supports(tool) { return false }
         return backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type)
     }
