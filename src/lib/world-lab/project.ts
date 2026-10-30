@@ -86,7 +86,7 @@ export const MAX_PROJECT_JSON_BYTES = 1024 * 1024;
 
 export function parseWorldLabProject(value: unknown): WorldLabProject {
   const parsed = worldLabProjectSchema.safeParse(value);
-  if (!parsed.success) throw new Error("Invalid or unsupported World Lab project. Check its schema, object IDs, dimensions and material references.");
+  if (!parsed.success) throw new Error("Invalid or unsupported World Lab project: " + parsed.error.issues.slice(0, 3).map(issue => issue.message).join("; "));
   return parsed.data;
 }
 export function readWorldLabProjectJson(json: string): WorldLabProject {
