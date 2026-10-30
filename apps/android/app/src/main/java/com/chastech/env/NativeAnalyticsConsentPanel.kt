@@ -39,10 +39,9 @@ fun NativeAnalyticsConsentPanel() {
 
     LaunchedEffect(Unit) {
         NativeAnalytics.startNewSession(context)
-        if (choice == "granted") {
-            NativeAnalytics.record(context, "app_opened")
-            runCatching { NativeAnalytics.flush(context) }
-        }
+        if (choice == "granted") NativeAnalytics.record(context, "app_opened")
+        // Also retries a pending opt-out revocation after an offline session.
+        runCatching { NativeAnalytics.flush(context) }
     }
 
     Card(
