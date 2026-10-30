@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createSessionLookup } from "../ai/server/session";
 import { getSql } from "../db";
 import { ANALYTICS_POLICY_VERSION, classifyReferrer, classifyUserAgent, validateConsentPayload, validateEventsPayload } from "./protocol.mjs";
@@ -29,6 +29,79 @@ function authorized(request: Request, expected: string | undefined) {
   const a = Buffer.from(actual), b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+const analyticsDashboardCookieName = "env_analytics_admin";
+const analyticsDashboardSessionSeconds = 8 * 60 * 60;
+
+function dashboardConfig() {
+  if (process.env.ANALYTICS_DASHBOARD_ENABLED !== "true") throw new AnalyticsError("ANALYTICS_DASHBOARD_DISABLED", "The private analytics dashboard is disabled.", 503);
+  const password = process.env.ANALYTICS_DASHBOARD_PASSWORD?.trim() ?? "";
+  const secret = process.env.ANALYTICS_DASHBOARD_COOKIE_SECRET?.trim() ?? "";
+  if (password.length < 24 || secret.length < 32) throw new AnalyticsError("ANALYTICS_DASHBOARD_NOT_CONFIGURED", "The private analytics dashboard credentials are not configured.", 503);
+  return { password, secret };
+}
+function cookieToken(request: Request) {
+  const cookies=request.headers.get("cookie")??"";
+  for(const part of cookies.split(";")){
+    const [name,...rest]=part.trim().split("=");
+    if(name===analyticsDashboardCookieName)return rest.join("=");
+  }
+  return "";
+}
+function validDashboardCookie(request: Request) {
+  try {
+    const {secret}=dashboardConfig();
+    const token=cookieToken(request);
+    const [payload,signature,...extra]=token.split(".");
+    if(!payload||!signature||extra.length)return false;
+    const supplied=Buffer.from(signature,"base64url");
+    const expected=createHmac("sha256",secret).update(payload).digest();
+    if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return false;
+    const session=JSON.parse(Buffer.from(payload,"base64url").toString("utf8")) as {version?:number;expiresAt?:number;issuedAt?:number;sessionId?:string};
+    const now=Math.floor(Date.now()/1000);
+    return session.version===1&&typeof session.sessionId==="string"&&session.expiresAt!==undefined&&session.expiresAt>now&&session.issuedAt!==undefined&&session.issuedAt<=now+60&&session.expiresAt-session.issuedAt<=analyticsDashboardSessionSeconds;
+  } catch { return false; }
+}
+function networkSubject(request: Request, secret: string) {
+  const forwarded=request.headers.get("x-vercel-forwarded-for")??request.headers.get("x-forwarded-for")??request.headers.get("cf-connecting-ip")??"unknown";
+  const address=forwarded.split(",").at(-1)?.trim().slice(0,128)||"unknown";
+  return createHmac("sha256",secret).update("analytics-admin-network:"+address).digest("hex");
+}
+export async function createAnalyticsDashboardSession(request: Request, input: unknown) {
+  configSecret();
+  const {password,secret}=dashboardConfig();
+  if(!input||typeof input!=="object"||Array.isArray(input)||typeof (input as Record<string,unknown>).password!=="string"||(input as Record<string,unknown>).password.length>256){
+    throw new AnalyticsError("INVALID_DASHBOARD_CREDENTIALS","Enter the developer dashboard password.",400);
+  }
+  const supplied=(input as Record<string,string>).password;
+  const expectedDigest=createHmac("sha256",secret).update(password).digest();
+  const suppliedDigest=createHmac("sha256",secret).update(supplied).digest();
+  const matches=timingSafeEqual(expectedDigest,suppliedDigest);
+  const sql=await getSql();
+  const subject=networkSubject(request,secret);
+  const window=Math.floor(Date.now()/900000);
+  const rows=await sql.query(
+    `insert into product_analytics_admin_rate_limits(subject_digest,window_minute,request_count,updated_at)
+     values($1,$2,1,now()) on conflict(subject_digest,window_minute) do update
+     set request_count=product_analytics_admin_rate_limits.request_count+1,updated_at=now()
+     where product_analytics_admin_rate_limits.request_count<8 returning request_count`,
+    [subject,window],
+  );
+  if(!rows.length)throw new AnalyticsError("ANALYTICS_DASHBOARD_RATE_LIMITED","Too many dashboard sign-in attempts. Try again later.",429);
+  if(!matches)throw new AnalyticsError("ANALYTICS_DASHBOARD_LOGIN_FAILED","The developer password is incorrect.",401);
+  const now=Math.floor(Date.now()/1000);
+  const payload=Buffer.from(JSON.stringify({version:1,sessionId:randomUUID(),issuedAt:now,expiresAt:now+analyticsDashboardSessionSeconds})).toString("base64url");
+  const signature=createHmac("sha256",secret).update(payload).digest("base64url");
+  await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1",[window-96]);
+  return {
+    setCookie: analyticsDashboardCookieName+"="+payload+"."+signature+"; Path=/api/analytics; Max-Age="+analyticsDashboardSessionSeconds+"; HttpOnly; Secure; SameSite=Strict",
+    expiresAt:new Date((now+analyticsDashboardSessionSeconds)*1000).toISOString(),
+  };
+}
+export function revokeAnalyticsDashboardSession() {
+  return analyticsDashboardCookieName+"=; Path=/api/analytics; Max-Age=0; HttpOnly; Secure; SameSite=Strict";
+}
+
 export async function saveAnalyticsConsent(request: Request, input: unknown) {
   const secret = configSecret();
   let body;
@@ -96,7 +169,7 @@ export async function ingestAnalyticsEvents(request: Request, input: unknown) {
 }
 export async function getAnalyticsSummary(request: Request) {
   configSecret();
-  if (!authorized(request, process.env.ANALYTICS_ADMIN_TOKEN)) throw new AnalyticsError("ANALYTICS_ADMIN_UNAUTHORIZED", "Developer analytics access is required.", 401);
+  if (!authorized(request, process.env.ANALYTICS_ADMIN_TOKEN) && !validDashboardCookie(request)) throw new AnalyticsError("ANALYTICS_ADMIN_UNAUTHORIZED", "Developer analytics access is required.", 401);
   const sql = await getSql();
   const [overview,daily,tools,platforms,devices,browsers,networks,referrers,failures] = await Promise.all([
     sql.query(`select count(*) total_events,count(distinct anonymous_subject_digest) installations,count(distinct user_id) signed_in_users,
