@@ -175,8 +175,16 @@ export async function getAnalyticsSummary(request: Request) {
     sql.query(`select count(*) total_events,count(distinct anonymous_subject_digest) installations,count(distinct user_id) signed_in_users,
       count(distinct session_digest) sessions,count(distinct tool_id) tools_used,count(*) filter(where outcome='failure') failures
       from product_analytics_events where received_at>=now()-interval '30 days'`),
-    sql.query(`select to_char(date_trunc('day',received_at),'YYYY-MM-DD') day,count(*) events,count(*) filter(where outcome='failure') failures
-      from product_analytics_events where received_at>=now()-interval '30 days' group by 1 order by 1`),
+    sql.query(`select day,sum(events)::bigint events,sum(failures)::bigint failures
+      from (
+        select to_char(date_trunc('day',received_at),'YYYY-MM-DD') day,count(*) events,count(*) filter(where outcome='failure') failures
+        from product_analytics_events where received_at>=now()-interval '30 days' group by 1
+        union all
+        select to_char(snapshot_day,'YYYY-MM-DD') day,sum(event_count) events,sum(failure_count) failures
+        from product_analytics_daily_snapshots
+        where snapshot_day>=current_date-364 and snapshot_day<current_date-29
+        group by snapshot_day
+      ) historical group by day order by day`),
     sql.query(`select tool_id,count(*) filter(where event_name='tool_viewed') views,count(*) filter(where outcome='failure') failures,
       count(*) filter(where event_name='tool_completed') completed from product_analytics_events
       where received_at>=now()-interval '30 days' and tool_id is not null group by tool_id order by views desc limit 25`),
@@ -189,7 +197,7 @@ export async function getAnalyticsSummary(request: Request) {
   const breakdown=(rows:Array<Record<string,unknown>>)=>rows.map(r=>({name:String(r.name??"unknown"),events:num(r.events)}));
   const o=overview[0]??{};
   return {
-    generatedAt:new Date().toISOString(),windowDays:30,
+    generatedAt:new Date().toISOString(),windowDays:30,historyDays:365,
     overview:{totalEvents:num(o.total_events),optedInInstallations:num(o.installations),signedInUsers:num(o.signed_in_users),
       sessions:num(o.sessions),toolsUsed:num(o.tools_used),failures:num(o.failures)},
     daily:daily.map(r=>({day:String(r.day),events:num(r.events),failures:num(r.failures)})),
@@ -205,7 +213,32 @@ export async function runAnalyticsRetention(request: Request) {
   const configured=Number(process.env.ANALYTICS_RETENTION_DAYS??90);
   const days=Number.isSafeInteger(configured)&&configured>=30&&configured<=365?configured:90;
   const sql=await getSql();
+  // Capture yesterday before raw events are eligible for deletion. The snapshot contains
+  // aggregates only: no installation, user, session, network or raw event identifiers.
+  const snapshots=await sql.query(
+    `insert into product_analytics_daily_snapshots(
+      snapshot_day,platform,tool_id,event_name,event_count,failure_count,unique_installations,
+      sessions,duration_total_ms,duration_sample_count,captured_at
+    )
+    select current_date-1,platform,coalesce(tool_id,''),event_name,count(*)::bigint,
+      count(*) filter(where outcome='failure')::bigint,
+      count(distinct anonymous_subject_digest)::bigint,count(distinct session_digest)::bigint,
+      coalesce(sum(duration_ms),0)::bigint,count(duration_ms)::bigint,now()
+    from product_analytics_events
+    where received_at>=current_date-1 and received_at<current_date
+    group by platform,coalesce(tool_id,''),event_name
+    on conflict(snapshot_day,platform,tool_id,event_name) do update set
+      event_count=excluded.event_count,failure_count=excluded.failure_count,
+      unique_installations=excluded.unique_installations,sessions=excluded.sessions,
+      duration_total_ms=excluded.duration_total_ms,duration_sample_count=excluded.duration_sample_count,
+      captured_at=now()
+    returning snapshot_day`,
+  );
   const events=await sql.query("delete from product_analytics_events where received_at<now()-($1*interval '1 day') returning event_id",[days]);
   const limits=await sql.query("delete from product_analytics_rate_limits where window_minute<$1 returning subject_digest",[Math.floor(Date.now()/60000)-1440]);
-  return {retainedDays:days,deletedEvents:events.length,deletedRateLimitRows:limits.length,completedAt:new Date().toISOString()};
+  const adminLimits=await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1 returning subject_digest",[Math.floor(Date.now()/900000)-96]);
+  const oldSnapshots=await sql.query("delete from product_analytics_daily_snapshots where snapshot_day<current_date-730 returning snapshot_day");
+  return {retainedDays:days,aggregateHistoryDays:730,snapshotsCaptured:snapshots.length,deletedEvents:events.length,
+    deletedRateLimitRows:limits.length,deletedAdminRateLimitRows:adminLimits.length,deletedOldSnapshots:oldSnapshots.length,
+    completedAt:new Date().toISOString()};
 }
