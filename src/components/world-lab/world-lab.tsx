@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import {
   advanceWorld, createLabObject, createWorldLabProject, describeLabObject,
-  LAB_LIMITATIONS, LAB_MODEL, validateWorldLabProject, type LabShape,
+  LAB_LIMITATIONS, LAB_MODEL, supportingRadiusM, validateWorldLabProject, type LabShape,
   type WorldLabObject, type WorldLabProject,
 } from "@/lib/world-lab/model";
 import { loadWorldLabProjects, saveWorldLabProject } from "@/lib/world-lab/storage";
@@ -106,14 +106,21 @@ export default function WorldLabStudio() {
       const elapsed = Math.min(0.05, (now - previous) / 1000) * speed;
       previous = now;
       if (elapsed > 0) {
-        setProject(old => {
+        try {
+          const old = current.current;
+          const next = advanceWorld(old, Math.min(1, elapsed));
           if (old.elapsedSeconds - lastRecorded >= 0.2) {
             history.current.push(old);
             if (history.current.length > 100) history.current.shift();
             lastRecorded = old.elapsedSeconds;
           }
-          return advanceWorld(old, Math.min(1, elapsed));
-        });
+          current.current = next;
+          setProject(next);
+        } catch (reason) {
+          setPlaying(false);
+          setError(reason instanceof Error ? reason.message : "Simulation stopped outside its supported bounds.");
+          return;
+        }
       }
       frame = requestAnimationFrame(update);
     };
@@ -237,7 +244,7 @@ export default function WorldLabStudio() {
             <div className="world-lab-time-readout"><strong>{project.elapsedSeconds.toFixed(2)} s</strong><span>simulated time</span></div>
             <div className="world-lab-time-actions">
               <button type="button" onClick={() => setPlaying(v => !v)}><>{playing ? <Pause size={18}/> : <Play size={18}/>}</>{playing ? "Pause" : "Play"}</button>
-              <button type="button" onClick={() => setProject(p => advanceWorld(p, 1 / 60))} disabled={playing} title="Step one 60th of a simulated second"><StepForward size={18}/> Step</button>
+              <button type="button" onClick={() => { try { const next = advanceWorld(current.current, 1 / 60); current.current = next; setProject(next); } catch (reason) { setError(reason instanceof Error ? reason.message : "Simulation step failed."); } }} disabled={playing} title="Step one 60th of a simulated second"><StepForward size={18}/> Step</button>
               <button type="button" onClick={reset}><RotateCcw size={18}/> Reset</button>
               <button type="button" onClick={() => { setPlaying(false); const snapshot = history.current.pop(); if (snapshot) setProject(snapshot); }} disabled={history.current.length === 0} title="Restore an earlier recorded snapshot">Earlier</button>
             </div>
@@ -260,8 +267,8 @@ export default function WorldLabStudio() {
             <input id="lab-material-density" type="number" min={1} max={50000} step={100} value={chosen.material.densityKgM3}
               onChange={e => { const v = asNumber(e.target.value, 1, 50000); if (v !== null) editObject(chosen.id, o => ({ ...o, material: { ...o.material, densityKgM3: v } })); }} />
             <label htmlFor="lab-object-height">Object center height · metres</label>
-            <input id="lab-object-height" type="number" step={0.25} min={-10000} max={10000} value={Number(chosen.positionM.y.toFixed(3))}
-              onChange={e => { const v = asNumber(e.target.value, 0.1, 10000); if (v !== null) editObject(chosen.id, o => ({ ...o, positionM: { ...o.positionM, y: v }, velocityMps: { x: 0, y: 0, z: 0 } })); }} />
+            <input id="lab-object-height" type="number" step={0.25} min={supportingRadiusM(chosen)} max={10000} value={Number(chosen.positionM.y.toFixed(3))}
+              onChange={e => { const v = asNumber(e.target.value, supportingRadiusM(chosen), 10000); if (v !== null) editObject(chosen.id, o => ({ ...o, positionM: { ...o.positionM, y: v }, velocityMps: { x: 0, y: 0, z: 0 } })); }} />
             <label htmlFor="lab-force-y">Applied upward force · newtons</label>
             <input id="lab-force-y" type="number" step={100} min={-100000} max={100000} value={chosen.forceN.y}
               onChange={e => { const v = asNumber(e.target.value, -100000, 100000); if (v !== null) editObject(chosen.id, o => ({ ...o, forceN: { ...o.forceN, y: v } })); }} />
