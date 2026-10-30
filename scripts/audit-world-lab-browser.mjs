@@ -63,6 +63,11 @@ try{
   await page.getByText(/Height above surface/).waitFor();
   await page.getByRole("button",{name:"Play drop"}).click();
   await page.getByRole("button",{name:"Pause drop"}).click();
+  // Changing invented geometry must invalidate old computed results, even when
+  // the user returns the dimensions to their original numerical values.
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.1");
+  await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
   assert.equal(new URL(page.url()).pathname,currentWorkspacePath,
     "Physical simulation must occur in the same digital world workspace");
   await page.getByRole("button",{name:"Test this solid as spring mass"}).click();
