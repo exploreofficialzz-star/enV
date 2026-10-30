@@ -250,3 +250,60 @@ enum NativeWorldLabActuator {
                 "Numerical thresholds exceeded; this trajectory needs review.")
     }
 }
+
+/// Ideal DC source with a dynamic electromechanical branch in parallel.
+struct NativeLabNetworkMotorSample {
+    let timeSeconds:Double
+    let totalSourceCurrentA:Double
+    let totalSourcePowerW:Double
+    let passiveResistorHeatW:Double
+    let combinedEnergyResidualJ:Double
+}
+struct NativeLabNetworkMotorRun {
+    let projectId:String
+    let projectRevision:Int
+    let networkId:String
+    let entityId:String
+    let dc:NativeLabDcResult
+    let motor:NativeActuatorResult
+    let samples:[NativeLabNetworkMotorSample]
+    let validity="One ideal stiff DC source powering a parallel dynamic motor; no battery sag or measured materials."
+}
+enum NativeWorldLabNetworkMotor {
+    static func evaluate(_ project:NativeWorldLabProject,
+                         network:NativeLabCircuitNetwork,
+                         entityId:String,massKg:Double,
+                         thermal:Bool) throws -> NativeLabNetworkMotorRun {
+        let sources=network.components.filter{$0.kind=="dc-source"}
+        guard sources.count==1,let source=sources.first,
+              let voltage=source.voltageV,voltage>=0 else {
+            throw NativeWorldLabError.invalid("Wired motor requires one supported positive DC source")
+        }
+        guard project.entities.contains(where:{$0.id==entityId}) else {
+            throw NativeWorldLabError.invalid("The selected invention is no longer present")
+        }
+        let dc=try NativeWorldLabDc.solve(network,project:project)
+        var input=NativeActuatorInput(massKg:massKg)
+        input.supplyVoltageV=voltage
+        if thermal {input.thermal=NativeActuatorThermalInput()}
+        let motor=try NativeWorldLabActuator.evaluate(input)
+        guard let passiveSourceCurrent=dc.branchCurrentsA[source.id] else {
+            throw NativeWorldLabError.invalid("Source current is unknown")
+        }
+        let samples=try motor.samples.map{sample -> NativeLabNetworkMotorSample in
+            let total=passiveSourceCurrent-sample.currentA
+            let power = -voltage*total
+            let residual=sample.energyResidualJ+dc.powerResidualW*sample.timeSeconds
+            guard total.isFinite,power.isFinite,residual.isFinite else {
+                throw NativeWorldLabError.invalid("Connected source energy is non-finite")
+            }
+            return NativeLabNetworkMotorSample(
+                timeSeconds:sample.timeSeconds,totalSourceCurrentA:total,
+                totalSourcePowerW:power,passiveResistorHeatW:dc.resistorHeatW,
+                combinedEnergyResidualJ:residual)
+        }
+        return NativeLabNetworkMotorRun(
+            projectId:project.id,projectRevision:project.revision,
+            networkId:network.id,entityId:entityId,dc:dc,motor:motor,samples:samples)
+    }
+}

@@ -40,6 +40,21 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         hot.thermal?.heatCapacityJPerK=0
         XCTAssertThrowsError(try NativeWorldLabActuator.evaluate(hot))
     }
+    func testWiredDCMotorChangesTotalSourceCurrentAndAccountsForPassiveLoad() throws {
+        let circuitData=try NativeWorldLabEditor.starterCircuit(
+            NativeWorldLabEditor.blank())
+        let withSolid=try NativeWorldLabEditor.addSolid(circuitData,shape:"box",id:"lift")
+        let project=try NativeWorldLabProject.decode(withSolid)
+        let network=try XCTUnwrap(project.networks?.first)
+        let run=try NativeWorldLabNetworkMotor.evaluate(
+            project,network:network,entityId:"lift",massKg:1,thermal:true)
+        let sample=run.samples[240]
+        XCTAssertLessThan(sample.totalSourceCurrentA,
+            try XCTUnwrap(run.dc.branchCurrentsA["source"]))
+        XCTAssertEqual(sample.totalSourcePowerW,
+            9*run.motor.samples[240].currentA+sample.passiveResistorHeatW,accuracy:1e-8)
+        XCTAssertTrue(run.samples.allSatisfy({$0.combinedEnergyResidualJ.isFinite}))
+    }
     func testUnpoweredActuatorCannotInventMotion() throws {
         var input=NativeActuatorInput(massKg:1)
         input.supplyVoltageV=0

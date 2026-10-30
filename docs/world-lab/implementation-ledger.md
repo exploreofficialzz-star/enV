@@ -214,3 +214,7 @@ release-candidate evidence bundle are unfinished.
 ## Android connected ideal source and actuator implementation (2026-10-30)
 
 - The native Kotlin graph's one ideal source now drives a dynamic electromechanical motor branch in parallel with passive loads. Its source-current and power ledger accounts for both the motor and resistor network at each numerical motor sample; the native UI displays calculated total source current, resistor heat and combined energy residual. No finite battery sag is implied. Added a regression case; deferred CI as requested.
+
+## iOS ideal-source network motor co-simulation (2026-10-30)
+
+- Added native Swift wired DC motor calculation that attaches a dynamic, optionally heated actuator branch to one supported ideal source; source current, passive resistor heat and shared energy balance now reflect the motor's live state. SwiftUI renders the connected output and stale project revisions invalidate it. Added native XCTest coverage. No finite battery behavior or universal multicomponent transient solver is claimed; final CI deferred as directed.

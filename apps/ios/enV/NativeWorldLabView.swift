@@ -47,6 +47,7 @@ struct NativeWorldLabView:View {
     @State private var dropPlaying=false
     @State private var dropSpeed=1.0
     @State private var motorRun:NativeActuatorResult?
+    @State private var wiredMotor:NativeLabNetworkMotorRun?
     @State private var motorAudit:NativeActuatorNumericalAudit?
     @State private var motorEntityId:String?
     @State private var motorTime=0.0
@@ -117,7 +118,7 @@ struct NativeWorldLabView:View {
             }
             let data=try work(old)
             project=try NativeWorldLabProject.decode(data)
-            projectData=data;dcRun=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            projectData=data;dcRun=nil;wiredMotor=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -312,12 +313,35 @@ struct NativeWorldLabView:View {
                                     if motorThermalEnabled {input.thermal=NativeActuatorThermalInput()}
                                     let result=try NativeWorldLabActuator.evaluate(input)
                                     motorAudit=try NativeWorldLabActuator.numericalAudit(input,result)
-                                    motorRun=result
+                                    motorRun=result;wiredMotor=nil
                                     motorEntityId=solid.id;motorTime=0;motorPlaying=true
                                     dropPlaying=false;playing=false;problem=""
                                     applyMotorPosition()
                                 }catch{problem=error.localizedDescription}
                             }.buttonStyle(.bordered)
+                            if let circuit=project.networks?.first {
+                                Button("Wire motor to circuit"){
+                                    do {
+                                        let linked=try NativeWorldLabNetworkMotor.evaluate(
+                                            project,network:circuit,entityId:solid.id,
+                                            massKg:derived,thermal:motorThermalEnabled)
+                                        guard let supply=circuit.components.first(where:{$0.kind=="dc-source"})?.voltageV else {
+                                            throw NativeWorldLabError.invalid("Circuit source voltage is missing")
+                                        }
+                                        var input=NativeActuatorInput(massKg:derived)
+                                        input.supplyVoltageV=supply
+                                        if motorThermalEnabled {
+                                            input.thermal=NativeActuatorThermalInput()
+                                        }
+                                        motorAudit=try NativeWorldLabActuator.numericalAudit(
+                                            input,linked.motor)
+                                        wiredMotor=linked;motorRun=linked.motor
+                                        motorEntityId=solid.id;motorTime=0;motorPlaying=true
+                                        dropPlaying=false;playing=false;problem=""
+                                        applyMotorPosition()
+                                    }catch{problem=error.localizedDescription}
+                                }.buttonStyle(.bordered)
+                            }
                             if let run=motorRun,motorEntityId==solid.id {
                                 let index=max(0,min(run.samples.count-1,
                                     Int((motorTime/run.stepSeconds).rounded())))
@@ -335,6 +359,14 @@ struct NativeWorldLabView:View {
                                     value("Cooling loss",sample.coolingPowerW,"W")
                                 }
                                 value("Energy balance residual",sample.energyResidualJ,"J")
+                                if let wired=wiredMotor,wired.projectId==project.id,
+                                   wired.projectRevision==project.revision,wired.entityId==solid.id {
+                                    let observation=wired.samples[index]
+                                    value("Total source current",observation.totalSourceCurrentA,"A")
+                                    value("Parallel resistor heat",observation.passiveResistorHeatW,"W")
+                                    value("Combined energy residual",observation.combinedEnergyResidualJ,"J")
+                                    Text(wired.validity).font(.caption).foregroundStyle(.secondary)
+                                }
                                 if let audit=motorAudit {
                                     Text("Numerical self-check: \(audit.status). \(audit.explanation)")
                                         .font(.caption).foregroundStyle(.secondary)
