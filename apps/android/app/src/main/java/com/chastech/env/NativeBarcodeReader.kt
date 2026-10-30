@@ -150,7 +150,7 @@ object NativeBarcodeImageDecoder {
     }
 
     fun decode(context: Context, uri: Uri): NativeBarcodeScan? {
-        val imageBytes = context.contentResolver.openInputStream(uri)?.use(::readBarcodeImageBytes)
+        val imageBytes = context.contentResolver.openInputStream(uri)?.use { input -> readBarcodeImageBytes(input) }
             ?: return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
