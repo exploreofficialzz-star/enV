@@ -65,7 +65,13 @@ function normalizeEvent(value) {
     if (!Number.isSafeInteger(value.durationMs) || value.durationMs < 0 || value.durationMs > 3600000) throw new TypeError("durationMs must be between 0 and 3600000.");
     durationMs = value.durationMs;
   }
-  const outcome = outcomes.has(value.outcome) ? value.outcome : "unknown";
+  const inferredOutcome = {
+    tool_completed: "success",
+    tool_failed: "failure",
+    tool_cancelled: "cancelled",
+    tool_abandoned: "abandoned",
+  }[value.name];
+  const outcome = inferredOutcome ?? (outcomes.has(value.outcome) ? value.outcome : "unknown");
   const errorCode = value.errorCode == null ? null : value.errorCode;
   if (errorCode !== null && (typeof errorCode !== "string" || !/^[A-Z0-9_]{1,64}$/.test(errorCode))) throw new TypeError("errorCode must be a short machine-readable code.");
   return {
