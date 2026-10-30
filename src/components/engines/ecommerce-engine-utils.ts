@@ -17,29 +17,84 @@ const pct = (n: number) => `${n.toFixed(2)}%`;
 
 export function buildEcommerceOutput(family: string, workflow: EcommerceWorkflow, input: {
   name: string; cost: number; price: number; quantity: number; tax: number; discount: number; stock: number; dailySales: number; leadTime: number; shipping: number; customer: string; code: string;
+  packaging?: number; feePercent?: number; advertising?: number; targetMargin?: number; safetyStock?: number; weight?: number; distance?: number;
 }): string {
   if (!FAMILIES.has(family) || !WORKFLOWS.has(workflow)) throw new Error("Unsupported e-commerce operation.");
-  if (![input.cost, input.price, input.quantity, input.tax, input.discount, input.stock, input.dailySales, input.leadTime, input.shipping].every(Number.isFinite)) throw new Error("Enter valid numeric values.");
-  if (input.quantity < 0 || input.stock < 0 || input.dailySales < 0 || input.leadTime < 0 || input.shipping < 0 || input.cost < 0 || input.price < 0) throw new Error("Numeric values cannot be negative.");
-  if (input.tax < 0 || input.discount < 0 || input.tax > 100 || input.discount > 100) throw new Error("Tax and discount must be between 0 and 100.");
+  const packaging = input.packaging ?? 0;
+  const feePercent = input.feePercent ?? 0;
+  const advertising = input.advertising ?? 0;
+  const targetMargin = input.targetMargin ?? 30;
+  const safetyStock = input.safetyStock ?? 0;
+  const weight = input.weight ?? 0;
+  const distance = input.distance ?? 0;
+  const numericValues = [input.cost, input.price, input.quantity, input.tax, input.discount, input.stock, input.dailySales, input.leadTime, input.shipping, packaging, feePercent, advertising, targetMargin, safetyStock, weight, distance];
+  if (!numericValues.every(Number.isFinite)) throw new Error("Enter valid numeric values.");
+  if (numericValues.some((value) => value < 0)) throw new Error("Numeric values cannot be negative.");
+  if ([input.tax, input.discount, feePercent, targetMargin].some((value) => value > 100)) throw new Error("Tax, discount, fees and target margin must be between 0 and 100.");
 
   const label = title(family);
   if (workflow === "calculator") {
     const subtotal = input.price * input.quantity;
     const discountAmount = subtotal * input.discount / 100;
-    const taxed = subtotal - discountAmount;
-    const taxAmount = taxed * input.tax / 100;
-    const total = taxed + taxAmount + input.shipping;
-    const profit = (input.price - input.cost) * input.quantity - discountAmount;
-    const margin = input.price > 0 ? ((input.price - input.cost) / input.price) * 100 : 0;
-    const reorderPoint = input.dailySales * input.leadTime;
-    const roi = input.cost > 0 ? ((input.price - input.cost) / input.cost) * 100 : 0;
-    const rows = family === "order" ? [`Subtotal: ${money(subtotal)}`, `Discount: ${money(discountAmount)}`, `Tax: ${money(taxAmount)}`, `Shipping: ${money(input.shipping)}`, `Order total: ${money(total)}`]
-      : family === "inventory" ? [`Current stock: ${input.stock}`, `Daily sales: ${input.dailySales}`, `Lead time: ${input.leadTime} days`, `Reorder point: ${Math.ceil(reorderPoint)}`]
-      : family === "discount" || family === "coupon" ? [`Original price: ${money(input.price)}`, `Discount: ${pct(input.discount)}`, `Savings: ${money(input.price * input.discount / 100)}`, `Sale price: ${money(input.price * (1 - input.discount / 100))}`]
-      : family === "profit" || family === "margin" ? [`Unit profit: ${money(input.price - input.cost)}`, `Total profit: ${money(profit)}`, `Gross margin: ${pct(margin)}`, `ROI on cost: ${pct(roi)}`]
-      : family === "shipping" ? [`Item value: ${money(subtotal)}`, `Shipping: ${money(input.shipping)}`, `Delivered total: ${money(subtotal + input.shipping)}`]
-      : [`Cost: ${money(input.cost)}`, `Price: ${money(input.price)}`, `Quantity: ${input.quantity}`, `Unit profit: ${money(input.price - input.cost)}`, `Margin: ${pct(margin)}`, `ROI: ${pct(roi)}`];
+    const netSales = subtotal - discountAmount;
+    const taxAmount = netSales * input.tax / 100;
+    const total = netSales + taxAmount + input.shipping;
+    const salePrice = input.price * (1 - input.discount / 100);
+    const packagingTotal = packaging * input.quantity;
+    const paymentFees = netSales * feePercent / 100;
+    const contributionProfit = netSales - input.cost * input.quantity - packagingTotal - paymentFees - advertising;
+    const margin = netSales > 0 ? contributionProfit / netSales * 100 : 0;
+    const costBase = input.cost * input.quantity + packagingTotal;
+    const roi = costBase > 0 ? contributionProfit / costBase * 100 : 0;
+    const reorderPoint = input.dailySales * input.leadTime + safetyStock;
+    const stockCover = input.dailySales > 0 ? input.stock / input.dailySales : null;
+    const rows = family === "order" ? [
+      `Subtotal: ${money(subtotal)}`, `Discount: ${money(discountAmount)}`, `Tax: ${money(taxAmount)}`,
+      `Shipping: ${money(input.shipping)}`, `Order total: ${money(total)}`,
+      `Merchant payment fee estimate (not added to customer total): ${money(paymentFees)}`,
+    ]
+      : family === "inventory" ? [
+        `Current stock: ${input.stock}`, `Daily sales: ${input.dailySales}`, `Lead time: ${input.leadTime} days`,
+        `Safety stock: ${safetyStock}`, `Reorder point: ${Math.ceil(reorderPoint)}`,
+        `Stock cover: ${stockCover === null ? "Not estimable until daily sales are entered" : `${money(stockCover)} days`}`,
+        input.stock <= reorderPoint ? "Action: Reorder review required." : "Action: Stock is above the reorder point.",
+      ]
+      : family === "discount" || family === "coupon" ? [
+        `Original price: ${money(input.price)}`, `Discount: ${pct(input.discount)}`,
+        `Savings per unit: ${money(input.price - salePrice)}`, `Sale price: ${money(salePrice)}`,
+        `Unit contribution after product, packaging and payment fees: ${money(salePrice - input.cost - packaging - salePrice * feePercent / 100)}`,
+        salePrice - input.cost - packaging - salePrice * feePercent / 100 < 0 ? "Warning: This promotion creates a unit loss before advertising." : "Promotion remains positive before advertising and fixed costs.",
+      ]
+      : family === "profit" || family === "margin" ? [
+        `Gross sales before discount: ${money(subtotal)}`, `Discount: ${money(discountAmount)}`,
+        `Net sales before tax: ${money(netSales)}`, `Product cost: ${money(input.cost * input.quantity)}`,
+        `Packaging / handling: ${money(packagingTotal)}`, `Payment / platform fees: ${money(paymentFees)}`,
+        `Advertising cost: ${money(advertising)}`, `Contribution profit: ${money(contributionProfit)}`,
+        `Contribution margin: ${pct(margin)}`, `ROI on product and packaging cost: ${pct(roi)}`,
+      ]
+      : family === "pricing" ? (() => {
+        const variableCost = input.cost + packaging;
+        const feeRate = feePercent / 100;
+        const breakEven = feeRate < 1 ? variableCost / (1 - feeRate) : Number.POSITIVE_INFINITY;
+        const targetPrice = targetMargin + feePercent < 100 ? variableCost / (1 - (targetMargin + feePercent) / 100) : Number.POSITIVE_INFINITY;
+        return [
+          `Unit cost including packaging: ${money(variableCost)}`, `Payment / platform fee: ${pct(feePercent)}`,
+          `Break-even selling price: ${Number.isFinite(breakEven) ? money(breakEven) : "Not achievable"}`,
+          `Target margin: ${pct(targetMargin)}`,
+          `Target selling price: ${Number.isFinite(targetPrice) ? money(targetPrice) : "Not achievable with these inputs"}`,
+          `Current selling price: ${money(input.price)}`,
+        ];
+      })()
+      : family === "shipping" ? [
+        `Package weight: ${money(weight)} kg`, `Distance: ${money(distance)} km`,
+        `Quoted shipping amount: ${money(input.shipping)}`, `Delivered item value: ${money(subtotal + input.shipping)}`,
+        "This is a recorded quote, not a live carrier rate. Connect an enabled carrier to compare or purchase a label.",
+      ]
+      : [
+        `Cost: ${money(input.cost)}`, `Price: ${money(input.price)}`, `Quantity: ${input.quantity}`,
+        `Unit sale price after discount: ${money(salePrice)}`, `Contribution profit: ${money(contributionProfit)}`,
+        `Margin: ${pct(margin)}`, `ROI: ${pct(roi)}`,
+      ];
     return `${label} Calculator\n\n${rows.join("\n")}`;
   }
 
