@@ -114,7 +114,7 @@ function DeveloperWorkspace() {
     setProblem(""); setNotice("");
     try {
       await api("/api/community/admin/update", { method: "POST", body: JSON.stringify({
-        reportId: report.reportId, status: "actioned", commentAction,
+        reportId: report.reportId, status: commentAction === "keep" ? "dismissed" : "actioned", commentAction,
       }) });
       setNotice("Community report moderated."); await loadAll();
     } catch (error) { setProblem(error instanceof Error ? error.message : "Moderation update failed."); }
