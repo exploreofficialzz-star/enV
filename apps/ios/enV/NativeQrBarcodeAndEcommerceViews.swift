@@ -41,6 +41,9 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
         guard let data = UserDefaults.standard.data(forKey: Self.historyDefaultsKey),
               let stored = try? JSONDecoder().decode([NativeBarcodeReadRecord].self, from: data) else { return }
         results = Array(stored.prefix(50))
+        for record in results {
+            lastScanAtBySignature[record.format + "\u{0}" + record.value] = record.scannedAt
+        }
     }
 
     private func persistResults() {
@@ -152,6 +155,7 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
 
     func clearResults() {
         results.removeAll()
+        lastScanAtBySignature.removeAll()
         persistResults()
         status = "Scan history cleared."
     }
