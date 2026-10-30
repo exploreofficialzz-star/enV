@@ -85,6 +85,16 @@ final class NativeEcommerceEngineTests: XCTestCase {
         XCTAssertTrue(output.contains("Current selling price: 75.00"))
     }
 
+    func testPricingCalculatorReportsBreakEvenImpossibleAtOneHundredPercentFees() throws {
+        let item = tool("pricing-calculator")
+        let values = NativeEcommerceEngine.initialValues(for: item).merging([
+            "cost": "40", "packaging": "2", "feePercent": "100", "targetMargin": "0"
+        ]) { _, new in new }
+        let output = try NativeEcommerceEngine.run(item, values: values)
+        XCTAssertTrue(output.contains("Minimum break-even price before tax and advertising: Not achievable with these fees"))
+        XCTAssertTrue(output.contains("Target selling price: Not achievable with these fee and margin inputs"))
+    }
+
     func testNegativeAndOutOfRangeInputsAreRejected() {
         let item = tool("discount-calculator")
         var values = NativeEcommerceEngine.initialValues(for: item)
