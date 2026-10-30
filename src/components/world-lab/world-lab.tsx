@@ -483,6 +483,7 @@ export default function WorldLab() {
     setDirty(true);setPlaying(false);
   }
   function runModel(input: ModelInput, source: AssumedMassSource | null = null) {
+    setDropPlaying(false);
     setError("");
     try {
       const next = runExperiment(input, {
@@ -529,6 +530,7 @@ export default function WorldLab() {
         heightM: dropHeight, restitution: dropBounce,
       });
       const result = runDropExperiment(derived.input, derived.source);
+      setPlaying(false);
       setDropRun(result);
       setDropTime(0);
       setDropPlaying(true);
@@ -912,6 +914,10 @@ export default function WorldLab() {
                           onClick={()=>setDropPlaying(v=>!v)}>{dropPlaying ? "Pause drop" : "Play drop"}</button>
                         <button type="button" className={buttonClass}
                           onClick={()=>{setDropPlaying(false);setDropTime(0);}}>Reset drop</button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>downloadJson("the-world-lab-drop-evidence.json",selectedDrop)}>
+                          Export drop evidence
+                        </button>
                         <select className={inputLabel} aria-label="Drop playback speed" value={dropPlaybackRate}
                           onChange={e=>setDropPlaybackRate(Number(e.target.value))}>
                           <option value={0.1}>0.1× slow</option>
