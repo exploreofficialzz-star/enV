@@ -356,8 +356,17 @@ try {
         const point = await right.boundingBox();
         await page.mouse.move(point.x+point.width/2,point.y+point.height/2);await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
         const afterHold = await waitForStored(page,project=>project.elements.find(item=>item.id===selected.id).x>selected.x+8,"continuous movement while held");
-        const releasedX=afterHold.elements.find(item=>item.id===selected.id).x;await page.waitForTimeout(220);
-        assert.equal((await storedProject(page)).elements.find(item=>item.id===selected.id).x,releasedX,"Release stops repeating");
+        // The pointer is released synchronously but the last queued React state
+        // update and localStorage persistence may finish after waitForStored
+        // has observed an earlier hold tick. Observe the fully settled position
+        // first, then assert no further ticks occur across multiple repeat periods.
+        await page.waitForTimeout(260);
+        const releasedX=(await storedProject(page)).elements.find(item=>item.id===selected.id).x;
+        assert.ok(releasedX >= afterHold.elements.find(item=>item.id===selected.id).x,
+          "Pending save after release must not roll back the last movement");
+        await page.waitForTimeout(300);
+        assert.equal((await storedProject(page)).elements.find(item=>item.id===selected.id).x,
+          releasedX,"Release stops repeating after pending state is persisted");
         await page.getByRole("button",{name:"Undo",exact:true}).last().click();
         await waitForStored(page,project=>project.elements.find(item=>item.id===selected.id).x===selected.x,"one-step undo for a whole hold gesture");
         entry.checks.push("Hold moves continuously, release stops, and one undo restores the gesture");
