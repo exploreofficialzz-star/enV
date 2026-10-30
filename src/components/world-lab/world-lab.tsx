@@ -9,6 +9,7 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
   putLocalWorldLabProject, saveLocalWorldLabRun } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
+import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
 import {
   advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
   HEAT_CELLS, type AssumedMassSource, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
@@ -23,6 +24,8 @@ type SceneHandles = {
   circuitMaterial: B.StandardMaterial;
   addedShapes: Map<string, B.Mesh>;
   heatSegments: B.Mesh[];
+  groundMaterial: B.StandardMaterial;
+  strataMaterials: B.StandardMaterial[];
 };
 const STORAGE_KEY = "env-world-lab-reference-v1";
 const defaultMechanical: DampedOscillator = {
@@ -74,7 +77,10 @@ export default function WorldLab() {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [seeInside, setSeeInside] = useState(false);
+  const [observerDepth, setObserverDepth] = useState(0);
+  const visualSettings = useRef({ seeInside: false, opacity: 55 });
   const [opacity, setOpacity] = useState(55);
+  visualSettings.current = { seeInside, opacity };
   const [project, setProject] = useState<WorldLabProject | null>(null);
   const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
@@ -178,6 +184,7 @@ export default function WorldLab() {
     let engine: B.Engine | undefined;
     let scene: B.Scene | undefined;
     let observer: ResizeObserver | undefined;
+    let observerNavigationCleanup: (() => void) | undefined;
     try {
       if (!B.Engine.isSupported()) throw new Error("3D graphics are not supported on this device.");
       engine = new B.Engine(canvas, true, { stencil: true, preserveDrawingBuffer: false }, true);
@@ -193,6 +200,38 @@ export default function WorldLab() {
       camera.keysLeft = [65, 37];
       camera.keysRight = [68, 39];
       camera.attachControl(canvas, true);
+      const wheelTravel = (event: WheelEvent) => {
+        event.preventDefault();
+        const distance = observerTravelMetres(event.deltaY, "wheel");
+        const candidate = camera.position.add(camera.getForwardRay().direction.scale(distance));
+        if (candidate.length() <= OBSERVER_BOUNDS_METRES.maxRadius && candidate.y >= OBSERVER_BOUNDS_METRES.minHeight)
+          camera.position.copyFrom(candidate);
+      };
+      const touches = new Map<number, { x: number; y: number }>();
+      let pinchDistance = 0;
+      const onTouchDown = (event: PointerEvent) => {
+        if (event.pointerType === "touch") touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      };
+      const onTouchMove = (event: PointerEvent) => {
+        if (event.pointerType !== "touch" || !touches.has(event.pointerId)) return;
+        touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (touches.size !== 2) { pinchDistance = 0; return; }
+        const [a, b] = [...touches.values()];
+        const distance = Math.hypot(a.x-b.x, a.y-b.y);
+        if (pinchDistance > 0) {
+          const travel = observerTravelMetres(distance - pinchDistance, "pinch");
+          const candidate = camera.position.add(camera.getForwardRay().direction.scale(travel));
+          if (candidate.length() <= OBSERVER_BOUNDS_METRES.maxRadius && candidate.y >= OBSERVER_BOUNDS_METRES.minHeight)
+            camera.position.copyFrom(candidate);
+        }
+        pinchDistance = distance;
+      };
+      const onTouchEnd = (event: PointerEvent) => { touches.delete(event.pointerId); pinchDistance = 0; };
+      canvas.addEventListener("wheel", wheelTravel, { passive: false });
+      canvas.addEventListener("pointerdown", onTouchDown);
+      canvas.addEventListener("pointermove", onTouchMove);
+      canvas.addEventListener("pointerup", onTouchEnd);
+      canvas.addEventListener("pointercancel", onTouchEnd);
       const ambient = new B.HemisphericLight("daylight", new B.Vector3(0, 1, 0), scene);
       ambient.intensity = 0.85;
       const sunlight = new B.DirectionalLight("sunlight", new B.Vector3(-0.4, -1, 0.6), scene);
@@ -202,6 +241,24 @@ export default function WorldLab() {
       groundMaterial.diffuseColor = B.Color3.FromHexString("#6D8E72");
       ground.material = groundMaterial;
       ground.isPickable = false;
+      // These large, layered volumes are intentionally illustrative, NOT site measurements.
+      const strataMaterials: B.StandardMaterial[] = [];
+      for (const layer of [
+        { center: -0.3, height: 0.6, color: "#75583C" },
+        { center: -1.4, height: 1.6, color: "#A1855F" },
+        { center: -3.5, height: 2.6, color: "#72767C" },
+        { center: -7.5, height: 5.4, color: "#535B68" },
+      ]) {
+        const rock = B.MeshBuilder.CreateBox("illustrative-earth-layer", { width: 160, height: layer.height, depth: 160 }, scene);
+        rock.position.y = layer.center;
+        rock.isPickable = false;
+        const material = new B.StandardMaterial("illustrative-rock", scene);
+        material.diffuseColor = B.Color3.FromHexString(layer.color);
+        material.specularColor = B.Color3.Black();
+        material.alpha = 0.65;
+        rock.material = material;
+        strataMaterials.push(material);
+      }
       const device = B.MeshBuilder.CreateSphere("mechanical-demonstrator", { diameter: 0.85, segments: 24 }, scene);
       device.position = new B.Vector3(0.5, 1, 0);
       const deviceMaterial = new B.StandardMaterial("mechanical", scene);
@@ -223,7 +280,23 @@ export default function WorldLab() {
         segment.setEnabled(false);
         heatSegments.push(segment);
       }
-      engine.runRenderLoop(() => scene?.render());
+      let lastDepthLabelAt = 0;
+      engine.runRenderLoop(() => {
+        // Reveal layers automatically when the observer enters the ground.
+        // See Inside is an optional view aid, not a navigation gate.
+        const depth = Math.max(0, -camera.position.y);
+        const inspection = visualSettings.current;
+        groundMaterial.alpha = depth > 0 || camera.position.y < 0.75
+          ? 0.12 : inspection.seeInside ? inspection.opacity / 100 : 1;
+        for (const material of strataMaterials)
+          material.alpha = depth > 0 ? 0.17 : inspection.seeInside ? inspection.opacity / 100 : 0.72;
+        const now = performance.now();
+        if (now - lastDepthLabelAt > 350) {
+          lastDepthLabelAt = now;
+          setObserverDepth(old => Math.abs(old - depth) > 0.02 ? depth : old);
+        }
+        scene?.render();
+      });
       observer = new ResizeObserver(() => engine?.resize());
       observer.observe(canvas);
       scene.onPointerObservable.add(info => {
@@ -231,15 +304,26 @@ export default function WorldLab() {
         const id = info.pickInfo?.pickedMesh?.metadata?.worldLabEntityId;
         if (typeof id === "string") setSelectedEntityId(id);
       });
-      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments };
+      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments, groundMaterial, strataMaterials };
+      // Callback-scoped cleanup also covers graphics initialization failures.
+      observerNavigationCleanup = () => {
+        canvas.removeEventListener("wheel", wheelTravel);
+        canvas.removeEventListener("pointerdown", onTouchDown);
+        canvas.removeEventListener("pointermove", onTouchMove);
+        canvas.removeEventListener("pointerup", onTouchEnd);
+        canvas.removeEventListener("pointercancel", onTouchEnd);
+        touches.clear();
+      };
     } catch (cause) {
       setGraphicsError(cause instanceof Error ? cause.message : "The 3D view could not be opened.");
       observer?.disconnect();
+      observerNavigationCleanup?.();
       scene?.dispose();
       engine?.dispose();
     }
     return () => {
       observer?.disconnect();
+      observerNavigationCleanup?.();
       sceneRef.current = null;
       scene?.dispose();
       engine?.dispose();
@@ -422,7 +506,7 @@ export default function WorldLab() {
     if (!(camera instanceof B.UniversalCamera)) return;
     const move = camera.getForwardRay().direction.scale(direction * 0.8);
     const next = camera.position.add(move);
-    if (next.length() > 1000 || next.y < 0.08) return;
+    if (next.length() > OBSERVER_BOUNDS_METRES.maxRadius || next.y < OBSERVER_BOUNDS_METRES.minHeight) return;
     camera.position.copyFrom(next);
   }
   function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
@@ -614,7 +698,7 @@ export default function WorldLab() {
               </div>
             )}
             <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-bg/90 px-2 py-1 text-xs text-fg">
-              Representative ground · not a measured geographic location
+              {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · not measured
             </p>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
