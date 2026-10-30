@@ -30,4 +30,33 @@ final class NativeWorldLabScienceTests:XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabScience.evaluate(
             .heat(diffusivityM2S:100,lengthM:0.1),atSeconds:12))
     }
+
+    func testNativeDropMatchesAnalyticalVacuumFall() throws {
+        var input=NativeDropInput(massKg:2,supportingHalfHeightM:0.5,projectedAreaM2:1)
+        input.dropHeightM=50
+        input.airDensityKgM3=0
+        input.restitution=0
+        let run=try NativeWorldLabDropScience.evaluate(input)
+        let atOne=run.samples[240]
+        XCTAssertEqual(atOne.heightAboveGroundM,50-9.80665/2,accuracy:0.03)
+        XCTAssertEqual(atOne.velocityMps,-9.80665,accuracy:1e-8)
+        XCTAssertEqual(run.inputEvidence,"hypothetical-user-assumed")
+    }
+    func testNativeDropContactSettlesWithoutInventingImpacts() throws {
+        var input=NativeDropInput(massKg:2,supportingHalfHeightM:0.5,projectedAreaM2:1)
+        input.dropHeightM=1
+        input.airDensityKgM3=0
+        input.restitution=0
+        let run=try NativeWorldLabDropScience.evaluate(input)
+        XCTAssertEqual(run.impactCount,1)
+        XCTAssertEqual(run.samples.last?.grounded,true)
+        XCTAssertTrue(run.samples.allSatisfy({$0.heightAboveGroundM>=0 && $0.kineticEnergyJ.isFinite}))
+    }
+    func testNativeDropRejectsImpossibleInputs() {
+        let nan=NativeDropInput(massKg:Double.nan,supportingHalfHeightM:0.5,projectedAreaM2:1)
+        XCTAssertThrowsError(try NativeWorldLabDropScience.evaluate(nan))
+        var badBounce=NativeDropInput(massKg:1,supportingHalfHeightM:0.5,projectedAreaM2:1)
+        badBounce.restitution=1.1
+        XCTAssertThrowsError(try NativeWorldLabDropScience.evaluate(badBounce))
+    }
 }
