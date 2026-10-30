@@ -6,7 +6,7 @@ test("observer wheel and pinch movement are continuous, finite and bounded", () 
   assert.equal(observerTravelMetres(0, "wheel"), 0);
   assert.equal(observerTravelMetres(100, "wheel"), -1.2);
   assert.equal(observerTravelMetres(-100, "wheel"), 1.2);
-  assert.equal(observerTravelMetres(50, "pinch"), 1.1);
+  assert.ok(Math.abs(observerTravelMetres(50, "pinch") - 1.1) < 1e-12);
   assert.equal(observerTravelMetres(10000, "pinch"), 5);
   assert.equal(observerTravelMetres(-10000, "pinch"), -5);
   assert.throws(() => observerTravelMetres(Infinity, "wheel"), /Invalid/);
