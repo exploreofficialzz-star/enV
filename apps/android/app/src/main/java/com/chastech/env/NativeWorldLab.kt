@@ -27,6 +27,7 @@ import com.chastech.env.engine.NativeDropResult
 import com.chastech.env.engine.NativeWorldLabDropScience
 import com.chastech.env.engine.NativeActuatorInput
 import com.chastech.env.engine.NativeActuatorResult
+import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
 import kotlin.math.PI
@@ -70,6 +71,7 @@ fun NativeWorldLabForm() {
     var motorEntityId by remember { mutableStateOf<String?>(null) }
     var motorFrame by remember { mutableIntStateOf(0) }
     var motorPlaying by remember { mutableStateOf(false) }
+    var motorThermalEnabled by remember { mutableStateOf(false) }
     var motorSpeed by remember { mutableFloatStateOf(1f) }
     var warning by remember { mutableStateOf("") }
     val model=when(kind) {
@@ -372,8 +374,13 @@ fun NativeWorldLabForm() {
                         }.onFailure{warning=it.message?:"This drop test exceeded the supported model."}
                     }) { Text("Drop this solid") }
                     OutlinedButton(onClick={
+                        motorThermalEnabled=!motorThermalEnabled
+                        motorResult=null;motorAudit=null;motorPlaying=false
+                    }) { Text(if(motorThermalEnabled)"Coil heating: on" else "Coil heating: off") }
+                    OutlinedButton(onClick={
                         runCatching {
-                            val input=NativeActuatorInput(massKg=derivedMass)
+                            val input=NativeActuatorInput(massKg=derivedMass,
+                                thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
                             val result=NativeWorldLabActuator.evaluate(input)
                             motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
                             motorResult=result;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
@@ -397,6 +404,12 @@ fun NativeWorldLabForm() {
                         Text("Upward force: "+labNumber(sample.motorForceN)+" N")
                         Text("Back-EMF: "+labNumber(sample.backEmfV)+" V")
                         Text("Coil heating: "+labNumber(sample.resistiveHeatW)+" W")
+                        sample.coilTemperatureK?.let{Text("Coil temperature: "+labNumber(it)+" K")}
+                        sample.coilResistanceOhm?.let{Text("Hot resistance: "+labNumber(it)+" Ω")}
+                        if(sample.coilTemperatureK!=null){
+                            Text("Stored coil heat: "+labNumber(sample.thermalEnergyJ)+" J")
+                            Text("Cooling: "+labNumber(sample.coolingPowerW)+" W")
+                        }
                         Text("Energy balance residual: "+labNumber(sample.energyResidualJ)+" J")
                         motorAudit?.let { audit ->
                             Text("Numerical self-check: "+audit.status+". "+audit.explanation)

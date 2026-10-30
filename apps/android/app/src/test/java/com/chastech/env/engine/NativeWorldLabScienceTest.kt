@@ -89,6 +89,20 @@ class NativeWorldLabScienceTest {
         assertTrue(first.maximumEnergyResidualFraction.isFinite())
         assertNotEquals("unavailable",first.status)
     }
+    @Test fun thermalCoilFeedsBackAndRecordsHeatAsStoredEnergy() {
+        val original=NativeActuatorInput(massKg=1.0)
+        val hot=original.copy(thermal=NativeActuatorThermal())
+        val base=NativeWorldLabActuator.evaluate(original)
+        val result=NativeWorldLabActuator.evaluate(hot)
+        assertEquals("1.1.0",result.modelVersion)
+        assertTrue(result.samples.last().coilTemperatureK!!>293.15)
+        assertTrue(result.samples.last().coilResistanceOhm!!>2.0)
+        assertTrue(result.samples.last().thermalEnergyJ>0)
+        assertNotEquals(base.samples.last().currentA,result.samples.last().currentA)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabActuator.evaluate(hot.copy(thermal=NativeActuatorThermal(heatCapacityJPerK=0.0)))
+        }
+    }
     @Test fun noVoltageDoesNotCreateFictitiousLift() {
         val run=NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg=1.0,supplyVoltageV=0.0))
         assertTrue(run.samples.all{it.heightM==0.0 && it.currentA==0.0})

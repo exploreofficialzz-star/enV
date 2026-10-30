@@ -7,6 +7,13 @@ import kotlin.math.*
  * force per ampere and speed-induced back-EMF; this is an illustrative
  * reference, NOT certified motor/aircraft/material performance.
  */
+data class NativeActuatorThermal(
+    val initialTemperatureK:Double=293.15,
+    val ambientTemperatureK:Double=293.15,
+    val heatCapacityJPerK:Double=80.0,
+    val coolingWPerK:Double=0.3,
+    val resistanceTemperatureCoefficientPerK:Double=0.004
+)
 data class NativeActuatorInput(
     val massKg:Double,
     val gravityMps2:Double=9.80665,
@@ -16,7 +23,8 @@ data class NativeActuatorInput(
     val inductanceH:Double=0.3,
     val forceConstantNPerA:Double=8.0,
     val dampingNsPerM:Double=0.5,
-    val durationSeconds:Double=4.0
+    val durationSeconds:Double=4.0,
+    val thermal:NativeActuatorThermal?=null
 )
 data class NativeActuatorSample(
     val timeSeconds:Double,
@@ -32,7 +40,11 @@ data class NativeActuatorSample(
     val magneticEnergyJ:Double,
     val energyResidualJ:Double,
     val suppliedEnergyJ:Double,
-    val dissipatedEnergyJ:Double
+    val dissipatedEnergyJ:Double,
+    val coilTemperatureK:Double?=null,
+    val coilResistanceOhm:Double?=null,
+    val thermalEnergyJ:Double=0.0,
+    val coolingPowerW:Double=0.0
 )
 data class NativeActuatorNumericalAudit(
     val status:String,
@@ -51,23 +63,31 @@ object NativeWorldLabActuator {
     private fun bounded(n:Double,low:Double,high:Double,label:String){
         require(n.isFinite()&&n>=low&&n<=high){"$label outside scientific reference limits"}
     }
+    private fun resistance(i:NativeActuatorInput,t:Double):Double {
+        val params=i.thermal?:return i.resistanceOhm
+        return i.resistanceOhm*(1+params.resistanceTemperatureCoefficientPerK*(t-params.ambientTemperatureK))
+    }
     private fun derivative(s:DoubleArray,i:NativeActuatorInput):DoubleArray{
-        val v=s[1];val current=s[2]
+        val v=s[1];val current=s[2];val t=s[3]
+        val r=resistance(i,t)
+        val heat=r*current*current
+        val cooling=i.thermal?.let{it.coolingWPerK*(t-it.ambientTemperatureK)}?:0.0
+        val heating=i.thermal?.let{(heat-cooling)/it.heatCapacityJPerK}?:0.0
         // At a resting unilateral stop the object cannot move downward or
         // induce a generator current until the coil can lift its weight.
         if(s[0]<=0.0 && v<=0.0 && i.forceConstantNPerA*current<=i.massKg*i.gravityMps2)
-            return doubleArrayOf(0.0,0.0,(i.supplyVoltageV-i.resistanceOhm*current)/i.inductanceH)
+            return doubleArrayOf(0.0,0.0,(i.supplyVoltageV-r*current)/i.inductanceH,heating)
         return doubleArrayOf(v,
             (i.forceConstantNPerA*current-i.dampingNsPerM*v)/i.massKg-i.gravityMps2,
-            (i.supplyVoltageV-i.resistanceOhm*current-i.forceConstantNPerA*v)/i.inductanceH)
+            (i.supplyVoltageV-r*current-i.forceConstantNPerA*v)/i.inductanceH,heating)
     }
     private fun step(s:DoubleArray,i:NativeActuatorInput,dt:Double,clamp:Boolean):DoubleArray{
         val k1=derivative(s,i)
-        fun shifted(k:DoubleArray,f:Double)=DoubleArray(3){j->s[j]+dt*k[j]*f}
+        fun shifted(k:DoubleArray,f:Double)=DoubleArray(4){j->s[j]+dt*k[j]*f}
         val k2=derivative(shifted(k1,0.5),i)
         val k3=derivative(shifted(k2,0.5),i)
         val k4=derivative(shifted(k3,1.0),i)
-        val n=DoubleArray(3){j->s[j]+dt*(k1[j]+2*k2[j]+2*k3[j]+k4[j])/6}
+        val n=DoubleArray(4){j->s[j]+dt*(k1[j]+2*k2[j]+2*k3[j]+k4[j])/6}
         if(clamp&&(n[0]<0||(n[0]==0.0&&n[1]<0))) {n[0]=0.0;n[1]=0.0}
         return n
     }
@@ -82,38 +102,63 @@ object NativeWorldLabActuator {
         bounded(i.dampingNsPerM,0.0,100000.0,"Damping")
         bounded(i.durationSeconds,0.1,12.0,"Duration")
         bounded(requestedStepSeconds,0.0001,0.05,"Step")
+        i.thermal?.let{t->
+            bounded(t.initialTemperatureK,1.0,1500.0,"Initial temperature")
+            bounded(t.ambientTemperatureK,1.0,1500.0,"Ambient temperature")
+            bounded(t.heatCapacityJPerK,1.0,1000000.0,"Heat capacity")
+            bounded(t.coolingWPerK,0.0,10000.0,"Cooling")
+            bounded(t.resistanceTemperatureCoefficientPerK,0.0,0.02,"Temperature coefficient")
+            require(resistance(i,t.initialTemperatureK)>=0.01){"Initial hot resistance is invalid"}
+        }
         val rate=max(1.0,max(i.resistanceOhm/i.inductanceH,
             max(i.dampingNsPerM/i.massKg,i.forceConstantNPerA/sqrt(i.inductanceH*i.massKg))))
         val steps=ceil(i.durationSeconds/min(requestedStepSeconds,0.06/rate)).toInt()
         require(steps<=50000){"The actuator needs a specialized stiff solver"}
         val dt=i.durationSeconds/steps
-        var state=doubleArrayOf(i.initialHeightM,0.0,0.0)
+        val temp0=i.thermal?.initialTemperatureK?:293.15
+        var state=doubleArrayOf(i.initialHeightM,0.0,0.0,temp0)
         var supplied=0.0;var dissipated=0.0
         val initialEnergy=i.massKg*i.gravityMps2*i.initialHeightM
         val output=ArrayList<NativeActuatorSample>(steps+1)
         for(n in 0..steps){
-            val h=state[0];val v=state[1];val a=state[2]
+            val h=state[0];val v=state[1];val a=state[2];val t=state[3]
+            val r=resistance(i,t)
+            val heat=r*a*a
+            val cooling=i.thermal?.let{it.coolingWPerK*(t-it.ambientTemperatureK)}?:0.0
+            val stored=i.thermal?.let{it.heatCapacityJPerK*(t-temp0)}?:0.0
             val ke=0.5*i.massKg*v*v
             val pe=i.massKg*i.gravityMps2*h
             val magnetic=0.5*i.inductanceH*a*a
-            require(listOf(h,v,a,ke,pe,magnetic,supplied,dissipated).all{it.isFinite()} &&
-                abs(a)<1e7&&abs(v)<1e5&&h<1e5){"Actuator exceeded stability envelope"}
+            require(listOf(h,v,a,t,r,stored,ke,pe,magnetic,supplied,dissipated).all{it.isFinite()} &&
+                r>=0.01&&r<=1e6&&t>=1&&t<=2000&&abs(a)<1e7&&abs(v)<1e5&&h<1e5){"Actuator exceeded stability envelope"}
             output.add(NativeActuatorSample(
                 n*dt,h,v,a,i.forceConstantNPerA*a,i.forceConstantNPerA*v,
-                i.resistanceOhm*a*a,i.supplyVoltageV*a,ke,pe,magnetic,
-                supplied+initialEnergy-ke-pe-magnetic-dissipated,supplied,dissipated))
+                heat,i.supplyVoltageV*a,ke,pe,magnetic,
+                supplied+initialEnergy-ke-pe-magnetic-stored-dissipated,supplied,dissipated,
+                coilTemperatureK=if(i.thermal==null)null else t,
+                coilResistanceOhm=if(i.thermal==null)null else r,
+                thermalEnergyJ=stored,coolingPowerW=cooling))
             if(n==steps)break
             val next=step(state,i,dt,true)
             val c2=next[2];val v2=next[1]
             supplied+=0.5*dt*i.supplyVoltageV*(a+c2)
-            dissipated+=0.5*dt*(i.resistanceOhm*(a*a+c2*c2)+i.dampingNsPerM*(v*v+v2*v2))
+            val t2=next[3]
+            val heat2=resistance(i,t2)*c2*c2
+            val cooling2=i.thermal?.let{it.coolingWPerK*(t2-it.ambientTemperatureK)}?:0.0
+            val loss1=i.dampingNsPerM*v*v+(if(i.thermal==null)heat else cooling)
+            val loss2=i.dampingNsPerM*v2*v2+(if(i.thermal==null)heat2 else cooling2)
+            dissipated+=0.5*dt*(loss1+loss2)
             if(next[0]==0.0 && v2==0.0 && (h>0||v<0)){
                 val raw=step(state,i,dt,false)
                 if(raw[1]<0)dissipated+=0.5*i.massKg*raw[1]*raw[1]
             }
             state=next
         }
-        return NativeActuatorResult(output,dt)
+        return NativeActuatorResult(output,dt,
+            modelVersion=if(i.thermal==null)"1.0.0" else "1.1.0",
+            validity=if(i.thermal==null)"Bounded 1D R-L actuator with hypothetical inputs."
+                else "Bounded 1D electrical, thermal and mechanical coupling with "+
+                    "hypothetical heat capacity, cooling and resistance feedback; not certified.")
     }
 
     /**
@@ -121,20 +166,20 @@ object NativeWorldLabActuator {
      * reference model. Internal numerical consistency is not measured proof.
      */
     fun numericalAudit(input:NativeActuatorInput,run:NativeActuatorResult):NativeActuatorNumericalAudit {
-        require(run.modelVersion=="1.0.0" && run.samples.size>=2 &&
+        require((run.modelVersion=="1.0.0"||run.modelVersion=="1.1.0") && run.samples.size>=2 &&
             run.stepSeconds.isFinite() && run.stepSeconds>0) {
             "A completed native actuator trajectory is required"
         }
         val start=run.samples.first()
-        val initial=start.kineticEnergyJ+start.gravityEnergyJ+start.magneticEnergyJ
+        val initial=start.kineticEnergyJ+start.gravityEnergyJ+start.magneticEnergyJ+start.thermalEnergyJ
         var worstEnergy=0.0
         for(s in run.samples) {
             require(listOf(s.energyResidualJ,s.suppliedEnergyJ,s.dissipatedEnergyJ,
-                s.kineticEnergyJ,s.gravityEnergyJ,s.magneticEnergyJ).all{it.isFinite()}) {
+                s.kineticEnergyJ,s.gravityEnergyJ,s.magneticEnergyJ,s.thermalEnergyJ).all{it.isFinite()}) {
                 "Non-finite native actuator energy evidence"
             }
             val scale=maxOf(1.0,abs(initial)+abs(s.suppliedEnergyJ),
-                abs(s.kineticEnergyJ)+abs(s.gravityEnergyJ)+abs(s.magneticEnergyJ)+
+                abs(s.kineticEnergyJ)+abs(s.gravityEnergyJ)+abs(s.magneticEnergyJ)+abs(s.thermalEnergyJ)+
                     abs(s.dissipatedEnergyJ))
             worstEnergy=max(worstEnergy,abs(s.energyResidualJ)/scale)
         }
