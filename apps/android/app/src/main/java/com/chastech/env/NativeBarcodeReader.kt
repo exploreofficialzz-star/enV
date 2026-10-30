@@ -291,6 +291,11 @@ fun NativeBarcodeReaderTool() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     var cameraActive by remember { mutableStateOf(false) }
+    var activeCamera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
+    var cameraTorchAvailable by remember { mutableStateOf(false) }
+    var torchEnabled by remember { mutableStateOf(false) }
+    var zoomRatio by remember { mutableStateOf(1f) }
+    var maxZoomRatio by remember { mutableStateOf(1f) }
     var status by remember { mutableStateOf("Choose Start camera or Read image. Decoding stays on this device.") }
     var error by remember { mutableStateOf("") }
     val recentScans = remember(context) {
@@ -403,7 +408,14 @@ fun NativeBarcodeReaderTool() {
                     previewUseCase = preview
                     analysisUseCase = analysis
                     provider.unbindAll()
-                    provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                    val boundCamera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                    activeCamera = boundCamera
+                    cameraTorchAvailable = boundCamera.cameraInfo.hasFlashUnit()
+                    torchEnabled = false
+                    boundCamera.cameraInfo.zoomState.value?.let { zoom ->
+                        zoomRatio = zoom.zoomRatio
+                        maxZoomRatio = zoom.maxZoomRatio
+                    }
                     mainHandler.post { status = "Scanner ready. Hold the code inside the camera view."; error = "" }
                 }.onFailure { cause ->
                     mainHandler.post {
@@ -414,6 +426,12 @@ fun NativeBarcodeReaderTool() {
             }, ContextCompat.getMainExecutor(context))
             onDispose {
                 disposed.set(true)
+                activeCamera?.cameraControl?.enableTorch(false)
+                activeCamera = null
+                cameraTorchAvailable = false
+                torchEnabled = false
+                zoomRatio = 1f
+                maxZoomRatio = 1f
                 runCatching { analysisUseCase?.clearAnalyzer() }
                 runCatching {
                     val provider = cameraProvider ?: if (providerFuture.isDone) providerFuture.get() else null
@@ -440,6 +458,49 @@ fun NativeBarcodeReaderTool() {
         }
         if (cameraActive && cameraPermission) {
             AndroidView(factory = { previewView }, modifier = Modifier.fillMaxWidth().height(260.dp))
+            if (cameraTorchAvailable || maxZoomRatio > 1.01f) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (cameraTorchAvailable) {
+                        OutlinedButton(onClick = {
+                            val next = !torchEnabled
+                            val future = activeCamera?.cameraControl?.enableTorch(next)
+                            future?.addListener({
+                                runCatching { future.get() }.fold(
+                                    onSuccess = { torchEnabled = next },
+                                    onFailure = { failure -> error = failure.message ?: "Could not change the camera light." },
+                                )
+                            }, ContextCompat.getMainExecutor(context))
+                        }) { Text(if (torchEnabled) "Light on" else "Light") }
+                    }
+                    if (maxZoomRatio > 1.01f) {
+                        OutlinedButton(onClick = {
+                            val next = (zoomRatio / 1.25f).coerceAtLeast(1f)
+                            val future = activeCamera?.cameraControl?.setZoomRatio(next)
+                            future?.addListener({
+                                runCatching { future.get() }.fold(
+                                    onSuccess = {
+                                        activeCamera?.cameraInfo?.zoomState?.value?.let { zoomRatio = it.zoomRatio }
+                                    },
+                                    onFailure = { failure -> error = failure.message ?: "Could not adjust camera zoom." },
+                                )
+                            }, ContextCompat.getMainExecutor(context))
+                        }, enabled = zoomRatio > 1.01f) { Text("− Zoom") }
+                        OutlinedButton(onClick = {
+                            val next = (zoomRatio * 1.25f).coerceAtMost(maxZoomRatio)
+                            val future = activeCamera?.cameraControl?.setZoomRatio(next)
+                            future?.addListener({
+                                runCatching { future.get() }.fold(
+                                    onSuccess = {
+                                        activeCamera?.cameraInfo?.zoomState?.value?.let { zoomRatio = it.zoomRatio }
+                                    },
+                                    onFailure = { failure -> error = failure.message ?: "Could not adjust camera zoom." },
+                                )
+                            }, ContextCompat.getMainExecutor(context))
+                        }, enabled = zoomRatio < maxZoomRatio - 0.01f) { Text("+ Zoom") }
+                        Text(String.format(Locale.US, "%.1fx", zoomRatio), modifier = Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
         } else {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Text("Camera is off. Camera access is requested only after you tap Start camera.", modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.bodySmall)
