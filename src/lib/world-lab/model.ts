@@ -2,11 +2,11 @@ import { z } from "zod";
 
 /** A bounded, explicitly simplified classical-mechanics experiment; not a universal physical solver. */
 const scalar = z.number().finite();
-const vector = z.object({ x: scalar, y: scalar, z: scalar }).strict();
+const vector = z.object({ x: scalar.min(-1000000).max(1000000), y: scalar.min(-1000000).max(1000000), z: scalar.min(-1000000).max(1000000) }).strict();
 const positiveVector = z.object({
-  x: scalar.gt(0).max(1000),
-  y: scalar.gt(0).max(1000),
-  z: scalar.gt(0).max(1000),
+  x: scalar.min(0.05).max(1000),
+  y: scalar.min(0.05).max(1000),
+  z: scalar.min(0.05).max(1000),
 }).strict();
 const objectSchema = z.object({
   id: z.string().min(1).max(120),
@@ -21,7 +21,7 @@ const objectSchema = z.object({
   opacity: scalar.min(0.05).max(1),
   material: z.object({
     name: z.string().min(1).max(120),
-    densityKgM3: scalar.gt(0).max(50000),
+    densityKgM3: scalar.min(1).max(50000),
     evidence: z.enum(["measured", "reference", "hypothetical"]),
     source: z.string().max(500),
   }).strict(),
@@ -129,6 +129,7 @@ export function advanceWorld(project: WorldLabProject, simulatedSeconds: number)
     for (const item of next) {
       if (item.behavior === "static") continue;
       const mass = massKg(item);
+      if (!Number.isFinite(mass) || mass < 1e-10) throw new Error("Material mass is outside the supported mechanics model.");
       const velocity = item.velocityMps;
       const position = item.positionM;
       const speed = Math.hypot(velocity.x, velocity.y, velocity.z);
@@ -140,6 +141,10 @@ export function advanceWorld(project: WorldLabProject, simulatedSeconds: number)
       position.x += velocity.x * dt;
       position.y += velocity.y * dt;
       position.z += velocity.z * dt;
+      if (![position.x, position.y, position.z, velocity.x, velocity.y, velocity.z].every(Number.isFinite)
+          || Math.hypot(velocity.x, velocity.y, velocity.z) > 1e6
+          || Math.hypot(position.x, position.y, position.z) > 1e7)
+        throw new Error("The model exceeded its stability envelope. Reduce applied force, time speed or change the object parameters.");
       const floor = groundY + supportingRadiusM(item);
       if (position.y <= floor) {
         position.y = floor;
