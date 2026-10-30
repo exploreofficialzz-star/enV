@@ -55,12 +55,22 @@ enum NativeWorldLabActuator {
     private static func step(_ s:[Double],_ i:NativeActuatorInput,_ dt:Double,clamp:Bool)->[Double] {
         let k1=derivative(s,i)
         func shifted(_ k:[Double],_ f:Double)->[Double] {
-            return (0..<3).map{j in s[j]+dt*k[j]*f}
+            let increment:Double=dt*f
+            return [
+                s[0]+increment*k[0],
+                s[1]+increment*k[1],
+                s[2]+increment*k[2]
+            ]
         }
         let k2=derivative(shifted(k1,0.5),i)
         let k3=derivative(shifted(k2,0.5),i)
         let k4=derivative(shifted(k3,1),i)
-        var n=(0..<3).map{j in s[j]+dt*(k1[j]+2*k2[j]+2*k3[j]+k4[j])/6}
+        let scale:Double=dt/6
+        var n:[Double]=[
+            s[0]+scale*(k1[0]+2*k2[0]+2*k3[0]+k4[0]),
+            s[1]+scale*(k1[1]+2*k2[1]+2*k3[1]+k4[1]),
+            s[2]+scale*(k1[2]+2*k2[2]+2*k3[2]+k4[2])
+        ]
         if clamp && (n[0]<0 || (n[0]==0 && n[1]<0)) {
             n[0]=0;n[1]=0
         }
