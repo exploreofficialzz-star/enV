@@ -95,4 +95,21 @@ class NativeDateTimeEngineTest {
         assertTrue(meeting.contains("Option 1:"))
         assertTrue(meeting.contains("ICS for option 1:"))
     }
+
+    @Test fun repeatedDaylightSavingTimeSelectsEarlierOccurrenceAndExplainsIt() {
+        val result = NativeDateTimeEngine.run("timezone-converter", options = mapOf(
+            "time" to "2024-11-03T01:30", "fromTz" to "America/New_York", "toTz" to "UTC"
+        ), now = fixedNow)
+        assertTrue(result.output.contains("Unix seconds: 1730611800"))
+        assertTrue(result.output.contains("DST note: This local time occurs twice; the earlier occurrence was selected."))
+    }
+
+    @Test fun invalidCustomHolidayDateIsRejected() {
+        try {
+            NativeDateTimeEngine.run("business-day-calculator", options = mapOf(
+                "from" to "2024-01-05", "to" to "2024-01-09", "excludedDates" to "2024-02-30"
+            ), now = fixedNow)
+            throw AssertionError("invalid excluded date should not be ignored")
+        } catch (_: IllegalArgumentException) { }
+    }
 }

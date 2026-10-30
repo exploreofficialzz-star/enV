@@ -90,4 +90,18 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertEqual(dateAdd.output, "Result: 2024-02-29 Thursday\nDate: 2024-02-29")
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow).output, "Result: 2024-01-05 Friday")
     }
+
+    func testRepeatedDaylightSavingTimeChoosesEarlierOccurrenceAndExplainsIt() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "timezone-converter", options: [
+            "time": "2024-11-03T01:30", "fromTz": "America/New_York", "toTz": "UTC"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("Unix seconds: 1730611800"))
+        XCTAssertTrue(result.output.contains("DST note: This local time occurs twice; the earlier occurrence was selected."))
+    }
+
+    func testInvalidCustomHolidayDateIsRejected() throws {
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "business-day-calculator", options: [
+            "from": "2024-01-05", "to": "2024-01-09", "excludedDates": "2024-02-30"
+        ], now: fixedNow))
+    }
 }

@@ -42,6 +42,14 @@ assert.match(converted.find((row) => row.label === "In America/New_York")?.value
 assert.throws(() => runDateTime("timezone", {
   time: "2024-03-10T02:30", fromTz: "America/New_York", toTz: "UTC",
 }), /does not exist/);
+const repeatedTime = runDateTime("timezone", {
+  time: "2024-11-03T01:30", fromTz: "America/New_York", toTz: "UTC",
+});
+assert.equal(repeatedTime.find((row) => row.label === "Unix seconds")?.value, "1730611800");
+assert.match(repeatedTime.find((row) => row.label === "DST note")?.value ?? "", /earlier occurrence was selected/);
+assert.throws(() => runDateTime("business-days", {
+  from: "2024-01-05", to: "2024-01-09", excludedDates: "2024-02-30",
+}), /Invalid date|excluded date/i);
 
 assert.equal(runDateTime("business-days", {
   from: "2024-01-05", to: "2024-01-09", includeEnd: "true", excludedDates: "2024-01-08",

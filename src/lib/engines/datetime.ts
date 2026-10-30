@@ -211,7 +211,19 @@ function parseWeekendDays(value?: string): Set<number> {
 }
 
 function parseExcludedDates(value?: string): Set<string> {
-  return new Set((value || "").split(/[\r\n,;]+/).map((item) => item.trim()).filter(Boolean));
+  const items = (value || "").split(/[\r\n,;]+/).map((item) => item.trim()).filter(Boolean);
+  const excluded = new Set<string>();
+  for (const item of items) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(item)) {
+      throw new Error(`Invalid excluded date: \${item}. Use YYYY-MM-DD.`);
+    }
+    const parsed = parseDate(item, "excluded date");
+    if (dateKey(parsed) !== item) {
+      throw new Error(`Invalid excluded date: \${item}. Use a real calendar date in YYYY-MM-DD format.`);
+    }
+    excluded.add(item);
+  }
+  return excluded;
 }
 
 function dateKey(date: Date): string {

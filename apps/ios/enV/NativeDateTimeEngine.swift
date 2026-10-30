@@ -105,30 +105,12 @@ public enum NativeDateTimeEngine {
         case "timezone":
             let fromName = options["fromTz"]?.isEmpty == false ? options["fromTz"]! : "UTC"
             let toName = options["toTz"]?.isEmpty == false ? options["toTz"]! : "America/New_York"
-            guard let fromZone = TimeZone(identifier: fromName), let toZone = TimeZone(identifier: toName) else {
-                throw NativeDateTimeError.invalidOperation("Unknown or unsupported time zone.")
-            }
-            let raw = options["time"] ?? ""
-            let instant: Date
-            if raw.hasSuffix("Z") || raw.range(of: "[+-]\\d{2}:\\d{2}$", options: .regularExpression) != nil {
-                instant = try parseDate(raw, label: "time")
-            } else {
-                let parts = raw.split(separator: "T", maxSplits: 1).map(String.init)
-                guard parts.count == 2 else { throw NativeDateTimeError.invalidOperation("Enter source local time as YYYY-MM-DDTHH:mm.") }
-                let formatter = DateFormatter()
-                formatter.locale = Locale(identifier: "en_US_POSIX")
-                formatter.timeZone = fromZone
-                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-                formatter.isLenient = false
-                let time = parts[1].count == 5 ? parts[1] + ":00" : parts[1]
-                guard let parsed = formatter.date(from: parts[0] + " " + time),
-                      formatter.string(from: parsed) == parts[0] + " " + time else {
-                    throw NativeDateTimeError.invalidOperation("That local time is invalid or falls in a daylight-saving clock gap.")
-                }
-                instant = parsed
-            }
-            var sourceCalendar = Calendar(identifier: .gregorian); sourceCalendar.timeZone = fromZone
-            var destinationCalendar = Calendar(identifier: .gregorian); destinationCalendar.timeZone = toZone
+            let fromChoice = try resolveZone(fromName)
+            let toChoice = try resolveZone(toName)
+            let converted = try parseWallTimeInZone(options["time"] ?? "", zone: fromChoice.zone)
+            let instant = converted.instant
+            var sourceCalendar = Calendar(identifier: .gregorian); sourceCalendar.timeZone = fromChoice.zone
+            var destinationCalendar = Calendar(identifier: .gregorian); destinationCalendar.timeZone = toChoice.zone
             let source = sourceCalendar.dateComponents([.year, .month, .day], from: instant)
             let destination = destinationCalendar.dateComponents([.year, .month, .day], from: instant)
             var utcCalendar = Calendar(identifier: .gregorian); utcCalendar.timeZone = utc
@@ -136,7 +118,16 @@ public enum NativeDateTimeEngine {
             let destinationDay = utcCalendar.date(from: destination)!
             let dayShift = calendar(.gregorian).dateComponents([.day], from: sourceDay, to: destinationDay).day ?? 0
             let dayText = dayShift == 0 ? "Same calendar day" : dayShift > 0 ? "\(dayShift) day(s) later" : "\(-dayShift) day(s) earlier"
-            return result(("In \(fromName)", localizedMedium(instant, zone: fromZone, locale: Locale(identifier: "en_GB"))), ("In \(toName)", localizedMedium(instant, zone: toZone, locale: Locale(identifier: "en_GB"))), ("Date change", dayText), ("Unix seconds", String(Int(instant.timeIntervalSince1970))))
+            var rows: [(String, String)] = [
+                ("In \(fromName)", "\(localizedMedium(instant, zone: fromChoice.zone, locale: Locale(identifier: "en_GB"))) · \(offsetLabel(instant, zone: fromChoice.zone))"),
+                ("In \(toName)", "\(localizedMedium(instant, zone: toChoice.zone, locale: Locale(identifier: "en_GB"))) · \(offsetLabel(instant, zone: toChoice.zone))"),
+                ("Date change", dayText),
+                ("Unix seconds", String(Int(instant.timeIntervalSince1970)))
+            ]
+            if converted.overlap {
+                rows.append(("DST note", "This local time occurs twice; the earlier occurrence was selected."))
+            }
+            return NativeDateTimeResult(rows: rows.map { NativeDateTimeRow(label: $0.0, value: $0.1) })
         case "unix":
             return try unix(options["value"] ?? input)
         case "format":
@@ -273,6 +264,61 @@ public enum NativeDateTimeEngine {
     private static func localizedMedium(_ date: Date, zone: TimeZone, locale: Locale) -> String { let f = DateFormatter(); f.locale = locale; f.timeZone = zone; f.dateStyle = .medium; f.timeStyle = .medium; return f.string(from: date) }
     private static func isoString(_ date: Date) -> String { let f = ISO8601DateFormatter(); f.timeZone = utc; f.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]; return f.string(from: date) }
     private static func format(_ date: Date, pattern: String) -> String { let f = DateFormatter(); f.locale = Locale(identifier: "en_GB"); f.calendar = calendar(.gregorian); f.timeZone = utc; f.dateFormat = pattern.replacingOccurrences(of: "do", with: "d"); return f.string(from: date) }
+
+    private struct ZonedWallTime {
+        let instant: Date
+        let overlap: Bool
+    }
+
+    private static func parseWallTimeInZone(_ rawValue: String, zone: TimeZone) throws -> ZonedWallTime {
+        let raw = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.hasSuffix("Z") || raw.range(of: "[+-]\\d{2}:\\d{2}$", options: .regularExpression) != nil {
+            return ZonedWallTime(instant: try parseDate(raw, label: "time"), overlap: false)
+        }
+        let parts = raw.split(separator: "T", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+              parts[1].range(of: "^\\d{2}:\\d{2}(:\\d{2})?$", options: .regularExpression) != nil else {
+            throw NativeDateTimeError.invalidOperation("Enter a local time as YYYY-MM-DDTHH:mm, or include an explicit UTC offset.")
+        }
+        let date = try dateOnly(parts[0], label: "time")
+        let time = parts[1].split(separator: ":").compactMap { Int($0) }
+        guard time.count == 2 || time.count == 3,
+              time[0] <= 23, time[1] <= 59, (time.count == 2 || time[2] <= 59) else {
+            throw NativeDateTimeError.invalidOperation("Enter a valid local time.")
+        }
+        let dateParts = calendar(.gregorian).dateComponents([.year, .month, .day], from: date)
+        let second = time.count == 3 ? time[2] : 0
+        var wallCalendar = Calendar(identifier: .gregorian)
+        wallCalendar.timeZone = zone
+        let matching = DateComponents(
+            year: dateParts.year, month: dateParts.month, day: dateParts.day,
+            hour: time[0], minute: time[1], second: second
+        )
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = utc
+        guard let naive = utcCalendar.date(from: matching) else {
+            throw NativeDateTimeError.invalidOperation("Enter a valid local date and time.")
+        }
+        let searchStart = naive.addingTimeInterval(-48 * 60 * 60)
+        func matchesLocalWallTime(_ candidate: Date) -> Bool {
+            let resolved = wallCalendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: candidate)
+            return resolved.year == dateParts.year && resolved.month == dateParts.month &&
+                resolved.day == dateParts.day && resolved.hour == time[0] &&
+                resolved.minute == time[1] && resolved.second == second
+        }
+        guard let first = wallCalendar.nextDate(
+            after: searchStart, matching: matching,
+            matchingPolicy: .strict, repeatedTimePolicy: .first, direction: .forward
+        ), abs(first.timeIntervalSince(naive)) < 48 * 60 * 60, matchesLocalWallTime(first) else {
+            throw NativeDateTimeError.invalidOperation("That local time does not exist in this time zone because the clock moves forward for daylight saving time. Choose another time.")
+        }
+        let last = wallCalendar.nextDate(
+            after: searchStart, matching: matching,
+            matchingPolicy: .strict, repeatedTimePolicy: .last, direction: .forward
+        )
+        let overlap = last.map { $0 != first && abs($0.timeIntervalSince(naive)) < 48 * 60 * 60 && matchesLocalWallTime($0) } ?? false
+        return ZonedWallTime(instant: first, overlap: overlap)
+    }
 
     private struct ZoneChoice {
         let label: String
