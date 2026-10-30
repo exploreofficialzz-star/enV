@@ -59,6 +59,12 @@ jobs:
       - name: Verify 3D project format
         run: npm run check:game-studio
 
+      - name: Verify World Lab scientific model and migration contracts
+        run: npm run check:world-lab
+
+      - name: Exercise World Lab in the browser
+        run: npm run audit:world-lab:browser
+
       - name: Exercise 3D Studio and exported game in the browser
         run: npm run audit:game-studio:browser
 
