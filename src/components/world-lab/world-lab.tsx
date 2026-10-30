@@ -66,6 +66,7 @@ export default function WorldLab() {
   const [heat, setHeat] = useState(defaultHeat);
   const [runs, setRuns] = useState<LabRun[]>([]);
   const [runId, setRunId] = useState("");
+  const [comparisonRunId, setComparisonRunId] = useState("");
   const [dirty, setDirty] = useState(false);
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
@@ -92,6 +93,17 @@ export default function WorldLab() {
   const currentRun = useMemo(() => runs.find((run) => run.id === runId) ?? null, [runs, runId]);
   const sample = currentRun ? sampleRun(currentRun, timeSeconds) : null;
   const trace = useMemo(() => currentRun ? buildScientificTimeTrace(currentRun) : null, [currentRun]);
+  const compatibleRuns = runs.filter(run => currentRun &&
+    run.id !== currentRun.id &&
+    run.modelId === currentRun.modelId &&
+    run.time.simulatedDurationSeconds === currentRun.time.simulatedDurationSeconds);
+  const comparisonRun = compatibleRuns.find(run => run.id === comparisonRunId) ?? null;
+  const comparisonSample = comparisonRun ? sampleRun(comparisonRun,
+    Math.min(timeSeconds, comparisonRun.time.simulatedDurationSeconds)) : null;
+  const currentTraceValue = trace && sample ? sample[trace.metric] : null;
+  const comparisonTraceValue = trace && comparisonSample ? comparisonSample[trace.metric] : null;
+  const comparedDifference = typeof currentTraceValue === "number" &&
+    typeof comparisonTraceValue === "number" ? currentTraceValue - comparisonTraceValue : null;
 
   useEffect(() => {
     try {
@@ -327,6 +339,7 @@ export default function WorldLab() {
       });
       setRuns((previous) => [...previous.slice(-6), next]);
       setRunId(next.id);
+      setComparisonRunId("");
       setTimeSeconds(0);
       setDirty(false);
       setPlaying(true);
@@ -447,7 +460,7 @@ export default function WorldLab() {
       setSavedRevision(null);
       setWorkspaceDirty(true);
       setSelectedEntityId("");
-      setRuns([]);setRunId("");setPlaying(false);setTimeSeconds(0);
+      setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
       setImportWarnings(warnings);
       setMessage("Imported a local project copy. Save it to keep it on this device.");
     }catch(cause){setError(cause instanceof Error?cause.message:"This file could not be imported.");}
@@ -457,14 +470,14 @@ export default function WorldLab() {
     if(!saved)return;
     if(workspaceDirty && !window.confirm("Discard unsaved local edits and open another project?"))return;
     setProject(saved);setSavedRevision(saved.revision);setWorkspaceDirty(false);
-    setSelectedEntityId("");setRuns([]);setRunId("");setPlaying(false);setTimeSeconds(0);
+    setSelectedEntityId("");setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     setMessage("Opened saved project "+saved.title+".");
   }
   function newProject(){
     if(workspaceDirty && !window.confirm("Discard unsaved local edits and create a new project?"))return;
     setProject(blankWorldLabProject(crypto.randomUUID(),new Date().toISOString()));
     setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
-    setRuns([]);setRunId("");setPlaying(false);setTimeSeconds(0);
+    setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     setMessage("New local World Lab project created.");
   }
   function addMaterial() {
@@ -664,7 +677,7 @@ export default function WorldLab() {
           <select id="worldlab-model" className={inputLabel} value={modelKind}
             onChange={(event) => {
               setModelKind(event.target.value as ModelInput["kind"]);
-              setPlaying(false); setDirty(true); setRunId(""); setTimeSeconds(0);
+              setPlaying(false); setDirty(true); setRunId(""); setComparisonRunId(""); setTimeSeconds(0);
             }}>
             <option value="damped-oscillator">Spring and moving mass</option>
             <option value="rc-circuit">Battery and capacitor (RC)</option>
@@ -739,6 +752,45 @@ export default function WorldLab() {
               value={timeSeconds} disabled={!currentRun}
               onChange={(event) => { setPlaying(false); setTimeSeconds(Number(event.target.value)); }} />
           </div>
+          {runs.length > 0 && (
+            <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+              <label htmlFor="worldlab-run-history" className="block font-medium">
+                Open recorded run (this session)
+              </label>
+              <select id="worldlab-run-history" className={inputLabel} value={runId}
+                onChange={event=>{
+                  const chosen=runs.find(run=>run.id===event.target.value);
+                  if(!chosen)return;
+                  setRunId(chosen.id);setComparisonRunId("");setTimeSeconds(0);
+                  setPlaying(false);setDirty(false);setModelKind(chosen.inputs.kind);
+                  if(chosen.inputs.kind==="damped-oscillator")setMechanical(chosen.inputs);
+                  else if(chosen.inputs.kind==="rc-circuit")setCircuit(chosen.inputs);
+                  else setHeat(chosen.inputs);
+                }}>
+                {runs.map((run,index)=><option key={run.id} value={run.id}>
+                  {index+1}. {run.modelId}{run.assumedMassSource?" · assumed material":""}
+                </option>)}
+              </select>
+              {currentRun && compatibleRuns.length>0 && (
+                <>
+                  <label htmlFor="worldlab-compare" className="mt-2 block font-medium">
+                    Compare to run
+                  </label>
+                  <select id="worldlab-compare" className={inputLabel} value={comparisonRunId}
+                    onChange={event=>setComparisonRunId(event.target.value)}>
+                    <option value="">Choose an earlier run</option>
+                    {compatibleRuns.map(run=><option key={run.id} value={run.id}>
+                      {run.modelId}{run.assumedMassSource?" · assumed material":""} · {run.id.slice(0,8)}
+                    </option>)}
+                  </select>
+                </>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Historical runs retain their original inputs. This short session history
+                is not yet cloud synced; export a run to keep it independently.
+              </p>
+            </div>
+          )}
           {dirty && currentRun && <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
             Inputs have changed; the displayed run uses the old parameters. Press Start to calculate a new branch.
           </p>}
@@ -815,6 +867,19 @@ export default function WorldLab() {
               <p className="mt-3 text-xs">Model {currentRun.modelId} v{currentRun.modelVersion};
                 solver Δt {currentRun.time.solverStepSeconds.toPrecision(4)} s;
                 simulation date {currentRun.time.worldDateUTC}.</p>
+              {comparisonRun && comparedDifference!==null && trace && (
+                <div className="mt-3 rounded-lg border border-border p-3 text-sm"
+                  aria-label="Experiment comparison">
+                  <p className="font-medium">Difference at selected time</p>
+                  <p>{trace.label}: current {metric(currentTraceValue as number,trace.unit)};
+                    previous {metric(comparisonTraceValue as number,trace.unit)};
+                    difference {metric(comparedDifference,trace.unit)}.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Computed values sampled from each run's recorded solver steps.
+                    Compare only the same model and duration; no measurement or interpolation.
+                  </p>
+                </div>
+              )}
               {currentRun.assumedMassSource && (
                 <div className="mt-2 rounded-lg border border-border p-3 text-xs" aria-label="Hypothetical material provenance">
                   <p className="font-medium">Derived from an invented solid · user-assumed</p>
