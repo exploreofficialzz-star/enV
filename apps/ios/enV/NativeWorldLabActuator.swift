@@ -108,8 +108,10 @@ enum NativeWorldLabActuator {
             let next=step(state,i,dt,clamp:true)
             let current2=next[2];let velocity2=next[1]
             supplied+=0.5*dt*i.supplyVoltageV*(current+current2)
-            dissipated+=0.5*dt*(i.resistanceOhm*(current*current+current2*current2)
-                +i.dampingNsPerM*(v*v+velocity2*velocity2))
+            dissipated += 0.5 * dt * (
+                i.resistanceOhm * (current * current + current2 * current2) +
+                i.dampingNsPerM * (v * v + velocity2 * velocity2)
+            )
             if next[0]==0 && velocity2==0 && (h>0 || v<0) {
                 let raw=step(state,i,dt,clamp:false)
                 if raw[1]<0 {dissipated+=0.5*i.massKg*raw[1]*raw[1]}
