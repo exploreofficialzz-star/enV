@@ -82,13 +82,20 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
     sql.query(
       `select c.id,c.parent_id as "parentId",c.body,
         case when c.identity_mode='anonymous' then 'Anonymous' else c.display_name end as "authorLabel",
-        c.identity_mode as "identityMode",c.created_at as "createdAt"
+        c.identity_mode as "identityMode",c.created_at as "createdAt",
+        (c.author_digest=$2) as "isMine"
        from tool_community_comments c
        where c.tool_id=$1 and c.moderation_status='visible'
          and (c.parent_id is null or c.parent_id in
            (select root.id from tool_community_comments root where root.tool_id=$1 and root.parent_id is null and root.moderation_status='visible'))
          and ($2::text is null or not exists(select 1 from tool_community_blocks b where b.blocker_digest=$2 and b.blocked_author_digest=c.author_digest))
-       order by (select root.created_at from tool_community_comments root where root.id=coalesce(c.parent_id,c.id)) desc,\n         case when c.parent_id is null then 0 else 1 end,c.created_at asc limit 100`,
+         and ($2::text is null or c.parent_id is null or not exists(
+           select 1 from tool_community_comments root
+           join tool_community_blocks rb on rb.blocker_digest=$2 and rb.blocked_author_digest=root.author_digest
+           where root.id=c.parent_id
+         ))
+       order by (select root.created_at from tool_community_comments root where root.id=coalesce(c.parent_id,c.id)) desc,
+         case when c.parent_id is null then 0 else 1 end,c.created_at asc limit 100`,
       [toolId,actorDigest],
     ),
     actorDigest ? sql.query<{reaction_type:string}>(
@@ -104,7 +111,7 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
     toolId,
     counts:{comments:num(counts[0]?.comments),likes:num(counts[0]?.likes),dislikes:num(counts[0]?.dislikes),views:num(views[0]?.total),views30Days:num(views[0]?.recent)},
     myReaction:reaction[0]?.reaction_type??null,
-    comments:comments.map(row=>({id:String(row.id),parentId:row.parentId?String(row.parentId):null,body:String(row.body),authorLabel:String(row.authorLabel),identityMode:String(row.identityMode),createdAt:row.createdAt})),
+    comments:comments.map(row=>({id:String(row.id),parentId:row.parentId?String(row.parentId):null,body:String(row.body),authorLabel:String(row.authorLabel),identityMode:String(row.identityMode),createdAt:row.createdAt,isMine:row.isMine===true})),
     generatedAt:new Date().toISOString(),
   };
 }
