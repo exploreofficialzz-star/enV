@@ -241,10 +241,39 @@ private struct NativeBarcodeCameraPreview: UIViewRepresentable {
     }
 }
 
+private struct NativeBarcodeCSVDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText] }
+    let text: String
+
+    init(records: [NativeBarcodeReadRecord]) {
+        let formatter = ISO8601DateFormatter()
+        func cell(_ value: String) -> String {
+            "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+        let rows = records.map { record in
+            [
+                cell(formatter.string(from: record.scannedAt)),
+                cell(record.format),
+                cell(record.value)
+            ].joined(separator: ",")
+        }
+        text = (["scanned_at,format,payload"] + rows).joined(separator: "\r\n") + "\r\n"
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        text = configuration.file.regularFileContents.map { String(decoding: $0, as: UTF8.self) } ?? ""
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
+
 struct NativeBarcodeReaderView: View {
     @StateObject private var scanner = NativeBarcodeCameraScanner()
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var readingImage = false
+    @State private var isExportingCSV = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -309,7 +338,12 @@ struct NativeBarcodeReaderView: View {
                 }
                 Spacer()
                 if !scanner.results.isEmpty {
-                    Button("Clear") { scanner.clearResults() }.font(.caption.weight(.semibold))
+                    HStack(spacing: 10) {
+                        Button("Export CSV") { isExportingCSV = true }
+                            .font(.caption.weight(.semibold))
+                        Button("Clear") { scanner.clearResults() }
+                            .font(.caption.weight(.semibold))
+                    }
                 }
             }
 
@@ -328,6 +362,16 @@ struct NativeBarcodeReaderView: View {
         .onChange(of: selectedPhoto) { item in
             guard let item else { return }
             Task { await readImage(item) }
+        }
+        .fileExporter(
+            isPresented: $isExportingCSV,
+            document: NativeBarcodeCSVDocument(records: scanner.results),
+            contentType: .commaSeparatedText,
+            defaultFilename: "env-scan-history.csv"
+        ) { result in
+            if case .failure(let failure) = result {
+                scanner.setFailure(failure.localizedDescription)
+            }
         }
         .onDisappear { scanner.stop() }
     }
