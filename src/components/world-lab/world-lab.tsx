@@ -21,6 +21,7 @@ import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
   snapSolidPosition,measureSolidCenters} from "@/lib/world-lab/edit-history";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
+import {runDigitalMotorExperiment,type DigitalMotorRun} from "@/lib/world-lab/digital-motor";
 import {runChemicalThermal,sampleChemicalThermal,
   type ReactionThermalInput,type ReactionThermalRun} from "@/lib/world-lab/chemical-thermal";
 import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
@@ -177,6 +178,7 @@ export default function WorldLab() {
   const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
   const [dcRun,setDcRun]=useState<DcNetworkResult|null>(null);
   const [wiredMotorRun,setWiredMotorRun]=useState<NetworkMotorRun|null>(null);
+  const [digitalMotorRun,setDigitalMotorRun]=useState<DigitalMotorRun|null>(null);
   const [newCircuitNodeLabel,setNewCircuitNodeLabel]=useState("");
   const [wirePositive,setWirePositive]=useState("supply");
   const [wireNegative,setWireNegative]=useState("ground");
@@ -768,7 +770,7 @@ export default function WorldLab() {
       });
       const result=wiredRun?.motor??runActuatorExperiment(
         derived!.input,derived!.source);
-      setWiredMotorRun(wiredRun);
+      setWiredMotorRun(wiredRun);setDigitalMotorRun(null);
       const numericalAudit=verifyActuatorNumerics(result);
       setActuatorAudit(numericalAudit);
       setPlaying(false);
@@ -782,6 +784,32 @@ export default function WorldLab() {
     } catch(cause) {
       setActuatorPlaying(false);
       setError(cause instanceof Error?cause.message:"The electromechanical model cannot run with these parameters.");
+    }
+  }
+
+  function startDigitalMotor(outputId:string) {
+    if(!project||!selectedEntity||!project.digitalNetworks?.[0])return;
+    setError("");
+    try {
+      const thermal=actuatorHeatEnabled?{thermal:{
+        initialTemperatureK:293.15,ambientTemperatureK:293.15,
+        heatCapacityJPerK:coilHeatCapacity,coolingWPerK:coilCooling,
+        resistanceTemperatureCoefficientPerK:0.004}}:{};
+      const result=runDigitalMotorExperiment(project,project.digitalNetworks[0].id,
+        outputId,selectedEntity.id,actuatorVoltage,{
+          forceConstantNPerA:actuatorConstant,...thermal,
+        });
+      setPlaying(false);setDropPlaying(false);setDropRun(null);
+      setWiredMotorRun(null);setDigitalMotorRun(result);
+      setActuatorRun(result.motor);
+      setActuatorAudit(verifyActuatorNumerics(result.motor));
+      setActuatorTime(0);setActuatorPlaying(true);
+      setMessage("A calculated Boolean output now controls assumed actuator voltage. "+
+        "This is an ideal static relay, not a real digital controller.");
+    }catch(cause){
+      setActuatorPlaying(false);
+      setError(cause instanceof Error?cause.message:
+        "The invented digital controller cannot power this solid.");
     }
   }
 
@@ -825,7 +853,7 @@ export default function WorldLab() {
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
     setFluidMotionPlaying(false);setFluidMotionRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
-    setWiredMotorRun(null);setDcRun(null);setRemoteJob(null);
+    setWiredMotorRun(null);setDigitalMotorRun(null);setDcRun(null);setRemoteJob(null);
   }
   function mutateProject(transform:(current:WorldLabProject)=>WorldLabProject){
     const current=projectForEdits.current;
@@ -1953,6 +1981,12 @@ export default function WorldLab() {
                     onClick={()=>startActuatorWithSelectedSolid(true)}>
                     Wire motor to circuit
                   </button>}
+                  {project?.digitalNetworks?.[0]?.outputs.map(output=>
+                    <button key={output.id} type="button" className={buttonClass+" mt-2 ml-2"}
+                      disabled={selectedQuantities.massKg===null}
+                      onClick={()=>startDigitalMotor(output.id)}>
+                      Drive with invented logic: {output.label}
+                    </button>)}
                   {selectedActuator && actuatorSample && (
                     <div className="mt-3 space-y-2" aria-label="Coupled electromechanical results">
                       <p className="text-xs text-muted-foreground">
@@ -1972,6 +2006,21 @@ export default function WorldLab() {
                         </>}
                         <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
                       </dl>
+                      {digitalMotorRun && digitalMotorRun.projectId===project?.id &&
+                        digitalMotorRun.projectRevision===project.revision &&
+                        digitalMotorRun.entityId===selectedEntity?.id &&
+                        digitalMotorRun.motor===actuatorRun && (
+                        <div className="rounded border border-border p-2 text-xs"
+                          aria-label="Computed invented digital controller">
+                          <p>Invented logic output: {digitalMotorRun.logicBit} (assumed Boolean)</p>
+                          <p>Applied ideal motor voltage: {digitalMotorRun.motor.input.supplyVoltageV.toFixed(3)} V</p>
+                          <p className="text-muted-foreground">{digitalMotorRun.validity}</p>
+                          <button type="button" className={buttonClass+" mt-2"}
+                            onClick={()=>downloadJson("world-lab-digital-motor-evidence.json",digitalMotorRun)}>
+                            Export linked digital-to-motion evidence
+                          </button>
+                        </div>
+                      )}
                       {wiredMotorRun && wiredMotorRun.projectRevision===project?.revision &&
                         wiredMotorRun.entityId===selectedEntity?.id && (
                         <div className="text-xs" aria-label="Connected motor and source results">
