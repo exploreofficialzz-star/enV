@@ -9,6 +9,7 @@ test("blob generator is deterministic, bounded and safely colors its output", ()
   assert.equal(first, again);
   assert.notEqual(first, changed);
   assert.match(first, /viewBox="0 0 100 100"/);
+  assert.match(buildBlobSvg({ seed: 18, points: 12, color: "#0d9f8a" }), /<path /);
   assert.match(first, /fill="#0d9f8a"/);
   const outlined = buildBlobSvg({ seed: 17, points: 12, color: "#0d9f8a", rotation: 45, stroke: "#112233", strokeWidth: 2 });
   assert.match(outlined, /rotate\(45 50 50\)/);
@@ -32,10 +33,10 @@ test("pattern generator clamps settings and rejects unsafe color values", () => 
 
 test("wave geometry responds to frequency, phase, layers and transparent canvas", () => {
   const basic = buildWaveSvg({ amplitude: 24, layers: 2, frequency: 2, phase: 0, baseline: 76, fill: "#0d9f8a", secondary: "#7c4dff", background: "#ffffff", transparent: false });
-  const changed = buildWaveSvg({ amplitude: 34, layers: 3, frequency: 4, phase: 45, baseline: 90, fill: "#0d9f8a", secondary: "#7c4dff", background: "#ffffff", transparent: true });
+  const changed = buildWaveSvg({ amplitude: 34, layers: 5, frequency: 4, phase: 45, baseline: 90, fill: "#0d9f8a", secondary: "#7c4dff", background: "#ffffff", transparent: true });
   assert.match(basic, /<rect width="1440" height="160" fill="#ffffff"\/>/);
   assert.equal((basic.match(/<path /g) ?? []).length, 2);
-  assert.equal((changed.match(/<path /g) ?? []).length, 3);
+  assert.equal((changed.match(/<path /g) ?? []).length, 5);
   assert.doesNotMatch(changed, /<rect /);
   assert.notEqual(basic, changed);
 });

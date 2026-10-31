@@ -60,7 +60,9 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "color", label: "Border color", type: "color", defaultValue: "#b9c5d5" },
   ],
   button: [
-    { name: "bg", label: "Background", type: "color", defaultValue: "#0d9f8a" },
+    { name: "variant", label: "Button style", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid" }, { value: "outline", label: "Outline" }, { value: "soft", label: "Soft" }, { value: "ghost", label: "Ghost" }] },
+    { name: "disabled", label: "Preview state", type: "select", defaultValue: "no", options: [{ value: "no", label: "Enabled" }, { value: "yes", label: "Disabled" }] },
+    { name: "bg", label: "Background / accent", type: "color", defaultValue: "#0d9f8a" },
     { name: "hover", label: "Hover background", type: "color", defaultValue: "#087f70" },
     { name: "focus", label: "Focus ring color", type: "color", defaultValue: "#7c4dff" },
     { name: "text", label: "Text color", type: "color", defaultValue: "#ffffff" },
@@ -69,6 +71,8 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "py", label: "Vertical padding", type: "number", defaultValue: 10, min: 0, max: 40, suffix: "px" },
   ],
   card: [
+    { name: "layout", label: "Card layout", type: "select", defaultValue: "standard", options: [{ value: "standard", label: "Standard" }, { value: "product", label: "Product" }, { value: "profile", label: "Profile" }, { value: "article", label: "Article" }, { value: "metric", label: "Metric" }] },
+    { name: "accent", label: "Accent color", type: "color", defaultValue: "#0d9f8a" },
     { name: "bg", label: "Card background", type: "color", defaultValue: "#ffffff" },
     { name: "border", label: "Border color", type: "color", defaultValue: "#e7e5e4" },
     { name: "text", label: "Heading color", type: "color", defaultValue: "#111827" },
@@ -127,7 +131,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   ],
   wave: [
     { name: "amp", label: "Wave height", type: "number", defaultValue: 24, min: 0, max: 58, suffix: "px" },
-    { name: "layers", label: "Wave layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }] },
+    { name: "layers", label: "Wave layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }, { value: "4", label: "4 layers" }, { value: "5", label: "5 layers" }] },
     { name: "frequency", label: "Wave frequency", type: "number", defaultValue: 2, min: 1, max: 5, suffix: "cycles" },
     { name: "phase", label: "Wave phase", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "baseline", label: "Wave vertical position", type: "number", defaultValue: 76, min: 30, max: 140, suffix: "%" },
@@ -264,15 +268,21 @@ function cssFor(
     const radius = numberValue(values, "radius", 10, 0, 48);
     const px = numberValue(values, "px", 16, 0, 64);
     const py = numberValue(values, "py", 10, 0, 40);
-    const css = `.env-button {\n  background: ${values.bg};\n  color: ${values.text};\n  border: 0;\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n  transition: background-color 160ms ease, transform 160ms ease;\n}\n.env-button:hover { background: ${values.hover}; }\n.env-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }\n@media (prefers-reduced-motion: reduce) { .env-button { transition: none; } }`;
-    return { css, style: { background: values.bg, color: values.text, borderRadius: `${radius}px`, padding: `${py}px ${px}px` } };
+    const variant = values.variant ?? "solid";
+    const background = variant === "outline" || variant === "ghost" ? "transparent" : variant === "soft" ? "#e8f7f3" : values.bg;
+    const color = variant === "solid" ? values.text : values.bg;
+    const border = variant === "outline" ? "1px solid " + values.bg : "1px solid transparent";
+    const hoverBackground = variant === "outline" || variant === "ghost" ? "#e8f7f3" : variant === "soft" ? "#d6f0e9" : values.hover;
+    const css = `.env-button {\n  background: ${background};\n  color: ${color};\n  border: ${border};\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n  font-weight: 600;\n  transition: background-color 160ms ease, transform 160ms ease;\n}\n.env-button:hover:not(:disabled) { background: ${hoverBackground}; }\n.env-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }\n.env-button:disabled { opacity: .52; cursor: not-allowed; }\n@media (prefers-reduced-motion: reduce) { .env-button { transition: none; } }`;
+    return { css, style: { background, color, border, borderRadius: `${radius}px`, padding: `${py}px ${px}px`, opacity: values.disabled === "yes" ? 0.52 : 1, cursor: values.disabled === "yes" ? "not-allowed" : "pointer" } };
   }
   if (family === "card") {
     const radius = numberValue(values, "radius", 20, 0, 64);
     const pad = numberValue(values, "pad", 20, 0, 80);
     const shadow = values.shadow === "none" ? "none" : values.shadow === "strong" ? "0 14px 36px rgb(22 24 29 / 0.18)" : "0 8px 24px rgb(22 24 29 / 0.08)";
-    const css = `.env-card {\n  background: ${values.bg};\n  color: ${values.text ?? "#111827"};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  padding: ${pad}px;\n  box-shadow: ${shadow};\n}\n.env-card__description { color: ${values.muted ?? "#475569"}; }`;
-    return { css, style: { background: values.bg, color: values.text ?? "#111827", border: `1px solid ${values.border}`, borderRadius: `${radius}px`, padding: `${pad}px`, boxShadow: shadow } };
+    const accent = values.accent ?? "#0d9f8a";
+    const css = `.env-card {\n  background: ${values.bg};\n  color: ${values.text ?? "#111827"};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  padding: ${pad}px;\n  box-shadow: ${shadow};\n  overflow: hidden;\n}\n.env-card__eyebrow { color: ${accent}; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }\n.env-card__title { color: ${values.text ?? "#111827"}; font-size: 1.125rem; font-weight: 700; }\n.env-card__description { color: ${values.muted ?? "#475569"}; line-height: 1.55; }\n.env-card__action { color: ${accent}; font-weight: 700; }`;
+    return { css, style: { background: values.bg, color: values.text ?? "#111827", border: "1px solid " + values.border, borderRadius: `${radius}px`, padding: `${pad}px`, boxShadow: shadow } };
   }
   if (family === "badge") {
     const radius = numberValue(values, "radius", 999, 0, 999);
@@ -338,7 +348,7 @@ function cssFor(
   if (family === "wave") {
     const svg = buildWaveSvg({
       amplitude: numberValue(values, "amp", 24, 0, 58),
-      layers: numberValue(values, "layers", 2, 1, 3),
+      layers: numberValue(values, "layers", 2, 1, 5),
       frequency: numberValue(values, "frequency", 2, 1, 5),
       phase: numberValue(values, "phase", 0, 0, 360),
       baseline: numberValue(values, "baseline", 76, 30, 140),
@@ -577,7 +587,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
         </div>
 
         <div className="min-w-0 space-y-3 lg:sticky lg:top-4">
-          {family === "button" ? <style>{`.env-live-button:hover { background: ${values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
+          {family === "button" ? <style>{`.env-live-button:hover:not(:disabled) { background: ${values.variant === "outline" || values.variant === "ghost" ? "#e8f7f3" : values.variant === "soft" ? "#d6f0e9" : values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
           {family === "input" ? <style>{`.env-live-input:focus-visible { outline: 3px solid ${values.focus ?? "#0d9f8a"}; outline-offset: 2px; }`}</style> : null}
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-fg">Live preview</p>
@@ -590,15 +600,18 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             {generatedSvg ? (
               <div className="w-full max-w-xl [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: generatedSvg }} />
             ) : family === "card" ? (
-              <div className="w-full max-w-xs" style={output.style}>
-                <p className="text-base font-semibold" style={{ color: values.text ?? "#111827" }}>A card preview</p>
-                <p className="env-card__description mt-2 text-sm" style={{ color: values.muted ?? "#475569" }}>See how spacing, surface and depth work together in a real component.</p>
-                <span className="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Learn more</span>
+              <div className="w-full max-w-xs space-y-3" style={output.style}>
+                {values.layout === "product" ? <div className="flex h-28 items-center justify-center rounded-lg" style={{ background: "linear-gradient(135deg, " + (values.accent ?? "#0d9f8a") + "22, " + (values.accent ?? "#0d9f8a") + "66)" }}><span className="text-3xl" aria-hidden="true">◇</span></div> : null}
+                {values.layout === "profile" ? <div className="flex items-center gap-3"><span className="flex size-12 items-center justify-center rounded-full font-bold text-white" style={{ background: values.accent ?? "#0d9f8a" }}>EN</span><div><p className="text-sm font-semibold">Alex Morgan</p><p className="text-xs" style={{ color: values.muted ?? "#475569" }}>Product designer</p></div></div> : null}
+                {values.layout === "article" ? <p className="env-card__eyebrow">Design insights · 6 min read</p> : null}
+                {values.layout === "metric" ? <><p className="env-card__eyebrow">Monthly revenue</p><p className="text-3xl font-bold">$12,480</p><p className="text-xs font-semibold" style={{ color: values.accent ?? "#0d9f8a" }}>↗ 12.4% this month</p></> : null}
+                {values.layout !== "metric" ? <><p className="env-card__eyebrow">{values.layout === "product" ? "Featured product" : values.layout === "profile" ? "Team member" : values.layout === "article" ? "Featured story" : "Workspace"}</p><p className="env-card__title">{values.layout === "product" ? "Everyday essentials" : values.layout === "profile" ? "Alex's design profile" : values.layout === "article" ? "Designing with intention" : "A card preview"}</p><p className="env-card__description text-sm">{values.layout === "product" ? "A product card with a clear image area and action." : values.layout === "profile" ? "Introduce a person, their role and what they work on." : values.layout === "article" ? "A readable article preview with a clear category and summary." : "See how spacing, surface and depth work together in a real component."}</p></> : null}
+                {values.layout !== "profile" ? <span className="env-card__action text-xs">{values.layout === "product" ? "View product →" : values.layout === "metric" ? "View report →" : "Learn more →"}</span> : null}
               </div>
             ) : family === "input" ? (
               <input readOnly value="Input field preview" className="env-live-input w-full max-w-xs px-3 py-2 text-sm text-slate-800" style={output.style} />
             ) : family === "button" ? (
-              <button type="button" className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors motion-reduce:transition-none" style={output.style}>{sampleText}</button>
+              <button type="button" disabled={values.disabled === "yes"} className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors motion-reduce:transition-none" style={output.style}>{sampleText}</button>
             ) : family === "badge" ? (
               <span style={output.style}>{sampleText.length > 18 ? "New feature" : sampleText}</span>
             ) : family === "text-shadow" ? (

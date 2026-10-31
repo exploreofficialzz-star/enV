@@ -59,6 +59,8 @@ const checks = [
   ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports") && paletteTests.includes("selectable counts from three to eight")],
   ["Strict HSV / HSB / CMYK parser and tested converters", designColor.includes("parsePercentOrUnit") && designColor.includes("hs[VB]") && designColorTests.includes("HSV and HSB accept percentages") && designColorTests.includes("CMYK accepts percentage")],
   ["Independent multi-layer shadow editor", cssEngine.includes("Independent shadow layers") && cssEngine.includes("setShadowLayers") && cssEngine.includes("buildBoxShadow") && cssEngine.includes("Add layer")],
+  ["Button variants and disabled interaction preview", cssEngine.includes("Button style") && cssEngine.includes("env-button:disabled") && cssEngine.includes("disabled={values.disabled === \"yes\"}")],
+  ["Five structured card preview layouts", cssEngine.includes("Card layout") && ["product", "profile", "article", "metric"].every((layout) => cssEngine.includes(`values.layout === "${layout}"`))],
   ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
   ["Editable color-vision palette", colorEngine.includes("Test your own interface colors") && colorEngine.includes("Reset sample colors")],
   ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background, canvas)") && colorEngine.includes("previewPair.background")],
@@ -67,7 +69,7 @@ const checks = [
   ["Blob, pattern and wave generator regression tests", svgGenerators.includes("buildWaveSvg") && svgGenerators.includes("buildBlobSvg") && svgGenerators.includes("PatternStyle") && svgGeneratorTests.includes("wave geometry responds to frequency") && svgGeneratorTests.includes("pattern generator clamps settings") && svgGeneratorTests.includes("outlined")],
   ["Expanded SVG pattern families and rotation", ["Concentric rings", "Chevron", "Hexagons", "Crosshatch", "Checkerboard"].every((name) => cssEngine.includes(name)) && svgGenerators.includes("checkerboard") && svgGeneratorTests.includes("new Set(variants).size, 10")],
   ["Multi-style pattern and outlined rotated blob controls", cssEngine.includes("Pattern style") && cssEngine.includes("Outline width") && cssEngine.includes("Rotation")],
-  ["Wave customization and transparent background UI", cssEngine.includes("Wave frequency") && cssEngine.includes("Wave phase") && cssEngine.includes("Canvas background") && cssEngine.includes("buildWaveSvg")],
+  ["Wave customization, transparency and five-layer support", cssEngine.includes("Wave frequency") && cssEngine.includes("Wave phase") && cssEngine.includes("Canvas background") && cssEngine.includes("value: \"5\", label: \"5 layers\"") && svgGenerators.includes("clamp(options.layers, 1, 5)")],
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
