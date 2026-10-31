@@ -1,4 +1,4 @@
-import { parseCssColor, toHex } from "./accessibility-color";
+import { parseCssColor, toHex } from "./accessibility-color.ts";
 
 export type PaletteExportFormat = "css" | "scss" | "tailwind" | "json" | "tokens";
 export type SemanticPaletteColors = {
