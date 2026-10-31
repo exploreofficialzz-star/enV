@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
@@ -402,13 +402,22 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     if ((field.name === "centerX" || field.name === "centerY") && values.kind === "linear") return false;
     if (field.name === "hueMethod" && !["hsl", "hwb", "lch", "oklch"].includes(values.colorSpace ?? "srgb")) return false;
     return true;
-  }), [allFields, family, values.kind]);
+  }), [allFields, family, values.colorSpace, values.kind]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
   const [gradientGlow, setGradientGlow] = useState(false);
   const [glowColor, setGlowColor] = useState("#ffffff");
   const [glowX, setGlowX] = useState(24);
   const [glowY, setGlowY] = useState(20);
   const [sampleText, setSampleText] = useState("Continue");
+  useEffect(() => {
+    setValues(initialValues(allFields));
+    setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop })));
+    setGradientGlow(false);
+    setGlowColor("#ffffff");
+    setGlowX(24);
+    setGlowY(20);
+    setSampleText("Continue");
+  }, [family, allFields]);
   const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
   const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, values]);
   const generatedSvg = output.svg;
