@@ -1777,10 +1777,16 @@ export default function WorldLab() {
             </div>}
         </div>
         {remoteError&&<p role="alert" className="mt-2 text-xs">{remoteError}</p>}
-        {remoteJob&&remoteJob.projectId===project?.id&&
-          remoteJob.projectRevision===project?.revision&&
+        {remoteJob&&
           <div role="status" aria-live="polite" className="mt-2 text-xs">
             <p>Job {remoteJob.id}: {remoteJob.status}</p>
+            {(remoteJob.projectId!==project?.id||
+              remoteJob.projectRevision!==project?.revision)&&
+              <p className="mt-1 text-muted-foreground">
+                This is evidence for a different or earlier project snapshot
+                ({remoteJob.projectId}, revision {remoteJob.projectRevision}).
+                It is available for export only and is not applied to this invention.
+              </p>}
             {remoteJob.errorCode&&<p>Solver status: {remoteJob.errorCode}</p>}
             {remoteJob.status==="succeeded"&&remoteJob.result!==null&&
               <button type="button" className={buttonClass} onClick={()=>
