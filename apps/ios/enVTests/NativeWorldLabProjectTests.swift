@@ -2,6 +2,45 @@ import XCTest
 @testable import enV
 
 final class NativeWorldLabProjectTests: XCTestCase {
+    func testNativeSpatialBroadPhaseAndConservativeCurvedBounds() throws {
+        let base=try NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a"),
+            shape:"box",id:"b")
+        let solids=try NativeWorldLabProject.decode(base).entities
+        var one=solids[0]
+        var two=solids[1]
+        // Reencode the portable fixture to set centers without inventing native constructors.
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:base) as? [String:Any])
+        var items=try XCTUnwrap(root["entities"] as? [[String:Any]])
+        items[0]["positionMeters"]=[0.0,0.5,0.0]
+        items[1]["positionMeters"]=[2.0,0.5,0.0]
+        root["entities"]=items
+        let project=try NativeWorldLabProject.decode(
+            JSONSerialization.data(withJSONObject:root))
+        one=project.entities[0];two=project.entities[1]
+        let separated=try NativeWorldLabSpatial.inspect(one,two)
+        XCTAssertEqual(separated.gapLowerBoundMeters,1,accuracy:1e-12)
+        XCTAssertEqual(separated.status,"separated")
+        items[1]["positionMeters"]=[0.75,0.5,0.0]
+        root["entities"]=items
+        let overlapping=try NativeWorldLabProject.decode(
+            JSONSerialization.data(withJSONObject:root))
+        let exact=try NativeWorldLabSpatial.inspect(
+            overlapping.entities[0],overlapping.entities[1])
+        XCTAssertEqual(exact.status,"box-intersection")
+        XCTAssertEqual(exact.overlapDepthMeters[0],0.25,accuracy:1e-12)
+        items[0]["shape"]="sphere"
+        items[1]["shape"]="cylinder"
+        items[1]["positionMeters"]=[0.7,0.5,0.7]
+        root["entities"]=items
+        let curved=try NativeWorldLabProject.decode(
+            JSONSerialization.data(withJSONObject:root))
+        let conservative=try NativeWorldLabSpatial.inspect(
+            curved.entities[0],curved.entities[1])
+        XCTAssertEqual(conservative.status,"potential-curved-intersection")
+        XCTAssertFalse(conservative.exactForBoxes)
+    }
+
     func testNativeDigitalTruthTableInventAndRejectCycles() throws {
         let start=try NativeWorldLabEditor.startDigitalInvention(
             NativeWorldLabEditor.blank())

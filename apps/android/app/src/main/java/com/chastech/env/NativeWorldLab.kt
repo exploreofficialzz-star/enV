@@ -29,6 +29,7 @@ import com.chastech.env.engine.NativeWorldLabFluidMotion
 import com.chastech.env.engine.NativeLabFluidMotionInput
 import com.chastech.env.engine.NativeLabFluidMotionRun
 import com.chastech.env.engine.NativeLabHydroResult
+import com.chastech.env.engine.NativeWorldLabSpatial
 import com.chastech.env.engine.NativeWorldLabDigitalLogic
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
@@ -734,8 +735,14 @@ fun NativeWorldLabForm() {
                     Text("Horizontal distance: "+labNumber(measured.horizontalDistanceM)+" m")
                     Text("Offset X/Y/Z: "+labNumber(measured.offsetXM)+" / "+
                         labNumber(measured.offsetYM)+" / "+labNumber(measured.offsetZM)+" m")
-                    Text("Center distances are geometry only, not surface clearance.",
-                        style=MaterialTheme.typography.bodySmall)
+                    val clearance=NativeWorldLabSpatial.inspect(solid,target)
+                    Text("Bounding-box clearance lower bound: "+
+                        labNumber(clearance.gapLowerBoundMeters)+" m")
+                    Text("Bounds: "+clearance.status.replace('-',' '))
+                    if(clearance.status=="box-intersection")
+                        Text("Overlap X/Y/Z: "+clearance.overlapDepthMeters
+                            .joinToString(" / "){labNumber(it)}+" m")
+                    Text(clearance.validity,style=MaterialTheme.typography.bodySmall)
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")

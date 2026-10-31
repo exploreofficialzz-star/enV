@@ -4,6 +4,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NativeWorldLabProjectTest {
+    @Test fun nativeSpatialClearanceNeverConfusesCurvedBoundsWithCollision(){
+        val fixture=NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="a"),
+            "box",id="b")
+        val initial=NativeWorldLabProjectCodec.decode(fixture)
+        val left=initial.entities[0].copy(positionMeters=NativeLabVector(0.0,0.5,0.0))
+        val right=initial.entities[1].copy(positionMeters=NativeLabVector(2.0,0.5,0.0))
+        val far=NativeWorldLabSpatial.inspect(left,right)
+        assertEquals("separated",far.status)
+        assertEquals(1.0,far.gapLowerBoundMeters,1e-12)
+        val touch=NativeWorldLabSpatial.inspect(left,right.copy(
+            positionMeters=NativeLabVector(1.0,0.5,0.0)))
+        assertEquals("bounds-touch",touch.status)
+        val overlap=NativeWorldLabSpatial.inspect(left,right.copy(
+            positionMeters=NativeLabVector(0.75,0.5,0.0)))
+        assertEquals("box-intersection",overlap.status)
+        assertEquals(0.25,overlap.overlapDepthMeters[0],1e-12)
+        val curved=NativeWorldLabSpatial.inspect(
+            left.copy(shape="sphere"),right.copy(shape="cylinder",
+                positionMeters=NativeLabVector(0.7,0.5,0.7)))
+        assertEquals("potential-curved-intersection",curved.status)
+        assertFalse(curved.exactForBoxes)
+    }
+
     @Test fun nativeDigitalTruthTableCanBeEditedWithoutExecutingUntrustedCode(){
         val blank=NativeWorldLabEditor.startDigitalInvention(NativeWorldLabEditor.blank())
         val initial=NativeWorldLabProjectCodec.decode(blank).digitalNetworks.first()

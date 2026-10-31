@@ -786,8 +786,20 @@ Text("Invent chemical heat").font(.headline)
                                 value("X offset",measurement.offsetXM,"m")
                                 value("Y offset",measurement.offsetYM,"m")
                                 value("Z offset",measurement.offsetZM,"m")
-                                Text("Geometry only; not surface clearance or collision.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                if let clearance=try? NativeWorldLabSpatial.inspect(solid,other) {
+                                    value("Bounding-box clearance lower bound",
+                                        clearance.gapLowerBoundMeters,"m")
+                                    Text("Bounds: "+clearance.status.replacingOccurrences(
+                                        of:"-",with:" "))
+                                    if clearance.status=="box-intersection" {
+                                        Text("Box overlap X/Y/Z: "+
+                                            clearance.overlapDepthMeters
+                                                .map{String(format:"%.4f",$0)}
+                                                .joined(separator:" / ")+" m")
+                                    }
+                                    Text(clearance.validity)
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
                         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")

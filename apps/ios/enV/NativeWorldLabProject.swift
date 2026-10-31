@@ -8,6 +8,47 @@ enum NativeWorldLabError: LocalizedError {
         return "Invalid World Lab project"
     }
 }
+/// Primitive bounding boxes: exact box separation, conservative for spheres/cylinders.
+struct NativeLabSpatialClearance {
+    let gapLowerBoundMeters:Double
+    let overlapDepthMeters:[Double]
+    let status:String
+    let exactForBoxes:Bool
+    let validity:String
+}
+enum NativeWorldLabSpatial {
+    static func inspect(_ a:NativeLabSolid,_ b:NativeLabSolid)throws->NativeLabSpatialClearance {
+        guard a.id != b.id else {
+            throw NativeWorldLabError.invalid("Select two different solids")
+        }
+        let ac=a.positionMeters,bc=b.positionMeters
+        let ad=a.dimensionsMeters,bd=b.dimensionsMeters
+        guard ac.count==3,bc.count==3,ad.count==3,bd.count==3,
+              (ac+bc).allSatisfy({$0.isFinite && abs($0)<=100000}),
+              (ad+bd).allSatisfy({$0.isFinite && $0>=0.001 && $0<=10000}) else {
+            throw NativeWorldLabError.invalid("Invalid primitive bounding geometry")
+        }
+        var gaps:[Double]=[],depths:[Double]=[]
+        for axis in 0..<3 {
+            let amin=ac[axis]-ad[axis]/2,amax=ac[axis]+ad[axis]/2
+            let bmin=bc[axis]-bd[axis]/2,bmax=bc[axis]+bd[axis]/2
+            gaps.append(max(0,amin-bmax,bmin-amax))
+            depths.append(max(0,min(amax,bmax)-max(amin,bmin)))
+        }
+        let gap=sqrt(gaps.reduce(0){$0+$1*$1})
+        let exact=a.shape=="box" && b.shape=="box"
+        let status=gap>1e-9 ? "separated" :
+            depths.contains(where:{$0<=1e-9}) ? "bounds-touch" :
+            exact ? "box-intersection" : "potential-curved-intersection"
+        let validity=exact ?
+            "Axis-aligned box separation only. No rigid collision or material stress." :
+            "Conservative bounding-box overlap only. Curved solids may not touch; no forces or damage modeled."
+        return NativeLabSpatialClearance(gapLowerBoundMeters:gap,
+            overlapDepthMeters:depths,status:status,
+            exactForBoxes:exact,validity:validity)
+    }
+}
+
 struct NativeLabVector3: Decodable {
     let values: [Double]
     func validate(positive: Bool = false) throws {

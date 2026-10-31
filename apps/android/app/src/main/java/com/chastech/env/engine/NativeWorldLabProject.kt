@@ -10,6 +10,44 @@ import kotlin.math.PI
  * Strict native Kotlin decoder for World Lab v1 interchange files.
  * This is not a physics solver or claim of full native authoring parity.
  */
+/** Axis-aligned broad-phase: exact for boxes; conservative bounds for curved primitives. */
+data class NativeLabSpatialClearance(
+    val gapLowerBoundMeters:Double,val overlapDepthMeters:List<Double>,
+    val status:String,val exactForBoxes:Boolean,val validity:String
+)
+object NativeWorldLabSpatial {
+    fun inspect(a:NativeLabSolid,b:NativeLabSolid):NativeLabSpatialClearance {
+        require(a.id!=b.id){"Choose two distinct solid objects"}
+        val ac=listOf(a.positionMeters.x,a.positionMeters.y,a.positionMeters.z)
+        val bc=listOf(b.positionMeters.x,b.positionMeters.y,b.positionMeters.z)
+        val ad=listOf(a.dimensionsMeters.x,a.dimensionsMeters.y,a.dimensionsMeters.z)
+        val bd=listOf(b.dimensionsMeters.x,b.dimensionsMeters.y,b.dimensionsMeters.z)
+        require((ac+bc).all{it.isFinite()&&it in -100000.0..100000.0}&&
+            (ad+bd).all{it.isFinite()&&it in 0.001..10000.0}){
+            "Invalid portable geometry"
+        }
+        val gap=(0..2).map{axis->
+            maxOf(0.0,ac[axis]-ad[axis]/2.0-(bc[axis]+bd[axis]/2.0),
+                bc[axis]-bd[axis]/2.0-(ac[axis]+ad[axis]/2.0))
+        }
+        val depth=(0..2).map{axis->
+            maxOf(0.0,minOf(ac[axis]+ad[axis]/2.0,bc[axis]+bd[axis]/2.0)-
+                maxOf(ac[axis]-ad[axis]/2.0,bc[axis]-bd[axis]/2.0))
+        }
+        val distance=kotlin.math.sqrt(gap.sumOf{it*it})
+        val exact=a.shape=="box" && b.shape=="box"
+        val status=when{
+            distance>1e-9->"separated"
+            depth.any{it<=1e-9}->"bounds-touch"
+            exact->"box-intersection"
+            else->"potential-curved-intersection"
+        }
+        return NativeLabSpatialClearance(distance,depth,status,exact,
+            if(exact)"Axis-aligned box geometry only; no contact force or deformation." else
+                "Conservative bounding boxes: curved parts may not touch despite overlapping bounds.")
+    }
+}
+
 data class NativeLabVector(val x: Double, val y: Double, val z: Double)
 data class NativeLabMaterial(
     val id: String, val name: String, val densityKgM3: Double?,
