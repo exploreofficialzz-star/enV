@@ -456,7 +456,7 @@ fun NativeWorldLabForm() {
                     runCatching { withContext(Dispatchers.IO){
                         val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
                         val current=NativeWorldLabProjectCodec.decode(json)
-                        val expected=if(savedBaseline?.id==current.id)savedBaseline.revision else null
+                        val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
                         localProjects.save(json,expectedSavedRevision=expected)
                         localProjects.listProjects()
                     } }.onSuccess{items->
@@ -920,6 +920,7 @@ fun NativeWorldLabForm() {
                 Text("Assumed fluid density: "+labNumber(fluidDensity)+" kg/m³")
                 Slider(value=fluidDensity.toFloat(),onValueChange={
                     fluidDensity=it.toDouble();hydroRun=null
+                    fluidPlaying=false;fluidMotion=null;fluidFrame=0
                 },valueRange=100f..2500f,
                     modifier=Modifier.semantics {contentDescription="Fluid density"})
                 Text("Immersion: "+labNumber(immersionFraction.toDouble()*100)+"% of height")
