@@ -31,11 +31,12 @@ function inspect(input:unknown){
     throw new WorldLabJobError("INVALID_JOB","Supply a scientific operation and portable project.");
   const body=input as Record<string,unknown>;
   if(body.kind!=="hydrostatics"&&body.kind!=="dc-network"&&body.kind!=="wired-motor"&&
-     body.kind!=="chemical-thermal"&&body.kind!=="multi-sphere"&&body.kind!=="exhaustive-logic"&&body.kind!=="chemical-sweep"&&body.kind!=="structural-sweep")
+     body.kind!=="chemical-thermal"&&body.kind!=="multi-sphere"&&body.kind!=="exhaustive-logic"&&body.kind!=="chemical-sweep"&&body.kind!=="structural-sweep"&&body.kind!=="newton-gravity")
     throw new WorldLabJobError("INVALID_JOB","Choose one supported scientific model.");
   const allowed=new Set(["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
-    "velocities","restitution","durationSeconds","networkId","tipForceN"]);
+    "velocities","restitution","durationSeconds","networkId","tipForceN",
+    "bodyIds","integrationSteps"]);
   if(Object.keys(body).some(k=>!allowed.has(k)))
     throw new WorldLabJobError("INVALID_JOB","Unknown scientific job input field.");
   const project=parseWorldLabProject(body.project);
@@ -153,10 +154,10 @@ export async function assertWorldLabWorkerReady():Promise<void>{
   const sql=await getSql();
   const rows=await sql.query<{applied:boolean}>(
     "SELECT EXISTS (SELECT 1 FROM public._migrations "+
-    "WHERE name='0015_world_lab_structural_sweep_jobs.sql') AS applied");
+    "WHERE name='0016_world_lab_gravity_jobs.sql') AS applied");
   if(rows[0]?.applied!==true)
     throw new WorldLabJobError("JOB_SCHEMA_OUTDATED",
-      "World Lab worker requires database migrations through 0015.");
+      "World Lab worker requires database migrations through 0016.");
 }
 export async function purgeExpiredWorldLabJobs():Promise<number>{
   requireEnabled();

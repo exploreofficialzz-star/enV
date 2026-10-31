@@ -137,3 +137,25 @@ test("remote structural parameter sweep retains computed and out-of-domain cases
    injectedFunction:"run",
  }),/Structural sensitivity only accepts/);
 });
+
+test("account worker computes gravitational motion over the larger capacity",()=>{
+ const project=fixture();
+ const s=project.entities[0];
+ s.shape="sphere";s.dimensionsMeters=[2,2,2];
+ s.materialId=project.materials[0].id;
+ project.materials[0].densityKgM3=100000;
+ for(let i=1;i<9;i++){
+  project.entities.push({...s,id:"orbit"+i,
+    positionMeters:[i*20,0,0] as [number,number,number]});
+ }
+ const run=runBoundedWorldLabOperation({kind:"newton-gravity",project,
+  bodyIds:project.entities.map(e=>e.id),velocities:{},
+  durationSeconds:3,integrationSteps:60});
+ assert.equal(run.kind,"newton-gravity");
+ if(!("bodies" in run.outcome))throw new Error("Missing Newtonian body results.");
+ assert.equal(run.outcome.bodies.length,9);
+ assert.ok(run.outcome.frames.length>1);
+ assert.throws(()=>runBoundedWorldLabOperation({kind:"newton-gravity",project,
+  bodyIds:[s.id,"orbit1"],velocities:{},durationSeconds:3,
+  integrationSteps:60,restitution:1}),/Gravitational calculations accept/);
+});

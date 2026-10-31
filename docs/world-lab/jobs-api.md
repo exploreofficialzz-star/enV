@@ -102,3 +102,14 @@ paid private worker, PostgreSQL URL, Better Auth enablement and migrations
 through 0015. The worker fails startup if the migration ledger lacks 0015.
 Native Android/iOS cloud job upload is deliberately not enabled without a
 real mobile Better Auth session bridge.
+
+## Newtonian gravitational inventions (migration 0016)
+
+Web can calculate a deterministic 2–8 sphere N-body gravity model locally, up
+to 1200 steps. With a real authenticated account and explicitly requested
+upload, the private worker supports 2–32 bodies and 2400 steps. The duration
+is 0.1–3600 seconds, with up to 241 evidence frames. Pairwise Newtonian
+inverse-square attraction uses the invented sphere material density. Contact
+is unsupported and triggers rejection; the solver audits energy drift and
+momentum instead of inventing orbital evidence. No measured planetary
+parameters, General Relativity or material formation are implied.

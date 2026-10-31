@@ -8,13 +8,14 @@ import type {Vec3} from "./sphere-collision-3d.ts";
 import {verifyDigitalTruthTablePacked} from "./digital-logic.ts";
 import {runChemicalAssumptionSweep} from "./chemical-sweep.ts";
 import {runStructuralAssumptionSweep} from "./structural-sweep.ts";
+import {runNewtonianGravity} from "./gravity.ts";
 
 /**
  * The authenticated HTTP layer controls access. This dispatcher only accepts
  * bounded scientific methods and user-supplied local projects. It never reads
  * or mutates other tenants' projects and executes no uploaded scripts/assets.
  */
-export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep"|"structural-sweep";
+export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep"|"structural-sweep"|"newton-gravity";
 const finiteBound=(n:unknown,min:number,max:number,name:string)=>{
   if(typeof n!=="number"||!Number.isFinite(n)||n<min||n>max)
     throw new Error(name+" is outside the supported finite scientific domain.");
@@ -35,27 +36,50 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   projectRevision:number;
   outcome:ReturnType<typeof calculateHydrostatics>|
     ReturnType<typeof solveDcNetwork>|ReturnType<typeof runNetworkMotorExperiment>|
-    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>|ReturnType<typeof verifyDigitalTruthTablePacked>|ReturnType<typeof runChemicalAssumptionSweep>|ReturnType<typeof runStructuralAssumptionSweep>;
+    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>|ReturnType<typeof verifyDigitalTruthTablePacked>|ReturnType<typeof runChemicalAssumptionSweep>|ReturnType<typeof runStructuralAssumptionSweep>|ReturnType<typeof runNewtonianGravity>;
 }> {
   if(!input||typeof input!=="object"||Array.isArray(input))
     throw new Error("Scientific request must be a JSON object.");
   const data=input as Record<string,unknown>;
   const kind=data.kind;
-  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere","exhaustive-logic","chemical-sweep","structural-sweep"].includes(String(kind)))
+  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere","exhaustive-logic","chemical-sweep","structural-sweep","newton-gravity"].includes(String(kind)))
     throw new Error("Requested scientific model is not available.");
   exactKeys(data,["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
-    "velocities","restitution","durationSeconds","networkId","tipForceN"]);
-  if(kind!=="multi-sphere"&&
+    "velocities","restitution","durationSeconds","networkId","tipForceN",
+    "bodyIds","integrationSteps"]);
+  if(kind!=="multi-sphere"&&kind!=="newton-gravity"&&
     ["velocities","restitution","durationSeconds"].some(key=>data[key]!==undefined))
     throw new Error("Sphere settings cannot be supplied to unrelated calculations.");
   if(kind!=="exhaustive-logic"&&data.networkId!==undefined)
     throw new Error("Digital network identifier is only accepted for digital verification.");
   if(kind!=="structural-sweep"&&data.tipForceN!==undefined)
     throw new Error("Beam tip load is only accepted for structural sensitivity.");
+  if(kind!=="newton-gravity"&&
+    (data.bodyIds!==undefined||data.integrationSteps!==undefined))
+    throw new Error("Gravitational body and step settings do not belong in this model.");
   const project:WorldLabProject=parseWorldLabProject(data.project);
   let outcome;
-  if(kind==="structural-sweep"){
+  if(kind==="newton-gravity"){
+    if(Object.keys(data).some(key=>!["kind","project","bodyIds","velocities",
+      "durationSeconds","integrationSteps"].includes(key)))
+      throw new Error("Gravitational calculations accept only explicit body and motion assumptions.");
+    if(!Array.isArray(data.bodyIds)||data.bodyIds.length<2||data.bodyIds.length>32||
+      data.bodyIds.some(id=>typeof id!=="string"||
+        !/^[A-Za-z0-9_-]{1,120}$/.test(id)))
+      throw new Error("Select between 2 and 32 valid gravitational body identifiers.");
+    if(!data.velocities||typeof data.velocities!=="object"||Array.isArray(data.velocities))
+      throw new Error("Gravitational starting velocities must be explicit.");
+    const integrationSteps=finiteBound(data.integrationSteps,2,2400,"Gravity steps");
+    if(!Number.isSafeInteger(integrationSteps))
+      throw new Error("Gravity steps must be an integer.");
+    outcome=runNewtonianGravity(project,{
+      bodyIds:data.bodyIds as string[],
+      velocities:data.velocities as Record<string,Vec3>,
+      durationSeconds:finiteBound(data.durationSeconds,0.1,3600,"Gravity duration"),
+      integrationSteps,
+    },32,2400);
+  }else if(kind==="structural-sweep"){
     if(Object.keys(data).some(key=>!["kind","project","entityId","tipForceN"].includes(key)))
       throw new Error("Structural sensitivity only accepts the invented beam and its load.");
     outcome=runStructuralAssumptionSweep(project,identifier(data.entityId),
