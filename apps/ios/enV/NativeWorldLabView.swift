@@ -47,6 +47,7 @@ struct NativeWorldLabView:View {
     @State private var collisionRightSpeed="0"
     @State private var collisionRestitution=0.5
     @State private var collisionRun:NativeLabCollisionResult?
+    @State private var exportingCollision=false
     @State private var collisionTime=0.0
     @State private var collisionPlaying=false
     @State private var collisionSpeed=1.0
@@ -105,6 +106,11 @@ struct NativeWorldLabView:View {
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private var collisionEvidenceDocument:NativeWorldLabJsonFile? {
+        guard let run=collisionRun,
+              let data=try? JSONEncoder().encode(run) else {return nil}
+        return NativeWorldLabJsonFile(content:data)
+    }
     private func newProject(){
         do {
             let data=try NativeWorldLabEditor.blank()
@@ -408,6 +414,11 @@ struct NativeWorldLabView:View {
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingCollision,
+            document:collisionEvidenceDocument,contentType:.json,
+            defaultFilename:"world-lab-two-body-collision-evidence"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
@@ -1022,6 +1033,8 @@ Text("Invent chemical heat").font(.headline)
             Picker("Collision playback speed",selection:$collisionSpeed){
                 Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
             }.pickerStyle(.segmented)
+            Button("Export collision evidence"){exportingCollision=true}
+                .buttonStyle(.bordered)
             Text(run.validity).font(.caption).foregroundStyle(.secondary)
         }
     }
