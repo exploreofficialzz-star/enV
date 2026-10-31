@@ -27,7 +27,8 @@ data class NativeGroupSphere(val entityId:String,val materialId:String,
 data class NativeGroupEvent(
     val atSeconds:Double,val firstEntityId:String,val secondEntityId:String,
     val contactNormal:NativeLabVector,val impulseNs:NativeLabVector,
-    val energyLostJ:Double
+    val energyLostJ:Double,val totalEnergyAfterJ:Double,
+    val totalMomentumAfterKgMps:NativeLabVector
 )
 data class NativeGroupSampleSphere(val entityId:String,
     val positionM:NativeLabVector,val velocityMps:NativeLabVector)
@@ -80,7 +81,9 @@ data class NativeGroupRun(
         for(e in events)contacts.put(JSONObject().put("atSeconds",e.atSeconds)
             .put("firstEntityId",e.firstEntityId).put("secondEntityId",e.secondEntityId)
             .put("contactNormal",vec(e.contactNormal)).put("impulseNs",vec(e.impulseNs))
-            .put("energyLostJ",e.energyLostJ))
+            .put("energyLostJ",e.energyLostJ)
+            .put("totalEnergyAfterJ",e.totalEnergyAfterJ)
+            .put("totalMomentumAfterKgMps",vec(e.totalMomentumAfterKgMps)))
         return JSONObject().put("format","env-world-lab-multi-sphere-impact")
             .put("modelVersion","1.0.0").put("evidence","physics-model-computed")
             .put("materialEvidence","hypothetical-user-assumed")
@@ -196,7 +199,8 @@ object NativeWorldLabMultiSphere {
                     "Conservation audit failed for sphere impact"
                 }
                 lostTotal+=loss
-                events.add(NativeGroupEvent(time,a.id,b.id,n.xyz(),impulse.xyz(),loss))
+                events.add(NativeGroupEvent(time,a.id,b.id,n.xyz(),impulse.xyz(),
+                    loss,energyAfter,p(objects).xyz()))
             }
         }
         val finalE=energy(objects);val finalP=p(objects);val finalL=l(objects)
