@@ -21,6 +21,24 @@ class NativeGamePlaybackTest {
         return ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
     }
 
+    /** Close only the emulator's unrelated Messages ANR. Never suppress an enV failure. */
+    private fun dismissMessagesAnr(): Boolean {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val root = automation.rootInActiveWindow ?: return false
+        val unrelated = root.findAccessibilityNodeInfosByText("Messages isn't responding")
+            .isNotEmpty()
+        if (!unrelated) return false
+        val label = root.findAccessibilityNodeInfosByText("Close app").firstOrNull()
+            ?: error("The unrelated emulator Messages ANR has no close control")
+        var target: android.view.accessibility.AccessibilityNodeInfo? = label
+        while (target != null && !target.isClickable) target = target.parent
+        require(target != null && target.performAction(
+            android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+        )) { "Failed to dismiss unrelated emulator Messages ANR" }
+        SystemClock.sleep(600)
+        return true
+    }
+
     @Test
     fun starterSceneLoadsInTheNativeRuntime() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -52,6 +70,13 @@ class NativeGamePlaybackTest {
         var screenshot: android.graphics.Bitmap? = null
         while (SystemClock.elapsedRealtime() < frameDeadline) {
             SystemClock.sleep(2_000)
+            if (dismissMessagesAnr()) {
+                // Do not count system alert pixels as a successfully rendered game.
+                screenshot?.recycle()
+                screenshot = null
+                colors = emptySet()
+                continue
+            }
             screenshot?.recycle()
             screenshot = automation.takeScreenshot()
             val image = screenshot ?: continue
@@ -70,6 +95,10 @@ class NativeGamePlaybackTest {
         ParcelFileDescriptor.AutoCloseInputStream(capture).use { it.readBytes() }
         println("Native frame: ${image.width}x${image.height}, sampled colors=${colors.size}")
         assertTrue("Native game screen did not contain visible scene content; sampled colors=${colors.size}", colors.size >= 4)
+        // A preloaded emulator app can present its own ANR after capture. Reject
+        // it before sending movement events so the game, not a dialog, gets input.
+        assertTrue("Unrelated system ANR continued to obscure the game.",
+            !dismissMessagesAnr())
         // Hold the on-screen right arrow and compare only the scene, excluding UI controls.
         val x = (image.width * 0.25).toInt()
         var start = -1
