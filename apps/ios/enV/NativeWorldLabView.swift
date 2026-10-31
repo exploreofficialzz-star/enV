@@ -378,9 +378,9 @@ struct NativeWorldLabView:View {
                     Text("Checked "+String(cases.count)+" assumed Boolean combinations.")
                         .font(.caption)
                     ForEach(0..<min(16,cases.count),id:\.self){index in
+                        let indexBits=String(index,radix:2)
                         let label=String(repeating:"0",
-                            count:max(0,network.inputs.count-String(index,radix:2).count)) +
-                            String(index,radix:2)
+                            count:max(0,network.inputs.count-indexBits.count)) + indexBits
                         let bits=network.outputs.map{String(cases[index][$0.id] ?? 0)}
                             .joined()
                         Text(label+" → "+bits).font(.caption.monospaced())
