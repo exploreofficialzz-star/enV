@@ -52,9 +52,14 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
             // Require the exact next revision: accepting a skipped revision would
             // silently overwrite divergent, independently edited histories.
             require(previous.id == project.id) { "Saved file has a mismatched project identity." }
+            if (expectedSavedRevision != null) {
+                require(expectedSavedRevision == previous.revision) {
+                    "The saved project changed since it was opened; a stale expected revision cannot be accepted."
+                }
+            }
             val unchanged = project.revision == previous.revision && json == previousJson
             val authorizedEdits = if (expectedSavedRevision != null) {
-                expectedSavedRevision == previous.revision && project.revision > previous.revision
+                project.revision > previous.revision
             } else {
                 project.revision.toLong() == previous.revision.toLong() + 1
             }
