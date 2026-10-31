@@ -1,4 +1,4 @@
-export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal";
+export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal" | "rings" | "chevron" | "hexagons" | "crosshatch" | "checkerboard";
 export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number };
 export type WaveSvgOptions = {
   amplitude: number;
@@ -25,7 +25,7 @@ function safeHex(value: string, fallback: string): string {
   return fallback;
 }
 
-export function buildPatternSvg(size: number, opacity: number, color: string, pattern: PatternStyle = "diagonal"): string {
+export function buildPatternSvg(size: number, opacity: number, color: string, pattern: PatternStyle = "diagonal", rotation = 0): string {
   const safeSize = Math.round(clamp(size, 6, 160));
   const safeOpacity = clamp(opacity, 0, 1);
   const safeColor = safeHex(color, "#0d9f8a");
@@ -37,9 +37,15 @@ export function buildPatternSvg(size: number, opacity: number, color: string, pa
     diagonal: `<path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}" ${stroke}/>`,
     cross: `<path d="M${center} 0V${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
     horizontal: `<path d="M0 ${center}H${safeSize}" ${stroke}/>`,
+    rings: `<circle cx="${center}" cy="${center}" r="${safeSize * 0.18}" ${stroke} fill="none"/><circle cx="${center}" cy="${center}" r="${safeSize * 0.4}" ${stroke} fill="none"/>`,
+    chevron: `<path d="M-${safeSize / 2} 0L${center} ${center}L-${safeSize / 2} ${safeSize}M${center} 0L${safeSize * 1.5} ${center}L${center} ${safeSize}" ${stroke} fill="none"/>`,
+    hexagons: `<path d="M${center} 0L${safeSize * 0.86} ${safeSize * 0.25}V${safeSize * 0.75}L${center} ${safeSize}L${safeSize * 0.14} ${safeSize * 0.75}V${safeSize * 0.25}Z M${safeSize * 1.5} ${safeSize * 0.5}L${safeSize * 1.86} ${safeSize * 0.75}V${safeSize * 1.25}L${safeSize * 1.5} ${safeSize * 1.5}L${safeSize * 1.14} ${safeSize * 1.25}V${safeSize * 0.75}Z" ${stroke} fill="none"/>`,
+    crosshatch: `<path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}M${center} 0L${center} ${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
+    checkerboard: `<rect x="0" y="0" width="${center}" height="${center}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><rect x="${center}" y="${center}" width="${center}" height="${center}" fill="${safeColor}" fill-opacity="${safeOpacity}"/>`,
   };
   const safePattern = Object.prototype.hasOwnProperty.call(patternShapes, pattern) ? pattern : "diagonal";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}">${patternShapes[safePattern]}</svg>`;
+  const safeRotation = clamp(rotation, 0, 360);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}"><g transform="rotate(${safeRotation} ${center} ${center})">${patternShapes[safePattern]}</g></svg>`;
 }
 
 export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#ffffff", strokeWidth = 0 }: BlobSvgOptions): string {
@@ -49,9 +55,14 @@ export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#fff
   const safeStroke = safeHex(stroke, "#ffffff");
   const safeRotation = clamp(rotation, 0, 360);
   const safeStrokeWidth = clamp(strokeWidth, 0, 8);
+  let randomState = safeSeed >>> 0;
+  const random = () => {
+    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+    return randomState / 4294967296;
+  };
   const coordinates = Array.from({ length: count }, (_, index) => {
     const angle = (index / count) * Math.PI * 2;
-    const radius = 28 + ((safeSeed * (index + 3) * 13) % 18);
+    const radius = 28 + random() * 18;
     return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
   });
   const middle = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
@@ -68,7 +79,7 @@ export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#fff
 
 export function buildWaveSvg(options: WaveSvgOptions): string {
   const amplitude = clamp(options.amplitude, 0, 58);
-  const layerCount = Math.round(clamp(options.layers, 1, 3));
+  const layerCount = Math.round(clamp(options.layers, 1, 5));
   const frequency = Math.round(clamp(options.frequency, 1, 5));
   const phase = clamp(options.phase, 0, 360) * Math.PI / 180;
   const baseline = clamp(options.baseline, 30, 140);

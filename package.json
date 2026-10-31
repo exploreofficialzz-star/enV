@@ -102,7 +102,7 @@
     "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs",
     "check:qr-barcode": "node scripts/check-qr-barcode.mjs",
     "audit:qr-barcode:browser": "node scripts/browser-qr-barcode-reader-audit.mjs",
-    "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/design-contrast.test.ts && node scripts/check-design.mjs"
+    "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/css-shadow.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/design-contrast.test.ts && node scripts/check-design.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
