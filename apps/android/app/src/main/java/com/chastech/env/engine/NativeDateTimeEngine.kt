@@ -423,8 +423,10 @@ object NativeDateTimeEngine {
             var seconds = division[0]
             var nanos = division[1]
             if (nanos.signum() < 0) { seconds = seconds.subtract(BigInteger.ONE); nanos = nanos.add(divisor) }
-            try { Instant.ofEpochSecond(seconds.longValueExact(), nanos.longValueExact()) }
-            catch (_: Exception) { throw IllegalArgumentException("That timestamp is out of range.") }
+            if (seconds < BigInteger.valueOf(Long.MIN_VALUE) || seconds > BigInteger.valueOf(Long.MAX_VALUE)) {
+                throw IllegalArgumentException("That timestamp is out of range.")
+            }
+            Instant.ofEpochSecond(seconds.toLong(), nanos.toLong())
         } else parseInstant(raw, "date")
         val totalNanos = BigInteger.valueOf(instant.epochSecond).multiply(BigInteger("1000000000")).add(BigInteger.valueOf(instant.nano.toLong()))
         return rows(

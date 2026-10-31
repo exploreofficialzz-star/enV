@@ -67,12 +67,12 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run Date & Time behavioural and catalogue audit
         run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-datetime.mjs
+      - name: Build web application
+        run: npm run build
       - name: Typecheck web application
         run: npm run typecheck
       - name: Lint Date & Time implementation
         run: npx eslint src/lib/engines/datetime.ts src/components/engines/io-engines.tsx src/lib/datetime/catalog-tools.ts src/lib/registry.ts scripts/check-datetime.mjs
-      - name: Build web application
-        run: npm run build
 
   android-datetime:
     name: Android Date & Time unit tests and build
