@@ -51,6 +51,10 @@ const checks = [
   ["Strict HSV / HSB / CMYK parser and tested converters", designColor.includes("parsePercentOrUnit") && designColor.includes("hs[VB]") && designColorTests.includes("HSV and HSB accept percentages") && designColorTests.includes("CMYK accepts percentage")],
   ["Layered shadow presets and opacity control", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from") && cssEngine.includes("Shadow opacity")],
   ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
+  ["Editable color-vision palette", colorEngine.includes("Test your own interface colors") && colorEngine.includes("Reset sample colors")],
+  ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background)") && colorEngine.includes("previewPair.background")],
+  ["Independent border corner radii", cssEngine.includes("Top left radius") && cssEngine.includes("bottomLeft")],
+  ["Dedicated button focus and reduced-motion states", cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
 ];
