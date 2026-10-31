@@ -57,8 +57,16 @@ async function makeCode128Image(value) {
 async function scanFile(name, mimeType, buffer, expectedItems) {
   await openTool("qr-payload-inspector");
   await page.locator('input[aria-label="Upload QR or barcode image"]').setInputFiles({ name, mimeType, buffer });
+
+  // Upload decoding is asynchronous. Waiting for the results section alone is
+  // insufficient because earlier scans can leave that section visible before
+  // the newly uploaded file has finished decoding.
+  for (const expected of expectedItems) {
+    await page.getByText(expected.text, { exact: true }).waitFor({ state: "visible", timeout: 12000 })
+      .catch(() => { throw new Error(`${name}: uploaded-image scan did not display ${expected.text}.`); });
+  }
+
   const results = page.locator('section[aria-labelledby="reader-results-heading"] article');
-  await results.first().waitFor({ state: "visible", timeout: 12000 });
   const content = (await results.allInnerTexts()).join("\\n");
   for (const expected of expectedItems) {
     if (!content.includes(expected.text)) throw new Error(`${name}: decoded content did not contain ${expected.text}.`);
@@ -156,6 +164,6 @@ const report = {
   error: failure,
   ok: !failure && outcomes.length === 4,
 };
-fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
+fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\\n");
 console.log(JSON.stringify({ ok: report.ok, passed: report.passed, failed: report.failed, reportPath, error: report.error }, null, 2));
 if (!report.ok) process.exitCode = 1;
