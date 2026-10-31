@@ -416,3 +416,8 @@ release-candidate evidence bundle are unfinished.
   saved project. No local existing project, unsaved editor or scientific run
   history is overwritten. This is intentional restore-as-copy rather than
   conflict-prone background last-write-wins synchronization.
+
+- The off-device worker can run a 25-case ideal structural beam sensitivity
+  grid over invented stiffness and load, returning actual deflection, stress
+  and strain only within the accepted small-deformation domain (migration
+  0015). No failure strengths are invented.

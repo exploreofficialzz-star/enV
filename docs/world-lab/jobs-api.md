@@ -81,3 +81,13 @@ cleanup. Do not rely on this as a compliance retention guarantee without
 hosted-worker monitoring. The GET history index omits inputs and outputs,
 while explicit single-job retrieval remains owner-scoped. Job quota and
 lease-token cancellation remain in place.
+
+## Invented structural beam sensitivity (migration 0015)
+
+The account-worker operation `structural-sweep` takes an owned caller's strict
+portable project, a chosen rectangular beam ID, and its hypothetical tip
+force. It evaluates 25 real Euler–Bernoulli calculation cases varying user
+assumed stiffness and applied force by 0.5× to 1.5×. Unsupported strains,
+deflections or stiffness values yield `outside-domain` and null results,
+never invented fracture conclusions. This is a deterministic sensitivity
+study of ideal static mechanics, NOT certification of invented material.

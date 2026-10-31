@@ -121,3 +121,19 @@ test("cloud dispatcher returns a bounded actual 25-case coupled chemical sensiti
    kind:"chemical-sweep",project,chemicalInput:input,scripting:"unsafe",
  }),/sensitivity jobs accept only/);
 });
+
+test("remote structural parameter sweep retains computed and out-of-domain cases",()=>{
+ const p=fixture();
+ p.materials[0].youngModulusPa=2e11;
+ p.entities[0].dimensionsMeters=[2,0.1,0.05];
+ const r=runBoundedWorldLabOperation({kind:"structural-sweep",project:p,
+   entityId:"solid",tipForceN:9000});
+ assert.equal(r.kind,"structural-sweep");
+ if(!("scenarios" in r.outcome))throw new Error("Missing stress sensitivity evidence.");
+ assert.equal(r.outcome.scenarioCount,25);
+ assert.ok(r.outcome.successfulCount<25);
+ assert.throws(()=>runBoundedWorldLabOperation({
+   kind:"structural-sweep",project:p,entityId:"solid",tipForceN:9000,
+   injectedFunction:"run",
+ }),/Structural sensitivity only accepts/);
+});

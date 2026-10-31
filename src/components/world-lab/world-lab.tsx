@@ -161,7 +161,7 @@ export default function WorldLab() {
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
-  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep">("hydrostatics");
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep"|"structural-sweep">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteHistory,setRemoteHistory]=useState<RemoteWorldLabJob[]>([]);
   const [remoteHistoryBusy,setRemoteHistoryBusy]=useState(false);
@@ -1208,12 +1208,14 @@ export default function WorldLab() {
       if(selectedKind!=="dc-network"&&selectedKind!=="chemical-thermal"&&selectedKind!=="multi-sphere"&&
         selectedKind!=="exhaustive-logic"&&selectedKind!=="chemical-sweep"&&!selectedEntityId)
         throw new Error("Select an invented solid before submitting this experiment.");
-      const body=selectedKind==="chemical-sweep"?{
+      const body=selectedKind==="structural-sweep"?{
+        kind:selectedKind,project,entityId:selectedEntityId,tipForceN:beamLoadN,
+      }:selectedKind==="chemical-sweep"?{
         kind:selectedKind,project,chemicalInput,
       }:selectedKind==="exhaustive-logic"?{
         kind:selectedKind,project,networkId:project.digitalNetworks?.[0]?.id,
       }:selectedKind==="multi-sphere"?{
-        kind:remoteKind,project,
+        kind:selectedKind,project,
         velocities:Object.fromEntries(groupSpheres.map((s,i)=>[
           s.id,groupVelocities[s.id]??(i===0?[2,0,0]:[0,0,0]),
         ])),
@@ -1741,6 +1743,7 @@ export default function WorldLab() {
             <option value="multi-sphere">3D moving sphere contacts</option>
             <option value="exhaustive-logic">Full invented digital truth-table check</option>
             <option value="chemical-sweep">Chemical model: 25 assumption combinations</option>
+            <option value="structural-sweep">Structural beam: 25 material/load combinations</option>
           </select>
           <button type="button" className={buttonClass} disabled={remoteBusy||!project||
               (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&!selectedEntity)||
