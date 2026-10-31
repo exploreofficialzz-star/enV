@@ -281,12 +281,12 @@ assert.match(android, /catalog\.webSearch\(value, limit = 8, includeRelatedRefer
 assert.match(android, /\(catalog\.tools \+ catalog\.relatedReferenceTools\)\.filter \{ it\.id in favorites \}/);
 assert.match(androidCatalog, /\(tools \+ relatedReferenceTools\)\.asSequence\(\)/);
 assert.ok(android.includes("NativeCopy.isWebRuntimeOnly(tool.id)") && android.includes('Text("Web only"'), "Android discovery labels retained browser-only tools");
-assert.match(android, /authority\("envtools\.store"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
+assert.match(android, /authority\("android.envtools\.store"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
 assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\)/);
 assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
 assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)(?: \+ catalog\.developerStudioTools\(\))?\)\.filter \{ favoriteIDs\.contains/);
 assert.match(iosCatalog, /catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)/);
-assert.ok(iosTools.includes("https://envtools.store/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
+assert.ok(iosTools.includes("https://ios.envtools.store/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
 assert.match(iosContent, /NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
 assert.match(android, /private fun nativeSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
 assert.match(android, /private fun nativeBackendSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
