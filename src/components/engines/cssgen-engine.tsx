@@ -126,8 +126,12 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   wave: [
     { name: "amp", label: "Wave height", type: "number", defaultValue: 24, min: 0, max: 58, suffix: "px" },
     { name: "layers", label: "Wave layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }] },
+    { name: "frequency", label: "Wave frequency", type: "number", defaultValue: 2, min: 1, max: 5, suffix: "cycles" },
+    { name: "phase", label: "Wave phase", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
+    { name: "baseline", label: "Wave vertical position", type: "number", defaultValue: 76, min: 30, max: 140, suffix: "%" },
     { name: "fill", label: "Front wave", type: "color", defaultValue: "#0d9f8a" },
     { name: "secondary", label: "Back wave", type: "color", defaultValue: "#7c4dff" },
+    { name: "backgroundMode", label: "Canvas background", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid background" }, { value: "transparent", label: "Transparent" }] },
     { name: "background", label: "Canvas color", type: "color", defaultValue: "#ffffff" },
   ],
   noise: [
@@ -370,18 +374,42 @@ function cssFor(
   if (family === "wave") {
     const amplitude = numberValue(values, "amp", 24, 0, 58);
     const layerCount = numberValue(values, "layers", 2, 1, 3);
+    const frequency = numberValue(values, "frequency", 2, 1, 5);
+    const phase = numberValue(values, "phase", 0, 0, 360) * Math.PI / 180;
+    const baseline = numberValue(values, "baseline", 76, 30, 140);
     const fill = values.fill ?? "#0d9f8a";
     const secondary = values.secondary ?? "#7c4dff";
     const background = values.background ?? "#ffffff";
+    const transparent = values.backgroundMode === "transparent";
     const paths = Array.from({ length: layerCount }, (_, index) => {
       const offset = (layerCount - index - 1) * amplitude * 0.32;
-      const height = Math.max(4, amplitude * (1 - index * 0.16));
-      const base = 76 + offset;
-      const d = `M0 ${base} C240 ${base - height}, 480 ${base + height}, 720 ${base} S1200 ${base - height}, 1440 ${base} L1440 160 L0 160 Z`;
+      const height = Math.max(0, amplitude * (1 - index * 0.16));
+      const segmentCount = frequency * 4;
+      const layerPhase = phase + index * 0.42;
+      const points = Array.from({ length: segmentCount + 1 }, (_, pointIndex) => {
+        const progress = pointIndex / segmentCount;
+        const angle = progress * frequency * Math.PI * 2 + layerPhase;
+        return {
+          x: progress * 1440,
+          y: baseline + offset - Math.sin(angle) * height,
+          derivative: -Math.cos(angle) * height * frequency * Math.PI * 2 / segmentCount,
+        };
+      });
+      let d = `M 0 ${points[0].y.toFixed(2)}`;
+      for (let pointIndex = 0; pointIndex < segmentCount; pointIndex += 1) {
+        const start = points[pointIndex];
+        const end = points[pointIndex + 1];
+        const dx = end.x - start.x;
+        const controlOneY = start.y + start.derivative / 3;
+        const controlTwoY = end.y - end.derivative / 3;
+        d += ` C ${(start.x + dx / 3).toFixed(2)} ${controlOneY.toFixed(2)} ${(end.x - dx / 3).toFixed(2)} ${controlTwoY.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+      }
+      d += " L1440 160 L0 160 Z";
       const color = index % 2 === 0 ? fill : secondary;
       return `<path fill="${color}" opacity="${1 - index * 0.12}" d="${d}"/>`;
     }).join("");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 160" preserveAspectRatio="none"><rect width="1440" height="160" fill="${background}"/>${paths}</svg>`;
+    const canvas = transparent ? "" : `<rect width="1440" height="160" fill="${background}"/>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 160" preserveAspectRatio="none">${canvas}${paths}</svg>`;
     return { css: svg, style: {}, svg };
   }
   const opacity = numberValue(values, "opacity", 0.08, 0, 1);
@@ -587,7 +615,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
           </div>
           <div
             className="flex min-h-64 items-center justify-center overflow-hidden rounded-xl border border-border p-8"
-            style={family === "glass" ? { background: "linear-gradient(135deg,#0d9f8a,#1d3557)" } : family === "wave" ? { background: values.background } : undefined}
+            style={family === "glass" ? { background: "linear-gradient(135deg,#0d9f8a,#1d3557)" } : family === "wave" ? { background: values.backgroundMode === "transparent" ? "transparent" : values.background } : undefined}
           >
             {generatedSvg ? (
               <div className="w-full max-w-xl [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: generatedSvg }} />
