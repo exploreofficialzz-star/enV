@@ -169,7 +169,8 @@ object NativeWorldLabSphereImpact {
             "3D collision failed momentum, angular momentum or energy invariants"
         }
         return NativeSphereImpactResult(project.id,project.revision,a.id,b.id,
-            materialA.id,materialB.id,a.positionMeters,b.positionMeters,
+            requireNotNull(materialA).id,requireNotNull(materialB).id,
+            a.positionMeters,b.positionMeters,
             firstVelocityMps,secondVelocityMps,nextA.toNative(),nextB.toNative(),
             ra,rb,ma,mb,hit,durationSeconds,restitution,normal.toNative(),
             impulse.toNative(),beforeMomentum.toNative(),afterMomentum.toNative(),
