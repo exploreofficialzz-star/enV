@@ -81,6 +81,7 @@ struct NativeWorldLabView:View {
     @State private var dropSpeed=1.0
     @State private var motorRun:NativeActuatorResult?
     @State private var wiredMotor:NativeLabNetworkMotorRun?
+    @State private var digitalMotor:NativeDigitalMotorResult?
     @State private var motorAudit:NativeActuatorNumericalAudit?
     @State private var motorEntityId:String?
     @State private var motorTime=0.0
@@ -184,7 +185,7 @@ struct NativeWorldLabView:View {
             let validated=try NativeWorldLabProject.decode(data)
             try editHistory.record(before:old,after:data)
             project=validated
-            projectData=data;dcRun=nil;wiredMotor=nil;hydroRun=nil;fluidPlaying=false;fluidMotion=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            projectData=data;dcRun=nil;wiredMotor=nil;digitalMotor=nil;hydroRun=nil;fluidPlaying=false;fluidMotion=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -197,7 +198,7 @@ struct NativeWorldLabView:View {
             guard let updated=next else {return}
             let restored=try NativeWorldLabProject.decode(updated)
             project=restored;projectData=updated
-            dcRun=nil;wiredMotor=nil;hydroRun=nil
+            dcRun=nil;wiredMotor=nil;digitalMotor=nil;hydroRun=nil
             fluidPlaying=false;fluidMotion=nil
             dropPlaying=false;dropRun=nil;motorPlaying=false;motorRun=nil
             selected=min(selected,max(0,restored.entities.count-1))
@@ -336,7 +337,7 @@ struct NativeWorldLabView:View {
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
-            motorPlaying=false;motorRun=nil;motorEntityId=nil;motorTime=0;redraw()
+            motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
         }
         .confirmationDialog("Delete selected saved World Lab project?",
             isPresented:$confirmingDelete,titleVisibility:.visible){
@@ -1071,7 +1072,7 @@ Text("Invent chemical heat").font(.headline)
                                     if motorThermalEnabled {input.thermal=NativeActuatorThermalInput()}
                                     let result=try NativeWorldLabActuator.evaluate(input)
                                     motorAudit=try NativeWorldLabActuator.numericalAudit(input,result)
-                                    motorRun=result;wiredMotor=nil
+                                    motorRun=result;wiredMotor=nil;digitalMotor=nil
                                     motorEntityId=solid.id;motorTime=0;motorPlaying=true
                                     dropPlaying=false;playing=false;problem=""
                                     applyMotorPosition()
@@ -1093,7 +1094,7 @@ Text("Invent chemical heat").font(.headline)
                                         }
                                         motorAudit=try NativeWorldLabActuator.numericalAudit(
                                             input,linked.motor)
-                                        wiredMotor=linked;motorRun=linked.motor
+                                        wiredMotor=linked;digitalMotor=nil;motorRun=linked.motor
                                         motorEntityId=solid.id;motorTime=0;motorPlaying=true
                                         dropPlaying=false;playing=false;problem=""
                                         applyMotorPosition()
@@ -1103,11 +1104,39 @@ Text("Invent chemical heat").font(.headline)
 
     }
 
+                            if let logic=project.digitalNetworks?.first {
+                                ForEach(logic.outputs,id:\.id){output in
+                                    Button("Drive with invented logic: "+output.label){
+                                        do {
+                                            let linked=try NativeWorldLabDigitalMotor.evaluate(
+                                                project,networkId:logic.id,outputId:output.id,
+                                                entityId:solid.id,massKg:derived,
+                                                thermal:motorThermalEnabled)
+                                            let verified=try NativeWorldLabActuator.numericalAudit(
+                                                linked.input,linked.motor)
+                                            digitalMotor=linked;wiredMotor=nil
+                                            motorRun=linked.motor;motorAudit=verified
+                                            motorEntityId=solid.id;motorTime=0;motorPlaying=true
+                                            dropPlaying=false;playing=false;problem=""
+                                            applyMotorPosition()
+                                        }catch {digitalMotor=nil;problem=error.localizedDescription}
+                                    }.buttonStyle(.bordered)
+                                }
+                            }
+
     @ViewBuilder private func solidMotorReadoutContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                             if let run=motorRun,motorEntityId==solid.id {
                                 let index=max(0,min(run.samples.count-1,
                                     Int((motorTime/run.stepSeconds).rounded())))
                                 let sample=run.samples[index]
+                                if let linked=digitalMotor,
+                                    linked.projectId==project.id,
+                                    linked.projectRevision==project.revision,
+                                    linked.entityId==solid.id {
+                                    Text("Invented digital output: "+String(linked.logicBit))
+                                    value("Applied ideal voltage",linked.input.supplyVoltageV,"V")
+                                    Text(linked.validity).font(.caption).foregroundStyle(.secondary)
+                                }
                                 value("Computed powered height",sample.heightM,"m")
                                 value("Coil current",sample.currentA,"A")
                                 value("Upward force",sample.motorForceN,"N")
