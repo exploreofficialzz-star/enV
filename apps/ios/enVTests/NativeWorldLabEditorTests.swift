@@ -119,6 +119,15 @@ final class NativeWorldLabEditorTests: XCTestCase {
         let chained=try XCTUnwrap(NativeWorldLabProject.decode(data).digitalNetworks?.first)
         XCTAssertEqual(chained.gates.count,2)
         XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(chained)["output_q"],1)
+        data=try NativeWorldLabEditor.addDigitalGate(
+            data,networkId:"invented",name:"Invented two-port",
+            assumption:"Assumed OR",inputNodeIds:["input_a","input_b"],id:"two-input")
+        data=try NativeWorldLabEditor.digitalTruthBit(
+            data,networkId:"invented",gateId:"two-input",row:2,bit:1)
+        data=try NativeWorldLabEditor.digitalOutputSource(
+            data,networkId:"invented",outputId:"output_q",sourceNodeId:"two-input")
+        let multi=try XCTUnwrap(NativeWorldLabProject.decode(data).digitalNetworks?.first)
+        XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(multi)["output_q"],1)
         XCTAssertThrowsError(try NativeWorldLabEditor.addDigitalGate(
             data,networkId:"invented",name:"Broken",
             assumption:"Assumed",inputNodeIds:["missing"]))
