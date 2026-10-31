@@ -99,11 +99,11 @@ function DeveloperWorkspace() {
     }
   }
 
-  async function updateTicket(ticket: Ticket, status: string, priority = ticket.priority) {
+  async function updateTicket(ticket: Ticket, status: string, priority = ticket.priority, developerNote = ticket.developerNote ?? null) {
     setProblem(""); setNotice("");
     try {
       await api("/api/feedback/admin/update", { method: "POST", body: JSON.stringify({
-        ticketId: ticket.id, status, priority, developerNote: ticket.developerNote ?? null,
+        ticketId: ticket.id, status, priority, developerNote,
       }) });
       setNotice("Feedback ticket updated."); await loadAll();
     } catch (error) { setProblem(error instanceof Error ? error.message : "Ticket update failed."); }
@@ -209,6 +209,16 @@ function DeveloperWorkspace() {
                 <select aria-label="Ticket priority" defaultValue={ticket.priority} onChange={event => void updateTicket(ticket,ticket.status,event.target.value)} className="min-h-9 rounded-md border border-border bg-surface-2 px-2 text-xs text-fg"><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select>
                 <label className="text-xs text-muted">Status</label>
                 <select aria-label="Ticket status" defaultValue={ticket.status} onChange={event => void updateTicket(ticket,event.target.value)} className="min-h-9 rounded-md border border-border bg-surface-2 px-2 text-xs text-fg"><option value="open">Open</option><option value="triaged">Triaged</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select>
+              </div>
+              <div className="mt-3 space-y-2">
+                <label htmlFor={`feedback-note-${ticket.id}`} className="block text-xs font-medium text-fg">Private developer note</label>
+                <textarea id={`feedback-note-${ticket.id}`} key={`${ticket.id}-${ticket.updatedAt}`} defaultValue={ticket.developerNote ?? ""} maxLength={2000} rows={2} placeholder="Internal triage notes; never visible to the reporter." className="w-full resize-y rounded-md border border-border bg-surface-2 px-3 py-2 text-xs leading-5 text-fg" />
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" onClick={event => {
+                    const field = event.currentTarget.closest("article")?.querySelector<HTMLTextAreaElement>(`#feedback-note-${ticket.id}`);
+                    void updateTicket(ticket,ticket.status,ticket.priority,field?.value ?? null);
+                  }}>Save private note</Button>
+                </div>
               </div>
             </article>
           ))}
