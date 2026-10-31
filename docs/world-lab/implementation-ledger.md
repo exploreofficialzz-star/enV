@@ -636,3 +636,10 @@ release-candidate evidence bundle are unfinished.
   scientific evidence. This is a *single-primary-ray* approximation, not
   branch-complete rendering, scattering, absorption or confirmed optical
   behavior of actual substances. Native geometry tracing remains unimplemented.
+
+test("primary ray power and ignored reflected branches sum to one",()=>{
+ const record=traceOpticalScene(source("box"),{originMeters:[-4,0,0],
+   direction:[1,0,0],maximumDistanceMeters:10,maximumInterfaces:8});
+ assert.ok(Math.abs(record.accountedLostBranchPowerFraction+
+   record.finalPrimaryRayPowerFraction-1)<1e-12);
+});

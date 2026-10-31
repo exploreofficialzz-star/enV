@@ -149,8 +149,11 @@ export function traceOpticalScene(raw:WorldLabProject,
     const transmittance=1-reflectance;
     const end=add(position,scale(direction,hit.t));
     const kind=total?"total-internal-reflection":"transmitted";
-    power*=total?1:transmittance;
-    discarded+=total?0:(power/(transmittance||1))*reflectance;
+    const powerBeforeInterface=power;
+    if(!total){
+      discarded+=powerBeforeInterface*reflectance;
+      power=powerBeforeInterface*transmittance;
+    }
     segments.push({startMeters:position,endMeters:end,kind,
       entityId:body.id,travelMeters:hit.t,incidentIndex:n1,
       transmittedIndex:total?null:n2,reflectance,transmittance,
@@ -161,9 +164,10 @@ export function traceOpticalScene(raw:WorldLabProject,
     if(!total)medium=entering?body.id:null;
     position=add(end,scale(direction,EPS*2));
     if(iteration===input.maximumInterfaces){
-      const left=Math.max(0,input.maximumDistanceMeters-travelled);
+      // The remaining planned distance is not travelled when the interface
+      // budget is reached; report a zero-length termination marker.
       segments.push({startMeters:end,endMeters:end,kind:"limit",
-        entityId:null,travelMeters:left,incidentIndex:n2,
+        entityId:null,travelMeters:0,incidentIndex:total?n1:n2,
         transmittedIndex:null,reflectance:0,transmittance:1,
         survivingRayPowerFraction:power});
     }
@@ -178,7 +182,7 @@ export function traceOpticalScene(raw:WorldLabProject,
     evidence:"physics-model-computed",materialEvidence:"hypothetical-user-assumed",
     projectId:project.id,projectRevision:project.revision,
     input,segments:Object.freeze(segments),
-    accountedLostBranchPowerFraction:discarded,
+    accountedLostBranchPowerFraction:Math.max(0,Math.min(1,discarded)),
     finalPrimaryRayPowerFraction:power,
     validity:"Geometric primary-ray propagation through invented non-overlapping "+
       "axis-aligned boxes and spheres with assumed real refractive indices, "+

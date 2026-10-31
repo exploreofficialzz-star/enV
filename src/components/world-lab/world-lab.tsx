@@ -1075,6 +1075,26 @@ export default function WorldLab() {
       ],new B.Color3(0.2,0.85,1));
     }
   }
+  function drawAuthoredOpticalTrace(run:import("@/lib/world-lab/optical-ray-trace").OpticalRayTrace|null){
+    drawOpticalReference(null);
+    const scene=sceneRef.current;
+    if(!run||!scene)return;
+    for(const [index,part] of run.segments.entries()){
+      if(part.kind==="limit")continue;
+      const start=B.Vector3.FromArray(part.startMeters);
+      const end=B.Vector3.FromArray(part.endMeters);
+      if(B.Vector3.DistanceSquared(start,end)<1e-12)continue;
+      const line=B.MeshBuilder.CreateLines("invented-optic-segment-"+index,{
+        points:[start,end],updatable:false,
+      },scene.scene);
+      const strength=part.survivingRayPowerFraction;
+      line.color=part.kind==="total-internal-reflection"?
+        new B.Color3(1,0.5,0.1):
+        new B.Color3(0.2+0.8*strength,0.9*strength,1);
+      line.isPickable=false;
+      opticalLinesRef.current.push(line);
+    }
+  }
   function invalidateWorldLabResults(){
     drawOpticalReference(null);
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
@@ -2222,7 +2242,8 @@ export default function WorldLab() {
           }
         }}/>
       <WorldLabOpticsPanel project={project} mutateProject={mutateProject}
-        onKeepEvidence={keepScientificEvidence} onVisualize={drawOpticalReference}/>
+        onKeepEvidence={keepScientificEvidence} onVisualize={drawOpticalReference}
+        onVisualizeRay={drawAuthoredOpticalTrace}/>
       <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
         remoteComputed={remoteJob?.status==="succeeded"&&
           remoteJob.kind==="newton-gravity"&&remoteJob.result&&
