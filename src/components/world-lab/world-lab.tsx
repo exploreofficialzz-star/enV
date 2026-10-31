@@ -19,6 +19,8 @@ import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
   snapSolidPosition,measureSolidCenters} from "@/lib/world-lab/edit-history";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
+import {runChemicalThermal,sampleChemicalThermal,
+  type ReactionThermalInput,type ReactionThermalRun} from "@/lib/world-lab/chemical-thermal";
 import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
 import {runFluidMotion,sampleFluidMotion,type FluidMotionRun}
   from "@/lib/world-lab/fluid-motion";
@@ -133,6 +135,15 @@ export default function WorldLab() {
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState("");
   const [fluidRun,setFluidRun]=useState<HydrostaticResult|null>(null);
+  const [chemicalInput,setChemicalInput]=useState<ReactionThermalInput>({
+    initialReactantMol:1,initialTemperatureK:300,ambientTemperatureK:300,
+    preExponentialPerS:0.5,activationEnergyJPerMol:10000,
+    reactionHeatReleasedJPerMol:50000,heatCapacityJPerK:500,
+    coolingConductanceWPerK:5,externalHeatingW:0,durationSeconds:6,
+  });
+  const [chemicalRun,setChemicalRun]=useState<ReactionThermalRun|null>(null);
+  const [chemicalTime,setChemicalTime]=useState(0);
+  const [chemicalPlaying,setChemicalPlaying]=useState(false);
   const [fluidDensity,setFluidDensity]=useState(1000);
   const [fluidDepth,setFluidDepth]=useState(0.5);
   const [fluidMotionRun,setFluidMotionRun]=useState<FluidMotionRun|null>(null);
@@ -176,6 +187,7 @@ export default function WorldLab() {
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
   const selectedQuantities = selectedEntity ? solidQuantities(selectedEntity, selectedMaterial) : null;
+  const chemicalSample=chemicalRun?sampleChemicalThermal(chemicalRun,chemicalTime):null;
   const measurementTarget=project?.entities.find(e=>e.id===measureTargetId)??null;
   const measurement=selectedEntity&&measurementTarget&&selectedEntity.id!==measurementTarget.id
     ?measureSolidCenters(selectedEntity,measurementTarget):null;
@@ -564,6 +576,24 @@ export default function WorldLab() {
     water.isPickable=false;
     return ()=>{water.dispose();color.dispose();};
   },[selectedFluidMotion]);
+  useEffect(()=>{
+    if(!chemicalPlaying||!chemicalRun)return;
+    let frame=0,previous=0;
+    const tick=(now:number)=>{
+      if(previous){
+        const elapsed=Math.min(0.05,(now-previous)/1000);
+        setChemicalTime(t=>Math.min(chemicalRun.input.durationSeconds,t+elapsed));
+      }
+      previous=now;
+      frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(frame);
+  },[chemicalPlaying,chemicalRun]);
+  useEffect(()=>{
+    if(chemicalRun&&chemicalTime>=chemicalRun.input.durationSeconds)
+      setChemicalPlaying(false);
+  },[chemicalTime,chemicalRun]);
   useEffect(() => {
     if (!dropPlaying || !dropRun) return;
     let frame = 0;
@@ -895,6 +925,17 @@ export default function WorldLab() {
       setError(cause instanceof Error?cause.message:"Fluid trajectory exceeds this solver's limits.");
     }
   }
+  function calculateChemicalReaction(){
+    setError("");
+    try{
+      const run=runChemicalThermal(chemicalInput);
+      setChemicalRun(run);setChemicalTime(0);setChemicalPlaying(true);
+      setMessage("Calculated coupled chemical conversion and temperature from user-supplied assumptions; no real substance is identified.");
+    }catch(cause){
+      setChemicalPlaying(false);setChemicalRun(null);
+      setError(cause instanceof Error?cause.message:"Unsupported chemical assumptions.");
+    }
+  }
   function runFluidTest(){
     if(!project||!selectedEntity)return;
     setError("");
@@ -1159,6 +1200,81 @@ export default function WorldLab() {
               </button>}
           </div>}
       </section>}
+      <section className="mb-3 rounded-xl border border-border p-3"
+        aria-label="Chemical reaction and temperature experiment">
+        <h3 className="text-sm font-semibold">See how an imagined reaction makes heat</h3>
+        <p className="text-xs text-muted-foreground">
+          Invent a hypothetical reaction. Temperature changes its rate;
+          released reaction heat changes temperature. These are your assumptions,
+          not proven chemical identities or real safety predictions.
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {([
+            ["initialReactantMol","Starting substance (mol)",0.001,10000,0.1],
+            ["preExponentialPerS","Assumed reaction factor (1/s)",0,100000,0.1],
+            ["activationEnergyJPerMol","Activation energy (J/mol)",0,200000,1000],
+            ["reactionHeatReleasedJPerMol","Heat released (+) or absorbed (−) (J/mol)",-1000000,1000000,1000],
+            ["heatCapacityJPerK","Total heat capacity (J/K)",1,1000000,50],
+            ["coolingConductanceWPerK","Cooling (W/K)",0,10000,1],
+            ["initialTemperatureK","Starting temperature (K)",200,1200,10],
+            ["ambientTemperatureK","Surrounding temperature (K)",200,1200,10],
+            ["externalHeatingW","External heating (+) or cooling (−) (W)",-10000,10000,10],
+          ] as const).map(([field,label,min,max,step])=>
+            <label key={field} className="text-xs">{label}
+              <input className={inputLabel} type="number" min={min} max={max}
+                step={step} aria-label={label} value={chemicalInput[field]}
+                onChange={e=>{
+                  setChemicalPlaying(false);setChemicalRun(null);
+                  setChemicalInput(p=>({...p,[field]:Number(e.target.value)}));
+                }}/>
+            </label>)}
+        </div>
+        <button type="button" className={buttonClass+" mt-2"}
+          onClick={calculateChemicalReaction}>Calculate reaction and temperature</button>
+        {chemicalRun&&chemicalSample&&<div className="mt-2 rounded-lg border border-border p-2 text-xs"
+          aria-label="Computed reaction rate and thermal energy">
+          <p>Time: {chemicalSample.timeSeconds.toFixed(3)} s</p>
+          <p>Conversion: {(100*chemicalSample.productFormedMol/
+            chemicalRun.input.initialReactantMol).toFixed(2)}%</p>
+          <p>Temperature: {chemicalSample.temperatureK.toFixed(3)} K</p>
+          <p>Reaction rate: {chemicalSample.reactionRateMolPerS.toExponential(3)} mol/s</p>
+          <p>Reaction thermal power: {chemicalSample.reactionPowerW.toFixed(3)} W</p>
+          <p>Stored heat change: {chemicalSample.storedThermalEnergyChangeJ.toFixed(4)} J</p>
+          <p>Energy balance residual: {chemicalSample.energyResidualJ.toExponential(3)} J</p>
+          <div className="mt-1 h-2 overflow-hidden rounded bg-slate-200"
+            role="img" aria-label="Computed fraction of assumed reactant converted">
+            <div className="h-full bg-blue-600" style={{
+              width:(100*chemicalSample.productFormedMol/
+                chemicalRun.input.initialReactantMol)+"%",
+            }}/>
+          </div>
+          <label className="mt-2 block">Explore reaction time
+            <input className="w-full" type="range" min={0}
+              max={chemicalRun.input.durationSeconds}
+              step={chemicalRun.solverStepSeconds} value={chemicalTime}
+              aria-label="Explore chemical time"
+              onChange={e=>{setChemicalPlaying(false);setChemicalTime(Number(e.target.value));}}/>
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className={buttonClass}
+              onClick={()=>setChemicalPlaying(v=>!v)}>
+              {chemicalPlaying?"Pause reaction":"Play reaction"}
+            </button>
+            <button type="button" className={buttonClass} onClick={()=>{
+              setChemicalPlaying(false);setChemicalTime(t=>
+                Math.min(chemicalRun.input.durationSeconds,t+chemicalRun.solverStepSeconds));
+            }}>Step reaction</button>
+            <button type="button" className={buttonClass} onClick={()=>{
+              setChemicalPlaying(false);setChemicalTime(0);
+            }}>Reset reaction</button>
+            <button type="button" className={buttonClass}
+              onClick={()=>downloadJson("world-lab-hypothetical-reaction-evidence.json",chemicalRun)}>
+              Export reaction evidence
+            </button>
+          </div>
+          <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
+        </div>}
+      </section>
       <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
         <h3 className="text-sm font-semibold">Connect electricity</h3>
         <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>

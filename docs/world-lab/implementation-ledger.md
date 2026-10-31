@@ -333,3 +333,7 @@ release-candidate evidence bundle are unfinished.
 ## iOS native visual assembly UI (2026-10-31)
 
 - The existing native SwiftUI World Lab now exposes named visual grouping of two existing invented solids, movable group offsets in three axes, and non-destructive ungroup operations, all through the validated iOS project editor and monotonic revision history. Overlapping/missing memberships are rejected rather than silently created. These groups do not imply rigid physics or structural joints; native simulator and accessibility audits remain pending.
+
+## Chemical–thermal inventor experiment (2026-10-31)
+
+- Added bounded well-mixed hypothetical first-order Arrhenius chemical reaction with temperature-dependent rate, reaction enthalpy feeding an assumed lumped thermal mass, external heater/cooler, Newton cooling, and integrated heat conservation/residual. Local RK4 solver rejects unsafe numerical settings, nonfinite heat/quantity, and stiff resource budgets. The Web studio now exposes child-friendly progressive reaction parameter fields, pause/step/seek, computed conversion/temperature/reaction power/energy records and JSON evidence. All invented chemical properties are explicitly *hypothetical*: no compound identity, physical reaction confirmation or chemical safety is claimed. Numeric tests authored and registered for later CI; native parity and true spatial chemistry remain undone.
