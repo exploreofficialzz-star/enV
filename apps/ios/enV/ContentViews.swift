@@ -119,7 +119,11 @@ struct NativeProductUpdatesBanner: View {
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
             }
         }
-        .task {\n            updates = (try? await NativeProductUpdatesClient.load()) ?? []\n            if !updates.isEmpty { NativeAnalyticsClient.record("update_viewed") }\n            try? await NativeAnalyticsClient.flush()\n        }
+        .task {
+            updates = (try? await NativeProductUpdatesClient.load()) ?? []
+            if !updates.isEmpty { NativeAnalyticsClient.record("update_viewed") }
+            try? await NativeAnalyticsClient.flush()
+        }
     }
 }
 
