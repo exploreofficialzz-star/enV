@@ -19,6 +19,7 @@ import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
 import {calculateObjectCollision,sampleObjectCollision,type ObjectCollisionRun} from "@/lib/world-lab/object-collision";
 import {solveSphereImpact3d,sampleSphereImpact3d,type SphereImpactEvidence,type Vec3} from "@/lib/world-lab/sphere-collision-3d";
+import {runMultiSphereCollisions,sampleMultiSphereCollisions,type MultiSphereRun} from "@/lib/world-lab/multi-sphere-collision";
 import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
   summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
@@ -224,9 +225,21 @@ export default function WorldLab() {
   const [sphereTime,setSphereTime]=useState(0);
   const [spherePlaying,setSpherePlaying]=useState(false);
   const [spherePlaybackRate,setSpherePlaybackRate]=useState(1);
+  const [groupVelocities,setGroupVelocities]=useState<Record<string,Vec3>>({});
+  const [groupRestitution,setGroupRestitution]=useState(1);
+  const [groupRun,setGroupRun]=useState<MultiSphereRun|null>(null);
+  const [groupTime,setGroupTime]=useState(0);
+  const [groupPlaying,setGroupPlaying]=useState(false);
+  const [groupRate,setGroupRate]=useState(1);
   const materials = project?.materials ?? [];
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
+  const groupSpheres=project?.entities.filter(e=>e.shape==="sphere")??[];
+  const activeGroupRun=groupRun&&project?.id===groupRun.projectId&&
+    project?.revision===groupRun.projectRevision&&
+    groupRun.initial.every(o=>groupSpheres.some(s=>s.id===o.entityId))?groupRun:null;
+  const groupSample=activeGroupRun?sampleMultiSphereCollisions(activeGroupRun,
+    Math.min(groupTime,activeGroupRun.durationSeconds)):null;
   const collisionPartner=project?.entities.find(e=>e.id===collisionOtherId);
   const sphereOther=project?.entities.find(e=>e.id===sphereOtherId);
   const selectedSphereRun=sphereRun&&project?.id===sphereRun.projectId&&
@@ -619,6 +632,29 @@ export default function WorldLab() {
     if(first)first.position.copyFromFloats(...sphereSample.firstCentreM);
     if(second)second.position.copyFromFloats(...sphereSample.secondCentreM);
   },[sphereSample,selectedSphereRun,project]);
+  useEffect(()=>{
+    if(!groupPlaying||!activeGroupRun)return;
+    let frame=0,previous=0;
+    const tick=(now:number)=>{
+      if(previous){
+        const dt=Math.min(0.05,(now-previous)/1000);
+        setGroupTime(t=>Math.min(activeGroupRun.durationSeconds,t+dt*groupRate));
+      }
+      previous=now;frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(frame);
+  },[groupPlaying,activeGroupRun,groupRate]);
+  useEffect(()=>{
+    if(activeGroupRun&&groupTime>=activeGroupRun.durationSeconds)setGroupPlaying(false);
+  },[groupTime,activeGroupRun]);
+  useEffect(()=>{
+    if(!groupSample)return;
+    const shapes=sceneRef.current?.addedShapes;
+    for(const o of groupSample.objects){
+      shapes?.get(o.entityId)?.position.copyFromFloats(...o.positionM);
+    }
+  },[groupSample,project]);
   useEffect(() => {
     if (!actuatorPlaying || !actuatorRun) return;
     let frame=0;
@@ -945,6 +981,7 @@ export default function WorldLab() {
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
     setWiredMotorRun(null);setDigitalMotorRun(null);setBeamRun(null);setDcRun(null);setRemoteJob(null);
     setCollisionPlaying(false);setCollisionRun(null);setCollisionTime(0);
+    setGroupPlaying(false);setGroupRun(null);setGroupTime(0);
     setSpherePlaying(false);setSphereRun(null);setSphereTime(0);
   }
   function mutateProject(transform:(current:WorldLabProject)=>WorldLabProject){
