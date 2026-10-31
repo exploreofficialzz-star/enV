@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
-import { recordAnalyticsEvent } from "@/lib/analytics/client";
+import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { applyViewMode, usePrefs } from "@/lib/storage";
