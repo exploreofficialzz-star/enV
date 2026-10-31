@@ -57,6 +57,7 @@ const CITY_ZONES: Record<string, string> = {
   hongkong: "Asia/Hong_Kong",
   istanbul: "Europe/Istanbul",
   jakarta: "Asia/Jakarta",
+  kathmandu: "Asia/Katmandu",
   johannesburg: "Africa/Johannesburg",
   lagos: "Africa/Lagos",
   lisbon: "Europe/Lisbon",
