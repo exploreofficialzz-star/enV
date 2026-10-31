@@ -491,3 +491,19 @@ release-candidate evidence bundle are unfinished.
   quantitative temperatures, conserved energy and metadata. The model is
   not a general conduction PDE, phase-change, safety or medical simulator.
   No CI, device tests or release gates have yet been executed for this batch.
+
+
+## Cross-model evidence persistence, portable v2 archive
+- Web IndexedDB is upgraded to version 4 with owner-scoped immutable numerical
+  gravity and two-material heat result records, separate from the original
+  oscillator/RC/rod run history. A revision-checked transaction atomically
+  commits project, legacy runs, and up to 20 typed additional evidence records.
+- The interactive gravity and thermal panels explicitly offer to retain a
+  computed result with the open invention. The saved evidence library lists,
+  exports and explicitly discards immutable snapshots; old projects retain
+  their earlier results when their geometry/material assumptions change.
+- Complete Web archives use `env-world-lab-archive` schema v2, carrying strict
+  typed gravitation/heat evidence as well as legacy numerical experiments.
+  Prior schema-v1 archives remain importable. This is not a universal archive
+  of every solver type yet; native Android/iOS have their own portable model
+  evidence exports and still lack combined archive import/export.

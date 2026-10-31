@@ -8,10 +8,13 @@ import {
 import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRuns,
   putLocalWorldLabArchive, saveLocalWorldLabRun,
   listLocalWorldLabDrafts, saveLocalWorldLabDraft, deleteLocalWorldLabDraft,
+  listLocalWorldLabScientificEvidence,deleteLocalWorldLabScientificEvidence,
   type WorldLabDraft } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import {parseWorldLabArchive,serializeWorldLabArchive,WORLD_LAB_ARCHIVE_MAX_BYTES}
   from "@/lib/world-lab/portable-archive";
+import {newScientificEvidenceRecord,type ScientificEvidenceRecord,
+  type ScientificEvidenceResult} from "@/lib/world-lab/scientific-evidence";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
@@ -128,6 +131,7 @@ export default function WorldLab() {
   const [circuit, setCircuit] = useState(defaultCircuit);
   const [heat, setHeat] = useState(defaultHeat);
   const [runs, setRuns] = useState<LabRun[]>([]);
+  const [scientificEvidence,setScientificEvidence]=useState<ScientificEvidenceRecord[]>([]);
   const [runId, setRunId] = useState("");
   const [comparisonRunId, setComparisonRunId] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -836,6 +840,12 @@ export default function WorldLab() {
 
   function restoreRunsForProject(projectId: string) {
     const epoch=++restoreRunsEpoch.current;
+    void listLocalWorldLabScientificEvidence(projectId).then(saved=>{
+      if(epoch===restoreRunsEpoch.current)setScientificEvidence(saved);
+    }).catch(cause=>{
+      if(epoch===restoreRunsEpoch.current)setError(cause instanceof Error?
+        cause.message:"Stored material and gravity evidence is unreadable.");
+    });
     void listLocalWorldLabRuns(projectId).then(saved=>{
       if(epoch!==restoreRunsEpoch.current)return;
       setRuns(saved);
@@ -1422,11 +1432,44 @@ export default function WorldLab() {
     mutateProject(current=>({...current, entities:current.entities.map(e=>
       e.id===selectedEntity.id?{...e,...patch}:e)}));
   }
+  function keepScientificEvidence(result:ScientificEvidenceResult){
+    const current=projectForEdits.current;
+    if(!current||current.id!==result.projectId||
+      current.revision!==result.projectRevision){
+      setError("This calculation belongs to a different revision. Recompute before keeping it.");
+      return;
+    }
+    try{
+      if(scientificEvidence.length>=20)
+        throw new Error("Scientific history holds 20 records. Export or discard one first.");
+      const record=newScientificEvidenceRecord(result,crypto.randomUUID(),
+        new Date().toISOString());
+      setScientificEvidence(rows=>[...rows,record]);
+      setWorkspaceDirty(true);
+      setMessage("Scientific evidence added to this invention. Save on device or export "+
+        "a complete archive to preserve it.");
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:"This scientific result could not be kept.");
+    }
+  }
+  async function discardScientificEvidence(record:ScientificEvidenceRecord){
+    if(!project||record.projectId!==project.id)return;
+    if(!window.confirm("Discard this recorded calculation? A downloaded evidence file "+
+      "cannot be changed, but device history will lose the copy."))return;
+    try{
+      await deleteLocalWorldLabScientificEvidence(project.id,record.id);
+      setScientificEvidence(rows=>rows.filter(row=>row.id!==record.id));
+      setMessage("Removed the selected scientific record from this device.");
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:
+        "The selected scientific evidence could not be removed.");
+    }
+  }
   async function save() {
     if (!project) return;
     setError("");
     try {
-      const saved=await putLocalWorldLabArchive(project,savedRevision,runs);
+      const saved=await putLocalWorldLabArchive(project,savedRevision,runs,scientificEvidence);
       setProject(saved);
       clearEditHistory();
       setSavedRevision(saved.revision);
@@ -1446,8 +1489,8 @@ export default function WorldLab() {
       } catch {
         // Project and scientific histories are in IndexedDB even if preferences storage is unavailable.
       }
-      setMessage("Project and "+runs.length+
-        " scientific runs saved together in one atomic device transaction.");
+      setMessage("Project, "+runs.length+" numerical runs and "+
+        scientificEvidence.length+" additional scientific records saved together atomically.");
     } catch(cause) {
       setError(cause instanceof Error?cause.message:"Could not save this project. Export a JSON backup.");
     }
@@ -1462,7 +1505,7 @@ export default function WorldLab() {
   function exportCompleteArchive(){
     if(!project)return;
     try{
-      const json=serializeWorldLabArchive(project,runs);
+      const json=serializeWorldLabArchive(project,runs,scientificEvidence);
       downloadJson("world-lab-complete-"+project.id+".json",JSON.parse(json));
       setMessage("Exported this portable project with its validated recorded numerical experiments.");
     }catch(cause){setError(cause instanceof Error?cause.message:
@@ -1478,6 +1521,7 @@ export default function WorldLab() {
       const data:unknown=JSON.parse(json);
       let imported:WorldLabProject;
       let importedRuns:LabRun[]=[];
+      let importedEvidence:ScientificEvidenceRecord[]=[];
       let isCompleteArchive=false;
       let warnings:string[]=[];
       if(data && typeof data==="object" && "format" in data &&
@@ -1485,6 +1529,7 @@ export default function WorldLab() {
         const archive=parseWorldLabArchive(json);
         imported=archive.project;
         importedRuns=archive.recordedRuns.map(entry=>entry.run);
+        importedEvidence=[...archive.scientificEvidence];
         isCompleteArchive=true;
         if(savedProjects.some(saved=>saved.id===imported.id))
           throw new Error("This archive's project ID already exists on this device. "+
@@ -1509,7 +1554,8 @@ export default function WorldLab() {
       setSavedRevision(null);
       setWorkspaceDirty(true);
       setSelectedEntityId("");
-      setRuns(importedRuns);setRunId(importedRuns[0]?.id??"");
+      setRuns(importedRuns);setScientificEvidence(importedEvidence);
+      setRunId(importedRuns[0]?.id??"");
       setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
       setImportWarnings(warnings);
       setMessage(isCompleteArchive?
@@ -1523,7 +1569,8 @@ export default function WorldLab() {
     if((workspaceDirty || (savedRevision === null && runs.length > 0)) &&
        !window.confirm("Discard unsaved local edits or recorded experiments and open another project?"))return;
     setProject(saved);clearEditHistory();setSavedRevision(saved.revision);setWorkspaceDirty(false);
-    setSelectedEntityId("");setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+    setSelectedEntityId("");setRuns([]);setScientificEvidence([]);
+    setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     restoreRunsForProject(saved.id);
     setMessage("Opened saved project "+saved.title+".");
   }
@@ -1534,7 +1581,8 @@ export default function WorldLab() {
     setProject(blankWorldLabProject(crypto.randomUUID(),new Date().toISOString()));
     clearEditHistory();
     setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
-    setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+    setRuns([]);setScientificEvidence([]);setRunId("");setComparisonRunId("");
+    setPlaying(false);setTimeSeconds(0);
     setMessage("New local World Lab project created.");
   }
   function restoreRecoveryDraft(draft:WorldLabDraft){
@@ -1547,7 +1595,8 @@ export default function WorldLab() {
       setProject(restored);clearEditHistory();
       setSavedRevision(draft.baseSavedRevision);
       setWorkspaceDirty(true);setSelectedEntityId("");
-      setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+      setRuns([]);setScientificEvidence([]);
+      setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
       if(draft.baseSavedRevision!==null)restoreRunsForProject(restored.id);
       setMessage("Recovered a cached, unsaved invention. Save or export to preserve it.");
     }catch(error){setError(error instanceof Error?error.message:"Recovery draft is invalid.");}
@@ -1899,7 +1948,35 @@ export default function WorldLab() {
           <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
         </div>}
       </section>
+      <section className="mb-3 rounded-xl border border-border p-3"
+        aria-label="Recorded scientific evidence library">
+        <h3 className="text-sm font-semibold">Saved scientific evidence</h3>
+        <p className="text-xs text-muted-foreground">
+          Gravity and material-contact results keep their original project
+          revision, hypothetical inputs and numerical trajectory. Save or
+          export the invention to preserve newly recorded experiments.
+        </p>
+        {scientificEvidence.length===0&&
+          <p className="mt-2 text-xs">No additional scientific records yet.</p>}
+        {scientificEvidence.map(record=>
+          <div key={record.id}
+            className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span>{record.kind==="newton-gravity"?"Gravity":"Material heat"} ·
+              revision {record.projectRevision} ·
+              {new Date(record.createdAt).toLocaleString()}</span>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={buttonClass}
+                onClick={()=>downloadJson("world-lab-"+record.kind+"-"+record.id+".json",
+                  record.result)}>Export evidence</button>
+              <button type="button" className={buttonClass}
+                onClick={()=>{void discardScientificEvidence(record);}}>
+                Discard record
+              </button>
+            </div>
+          </div>)}
+      </section>
       <WorldLabMaterialHeatPanel project={project}
+        onKeepEvidence={keepScientificEvidence}
         onSample={(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>{
           const scene=sceneRef.current;
           if(!scene||!sample||!run)return;
@@ -1914,7 +1991,8 @@ export default function WorldLab() {
             }
           }
         }}/>
-      <WorldLabGravityPanel project={project} cloudEnabled={remoteJobsEnabled}
+      <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
+        cloudEnabled={remoteJobsEnabled}
         cloudBusy={remoteBusy}
         remoteJobStatus={remoteJob?.kind==="newton-gravity"&&
           remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision

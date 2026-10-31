@@ -9,8 +9,9 @@ const button="rounded-lg border border-border px-3 py-2 text-sm";
 type Props={
   project:WorldLabProject|null;
   onSample:(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>void;
+  onKeepEvidence:(run:MaterialHeatRun)=>void;
 };
-export function WorldLabMaterialHeatPanel({project,onSample}:Props){
+export function WorldLabMaterialHeatPanel({project,onSample,onKeepEvidence}:Props){
   const [firstId,setFirstId]=useState("");
   const [secondId,setSecondId]=useState("");
   const [hot,setHot]=useState(400);
@@ -132,6 +133,10 @@ export function WorldLabMaterialHeatPanel({project,onSample}:Props){
               document.body.appendChild(a);a.click();a.remove();
             }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
           }}>Export thermal evidence</button>
+          <button type="button" className={button}
+            onClick={()=>onKeepEvidence(active)}>
+            Keep heat result with invention
+          </button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{active.validity}</p>
       </>}

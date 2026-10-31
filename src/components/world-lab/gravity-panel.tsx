@@ -12,6 +12,7 @@ type Props={
   remoteJobStatus:string|null;
   onRemote:(config:GravityConfig)=>void;
   onFrame:(frame:GravityFrame|null,bodies:readonly GravityBody[])=>void;
+  onKeepEvidence:(run:GravityRun)=>void;
 };
 function download(run:GravityRun){
   const blob=new Blob([JSON.stringify(run,null,2)],{type:"application/json"});
@@ -23,7 +24,7 @@ function download(run:GravityRun){
   }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
 }
 export function WorldLabGravityPanel({
-  project,cloudEnabled,cloudBusy,remoteJobStatus,onRemote,onFrame,
+  project,cloudEnabled,cloudBusy,remoteJobStatus,onRemote,onFrame,onKeepEvidence,
 }:Props){
   const [selection,setSelection]=useState<string[]>([]);
   const [velocities,setVelocities]=useState<Record<string,Vec3>>({});
@@ -179,6 +180,9 @@ export function WorldLabGravityPanel({
           </select>
           <button className={button} type="button" onClick={()=>download(active)}>
             Export trajectory evidence
+          </button>
+          <button className={button} type="button" onClick={()=>onKeepEvidence(active)}>
+            Keep gravity with invention
           </button>
         </div>
         <label className="mt-2 block text-xs">Simulated time: {time.toFixed(2)} s
