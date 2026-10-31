@@ -24,7 +24,7 @@ test("pattern generator clamps settings and rejects unsafe color values", () => 
   assert.doesNotMatch(svg, /<script>/);
   const variants = (["dots", "grid", "diagonal", "cross", "horizontal", "rings", "chevron", "hexagons", "crosshatch", "checkerboard"] as const).map((kind) => buildPatternSvg(28, 0.5, "#123456", kind));
   assert.equal(new Set(variants).size, 10);
-  assert.match(buildPatternSvg(28, 0.5, "#123456", "rings", 35), /rotate\\(35 14 14\\)/);
+  assert.ok(buildPatternSvg(28, 0.5, "#123456", "rings", 35).includes("rotate(35 14 14)"));
   const unsafeVariant = buildPatternSvg(28, 0.5, "#123456", "__proto__" as never);
   assert.match(unsafeVariant, /<path /);
   assert.doesNotMatch(unsafeVariant, /\[object Object\]/);

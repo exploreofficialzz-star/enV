@@ -28,5 +28,6 @@ test("untrusted dimensions, opacity, colors and layer counts are bounded", () =>
   const unsafe = [{ id: "x", x: 999, y: -999, blur: 999, spread: -999, color: "red; } body {", opacity: 2, inset: false, enabled: true }];
   const normalized = normalizeShadowLayers(unsafe);
   assert.deepEqual([normalized[0].x, normalized[0].y, normalized[0].blur, normalized[0].spread, normalized[0].opacity, normalized[0].color], [100, -100, 200, -100, 1, "#0f172a"]);
-  assert.equal(normalizeShadowLayers(Array.from({ length: 9 }, (_, index) => ({ ...createShadowPreset("custom")[0], id: String(index) })).length, 5);
+  const tooMany = Array.from({ length: 9 }, (_, index) => ({ ...createShadowPreset("custom")[0], id: String(index) }));
+  assert.equal(normalizeShadowLayers(tooMany).length, 5);
 });
