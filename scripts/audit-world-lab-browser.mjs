@@ -89,6 +89,22 @@ try{
   await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("2000");
   await page.getByRole("button",{name:"Export assumed bending evidence"})
     .waitFor({state:"hidden"});
+
+  await page.getByRole("button",{name:"Revise assumptions for Invented stiff matter"}).click();
+  await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("100000000000");
+  await page.getByRole("button",{name:"Save revised assumptions"}).click();
+  await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("1000");
+  await page.getByRole("button",{name:"Calculate elastic bending"}).click();
+  const revisionExport=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export assumed bending evidence"}).click();
+  let revisedJson="";
+  for await(const part of await (await revisionExport).createReadStream())
+    revisedJson+=part.toString();
+  const revisedBeam=JSON.parse(revisedJson);
+  assert.equal(revisedBeam.materialId,structural.materialId);
+  assert.ok(revisedBeam.projectRevision>structural.projectRevision);
+  assert.ok(Math.abs(revisedBeam.maximumTipDeflectionM-0.0064)<1e-12);
+
   // Restore the main reference project before the existing motion scenarios.
   await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("1");
   await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("1");
