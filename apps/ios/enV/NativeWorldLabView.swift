@@ -1044,36 +1044,27 @@ Text("Invent chemical heat").font(.headline)
             value("3D impact time",run.impactTimeSeconds,"s")
             value("First mass",run.firstMassKg,"kg")
             value("Second mass",run.secondMassKg,"kg")
-            Text("Impulse X/Y/Z (N·s): "+
-                run.impulseNs.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Impulse X/Y/Z (N·s): "+run.impulseNs.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Final first velocity X/Y/Z (m/s): "+
-                run.firstFinalVelocityMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Final first velocity X/Y/Z (m/s): "+run.firstFinalVelocityMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Final second velocity X/Y/Z (m/s): "+
-                run.secondFinalVelocityMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Final second velocity X/Y/Z (m/s): "+run.secondFinalVelocityMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Momentum before X/Y/Z: "+
-                run.momentumBeforeKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Momentum before X/Y/Z: "+run.momentumBeforeKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Momentum after X/Y/Z: "+
-                run.momentumAfterKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Momentum after X/Y/Z: "+run.momentumAfterKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Angular momentum before X/Y/Z: "+
-                run.angularMomentumBeforeKgM2PerS.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Angular momentum before X/Y/Z: "+run.angularMomentumBeforeKgM2PerS.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Angular momentum after X/Y/Z: "+
-                run.angularMomentumAfterKgM2PerS.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+            Text("Angular momentum after X/Y/Z: "+run.angularMomentumAfterKgM2PerS.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
             value("Energy before",run.energyBeforeJ,"J")
             value("Energy after",run.energyAfterJ,"J")
             value("Dissipated energy",run.dissipatedEnergyJ,"J")
             if let at=try? run.sample(sphereTime){
-                Text("First centre X/Y/Z (m): "+
-                    at.firstCentreM.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                Text("First centre X/Y/Z (m): "+at.firstCentreM.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                     .font(.caption)
-                Text("Second centre X/Y/Z (m): "+
-                    at.secondCentreM.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                Text("Second centre X/Y/Z (m): "+at.secondCentreM.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                     .font(.caption)
             }
             Text("3D impact time: "+String(format:"%.2f",sphereTime)+" s")
