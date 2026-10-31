@@ -310,6 +310,25 @@ struct NativeWorldLabView:View {
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
+        .onChange(of:reactionHeat){_ in
+            chemicalPlaying=false;chemicalRun=nil;chemicalTime=0
+        }
+        .onChange(of:reactionFactor){_ in
+            chemicalPlaying=false;chemicalRun=nil;chemicalTime=0
+        }
+        .onChange(of:reactionHeater){_ in
+            chemicalPlaying=false;chemicalRun=nil;chemicalTime=0
+        }
+        .onChange(of:fluidDensity){_ in
+            hydroRun=nil;fluidPlaying=false;fluidMotion=nil;fluidTime=0
+        }
+        .onChange(of:fluidSurfaceHeight){_ in
+            fluidPlaying=false;fluidMotion=nil;fluidTime=0
+        }
+        .onChange(of:fluidDrag){_ in
+            fluidPlaying=false;fluidMotion=nil;fluidTime=0
+        }
+        .onChange(of:fluidFraction){_ in hydroRun=nil }
         .onChange(of:projectData){_ in
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
