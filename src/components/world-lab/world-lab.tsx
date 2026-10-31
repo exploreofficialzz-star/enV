@@ -10,6 +10,8 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
   listLocalWorldLabDrafts, saveLocalWorldLabDraft, deleteLocalWorldLabDraft,
   type WorldLabDraft } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
+import {parseWorldLabArchive,serializeWorldLabArchive,WORLD_LAB_ARCHIVE_MAX_BYTES}
+  from "@/lib/world-lab/portable-archive";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
@@ -1373,33 +1375,62 @@ export default function WorldLab() {
       setMessage("Portable project exported. Run history is a separate scientific result export.");
     }catch(cause){setError(cause instanceof Error?cause.message:"Could not export this project.");}
   }
+  function exportCompleteArchive(){
+    if(!project)return;
+    try{
+      const json=serializeWorldLabArchive(project,runs);
+      downloadJson("world-lab-complete-"+project.id+".json",JSON.parse(json));
+      setMessage("Exported this portable project with its validated recorded numerical experiments.");
+    }catch(cause){setError(cause instanceof Error?cause.message:
+      "Complete archive could not be exported. Export project and individual runs.");}
+  }
   async function importProject(file: File | undefined) {
     if (!file) return;
     setError("");setImportWarnings([]);
     try{
-      if (file.size>1024*1024) throw new Error("Import files must be no larger than 1 MB.");
+      if(file.size>WORLD_LAB_ARCHIVE_MAX_BYTES)
+        throw new Error("Imported scientific archives must be no larger than 24 MB.");
       const json=await file.text();
       const data:unknown=JSON.parse(json);
       let imported:WorldLabProject;
+      let importedRuns:LabRun[]=[];
+      let isCompleteArchive=false;
       let warnings:string[]=[];
-      if(data && typeof data==="object" && "format" in data && data.format==="env-3d-game"){
+      if(data && typeof data==="object" && "format" in data &&
+        data.format==="env-world-lab-archive"){
+        const archive=parseWorldLabArchive(json);
+        imported=archive.project;
+        importedRuns=archive.recordedRuns.map(entry=>entry.run);
+        isCompleteArchive=true;
+        if(savedProjects.some(saved=>saved.id===imported.id))
+          throw new Error("This archive's project ID already exists on this device. "+
+            "Export the existing project before importing this preserved scientific history.");
+      }else if(data && typeof data==="object" && "format" in data && data.format==="env-3d-game"){
+        if(file.size>1024*1024)throw new Error("Legacy imports must be 1 MB or smaller.");
         const report=importLegacyGameScene(data,crypto.randomUUID(),new Date().toISOString());
         imported=report.project;
         warnings=report.warnings;
-      }else imported=readWorldLabProjectJson(json);
+      }else {
+        if(file.size>1024*1024)throw new Error("Project imports must be 1 MB or smaller.");
+        imported=readWorldLabProjectJson(json);
+      }
       if((workspaceDirty || (savedRevision === null && runs.length > 0)) &&
          !window.confirm("Discard unsaved local edits or recorded experiments and import a different project?")) return;
       restoreRunsEpoch.current++;
       const now=new Date().toISOString();
-      setProject(parseWorldLabProject({...imported,id:crypto.randomUUID(),title:imported.title,
-        revision:0,createdAt:now,updatedAt:now}));
+      setProject(parseWorldLabProject({...imported,
+        id:isCompleteArchive?imported.id:crypto.randomUUID(),
+        title:imported.title,revision:0,createdAt:now,updatedAt:now}));
       clearEditHistory();
       setSavedRevision(null);
       setWorkspaceDirty(true);
       setSelectedEntityId("");
-      setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+      setRuns(importedRuns);setRunId(importedRuns[0]?.id??"");
+      setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
       setImportWarnings(warnings);
-      setMessage("Imported a local project copy. Save it to keep it on this device.");
+      setMessage(isCompleteArchive?
+        "Imported project and recorded scientific runs. Save locally to archive both on this device.":
+        "Imported a local project copy. Save it to keep it on this device.");
     }catch(cause){setError(cause instanceof Error?cause.message:"This file could not be imported.");}
   }
   function openSavedProject(id:string){
@@ -1503,6 +1534,8 @@ export default function WorldLab() {
           <button type="button" className={buttonClass} onClick={newProject}>New project</button>
           <button type="button" className={buttonClass} onClick={() => void save()} disabled={!project}>Save on device</button>
           <button type="button" className={buttonClass} onClick={exportProject} disabled={!project}>Export project</button>
+          <button type="button" className={buttonClass} onClick={exportCompleteArchive}
+            disabled={!project}>Export complete archive</button>
           <input ref={importInput} className="sr-only" type="file" accept=".json,application/json"
             aria-label="Import World Lab or legacy 3D project" onChange={event=>{
               void importProject(event.target.files?.[0]);event.target.value="";
