@@ -368,6 +368,28 @@ object NativeWorldLabEditor {
             .put("youngModulusPa",youngModulusPa?:JSONObject.NULL)
             .put("evidence","hypothetical-user-assumed"))
     }
+    /** Modify only hypothetical properties; retain material and solid identities. */
+    fun reviseHypotheticalMaterial(source:String,id:String,name:String,
+        densityKgM3:Double?,youngModulusPa:Double?):String=edit(source){project->
+        require(name.isNotBlank()&&name.length<=120){"Material name is required"}
+        require(densityKgM3==null ||
+            densityKgM3.isFinite()&&densityKgM3 in 0.001..1e9){
+            "Assumed density is outside supported finite bounds"
+        }
+        require(youngModulusPa==null ||
+            youngModulusPa.isFinite()&&youngModulusPa in 0.0..1e15){
+            "Assumed Young's modulus is outside supported finite bounds"
+        }
+        val materials=project.getJSONArray("materials")
+        val selected=(0 until materials.length()).map{materials.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}
+            ?:error("Invented material to revise was not found")
+        selected.put("name",name.trim())
+            .put("densityKgM3",densityKgM3?:JSONObject.NULL)
+            .put("youngModulusPa",youngModulusPa?:JSONObject.NULL)
+            .put("evidence","hypothetical-user-assumed")
+    }
+
     fun renameSolid(source:String,id:String,newName:String):String =
         edit(source){project->
             val arr=project.getJSONArray("entities")
