@@ -232,7 +232,7 @@ function cssFor(family: string, values: Record<string, string>, gradientStops: G
   if (family === "input") {
     const radius = numberValue(values, "radius", 10, 0, 48);
     const css = `.env-input {\n  background: ${values.bg};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  outline: none;\n}\n.env-input:focus-visible { outline: 3px solid ${values.focus}; outline-offset: 2px; }`;
-    return { css, style: { background: values.bg, border: `1px solid ${values.border}`, borderRadius: `${radius}px`, outline: `2px solid ${values.focus}` } };
+    return { css, style: { background: values.bg, border: `1px solid ${values.border}`, borderRadius: `${radius}px` } };
   }
   if (family === "avatar") {
     const size = numberValue(values, "size", 96, 24, 400);
@@ -323,11 +323,11 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     return true;
   }), [allFields, family, values.kind]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
-  const [sampleText, setSampleText] = useState("A little detail makes a big difference.");
+  const [sampleText, setSampleText] = useState("Continue");
   const output = useMemo(() => cssFor(family, values, gradientStops), [family, gradientStops, values]);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
-  const isText = family === "button" || family === "badge" || family === "input" || family === "text-shadow";
+  const isText = family === "button" || family === "badge" || family === "text-shadow";
 
   function randomizeShape() {
     setValues((previous) => ({ ...previous, seed: String(Math.floor(Math.random() * 999) + 1) }));
@@ -462,6 +462,8 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
         </div>
 
         <div className="min-w-0 space-y-3 lg:sticky lg:top-4">
+          {family === "button" ? <style>{`.env-live-button:hover { background: ${values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.hover ?? values.bg}; outline-offset: 3px; }`}</style> : null}
+          {family === "input" ? <style>{`.env-live-input:focus-visible { outline: 3px solid ${values.focus ?? "#0d9f8a"}; outline-offset: 2px; }`}</style> : null}
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-fg">Live preview</p>
             <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent">Updates as you edit</span>
@@ -479,9 +481,9 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                 <span className="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Learn more</span>
               </div>
             ) : family === "input" ? (
-              <input readOnly value="Input field preview" className="w-full max-w-xs px-3 py-2 text-sm text-slate-800" style={output.style} />
+              <input readOnly value="Input field preview" className="env-live-input w-full max-w-xs px-3 py-2 text-sm text-slate-800" style={output.style} />
             ) : family === "button" ? (
-              <button type="button" className="font-semibold" style={output.style}>{sampleText.length > 26 ? "Continue" : sampleText}</button>
+              <button type="button" className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors" style={output.style}>{sampleText}</button>
             ) : family === "badge" ? (
               <span style={output.style}>{sampleText.length > 18 ? "New feature" : sampleText}</span>
             ) : family === "text-shadow" ? (

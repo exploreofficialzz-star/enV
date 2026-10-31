@@ -43,6 +43,7 @@ const checks = [
   ["Gradient modes and editable stops", cssEngine.includes("Add stop (") && cssEngine.includes("Distribute evenly") && cssEngine.includes("Reverse") && cssEngine.includes("GRADIENT_PRESETS.map")],
   ["Gradient stop engine and regression tests", cssGradient.includes("normalizeGradientStops") && cssGradient.includes("repeating-linear-gradient") && cssGradientTests.includes("radial and conic gradients emit their selected geometry")],
   ["Layered shadow presets", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from")],
+  ["Button hover and input focus preview states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
   ["SVG shape color controls", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??")],
 ];
