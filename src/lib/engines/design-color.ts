@@ -52,7 +52,7 @@ export function parseDesignColor(input: string): RgbaColor | null {
   if (cssColor) return cssColor;
 
   const value = input.trim();
-  const hsvPattern = new RegExp("^hs[VB]\\\\(\\\\s*(" + NUMBER + ")(?:deg)?\\\\s*(?:,|\\\\s)\\\\s*(" + NUMBER + ")(%)?\\\\s*(?:,|\\\\s)\\\\s*(" + NUMBER + ")(%)?\\\\s*\\\\)$", "i");
+  const hsvPattern = new RegExp("^hs[VB]\\(\\s*(" + NUMBER + ")(?:deg)?\\s*(?:,|\\s)\\s*(" + NUMBER + ")(%)?\\s*(?:,|\\s)\\s*(" + NUMBER + ")(%)?\\s*\\)$", "i");
   const hsv = value.match(hsvPattern);
   if (hsv) {
     const hue = Number(hsv[1]);
@@ -63,7 +63,7 @@ export function parseDesignColor(input: string): RgbaColor | null {
     }
   }
 
-  const cmykPattern = new RegExp("^cmyk\\\\(\\\\s*(" + NUMBER + ")(%)?\\\\s*(?:,|\\\\s)\\\\s*(" + NUMBER + ")(%)?\\\\s*(?:,|\\\\s)\\\\s*(" + NUMBER + ")(%)?\\\\s*(?:,|\\\\s)\\\\s*(" + NUMBER + ")(%)?\\\\s*\\\\)$", "i");
+  const cmykPattern = new RegExp("^cmyk\\(\\s*(" + NUMBER + ")(%)?\\s*(?:,|\\s)\\s*(" + NUMBER + ")(%)?\\s*(?:,|\\s)\\s*(" + NUMBER + ")(%)?\\s*(?:,|\\s)\\s*(" + NUMBER + ")(%)?\\s*\\)$", "i");
   const cmyk = value.match(cmykPattern);
   if (cmyk) {
     const raw = [
