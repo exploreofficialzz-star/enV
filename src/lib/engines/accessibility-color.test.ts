@@ -9,6 +9,7 @@ import {
   suggestContrastCorrections,
   toHex,
 } from "./accessibility-color.ts";
+import { simulateColorVision } from "./color-vision.ts";
 import { auditUxUiStudioTextContrast } from "./ux-ui-studio-qa.ts";
 import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, type UxCodegenProject } from "./ux-ui-studio-codegen.ts";
@@ -157,4 +158,20 @@ test("opacity corrections never reduce opacity below the supplied alpha", () => 
   assert.ok(suggestion);
   assert.ok(suggestion.a >= fg.a);
   assert.ok(contrastRatio(suggestion, bg) >= 4.5);
+});
+
+
+test("color vision simulations preserve neutral black and white", () => {
+  for (const mode of ["protanopia", "deuteranopia", "tritanopia", "achromatopsia"] as const) {
+    assert.equal(simulateColorVision("#000000", mode), "#000000");
+    assert.equal(simulateColorVision("#ffffff", mode), "#ffffff");
+  }
+});
+
+test("color vision simulations produce valid and distinct previews", () => {
+  const modes = ["protanopia", "deuteranopia", "tritanopia", "achromatopsia"] as const;
+  const results = modes.map((mode) => simulateColorVision("#e34b4b", mode));
+  assert.ok(results.every((value) => value && parseCssColor(value)));
+  assert.ok(new Set(results).size > 1);
+  assert.equal(simulateColorVision("not-a-color", "protanopia"), null);
 });
