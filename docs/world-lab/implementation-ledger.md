@@ -405,3 +405,8 @@ release-candidate evidence bundle are unfinished.
   factors, for larger multi-experiment workloads. It does not simulate chemical
   structures or measure reaction safety. The account worker and migration 0014
   remain undeployed until accepted.
+
+- Private backend worker now performs capped batches of 30-day scientific job
+  expiry at startup/every six hours. Sensitive project and evidence payloads
+  are not retained indefinitely by design when the worker is operational;
+  hosted scheduling, auditing and deletion observability remain release gates.

@@ -70,3 +70,14 @@ fabricated temperatures. The parent project is included for provenance and
 no externally supplied executable code is allowed. The 25-case grid is
 a mathematical sensitivity analysis, not uncertainty probabilities or
 real chemical safety validation. The cloud choice requires consent.
+
+## Retention and recovery bounds
+
+Account science jobs retain their submitted portable project input and result
+for up to approximately 30 days, then the dedicated worker removes expired
+rows in bounded 200-item DELETE batches on startup and every six hours.
+Actual expiry depends on the worker running; a stopped worker cannot perform
+cleanup. Do not rely on this as a compliance retention guarantee without
+hosted-worker monitoring. The GET history index omits inputs and outputs,
+while explicit single-job retrieval remains owner-scoped. Job quota and
+lease-token cancellation remain in place.

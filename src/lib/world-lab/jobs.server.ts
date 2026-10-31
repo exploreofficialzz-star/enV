@@ -138,6 +138,22 @@ export async function claimNextWorldLabJob():Promise<{job:WorldLabJobRow;token:s
     return {job:claimed[0],token};
   });
 }
+/**
+ * Hard retention window: queued, running and completed job input_json/results
+ * are private account data, not a perpetual cloud backup. Prune at most 200
+ * oldest rows per batch to avoid unbounded transactions. The worker invokes
+ * this on startup and periodically; an inactive worker cannot enforce TTL.
+ */
+export async function purgeExpiredWorldLabJobs():Promise<number>{
+  requireEnabled();
+  const sql=await getSql();
+  const removed=await sql.query<{id:string}>(
+    "DELETE FROM public.world_lab_jobs WHERE id IN "+
+    "(SELECT id FROM public.world_lab_jobs "+
+    "WHERE created_at < now()-interval '30 days' "+
+    "ORDER BY created_at ASC LIMIT 200) RETURNING id");
+  return removed.length;
+}
 export async function processOneWorldLabJob():Promise<boolean>{
   const leased=await claimNextWorldLabJob();
   if(!leased)return false;
