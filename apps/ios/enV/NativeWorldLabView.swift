@@ -536,22 +536,30 @@ struct NativeWorldLabView:View {
         }
     }
     @ViewBuilder private func projectContent(_ project:NativeWorldLabProject)->some View {
-
-                    Text(project.title+" · "+String(project.entities.count)+" solids")
-                        .font(.headline)
-                    digitalContent(project)
-                    chemicalContent()
-                    Text("Connected DC circuits").font(.headline)
-                    if let circuit=project.networks?.first { circuitContent(circuit,project:project) }else {
-                        Button("Build first circuit"){
-                            applyProject{try NativeWorldLabEditor.starterCircuit($0)}
-                        }.buttonStyle(.bordered)
-                    }
+        Text(project.title+" · "+String(project.entities.count)+" solids").font(.headline)
+        digitalContent(project)
+        chemicalContent()
+        Text("Connected DC circuits").font(.headline)
+        if let circuit=project.networks?.first {
+            circuitContent(circuit,project:project)
+        }else{
+            Button("Build first circuit"){
+                applyProject{try NativeWorldLabEditor.starterCircuit($0)}
+            }.buttonStyle(.bordered)
+        }
+        projectShapeButtons(project)
+        projectAssemblyControls(project)
+        projectHistoryControls(project)
+        projectMaterialControls(project)
+    }
+    @ViewBuilder private func projectShapeButtons(_ project:NativeWorldLabProject)->some View {
                     HStack(spacing:8){
                         Button("Add cube"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"box")}}
                         Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}
                         Button("Add cylinder"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"cylinder")}}
                     }.buttonStyle(.bordered).disabled(project.entities.count>=200)
+    }
+    @ViewBuilder private func projectAssemblyControls(_ project:NativeWorldLabProject)->some View {
                     Text("Build from visual parts").font(.headline)
                     Text("Connect solid shapes for coordinated movement, not a calculated mechanical joint.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -603,18 +611,22 @@ struct NativeWorldLabView:View {
                             }.buttonStyle(.bordered)
                         }
                     }
+    }
+    @ViewBuilder private func projectHistoryControls(_ project:NativeWorldLabProject)->some View {
                     HStack {
                         Button("Undo"){travelEdit(false)}.disabled(!editHistory.canUndo)
                         Button("Redo"){travelEdit(true)}.disabled(!editHistory.canRedo)
                     }.buttonStyle(.bordered)
                     if let solid { solidContent(project:project,solid:solid) }
+    }
+    @ViewBuilder private func projectMaterialControls(_ project:NativeWorldLabProject)->some View {
                     if let solid,
                        let attached=project.materials.first(where:{$0.id==solid.materialId}){
                         Button("Revise this material's assumptions"){
                             editingMaterialId=attached.id
                             inventedName=attached.name
-                            inventedDensity=attached.densityKgM3.map(String.init) ?? ""
-                            inventedModulus=attached.youngModulusPa.map(String.init) ?? ""
+                            inventedDensity=attached.densityKgM3.map{String($0)} ?? ""
+                            inventedModulus=attached.youngModulusPa.map{String($0)} ?? ""
                         }.buttonStyle(.bordered)
                     }
                     TextField("Invented material name",text:$inventedName)
