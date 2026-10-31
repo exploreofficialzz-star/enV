@@ -367,4 +367,36 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun nativeGravityIntegratesInventedMassAndRejectsPhysicalContact(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="gravity-a")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="gravity-b")
+        json=NativeWorldLabEditor.addHypotheticalMaterial(
+            json,"Hypothetical gravity substance",100000.0,id="gravity-matter")
+        json=NativeWorldLabEditor.assignMaterial(json,"gravity-a","gravity-matter")
+        json=NativeWorldLabEditor.assignMaterial(json,"gravity-b","gravity-matter")
+        json=NativeWorldLabEditor.positionSolid(json,"gravity-a",listOf(0.0,0.5,0.0))
+        json=NativeWorldLabEditor.positionSolid(json,"gravity-b",listOf(20.0,0.5,0.0))
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val run=NativeWorldLabGravity.evaluate(project,
+            listOf("gravity-a","gravity-b"),emptyMap(),10.0,400)
+        assertEquals(2,run.bodies.size)
+        assertTrue(run.sample(10.0).positionsM[0].x>0)
+        assertTrue(run.sample(10.0).positionsM[1].x<20)
+        assertTrue(run.energyDriftFraction<0.001)
+        assertTrue(run.frames.size<=241)
+        val missing=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.assignMaterial(json,"gravity-b",null))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabGravity.evaluate(missing,listOf("gravity-a","gravity-b"),
+                emptyMap(),10.0,400)
+        }
+        val touching=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.positionSolid(json,"gravity-b",listOf(0.0,0.5,0.0)))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabGravity.evaluate(touching,listOf("gravity-a","gravity-b"),
+                emptyMap(),10.0,400)
+        }
+    }
+
 }

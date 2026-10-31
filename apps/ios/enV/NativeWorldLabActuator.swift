@@ -1030,6 +1030,11 @@ struct NativeGravityFrame:Encodable {
     let totalMomentumKgMps:[Double]
 }
 struct NativeGravityRun:Encodable {
+    let format="env-world-lab-newton-gravity"
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let materialEvidence="hypothetical-user-assumed"
+    let gravitationalConstantM3KgS2=6.67430e-11
     let projectId:String
     let projectRevision:Int
     let bodies:[NativeGravityBody]
@@ -1052,8 +1057,8 @@ struct NativeGravityRun:Encodable {
             (0..<3).map{x[$0]+(y[$0]-x[$0])*k}
         }
         return NativeGravityFrame(timeSeconds:time,
-            positionsM:zip(a.positionsM,b.positionsM).map{blend($0,$1)},
-            velocitiesMps:zip(a.velocitiesMps,b.velocitiesMps).map{blend($0,$1)},
+            positionsM:zip(a.positionsM,b.positionsM).map{pair in blend(pair.0,pair.1)},
+            velocitiesMps:zip(a.velocitiesMps,b.velocitiesMps).map{pair in blend(pair.0,pair.1)},
             totalEnergyJ:a.totalEnergyJ+(b.totalEnergyJ-a.totalEnergyJ)*k,
             energyDriftJ:a.energyDriftJ+(b.energyDriftJ-a.energyDriftJ)*k,
             totalMomentumKgMps:blend(a.totalMomentumKgMps,b.totalMomentumKgMps))

@@ -26,3 +26,8 @@ checks pass.** No account tokens, user sessions or provider credentials are
 embedded in this Docker image. The native Android and iOS clients currently
 lack a secure Better Auth API session bridge for this queue; they continue
 running their supported solvers locally and exchanging portable projects.
+
+
+Gravity queue additionally requires migration 0016, which raises the job-kind
+constraint to cover the explicit `newton-gravity` operation. The worker now
+requires this migration in its startup preflight; do not enable without it.

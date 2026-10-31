@@ -342,4 +342,44 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         ],restitution:1,durationSeconds:2))
     }
 
+    func testNativeNewtonianGravityIsFiniteAndConservesMomentum() throws {
+        var json=try NativeWorldLabEditor.blank()
+        json=try NativeWorldLabEditor.addSolid(json,shape:"sphere",id:"gravity-a")
+        json=try NativeWorldLabEditor.addSolid(json,shape:"sphere",id:"gravity-b")
+        json=try NativeWorldLabEditor.addHypotheticalMaterial(json,
+            name:"Invented gravity substance",densityKgM3:100000,id:"gravity-matter")
+        json=try NativeWorldLabEditor.assignMaterial(json,
+            solidId:"gravity-a",materialId:"gravity-matter")
+        json=try NativeWorldLabEditor.assignMaterial(json,
+            solidId:"gravity-b",materialId:"gravity-matter")
+        json=try NativeWorldLabEditor.positionSolid(json,id:"gravity-a",
+            positionMeters:[0,0.5,0])
+        json=try NativeWorldLabEditor.positionSolid(json,id:"gravity-b",
+            positionMeters:[20,0.5,0])
+        let project=try NativeWorldLabProject.decode(json)
+        let run=try NativeWorldLabGravity.evaluate(project,
+            ids:["gravity-a","gravity-b"],velocities:[:],
+            durationSeconds:10,integrationSteps:400)
+        XCTAssertEqual(run.bodies.count,2)
+        let final=try run.sample(10)
+        XCTAssertTrue(final.positionsM[0][0]>0)
+        XCTAssertTrue(final.positionsM[1][0]<20)
+        XCTAssertLessThan(run.energyDriftFraction,0.001)
+        XCTAssertLessThanOrEqual(run.frames.count,241)
+        let evidence=try JSONSerialization.jsonObject(with:JSONEncoder().encode(run))
+            as? [String:Any]
+        XCTAssertEqual(evidence?["format"] as? String,
+            "env-world-lab-newton-gravity")
+        let missing=try NativeWorldLabEditor.assignMaterial(json,
+            solidId:"gravity-b",materialId:nil)
+        XCTAssertThrowsError(try NativeWorldLabGravity.evaluate(
+            NativeWorldLabProject.decode(missing),
+            ids:["gravity-a","gravity-b"],velocities:[:]))
+        let touching=try NativeWorldLabEditor.positionSolid(json,
+            id:"gravity-b",positionMeters:[0,0.5,0])
+        XCTAssertThrowsError(try NativeWorldLabGravity.evaluate(
+            NativeWorldLabProject.decode(touching),
+            ids:["gravity-a","gravity-b"],velocities:[:]))
+    }
+
 }

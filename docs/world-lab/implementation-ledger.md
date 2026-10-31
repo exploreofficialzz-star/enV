@@ -442,3 +442,21 @@ release-candidate evidence bundle are unfinished.
   account history, retention and migration 0016. No automatic transfer.
 - Not integrated with collisions, electricity, chemistry, tides, relativistic
   dynamics or verified astronomical data. Production readiness not claimed.
+
+
+## 2026-10-31 integrated Newtonian science batch
+- Web/TypeScript, native Android/Kotlin and native iOS/Swift now each
+  implement a real velocity-Verlet Newtonian point-mass gravity solver
+  driven by validated invented sphere geometry and density assumptions,
+  with 2–8 body local capacities, simulation timeline, non-overlap guard,
+  energy/momentum conservation diagnostics and evidence export. Native
+  solvers remain independent, not WebViews.
+- Web additionally supports 2–32 sphere owner-scoped private-worker
+  computations, explicit user cloud consent and bounded 241-frame evidence
+  via authenticated queued jobs. Database migration 0016 must be applied;
+  the dedicated worker schema preflight refuses old versions.
+- Native Kotlin and Swift regression cases have been authored for actual
+  attraction, energy drift, material provenance and overlapping bodies.
+  This is code committed only: no successful CI, real device acceptance,
+  paid worker deployment, measured planetary inputs, or merged production
+  release is claimed.
