@@ -749,7 +749,7 @@ export async function synchronizeWebOfflineAllowance(allowanceId: string, finali
   };
   try {
     const result = await synchronizeWebOfflineAllowanceInternal(allowanceId, finalize);
-    if (result.status === "needs_recovery" || result.retryable === true) {
+    if (result.status === "needs_recovery" || ("retryable" in result && result.retryable === true)) {
       recordOutcome(false, "OFFLINE_RECOVERY_REQUIRED");
     } else {
       recordOutcome(true);
