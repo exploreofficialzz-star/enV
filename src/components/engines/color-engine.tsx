@@ -18,7 +18,7 @@ import {
   type RgbaColor,
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
-import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony } from "@/lib/engines/design-palette";
+import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony, type SemanticPaletteColors } from "@/lib/engines/design-palette";
 import { formatCmyk, formatHsv, parseDesignColor } from "@/lib/engines/design-color";
 
 type Harmony = PaletteHarmony;
@@ -119,6 +119,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [visionColors, setVisionColors] = useState(DEFAULT_VISION_COLORS);
   const [converterValue, setConverterValue] = useState(() => CONVERTER_DEFAULTS[toolId ?? ""] ?? "#0d9f8a");
   const [lockedSwatches, setLockedSwatches] = useState<Record<number, string>>({});
+  const [roleOverrides, setRoleOverrides] = useState<Partial<SemanticPaletteColors>>({});
   const [previewMode, setPreviewMode] = useState<"light" | "dark">("light");
   const [exportFormat, setExportFormat] = useState<PaletteExportFormat>("css");
   const [imagePalette, setImagePalette] = useState<string[]>([]);
@@ -135,12 +136,27 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     const sharedBase = params.get("base");
     const sharedHarmony = params.get("harmony");
     const sharedLocks = params.get("locks");
+    const sharedRoles = params.get("roles");
     if (sharedBase && parseDesignColor(sharedBase)) setColorValue(sharedBase);
     if (sharedHarmony && ["analogous", "complementary", "triadic", "split", "tetradic", "monochromatic"].includes(sharedHarmony)) {
       setHarmony(sharedHarmony as Harmony);
     }
     const sharedCount = Number(params.get("count"));
     if (Number.isInteger(sharedCount) && sharedCount >= 3 && sharedCount <= 8) setPaletteCount(sharedCount);
+    if (sharedRoles) {
+      try {
+        const parsed = JSON.parse(sharedRoles) as Record<string, unknown>;
+        const allowedRoles: Array<keyof SemanticPaletteColors> = ["primary", "secondary", "accent", "success", "info", "background", "surface", "text", "border"];
+        const safeRoles: Partial<SemanticPaletteColors> = {};
+        for (const role of allowedRoles) {
+          const value = parsed[role];
+          if (typeof value === "string" && parseDesignColor(value)) safeRoles[role] = value;
+        }
+        setRoleOverrides(safeRoles);
+      } catch {
+        setPaletteError("The shared semantic color roles were invalid; generated role colors are still available.");
+      }
+    }
     if (sharedLocks) {
       try {
         const parsed = JSON.parse(sharedLocks) as Record<string, string>;
@@ -172,17 +188,29 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   }, [color, harmony, lockedSwatches, paletteCount]);
   const primaryColor = toHex(palette[2] ?? { r: 13, g: 159, b: 138, a: 1 });
   const shadeScale = useMemo(() => createColorShadeScale(primaryColor), [primaryColor]);
-  const roleColors = useMemo(() => ({
-    primary: primaryColor,
-    secondary: toHex(palette[1] ?? { r: 90, g: 158, b: 232, a: 1 }),
-    accent: toHex(palette[4] ?? { r: 124, g: 77, b: 255, a: 1 }),
-    success: toHex(palette[3] ?? { r: 34, g: 153, b: 104, a: 1 }),
-    info: toHex(palette[0] ?? { r: 52, g: 127, b: 196, a: 1 }),
-    background: previewMode === "light" ? "#f8fafc" : "#0f172a",
-    surface: previewMode === "light" ? "#ffffff" : "#1e293b",
-    text: previewMode === "light" ? "#111827" : "#f8fafc",
-    border: previewMode === "light" ? "#e2e8f0" : "#334155",
-  }), [palette, previewMode, primaryColor]);
+  const roleColors = useMemo<SemanticPaletteColors>(() => {
+    const generated: SemanticPaletteColors = {
+      primary: primaryColor,
+      secondary: toHex(palette[1] ?? { r: 90, g: 158, b: 232, a: 1 }),
+      accent: toHex(palette[4] ?? { r: 124, g: 77, b: 255, a: 1 }),
+      success: toHex(palette[3] ?? { r: 34, g: 153, b: 104, a: 1 }),
+      info: toHex(palette[0] ?? { r: 52, g: 127, b: 196, a: 1 }),
+      background: previewMode === "light" ? "#f8fafc" : "#0f172a",
+      surface: previewMode === "light" ? "#ffffff" : "#1e293b",
+      text: previewMode === "light" ? "#111827" : "#f8fafc",
+      border: previewMode === "light" ? "#e2e8f0" : "#334155",
+    };
+    return { ...generated, ...roleOverrides };
+  }, [palette, previewMode, primaryColor, roleOverrides]);
+  const semanticContrast = useMemo(() => {
+    const text = parseDesignColor(roleColors.text);
+    const background = parseDesignColor(roleColors.background);
+    const primary = parseDesignColor(roleColors.primary);
+    return {
+      body: text && background ? contrastRatio(text, background) : null,
+      primary: primary && background ? contrastRatio(primary, background) : null,
+    };
+  }, [roleColors]);
   const paletteExport = useMemo(
     () => buildDesignPaletteExport(roleColors, shadeScale, exportFormat),
     [exportFormat, roleColors, shadeScale],
@@ -194,8 +222,9 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     url.searchParams.set("harmony", harmony);
     url.searchParams.set("count", String(paletteCount));
     url.searchParams.set("locks", JSON.stringify(lockedSwatches));
+    url.searchParams.set("roles", JSON.stringify(roleOverrides));
     return url.toString();
-  }, [colorValue, harmony, lockedSwatches, paletteCount]);
+  }, [colorValue, harmony, lockedSwatches, paletteCount, roleOverrides]);
   const contrastChecks = useMemo(() => foreground && background && canvas
     ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value, canvas) }))
     : [], [foreground, background, canvas]);
@@ -525,11 +554,27 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   <option value="dark">Dark preview</option>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {Object.entries(roleColors).map(([role, value]) => <div key={role} className="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 p-2">
-                  <span className="size-8 shrink-0 rounded-md border border-black/10" style={{ background: value }} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted">Edit any role without regenerating the rest of your palette.</p>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setRoleOverrides({})} disabled={Object.keys(roleOverrides).length === 0}>Reset generated roles</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {(Object.entries(roleColors) as Array<[keyof SemanticPaletteColors, string]>).map(([role, value]) => <label key={role} className="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 p-2">
+                  <Input type="color" aria-label={"Edit " + role + " role"} value={value} onChange={(event) => setRoleOverrides((previous) => ({ ...previous, [role]: event.target.value }))} className="h-9 w-10 shrink-0 p-1" />
                   <span className="min-w-0"><span className="block text-[11px] font-semibold capitalize text-fg">{role}</span><span className="block truncate font-mono text-[10px] text-muted">{value.toUpperCase()}</span></span>
-                </div>)}
+                </label>)}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2" aria-live="polite">
+                <div className="rounded-lg border border-border p-2">
+                  <p className="text-[11px] text-muted">Body text on background</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">{semanticContrast.body === null ? "Unavailable" : semanticContrast.body.toFixed(2) + ":1"}</p>
+                  <p className="text-[10px] text-muted">{semanticContrast.body !== null && semanticContrast.body >= 4.5 ? "Meets normal-text AA" : "Below normal-text AA target"}</p>
+                </div>
+                <div className="rounded-lg border border-border p-2">
+                  <p className="text-[11px] text-muted">Primary color on background</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">{semanticContrast.primary === null ? "Unavailable" : semanticContrast.primary.toFixed(2) + ":1"}</p>
+                  <p className="text-[10px] text-muted">{semanticContrast.primary !== null && semanticContrast.primary >= 3 ? "Meets non-text AA target" : "Below non-text AA target"}</p>
+                </div>
               </div>
               <div className="overflow-hidden rounded-xl border" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }}>
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
@@ -570,7 +615,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   <option value="tokens">W3C tokens</option>
                 </Select>
               </div>
-              <div className="flex flex-wrap gap-2"><CopyButton text={paletteShareUrl} label="Copy share link" /><span className="self-center text-xs text-muted">Locked swatches and harmony are included.</span></div>
+              <div className="flex flex-wrap gap-2"><CopyButton text={paletteShareUrl} label="Copy share link" /><span className="self-center text-xs text-muted">Locked swatches, editable roles and harmony are included.</span></div>
               <CodeResult code={paletteExport} filename={`env-design-tokens.${exportFormat === "css" ? "css" : exportFormat === "scss" ? "scss" : exportFormat === "tailwind" ? "js" : "json"}`} />
             </section>
           </>
