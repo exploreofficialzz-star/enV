@@ -39,36 +39,13 @@ fun NativeWorldLabHeatPanel(project:NativeWorldLabProject,onError:(String)->Unit
     var speed by remember(project){mutableFloatStateOf(1f)}
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    val savedScience=remember(context){NativeWorldLabEvidenceStore(context.filesDir)}
     val export=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null&&run!=null)scope.launch {
             runCatching{withContext(Dispatchers.IO){
-                val actual=run?:error("No calculated thermal evidence")
-                val bytes=JSONObject()
-                    .put("format","env-world-lab-material-heat-transfer")
-                    .put("modelVersion","1.0.0")
-                    .put("evidence","physics-model-computed")
-                    .put("materialEvidence","hypothetical-user-assumed")
-                    .put("projectId",actual.projectId)
-                    .put("projectRevision",actual.projectRevision)
-                    .put("firstEntityId",actual.firstEntityId)
-                    .put("secondEntityId",actual.secondEntityId)
-                    .put("firstMaterialId",actual.firstMaterialId)
-                    .put("secondMaterialId",actual.secondMaterialId)
-                    .put("firstThermalCapacityJPerK",actual.firstCapacityJPerK)
-                    .put("secondThermalCapacityJPerK",actual.secondCapacityJPerK)
-                    .put("conductanceWPerK",actual.conductanceWPerK)
-                    .put("equilibriumTemperatureK",actual.equilibriumTemperatureK)
-                    .put("durationSeconds",actual.durationSeconds)
-                    .put("validity",actual.validity)
-                    .put("samples",JSONArray().apply{actual.samples.forEach{sample->
-                        put(JSONObject()
-                            .put("timeSeconds",sample.timeSeconds)
-                            .put("firstTemperatureK",sample.firstTemperatureK)
-                            .put("secondTemperatureK",sample.secondTemperatureK)
-                            .put("interfaceHeatFlowW",sample.interfaceHeatFlowW)
-                            .put("energyResidualJ",sample.energyResidualJ))
-                    }}).toString(2).toByteArray(Charsets.UTF_8)
+                val actual=run?:error("No calculated material heat evidence")
+                val bytes=NativeWorldLabEvidenceJson.heat(actual).toString(2).toByteArray(Charsets.UTF_8)
                 require(bytes.size<=1048576){"Thermal evidence exceeds 1 MB"}
                 context.contentResolver.openOutputStream(uri,"wt")?.use{
                     it.write(bytes);it.flush()
@@ -154,6 +131,17 @@ fun NativeWorldLabHeatPanel(project:NativeWorldLabProject,onError:(String)->Unit
             OutlinedButton(onClick={export.launch("world-lab-material-heat.json")}){
                 Text("Export evidence")
             }
+            OutlinedButton(onClick={
+                scope.launch{
+                    runCatching{withContext(Dispatchers.IO){
+                        savedScience.save(project,NativeWorldLabEvidenceJson.heat(active))
+                    }}.onSuccess{
+                        onError("Material heat evidence saved in private device history.")
+                    }.onFailure{
+                        onError(it.message?:"Save the project before retaining evidence.")
+                    }
+                }
+            }){Text("Keep on device")}
         }
         Slider(value=speed,onValueChange={speed=it},valueRange=0.1f..10f,
             modifier=Modifier.semantics{contentDescription="Heat playback speed"})

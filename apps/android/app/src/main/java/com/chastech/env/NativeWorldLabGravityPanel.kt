@@ -39,41 +39,13 @@ fun NativeWorldLabGravityPanel(project:NativeWorldLabProject,onError:(String)->U
     var rate by remember(project){mutableFloatStateOf(1f)}
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
+    val savedScience=remember(context){NativeWorldLabEvidenceStore(context.filesDir)}
     val export=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null&&run!=null)scope.launch{
             runCatching{withContext(Dispatchers.IO){
-                val evidence=run ?: error("No gravity evidence")
-                fun vec(v:NativeLabVector)=JSONArray().put(v.x).put(v.y).put(v.z)
-                val json=JSONObject().put("format","env-world-lab-newton-gravity")
-                    .put("modelVersion","1.0.0")
-                    .put("evidence","physics-model-computed")
-                    .put("materialEvidence","hypothetical-user-assumed")
-                    .put("projectId",evidence.projectId)
-                    .put("projectRevision",evidence.projectRevision)
-                    .put("durationSeconds",evidence.durationSeconds)
-                    .put("integrationSteps",evidence.integrationSteps)
-                    .put("gravitationalConstantM3KgS2",NativeWorldLabGravity.G)
-                    .put("energyDriftFraction",evidence.energyDriftFraction)
-                    .put("initialEnergyJ",evidence.initialEnergyJ)
-                    .put("finalEnergyJ",evidence.finalEnergyJ)
-                    .put("validity",evidence.validity)
-                    .put("bodies",JSONArray().apply{evidence.bodies.forEach{body->
-                        put(JSONObject().put("entityId",body.entityId)
-                            .put("massKg",body.massKg).put("radiusM",body.radiusM)
-                            .put("initialPositionM",vec(body.initialPositionM))
-                            .put("initialVelocityMps",vec(body.initialVelocityMps)))
-                    }})
-                    .put("frames",JSONArray().apply{evidence.frames.forEach{frame->
-                        put(JSONObject().put("timeSeconds",frame.timeSeconds)
-                            .put("positionsM",JSONArray().apply{
-                                frame.positionsM.forEach{put(vec(it))}
-                            }).put("velocitiesMps",JSONArray().apply{
-                                frame.velocitiesMps.forEach{put(vec(it))}
-                            }).put("totalEnergyJ",frame.totalEnergyJ)
-                            .put("energyDriftJ",frame.energyDriftJ)
-                            .put("totalMomentumKgMps",vec(frame.totalMomentumKgMps)))
-                    }}).toString(2).toByteArray(Charsets.UTF_8)
+                val evidence=run?:error("No computed gravitational evidence")
+                val json=NativeWorldLabEvidenceJson.gravity(evidence).toString(2).toByteArray(Charsets.UTF_8)
                 require(json.size<=1048576){"Gravity evidence is larger than 1 MB"}
                 context.contentResolver.openOutputStream(uri,"wt")?.use{
                     it.write(json);it.flush()
@@ -170,6 +142,17 @@ fun NativeWorldLabGravityPanel(project:NativeWorldLabProject,onError:(String)->U
             OutlinedButton(onClick={export.launch("world-lab-gravity-evidence.json")}){
                 Text("Export evidence")
             }
+            OutlinedButton(onClick={
+                scope.launch{
+                    runCatching{withContext(Dispatchers.IO){
+                        savedScience.save(project,NativeWorldLabEvidenceJson.gravity(active))
+                    }}.onSuccess{
+                        onError("Gravity evidence saved in private device history.")
+                    }.onFailure{
+                        onError(it.message?:"Save the project before retaining evidence.")
+                    }
+                }
+            }){Text("Keep on device")}
         }
         Slider(value=rate,onValueChange={rate=it},valueRange=0.1f..10f,
             modifier=Modifier.semantics{contentDescription="Gravity playback speed"})

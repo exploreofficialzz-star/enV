@@ -1183,6 +1183,7 @@ fun NativeWorldLabForm() {
                 NativeWorldLabMultiSpherePanel(project!!){ warning=it }
                 NativeWorldLabGravityPanel(project!!){ warning=it }
                 NativeWorldLabHeatPanel(project!!){ warning=it }
+                NativeWorldLabEvidencePanel(project!!){ warning=it }
                 Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
                 Text("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.",
                     style=MaterialTheme.typography.bodySmall)
