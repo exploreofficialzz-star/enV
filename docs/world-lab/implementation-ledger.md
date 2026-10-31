@@ -474,3 +474,20 @@ release-candidate evidence bundle are unfinished.
   numeric heat flow, a colored 3D visualization and complete JSON evidence.
   This is exact only for the stated insulated lumped interface; it is not a
   spatial PDE solver, radiation, convection or thermal hazard certification.
+
+
+## 2026-10-31 material-to-thermal system integration (source committed)
+- The portable project now optionally contains invented specific heat and thermal
+  conductivity per material; Web, Android and iOS editors can create and revise
+  these values. Older projects and incomplete materials preserve unknown
+  fields rather than obtaining invented thermal properties.
+- A real local, energy-conserving two-box contact exchange is implemented in
+  TypeScript, Kotlin and Swift using directly coupled assumed density and
+  thermal conductivity/specific heat. All interfaces offer Kelvin input,
+  modeled time control, numerical heat flow, computed temperatures and
+  evidence export. Web and iOS visualize temperatures in their 3D scenes;
+  Android provides a calculated thermal projection.
+- Added native source tests for geometry contact, material assumptions,
+  quantitative temperatures, conserved energy and metadata. The model is
+  not a general conduction PDE, phase-change, safety or medical simulator.
+  No CI, device tests or release gates have yet been executed for this batch.

@@ -866,9 +866,9 @@ struct NativeWorldLabView:View {
                                 modulus=nil
                             }else if let value=Double(inventedModulus) {modulus=value}
                             else {throw NativeWorldLabError.invalid("Young's modulus must be numeric")}
-                            let conductivity=try inventedConductivity.trimmingCharacters(
+                            let conductivity=inventedConductivity.trimmingCharacters(
                                 in:.whitespaces).isEmpty ? nil : Double(inventedConductivity)
-                            let heatCapacity=try inventedSpecificHeat.trimmingCharacters(
+                            let heatCapacity=inventedSpecificHeat.trimmingCharacters(
                                 in:.whitespaces).isEmpty ? nil : Double(inventedSpecificHeat)
                             if !inventedConductivity.trimmingCharacters(in:.whitespaces).isEmpty &&
                                conductivity==nil {

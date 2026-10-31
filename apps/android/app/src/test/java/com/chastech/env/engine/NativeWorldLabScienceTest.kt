@@ -399,4 +399,35 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun inventedTwoSlabHeatExchangeConservesEnergyWithoutInventingUnknownMatter(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="thermal-a")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="thermal-b")
+        json=NativeWorldLabEditor.positionSolid(json,"thermal-a",listOf(0.0,0.5,0.0))
+        json=NativeWorldLabEditor.positionSolid(json,"thermal-b",listOf(1.0,0.5,0.0))
+        json=NativeWorldLabEditor.addHypotheticalMaterial(json,
+            "Invented conducting solid",1000.0,id="conductor",
+            thermalConductivityWPerMK=10.0,specificHeatJPerKgK=100.0)
+        json=NativeWorldLabEditor.assignMaterial(json,"thermal-a","conductor")
+        json=NativeWorldLabEditor.assignMaterial(json,"thermal-b","conductor")
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val result=NativeWorldLabHeatTransfer.evaluate(project,"thermal-a",
+            "thermal-b",400.0,300.0,100.0)
+        assertEquals(121,result.samples.size)
+        assertEquals(350.0,result.equilibriumTemperatureK,1e-9)
+        assertTrue(result.samples.last().firstTemperatureK<400)
+        assertTrue(result.samples.last().secondTemperatureK>300)
+        assertEquals(0.0,result.samples.last().energyResidualJ,1e-6)
+        val invalid=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.positionSolid(json,"thermal-b",listOf(2.0,0.5,0.0)))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabHeatTransfer.evaluate(invalid,"thermal-a","thermal-b",400.0,300.0)
+        }
+        val unassigned=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.assignMaterial(json,"thermal-b",null))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabHeatTransfer.evaluate(unassigned,"thermal-a","thermal-b",400.0,300.0)
+        }
+    }
+
 }

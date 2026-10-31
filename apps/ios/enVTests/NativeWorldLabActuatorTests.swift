@@ -382,4 +382,47 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             ids:["gravity-a","gravity-b"],velocities:[:]))
     }
 
+    func testNativeInventedMaterialHeatExchangeIsEnergyConserving() throws {
+        var data=try NativeWorldLabEditor.blank()
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"thermal-a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"thermal-b")
+        data=try NativeWorldLabEditor.positionSolid(data,id:"thermal-a",
+            positionMeters:[0,0.5,0])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"thermal-b",
+            positionMeters:[1,0.5,0])
+        data=try NativeWorldLabEditor.addHypotheticalMaterial(data,
+            name:"Invented conductive solid",densityKgM3:1000,
+            id:"conductor",thermalConductivityWPerMK:10,specificHeatJPerKgK:100)
+        data=try NativeWorldLabEditor.assignMaterial(data,
+            solidId:"thermal-a",materialId:"conductor")
+        data=try NativeWorldLabEditor.assignMaterial(data,
+            solidId:"thermal-b",materialId:"conductor")
+        let project=try NativeWorldLabProject.decode(data)
+        let run=try NativeWorldLabHeatTransfer.evaluate(project,
+            firstId:"thermal-a",secondId:"thermal-b",
+            firstTemperatureK:400,secondTemperatureK:300,durationSeconds:100)
+        XCTAssertEqual(run.samples.count,121)
+        XCTAssertEqual(run.equilibriumTemperatureK,350,accuracy:1e-9)
+        let end=try run.sample(100)
+        XCTAssertLessThan(end.firstTemperatureK,400)
+        XCTAssertGreaterThan(end.secondTemperatureK,300)
+        XCTAssertEqual(end.energyResidualJ,0,accuracy:1e-6)
+        let encoded=try JSONSerialization.jsonObject(with:JSONEncoder().encode(run))
+            as? [String:Any]
+        XCTAssertEqual(encoded?["format"] as? String,
+            "env-world-lab-material-heat-transfer")
+        let displaced=try NativeWorldLabEditor.positionSolid(data,
+            id:"thermal-b",positionMeters:[2,0.5,0])
+        XCTAssertThrowsError(try NativeWorldLabHeatTransfer.evaluate(
+            NativeWorldLabProject.decode(displaced),
+            firstId:"thermal-a",secondId:"thermal-b",
+            firstTemperatureK:400,secondTemperatureK:300))
+        let noMaterial=try NativeWorldLabEditor.assignMaterial(data,
+            solidId:"thermal-b",materialId:nil)
+        XCTAssertThrowsError(try NativeWorldLabHeatTransfer.evaluate(
+            NativeWorldLabProject.decode(noMaterial),
+            firstId:"thermal-a",secondId:"thermal-b",
+            firstTemperatureK:400,secondTemperatureK:300))
+    }
+
 }
