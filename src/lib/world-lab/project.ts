@@ -78,6 +78,14 @@ const circuitNetworkSchema=z.object({
 export type WorldLabCircuitNetwork=z.infer<typeof circuitNetworkSchema>;
 export type WorldLabCircuitComponent=WorldLabCircuitNetwork["components"][number];
 
+const assemblySchema=z.object({
+  id:uid,
+  name:z.string().trim().min(1).max(120),
+  entityIds:z.array(uid).min(2).max(30),
+}).strict().superRefine((a,ctx)=>{
+  if(new Set(a.entityIds).size!==a.entityIds.length)
+    ctx.addIssue({code:"custom",message:"An assembly cannot contain the same solid twice."});
+});
 export const worldLabProjectSchema = z.object({
   format: z.literal("env-world-lab"),
   schemaVersion: z.literal(1),
@@ -99,6 +107,7 @@ export const worldLabProjectSchema = z.object({
   entities: z.array(entitySchema).max(200),
   materials: z.array(materialSchema).max(100),
   networks: z.array(circuitNetworkSchema).max(12).optional(),
+  assemblies:z.array(assemblySchema).max(50).optional(),
 }).strict().superRefine((p, ctx) => {
   if (new Set(p.entities.map(x => x.id)).size !== p.entities.length) {
     ctx.addIssue({ code: "custom", message: "Duplicate entity IDs." });
@@ -108,6 +117,21 @@ export const worldLabProjectSchema = z.object({
   }
   if(new Set((p.networks??[]).map(x=>x.id)).size!==(p.networks??[]).length)
     ctx.addIssue({code:"custom",message:"Duplicate circuit network IDs."});
+  const entityIds=new Set(p.entities.map(x=>x.id));
+  const groupIds=new Set<string>();
+  const assigned=new Set<string>();
+  for(const group of p.assemblies??[]){
+    if(groupIds.has(group.id))
+      ctx.addIssue({code:"custom",message:"Duplicate assembly IDs."});
+    groupIds.add(group.id);
+    for(const id of group.entityIds){
+      if(!entityIds.has(id))
+        ctx.addIssue({code:"custom",message:"Assembly references a missing solid."});
+      if(assigned.has(id))
+        ctx.addIssue({code:"custom",message:"A solid cannot belong to multiple assemblies."});
+      assigned.add(id);
+    }
+  }
   const materials = new Set(p.materials.map(x => x.id));
   for (const entity of p.entities) {
     if (entity.materialId !== null && !materials.has(entity.materialId)) {
@@ -153,7 +177,7 @@ export function blankWorldLabProject(id: string, now: string): WorldLabProject {
     world: { frame: "LOCAL_ENU", origin: [0, 0, 0],
       representation: "representative-not-measured", terrainSource: null },
     camera: { positionMeters: [0, 1.65, -8], lookingAtMeters: [0, 1.2, 0] },
-    entities: [], materials: [], networks: [],
+    entities: [], materials: [], networks: [], assemblies: [],
   });
 }
 export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number): WorldLabEntity {
