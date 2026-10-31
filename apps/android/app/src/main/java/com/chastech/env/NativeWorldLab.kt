@@ -435,6 +435,24 @@ fun NativeWorldLabForm() {
                         }
                     }
                 }
+                val signalNodes=digital.inputs.map{it.id to it.label}+
+                    digital.gates.map{it.id to it.name}
+                digital.outputs.forEach{output->
+                    val current=signalNodes.indexOfFirst{it.first==output.sourceNodeId}
+                    OutlinedButton(onClick={
+                        if(signalNodes.isNotEmpty()){
+                            val next=signalNodes[(current+1)%signalNodes.size].first
+                            applyProjectEdit{json->
+                                NativeWorldLabEditor.digitalOutputSource(
+                                    json,digital.id,output.id,next)
+                            }
+                        }
+                    }){
+                        Text(output.label+" reads "+
+                            (signalNodes.getOrNull(current)?.second?:"unknown")+
+                            " · tap to change source")
+                    }
+                }
                 OutlinedButton(onClick={digitalShowCases=!digitalShowCases}){
                     Text(if(digitalShowCases)"Hide all logic cases" else "Check every input combination")
                 }
