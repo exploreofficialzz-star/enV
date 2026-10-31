@@ -643,3 +643,11 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
  assert.ok(Math.abs(record.accountedLostBranchPowerFraction+
    record.finalPrimaryRayPowerFraction-1)<1e-12);
 });
+
+- Native Android now has a separate fully local optical scene ray UI, connected
+  to the existing invented-solid editor. It can aim at authored optically
+  characterized spheres/boxes, trace bounded 3D Snell/Fresnel material
+  intersections using a pure Kotlin implementation, display each path
+  segment and export a portable project/revision-bound scientific evidence
+  envelope. It is not a path-rendered Android AR camera or fully branched
+  optical renderer; local ray evidence history is still an independent export.

@@ -1220,6 +1220,7 @@ fun NativeWorldLabForm() {
                 NativeWorldLabMultiSpherePanel(project!!){ warning=it }
                 NativeWorldLabGravityPanel(project!!){ warning=it }
                 NativeWorldLabOpticsPanel(project!!){ warning=it }
+                NativeWorldLabRayPanel(project!!){ warning=it }
                 NativeWorldLabHeatPanel(project!!){ warning=it }
                 NativeWorldLabEvidencePanel(project!!){ warning=it }
                 Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
