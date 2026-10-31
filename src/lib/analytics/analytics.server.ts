@@ -290,7 +290,7 @@ export async function runAnalyticsRetention(request: Request) {
   const dayKeys = new Set([
     ...overviewRows.map(row=>String(row.report_day).slice(0,10)),
     String(previousDay[0]?.report_day ?? '').slice(0,10),
-  ].filter(day=>/^\\d{4}-\\d{2}-\\d{2}$/.test(day)));
+  ].filter(day=>/^\d{4}-\d{2}-\d{2}$/.test(day)));
   const rowsForDay = (rows,day) => rows.filter(row=>String(row.report_day).slice(0,10)===day);
   let dailyReportsSaved=0;
   for (const day of dayKeys) {
