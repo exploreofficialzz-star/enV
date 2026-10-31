@@ -97,8 +97,9 @@ class NativeGamePlaybackTest {
         assertTrue("Native game screen did not contain visible scene content; sampled colors=${colors.size}", colors.size >= 4)
         // A preloaded emulator app can present its own ANR after capture. Reject
         // it before sending movement events so the game, not a dialog, gets input.
-        assertTrue("Unrelated system ANR continued to obscure the game.",
-            !dismissMessagesAnr())
+        // A late Messages dialog can arrive after the valid baseline image.
+        // Close that unrelated system app and still require visible movement.
+        dismissMessagesAnr()
         // Hold the on-screen right arrow and compare only the scene, excluding UI controls.
         val x = (image.width * 0.25).toInt()
         var start = -1
