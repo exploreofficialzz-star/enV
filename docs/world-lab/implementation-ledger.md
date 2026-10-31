@@ -658,3 +658,10 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
   segments against actual authored 3D solids, and versioned evidence is
   retained via the existing private scientific store and complete archives.
   The separate Swift solver source is explicitly registered with Xcode.
+
+- Android's original private optical-evidence store now handles BOTH
+  ideal planar interface results and actual 3D geometry-traced ray records,
+  using their distinct strict portable schemas under one 20-item quota.
+  Android ray calculations can be retained with the saved invention and
+  exported; document-picker imports now support either record type. Native
+  iOS SceneKit ray segments explicitly assign a visible constant-color material.

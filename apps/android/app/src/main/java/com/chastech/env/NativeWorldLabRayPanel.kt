@@ -26,6 +26,7 @@ fun NativeWorldLabRayPanel(project:NativeWorldLabProject,onMessage:(String)->Uni
         mutableStateOf<NativeOpticalSceneRun?>(null)
     }
     val context=LocalContext.current
+    val savedEvidence=remember(context){NativeWorldLabOpticsEvidenceStore(context.filesDir)}
     var exportJson by remember {mutableStateOf("")}
     val export=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
@@ -105,6 +106,13 @@ fun NativeWorldLabRayPanel(project:NativeWorldLabProject,onMessage:(String)->Uni
                     " · "+String.format(Locale.US,"%.3f",part.travelledMeters)+" m",
                     style=MaterialTheme.typography.bodySmall)
             }
+            OutlinedButton(onClick={
+                runCatching{savedEvidence.save(record)}.onSuccess{
+                    onMessage("Saved 3D ray evidence with this device's invention.")
+                }.onFailure{
+                    onMessage(it.message?:"Could not retain optical scene evidence.")
+                }
+            }){Text("Keep 3D ray evidence on device")}
             OutlinedButton(onClick={
                 runCatching{record.portableEvidence()}.onSuccess{
                     exportJson=it

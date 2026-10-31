@@ -2456,10 +2456,13 @@ Text("Invent chemical heat").font(.headline)
                 let element=SCNGeometryElement(indices:[Int32(0),Int32(1)],
                     primitiveType:.line)
                 let geometry=SCNGeometry(sources:[source],elements:[element])
-                geometry.firstMaterial?.lightingModel = .constant
-                geometry.firstMaterial?.diffuse.contents =
+                let rayMaterial=SCNMaterial()
+                rayMaterial.lightingModel = .constant
+                rayMaterial.diffuse.contents =
                     part.kind=="total-internal-reflection" ?
                         UIColor.systemOrange:UIColor.systemCyan
+                rayMaterial.isDoubleSided=true
+                geometry.materials=[rayMaterial]
                 let pathNode=SCNNode(geometry:geometry)
                 pathNode.name="invented-optical-ray-"+String(index)
                 next.rootNode.addChildNode(pathNode)

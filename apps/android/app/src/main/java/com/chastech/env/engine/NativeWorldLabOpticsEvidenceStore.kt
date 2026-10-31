@@ -27,12 +27,76 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         val outer=JSONObject(String(bytes,StandardCharsets.UTF_8))
         require(outer.length()==6&&
             outer.getString("id")==id&&outer.getString("projectId")==projectId&&
-            outer.getString("kind")=="interface-optics"&&
+            outer.getString("kind") in setOf("interface-optics","optical-scene-ray")&&
             outer.getInt("projectRevision")>=0){"Optical evidence identity was changed."}
         require(outer.getString("createdAt").let{
             runCatching{OffsetDateTime.parse(it)}.isSuccess
         }){"Optical evidence date is invalid."}
         val result=outer.getJSONObject("result")
+        if(outer.getString("kind")=="optical-scene-ray"){
+            val requiredRay=setOf("format","modelVersion","evidence",
+                "materialEvidence","projectId","projectRevision","input","segments",
+                "accountedLostBranchPowerFraction","finalPrimaryRayPowerFraction","validity")
+            require(result.keys().asSequence().toSet()==requiredRay&&
+                result.getString("format")=="env-world-lab-optical-scene-ray"&&
+                result.getString("modelVersion")=="1.0.0"&&
+                result.getString("evidence")=="physics-model-computed"&&
+                result.getString("materialEvidence")=="hypothetical-user-assumed"&&
+                result.getString("projectId")==projectId&&
+                result.getInt("projectRevision")==outer.getInt("projectRevision")&&
+                result.getString("validity").length in 30..2000){
+                "3D optical evidence is not a supported World Lab record."
+            }
+            fun vector3(value:org.json.JSONArray):Boolean{
+                if(value.length()!=3)return false
+                return (0..2).all{idx->
+                    val v=value.getDouble(idx)
+                    v.isFinite()&&kotlin.math.abs(v)<=100000
+                }
+            }
+            val input=result.getJSONObject("input")
+            require(input.keys().asSequence().toSet()==setOf("originMeters",
+                "direction","maximumDistanceMeters","maximumInterfaces")&&
+                vector3(input.getJSONArray("originMeters"))&&
+                vector3(input.getJSONArray("direction"))&&
+                input.getDouble("maximumDistanceMeters") in 0.1..1000.0&&
+                input.getInt("maximumInterfaces") in 1..16){
+                "Invented ray origin, direction or simulation budget is unsupported."
+            }
+            val segments=result.getJSONArray("segments")
+            require(segments.length() in 1..18){
+                "3D optical evidence has an invalid intersection count."
+            }
+            for(i in 0 until segments.length()){
+                val part=segments.getJSONObject(i)
+                require(part.keys().asSequence().toSet()==setOf(
+                    "startMeters","endMeters","kind","entityId","travelMeters",
+                    "incidentIndex","transmittedIndex","reflectance",
+                    "transmittance","survivingRayPowerFraction")&&
+                    vector3(part.getJSONArray("startMeters"))&&
+                    vector3(part.getJSONArray("endMeters"))&&
+                    part.getString("kind") in setOf("transmitted",
+                        "total-internal-reflection","escaped","limit")&&
+                    part.getDouble("travelMeters")>=0&&
+                    part.getDouble("incidentIndex") in 1.0..5.0&&
+                    (part.isNull("transmittedIndex")||
+                        part.getDouble("transmittedIndex") in 1.0..5.0)&&
+                    part.getDouble("reflectance") in 0.0..1.0&&
+                    part.getDouble("transmittance") in 0.0..1.0&&
+                    part.getDouble("survivingRayPowerFraction") in 0.0..1.0&&
+                    kotlin.math.abs(part.getDouble("reflectance")+
+                        part.getDouble("transmittance")-1)<1e-9){
+                    "Imported 3D optical segment violates finite model bounds."
+                }
+            }
+            val primary=result.getDouble("finalPrimaryRayPowerFraction")
+            val ignored=result.getDouble("accountedLostBranchPowerFraction")
+            require(primary in 0.0..1.0&&ignored in 0.0..1.0&&
+                kotlin.math.abs(primary+ignored-1)<1e-6){
+                "Optical 3D evidence does not account for its reflected power."
+            }
+            return outer
+        }
         val required=setOf("format","modelVersion","evidence","materialEvidence",
             "projectId","projectRevision","firstMaterialId","secondMaterialId",
             "firstIndex","secondIndex","incidentAngleDegrees","reflectedAngleDegrees",
@@ -132,6 +196,8 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         }finally{temp.delete()}
         return recordId
     }
+    @Synchronized fun save(run:NativeOpticalSceneRun):String =
+        importRecord(run.portableEvidence(),run.projectId)
     /** Import only an already-saved, project-bound, immutable optical result. */
     @Synchronized fun importRecord(json:String,projectId:String):String {
         val bytes=json.toByteArray(StandardCharsets.UTF_8)
