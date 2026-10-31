@@ -908,8 +908,7 @@ enum NativeWorldLabMultiSphere {
         }
         for i in bodies.indices {
             for j in (i+1)..<bodies.count {
-                guard (bodies[j].position-bodies[i].position).length>
-                    bodies[i].radius+bodies[j].radius+tolerance else {
+                guard (bodies[j].position-bodies[i].position).length > bodies[i].radius+bodies[j].radius+tolerance else {
                     throw NativeWorldLabError.invalid("Group spheres must start separated, not touching")
                 }
             }
