@@ -16,7 +16,8 @@ private data class GV(val x:Double,val y:Double,val z:Double) {
     fun asLab()=NativeLabVector(x,y,z)
     companion object {fun of(v:NativeLabVector)=GV(v.x,v.y,v.z)}
 }
-data class NativeGravityBody(val entityId:String,val massKg:Double,val radiusM:Double,
+data class NativeGravityBody(val entityId:String,val materialId:String,
+    val massKg:Double,val radiusM:Double,
     val initialPositionM:NativeLabVector,val initialVelocityMps:NativeLabVector)
 data class NativeGravityFrame(val timeSeconds:Double,
     val positionsM:List<NativeLabVector>,val velocitiesMps:List<NativeLabVector>,
@@ -93,7 +94,7 @@ object NativeWorldLabGravity {
             val vector=GV.of(speed)
             require(vector.valid()&&vector.magnitude()<=1e6){
                 "Gravity velocities must be finite and no faster than 10^6 m/s"}
-            NativeGravityBody(id,mass,solid.dimensionsMeters.x/2,
+            NativeGravityBody(id,material.id,mass,solid.dimensionsMeters.x/2,
                 solid.positionMeters,speed)
         }
         var p=bodies.map{GV.of(it.initialPositionM)}

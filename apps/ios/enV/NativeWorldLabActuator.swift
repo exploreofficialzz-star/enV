@@ -1016,6 +1016,7 @@ enum NativeWorldLabMultiSphere {
 // This is not a GR solver or measured astronomy.
 struct NativeGravityBody:Encodable {
     let entityId:String
+    let materialId:String
     let massKg:Double
     let radiusM:Double
     let initialPositionM:[Double]
@@ -1035,6 +1036,8 @@ struct NativeGravityRun:Encodable {
     let evidence="physics-model-computed"
     let materialEvidence="hypothetical-user-assumed"
     let gravitationalConstantM3KgS2=6.67430e-11
+    var initialMomentumKgMps:[Double]{frames.first?.totalMomentumKgMps ?? [0,0,0]}
+    var finalMomentumKgMps:[Double]{frames.last?.totalMomentumKgMps ?? [0,0,0]}
     let projectId:String
     let projectRevision:Int
     let bodies:[NativeGravityBody]
@@ -1125,7 +1128,7 @@ enum NativeWorldLabGravity {
                   GroupVector(speed).length<=1e6 else {
                 throw NativeWorldLabError.invalid("Unsupported assumed mass or gravity speed")
             }
-            return NativeGravityBody(entityId:id,massKg:mass,
+            return NativeGravityBody(entityId:id,materialId:material.id,massKg:mass,
                 radiusM:solid.dimensionsMeters[0]/2,
                 initialPositionM:solid.positionMeters,initialVelocityMps:speed)
         }
@@ -1179,6 +1182,13 @@ struct NativeMaterialHeatSample:Encodable {
     let interfaceHeatFlowW:Double
     let energyResidualJ:Double
 }
+struct NativeMaterialHeatInput:Encodable {
+    let firstEntityId:String
+    let secondEntityId:String
+    let firstTemperatureK:Double
+    let secondTemperatureK:Double
+    let durationSeconds:Double
+}
 struct NativeMaterialHeatRun:Encodable {
     let format="env-world-lab-material-heat-transfer"
     let modelVersion="1.0.0"
@@ -1196,6 +1206,15 @@ struct NativeMaterialHeatRun:Encodable {
     let equilibriumTemperatureK:Double
     let durationSeconds:Double
     let samples:[NativeMaterialHeatSample]
+    var firstThermalCapacityJPerK:Double{firstCapacityJPerK}
+    var secondThermalCapacityJPerK:Double{secondCapacityJPerK}
+    var input:NativeMaterialHeatInput {
+        NativeMaterialHeatInput(firstEntityId:firstEntityId,
+            secondEntityId:secondEntityId,
+            firstTemperatureK:samples[0].firstTemperatureK,
+            secondTemperatureK:samples[0].secondTemperatureK,
+            durationSeconds:durationSeconds)
+    }
     let validity:String
     func sample(_ time:Double)throws->NativeMaterialHeatSample {
         guard time.isFinite else {
