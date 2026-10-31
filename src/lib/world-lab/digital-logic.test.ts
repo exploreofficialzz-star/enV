@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {blankWorldLabProject,parseWorldLabProject,serializeWorldLabProject} from "./project.ts";
-import {appendDigitalGate,setDigitalInput,setDigitalTruthBit,
+import {appendDigitalGate,setDigitalInput,setDigitalOutputSource,setDigitalTruthBit,
   solveDigitalLogic,starterDigitalNetwork,verifyDigitalTruthTable} from "./digital-logic.ts";
 const base=()=>{
  const p=blankWorldLabProject("digital","2026-10-31T00:00:00Z");
@@ -34,6 +34,23 @@ test("inventors may edit arbitrary truth-table rows and chain finite gates",()=>
  assert.equal(solveDigitalLogic(p,"logic").outputs.inverted,0);
  assert.deepEqual(parseWorldLabProject(JSON.parse(serializeWorldLabProject(p))).digitalNetworks,
    p.digitalNetworks);
+});
+test("indicators can be wired to newly invented gates with revision-safe portable output",()=>{
+ let p=base();
+ p=appendDigitalGate(p,"logic","gate2","Independent NOT","User-assumed inverter",["invented_gate"]);
+ p=setDigitalTruthBit(p,"logic","gate2",0,1);
+ p=setDigitalTruthBit(p,"logic","gate2",1,0);
+ p=setDigitalOutputSource(p,"logic","output_q","gate2");
+ assert.equal(solveDigitalLogic(p,"logic").outputs.output_q,0);
+ assert.equal(parseWorldLabProject(JSON.parse(serializeWorldLabProject(p)))
+   .digitalNetworks?.[0].outputs[0].sourceNodeId,"gate2");
+ p=setDigitalOutputSource(p,"logic","output_q","input_b");
+ assert.equal(solveDigitalLogic(p,"logic").outputs.output_q,0);
+ p=setDigitalInput(p,"logic","input_b",true);
+ assert.equal(solveDigitalLogic(p,"logic").outputs.output_q,1);
+ assert.throws(()=>setDigitalOutputSource(p,"logic","output_q","missing"),/existing switch/);
+ assert.throws(()=>setDigitalOutputSource(p,"logic","missing","gate2"),/does not exist/);
+ assert.throws(()=>setDigitalOutputSource(p,"missing","output_q","gate2"),/does not exist/);
 });
 test("rejects cycles, dangling nodes, duplicate IDs, executable input and incomplete truth tables",()=>{
  const p=base();const n=p.digitalNetworks![0];
