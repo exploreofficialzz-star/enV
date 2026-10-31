@@ -967,6 +967,9 @@ Text("Invent chemical heat").font(.headline)
                 Text(item.name).tag(item.id)
             }
         }.pickerStyle(.menu)
+            .onChange(of:collisionOtherId){_ in
+                collisionRun=nil;collisionPlaying=false;redraw()
+            }
         TextField("Left object speed m/s",text:$collisionLeftSpeed)
             .keyboardType(.numbersAndPunctuation).textFieldStyle(.roundedBorder)
             .onChange(of:collisionLeftSpeed){_ in
@@ -1022,6 +1025,7 @@ Text("Invent chemical heat").font(.headline)
                     if editing {collisionPlaying=false}
                     updateCollisionScene()
                 }).accessibilityLabel("Explore collision time")
+                .onChange(of:collisionTime){_ in updateCollisionScene()}
             HStack {
                 Button(collisionPlaying ? "Pause collision":"Play collision"){
                     collisionPlaying.toggle()
