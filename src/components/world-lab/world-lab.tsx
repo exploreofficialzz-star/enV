@@ -19,6 +19,8 @@ import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitN
   from "@/lib/world-lab/network-graph";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
+import {WorldLabGravityPanel} from "./gravity-panel";
+import type {GravityConfig,GravityFrame,GravityBody} from "@/lib/world-lab/gravity";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
 import {calculateObjectCollision,sampleObjectCollision,type ObjectCollisionRun} from "@/lib/world-lab/object-collision";
@@ -161,7 +163,7 @@ export default function WorldLab() {
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
-  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep"|"structural-sweep">("hydrostatics");
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep"|"structural-sweep"|"newton-gravity">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteHistory,setRemoteHistory]=useState<RemoteWorldLabJob[]>([]);
   const [remoteHistoryBusy,setRemoteHistoryBusy]=useState(false);
@@ -1197,7 +1199,7 @@ export default function WorldLab() {
       setCloudError(error instanceof Error?error.message:"Backup was not deleted.");
     }finally{setCloudBusy(false);}
   }
-  async function submitRemoteJob(selectedKind=remoteKind){
+  async function submitRemoteJob(selectedKind=remoteKind,gravity?:GravityConfig){
     if(!remoteJobsEnabled||!project||remoteBusy)return;
     if(!window.confirm("Send this portable invention and the selected scientific assumptions "+
       "to your authenticated account's science worker? The cloud retains its job inputs and "+
@@ -1206,9 +1208,19 @@ export default function WorldLab() {
     setRemoteBusy(true);setRemoteError("");
     try{
       if(selectedKind!=="dc-network"&&selectedKind!=="chemical-thermal"&&selectedKind!=="multi-sphere"&&
-        selectedKind!=="exhaustive-logic"&&selectedKind!=="chemical-sweep"&&!selectedEntityId)
+        selectedKind!=="exhaustive-logic"&&selectedKind!=="chemical-sweep"&&
+        selectedKind!=="newton-gravity"&&!selectedEntityId)
         throw new Error("Select an invented solid before submitting this experiment.");
-      const body=selectedKind==="structural-sweep"?{
+      const body=selectedKind==="newton-gravity"?{
+        kind:selectedKind,project,
+        ...(gravity??{
+          bodyIds:groupSpheres.slice(0,32).map(s=>s.id),
+          velocities:Object.fromEntries(groupSpheres.slice(0,32).map(s=>[
+            s.id,groupVelocities[s.id]??[0,0,0],
+          ])),
+          durationSeconds:30,integrationSteps:480,
+        }),
+      }:selectedKind==="structural-sweep"?{
         kind:selectedKind,project,entityId:selectedEntityId,tipForceN:beamLoadN,
       }:selectedKind==="chemical-sweep"?{
         kind:selectedKind,project,chemicalInput,
@@ -1744,13 +1756,17 @@ export default function WorldLab() {
             <option value="exhaustive-logic">Full invented digital truth-table check</option>
             <option value="chemical-sweep">Chemical model: 25 assumption combinations</option>
             <option value="structural-sweep">Structural beam: 25 material/load combinations</option>
+            <option value="newton-gravity">Newtonian multi-body gravity</option>
           </select>
           <button type="button" className={buttonClass} disabled={remoteBusy||!project||
-              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&!selectedEntity)||
+              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&
+                remoteKind!=="newton-gravity"&&!selectedEntity)||
               (remoteKind==="exhaustive-logic"&&
                 ((project?.digitalNetworks?.[0]?.inputs.length??0)<9))||
+              (remoteKind==="newton-gravity"&&groupSpheres.length<2)||
               (remoteKind==="multi-sphere"&&(groupSpheres.length<2||groupSpheres.length>12))||
-              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&!project?.networks?.[0])}
+              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&
+                remoteKind!=="newton-gravity"&&!project?.networks?.[0])}
             onClick={()=>{void submitRemoteJob();}}>
             {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
           </button>
@@ -1870,6 +1886,23 @@ export default function WorldLab() {
           <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
         </div>}
       </section>
+      <WorldLabGravityPanel project={project} cloudEnabled={remoteJobsEnabled}
+        cloudBusy={remoteBusy}
+        remoteJobStatus={remoteJob?.kind==="newton-gravity"&&
+          remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
+          ?remoteJob.status:null}
+        onRemote={config=>{void submitRemoteJob("newton-gravity",config);}}
+        onFrame={(frame:GravityFrame|null,bodies:readonly GravityBody[])=>{
+          const scene=sceneRef.current;
+          if(!scene)return;
+          for(let i=0;i<bodies.length;i++){
+            const mesh=scene.addedShapes.get(bodies[i].entityId);
+            if(mesh){
+              const pos=frame?.positionsM[i]??bodies[i].initialPositionM;
+              mesh.position.copyFromFloats(...pos);
+            }
+          }
+        }}/>
       <WorldLabDigitalLogicPanel project={project} mutateProject={mutateProject}
         cloudConfigured={remoteJobsEnabled} cloudBusy={remoteBusy}
         remoteJobStatus={remoteJob?.kind==="exhaustive-logic"&&

@@ -426,3 +426,19 @@ release-candidate evidence bundle are unfinished.
   private World Lab science worker, with a database schema preflight requiring
   migration 0015. Root media-service Render configuration is unchanged;
   no paid worker or production flag is activated by this source change.
+
+
+## End-to-end Newtonian gravity exploration (source only, not verified)
+- A bounded symplectic N-body Newtonian simulation now uses the exact portable
+  invented sphere geometry and user-assumed material density. It rejects
+  touching bodies, impossible speeds and excessive numerical energy drift
+  rather than fabricating a new astrophysical law.
+- Web World Lab has a native-to-its-stack gravity editor, selectable bodies,
+  3-axis initial velocities, timeline scrubbing and adjustable playback speed.
+  The Babylon canvas positions follow local sampled trajectories; numerical
+  output and full validity evidence can be exported.
+- Device-local runs support 2–8 bodies and up to 1200 steps; explicit approved
+  cloud jobs support 2–32 and 2400 steps, with real session authorization,
+  account history, retention and migration 0016. No automatic transfer.
+- Not integrated with collisions, electricity, chemistry, tides, relativistic
+  dynamics or verified astronomical data. Production readiness not claimed.
