@@ -68,6 +68,8 @@ assert.equal(runDateTime("business-days", {
 })[0].value, "1");
 assert.match(runDateTime("workday", { start: "2024-01-08", days: "-1" })[0].value, /2024-01-05/);
 assert.equal(runDateTime("world-clock", { zones: "Lagos\nLondon" }).length, 2);
+assert.equal(runDateTime("world-clock", { zones: "Stockholm, Kathmandu, Brisbane" }).length, 3);
+assert.throws(() => runDateTime("world-clock", { zones: "A city that is not real" }), /Unknown city or time zone/);
 
 const micros = runDateTime("unix", { value: "1704067200000000" });
 assert.equal(micros.find((row) => row.label === "Detected precision")?.value, "microseconds");

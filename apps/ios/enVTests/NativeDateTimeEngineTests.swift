@@ -86,6 +86,17 @@ final class NativeDateTimeEngineTests: XCTestCase {
         ], now: fixedNow))
     }
 
+    func testWorldClockAcceptsUnambiguousIanaCityAliases() throws {
+        let result = try NativeDateTimeEngine.run(
+            toolID: "world-clock",
+            options: ["zones": "Stockholm, Kathmandu, Brisbane"],
+            now: fixedNow
+        )
+        XCTAssertEqual(result.rows.count, 3)
+        XCTAssertEqual(result.rows.map(\.label), ["Stockholm", "Kathmandu", "Brisbane"])
+        XCTAssertTrue(result.rows.allSatisfy { $0.value.contains("UTC") })
+    }
+
     func testDateAdditionAgeAndNegativeWorkdayAreSupported() throws {
         XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "age-calculator", options: ["birth": "1990-02-01"], now: fixedNow).output.contains("Age: 33 years, 11 months, 14 days"))
         let dateAdd = try NativeDateTimeEngine.run(toolID: "date-calculator", options: ["start": "2024-01-31", "months": "1"], now: fixedNow)

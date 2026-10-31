@@ -60,6 +60,19 @@ object NativeDateTimeEngine {
         "kuala lumpur" to "Asia/Kuala_Lumpur", "cape town" to "Africa/Johannesburg", "utc" to "UTC"
     )
 
+    private fun normalizeCityAlias(value: String): String =
+        value.trim().replace('_', ' ').trim().split(Regex("\\s+")).joinToString(" ").lowercase(Locale.ROOT)
+
+    private val ianaCityZones: Map<String, String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        val grouped = ZoneId.getAvailableZoneIds()
+            .asSequence()
+            .filter { it.contains("/") && !it.startsWith("Etc/") }
+            .groupBy { normalizeCityAlias(it.substringAfterLast('/')) }
+        grouped.mapNotNull { (alias, ids) ->
+            ids.distinct().singleOrNull()?.let { alias to it }
+        }.toMap()
+    }
+
     fun run(
         toolId: String,
         input: String = "",
@@ -259,7 +272,8 @@ object NativeDateTimeEngine {
     private fun resolveZone(raw: String): ZoneChoice {
         val input = raw.trim()
         if (input.isEmpty()) throw IllegalArgumentException("Enter a time zone or city.")
-        val id = cityZones[input.lowercase(Locale.ROOT)] ?: input
+        val key = normalizeCityAlias(input)
+        val id = cityZones[key] ?: ianaCityZones[key] ?: input
         val zone = try { ZoneId.of(id) } catch (_: Exception) {
             throw IllegalArgumentException("Unknown city or time zone: $input. Use a city name or IANA ID such as Africa/Lagos.")
         }

@@ -17,6 +17,32 @@ import {
 type DateTimeRow = { label: string; value: string };
 type ZoneChoice = { label: string; zone: string };
 
+function normalizeCityAlias(value: string): string {
+  return value.trim().replace(/_/g, " ").replace(/\s+/g, " ").toLowerCase();
+}
+
+const IANA_CITY_ZONES: Record<string, string> = (() => {
+  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: "timeZone") => string[] };
+  const supported = typeof intl.supportedValuesOf === "function"
+    ? intl.supportedValuesOf("timeZone")
+    : [];
+  const aliases = new Map<string, Set<string>>();
+  for (const zone of supported) {
+    if (!zone.includes("/") || zone.startsWith("Etc/")) continue;
+    const city = zone.slice(zone.lastIndexOf("/") + 1);
+    const key = normalizeCityAlias(city);
+    if (!key) continue;
+    const ids = aliases.get(key) ?? new Set<string>();
+    ids.add(zone);
+    aliases.set(key, ids);
+  }
+  const unique: Record<string, string> = {};
+  for (const [alias, ids] of aliases) {
+    if (ids.size === 1) unique[alias] = [...ids][0];
+  }
+  return unique;
+})();
+
 const CITY_ZONES: Record<string, string> = {
   accra: "Africa/Accra",
   amsterdam: "Europe/Amsterdam",
@@ -91,7 +117,8 @@ function parseInstant(value: string, label = "date and time"): Date {
 function resolveZone(raw: string): ZoneChoice {
   const input = raw.trim();
   if (!input) throw new Error("Enter a time zone or city.");
-  const mapped = CITY_ZONES[input.toLowerCase()] ?? input;
+  const key = normalizeCityAlias(input);
+  const mapped = CITY_ZONES[key] ?? IANA_CITY_ZONES[key] ?? input;
   try {
     new Intl.DateTimeFormat("en", { timeZone: mapped }).format(new Date(0));
     return { label: input, zone: mapped };

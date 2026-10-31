@@ -83,6 +83,17 @@ class NativeDateTimeEngineTest {
     }
 
 
+    @Test fun worldClockAcceptsUnambiguousIanaCityAliases() {
+        val result = NativeDateTimeEngine.run(
+            "world-clock",
+            options = mapOf("zones" to "Stockholm, Kathmandu, Brisbane"),
+            now = fixedNow
+        )
+        assertEquals(3, result.rows.size)
+        assertEquals(listOf("Stockholm", "Kathmandu", "Brisbane"), result.rows.map { it.label })
+        assertTrue(result.rows.all { it.value.contains("UTC") })
+    }
+
     @Test fun dateAdditionAgeDurationAndMeetingPlannerAreAvailable() {
         assertTrue(NativeDateTimeEngine.run("age-calculator", options = mapOf("birth" to "1990-02-01"), now = fixedNow).output.contains("Age: 33 years, 11 months, 14 days"))
         assertEquals("Result: 2024-02-29 Thursday\nDate: 2024-02-29", NativeDateTimeEngine.run("date-calculator", options = mapOf("start" to "2024-01-31", "months" to "1"), now = fixedNow).output)

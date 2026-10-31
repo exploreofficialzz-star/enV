@@ -353,10 +353,31 @@ public enum NativeDateTimeEngine {
         "cape town": "Africa/Johannesburg", "utc": "UTC"
     ]
 
+    private static func normalizeCityAlias(_ value: String) -> String {
+        value.replacingOccurrences(of: "_", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+            .lowercased()
+    }
+
+    private static let ianaCityZones: [String: String] = {
+        var grouped: [String: Set<String>] = [:]
+        for identifier in TimeZone.knownTimeZoneIdentifiers where identifier.contains("/") && !identifier.hasPrefix("Etc/") {
+            guard let city = identifier.split(separator: "/").last else { continue }
+            let key = normalizeCityAlias(String(city))
+            guard !key.isEmpty else { continue }
+            grouped[key, default: []].insert(identifier)
+        }
+        return grouped.compactMapValues { identifiers in
+            identifiers.count == 1 ? identifiers.first : nil
+        }
+    }()
+
     private static func resolveZone(_ raw: String) throws -> ZoneChoice {
         let label = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !label.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a city or IANA time zone.") }
-        let identifier = cityZones[label.lowercased()] ?? label
+        let key = normalizeCityAlias(label)
+        let identifier = cityZones[key] ?? ianaCityZones[key] ?? label
         guard let zone = TimeZone(identifier: identifier) else {
             throw NativeDateTimeError.invalidOperation("Unknown city or time zone: \(label). Use a city name or IANA ID such as Africa/Lagos.")
         }
