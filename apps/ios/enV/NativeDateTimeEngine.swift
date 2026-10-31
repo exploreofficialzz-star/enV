@@ -522,7 +522,7 @@ public enum NativeDateTimeEngine {
             guard let value = Int(part), (0...6).contains(value) else {
                 throw NativeDateTimeError.invalidOperation("Weekend days must be numbers from 0 (Sunday) to 6 (Saturday).")
             }
-            days.insert(value == 0 ? 1 : value + 1)
+            days.insert(value)
         }
         return days
     }
