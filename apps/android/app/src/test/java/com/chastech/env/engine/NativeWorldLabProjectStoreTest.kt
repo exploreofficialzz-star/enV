@@ -22,6 +22,31 @@ class NativeWorldLabProjectStoreTest {
             assertEquals(b,store.read(saved.id).json)
         }finally{root.deleteRecursively()}
     }
+    @Test fun browseDeleteAndRevisionSafeMultiEditSave(){
+        val root=Files.createTempDirectory("world-lab-browse").toFile()
+        try {
+            val store=NativeWorldLabProjectStore(root)
+            val first=NativeWorldLabEditor.blank("First")
+            val saved=store.save(first)
+            var edited=NativeWorldLabEditor.addSolid(first,"box",id="a")
+            edited=NativeWorldLabEditor.addSolid(edited,"sphere",id="b")
+            assertThrows(IllegalArgumentException::class.java){store.save(edited)}
+            store.save(edited,expectedSavedRevision=saved.revision)
+            assertEquals(2,store.read(saved.id).let{
+                NativeWorldLabProjectCodec.decode(it.json).entities.size})
+            val second=store.save(NativeWorldLabEditor.blank("Second"))
+            assertEquals(2,store.listProjects().size)
+            assertThrows(IllegalArgumentException::class.java){
+                store.save(edited,expectedSavedRevision=0)
+            }
+            store.delete(second.id)
+            assertEquals(saved.id,store.loadLatest()!!.id)
+            assertEquals(1,store.listProjects().size)
+            assertThrows(IllegalArgumentException::class.java){store.delete("../escape")}
+            store.delete(saved.id)
+            assertNull(store.loadLatest())
+        }finally{root.deleteRecursively()}
+    }
     @Test fun rejectsCorruptOnDiskStateAndPathTraversal(){
         val root=Files.createTempDirectory("world-lab-android-corruption").toFile()
         try {
