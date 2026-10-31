@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CopyButton } from "@/components/tools/copy-button";
 import { CodeResult } from "@/components/engines/result-panel";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   type RgbaColor,
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
+import { buildDesignPaletteExport, createColorShadeScale, type PaletteExportFormat } from "@/lib/engines/design-palette";
 
 type Harmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
 
@@ -133,6 +134,45 @@ function colorInputValue(color: RgbaColor): string {
   return toHex({ ...color, a: 1 }).slice(0, 7);
 }
 
+function extractImageColors(file: File): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 72;
+        canvas.height = 72;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("This browser could not read the selected image.");
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const counts = new Map<string, number>();
+        for (let index = 0; index < pixels.length; index += 4) {
+          if (pixels[index + 3] < 160) continue;
+          const red = Math.min(255, Math.round(pixels[index] / 17) * 17);
+          const green = Math.min(255, Math.round(pixels[index + 1] / 17) * 17);
+          const blue = Math.min(255, Math.round(pixels[index + 2] / 17) * 17);
+          const hex = "#" + [red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("");
+          counts.set(hex, (counts.get(hex) ?? 0) + 1);
+        }
+        const colors = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([hex]) => hex);
+        if (!colors.length) throw new Error("No visible colors could be sampled from this image.");
+        resolve(colors);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Could not extract colors from this image."));
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("The selected image could not be opened."));
+    };
+    image.src = objectUrl;
+  });
+}
+
 function ContrastStatus({ passes, label }: { passes: boolean; label: string }) {
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${passes ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
@@ -150,18 +190,75 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [target, setTarget] = useState<ContrastTarget>("normal-aa");
   const [visionMode, setVisionMode] = useState<ColorVisionMode>("deuteranopia");
   const [converterValue, setConverterValue] = useState(() => CONVERTER_DEFAULTS[toolId ?? ""] ?? "#0d9f8a");
+  const [lockedSwatches, setLockedSwatches] = useState<Record<number, string>>({});
+  const [previewMode, setPreviewMode] = useState<"light" | "dark">("light");
+  const [exportFormat, setExportFormat] = useState<PaletteExportFormat>("css");
+  const [imagePalette, setImagePalette] = useState<string[]>([]);
+  const [paletteError, setPaletteError] = useState("");
+
+  useEffect(() => {
+    if (op !== "palette" || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedBase = params.get("base");
+    const sharedHarmony = params.get("harmony");
+    const sharedLocks = params.get("locks");
+    if (sharedBase && parseDesignColor(sharedBase)) setColorValue(sharedBase);
+    if (sharedHarmony && ["analogous", "complementary", "triadic", "split", "tetradic", "monochromatic"].includes(sharedHarmony)) {
+      setHarmony(sharedHarmony as Harmony);
+    }
+    if (sharedLocks) {
+      try {
+        const parsed = JSON.parse(sharedLocks) as Record<string, string>;
+        const safeLocks: Record<number, string> = {};
+        for (const [index, value] of Object.entries(parsed)) {
+          const numericIndex = Number(index);
+          if (Number.isInteger(numericIndex) && numericIndex >= 0 && numericIndex < 5 && typeof value === "string" && parseDesignColor(value)) {
+            safeLocks[numericIndex] = value;
+          }
+        }
+        setLockedSwatches(safeLocks);
+      } catch {
+        setPaletteError("The shared palette lock settings were invalid; generated colors are still available.");
+      }
+    }
+  }, [op]);
 
   const color = useMemo(() => parseDesignColor(colorValue), [colorValue]);
   const foreground = useMemo(() => parseDesignColor(foregroundValue), [foregroundValue]);
   const background = useMemo(() => parseDesignColor(backgroundValue), [backgroundValue]);
   const converted = useMemo(() => parseDesignColor(converterValue), [converterValue]);
-  const palette = useMemo(() => color ? makePalette(color, harmony) : [], [color, harmony]);
-  const paletteCss = useMemo(() => `:root {
-${palette.map((swatch, index) => `  --env-palette-${index + 1}: ${toHex(swatch)};`).join("\n")}
-  --env-primary: ${toHex(palette[2] ?? { r: 13, g: 159, b: 138, a: 1 })};
-  --env-secondary: ${toHex(palette[1] ?? { r: 90, g: 158, b: 232, a: 1 })};
-  --env-accent: ${toHex(palette[4] ?? { r: 124, g: 77, b: 255, a: 1 })};
-}`, [palette]);
+  const palette = useMemo(() => {
+    if (!color) return [];
+    return makePalette(color, harmony).map((swatch, index) => {
+      const locked = lockedSwatches[index] ? parseDesignColor(lockedSwatches[index]) : null;
+      return locked ?? swatch;
+    });
+  }, [color, harmony, lockedSwatches]);
+  const primaryColor = toHex(palette[2] ?? { r: 13, g: 159, b: 138, a: 1 });
+  const shadeScale = useMemo(() => createColorShadeScale(primaryColor), [primaryColor]);
+  const roleColors = useMemo(() => ({
+    primary: primaryColor,
+    secondary: toHex(palette[1] ?? { r: 90, g: 158, b: 232, a: 1 }),
+    accent: toHex(palette[4] ?? { r: 124, g: 77, b: 255, a: 1 }),
+    success: toHex(palette[3] ?? { r: 34, g: 153, b: 104, a: 1 }),
+    info: toHex(palette[0] ?? { r: 52, g: 127, b: 196, a: 1 }),
+    background: previewMode === "light" ? "#f8fafc" : "#0f172a",
+    surface: previewMode === "light" ? "#ffffff" : "#1e293b",
+    text: previewMode === "light" ? "#111827" : "#f8fafc",
+    border: previewMode === "light" ? "#e2e8f0" : "#334155",
+  }), [palette, previewMode, primaryColor]);
+  const paletteExport = useMemo(
+    () => buildDesignPaletteExport(roleColors, shadeScale, exportFormat),
+    [exportFormat, roleColors, shadeScale],
+  );
+  const paletteShareUrl = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const url = new URL(window.location.href);
+    url.searchParams.set("base", colorValue);
+    url.searchParams.set("harmony", harmony);
+    url.searchParams.set("locks", JSON.stringify(lockedSwatches));
+    return url.toString();
+  }, [colorValue, harmony, lockedSwatches]);
   const contrastChecks = useMemo(() => foreground && background
     ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value) }))
     : [], [foreground, background]);
@@ -341,13 +438,14 @@ ${palette.map((swatch, index) => `  --env-palette-${index + 1}: ${toHex(swatch)}
   }
 
   if (op === "palette") {
+    const primaryText = color && contrastRatio(parseDesignColor("#ffffff")!, parseDesignColor(roleColors.primary)!) >= 4.5 ? "#ffffff" : "#111827";
     return (
       <div className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
           <div className="space-y-2">
             <Label htmlFor="palette-base">Starting color</Label>
             <div className="flex gap-2">
-              <Input type="color" aria-label="Choose base palette color" value={color ? colorInputValue(color) : "#0d9f8a"} onChange={(event) => setColorValue(event.target.value)} className="h-11 w-14 shrink-0 p-1" />
+              <Input type="color" aria-label="Choose base palette color" value={color ? colorInputValue(color) : "#0d9f8a"} onChange={(event) => { setColorValue(event.target.value); setPaletteError(""); }} className="h-11 w-14 shrink-0 p-1" />
               <Input id="palette-base" value={colorValue} onChange={(event) => setColorValue(event.target.value)} className="font-mono" />
             </div>
             {!color ? <p className="text-xs text-danger">Enter a valid color value.</p> : null}
@@ -364,37 +462,129 @@ ${palette.map((swatch, index) => `  --env-palette-${index + 1}: ${toHex(swatch)}
             </Select>
           </div>
         </div>
+        <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="image-palette-heading">
+          <div>
+            <h3 id="image-palette-heading" className="text-sm font-semibold text-fg">Extract colors from an image</h3>
+            <p className="mt-1 text-xs leading-5 text-muted">Choose a photo or design file. The image is sampled locally in this browser; it is not uploaded.</p>
+          </div>
+          <Input type="file" accept="image/*" aria-label="Choose an image to extract a color palette" onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            if (file.size > 12 * 1024 * 1024) {
+              setPaletteError("Choose an image smaller than 12 MB.");
+              event.target.value = "";
+              return;
+            }
+            try {
+              const extracted = await extractImageColors(file);
+              setImagePalette(extracted);
+              setColorValue(extracted[0]);
+              setLockedSwatches({});
+              setPaletteError("");
+            } catch (error) {
+              setPaletteError(error instanceof Error ? error.message : "Could not read the image.");
+            }
+            event.target.value = "";
+          }} className="min-h-11" />
+          {imagePalette.length > 0 ? <div className="flex flex-wrap gap-2" aria-label="Extracted image colors">
+            {imagePalette.map((value) => <button key={value} type="button" onClick={() => setColorValue(value)} className="group flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2 text-xs" aria-label={`Use extracted color ${value}`}>
+              <span className="size-7 rounded-md border border-black/10" style={{ background: value }} />
+              <span className="font-mono">{value.toUpperCase()}</span>
+            </button>)}
+          </div> : null}
+          {paletteError ? <p role="status" className="text-xs text-danger">{paletteError}</p> : null}
+        </section>
         {color ? (
           <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-fg">Your color palette</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setColorValue("#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0"))}>Randomize unlocked</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setLockedSwatches({})} disabled={Object.keys(lockedSwatches).length === 0}>Unlock all</Button>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {palette.map((swatch, index) => {
                 const value = toHex(swatch);
+                const locked = Boolean(lockedSwatches[index]);
                 return (
-                  <div key={`${value}-${index}`} className="overflow-hidden rounded-xl border border-border">
-                    <button type="button" onClick={() => setColorValue(value)} className="block h-24 w-full sm:h-32" style={{ background: value }} aria-label={`Set base color to ${value}`} />
-                    <div className="flex items-center justify-between gap-1 bg-surface p-2">
-                      <span className="truncate font-mono text-[11px] text-fg">{value.toUpperCase()}</span>
-                      <CopyButton text={value} label="Copy" />
+                  <div key={index} className="overflow-hidden rounded-xl border border-border">
+                    <button type="button" onClick={() => setColorValue(value)} className="block h-24 w-full sm:h-32" style={{ background: value }} aria-label={`Use ${value} as the base color`} />
+                    <div className="space-y-2 bg-surface p-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate font-mono text-[11px] text-fg">{value.toUpperCase()}</span>
+                        <CopyButton text={value} label="Copy" />
+                      </div>
+                      <Button type="button" size="sm" variant={locked ? "secondary" : "ghost"} className="min-h-9 w-full" aria-pressed={locked} onClick={() => setLockedSwatches((previous) => {
+                        const next = { ...previous };
+                        if (next[index]) delete next[index];
+                        else next[index] = value;
+                        return next;
+                      })}>{locked ? "Locked · keep color" : "Lock color"}</Button>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div className="rounded-xl bg-surface-2 p-4">
-              <p className="text-sm font-semibold text-fg">See the colors in context</p>
-              <div className="mt-3 overflow-hidden rounded-lg border border-border bg-white">
-                <div className="flex h-2">{palette.map((swatch, index) => <span key={index} className="flex-1" style={{ background: toHex(swatch) }} />)}</div>
-                <div className="p-4">
-                  <div className="h-3 w-1/3 rounded bg-slate-200" />
-                  <div className="mt-2 h-2 w-2/3 rounded bg-slate-100" />
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-md px-3 py-2 text-xs font-semibold text-white" style={{ background: toHex(palette[2] ?? color) }}>Primary action</span>
-                    <span className="rounded-md border px-3 py-2 text-xs font-semibold text-slate-700" style={{ borderColor: toHex(palette[1] ?? color) }}>Secondary</span>
+            <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="semantic-colors-heading">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 id="semantic-colors-heading" className="text-sm font-semibold text-fg">Interface color roles</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">A palette mapped to practical roles instead of disconnected swatches.</p>
+                </div>
+                <Select value={previewMode} onChange={(event) => setPreviewMode(event.target.value as "light" | "dark")} aria-label="Preview color theme" className="w-32">
+                  <option value="light">Light preview</option>
+                  <option value="dark">Dark preview</option>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {Object.entries(roleColors).map(([role, value]) => <div key={role} className="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 p-2">
+                  <span className="size-8 shrink-0 rounded-md border border-black/10" style={{ background: value }} />
+                  <span className="min-w-0"><span className="block text-[11px] font-semibold capitalize text-fg">{role}</span><span className="block truncate font-mono text-[10px] text-muted">{value.toUpperCase()}</span></span>
+                </div>)}
+              </div>
+              <div className="overflow-hidden rounded-xl border" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }}>
+                <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                  <span className="text-sm font-bold">Acme workspace</span>
+                  <span className="rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: "#ffffff" }}>PRO</span>
+                </div>
+                <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr]">
+                  <div className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                    <p className="text-xs font-medium opacity-70">Overview</p>
+                    <p className="mt-2 text-xl font-bold">Design system</p>
+                    <p className="mt-1 text-xs opacity-70">Semantic colors, components and states.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="rounded-md px-3 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Primary action</span>
+                      <span className="rounded-md border px-3 py-2 text-xs font-semibold" style={{ background: roleColors.surface, borderColor: roleColors.secondary, color: roleColors.text }}>Secondary</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                    <span className="size-9 rounded-full" style={{ background: roleColors.success }} />
+                    <span><span className="block text-sm font-semibold">All systems normal</span><span className="block text-xs opacity-70">Status uses a label as well as color.</span></span>
                   </div>
                 </div>
               </div>
-            </div>
-            <CodeResult code={paletteCss} filename="env-color-palette.css" />
+            </section>
+            <section className="space-y-2" aria-labelledby="shade-scale-heading">
+              <div><h3 id="shade-scale-heading" className="text-sm font-semibold text-fg">Primary shade scale</h3><p className="mt-1 text-xs text-muted">Useful for hover, borders, backgrounds and emphasis in a real design system.</p></div>
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-11">
+                {shadeScale.map(({ step, color: shade }) => <div key={step} className="overflow-hidden rounded-md border border-border"><div className="h-10" style={{ background: shade }} /><p className="bg-surface px-1 py-1 text-center text-[10px] text-muted">{step}</p></div>)}
+              </div>
+            </section>
+            <section className="space-y-2 rounded-xl border border-border p-3" aria-labelledby="palette-export-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><h3 id="palette-export-heading" className="text-sm font-semibold text-fg">Export design tokens</h3><p className="mt-1 text-xs text-muted">Use these semantic roles and shade values in your project.</p></div>
+                <Select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as PaletteExportFormat)} className="w-36" aria-label="Palette export format">
+                  <option value="css">CSS variables</option>
+                  <option value="scss">SCSS variables</option>
+                  <option value="tailwind">Tailwind config</option>
+                  <option value="json">JSON tokens</option>
+                  <option value="tokens">W3C tokens</option>
+                </Select>
+              </div>
+              <div className="flex flex-wrap gap-2"><CopyButton text={paletteShareUrl} label="Copy share link" /><span className="self-center text-xs text-muted">Locked swatches and harmony are included.</span></div>
+              <CodeResult code={paletteExport} filename={`env-design-tokens.${exportFormat === "css" ? "css" : exportFormat === "scss" ? "scss" : exportFormat === "tailwind" ? "js" : "json"}`} />
+            </section>
           </>
         ) : null}
       </div>
