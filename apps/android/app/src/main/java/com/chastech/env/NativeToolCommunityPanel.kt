@@ -163,6 +163,7 @@ fun NativeToolCommunityPanel(toolId: String) {
                 withContext(Dispatchers.IO) {
                     NativeCommunityApi.post("/api/community/reactions", JSONObject().put("toolId", toolId).put("visitorId", visitorId).put("reaction", reaction))
                 }
+                NativeAnalytics.record(context, "reaction_created", toolId, "success")
                 refresh()
             } catch (failure: Exception) { error = failure.message ?: "Your reaction could not be saved." }
         }
@@ -218,6 +219,7 @@ fun NativeToolCommunityPanel(toolId: String) {
                     .put("displayName", if (publicIdentity) displayName.trim() else JSONObject.NULL)
                     .put("parentId", replyTo ?: JSONObject.NULL)
                 withContext(Dispatchers.IO) { NativeCommunityApi.post("/api/community/comments", payload) }
+                NativeAnalytics.record(context, "comment_created", toolId, "success")
                 commentText = ""
                 replyTo = null
                 notice = "Your comment was posted."
