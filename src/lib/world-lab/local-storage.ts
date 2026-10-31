@@ -5,10 +5,13 @@
 import { parseWorldLabProject, type WorldLabProject } from "./project.ts";
 import { MAX_STORED_RUNS_PER_PROJECT, parseStoredWorldLabRun, serializeStoredWorldLabRun } from "./run-record.ts";
 import type { LabRun } from "./model.ts";
+import {MAX_SCIENCE_EVIDENCE_PER_PROJECT,parseScientificEvidenceRecord,
+  type ScientificEvidenceRecord} from "./scientific-evidence.ts";
 const DB_NAME="env-world-lab-v1";
 const STORE="projects";
 const RUNS="runs";
 const DRAFTS="drafts";
+const EVIDENCE="science-evidence";
 const validProjectId=(value:string)=>/^[A-Za-z0-9_-]{1,120}$/.test(value);
 export type WorldLabDraft=Readonly<{
   id:string;project:WorldLabProject;baseSavedRevision:number|null;savedAt:string;
@@ -16,11 +19,15 @@ export type WorldLabDraft=Readonly<{
 function connect():Promise<IDBDatabase>{
   if(typeof indexedDB==="undefined") return Promise.reject(new Error("Browser project storage is unavailable."));
   return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB_NAME,3);
+    const req=indexedDB.open(DB_NAME,4);
     req.onupgradeneeded=()=>{
       if(!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE,{keyPath:"id"});
       if(!req.result.objectStoreNames.contains(DRAFTS))
         req.result.createObjectStore(DRAFTS,{keyPath:"id"});
+      if(!req.result.objectStoreNames.contains(EVIDENCE)){
+        const evidence=req.result.createObjectStore(EVIDENCE,{keyPath:"id"});
+        evidence.createIndex("projectId","projectId",{unique:false});
+      }
       if(!req.result.objectStoreNames.contains(RUNS)) {
         const runs=req.result.createObjectStore(RUNS,{keyPath:"id"});
         runs.createIndex("projectId","projectId",{unique:false});
@@ -153,7 +160,8 @@ export async function putLocalWorldLabProject(
  * This is used for complete portable archive import and ordinary save alike.
  */
 export async function putLocalWorldLabArchive(source:WorldLabProject,
-  expectedRevision:number|null,runs:readonly LabRun[]):Promise<WorldLabProject>{
+  expectedRevision:number|null,runs:readonly LabRun[],
+  scientificRecords:readonly ScientificEvidenceRecord[]=[]):Promise<WorldLabProject>{
   const project=parseWorldLabProject(source);
   if(expectedRevision!==null&&
     (!Number.isSafeInteger(expectedRevision)||expectedRevision<0))
@@ -170,11 +178,23 @@ export async function putLocalWorldLabArchive(source:WorldLabProject,
       throw new Error("Scientific run provenance identifies another project.");
     return {run,serialized};
   });
+  if(scientificRecords.length>MAX_SCIENCE_EVIDENCE_PER_PROJECT)
+    throw new Error("The project supports at most twenty separate scientific evidence records.");
+  const preparedEvidence=scientificRecords.map(candidate=>{
+    const record=parseScientificEvidenceRecord(candidate);
+    if(record.projectId!==project.id)
+      throw new Error("Scientific evidence belongs to another invention.");
+    if(unique.has(record.id))
+      throw new Error("A numerical run and a scientific record share an immutable ID.");
+    unique.add(record.id);
+    return {record,serialized:JSON.stringify(record)};
+  });
   const db=await connect();
   return new Promise((resolve,reject)=>{
-    const tx=db.transaction([STORE,RUNS],"readwrite");
+    const tx=db.transaction([STORE,RUNS,EVIDENCE],"readwrite");
     const projects=tx.objectStore(STORE);
     const history=tx.objectStore(RUNS);
+    const scientificHistory=tx.objectStore(EVIDENCE);
     let saved:WorldLabProject|null=null;
     let error:Error|null=null;
     const abort=(cause:unknown)=>{
@@ -207,11 +227,32 @@ export async function putLocalWorldLabArchive(source:WorldLabProject,
             }
             if(rows.length+newCount>MAX_STORED_RUNS_PER_PROJECT)
               throw new Error("The combined experiment history exceeds 20 runs.");
-            // Global run IDs must also be unique across all projects. An
-            // IndexedDB constraint failure aborts this entire transaction.
-            projects.put(saved!);
-            for(const item of prepared)if(!byId.has(item.run.id))
-              history.add({id:item.run.id,projectId:project.id,run:item.run});
+            const evidenceRequest=scientificHistory.index("projectId").getAll(project.id);
+            evidenceRequest.onsuccess=()=>{
+              try{
+                const prior=evidenceRequest.result as ScientificEvidenceRecord[];
+                if(prior.length>MAX_SCIENCE_EVIDENCE_PER_PROJECT)
+                  throw new Error("Saved scientific evidence history is inconsistent.");
+                const byEvidenceId=new Map(prior.map(record=>[record.id,record]));
+                let additional=0;
+                for(const item of preparedEvidence){
+                  const previousEvidence=byEvidenceId.get(item.record.id);
+                  if(previousEvidence){
+                    if(JSON.stringify(parseScientificEvidenceRecord(previousEvidence))!==
+                      item.serialized)
+                      throw new Error("Immutable scientific evidence cannot be overwritten.");
+                  }else additional++;
+                }
+                if(prior.length+additional>MAX_SCIENCE_EVIDENCE_PER_PROJECT)
+                  throw new Error("Scientific evidence history is full (20 records).");
+                // The three stores either commit together or all roll back.
+                projects.put(saved!);
+                for(const item of prepared)if(!byId.has(item.run.id))
+                  history.add({id:item.run.id,projectId:project.id,run:item.run});
+                for(const item of preparedEvidence)if(!byEvidenceId.has(item.record.id))
+                  scientificHistory.add(item.record);
+              }catch(cause){abort(cause);}
+            };
           }catch(cause){abort(cause);}
         };
       }catch(cause){abort(cause);}
@@ -326,5 +367,48 @@ export async function deleteLocalWorldLabRun(projectId:string,runId:string):Prom
     tx.oncomplete=()=>{db.close();resolve();};
     tx.onabort=()=>{db.close();reject(error??new Error("Could not remove saved experiment."));};
     tx.onerror=()=>{db.close();reject(error??new Error("Could not remove saved experiment."));};
+  });
+}
+
+/** Project-owned scientific evidence for the new gravity and thermal solvers. */
+export async function listLocalWorldLabScientificEvidence(
+  projectId:string):Promise<ScientificEvidenceRecord[]>{
+  if(!validProjectId(projectId))throw new Error("Invalid invention ID.");
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(EVIDENCE,"readonly");
+    const read=tx.objectStore(EVIDENCE).index("projectId").getAll(projectId);
+    tx.oncomplete=()=>{
+      db.close();
+      try{
+        const rows=(read.result as unknown[]).map(parseScientificEvidenceRecord);
+        if(rows.length>MAX_SCIENCE_EVIDENCE_PER_PROJECT||
+          rows.some(row=>row.projectId!==projectId))
+          throw new Error("Local scientific evidence ownership or quota is inconsistent.");
+        resolve(rows.sort((a,b)=>a.createdAt.localeCompare(b.createdAt)));
+      }catch(error){reject(error);}
+    };
+    tx.onerror=()=>{db.close();reject(new Error("Scientific evidence storage is unreadable."));};
+  });
+}
+export async function deleteLocalWorldLabScientificEvidence(
+  projectId:string,id:string):Promise<void>{
+  if(!validProjectId(projectId)||!validProjectId(id))
+    throw new Error("Valid invention and evidence IDs are required.");
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(EVIDENCE,"readwrite");
+    const records=tx.objectStore(EVIDENCE);
+    let failure:Error|null=null;
+    const read=records.get(id);
+    read.onsuccess=()=>{
+      if(read.result && read.result.projectId!==projectId){
+        failure=new Error("This scientific evidence belongs to another project.");
+        tx.abort();
+      }else records.delete(id);
+    };
+    tx.oncomplete=()=>{db.close();resolve();};
+    tx.onabort=()=>{db.close();reject(failure??new Error("Scientific evidence deletion failed."));};
+    tx.onerror=()=>{db.close();reject(failure??new Error("Scientific evidence deletion interrupted."));};
   });
 }
