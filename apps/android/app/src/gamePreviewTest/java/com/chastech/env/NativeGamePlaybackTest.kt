@@ -109,5 +109,35 @@ class NativeGamePlaybackTest {
         image.recycle()
         after.recycle()
         assertTrue("Touch movement did not change the rendered scene; changed samples=$changed", changed > 25)
+        // The Godot runtime is isolated in :game_preview. Exit it before the test
+        // runner uninstalls the app, so the native graphics process releases EGL
+        // and its SurfaceView normally instead of being torn down by package cleanup.
+        val exitNode = automation.rootInActiveWindow
+            ?.findAccessibilityNodeInfosByText("Exit")
+            ?.firstOrNull()
+        val exitedByAccessibility = exitNode?.performAction(
+            android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+        ) == true
+        if (!exitedByAccessibility) {
+            val exitX = image.width * 92 / 100
+            val exitY = image.height * 10 / 100
+            val exitTap = automation.executeShellCommand("input tap $exitX $exitY")
+            ParcelFileDescriptor.AutoCloseInputStream(exitTap).use { it.readBytes() }
+        }
+        val previewDeadline = SystemClock.elapsedRealtime() + 15_000
+        var returnedToPreview = false
+        while (SystemClock.elapsedRealtime() < previewDeadline) {
+            val nodes = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Play preset")
+            if (!nodes.isNullOrEmpty()) {
+                returnedToPreview = true
+                break
+            }
+            SystemClock.sleep(250)
+        }
+        assertTrue(
+            "Native game did not exit cleanly back to the preview screen before instrumentation cleanup",
+            returnedToPreview
+        )
+        println("Native game exited cleanly before instrumentation cleanup")
     }
 }
