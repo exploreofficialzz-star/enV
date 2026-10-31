@@ -272,7 +272,7 @@ function cssFor(family: string, values: Record<string, string>) {
 }
 
 export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
-  const { family, workflow } = familyAndWorkflow(op, toolId);
+  const { family } = familyAndWorkflow(op, toolId);
   const fields = BASE_FIELDS[family] ?? BASE_FIELDS.gradient;
   const [values, setValues] = useState(() => initialValues(fields));
   const [sampleText, setSampleText] = useState("A little detail makes a big difference.");
