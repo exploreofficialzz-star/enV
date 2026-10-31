@@ -29,8 +29,9 @@ try{
   }).selectOption("1");
   const indicator=page.getByRole("combobox",{name:"Wire Indicator Q to digital node"});
   await indicator.selectOption({label:"Invented child gate"});
-  assert.match(await indicator.locator("..").innerText(),/\\b1\\b/,
-    "The indicator must show the computed invented-gate output");
+  // Wait for the computed Boolean value after React commits the new wiring.
+  await indicator.locator("..").locator("strong").getByText("1",{exact:true})
+    .waitFor({state:"visible",timeout:10000});
   await page.getByRole("button",{name:"Test every switch combination"}).click();
   await page.getByText(/Verified 4 mathematical input combinations/).waitFor();
 
