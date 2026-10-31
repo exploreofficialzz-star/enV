@@ -77,10 +77,19 @@ class NativeWorldLabPortableArchiveStore(private val root:File){
         val original=if(file(project.id).isFile)JSONArray(
             file(project.id).readText(StandardCharsets.UTF_8))else JSONArray()
         val records=NativeWorldLabEvidenceStore(root).list(project.id)
+        val optics=NativeWorldLabOpticsEvidenceStore(root)
+        val opticalRecords=optics.list(project.id).map{
+            JSONObject(optics.read(project.id,it))
+        }
+        val total=records+opticalRecords
+        require(total.size<=20){"Combined science evidence exceeds the 20-record archive budget."}
+        require(total.map{it.getString("id")}.toSet().size==total.size){
+            "Existing private science histories contain duplicate record identities."
+        }
         val archive=JSONObject().put("format","env-world-lab-archive")
             .put("schemaVersion",2).put("project",JSONObject(projectJson))
             .put("recordedRuns",original)
-            .put("scientificEvidence",JSONArray().apply{records.forEach{put(it)}})
+            .put("scientificEvidence",JSONArray().apply{total.forEach{put(it)}})
         val result=archive.toString()
         decode(result)
         return result

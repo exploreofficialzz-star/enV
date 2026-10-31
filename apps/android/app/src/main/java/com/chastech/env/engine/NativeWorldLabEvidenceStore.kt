@@ -58,6 +58,10 @@ class NativeWorldLabEvidenceStore(private val root:File){
                     result.getJSONArray("samples").length()==121){
                     "Invalid native contact-heat evidence dimensions"}
             }
+            "interface-optics","optical-scene-ray"->{
+                NativeWorldLabOpticsEvidenceStore(root).validatePortableEnvelope(
+                    raw,projectId)
+            }
             else->error("Unknown invented scientific calculation kind")
         }
         require(recordId.isNotBlank()){"Missing evidence ID"}
@@ -108,6 +112,8 @@ class NativeWorldLabEvidenceStore(private val root:File){
         val kind=when(result.getString("format")){
             "env-world-lab-newton-gravity"->"newton-gravity"
             "env-world-lab-material-heat-transfer"->"material-heat"
+            "env-world-lab-interface-optics"->"interface-optics"
+            "env-world-lab-optical-scene-ray"->"optical-scene-ray"
             else->error("Unrecognized scientific evidence")
         }
         val envelope=JSONObject().put("id",recordId).put("projectId",project.id)

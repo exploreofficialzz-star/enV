@@ -671,3 +671,11 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
   now renders a bounded XY projection of genuine calculated 3D segments,
   explicitly labeling that Z is not visible in this planar projection;
   the exported evidence retains all X/Y/Z coordinates.
+
+- Android complete-invention archives now combine the original gravity/thermal
+  scientific history with the typed private optical history (planar interface
+  and actual 3D ray tracing). Both histories are revalidated before export,
+  unique IDs and the 20-record science quota are enforced, and the existing
+  archive importer accepts those optical records through a shared strict
+  optical evidence validator. Imported optical records land in the standard
+  native evidence library; no other saved local invention is overwritten.

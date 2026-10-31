@@ -144,6 +144,12 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         }
         return outer
     }
+    /** Shared validator for complete-archive import (no storage writes). */
+    fun validatePortableEnvelope(raw:String,projectId:String):JSONObject {
+        val input=JSONObject(raw)
+        val identifier=safeId(input.getString("id"))
+        return validate(raw.toByteArray(StandardCharsets.UTF_8),projectId,identifier)
+    }
     @Synchronized fun save(run:NativeLabOpticsResult):String {
         val stored=NativeWorldLabProjectStore(root).read(run.projectId)
         require(stored.revision>=run.projectRevision){
