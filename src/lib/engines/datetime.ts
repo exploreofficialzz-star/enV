@@ -427,7 +427,7 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
   const duration = boundedInteger(options.durationMinutes, "Meeting length", 30, 5, 480);
   const interval = boundedInteger(options.intervalMinutes, "Slot interval", 30, 5, 120);
   const workDaysRaw = options.workDays === undefined ? "1,2,3,4,5" : options.workDays.trim();
-  const workDayParts = workDaysRaw.split(/[\\s,]+/).filter(Boolean);
+  const workDayParts = workDaysRaw.split(/[\s,]+/).filter(Boolean);
   const workDays = new Set<number>();
   for (const part of workDayParts) {
     const day = Number(part);
