@@ -1974,6 +1974,116 @@ export default function WorldLab() {
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
                 <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                  aria-label="Multiple moving sphere impact experiment">
+                  <h3 className="text-sm font-semibold">Simulate a group of moving spheres</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Give every sphere an X/Y/Z starting velocity. A bounded event-driven
+                    3D solver checks each future impact, transfers the calculated impulse,
+                    and continues to the next contact. For 2–12 non-overlapping spheres
+                    with invented density; simultaneous or crowded contacts are rejected,
+                    not approximated as established physics.
+                  </p>
+                  {groupSpheres.length<2||groupSpheres.length>12
+                    ?<p className="mt-2 text-xs">Add 2–12 spheres and assign an invented material density to each.</p>
+                    :<>
+                      <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                        {groupSpheres.map((sphere,index)=>{
+                          const velocity=groupVelocities[sphere.id]??
+                            (index===0?[2,0,0] as Vec3:[0,0,0] as Vec3);
+                          return <div className="rounded border border-border p-2" key={sphere.id}>
+                            <p className="text-xs font-medium">{sphere.name} · {sphere.id.slice(0,8)}</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {([0,1,2] as const).map(axis=><label key={axis} className="text-xs">
+                                {["X","Y","Z"][axis]} m/s
+                                <input className={inputLabel} type="number" min={-100}
+                                  max={100} step="any"
+                                  aria-label={"Group "+sphere.id+" "+["X","Y","Z"][axis]+" speed"}
+                                  value={velocity[axis]}
+                                  onChange={e=>{
+                                    const next=[...velocity] as [number,number,number];
+                                    next[axis]=Number(e.target.value);
+                                    setGroupVelocities(old=>({...old,[sphere.id]:next}));
+                                    setGroupPlaying(false);setGroupRun(null);
+                                  }}/>
+                              </label>)}
+                            </div>
+                          </div>;
+                        })}
+                      </div>
+                      <label className="mt-2 block text-xs">Assumed group restitution (0–1)
+                        <input className={inputLabel} type="number" min={0} max={1}
+                          step="0.05" aria-label="Group sphere restitution"
+                          value={groupRestitution} onChange={e=>{
+                            setGroupRestitution(Number(e.target.value));
+                            setGroupPlaying(false);setGroupRun(null);
+                          }}/>
+                      </label>
+                      <button type="button" className={buttonClass+" mt-2"}
+                        onClick={()=>{
+                          if(!project)return;
+                          try{
+                            const velocityInputs=Object.fromEntries(groupSpheres.map((s,i)=>[
+                              s.id,groupVelocities[s.id]??(i===0?[2,0,0]:[0,0,0]),
+                            ])) as Record<string,Vec3>;
+                            const run=runMultiSphereCollisions(project,velocityInputs,groupRestitution);
+                            setGroupRun(run);setGroupPlaying(false);setGroupTime(0);
+                            setSphereRun(null);setSpherePlaying(false);
+                            setCollisionRun(null);setCollisionPlaying(false);
+                            setError("");
+                            setMessage("Calculated successive 3D contacts with conserved momentum and audited energy.");
+                          }catch(cause){
+                            setGroupRun(null);setGroupPlaying(false);
+                            setError(cause instanceof Error?cause.message:"Unsupported multi-contact assumptions.");
+                          }
+                        }}>Calculate all sphere contacts</button>
+                    </>}
+                  {activeGroupRun&&(
+                    <div className="mt-3 space-y-2 text-xs" aria-label="Group collision results">
+                      <p>Actual computed contacts: {activeGroupRun.events.length}
+                        {" · "}assumed inertial spheres: {activeGroupRun.initial.length}</p>
+                      <p>Momentum before/after (kg·m/s):
+                        {activeGroupRun.initialMomentumKgMps.map(x=>x.toPrecision(4)).join(" / ")}
+                        {" → "}
+                        {activeGroupRun.finalMomentumKgMps.map(x=>x.toPrecision(4)).join(" / ")}</p>
+                      <p>Kinetic energy: {metric(activeGroupRun.totalInitialEnergyJ,"J")}
+                        {" → "}{metric(activeGroupRun.totalFinalEnergyJ,"J")};
+                        lost {metric(activeGroupRun.totalDissipatedEnergyJ,"J")}</p>
+                      {activeGroupRun.events.map((event,i)=><p key={i}>
+                        Impact {i+1} at {event.atSeconds.toFixed(4)} s between
+                        {" "}{event.firstEntityId.slice(0,8)} and {event.secondEntityId.slice(0,8)}.
+                        Kinetic loss {metric(event.energyLostJ,"J")}
+                      </p>)}
+                      <label className="block">Group simulation time: {groupTime.toFixed(2)} s
+                        <input className="w-full" type="range" min={0}
+                          max={activeGroupRun.durationSeconds} step={0.01}
+                          aria-label="Explore group collision time" value={groupTime}
+                          onChange={e=>{
+                            setGroupPlaying(false);setGroupTime(Number(e.target.value));
+                          }}/>
+                      </label>
+                      {groupSample&&<p>Impacts completed at this moment: {groupSample.completedEvents}</p>}
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={buttonClass}
+                          onClick={()=>setGroupPlaying(v=>!v)}>
+                          {groupPlaying?"Pause group impact":"Play group impact"}
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setGroupPlaying(false);setGroupTime(0);}}>Reset group impact</button>
+                        <select className={inputLabel} aria-label="Group impact playback rate"
+                          value={groupRate} onChange={e=>setGroupRate(Number(e.target.value))}>
+                          <option value={0.1}>0.1×</option><option value={1}>1×</option>
+                          <option value={4}>4×</option>
+                        </select>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>downloadJson("world-lab-multi-sphere-evidence.json",activeGroupRun)}>
+                          Export group impact evidence
+                        </button>
+                      </div>
+                      <p className="text-muted-foreground">{activeGroupRun.validity}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3"
                   aria-label="Three-dimensional sphere impact experiment">
                   <h3 className="text-sm font-semibold">Collide invented spheres in three dimensions</h3>
                   <p className="text-xs text-muted-foreground">
