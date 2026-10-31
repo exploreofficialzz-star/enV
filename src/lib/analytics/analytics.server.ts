@@ -70,10 +70,14 @@ function networkSubject(request: Request, secret: string) {
 export async function createAnalyticsDashboardSession(request: Request, input: unknown) {
   configSecret();
   const {password,secret}=dashboardConfig();
-  if(!input||typeof input!=="object"||Array.isArray(input)||typeof (input as Record<string,unknown>).password!=="string"||(input as Record<string,unknown>).password.length>256){
+  if(!input||typeof input!=="object"||Array.isArray(input)){
     throw new AnalyticsError("INVALID_DASHBOARD_CREDENTIALS","Enter the developer dashboard password.",400);
   }
-  const supplied=(input as Record<string,string>).password;
+  const suppliedValue=(input as Record<string,unknown>).password;
+  if(typeof suppliedValue!=="string"||suppliedValue.length>256){
+    throw new AnalyticsError("INVALID_DASHBOARD_CREDENTIALS","Enter the developer dashboard password.",400);
+  }
+  const supplied=suppliedValue;
   const expectedDigest=createHmac("sha256",secret).update(password).digest();
   const suppliedDigest=createHmac("sha256",secret).update(supplied).digest();
   const matches=timingSafeEqual(expectedDigest,suppliedDigest);
