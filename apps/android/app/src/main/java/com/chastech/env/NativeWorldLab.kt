@@ -207,7 +207,7 @@ fun NativeWorldLabForm() {
                 }?:error("File could not be opened.")
                 val json=out.toString(Charsets.UTF_8.name())
                 Pair(json,NativeWorldLabProjectCodec.decode(json))
-            } }.onSuccess { projectJson=it.first;project=it.second;selected=0;warning="" }
+            } }.onSuccess { projectJson=it.first;project=it.second;selected=0;warning="";editHistory.clear() }
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
     }

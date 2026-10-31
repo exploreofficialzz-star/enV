@@ -312,8 +312,7 @@ class NativeWorldLabEditHistory {
     fun record(before:String,after:String){
         val old=NativeWorldLabProjectCodec.decode(before)
         val next=NativeWorldLabProjectCodec.decode(after)
-        require(old.id==next.id && old.schemaVersion==next.schemaVersion &&
-            next.revision>old.revision){"History edits require one advancing project"}
+        require(old.id==next.id && next.revision>old.revision){"History edits require one advancing project"}
         past.addLast(before)
         while(past.size>50)past.removeFirst()
         future.clear()
@@ -321,7 +320,7 @@ class NativeWorldLabEditHistory {
     private fun restore(snapshot:String,current:String):String{
         val target=NativeWorldLabProjectCodec.decode(snapshot)
         val active=NativeWorldLabProjectCodec.decode(current)
-        require(target.id==active.id && target.schemaVersion==active.schemaVersion){
+        require(target.id==active.id){
             "Undo cannot restore another project"
         }
         require(active.revision<1_000_000_000){"Project revision capacity reached"}
