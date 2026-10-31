@@ -91,6 +91,8 @@ fun NativeWorldLabForm() {
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
     var proposedModulus by remember { mutableStateOf("") }
+    var proposedConductivity by remember { mutableStateOf("") }
+    var proposedSpecificHeat by remember { mutableStateOf("") }
     var editingMaterialId by remember { mutableStateOf<String?>(null) }
     var beamForce by remember { mutableStateOf("1000") }
     var beamRun by remember { mutableStateOf<NativeLabBeamBendingResult?>(null) }
@@ -1291,6 +1293,8 @@ fun NativeWorldLabForm() {
                     proposedName=material.name
                     proposedDensity=material.densityKgM3?.toString()?:""
                     proposedModulus=material.youngModulusPa?.toString()?:""
+                    proposedConductivity=material.thermalConductivityWPerMK?.toString()?:""
+                    proposedSpecificHeat=material.specificHeatJPerKgK?.toString()?:""
                 }){Text("Revise this material's assumptions")}
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
                 Text("Assumed Young's modulus: "+labNumber(material?.youngModulusPa)+" Pa")
@@ -1563,33 +1567,49 @@ fun NativeWorldLabForm() {
             OutlinedTextField(value=proposedModulus,onValueChange={proposedModulus=it},
                 label={Text("Hypothetical Young's modulus (Pa), or blank")},
                 singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedConductivity,
+                onValueChange={proposedConductivity=it},
+                label={Text("Assumed thermal conductivity (W/m K), or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedSpecificHeat,
+                onValueChange={proposedSpecificHeat=it},
+                label={Text("Assumed specific heat (J/kg K), or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
             Button(onClick={
                 runCatching {
                     require(proposedName.isNotBlank()){"Name your invented material first."}
                     val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val conductivity=proposedConductivity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val heatCapacity=proposedSpecificHeat.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val materialId=editingMaterialId
                     val freshId=java.util.UUID.randomUUID().toString()
                     val previous=projectJson
                     applyProjectEdit{json->
                         if(materialId!=null){
                             NativeWorldLabEditor.reviseHypotheticalMaterial(
-                                json,materialId,proposedName,density,modulus)
+                                json,materialId,proposedName,density,modulus,
+                                thermalConductivityWPerMK=conductivity,
+                                specificHeatJPerKgK=heatCapacity)
                         }else{
                             val proposed=NativeWorldLabEditor.addHypotheticalMaterial(
-                                json,proposedName,density,youngModulusPa=modulus,id=freshId)
+                                json,proposedName,density,youngModulusPa=modulus,id=freshId,
+                                thermalConductivityWPerMK=conductivity,
+                                specificHeatJPerKgK=heatCapacity)
                             solid?.let{NativeWorldLabEditor.assignMaterial(
                                 proposed,it.id,freshId)}?:proposed
                         }
                     }
                     if(projectJson!=previous){
                         proposedName="";proposedDensity="";proposedModulus=""
+                        proposedConductivity="";proposedSpecificHeat=""
                         editingMaterialId=null;beamRun=null
                     }
                 }.onFailure{warning=it.message?:"Material edit was not saved."}
             }){Text(if(editingMaterialId==null)"Save invented material" else "Save revised material")}
             if(editingMaterialId!=null)OutlinedButton(onClick={
                 editingMaterialId=null;proposedName="";proposedDensity="";proposedModulus=""
+                proposedConductivity="";proposedSpecificHeat=""
             }){Text("Cancel material revision")}
             Text("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.",
                 style=MaterialTheme.typography.bodySmall)

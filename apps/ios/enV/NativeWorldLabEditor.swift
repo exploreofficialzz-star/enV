@@ -417,12 +417,16 @@ enum NativeWorldLabEditor {
     }
     static func addHypotheticalMaterial(_ data:Data,name:String,densityKgM3:Double?,
                                         youngModulusPa:Double?=nil,
-                                        id:String=UUID().uuidString) throws -> Data {
+                                        id:String=UUID().uuidString,
+                                        thermalConductivityWPerMK:Double?=nil,
+                                        specificHeatJPerKgK:Double?=nil) throws -> Data {
         try mutate(data){root in
             guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   name.count <= 120,
                   (densityKgM3.map { $0.isFinite && $0 >= 0.001 && $0 <= 1e9 } ?? true),
-                  (youngModulusPa.map { $0.isFinite && $0 >= 0 && $0 <= 1e15 } ?? true) else {
+                  (youngModulusPa.map { $0.isFinite && $0 >= 0 && $0 <= 1e15 } ?? true),
+                  (thermalConductivityWPerMK.map{$0.isFinite && $0>=1e-6 && $0<=1e6} ?? true),
+                  (specificHeatJPerKgK.map{$0.isFinite && $0>=0.01 && $0<=1e7} ?? true) else {
                 throw NativeWorldLabError.invalid("Hypothetical properties must be finite values inside their documented SI limits")
             }
             guard var materials=root["materials"] as? [[String:Any]],
@@ -433,6 +437,8 @@ enum NativeWorldLabEditor {
             materials.append([
                 "id":id,"name":name,"densityKgM3":densityKgM3.map{$0 as Any} ?? NSNull(),
                 "youngModulusPa":youngModulusPa.map{$0 as Any} ?? NSNull(),
+                "thermalConductivityWPerMK":thermalConductivityWPerMK.map{$0 as Any} ?? NSNull(),
+                "specificHeatJPerKgK":specificHeatJPerKgK.map{$0 as Any} ?? NSNull(),
                 "evidence":"hypothetical-user-assumed",
             ])
             root["materials"]=materials
@@ -440,12 +446,16 @@ enum NativeWorldLabEditor {
     }
     /// Revise a hypothetical material; attached solids keep their original material ID.
     static func reviseHypotheticalMaterial(_ data:Data,id:String,name:String,
-        densityKgM3:Double?,youngModulusPa:Double?)throws->Data {
+        densityKgM3:Double?,youngModulusPa:Double?,
+        thermalConductivityWPerMK:Double?=nil,
+        specificHeatJPerKgK:Double?=nil)throws->Data {
         try mutate(data){root in
             guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
                   name.count<=120,
                   (densityKgM3.map{$0.isFinite && $0 >= 0.001 && $0<=1e9} ?? true),
                   (youngModulusPa.map{$0.isFinite && $0 >= 0 && $0<=1e15} ?? true),
+                  (thermalConductivityWPerMK.map{$0.isFinite && $0>=1e-6 && $0<=1e6} ?? true),
+                  (specificHeatJPerKgK.map{$0.isFinite && $0>=0.01 && $0<=1e7} ?? true),
                   var materials=root["materials"] as? [[String:Any]],
                   let index=materials.firstIndex(where:{$0["id"] as? String==id}) else {
                 throw NativeWorldLabError.invalid("Invented material or its proposed properties are invalid")
@@ -453,6 +463,9 @@ enum NativeWorldLabEditor {
             materials[index]["name"]=name.trimmingCharacters(in:.whitespacesAndNewlines)
             materials[index]["densityKgM3"]=densityKgM3.map{$0 as Any} ?? NSNull()
             materials[index]["youngModulusPa"]=youngModulusPa.map{$0 as Any} ?? NSNull()
+            materials[index]["thermalConductivityWPerMK"]=
+                thermalConductivityWPerMK.map{$0 as Any} ?? NSNull()
+            materials[index]["specificHeatJPerKgK"]=specificHeatJPerKgK.map{$0 as Any} ?? NSNull()
             materials[index]["evidence"]="hypothetical-user-assumed"
             root["materials"]=materials
         }

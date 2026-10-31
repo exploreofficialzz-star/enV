@@ -44,6 +44,8 @@ struct NativeWorldLabView:View {
     @State private var inventedName=""
     @State private var inventedDensity=""
     @State private var inventedModulus=""
+    @State private var inventedConductivity=""
+    @State private var inventedSpecificHeat=""
     @State private var editingMaterialId:String?
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
@@ -803,6 +805,10 @@ struct NativeWorldLabView:View {
                             inventedName=attached.name
                             inventedDensity=attached.densityKgM3.map{String($0)} ?? ""
                             inventedModulus=attached.youngModulusPa.map{String($0)} ?? ""
+                            inventedConductivity=attached.thermalConductivityWPerMK.map{
+                                String($0)} ?? ""
+                            inventedSpecificHeat=attached.specificHeatJPerKgK.map{
+                                String($0)} ?? ""
                         }.buttonStyle(.bordered)
                     }
                     TextField("Invented material name",text:$inventedName)
@@ -810,6 +816,12 @@ struct NativeWorldLabView:View {
                     TextField("Assumed density in kg/m³ (optional)",text:$inventedDensity)
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
                     TextField("Assumed Young's modulus in Pa (optional)",text:$inventedModulus)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    TextField("Assumed conductivity W/(m K) (optional)",
+                              text:$inventedConductivity)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    TextField("Assumed specific heat J/(kg K) (optional)",
+                              text:$inventedSpecificHeat)
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
                     Button(editingMaterialId==nil ? "Save invented material" : "Save revised material") {
                         do {
@@ -826,16 +838,32 @@ struct NativeWorldLabView:View {
                                 modulus=nil
                             }else if let value=Double(inventedModulus) {modulus=value}
                             else {throw NativeWorldLabError.invalid("Young's modulus must be numeric")}
+                            let conductivity=try inventedConductivity.trimmingCharacters(
+                                in:.whitespaces).isEmpty ? nil : Double(inventedConductivity)
+                            let heatCapacity=try inventedSpecificHeat.trimmingCharacters(
+                                in:.whitespaces).isEmpty ? nil : Double(inventedSpecificHeat)
+                            if !inventedConductivity.trimmingCharacters(in:.whitespaces).isEmpty &&
+                               conductivity==nil {
+                                throw NativeWorldLabError.invalid("Conductivity must be numeric")
+                            }
+                            if !inventedSpecificHeat.trimmingCharacters(in:.whitespaces).isEmpty &&
+                               heatCapacity==nil {
+                                throw NativeWorldLabError.invalid("Specific heat must be numeric")
+                            }
                             let id=UUID().uuidString
                             applyProject {old in
                                 if let editingMaterialId {
                                     return try NativeWorldLabEditor.reviseHypotheticalMaterial(
                                         old,id:editingMaterialId,name:inventedName,
-                                        densityKgM3:density,youngModulusPa:modulus)
+                                        densityKgM3:density,youngModulusPa:modulus,
+                                        thermalConductivityWPerMK:conductivity,
+                                        specificHeatJPerKgK:heatCapacity)
                                 }
                                 let first=try NativeWorldLabEditor.addHypotheticalMaterial(
                                     old,name:inventedName,densityKgM3:density,
-                                    youngModulusPa:modulus,id:id)
+                                    youngModulusPa:modulus,id:id,
+                                    thermalConductivityWPerMK:conductivity,
+                                    specificHeatJPerKgK:heatCapacity)
                                 if let solid {
                                     return try NativeWorldLabEditor.assignMaterial(
                                         first,solidId:solid.id,materialId:id)
@@ -844,6 +872,7 @@ struct NativeWorldLabView:View {
                             }
                             if problem.isEmpty {
                                 inventedName="";inventedDensity="";inventedModulus=""
+                                inventedConductivity="";inventedSpecificHeat=""
                                 editingMaterialId=nil;beamRun=nil
                             }
                         }catch{problem=error.localizedDescription}
