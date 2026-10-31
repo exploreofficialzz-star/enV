@@ -270,3 +270,8 @@ release-candidate evidence bundle are unfinished.
 ## Solver-driven fluid cutaway (2026-10-30)
 
 - Added a read-only accessible Web fluid surface cross-section following the actual user-selected immersion depth (0–100% vertical extent), tied to the numerical Archimedes result of the selected invented primitive. Waterline and legend clearly identify this as a 2D illustrative cutaway; volumetric buoyancy remains independently computed from exact primitive geometry and unknown material properties are never invented. Native platforms continue their numeric readouts; full visual/solver acceptance deferred.
+
+## Web undo/redo and geometry tools (2026-10-31)
+
+- Integrated a 50-entry, project-local undo/redo history into Web edits of solids, invented materials and circuit graphs. All snapshots validate the strict portable format; redo is discarded on a new edit, and save/import/new/open reset the in-memory undo timeline without altering saved experiment evidence. Editing and reversing invalidate active solver results, not archived evidence.
+- Added SI grid snap for selected solid center and center-to-center/horizontal/delta displacement measurement between two created objects, with geometry-only disclaimers and touch-friendly controls. Regression tests registered for the consolidated audit. Kotlin/Swift affordance parity is not claimed yet.

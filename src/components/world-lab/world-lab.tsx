@@ -12,6 +12,8 @@ import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
+import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
+  snapSolidPosition,measureSolidCenters} from "@/lib/world-lab/edit-history";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
 import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
 import { WorldLabFluidCutaway } from "./fluid-cutaway";
@@ -98,7 +100,21 @@ export default function WorldLab() {
   const visualSettings = useRef({ seeInside: false, opacity: 55 });
   const [opacity, setOpacity] = useState(55);
   visualSettings.current = { seeInside, opacity };
-  const [project, setProject] = useState<WorldLabProject | null>(null);
+  const [project, setProjectState] = useState<WorldLabProject | null>(null);
+  const projectForEdits=useRef<WorldLabProject|null>(null);
+  const editHistory=useRef(emptyWorldLabEditHistory());
+  const [editEpoch,setEditEpoch]=useState(0);
+  const [gridStep,setGridStep]=useState(0.5);
+  const [measureTargetId,setMeasureTargetId]=useState("");
+  function setProject(value:WorldLabProject|null|
+    ((current:WorldLabProject|null)=>WorldLabProject|null)){
+    const next=typeof value==="function"?value(projectForEdits.current):value;
+    projectForEdits.current=next;setProjectState(next);
+  }
+  function clearEditHistory(){
+    editHistory.current=emptyWorldLabEditHistory();
+    setEditEpoch(x=>x+1);
+  }
   const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
   const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
@@ -141,6 +157,11 @@ export default function WorldLab() {
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
   const selectedQuantities = selectedEntity ? solidQuantities(selectedEntity, selectedMaterial) : null;
+  const measurementTarget=project?.entities.find(e=>e.id===measureTargetId)??null;
+  const measurement=selectedEntity&&measurementTarget&&selectedEntity.id!==measurementTarget.id
+    ?measureSolidCenters(selectedEntity,measurementTarget):null;
+  const canUndo=editHistory.current.past.length>0,canRedo=editHistory.current.future.length>0;
+  void editEpoch;
   const selectedDrop = dropRun && selectedEntity?.id === dropRun.source.entityId
     && project?.id === dropRun.source.projectId
     && project?.revision === dropRun.source.projectRevision ? dropRun : null;
@@ -686,13 +707,37 @@ export default function WorldLab() {
     if (next.length() > OBSERVER_BOUNDS_METRES.maxRadius || next.y < OBSERVER_BOUNDS_METRES.minHeight) return;
     camera.position.copyFrom(next);
   }
-  function mutateProject(transform: (current: WorldLabProject) => WorldLabProject) {
-    // A changed material, shape, or arrangement invalidates its old scientific results.
+  function invalidateWorldLabResults(){
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
-    setActuatorPlaying(false);setActuatorRun(null);setWiredMotorRun(null);setDcRun(null);
-    setRemoteJob(null);
-    setProject(current => current ? transform(current) : current);
-    setWorkspaceDirty(true);
+    setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
+    setWiredMotorRun(null);setDcRun(null);setRemoteJob(null);
+  }
+  function mutateProject(transform:(current:WorldLabProject)=>WorldLabProject){
+    const current=projectForEdits.current;
+    if(!current)return;
+    try{
+      const edit=recordWorldLabEdit(editHistory.current,current,transform(current));
+      if(!edit.changed)return;
+      editHistory.current=edit.history;setEditEpoch(n=>n+1);
+      invalidateWorldLabResults();
+      setProject(edit.project);setWorkspaceDirty(true);setError("");
+    }catch(err){setError(err instanceof Error?err.message:"Edit rejected.");}
+  }
+  function travelEdit(direction:"undo"|"redo"){
+    const current=projectForEdits.current;
+    if(!current)return;
+    try{
+      const step=travelWorldLabEdit(editHistory.current,current,direction);
+      if(!step)return;
+      editHistory.current=step.history;setEditEpoch(n=>n+1);
+      invalidateWorldLabResults();
+      setProject(step.project);
+      setSelectedEntityId(id=>step.project.entities.some(e=>e.id===id)?id:"");
+      setWorkspaceDirty(true);
+      setMessage(direction==="undo"?"Undid invention edit. Save to keep this version.":
+        "Redid invention edit. Save to keep this version.");
+      setError("");
+    }catch(err){setError(err instanceof Error?err.message:"Cannot restore edit.");}
   }
   async function submitRemoteJob(){
     if(!remoteJobsEnabled||!project||remoteBusy)return;
@@ -831,6 +876,7 @@ export default function WorldLab() {
     try {
       const saved=await putLocalWorldLabProject(project,savedRevision);
       setProject(saved);
+      clearEditHistory();
       setSavedRevision(saved.revision);
       setWorkspaceDirty(false);
       setSavedProjects(await listLocalWorldLabProjects());
@@ -883,6 +929,7 @@ export default function WorldLab() {
       const now=new Date().toISOString();
       setProject(parseWorldLabProject({...imported,id:crypto.randomUUID(),title:imported.title,
         revision:0,createdAt:now,updatedAt:now}));
+      clearEditHistory();
       setSavedRevision(null);
       setWorkspaceDirty(true);
       setSelectedEntityId("");
@@ -896,7 +943,7 @@ export default function WorldLab() {
     if(!saved)return;
     if((workspaceDirty || (savedRevision === null && runs.length > 0)) &&
        !window.confirm("Discard unsaved local edits or recorded experiments and open another project?"))return;
-    setProject(saved);setSavedRevision(saved.revision);setWorkspaceDirty(false);
+    setProject(saved);clearEditHistory();setSavedRevision(saved.revision);setWorkspaceDirty(false);
     setSelectedEntityId("");setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     restoreRunsForProject(saved.id);
     setMessage("Opened saved project "+saved.title+".");
@@ -906,6 +953,7 @@ export default function WorldLab() {
        !window.confirm("Discard unsaved local edits or recorded experiments and create a new project?"))return;
     restoreRunsEpoch.current++;
     setProject(blankWorldLabProject(crypto.randomUUID(),new Date().toISOString()));
+    clearEditHistory();
     setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
     setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     setMessage("New local World Lab project created.");
@@ -1141,6 +1189,10 @@ export default function WorldLab() {
             <button type="button" className={buttonClass} disabled={!selectedEntity}
               onClick={() => {if(selectedEntity)mutateProject(p=>({...p,entities:p.entities.filter(e=>e.id!==selectedEntity.id)}));
                 setSelectedEntityId("");}}>Remove selected</button>
+              <button type="button" className={buttonClass} disabled={!canUndo}
+                aria-label="Undo World Lab edit" onClick={()=>travelEdit("undo")}>Undo</button>
+              <button type="button" className={buttonClass} disabled={!canRedo}
+                aria-label="Redo World Lab edit" onClick={()=>travelEdit("redo")}>Redo</button>
           </div>
           {seeInside && (
             <div className="mt-2 rounded-lg border border-border p-3">
@@ -1209,6 +1261,38 @@ export default function WorldLab() {
                   <button type="button" className={buttonClass} onClick={focusSelected}>
                     Focus selected object
                   </button>
+                </div>
+                <div className="sm:col-span-2 rounded-lg border border-border p-2">
+                  <p className="text-xs font-semibold">Position and measure</p>
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <label className="text-xs">Snap spacing (metres)
+                      <select className={inputLabel} aria-label="Grid snap spacing"
+                        value={gridStep} onChange={e=>setGridStep(Number(e.target.value))}>
+                        <option value={0.1}>0.1 m</option><option value={0.5}>0.5 m</option>
+                        <option value={1}>1 m</option><option value={5}>5 m</option>
+                      </select>
+                    </label>
+                    <button type="button" className={buttonClass}
+                      onClick={()=>editSelected(snapSolidPosition(selectedEntity,gridStep))}>
+                      Snap selected to grid
+                    </button>
+                  </div>
+                  <label className="mt-2 block text-xs">Measure to another solid
+                    <select className={inputLabel} aria-label="Measure distance to solid"
+                      value={measurementTarget?.id??""}
+                      onChange={e=>setMeasureTargetId(e.target.value)}>
+                      <option value="">Choose second solid</option>
+                      {project?.entities.filter(e=>e.id!==selectedEntity.id).map(e=>
+                        <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                  </label>
+                  {measurement&&<div role="status" className="mt-2 text-xs"
+                    aria-label="Measured geometric distance">
+                    <p>Center-to-center: {measurement.centerDistanceMeters.toFixed(4)} m</p>
+                    <p>Horizontal distance: {measurement.horizontalDistanceMeters.toFixed(4)} m</p>
+                    <p>Offset X/Y/Z: {measurement.deltaMeters.map(v=>v.toFixed(3)).join(" / ")} m</p>
+                    <p className="text-muted-foreground">Geometry only, not surface clearance or collision measurement.</p>
+                  </div>}
                 </div>
                 <label>Material assumption
                   <select className={inputLabel} value={selectedEntity.materialId??""}
