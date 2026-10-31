@@ -9,7 +9,6 @@ import {
   contrastRatio,
   evaluateContrast,
   getContrastTargets,
-  parseCssColor,
   resolveRenderedPair,
   rgbToHsl,
   suggestContrastCorrections,
@@ -21,6 +20,7 @@ import {
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
 import { buildDesignPaletteExport, createColorShadeScale, type PaletteExportFormat } from "@/lib/engines/design-palette";
+import { formatCmyk, formatHsv, parseDesignColor } from "@/lib/engines/design-color";
 
 type Harmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
 const DEFAULT_VISION_COLORS = [
@@ -43,68 +43,6 @@ const TARGETS = getContrastTargets();
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function hsvToRgb(h: number, s: number, v: number): RgbaColor {
-  const hue = ((h % 360) + 360) % 360;
-  const chroma = v * s;
-  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = v - chroma;
-  let rgb: [number, number, number];
-  if (hue < 60) rgb = [chroma, x, 0];
-  else if (hue < 120) rgb = [x, chroma, 0];
-  else if (hue < 180) rgb = [0, chroma, x];
-  else if (hue < 240) rgb = [0, x, chroma];
-  else if (hue < 300) rgb = [x, 0, chroma];
-  else rgb = [chroma, 0, x];
-  return { r: (rgb[0] + m) * 255, g: (rgb[1] + m) * 255, b: (rgb[2] + m) * 255, a: 1 };
-}
-
-function rgbToHsv(color: Pick<RgbaColor, "r" | "g" | "b">) {
-  const r = color.r / 255, g = color.g / 255, b = color.b / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
-  let h = 0;
-  if (delta) {
-    if (max === r) h = 60 * (((g - b) / delta) % 6);
-    else if (max === g) h = 60 * ((b - r) / delta + 2);
-    else h = 60 * ((r - g) / delta + 4);
-  }
-  return { h: (h + 360) % 360, s: max === 0 ? 0 : delta / max, v: max };
-}
-
-function parseDesignColor(input: string): RgbaColor | null {
-  const cssColor = parseCssColor(input);
-  if (cssColor) return cssColor;
-  const hsv = input.trim().match(/^hs[ vb]\(\s*([+-]?[\d.]+)(?:deg)?[ ,]+([\d.]+)%?[ ,]+([\d.]+)%?\s*\)$/i);
-  if (hsv) {
-    const usesPercent = input.includes("%");
-    const h = Number(hsv[1]), s = Number(hsv[2]) / (usesPercent ? 100 : 1), v = Number(hsv[3]) / (usesPercent ? 100 : 1);
-    if ([h, s, v].every(Number.isFinite) && s >= 0 && s <= 1 && v >= 0 && v <= 1) return hsvToRgb(h, s, v);
-  }
-  const cmyk = input.trim().match(/^cmyk\(\s*([\d.]+)%?\s*[, ]+([\d.]+)%?\s*[, ]+([\d.]+)%?\s*[, ]+([\d.]+)%?\s*\)$/i);
-  if (cmyk) {
-    const values = cmyk.slice(1).map(Number);
-    if (values.every((value) => Number.isFinite(value) && value >= 0 && value <= 100)) {
-      const [c, m, y, k] = values.map((value) => value / 100);
-      return { r: 255 * (1 - c) * (1 - k), g: 255 * (1 - m) * (1 - k), b: 255 * (1 - y) * (1 - k), a: 1 };
-    }
-  }
-  return null;
-}
-
-function formatHsv(color: RgbaColor): string {
-  const hsv = rgbToHsv(color);
-  return `hsv(${Math.round(hsv.h)} ${Math.round(hsv.s * 100)}% ${Math.round(hsv.v * 100)}%)`;
-}
-
-function formatCmyk(color: RgbaColor): string {
-  const r = clamp(color.r / 255, 0, 1), g = clamp(color.g / 255, 0, 1), b = clamp(color.b / 255, 0, 1);
-  const k = 1 - Math.max(r, g, b);
-  if (k >= 0.999999) return "cmyk(0%, 0%, 0%, 100%)";
-  const c = ((1 - r - k) / (1 - k)) * 100;
-  const m = ((1 - g - k) / (1 - k)) * 100;
-  const y = ((1 - b - k) / (1 - k)) * 100;
-  return `cmyk(${Math.round(c)}%, ${Math.round(m)}%, ${Math.round(y)}%, ${Math.round(k * 100)}%)`;
 }
 
 function makePalette(color: RgbaColor, harmony: Harmony): RgbaColor[] {
