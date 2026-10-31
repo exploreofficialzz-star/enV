@@ -241,6 +241,23 @@ export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number)
   });
 }
 
+/** Change an inventor's assumptions, never rewrite an invented material's identity. */
+export function reviseWorldLabMaterial(
+  raw:WorldLabProject,id:string,
+  assumptions:Pick<WorldLabMaterial,"name"|"densityKgM3"|"youngModulusPa">,
+):WorldLabProject {
+  const project=parseWorldLabProject(raw);
+  if(!project.materials.some(material=>material.id===id))
+    throw new Error("The invented material to revise does not exist.");
+  const updated=materialSchema.parse({
+    id,name:assumptions.name,densityKgM3:assumptions.densityKgM3,
+    youngModulusPa:assumptions.youngModulusPa,evidence:"hypothetical-user-assumed",
+  });
+  return parseWorldLabProject({...project,
+    materials:project.materials.map(material=>material.id===id?updated:material),
+  });
+}
+
 export function solidQuantities(entity: WorldLabEntity, material?: WorldLabMaterial): {
   volumeM3: number; massKg: number | null; evidence: "physics-model-computed" | "unknown-insufficient-evidence";
 } {
