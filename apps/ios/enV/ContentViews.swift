@@ -495,6 +495,8 @@ struct HomeView: View {
                             Label("Send feedback to enV", systemImage: "bubble.left.and.bubble.right")
                                 .font(.envScaled(size: 12, weight: .medium))
                                 .foregroundStyle(Color.envAccent)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 16) {
