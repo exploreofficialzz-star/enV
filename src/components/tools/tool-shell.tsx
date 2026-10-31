@@ -42,9 +42,13 @@ export function ToolShell({
   const toolViewedAtRef = useRef(Date.now());
   const executionStartedAtRef = useRef<number | null>(null);
   const executionFinishedRef = useRef(false);
+  const lastExecutionStartAtRef = useRef(0);
 
   const startToolExecution = (entryPoint: string) => {
     const startedAt = Date.now();
+    // A submit button emits both click and submit events. Count that as one run.
+    if (entryPoint === "form_submit" && startedAt - lastExecutionStartAtRef.current < 1000) return;
+    lastExecutionStartAtRef.current = startedAt;
     executionStartedAtRef.current = startedAt;
     executionFinishedRef.current = false;
     toolStartedRef.current = true;
@@ -95,6 +99,7 @@ export function ToolShell({
     toolStartedAtRef.current = null;
     executionStartedAtRef.current = null;
     executionFinishedRef.current = false;
+    lastExecutionStartAtRef.current = 0;
     toolViewedAtRef.current = Date.now();
   }, [tool.id, recordRecent]);
 
@@ -250,10 +255,10 @@ export function ToolShell({
         onClickCapture={(event) => {
           const target = event.target;
           if (!(target instanceof HTMLElement) || target.closest(".env-tool-fullscreen__toolbar")) return;
-          const button = target.closest("button");
-          if (!button || button.disabled || button.type === "submit") return;
-          const label = [button.getAttribute("aria-label"), button.getAttribute("title"), button.innerText].filter(Boolean).join(" ");
-          if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render)\b/i.test(label)) {
+          const action = target.closest("button,[role=button]");
+          if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
+          const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
+          if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label)) {
             startToolExecution("action_button");
           }
         }}
