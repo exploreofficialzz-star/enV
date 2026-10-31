@@ -68,7 +68,7 @@ try{
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Cube"});
-  await page.getByRole("combobox",{name:"Other solid to collide with"}).selectOption({label:/Sphere/});
+  await page.getByRole("combobox",{name:"Other solid to collide with"}).selectOption({index:1});
   await page.getByRole("spinbutton",{name:"Collision restitution"}).fill("1");
   await page.getByRole("button",{name:"Calculate two-body collision"}).click();
   await page.getByText(/Impact time: 1.2500 s/).waitFor();
