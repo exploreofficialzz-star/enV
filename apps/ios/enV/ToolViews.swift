@@ -5825,7 +5825,8 @@ struct NativeDateTimeToolView: View {
         case "fromTz", "sourceTz": return TimeZone.current.identifier
         case "toTz": return "America/New_York"
         case "pattern": return "yyyy-MM-dd EEEE"
-        case "days": return "1"
+        case "days": return tool.id == "workday-calculator" ? "10" : "0"
+        case "year": return String(Calendar.current.component(.year, from: Date()))
         case "years", "months", "weeks": return "0"
         case "direction": return "add"
         case "repeatCount": return "1"
