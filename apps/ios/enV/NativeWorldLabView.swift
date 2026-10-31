@@ -60,6 +60,13 @@ struct NativeWorldLabView:View {
     @State private var spherePlaying=false
     @State private var sphereSpeed=1.0
     @State private var exportingSphereImpact=false
+    @State private var groupSpeeds:[String:String]=[:]
+    @State private var groupRestitution=1.0
+    @State private var groupRun:NativeGroupSphereRun?
+    @State private var groupTime=0.0
+    @State private var groupPlaying=false
+    @State private var groupPlaybackRate=1.0
+    @State private var exportingGroupEvidence=false
     @State private var deviceName=""
     @State private var deviceAssumption=""
     @State private var deviceResistance=""
@@ -115,6 +122,11 @@ struct NativeWorldLabView:View {
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private var groupEvidenceDocument:NativeWorldLabJsonFile? {
+        guard let run=groupRun,
+              let data=try? JSONEncoder().encode(run) else {return nil}
+        return NativeWorldLabJsonFile(content:data)
+    }
     private var sphereEvidenceDocument:NativeWorldLabJsonFile? {
         guard let run=sphereRun,
               let data=try? JSONEncoder().encode(run) else {return nil}
@@ -372,6 +384,7 @@ struct NativeWorldLabView:View {
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             beamRun=nil
             collisionPlaying=false;collisionRun=nil;collisionTime=0
+            groupPlaying=false;groupRun=nil;groupTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
         }
@@ -402,6 +415,11 @@ struct NativeWorldLabView:View {
                 if fluidTime >= (run.samples.last?.timeSeconds ?? 4) {
                     fluidPlaying=false
                 }
+            }
+            if groupPlaying,let run=groupRun {
+                groupTime=min(run.durationSeconds,groupTime+dt*groupPlaybackRate)
+                updateGroupSphereScene()
+                if groupTime>=run.durationSeconds {groupPlaying=false}
             }
             if spherePlaying,let run=sphereRun {
                 sphereTime=min(run.durationSeconds,sphereTime+dt*sphereSpeed)
@@ -434,6 +452,11 @@ struct NativeWorldLabView:View {
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingGroupEvidence,
+            document:groupEvidenceDocument,contentType:.json,
+            defaultFilename:"world-lab-multi-sphere-evidence"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
         .fileExporter(isPresented:$exportingSphereImpact,
@@ -958,6 +981,7 @@ Text("Invent chemical heat").font(.headline)
     @ViewBuilder private func solidContent(project:NativeWorldLabProject,
         solid:NativeLabSolid)->some View {
         solidPlacementContent(project:project,solid:solid)
+        solidGroupSphereContent(project:project)
         solidSphereImpactContent(project:project,solid:solid)
         solidCollisionContent(project:project,solid:solid)
         solidBeamContent(project:project,solid:solid)
