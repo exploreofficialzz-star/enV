@@ -1107,6 +1107,40 @@ export default function WorldLab() {
       setCloudError(error instanceof Error?error.message:"Backup download failed.");
     }finally{setCloudBusy(false);}
   }
+  /**
+   * Explicit cloud-to-device transfer makes an independent project ID.
+   * The current unsaved scene, saved local revision and model runs are untouched.
+   */
+  async function saveCloudBackupAsDeviceCopy(id:string,revision?:number){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const url="/api/world-lab/projects/"+encodeURIComponent(id)+
+        (revision===undefined?"":"/versions/"+revision);
+      const response=await fetch(url,{credentials:"same-origin",cache:"no-store"});
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.project)
+        throw new Error(body.error||body.code||"Cannot retrieve this account project.");
+      if(revision!==undefined&&body.version?.serverRevision!==revision)
+        throw new Error("Cloud version does not match the selected snapshot.");
+      const remote=parseWorldLabProject(body.project);
+      if(remote.id!==id)throw new Error("Cloud project identity mismatch.");
+      const now=new Date().toISOString();
+      const copy=parseWorldLabProject({...remote,
+        id:crypto.randomUUID(),
+        title:remote.title,
+        revision:0,createdAt:now,updatedAt:now});
+      // A brand new device-side identity; atomic insert cannot overwrite a
+      // different local project even when their source names are identical.
+      await putLocalWorldLabArchive(copy,null,[]);
+      setSavedProjects(await listLocalWorldLabProjects());
+      setCloudStatus("Saved an independent local copy of "+copy.title+
+        ". Open it from Saved local projects. Your current invention is unchanged.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:
+        "Cloud invention could not be copied to this device.");
+    }finally{setCloudBusy(false);}
+  }
   async function loadAccountBackupVersions(id:string){
     if(!cloudBackupsEnabled||cloudBusy)return;
     setCloudBusy(true);setCloudError("");
@@ -1646,6 +1680,10 @@ export default function WorldLab() {
               Download JSON safely
             </button>
             <button type="button" className={buttonClass} disabled={cloudBusy}
+              onClick={()=>{void saveCloudBackupAsDeviceCopy(backup.projectId);}}>
+              Save new device copy
+            </button>
+            <button type="button" className={buttonClass} disabled={cloudBusy}
               onClick={()=>{void loadAccountBackupVersions(backup.projectId);}}>
               View history
             </button>
@@ -1675,6 +1713,11 @@ export default function WorldLab() {
                     onClick={()=>{void downloadAccountBackupVersion(
                       backup.projectId,version.serverRevision);}}>
                     Download snapshot
+                  </button>
+                  <button type="button" className={buttonClass} disabled={cloudBusy}
+                    onClick={()=>{void saveCloudBackupAsDeviceCopy(
+                      backup.projectId,version.serverRevision);}}>
+                    Save local copy
                   </button>
                 </div>)}
             </div>}

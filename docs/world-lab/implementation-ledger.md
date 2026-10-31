@@ -410,3 +410,9 @@ release-candidate evidence bundle are unfinished.
   expiry at startup/every six hours. Sensitive project and evidence payloads
   are not retained indefinitely by design when the worker is operational;
   hosted scheduling, auditing and deletion observability remain release gates.
+
+- An explicit cloud-to-device copy action imports a current or historical
+  authenticated account backup as a newly identified, immediately locally
+  saved project. No local existing project, unsaved editor or scientific run
+  history is overwritten. This is intentional restore-as-copy rather than
+  conflict-prone background last-write-wins synchronization.
