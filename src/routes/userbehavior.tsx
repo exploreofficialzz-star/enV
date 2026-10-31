@@ -122,7 +122,7 @@ function downloadAnalyticsReport(summary: Summary) {
   anchor.href = url;
   anchor.download = `env-user-behavior-${new Date(summary.generatedAt).toISOString().slice(0, 10)}.csv`;
   anchor.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function UserBehaviorDashboard() {
