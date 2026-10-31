@@ -98,10 +98,14 @@ object NativeDateTimeEngine {
             "date-add" -> {
                 val start = parseDate(options["start"] ?: options["value"], "start date")
                 val values = listOf("years", "months", "weeks", "days").map { key ->
-                    options[key]?.toIntOrNull() ?: 0
+                    val raw = options[key]?.trim().orEmpty()
+                    if (raw.isEmpty()) 0 else raw.toIntOrNull()
+                        ?: throw IllegalArgumentException("$key must be a whole number.")
                 }
                 if (values.none { it != 0 }) throw IllegalArgumentException("Enter at least one date unit to add or subtract.")
-                val repeatCount = (options["repeatCount"]?.toIntOrNull() ?: 1).coerceIn(1, 100)
+                val repeatRaw = options["repeatCount"]?.trim().orEmpty()
+                val repeatCount = if (repeatRaw.isEmpty()) 1 else repeatRaw.toIntOrNull()?.takeIf { it in 1..100 }
+                    ?: throw IllegalArgumentException("Repeat count must be a whole number from 1 to 100.")
                 if (repeatCount > 1) {
                     var cursor = start
                     val result = mutableListOf(Row("Start date", formatDate(cursor, "yyyy-MM-dd EEEE")))
@@ -117,8 +121,8 @@ object NativeDateTimeEngine {
             }
             "workday" -> {
                 val start = parseDate(options["start"] ?: options["from"], "start date")
-                val amount = options["days"]?.toDoubleOrNull()?.takeIf { it.isFinite() }
-                    ?: throw IllegalArgumentException("Enter how many business days to add.")
+                val amount = options["days"]?.toDoubleOrNull()?.takeIf { it.isFinite() && it % 1.0 == 0.0 && abs(it) <= 366_000.0 }
+                    ?: throw IllegalArgumentException("Business days must be a whole number between -366000 and 366000.")
                 rows("Result" to formatDate(addWorkingDays(start, amount, options), "yyyy-MM-dd EEEE"))
             }
             "business-days" -> {
@@ -283,7 +287,8 @@ object NativeDateTimeEngine {
     private fun parseZoneList(value: String, limit: Int): List<ZoneChoice> {
         val choices = value.split(Regex("[\\r\\n,;]+")).map { it.trim() }.filter { it.isNotEmpty() }
         if (choices.isEmpty()) throw IllegalArgumentException("Enter at least one city or IANA time zone.")
-        return choices.map { resolveZone(it) }.distinctBy { it.zone.id }.take(limit)
+        if (choices.size > limit) throw IllegalArgumentException("Enter no more than $limit cities or time zones.")
+        return choices.map { resolveZone(it) }.distinctBy { it.zone.id }
     }
 
     private fun parseWallTimeInZone(rawValue: String, zone: ZoneId): ZonedInput {
@@ -346,6 +351,9 @@ object NativeDateTimeEngine {
     }
 
     private fun addWorkingDays(start: LocalDate, amount: Double, options: Map<String, String>): LocalDate {
+        if (!amount.isFinite() || amount % 1.0 != 0.0 || abs(amount) > 366_000.0) {
+            throw IllegalArgumentException("Business days must be a whole number between -366000 and 366000.")
+        }
         val weekends = parseWeekendDays(options)
         val excluded = parseExcludedDates(options["excludedDates"])
         var remaining = floor(abs(amount)).toLong()
@@ -366,13 +374,24 @@ object NativeDateTimeEngine {
         val date = parseDate(options["date"], "meeting date")
         val workStart = options["workStart"] ?: "09:00"
         val workEnd = options["workEnd"] ?: "17:00"
-        val duration = (options["durationMinutes"]?.toIntOrNull() ?: 30).coerceIn(5, 480)
-        val interval = (options["intervalMinutes"]?.toIntOrNull() ?: 30).coerceIn(5, 120)
-        val start = parseWallTimeInZone("${date}T$workStart", anchor.zone).instant
-        var end = parseWallTimeInZone("${date}T$workEnd", anchor.zone).instant
-        if (end <= start) end = end.plusSeconds(86_400)
         val startMinutes = parseClock(workStart)
         val endMinutes = parseClock(workEnd)
+        if (endMinutes <= startMinutes) {
+            throw IllegalArgumentException("The meeting planner requires a daytime work window: end time must be later than start time.")
+        }
+        fun meetingLimit(key: String, label: String, fallback: Int, minimum: Int, maximum: Int): Int {
+            val raw = options[key]?.trim().orEmpty()
+            if (raw.isEmpty()) return fallback
+            val value = raw.toIntOrNull()
+                ?: throw IllegalArgumentException("$label must be a whole number from $minimum to $maximum.")
+            if (value !in minimum..maximum) throw IllegalArgumentException("$label must be a whole number from $minimum to $maximum.")
+            return value
+        }
+        val duration = meetingLimit("durationMinutes", "Meeting length", 30, 5, 480)
+        val interval = meetingLimit("intervalMinutes", "Slot interval", 30, 5, 120)
+        val start = parseWallTimeInZone("${date}T$workStart", anchor.zone).instant
+        val end = parseWallTimeInZone("${date}T$workEnd", anchor.zone).instant
+        if (end <= start) throw IllegalArgumentException("The reference city's work window is not valid on that date.")
         val slots = mutableListOf<Pair<Instant, String>>()
         var cursor = start
         while (cursor.plusSeconds(duration * 60L) <= end && slots.size < 500) {

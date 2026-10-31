@@ -64,9 +64,18 @@ public enum NativeDateTimeEngine {
             return result(("Calendar span", "\(sign)\(span.years) years, \(span.months) months, \(span.days) days"), ("Total days", String(span.totalDays)), ("Weeks", String(format: "%.2f", Double(span.totalDays) / 7)), ("Calendar hours (24-hour days)", String(span.totalDays * 24)))
         case "date-add":
             let start = try dateOnly(options["start"] ?? options["value"] ?? "", label: "start date")
-            let unitValues = ["years", "months", "weeks", "days"].map { Int(options[$0] ?? "0") ?? 0 }
+            let unitValues = try ["years", "months", "weeks", "days"].map { key -> Int in
+                let raw = (options[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if raw.isEmpty { return 0 }
+                guard let value = Int(raw) else { throw NativeDateTimeError.invalidOperation("(key) must be a whole number.") }
+                return value
+            }
             guard unitValues.contains(where: { $0 != 0 }) else { throw NativeDateTimeError.invalidOperation("Enter at least one date unit to add or subtract.") }
-            let repeatCount = min(100, max(1, Int(options["repeatCount"] ?? "1") ?? 1))
+            let repeatRaw = (options["repeatCount"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let repeatCount = repeatRaw.isEmpty ? 1 : Int(repeatRaw)
+            guard let repeatCount, (1...100).contains(repeatCount) else {
+                throw NativeDateTimeError.invalidOperation("Repeat count must be a whole number from 1 to 100.")
+            }
             if repeatCount > 1 {
                 var cursor = start
                 var rows: [(String, String)] = [("Start date", format(cursor, pattern: "yyyy-MM-dd EEEE"))]
@@ -80,7 +89,10 @@ public enum NativeDateTimeEngine {
             return result(("Result", format(calculated, pattern: "yyyy-MM-dd EEEE")), ("Date", format(calculated, pattern: "yyyy-MM-dd")))
         case "workday":
             let start = try dateOnly(options["start"] ?? options["from"] ?? "", label: "start date")
-            guard let amount = Double(options["days"] ?? ""), amount.isFinite else { throw NativeDateTimeError.invalidOperation("Enter how many business days to add.") }
+            guard let amount = Double(options["days"] ?? ""), amount.isFinite,
+                  amount.rounded(.towardZero) == amount, abs(amount) <= 366_000 else {
+                throw NativeDateTimeError.invalidOperation("Business days must be a whole number between -366000 and 366000.")
+            }
             return result(("Result", format(try addWorkingDays(start, amount, options: options), pattern: "yyyy-MM-dd EEEE")))
         case "business-days":
             let from = try dateOnly(options["from"] ?? "", label: "start date")
@@ -388,6 +400,7 @@ public enum NativeDateTimeEngine {
         let raw = value.components(separatedBy: CharacterSet(charactersIn: ",;\n\r"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter at least one city or IANA time zone.") }
+        guard raw.count <= limit else { throw NativeDateTimeError.invalidOperation("Enter no more than (limit) cities or time zones.") }
         var seen = Set<String>()
         var result: [ZoneChoice] = []
         for item in raw {
@@ -487,7 +500,9 @@ public enum NativeDateTimeEngine {
     }
 
     private static func addWorkingDays(_ start: Date, _ amount: Double, options: [String: String]) throws -> Date {
-        guard amount.isFinite else { throw NativeDateTimeError.invalidOperation("Enter a finite number of business days.") }
+        guard amount.isFinite, amount.rounded(.towardZero) == amount, abs(amount) <= 366_000 else {
+            throw NativeDateTimeError.invalidOperation("Business days must be a whole number between -366000 and 366000.")
+        }
         let cal = calendar(.gregorian)
         let weekends = try weekendDays(options)
         let excluded = try excludedDates(options["excludedDates"] ?? "")
@@ -519,8 +534,19 @@ public enum NativeDateTimeEngine {
         let workEnd = options["workEnd"] ?? "17:00"
         let startMinutes = try parseClock(workStart)
         let endMinutes = try parseClock(workEnd)
-        let duration = min(480, max(5, Int(options["durationMinutes"] ?? "30") ?? 30))
-        let interval = min(120, max(5, Int(options["intervalMinutes"] ?? "30") ?? 30))
+        guard endMinutes > startMinutes else {
+            throw NativeDateTimeError.invalidOperation("The meeting planner requires a daytime work window: end time must be later than start time.")
+        }
+        func meetingLimit(_ key: String, label: String, fallback: Int, minimum: Int, maximum: Int) throws -> Int {
+            let raw = (options[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if raw.isEmpty { return fallback }
+            guard let value = Int(raw), (minimum...maximum).contains(value) else {
+                throw NativeDateTimeError.invalidOperation("(label) must be a whole number from (minimum) to (maximum).")
+            }
+            return value
+        }
+        let duration = try meetingLimit("durationMinutes", label: "Meeting length", fallback: 30, minimum: 5, maximum: 480)
+        let interval = try meetingLimit("intervalMinutes", label: "Slot interval", fallback: 30, minimum: 5, maximum: 120)
         let dayText = format(date, pattern: "yyyy-MM-dd")
         let localFormatter = DateFormatter()
         localFormatter.locale = Locale(identifier: "en_US_POSIX")
@@ -535,7 +561,9 @@ public enum NativeDateTimeEngine {
               localFormatter.string(from: end) == "\(dayText) \(workEnd):00" else {
             throw NativeDateTimeError.invalidOperation("The reference city's work end is not a valid local time.")
         }
-        if end <= start { end = end.addingTimeInterval(86_400) }
+        guard end > start else {
+            throw NativeDateTimeError.invalidOperation("The reference city's work window is not valid on that date.")
+        }
         var slots: [(Date, String)] = []
         var cursor = start
         while cursor.addingTimeInterval(Double(duration * 60)) <= end && slots.count < 500 {

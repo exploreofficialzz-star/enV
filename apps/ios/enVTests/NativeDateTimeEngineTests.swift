@@ -86,6 +86,22 @@ final class NativeDateTimeEngineTests: XCTestCase {
         ], now: fixedNow))
     }
 
+    func testInvalidDateTimeOptionsAreRejectedRatherThanSilentlyDefaulted() throws {
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: [
+            "start": "2024-01-08", "days": "1.5"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-calculator", options: [
+            "start": "2024-01-01", "days": "abc"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-15", "zones": "Lagos, London", "sourceTz": "Lagos", "durationMinutes": "abc"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-15", "zones": "Lagos, London", "sourceTz": "Lagos",
+            "workStart": "20:00", "workEnd": "08:00"
+        ], now: fixedNow))
+    }
+
     func testWorldClockAcceptsUnambiguousIanaCityAliases() throws {
         let result = try NativeDateTimeEngine.run(
             toolID: "world-clock",

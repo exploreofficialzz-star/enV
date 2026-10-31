@@ -70,6 +70,15 @@ assert.match(runDateTime("workday", { start: "2024-01-08", days: "-1" })[0].valu
 assert.equal(runDateTime("world-clock", { zones: "Lagos\nLondon" }).length, 2);
 assert.equal(runDateTime("world-clock", { zones: "Stockholm, Kathmandu, Brisbane" }).length, 3);
 assert.throws(() => runDateTime("world-clock", { zones: "A city that is not real" }), /Unknown city or time zone/);
+assert.equal(runDateTime("weekday", { value: "0001-01-01" })[0].value, "Monday");
+assert.throws(() => runDateTime("workday", { start: "2024-01-08", days: "1.5" }), /whole number/);
+assert.throws(() => runDateTime("business-days", { from: "2000-01-01", to: "3002-01-01" }), /range is too large/);
+assert.throws(() => runDateTime("meeting-planner", {
+  date: "2024-01-15", zones: "Lagos, London", sourceTz: "Lagos", durationMinutes: "abc"
+}), /Meeting length/);
+assert.throws(() => runDateTime("meeting-planner", {
+  date: "2024-01-15", zones: "Lagos, London", sourceTz: "Lagos", workStart: "20:00", workEnd: "08:00"
+}), /daytime work window/);
 
 const micros = runDateTime("unix", { value: "1704067200000000" });
 assert.equal(micros.find((row) => row.label === "Detected precision")?.value, "microseconds");

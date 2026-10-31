@@ -83,6 +83,30 @@ class NativeDateTimeEngineTest {
     }
 
 
+    @Test fun invalidDateTimeOptionsAreRejectedRatherThanSilentlyDefaulted() {
+        try {
+            NativeDateTimeEngine.run("workday-calculator", options = mapOf("start" to "2024-01-08", "days" to "1.5"), now = fixedNow)
+            throw AssertionError("fractional business days accepted")
+        } catch (_: IllegalArgumentException) { }
+        try {
+            NativeDateTimeEngine.run("date-calculator", options = mapOf("start" to "2024-01-01", "days" to "abc"), now = fixedNow)
+            throw AssertionError("invalid date unit accepted")
+        } catch (_: IllegalArgumentException) { }
+        try {
+            NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
+                "date" to "2024-01-15", "zones" to "Lagos, London", "sourceTz" to "Lagos", "durationMinutes" to "abc"
+            ), now = fixedNow)
+            throw AssertionError("invalid meeting duration accepted")
+        } catch (_: IllegalArgumentException) { }
+        try {
+            NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
+                "date" to "2024-01-15", "zones" to "Lagos, London", "sourceTz" to "Lagos",
+                "workStart" to "20:00", "workEnd" to "08:00"
+            ), now = fixedNow)
+            throw AssertionError("overnight window must not be reported as supported")
+        } catch (_: IllegalArgumentException) { }
+    }
+
     @Test fun worldClockAcceptsUnambiguousIanaCityAliases() {
         val result = NativeDateTimeEngine.run(
             "world-clock",
