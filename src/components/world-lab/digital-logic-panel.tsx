@@ -1,7 +1,7 @@
 import {useMemo,useState} from "react";
 import type {WorldLabProject} from "@/lib/world-lab/project";
 import {appendDigitalGate,setDigitalInput,setDigitalTruthBit,
-  solveDigitalLogic,starterDigitalNetwork,verifyDigitalTruthTable} from "@/lib/world-lab/digital-logic";
+  solveDigitalLogic,setDigitalOutputSource,starterDigitalNetwork,verifyDigitalTruthTable} from "@/lib/world-lab/digital-logic";
 type Props={
   project:WorldLabProject|null;
   mutateProject:(fn:(p:WorldLabProject)=>WorldLabProject)=>void;
@@ -74,9 +74,18 @@ export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
         </div>
       </details>)}
       <div className="rounded border border-border p-2" aria-live="polite">
-        {net.outputs.map(out=><p key={out.id}>
-          {out.label}: <strong>{result?.outputs[out.id]??"Not calculated"}</strong>
-        </p>)}
+        {net.outputs.map(out=><div key={out.id} className="mb-2 flex flex-wrap items-center gap-2">
+          <label htmlFor={"digital-output-"+out.id}>{out.label} reads</label>
+          <select id={"digital-output-"+out.id} className="rounded border border-border p-1"
+            aria-label={"Wire "+out.label+" to digital node"}
+            value={out.sourceNodeId}
+            onChange={e=>mutateProject(p=>setDigitalOutputSource(
+              p,net.id,out.id,e.target.value))}>
+            {[...net.inputs,...net.gates].map(n=>
+              <option key={n.id} value={n.id}>{"label" in n?n.label:n.name}</option>)}
+          </select>
+          <strong aria-live="polite">{result?.outputs[out.id]??"Not calculated"}</strong>
+        </div>)}
       </div>
       <details className="rounded border border-border p-2">
         <summary className="cursor-pointer">Create another invented gate</summary>
