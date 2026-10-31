@@ -1895,6 +1895,111 @@ export default function WorldLab() {
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
                 <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                  aria-label="Object-to-object impact experiment">
+                  <h3 className="text-sm font-semibold">Collide two invented solids</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Calculate a central X-direction collision in this world, without moving the saved geometry.
+                    Objects need aligned Y/Z centres, a positive starting gap and invented material densities.
+                    This is not a general 3D contact, deformation or fracture model.
+                  </p>
+                  <label className="mt-2 block text-xs">Second physical solid
+                    <select className={inputLabel} aria-label="Other solid to collide with"
+                      value={collisionPartner?.id!==selectedEntity.id?collisionOtherId:""}
+                      onChange={event=>{
+                        setCollisionOtherId(event.target.value);
+                        setCollisionRun(null);setCollisionPlaying(false);
+                      }}>
+                      <option value="">Choose another solid</option>
+                      {project?.entities.filter(e=>e.id!==selectedEntity.id).map(e=>
+                        <option key={e.id} value={e.id}>{e.name} · {e.id.slice(0,8)}</option>)}
+                    </select>
+                  </label>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="text-xs">Left speed (m/s)
+                      <input aria-label="Collision left speed" className={inputLabel}
+                        type="number" min={-100} max={100} step="any"
+                        value={collisionLeftSpeed} onChange={e=>{
+                          setCollisionLeftSpeed(Number(e.target.value));
+                          setCollisionRun(null);setCollisionPlaying(false);
+                        }}/>
+                    </label>
+                    <label className="text-xs">Right speed (m/s)
+                      <input aria-label="Collision right speed" className={inputLabel}
+                        type="number" min={-100} max={100} step="any"
+                        value={collisionRightSpeed} onChange={e=>{
+                          setCollisionRightSpeed(Number(e.target.value));
+                          setCollisionRun(null);setCollisionPlaying(false);
+                        }}/>
+                    </label>
+                    <label className="col-span-2 text-xs">Assumed restitution coefficient (0–1)
+                      <input aria-label="Collision restitution" className={inputLabel}
+                        type="number" min={0} max={1} step={0.1}
+                        value={collisionRestitution} onChange={e=>{
+                          setCollisionRestitution(Number(e.target.value));
+                          setCollisionRun(null);setCollisionPlaying(false);
+                        }}/>
+                    </label>
+                  </div>
+                  <button type="button" className={buttonClass+" mt-2"}
+                    disabled={!collisionPartner||collisionPartner.id===selectedEntity.id}
+                    onClick={()=>{
+                      if(!project||!collisionPartner)return;
+                      try{
+                        const run=calculateObjectCollision(project,selectedEntity.id,
+                          collisionPartner.id,collisionLeftSpeed,collisionRightSpeed,
+                          collisionRestitution);
+                        setCollisionRun(run);setCollisionTime(0);setCollisionPlaying(false);
+                        setError("");setMessage("Computed physical impact, momentum and dissipated energy from invented density.");
+                      }catch(cause){
+                        setCollisionRun(null);setCollisionPlaying(false);
+                        setError(cause instanceof Error?cause.message:"Collision assumptions unsupported.");
+                      }
+                    }}>Calculate two-body collision</button>
+                  {selectedCollision && (selectedCollision.leftEntityId===selectedEntity.id||
+                    selectedCollision.rightEntityId===selectedEntity.id)&&(
+                    <div className="mt-3 space-y-2 text-xs"
+                      aria-label="Calculated collision motion and energy">
+                      <p>Invented mass left/right: {metric(selectedCollision.leftMassKg,"kg")} / {metric(selectedCollision.rightMassKg,"kg")}</p>
+                      <p>Impact time: {metric(selectedCollision.impactTimeSeconds,"s")}. Impulse: {metric(selectedCollision.impulseNs,"N·s")}</p>
+                      <p>Velocity after impact, left/right: {metric(selectedCollision.leftFinalVelocityMps,"m/s")} / {metric(selectedCollision.rightFinalVelocityMps,"m/s")}</p>
+                      <p>Momentum before/after: {metric(selectedCollision.momentumBeforeKgMps,"kg·m/s")} / {metric(selectedCollision.momentumAfterKgMps,"kg·m/s")}</p>
+                      <p>Energy before/after: {metric(selectedCollision.energyBeforeJ,"J")} / {metric(selectedCollision.energyAfterJ,"J")}. Dissipated: {metric(selectedCollision.dissipatedEnergyJ,"J")}</p>
+                      <label className="block">Explore collision time: {collisionTime.toFixed(2)} s
+                        <input className="w-full" aria-label="Explore collision time" type="range"
+                          min={0} max={selectedCollision.durationSeconds} step={0.01}
+                          value={collisionTime} onChange={e=>{
+                            setCollisionPlaying(false);setCollisionTime(Number(e.target.value));
+                          }}/>
+                      </label>
+                      {collisionSample&&<>
+                        <p>Live centre X, left/right: {metric(collisionSample.leftCenterXM,"m")} / {metric(collisionSample.rightCenterXM,"m")}</p>
+                        <p>Phase: {collisionSample.collided?"after impact":"approaching"}</p>
+                      </>}
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={buttonClass}
+                          onClick={()=>setCollisionPlaying(v=>!v)}>
+                          {collisionPlaying?"Pause collision":"Play collision"}
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(0);}}>
+                          Reset collision
+                        </button>
+                        <select className={inputLabel} aria-label="Collision playback speed"
+                          value={collisionPlaybackRate} onChange={e=>setCollisionPlaybackRate(Number(e.target.value))}>
+                          <option value={0.1}>0.1× slow</option>
+                          <option value={1}>1× normal</option>
+                          <option value={4}>4× fast</option>
+                        </select>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>downloadJson("world-lab-two-body-collision-evidence.json",selectedCollision)}>
+                          Export collision evidence
+                        </button>
+                      </div>
+                      <p className="text-muted-foreground">{selectedCollision.validity}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3"
                   aria-label="Invented material bending experiment">
                   <h3 className="text-sm font-semibold">Test invented material stiffness</h3>
                   <p className="text-xs text-muted-foreground">
