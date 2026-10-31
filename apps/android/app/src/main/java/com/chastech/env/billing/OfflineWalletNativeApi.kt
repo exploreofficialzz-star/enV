@@ -343,7 +343,18 @@ object OfflineWalletNativeApi {
         require(unresolved == 0) { "An offline calculator operation has an unfinished journal record. Finish or recover it before synchronizing." }
         if (journal.pendingTransactionCount(allowanceId) == 0 && !finalize) return@withContext Result(true, "No pending offline operations need synchronization.")
         val batch = journal.buildSyncBatch(allowanceId, finalize)
-        val response = request("/api/billing/offline/sync", "POST", batch.toJson(), bearer)
+        val response = try {
+            request("/api/billing/offline/sync", "POST", batch.toJson(), bearer)
+        } catch (failure: Exception) {
+            NativeAnalytics.record(
+                context,
+                "offline_sync_failed",
+                outcome = "failure",
+                durationMs = (System.currentTimeMillis() - syncStartedAt).coerceIn(0, 3_600_000),
+                errorCode = "OFFLINE_NETWORK_FAILED",
+            )
+            throw failure
+        }
         val data = response.body.optJSONObject("data")
         if (response.status in 200..299 && response.body.optBoolean("ok", false) && data != null) {
             val status = data.optString("status")
