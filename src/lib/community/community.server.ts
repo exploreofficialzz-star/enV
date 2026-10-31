@@ -36,7 +36,9 @@ async function actorFor(request: Request, visitorId: string, secret: string) {
   return { userId, actorDigest: digest(userId ? "user:"+userId : "visitor:"+visitorId, secret) };
 }
 function networkDigest(request: Request, secret: string) {
-  const raw = request.headers.get("x-vercel-forwarded-for") ?? request.headers.get("x-forwarded-for") ?? request.headers.get("cf-connecting-ip");
+  // Generic x-forwarded-for / cf-connecting-ip values are not trusted unless
+  // this deployment explicitly establishes that proxy boundary.
+  const raw = request.headers.get("x-vercel-forwarded-for");
   if (!raw) return null;
   const address = raw.split(",").at(-1)?.trim().slice(0,128) ?? "";
   return address ? digest("network:"+address,secret) : null;
