@@ -91,6 +91,22 @@ object NativeWorldLabEditor {
         require(row in 0 until table.length()){"Digital row is outside truth table"}
         table.put(row,bit)
     }
+    /** Attach the indicator to a valid upstream node without altering any gate assumption. */
+    fun digitalOutputSource(source:String,networkId:String,outputId:String,
+        sourceNodeId:String):String=edit(source){p->
+        val nets=p.getJSONArray("digitalNetworks")
+        val network=(0 until nets.length()).map{nets.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==networkId}?:error("Unknown digital network")
+        val inputs=network.getJSONArray("inputs")
+        val gates=network.getJSONArray("gates")
+        val known=(0 until inputs.length()).map{inputs.getJSONObject(it).getString("id")}+
+            (0 until gates.length()).map{gates.getJSONObject(it).getString("id")}
+        require(sourceNodeId in known){"Digital output must read an existing switch or gate"}
+        val outputs=network.getJSONArray("outputs")
+        val output=(0 until outputs.length()).map{outputs.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==outputId}?:error("Unknown digital output")
+        output.put("sourceNodeId",sourceNodeId)
+    }
     fun addStarterCircuit(source:String,id:String=UUID.randomUUID().toString()):String =
         edit(source){root->
             val networks=root.optJSONArray("networks")?:JSONArray().also{root.put("networks",it)}
