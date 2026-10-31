@@ -1021,7 +1021,7 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject)->some View {
         let spheres=project.entities.filter{$0.shape=="sphere"}
         Text("Collide a group of spheres").font(.headline)
-        Text("An event-driven free-flight calculation: each sphere has an invented density and X/Y/Z velocity. Successive isolated impacts transfer momentum. Concurrent contacts, spin, gravity and breakage are not modeled.")
+        Text("An event-driven free-flight calculation: each sphere has an invented density and X/Y/Z velocity. Successive or independent simultaneous impacts transfer momentum. Shared-sphere contacts, spin, gravity and breakage are not modeled.")
             .font(.caption).foregroundStyle(.secondary)
         if spheres.count<2 || spheres.count>12 {
             Text("Create 2–12 spheres and assign an invented density to each.")
