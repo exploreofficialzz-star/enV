@@ -24,11 +24,10 @@ function configuration() {
 }
 
 function networkDigest(request: Request, secret: string) {
-  const forwarded = request.headers.get("x-vercel-forwarded-for")
-    ?? request.headers.get("x-forwarded-for")
-    ?? request.headers.get("cf-connecting-ip")
-    ?? "unknown";
-  const address = forwarded.split(",").at(-1)?.trim().slice(0, 128) || "unknown";
+  // Never let an untrusted request header select its own login throttle bucket.
+  const forwarded = request.headers.get("x-vercel-forwarded-for");
+  const address = forwarded?.split(",").at(-1)?.trim().slice(0, 128);
+  if (!address) throw new DeveloperAdminError("ADMIN_RATE_LIMIT_UNAVAILABLE", "Secure sign-in throttling is unavailable. Please retry later.", 503);
   return createHmac("sha256", secret).update("developer-admin-network:" + address).digest("hex");
 }
 
