@@ -51,7 +51,7 @@ test("fully plastic 3D sphere contact dissipates normal kinetic energy only",()=
   const after=sampleSphereImpact3d(run,run.durationSeconds);
   assert.deepEqual(before.firstVelocityMps,[2,0,0]);
   near(run.dissipatedEnergyJ,0.75);
-  near(after.firstVelocityMps[1],after.secondVelocityMps[1]);
+  near(after.firstVelocityMps.reduce((s,v,i)=>s+(after.secondVelocityMps[i]-v)*run.impactNormal[i],0),0);
   near(run.energyBeforeJ,run.energyAfterJ+run.dissipatedEnergyJ);
 });
 test("3D sphere model strictly rejects no contact, invalid mass and malformed physics",()=>{
