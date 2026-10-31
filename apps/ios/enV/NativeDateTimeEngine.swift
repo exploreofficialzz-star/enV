@@ -142,7 +142,7 @@ public enum NativeDateTimeEngine {
             return NativeDateTimeResult(rows: rows.map { NativeDateTimeRow(label: $0.0, value: $0.1) })
         case "unix":
             let values = (options["value"] ?? input)
-                .components(separatedBy: CharacterSet(charactersIn: ",;\\n\\r"))
+                .components(separatedBy: CharacterSet(charactersIn: ",;\n\r"))
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             guard !values.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a date or Unix timestamp.") }
@@ -153,8 +153,8 @@ public enum NativeDateTimeEngine {
                 let converted = try unix(value)
                 guard converted.rows.count >= 7 else { throw NativeDateTimeError.invalidOperation("Could not convert timestamp batch item.") }
                 rows.append(NativeDateTimeRow(
-                    label: "Timestamp \\(index + 1)",
-                    value: "\\(converted.rows[1].value) | \\(converted.rows[6].value) ns"
+                    label: "Timestamp \(index + 1)",
+                    value: "\(converted.rows[1].value) | \(converted.rows[6].value) ns"
                 ))
             }
             return NativeDateTimeResult(rows: rows)
