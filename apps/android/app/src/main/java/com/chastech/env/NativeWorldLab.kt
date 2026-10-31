@@ -82,6 +82,9 @@ fun NativeWorldLabForm() {
     var projectJson by remember { mutableStateOf<String?>(null) }
     var dcRun by remember { mutableStateOf<NativeLabDcResult?>(null) }
     var savedSnapshot by remember { mutableStateOf<String?>(null) }
+    var recoveryDrafts by remember { mutableStateOf<List<WorldLabSavedLocal>>(emptyList()) }
+    var selectedDraftId by remember { mutableStateOf("") }
+    var confirmingDraftDelete by remember { mutableStateOf(false) }
     val editHistory=remember { NativeWorldLabEditHistory() }
     var confirmation by remember { mutableStateOf<String?>(null) }
     var requestImport by remember { mutableStateOf(false) }
@@ -238,6 +241,37 @@ fun NativeWorldLabForm() {
                 }.onFailure{warning=it.message?:"Could not open this saved project."}
         }
     }
+    fun restoreSelectedDraft(){
+        val id=selectedDraftId
+        if(id.isEmpty())return
+        scope.launch{
+            runCatching {withContext(Dispatchers.IO){
+                val draft=localProjects.readDraft(id)
+                val baseline=runCatching{localProjects.read(id).json}.getOrNull()
+                draft to baseline
+            }}.onSuccess{(draft,baseline)->
+                projectJson=draft.json
+                project=NativeWorldLabProjectCodec.decode(draft.json)
+                savedSnapshot=baseline
+                selected=0;warning="Recovered an unfinished invention. Save locally to commit."
+                editHistory.clear()
+            }.onFailure{warning=it.message?:"The draft could not be recovered."}
+        }
+    }
+    fun deleteSelectedDraft(){
+        val id=selectedDraftId
+        if(id.isEmpty())return
+        scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                localProjects.deleteDraft(id)
+                localProjects.listDrafts()
+            }}.onSuccess{list->
+                recoveryDrafts=list
+                selectedDraftId=list.firstOrNull()?.id?:""
+                warning="Selected cached draft discarded. Saved projects are unchanged."
+            }.onFailure{warning=it.message?:"Recovery cache deletion failed."}
+        }
+    }
     fun deleteSelectedProject(){
         val id=selectedSavedId
         if(id.isEmpty())return
@@ -254,6 +288,11 @@ fun NativeWorldLabForm() {
         }
     }
     LaunchedEffect(Unit){
+        runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
+            .onSuccess{items->
+                recoveryDrafts=items
+                selectedDraftId=items.firstOrNull()?.id?:""
+            }.onFailure{warning=it.message?:"Recovery cache is unreadable; export your invention."}
         runCatching{withContext(Dispatchers.IO){localProjects.listProjects()}}
             .onSuccess{items->
                 savedProjects=items
@@ -267,6 +306,7 @@ fun NativeWorldLabForm() {
             "open"->loadSavedProject()
             "open-selected"->loadSelectedProject()
             "import"->requestImport=true
+            "restore-draft"->restoreSelectedDraft()
         }
     }
     val exportPicker=rememberLauncherForActivityResult(
@@ -338,6 +378,18 @@ fun NativeWorldLabForm() {
                 Pair(json,NativeWorldLabProjectCodec.decode(json))
             } }.onSuccess { projectJson=it.first;project=it.second;savedSnapshot=null;selected=0;warning="";editHistory.clear() }
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
+        }
+    }
+    LaunchedEffect(projectJson,savedSnapshot){
+        val draft=projectJson
+        if(draft!=null&&draft!=savedSnapshot){
+            delay(700)
+            runCatching{withContext(Dispatchers.IO){
+                localProjects.saveDraft(draft)
+                localProjects.listDrafts()
+            }}.onSuccess{items->recoveryDrafts=items;selectedDraftId=
+                if(items.any{it.id==selectedDraftId})selectedDraftId else items.firstOrNull()?.id?:""}
+                .onFailure{warning=it.message?:"Recovery cache failed. Export your invention."}
         }
     }
     LaunchedEffect(projectJson) {
@@ -425,6 +477,7 @@ fun NativeWorldLabForm() {
                 "open"->loadSavedProject()
                 "open-selected"->loadSelectedProject()
                 "import"->requestImport=true
+                "restore-draft"->restoreSelectedDraft()
             }
         }){Text("Discard and continue")}},
         dismissButton={TextButton(onClick={confirmation=null}){Text("Keep editing")}}
@@ -438,6 +491,15 @@ fun NativeWorldLabForm() {
             deleteSelectedProject()
         }){Text("Delete saved copy")}},
         dismissButton={TextButton(onClick={confirmingSavedDelete=false}){Text("Cancel")}}
+    )
+    if(confirmingDraftDelete)AlertDialog(
+        onDismissRequest={confirmingDraftDelete=false},
+        title={Text("Discard cached invention?")},
+        text={Text("Only this temporary recovery draft is deleted; saved projects remain.")},
+        confirmButton={TextButton(onClick={
+            confirmingDraftDelete=false;deleteSelectedDraft()
+        }){Text("Discard draft")}},
+        dismissButton={TextButton(onClick={confirmingDraftDelete=false}){Text("Cancel")}}
     )
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("The World Lab",style=MaterialTheme.typography.titleLarge)
@@ -543,11 +605,16 @@ fun NativeWorldLabForm() {
                         val current=NativeWorldLabProjectCodec.decode(json)
                         val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
                         localProjects.save(json,expectedSavedRevision=expected)
+                        localProjects.deleteDraft(current.id)
                         localProjects.listProjects()
                     } }.onSuccess{items->
                         savedSnapshot=json;savedProjects=items
                         selectedSavedId=project?.id?:""
                         warning="";editHistory.clear()
+                        scope.launch {
+                            runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
+                                .onSuccess{recoveryDrafts=it}
+                        }
                     }
                         .onFailure{warning=it.message?:"Could not save the project locally."}
                 }
@@ -574,6 +641,24 @@ fun NativeWorldLabForm() {
                 OutlinedButton(onClick={confirmingSavedDelete=true},
                     enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
             }
+        }
+        if(recoveryDrafts.isNotEmpty()){
+            Text("Recover unfinished inventions",style=MaterialTheme.typography.titleSmall)
+            Text("Cached drafts never replace the open project unless you choose Restore.",
+                style=MaterialTheme.typography.bodySmall)
+            recoveryDrafts.take(10).forEach{draft->
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    Text(draft.title,modifier=Modifier.weight(1f))
+                    OutlinedButton(onClick={
+                        selectedDraftId=draft.id;askReplace("restore-draft")
+                    }){Text("Restore")}
+                    OutlinedButton(onClick={
+                        selectedDraftId=draft.id;confirmingDraftDelete=true
+                    }){Text("Discard")}
+                }
+            }
+            if(recoveryDrafts.size>10)Text("Older cached drafts: "+
+                (recoveryDrafts.size-10)+" (export or clean up your project cache).")
         }
         if(projectJson!=null && savedSnapshot!=projectJson)
             Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",

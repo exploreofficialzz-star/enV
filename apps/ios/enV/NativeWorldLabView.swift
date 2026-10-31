@@ -34,6 +34,11 @@ struct NativeWorldLabView:View {
     @State private var editHistory=NativeWorldLabEditHistory()
     @State private var projectData:Data?
     @State private var savedSnapshot:Data?
+    @State private var recoveryDrafts:[NativeWorldLabProject]=[]
+    @State private var recoveringDraftId=""
+    @State private var deletingDraftId=""
+    @State private var confirmingDraftDelete=false
+    @State private var draftSaveTask:Task<Void,Never>?
     @State private var confirmation=false
     @State private var pendingReplacement=""
     @State private var inventedName=""
@@ -144,6 +149,38 @@ struct NativeWorldLabView:View {
             projectData=data;savedSnapshot=nil;selected=0;editHistory.clear();problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
+    private func refreshRecoveryDrafts(){
+        do {recoveryDrafts=try localProjects.listDrafts()}
+        catch {problem=error.localizedDescription}
+    }
+    private func restoreRecoveryDraft(){
+        do {
+            guard !recoveringDraftId.isEmpty else{return}
+            let record=try localProjects.readDraft(recoveringDraftId)
+            let baseline=try? localProjects.read(recoveringDraftId).0
+            projectData=record.0;project=record.1;savedSnapshot=baseline
+            selected=0;editHistory.clear();problem="Recovered unfinished design. Save locally to commit."
+            redraw()
+        }catch{problem=error.localizedDescription}
+    }
+    private func discardRecoveryDraft(){
+        do {
+            try localProjects.deleteDraft(deletingDraftId)
+            deletingDraftId="";refreshRecoveryDrafts()
+        }catch{problem=error.localizedDescription}
+    }
+    private func scheduleRecoveryDraft(){
+        draftSaveTask?.cancel()
+        guard hasUnsavedWork,let data=projectData else{return}
+        draftSaveTask=Task{
+            try? await Task.sleep(nanoseconds:700_000_000)
+            if Task.isCancelled{return}
+            do {
+                _ = try localProjects.saveDraft(data)
+                refreshRecoveryDrafts()
+            }catch{problem=error.localizedDescription}
+        }
+    }
     private func refreshSavedProjects(){
         do {
             savedProjects=try localProjects.listProjects()
@@ -187,6 +224,7 @@ struct NativeWorldLabView:View {
         else if action=="open" {loadSavedProject()}
         else if action=="open-selected" {openSelectedProject()}
         else if action=="import" {importing=true}
+        else if action=="restore-draft" {restoreRecoveryDraft()}
     }
     private func saveLocally(){
         do {
@@ -197,7 +235,10 @@ struct NativeWorldLabView:View {
             let current=try NativeWorldLabProject.decode(data)
             let expected=baseline?.id==current.id ? baseline?.revision : nil
             _ = try localProjects.save(data,expectedSavedRevision:expected)
-            savedSnapshot=data;editHistory.clear();problem="";refreshSavedProjects()
+            draftSaveTask?.cancel()
+            try localProjects.deleteDraft(current.id)
+            savedSnapshot=data;editHistory.clear();problem=""
+            refreshSavedProjects();refreshRecoveryDrafts()
         }catch{problem=error.localizedDescription}
     }
     private var input:NativeLabInput {
@@ -341,6 +382,23 @@ struct NativeWorldLabView:View {
                         }.buttonStyle(.bordered).disabled(chosenSavedId.isEmpty)
                     }
                 }
+                if !recoveryDrafts.isEmpty {
+                    Text("Recover unfinished inventions").font(.headline)
+                    Text("Drafts are device-private. Restore only after explicit selection.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    ForEach(recoveryDrafts.prefix(10),id:\.id){draft in
+                        HStack {
+                            Text(draft.title).font(.caption)
+                            Spacer()
+                            Button("Restore"){
+                                recoveringDraftId=draft.id;askToReplace("restore-draft")
+                            }.buttonStyle(.bordered)
+                            Button("Discard",role:.destructive){
+                                deletingDraftId=draft.id;confirmingDraftDelete=true
+                            }.buttonStyle(.bordered)
+                        }
+                    }
+                }
                 if hasUnsavedWork {
                     Text("Unsaved on this device. Save locally or export JSON to preserve these changes.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -354,7 +412,7 @@ struct NativeWorldLabView:View {
     }
     private var sceneSettingsView:some View {
         coreView
-        .onAppear{redraw();lastTick=Date();refreshSavedProjects()}
+        .onAppear{redraw();lastTick=Date();refreshSavedProjects();refreshRecoveryDrafts()}
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
         .onChange(of:dropTime){_ in applyDropPosition()}
@@ -387,6 +445,7 @@ struct NativeWorldLabView:View {
         }
         .onChange(of:fluidFraction){_ in hydroRun=nil }
         .onChange(of:projectData){_ in
+            scheduleRecoveryDraft()
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             beamRun=nil
@@ -394,6 +453,13 @@ struct NativeWorldLabView:View {
             groupPlaying=false;groupRun=nil;groupTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
+        }
+        .confirmationDialog("Discard cached World Lab draft?",
+            isPresented:$confirmingDraftDelete,titleVisibility:.visible){
+            Button("Discard recovery draft",role:.destructive){discardRecoveryDraft()}
+            Button("Cancel",role:.cancel){}
+        }message:{
+            Text("Only the selected cached draft is removed, not any saved project.")
         }
         .confirmationDialog("Delete selected saved World Lab project?",
             isPresented:$confirmingDelete,titleVisibility:.visible){
@@ -450,6 +516,7 @@ struct NativeWorldLabView:View {
                 else if pendingReplacement=="open" {loadSavedProject()}
                 else if pendingReplacement=="open-selected" {openSelectedProject()}
                 else if pendingReplacement=="import" {importing=true}
+                else if pendingReplacement=="restore-draft" {restoreRecoveryDraft()}
                 pendingReplacement=""
             }
             Button("Keep editing",role:.cancel){pendingReplacement=""}

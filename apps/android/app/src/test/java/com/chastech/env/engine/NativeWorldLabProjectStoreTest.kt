@@ -84,5 +84,22 @@ class NativeWorldLabProjectStoreTest {
             assertThrows(IllegalArgumentException::class.java){store.save(modified)}
             assertEquals(json,store.loadLatest()!!.json)
         }finally{root.deleteRecursively()}
+    }    @Test fun draftCacheIsSeparateFromCommittedProjectsAndRequiresExplicitRestore(){
+        val root=Files.createTempDirectory("world-lab-android-draft").toFile()
+        try{
+            val store=NativeWorldLabProjectStore(root)
+            val original=NativeWorldLabEditor.blank()
+            val saved=store.save(original)
+            val draft=NativeWorldLabEditor.addSolid(original,"sphere",id="invented")
+            store.saveDraft(draft)
+            assertEquals(1,store.listDrafts().size)
+            assertEquals(0,NativeWorldLabProjectCodec.decode(store.read(saved.id).json).entities.size)
+            assertEquals(1,NativeWorldLabProjectCodec.decode(store.readDraft(saved.id).json).entities.size)
+            assertThrows(IllegalArgumentException::class.java){store.readDraft("../bad")}
+            store.deleteDraft(saved.id)
+            assertTrue(store.listDrafts().isEmpty())
+            assertEquals(original,store.read(saved.id).json)
+        }finally{root.deleteRecursively()}
     }
 }
+

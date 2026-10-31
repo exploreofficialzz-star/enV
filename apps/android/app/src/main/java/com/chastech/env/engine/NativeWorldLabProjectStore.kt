@@ -14,6 +14,7 @@ import java.nio.file.StandardCopyOption
  */
 class NativeWorldLabProjectStore(private val appFilesDir: File) {
     private val storageDir = File(appFilesDir, "world-lab-v1")
+    private val draftDir = File(appFilesDir, "world-lab-recovery-v1")
     companion object { const val MAX_LOCAL_PROJECTS = 50 }
     private fun safeFileName(id: String): String {
         require(id.matches(Regex("[A-Za-z0-9_-]{1,120}"))) { "Invalid World Lab local project ID." }
@@ -21,7 +22,7 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
     }
     private fun projectFile(id: String): File = File(storageDir, safeFileName(id))
     private fun writeAtomically(target: File, bytes: ByteArray) {
-        val tmp = File.createTempFile(".world-lab-writing-", ".tmp", storageDir)
+        val tmp = File.createTempFile(".world-lab-writing-", ".tmp", target.parentFile)
         try {
             FileOutputStream(tmp).use { stream ->
                 stream.write(bytes)
@@ -75,6 +76,44 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
         return WorldLabSavedLocal(project.id, project.title, project.revision, json)
     }
 
+    /** Device-private, bounded unsaved drafts. Never silently restore a draft. */
+    @Synchronized fun saveDraft(json: String): WorldLabSavedLocal {
+        val bytes=json.toByteArray(StandardCharsets.UTF_8)
+        require(bytes.size<=NativeWorldLabProjectCodec.MAX_BYTES) { "Recovery draft exceeds 1 MB." }
+        val project=NativeWorldLabProjectCodec.decode(json)
+        require(draftDir.isDirectory || draftDir.mkdirs()) { "Cannot create recovery storage." }
+        val dest=File(draftDir,safeFileName(project.id))
+        val count=draftDir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0
+        require(dest.isFile||count<MAX_LOCAL_PROJECTS) { "Recovery storage is full (50 inventions)." }
+        writeAtomically(dest,bytes)
+        return WorldLabSavedLocal(project.id,project.title,project.revision,json)
+    }
+    @Synchronized fun readDraft(id:String):WorldLabSavedLocal {
+        val file=File(draftDir,safeFileName(id))
+        require(file.isFile && file.length()<=NativeWorldLabProjectCodec.MAX_BYTES) {
+            "Recovery draft is missing or exceeds 1 MB."
+        }
+        val json=file.readText(StandardCharsets.UTF_8)
+        val project=NativeWorldLabProjectCodec.decode(json)
+        require(project.id==id) { "Recovery file identity mismatch." }
+        return WorldLabSavedLocal(id,project.title,project.revision,json)
+    }
+    @Synchronized fun listDrafts():List<WorldLabSavedLocal> {
+        if(!draftDir.isDirectory)return emptyList()
+        val files=draftDir.listFiles()?.filter{it.isFile&&it.extension=="json"}
+            ?:error("Cannot list recovery drafts.")
+        require(files.size<=MAX_LOCAL_PROJECTS){"Recovery cache limit is inconsistent."}
+        return files.sortedByDescending{it.lastModified()}.map{
+            readDraft(it.name.removeSuffix(".json"))
+        }
+    }
+    @Synchronized fun deleteDraft(id:String){
+        val file=File(draftDir,safeFileName(id))
+        if(file.exists()){
+            readDraft(id)
+            require(file.delete()){"Recovery draft could not be discarded."}
+        }
+    }
     @Synchronized fun loadLatest(): WorldLabSavedLocal? {
         val pointer = File(storageDir, "recent-id")
         if (!pointer.isFile) return null

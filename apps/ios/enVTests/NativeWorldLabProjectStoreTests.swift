@@ -75,5 +75,20 @@ final class NativeWorldLabProjectStoreTests:XCTestCase {
         let altered=try JSONSerialization.data(withJSONObject:root)
         XCTAssertThrowsError(try store.save(altered))
         XCTAssertEqual(try store.loadLatest()?.0,a)
+    }    func testRecoveryDraftsRequireExplicitReadAndDoNotOverwriteSavedCopy() throws {
+        let store=try temporaryStore()
+        defer{try? FileManager.default.removeItem(at:store.directory)}
+        let original=try NativeWorldLabEditor.blank()
+        let saved=try store.save(original)
+        let draft=try NativeWorldLabEditor.addSolid(original,shape:"sphere",id:"invented")
+        _ = try store.saveDraft(draft)
+        XCTAssertEqual(try store.listDrafts().count,1)
+        XCTAssertEqual(try store.read(saved.id).1.entities.count,0)
+        XCTAssertEqual(try store.readDraft(saved.id).1.entities.count,1)
+        XCTAssertThrowsError(try store.readDraft("../bad"))
+        try store.deleteDraft(saved.id)
+        XCTAssertTrue(try store.listDrafts().isEmpty)
+        XCTAssertEqual(try store.read(saved.id).0,original)
     }
 }
+

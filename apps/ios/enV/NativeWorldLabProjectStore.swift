@@ -19,6 +19,59 @@ struct NativeWorldLabProjectStore {
         return directory.appendingPathComponent(id+".json",isDirectory:false)
     }
     private var recent:URL { directory.appendingPathComponent("recent-id",isDirectory:false) }
+    private var recovery:URL { directory.appendingPathComponent("Recovery",isDirectory:true) }
+    @discardableResult func saveDraft(_ data:Data)throws->NativeWorldLabProject {
+        guard data.count<=NativeWorldLabProject.maxBytes else {
+            throw NativeWorldLabError.invalid("Recovery draft exceeds 1 MB")
+        }
+        let project=try NativeWorldLabProject.decode(data)
+        let manager=FileManager.default
+        try manager.createDirectory(at:recovery,withIntermediateDirectories:true)
+        let destination=recovery.appendingPathComponent(try file(project.id).lastPathComponent)
+        let files=try manager.contentsOfDirectory(at:recovery,includingPropertiesForKeys:nil)
+            .filter{$0.pathExtension=="json"}
+        guard manager.fileExists(atPath:destination.path) || files.count<Self.maxLocalProjects else {
+            throw NativeWorldLabError.invalid("Recovery cache is full (50 projects)")
+        }
+        try data.write(to:destination,options:.atomic)
+        return project
+    }
+    func readDraft(_ id:String)throws->(Data,NativeWorldLabProject){
+        let url=recovery.appendingPathComponent(try file(id).lastPathComponent)
+        let attrs=try FileManager.default.attributesOfItem(atPath:url.path)
+        guard let size=(attrs[.size] as? NSNumber)?.intValue,
+              size<=NativeWorldLabProject.maxBytes else {
+            throw NativeWorldLabError.invalid("Recovery draft exceeds 1 MB")
+        }
+        let data=try Data(contentsOf:url)
+        let project=try NativeWorldLabProject.decode(data)
+        guard project.id==id else {
+            throw NativeWorldLabError.invalid("Recovery file identity mismatch")
+        }
+        return (data,project)
+    }
+    func listDrafts()throws->[NativeWorldLabProject]{
+        let manager=FileManager.default
+        guard manager.fileExists(atPath:recovery.path) else{return []}
+        let files=try manager.contentsOfDirectory(at:recovery,
+            includingPropertiesForKeys:[.contentModificationDateKey])
+            .filter{$0.pathExtension=="json"}
+        guard files.count<=Self.maxLocalProjects else {
+            throw NativeWorldLabError.invalid("Recovery cache limit is inconsistent")
+        }
+        let sorted=try files.map{ url -> (URL,Date) in
+            let values=try url.resourceValues(forKeys:[.contentModificationDateKey])
+            return (url,values.contentModificationDate ?? .distantPast)
+        }.sorted{$0.1>$1.1}
+        return try sorted.map{try readDraft($0.0.deletingPathExtension().lastPathComponent).1}
+    }
+    func deleteDraft(_ id:String)throws{
+        let url=recovery.appendingPathComponent(try file(id).lastPathComponent)
+        if FileManager.default.fileExists(atPath:url.path){
+            _ = try readDraft(id)
+            try FileManager.default.removeItem(at:url)
+        }
+    }
     @discardableResult func save(_ data:Data,expectedSavedRevision:Int?=nil) throws -> NativeWorldLabProject {
         let project=try NativeWorldLabProject.decode(data)
         let manager=FileManager.default
