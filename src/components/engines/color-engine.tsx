@@ -133,6 +133,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [colorValue, setColorValue] = useState("#0d9f8a");
   const [foregroundValue, setForegroundValue] = useState("#16181d");
   const [backgroundValue, setBackgroundValue] = useState("#ffffff");
+  const [canvasValue, setCanvasValue] = useState("#ffffff");
   const [harmony, setHarmony] = useState<Harmony>("analogous");
   const [target, setTarget] = useState<ContrastTarget>("normal-aa");
   const [visionMode, setVisionMode] = useState<ColorVisionMode>("deuteranopia");
@@ -179,6 +180,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const color = useMemo(() => parseDesignColor(colorValue), [colorValue]);
   const foreground = useMemo(() => parseDesignColor(foregroundValue), [foregroundValue]);
   const background = useMemo(() => parseDesignColor(backgroundValue), [backgroundValue]);
+  const canvas = useMemo(() => parseDesignColor(canvasValue), [canvasValue]);
   const converted = useMemo(() => parseDesignColor(converterValue), [converterValue]);
   const palette = useMemo(() => {
     if (!color) return [];
@@ -212,16 +214,16 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     url.searchParams.set("locks", JSON.stringify(lockedSwatches));
     return url.toString();
   }, [colorValue, harmony, lockedSwatches]);
-  const contrastChecks = useMemo(() => foreground && background
-    ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value) }))
-    : [], [foreground, background]);
+  const contrastChecks = useMemo(() => foreground && background && canvas
+    ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value, canvas) }))
+    : [], [foreground, background, canvas]);
   const activeCheck = contrastChecks.find((item) => item.value === target);
   const previewPair = useMemo(
-    () => foreground && background ? resolveRenderedPair(foreground, background) : null,
-    [foreground, background],
+    () => foreground && background && canvas ? resolveRenderedPair(foreground, background, canvas) : null,
+    [foreground, background, canvas],
   );
-  const correction = foreground && background
-    ? suggestContrastCorrections(foreground, background, target)
+  const correction = foreground && background && canvas
+    ? suggestContrastCorrections(foreground, background, target, canvas)
     : null;
 
   const converterIds = ["hex-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter"];
@@ -276,9 +278,14 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   }
 
   if (op === "contrast") {
+    const isWcagReport = toolId === "wcag-checker";
     return (
       <div className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <h3 className="text-sm font-semibold text-fg">{isWcagReport ? "WCAG contrast report" : "Contrast checker"}</h3>
+          <p className="mt-1 text-xs leading-5 text-muted">{isWcagReport ? "Review all five WCAG text and non-text contrast targets for this color pair." : "Check the rendered contrast of a foreground and background color."}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="contrast-foreground">Text / foreground color</Label>
             <div className="flex gap-2">
@@ -293,9 +300,16 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               <Input id="contrast-background" value={backgroundValue} onChange={(event) => setBackgroundValue(event.target.value)} className="font-mono" />
             </div>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="contrast-canvas">Page / canvas behind transparency</Label>
+            <div className="flex gap-2">
+              <Input type="color" aria-label="Choose canvas color behind transparent colors" value={canvas ? colorInputValue(canvas) : "#ffffff"} onChange={(event) => setCanvasValue(event.target.value)} className="h-11 w-14 shrink-0 p-1" />
+              <Input id="contrast-canvas" value={canvasValue} onChange={(event) => setCanvasValue(event.target.value)} className="font-mono" />
+            </div>
+          </div>
         </div>
-        {!foreground || !background ? <p className="text-sm text-danger">Enter valid CSS colors, including HEX with alpha, RGB or HSL.</p> : null}
-        {foreground && background ? (
+        {!foreground || !background || !canvas ? <p className="text-sm text-danger">Enter valid foreground, background and canvas CSS colors, including HEX with alpha, RGB or HSL.</p> : null}
+        {foreground && background && canvas ? (
           <>
             <div className="overflow-hidden rounded-xl border border-border">
               <div className="px-5 py-8 text-center" style={{ background: previewPair ? toHex(previewPair.background) : "#ffffff", color: previewPair ? toHex(previewPair.foreground) : "#111827" }}>
@@ -306,12 +320,31 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-2 px-4 py-3">
                 <span className="text-xs font-medium text-muted">Contrast ratio</span>
-                <strong className="text-lg tabular-nums text-fg">{contrastRatio(foreground, background).toFixed(2)}:1</strong>
+                <strong className="text-lg tabular-nums text-fg">{contrastRatio(foreground, background, canvas).toFixed(2)}:1</strong>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {contrastChecks.map((item) => <ContrastStatus key={item.value} passes={item.result.passes} label={item.label.replace(" · ", " ")} />)}
-            </div>
+            {isWcagReport ? (
+              <section className="overflow-hidden rounded-xl border border-border" aria-labelledby="wcag-report-heading">
+                <div className="border-b border-border bg-surface-2 px-4 py-3">
+                  <h4 id="wcag-report-heading" className="text-sm font-semibold text-fg">WCAG 2.2 contrast requirements</h4>
+                  <p className="mt-1 text-xs text-muted">Each requirement is evaluated against the same composited color pair.</p>
+                </div>
+                <div className="divide-y divide-border">
+                  {contrastChecks.map((item) => (
+                    <div key={item.value} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
+                      <div><p className="text-sm font-medium text-fg">{item.label}</p><p className="mt-0.5 text-xs text-muted">Success criterion 1.{item.result.criterion}</p></div>
+                      <span className="text-xs tabular-nums text-muted">Required {item.result.threshold.toFixed(1)}:1</span>
+                      <span className="text-xs tabular-nums text-fg">Actual {item.result.ratio.toFixed(2)}:1</span>
+                      <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.result.passes ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>{item.result.passes ? "PASS" : "FAIL"}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {contrastChecks.map((item) => <ContrastStatus key={item.value} passes={item.result.passes} label={item.label.replace(" · ", " ")} />)}
+              </div>
+            )}
             <div className="rounded-xl border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -343,7 +376,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                 </div>
               ) : null}
             </div>
-            <p className="text-xs leading-5 text-muted">Alpha is composited before contrast is evaluated. This checks the selected color pair only; it does not automatically inspect every element on a website.</p>
+            <p className="text-xs leading-5 text-muted">Foreground and background alpha are composited in order over the selected page/canvas color before the ratio is calculated. This checks the selected pair only; it does not automatically inspect every element on a website. The non-text target is intended for meaningful UI components and graphical objects, not decorative graphics.</p>
           </>
         ) : null}
       </div>
