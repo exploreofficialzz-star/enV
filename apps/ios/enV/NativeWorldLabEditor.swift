@@ -103,6 +103,46 @@ enum NativeWorldLabEditor {
             root["digitalNetworks"]=networks
         }
     }
+    /// Define a bounded, forward-wired hypothetical truth-table gate.
+    static func addDigitalGate(_ data:Data,networkId:String,name:String,
+        assumption:String,inputNodeIds:[String],id:String=UUID().uuidString)throws->Data {
+        try mutate(data){root in
+            guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+                  name.count<=120,
+                  !assumption.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+                  assumption.count<=500,
+                  (1...4).contains(inputNodeIds.count),
+                  Set(inputNodeIds).count==inputNodeIds.count else {
+                throw NativeWorldLabError.invalid(
+                    "Digital invention requires a name, an assumption and distinct inputs")
+            }
+            guard var networks=root["digitalNetworks"] as? [[String:Any]],
+                  let index=networks.firstIndex(where:{$0["id"] as? String==networkId}),
+                  var gates=networks[index]["gates"] as? [[String:Any]],
+                  let inputs=networks[index]["inputs"] as? [[String:Any]],
+                  let outputs=networks[index]["outputs"] as? [[String:Any]],
+                  gates.count<32 else {
+                throw NativeWorldLabError.invalid("Digital network or gate limit invalid")
+            }
+            let inputIds=inputs.compactMap{$0["id"] as? String}
+            let gateIds=gates.compactMap{$0["id"] as? String}
+            let outputIds=outputs.compactMap{$0["id"] as? String}
+            let preceding=inputIds+gateIds
+            guard inputNodeIds.allSatisfy({preceding.contains($0)}),
+                  !(preceding+outputIds).contains(id) else {
+                throw NativeWorldLabError.invalid(
+                    "Digital gate must have a unique ID and only preceding input nodes")
+            }
+            let gate:[String:Any]=["id":id,"name":name.trimmingCharacters(in:.whitespaces),
+                "assumption":assumption.trimmingCharacters(in:.whitespaces),
+                "inputNodeIds":inputNodeIds,
+                "truthTable":Array(repeating:0,count:1 << inputNodeIds.count),
+                "evidence":"hypothetical-user-assumed"]
+            gates.append(gate)
+            networks[index]["gates"]=gates
+            root["digitalNetworks"]=networks
+        }
+    }
     /// Rewire a Boolean indicator to an existing input or computed invented gate.
     static func digitalOutputSource(_ data:Data,networkId:String,outputId:String,
         sourceNodeId:String)throws->Data {
