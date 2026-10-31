@@ -116,6 +116,7 @@ fun NativeWorldLabForm() {
     var secondAssemblyIndex by remember { mutableIntStateOf(0) }
     var assemblyMoveStep by remember { mutableStateOf(0.5) }
     var digitalShowCases by remember { mutableStateOf(false) }
+    var digitalNewGateName by remember { mutableStateOf("Invented device") }
     var snapMeters by remember { mutableStateOf(0.5) }
     var measurementTargetIndex by remember { mutableIntStateOf(0) }
     val model=when(kind) {
@@ -435,6 +436,22 @@ fun NativeWorldLabForm() {
                         }
                     }
                 }
+                OutlinedTextField(value=digitalNewGateName,
+                    onValueChange={digitalNewGateName=it.take(120)},
+                    label={Text("Name your next invented digital gate")},
+                    singleLine=true)
+                OutlinedButton(
+                    onClick={applyProjectEdit{json->
+                        NativeWorldLabEditor.addDigitalGate(
+                            json,digital.id,digitalNewGateName,
+                            "User-assumed one-input truth table",
+                            listOf(digital.gates.last().id))
+                    }},
+                    enabled=digital.gates.size<32&&digitalNewGateName.isNotBlank()
+                ){Text("Connect a new invented gate")}
+                Text("Each new gate reads the preceding gate. Toggle its truth-table bits,"+
+                    " then wire an indicator to inspect it.",
+                    style=MaterialTheme.typography.bodySmall)
                 val signalNodes=digital.inputs.map{it.id to it.label}+
                     digital.gates.map{it.id to it.name}
                 digital.outputs.forEach{output->
