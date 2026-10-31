@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDesignPaletteExport, createColorShadeScale } from "./design-palette.ts";
+import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette } from "./design-palette.ts";
+import { parseCssColor, toHex } from "./accessibility-color.ts";
 
 const colors = {
   primary: "#0d9f8a",
@@ -41,4 +42,16 @@ test("Tailwind, JSON and W3C token exports retain semantic values", () => {
   assert.equal(tokens.color.primary.$type, "color");
   assert.equal(tokens.color.primary.$value, colors.primary);
   assert.equal(tokens.primary["500"].$value, colors.primary);
+});
+
+test("harmony palette generator respects selectable counts from three to eight", () => {
+  const source = parseCssColor("#0d9f8a")!;
+  for (const count of [3, 4, 5, 6, 7, 8]) {
+    for (const harmony of ["analogous", "complementary", "triadic", "split", "tetradic", "monochromatic"] as const) {
+      const palette = createHarmonyPalette(source, harmony, count);
+      assert.equal(palette.length, count, `${harmony} count ${count}`);
+      assert.ok(palette.every((color) => color.r >= 0 && color.r <= 255 && color.g >= 0 && color.g <= 255 && color.b >= 0 && color.b <= 255));
+    }
+  }
+  assert.equal(new Set(createHarmonyPalette(source, "triadic", 3).map(toHex)).size, 3);
 });

@@ -19,10 +19,10 @@ import {
   type RgbaColor,
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
-import { buildDesignPaletteExport, createColorShadeScale, type PaletteExportFormat } from "@/lib/engines/design-palette";
+import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony } from "@/lib/engines/design-palette";
 import { formatCmyk, formatHsv, parseDesignColor } from "@/lib/engines/design-color";
 
-type Harmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
+type Harmony = PaletteHarmony;
 const DEFAULT_VISION_COLORS = [
   { label: "Error", color: "#D94B4B" },
   { label: "Success", color: "#229968" },
@@ -43,38 +43,6 @@ const TARGETS = getContrastTargets();
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function makePalette(color: RgbaColor, harmony: Harmony): RgbaColor[] {
-  const hsl = rgbToHsl(color);
-  const stops: Record<Exclude<Harmony, "monochromatic">, number[]> = {
-    analogous: [-40, -20, 0, 20, 40],
-    complementary: [-15, 0, 180, 195, 210],
-    triadic: [0, 120, 240, 120, 0],
-    split: [0, 150, 210, 150, 210],
-    tetradic: [0, 90, 180, 270, 90],
-  };
-  const fromHsl = (h: number, s: number, l: number): RgbaColor => {
-    const hue = ((h % 360) + 360) % 360 / 360;
-    const sat = clamp(s, 0, 1), light = clamp(l, 0, 1);
-    if (sat === 0) return { r: light * 255, g: light * 255, b: light * 255, a: 1 };
-    const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat;
-    const p = 2 * light - q;
-    const channel = (t: number) => {
-      let x = t;
-      if (x < 0) x += 1;
-      if (x > 1) x -= 1;
-      if (x < 1 / 6) return p + (q - p) * 6 * x;
-      if (x < 1 / 2) return q;
-      if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
-      return p;
-    };
-    return { r: channel(hue + 1 / 3) * 255, g: channel(hue) * 255, b: channel(hue - 1 / 3) * 255, a: 1 };
-  };
-  if (harmony === "monochromatic") {
-    return [-0.32, -0.16, 0, 0.16, 0.3].map((offset) => fromHsl(hsl.h, hsl.s, clamp(hsl.l + offset, 0.06, 0.94)));
-  }
-  return stops[harmony].map((offset) => fromHsl(hsl.h + offset, hsl.s, hsl.l));
 }
 
 function colorInputValue(color: RgbaColor): string {
@@ -135,6 +103,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [backgroundValue, setBackgroundValue] = useState("#ffffff");
   const [canvasValue, setCanvasValue] = useState("#ffffff");
   const [harmony, setHarmony] = useState<Harmony>("analogous");
+  const [paletteCount, setPaletteCount] = useState(5);
   const [target, setTarget] = useState<ContrastTarget>("normal-aa");
   const [visionMode, setVisionMode] = useState<ColorVisionMode>("deuteranopia");
   const [visionColors, setVisionColors] = useState(DEFAULT_VISION_COLORS);
@@ -160,13 +129,15 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     if (sharedHarmony && ["analogous", "complementary", "triadic", "split", "tetradic", "monochromatic"].includes(sharedHarmony)) {
       setHarmony(sharedHarmony as Harmony);
     }
+    const sharedCount = Number(params.get("count"));
+    if (Number.isInteger(sharedCount) && sharedCount >= 3 && sharedCount <= 8) setPaletteCount(sharedCount);
     if (sharedLocks) {
       try {
         const parsed = JSON.parse(sharedLocks) as Record<string, string>;
         const safeLocks: Record<number, string> = {};
         for (const [index, value] of Object.entries(parsed)) {
           const numericIndex = Number(index);
-          if (Number.isInteger(numericIndex) && numericIndex >= 0 && numericIndex < 5 && typeof value === "string" && parseDesignColor(value)) {
+          if (Number.isInteger(numericIndex) && numericIndex >= 0 && numericIndex < 8 && typeof value === "string" && parseDesignColor(value)) {
             safeLocks[numericIndex] = value;
           }
         }
@@ -184,11 +155,11 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const converted = useMemo(() => parseDesignColor(converterValue), [converterValue]);
   const palette = useMemo(() => {
     if (!color) return [];
-    return makePalette(color, harmony).map((swatch, index) => {
+    return createHarmonyPalette(color, harmony, paletteCount).map((swatch, index) => {
       const locked = lockedSwatches[index] ? parseDesignColor(lockedSwatches[index]) : null;
       return locked ?? swatch;
     });
-  }, [color, harmony, lockedSwatches]);
+  }, [color, harmony, lockedSwatches, paletteCount]);
   const primaryColor = toHex(palette[2] ?? { r: 13, g: 159, b: 138, a: 1 });
   const shadeScale = useMemo(() => createColorShadeScale(primaryColor), [primaryColor]);
   const roleColors = useMemo(() => ({
@@ -211,9 +182,10 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     const url = new URL(window.location.href);
     url.searchParams.set("base", colorValue);
     url.searchParams.set("harmony", harmony);
+    url.searchParams.set("count", String(paletteCount));
     url.searchParams.set("locks", JSON.stringify(lockedSwatches));
     return url.toString();
-  }, [colorValue, harmony, lockedSwatches]);
+  }, [colorValue, harmony, lockedSwatches, paletteCount]);
   const contrastChecks = useMemo(() => foreground && background && canvas
     ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value, canvas) }))
     : [], [foreground, background, canvas]);
@@ -496,7 +468,11 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-fg">Your color palette</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Label htmlFor="palette-count" className="text-xs text-muted">Colors</Label>
+                <Select id="palette-count" value={String(paletteCount)} onChange={(event) => setPaletteCount(clamp(Number(event.target.value), 3, 8))} className="w-20">
+                  {[3, 4, 5, 6, 7, 8].map((count) => <option key={count} value={count}>{count}</option>)}
+                </Select>
                 <Button type="button" size="sm" variant="outline" onClick={() => setColorValue("#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0"))}>Randomize unlocked</Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setLockedSwatches({})} disabled={Object.keys(lockedSwatches).length === 0}>Unlock all</Button>
               </div>
@@ -512,6 +488,10 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                       <div className="flex items-center justify-between gap-1">
                         <span className="truncate font-mono text-[11px] text-fg">{value.toUpperCase()}</span>
                         <CopyButton text={value} label="Copy" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input type="color" aria-label={`Edit palette color ${index + 1}`} value={colorInputValue(swatch)} onChange={(event) => setLockedSwatches((previous) => ({ ...previous, [index]: event.target.value }))} className="h-9 w-12 shrink-0 p-1" />
+                        <span className="min-w-0 text-[10px] text-muted">Edit swatch</span>
                       </div>
                       <Button type="button" size="sm" variant={locked ? "secondary" : "ghost"} className="min-h-9 w-full" aria-pressed={locked} onClick={() => setLockedSwatches((previous) => {
                         const next = { ...previous };

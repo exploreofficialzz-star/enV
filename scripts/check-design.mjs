@@ -40,7 +40,7 @@ const checks = [
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],
   ["HSV conversion implementation", designColor.includes("function rgbToHsv") && designColor.includes("function hsvToRgb")],
-  ["Palette harmony controls", colorEngine.includes("Split complementary") && colorEngine.includes("Monochromatic")],
+  ["Palette harmony controls and selectable palette counts", colorEngine.includes("Split complementary") && colorEngine.includes("Monochromatic") && colorEngine.includes("palette-count") && colorEngine.includes("Edit palette color") && palette.includes("createHarmonyPalette")],
   ["Distinct WCAG target checks and WCAG report", colorEngine.includes("getContrastTargets()") && colorEngine.includes("evaluateContrast") && colorEngine.includes("WCAG contrast report")],
   ["Custom transparent-color canvas and report details", colorEngine.includes("Page / canvas behind transparency") && colorEngine.includes("Success criterion {item.result.criterion}") && colorEngine.includes("Actual {item.result.ratio.toFixed(2)}:1")],
   ["Published CVD simulation utility", colorVision.includes("simulateColorVision") && colorVision.includes("protanopia") && colorVision.includes("tritanopia")],

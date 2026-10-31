@@ -1,6 +1,8 @@
-import { parseCssColor, toHex } from "./accessibility-color";
+import { parseCssColor, rgbToHsl, toHex, type RgbaColor } from "./accessibility-color";
 
 export type PaletteExportFormat = "css" | "scss" | "tailwind" | "json" | "tokens";
+export type PaletteHarmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
+
 export type SemanticPaletteColors = {
   primary: string;
   secondary: string;
@@ -13,6 +15,61 @@ export type SemanticPaletteColors = {
   border: string;
 };
 export type PaletteShade = { step: number; color: string };
+
+const HARMONY_OFFSETS: Record<Exclude<PaletteHarmony, "monochromatic">, number[]> = {
+  analogous: [-40, -20, 0, 20, 40],
+  complementary: [-15, 0, 180, 195, 210],
+  triadic: [0, 120, 240, 120, 0],
+  split: [0, 150, 210, 150, 210],
+  tetradic: [0, 90, 180, 270, 90],
+};
+
+function fromHsl(h: number, s: number, l: number): RgbaColor {
+  const hue = ((h % 360) + 360) % 360 / 360;
+  const saturation = Math.min(1, Math.max(0, s));
+  const light = Math.min(0.94, Math.max(0.06, l));
+  if (saturation === 0) return { r: light * 255, g: light * 255, b: light * 255, a: 1 };
+  const q = light < 0.5 ? light * (1 + saturation) : light + saturation - light * saturation;
+  const p = 2 * light - q;
+  const channel = (input: number) => {
+    let value = input;
+    if (value < 0) value += 1;
+    if (value > 1) value -= 1;
+    if (value < 1 / 6) return p + (q - p) * 6 * value;
+    if (value < 1 / 2) return q;
+    if (value < 2 / 3) return p + (q - p) * (2 / 3 - value) * 6;
+    return p;
+  };
+  return {
+    r: channel(hue + 1 / 3) * 255,
+    g: channel(hue) * 255,
+    b: channel(hue - 1 / 3) * 255,
+    a: 1,
+  };
+}
+
+export function createHarmonyPalette(color: RgbaColor, harmony: PaletteHarmony, count = 5): RgbaColor[] {
+  const safeCount = Math.min(8, Math.max(3, Math.round(Number.isFinite(count) ? count : 5)));
+  const hsl = rgbToHsl(color);
+  if (safeCount === 5) {
+    if (harmony === "monochromatic") {
+      return [-0.32, -0.16, 0, 0.16, 0.3].map((offset) => fromHsl(hsl.h, hsl.s, hsl.l + offset));
+    }
+    return HARMONY_OFFSETS[harmony].map((offset) => fromHsl(hsl.h + offset, hsl.s, hsl.l));
+  }
+  if (harmony === "monochromatic") {
+    return Array.from({ length: safeCount }, (_, index) => {
+      const progress = index / (safeCount - 1);
+      return fromHsl(hsl.h, hsl.s, 0.12 + progress * 0.76);
+    });
+  }
+  const offsets = HARMONY_OFFSETS[harmony];
+  return Array.from({ length: safeCount }, (_, index) => {
+    const cycle = Math.floor(index / offsets.length);
+    const lightnessShift = cycle === 0 ? 0 : (cycle % 2 ? 1 : -1) * Math.min(0.12, cycle * 0.04);
+    return fromHsl(hsl.h + offsets[index % offsets.length], hsl.s, hsl.l + lightnessShift);
+  });
+}
 
 const SCALE_STEPS: Array<{ step: number; mix: number }> = [
   { step: 50, mix: 0.94 },
