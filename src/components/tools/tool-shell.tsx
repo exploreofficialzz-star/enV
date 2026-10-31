@@ -13,6 +13,7 @@ import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
+import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 
@@ -39,6 +40,35 @@ export function ToolShell({
   const toolAbandonmentRecordedRef = useRef(false);
   const toolStartedAtRef = useRef<number | null>(null);
   const toolViewedAtRef = useRef(Date.now());
+  const executionStartedAtRef = useRef<number | null>(null);
+  const executionFinishedRef = useRef(false);
+
+  const startToolExecution = (entryPoint: string) => {
+    const startedAt = Date.now();
+    executionStartedAtRef.current = startedAt;
+    executionFinishedRef.current = false;
+    toolStartedRef.current = true;
+    toolFinishedRef.current = false;
+    toolAbandonmentRecordedRef.current = false;
+    toolStartedAtRef.current = startedAt;
+    if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(startedAt);
+    recordAnalyticsEvent({
+      name: "tool_started",
+      toolId: tool.id,
+      outcome: "unknown",
+      durationMs: Math.min(3600000, Math.max(0, startedAt - toolViewedAtRef.current)),
+      properties: { entry_point: entryPoint },
+    });
+  };
+
+  const executionTelemetry: ToolExecutionTelemetry = {
+    finish: (outcome: ToolExecutionOutcome, errorCode?: string) => {
+      const startedAt = executionStartedAtRef.current;
+      if (startedAt === null || executionFinishedRef.current) return;
+      executionFinishedRef.current = true;
+      recordToolExecutionResult(tool.id, outcome, Date.now() - startedAt, "shared_result", errorCode);
+    },
+  };
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
@@ -63,6 +93,8 @@ export function ToolShell({
     toolFinishedRef.current = false;
     toolAbandonmentRecordedRef.current = false;
     toolStartedAtRef.current = null;
+    executionStartedAtRef.current = null;
+    executionFinishedRef.current = false;
     toolViewedAtRef.current = Date.now();
   }, [tool.id, recordRecent]);
 
@@ -71,6 +103,7 @@ export function ToolShell({
       const detail = (event as CustomEvent<{ toolId?: string; outcome?: string }>).detail;
       if (detail?.toolId === tool.id && ["success", "failure", "cancelled"].includes(detail.outcome ?? "")) {
         toolFinishedRef.current = true;
+        executionFinishedRef.current = true;
       }
     };
     const reportAbandoned = () => {
@@ -215,30 +248,18 @@ export function ToolShell({
         aria-modal={isFullscreen || undefined}
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
         onClickCapture={(event) => {
-          if (toolStartedRef.current) return;
           const target = event.target;
-          if (!(target instanceof HTMLElement) || !target.closest("button,input,textarea,select,[role=button],[contenteditable=true]")) return;
-          if (target.closest(".env-tool-fullscreen__toolbar")) return;
-          toolStartedRef.current = true;
-          toolStartedAtRef.current = Date.now();
-          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
-          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.min(3600000, Math.max(0, Date.now() - toolViewedAtRef.current)), properties: { entry_point: "first_interaction" } });
+          if (!(target instanceof HTMLElement) || target.closest(".env-tool-fullscreen__toolbar")) return;
+          const button = target.closest("button");
+          if (!button || button.disabled || button.type === "submit") return;
+          const label = [button.getAttribute("aria-label"), button.getAttribute("title"), button.innerText].filter(Boolean).join(" ");
+          if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render)\b/i.test(label)) {
+            startToolExecution("action_button");
+          }
         }}
-        onInputCapture={() => {
-          if (toolStartedRef.current) return;
-          toolStartedRef.current = true;
-          toolStartedAtRef.current = Date.now();
-          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
-          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.min(3600000, Math.max(0, Date.now() - toolViewedAtRef.current)), properties: { entry_point: "first_input" } });
-        }}
-        onSubmitCapture={() => {
-          if (toolStartedRef.current) return;
-          toolStartedRef.current = true;
-          toolStartedAtRef.current = Date.now();
-          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
-          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.min(3600000, Math.max(0, Date.now() - toolViewedAtRef.current)), properties: { entry_point: "form_submit" } });
-        }}
+        onSubmitCapture={() => startToolExecution("form_submit")}
       >
+        <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
         {isMusicSandbox ? (
           <>
             {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
@@ -262,6 +283,7 @@ export function ToolShell({
             <div className="env-tool-fullscreen__content">{children}</div>
           </>
         ) : children}
+        </ToolExecutionTelemetryContext.Provider>
       </section>
 
       <AiAssistPanel toolId={tool.id} />
