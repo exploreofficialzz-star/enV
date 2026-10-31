@@ -2334,7 +2334,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var from by rememberSaveable(toolId) { mutableStateOf(today) }
     var to by rememberSaveable(toolId) { mutableStateOf(today) }
     var start by rememberSaveable(toolId) { mutableStateOf(today) }
-    var days by rememberSaveable(toolId) { mutableStateOf("5") }
+    var days by rememberSaveable(toolId) { mutableStateOf(if (op == "workday") "10" else "0") }
     var years by rememberSaveable(toolId) { mutableStateOf("0") }
     var months by rememberSaveable(toolId) { mutableStateOf("0") }
     var weeks by rememberSaveable(toolId) { mutableStateOf("0") }
@@ -2343,7 +2343,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var includeEnd by rememberSaveable(toolId) { mutableStateOf(if (op == "deadline") "false" else "true") }
     var weekendDays by rememberSaveable(toolId) { mutableStateOf("0,6") }
     var excludedDates by rememberSaveable(toolId) { mutableStateOf("") }
-    var target by rememberSaveable(toolId) { mutableStateOf(now.plusSeconds(3600).toString()) }
+    var target by rememberSaveable(toolId) { mutableStateOf(if (op == "countdown") now.plusSeconds(3600).toString() else "") }
     var zones by rememberSaveable(toolId) { mutableStateOf("Lagos\nLondon\nNew York\nTokyo") }
     var time by rememberSaveable(toolId) { mutableStateOf(java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()) }
     var fromTz by rememberSaveable(toolId) { mutableStateOf(java.time.ZoneId.systemDefault().id) }
@@ -2354,8 +2354,8 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var intervalMinutes by rememberSaveable(toolId) { mutableStateOf("30") }
     var value by rememberSaveable(toolId) { mutableStateOf(now.epochSecond.toString()) }
     var pattern by rememberSaveable(toolId) { mutableStateOf("yyyy-MM-dd") }
-    var year by rememberSaveable(toolId) { mutableStateOf("2024") }
-    var birth by rememberSaveable(toolId) { mutableStateOf("1990-01-01") }
+    var year by rememberSaveable(toolId) { mutableStateOf(LocalDate.now().year.toString()) }
+    var birth by rememberSaveable(toolId) { mutableStateOf("") }
     var output by rememberSaveable(toolId) { mutableStateOf("") }
     var error by rememberSaveable(toolId) { mutableStateOf("") }
     fun copy(text: String) { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("enV output", text)) }
@@ -2445,13 +2445,15 @@ private fun NativeDateTimeToolForm(toolId: String) {
                 runCatching { NativeDateTimeEngine.run(toolId, input, options) }.fold({ output = it.output; error = "" }, { output = ""; error = it.message ?: "Unable to run date/time tool" })
             },
             onReset = {
-                input = today; from = today; to = today; start = today; days = "5"
+                input = today; from = today; to = today; start = today
+                days = if (op == "workday") "10" else "0"
                 years = "0"; months = "0"; weeks = "0"; direction = "add"; repeatCount = "1"
                 includeEnd = if (op == "deadline") "false" else "true"; weekendDays = "0,6"; excludedDates = ""
-                target = now.plusSeconds(3600).toString(); zones = "Lagos\nLondon\nNew York\nTokyo"; time = java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()
+                target = if (op == "countdown") now.plusSeconds(3600).toString() else ""
+                zones = "Lagos\nLondon\nNew York\nTokyo"; time = java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()
                 fromTz = java.time.ZoneId.systemDefault().id; toTz = "America/New_York"; workStart = "09:00"; workEnd = "17:00"
                 meetingDuration = "30"; intervalMinutes = "30"; value = now.epochSecond.toString()
-                pattern = "yyyy-MM-dd"; year = "2024"; birth = "1990-01-01"; output = ""; error = ""
+                pattern = "yyyy-MM-dd"; year = LocalDate.now().year.toString(); birth = ""; output = ""; error = ""
             }
         )
         ResultBox(output, error, ::copy)
