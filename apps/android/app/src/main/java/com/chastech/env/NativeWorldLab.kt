@@ -35,6 +35,9 @@ import com.chastech.env.engine.NativeWorldLabStructural
 import com.chastech.env.engine.NativeLabBeamBendingResult
 import com.chastech.env.engine.NativeWorldLabCollision
 import com.chastech.env.engine.NativeLabCollisionResult
+import com.chastech.env.engine.NativeWorldLabSphereImpact
+import com.chastech.env.engine.NativeSphereImpactResult
+import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
@@ -96,6 +99,14 @@ fun NativeWorldLabForm() {
     var collisionTime by remember { mutableFloatStateOf(0f) }
     var collisionPlaying by remember { mutableStateOf(false) }
     var collisionSpeed by remember { mutableFloatStateOf(1f) }
+    var sphereTargetIndex by remember { mutableIntStateOf(0) }
+    var sphereFirstVelocity by remember { mutableStateOf("2,0,0") }
+    var sphereSecondVelocity by remember { mutableStateOf("0,0,0") }
+    var sphereRestitution by remember { mutableFloatStateOf(0.65f) }
+    var sphereRun by remember { mutableStateOf<NativeSphereImpactResult?>(null) }
+    var sphereTime by remember { mutableFloatStateOf(0f) }
+    var spherePlaying by remember { mutableStateOf(false) }
+    var sphereSpeed by remember { mutableFloatStateOf(1f) }
     var deviceName by remember { mutableStateOf("") }
     var deviceAssumption by remember { mutableStateOf("") }
     var deviceResistance by remember { mutableStateOf("") }
@@ -276,6 +287,21 @@ fun NativeWorldLabForm() {
             }
         }
     }
+    val sphereEvidencePicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null){
+            val run=sphereRun
+            if(run!=null)scope.launch{
+                runCatching{withContext(Dispatchers.IO){
+                    val evidence=run.toEvidenceJson().toByteArray(Charsets.UTF_8)
+                    require(evidence.size<=NativeWorldLabProjectCodec.MAX_BYTES)
+                    context.contentResolver.openOutputStream(uri,"wt")?.use{
+                        it.write(evidence);it.flush()
+                    }?:error("Unable to open sphere-impact evidence destination")
+                }}.onFailure{warning=it.message?:"Could not export 3D impact evidence"}
+            }
+        }
+    }
     val collisionEvidencePicker=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null){
@@ -319,6 +345,7 @@ fun NativeWorldLabForm() {
         dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
         motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0;digitalMotor=null
         collisionPlaying=false;collisionRun=null;collisionTime=0f
+        spherePlaying=false;sphereRun=null;sphereTime=0f
     }
     LaunchedEffect(requestImport) {
         if(requestImport){
@@ -351,6 +378,15 @@ fun NativeWorldLabForm() {
             val stride=kotlin.math.max(1,kotlin.math.round(0.04f*dropSpeed/result.stepSeconds).toInt())
             dropFrame=(dropFrame+stride).coerceAtMost(result.samples.lastIndex)
             if(dropFrame==result.samples.lastIndex)dropPlaying=false
+        }
+    }
+    LaunchedEffect(spherePlaying,sphereSpeed,sphereRun) {
+        while(spherePlaying){
+            delay(40)
+            val run=sphereRun?:break
+            sphereTime=(sphereTime+0.04f*sphereSpeed)
+                .coerceAtMost(run.durationSeconds.toFloat())
+            if(sphereTime>=run.durationSeconds.toFloat())spherePlaying=false
         }
     }
     LaunchedEffect(collisionPlaying,collisionSpeed,collisionRun) {
@@ -937,6 +973,126 @@ fun NativeWorldLabForm() {
                             .joinToString(" / "){labNumber(it)}+" m")
                     Text(clearance.validity,style=MaterialTheme.typography.bodySmall)
                 }
+                Text("Collide spheres in three dimensions",
+                    style=MaterialTheme.typography.titleSmall)
+                Text("One true off-axis first contact between smooth spheres. Assumed inventor densities and restitution; no arbitrary shape physics, rolling, fracture or gravity.",
+                    style=MaterialTheme.typography.bodySmall)
+                val sphereCandidates=project!!.entities.filter{
+                    it.shape=="sphere"&&it.id!=solid.id
+                }
+                if(solid.shape=="sphere"&&sphereCandidates.isNotEmpty()){
+                    val other=sphereCandidates[sphereTargetIndex%sphereCandidates.size]
+                    OutlinedButton(onClick={
+                        sphereTargetIndex=(sphereTargetIndex+1)%sphereCandidates.size
+                        sphereRun=null;spherePlaying=false
+                    }){Text("Spatial impact with: "+other.name+" (change)")}
+                    OutlinedTextField(value=sphereFirstVelocity,onValueChange={
+                        sphereFirstVelocity=it;sphereRun=null;spherePlaying=false
+                    },label={Text("First sphere X,Y,Z speeds (m/s)")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=sphereSecondVelocity,onValueChange={
+                        sphereSecondVelocity=it;sphereRun=null;spherePlaying=false
+                    },label={Text("Second sphere X,Y,Z speeds (m/s)")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    Text("Assumed restitution: "+labNumber(sphereRestitution.toDouble()))
+                    Slider(value=sphereRestitution,onValueChange={
+                        sphereRestitution=it;sphereRun=null;spherePlaying=false
+                    },valueRange=0f..1f,
+                        modifier=Modifier.semantics{contentDescription="Three-dimensional restitution"})
+                    OutlinedButton(onClick={
+                        runCatching{
+                            val p=project?:error("Project unavailable")
+                            sphereRun=NativeWorldLabSphereImpact.evaluate(
+                                p,solid.id,other.id,
+                                nativeLabImpactVelocity(sphereFirstVelocity),
+                                nativeLabImpactVelocity(sphereSecondVelocity),
+                                sphereRestitution.toDouble())
+                            sphereTime=0f;spherePlaying=false
+                            collisionRun=null;collisionPlaying=false;warning=""
+                        }.onFailure{warning=it.message?:"Invalid spatial impact";sphereRun=null}
+                    }){Text("Calculate three-dimensional sphere impact")}
+                }else Text("Select a sphere and add a second invented sphere with material density.")
+                sphereRun?.takeIf{run->
+                    run.projectId==project!!.id&&run.projectRevision==project!!.revision&&
+                    (run.firstEntityId==solid.id||run.secondEntityId==solid.id)
+                }?.let{run->
+                    val motion=run.sample(sphereTime.toDouble()
+                        .coerceIn(0.0,run.durationSeconds))
+                    Text("Spatial contact at "+labNumber(run.impactTimeSeconds)+" s")
+                    Text("3D impulse X/Y/Z: "+labNumber(run.impulseNs.x)+" / "+
+                        labNumber(run.impulseNs.y)+" / "+labNumber(run.impulseNs.z)+" N·s")
+                    Text("Momentum X/Y/Z before: "+labNumber(run.momentumBeforeKgMps.x)+
+                        " / "+labNumber(run.momentumBeforeKgMps.y)+" / "+
+                        labNumber(run.momentumBeforeKgMps.z)+" kg·m/s")
+                    Text("Momentum X/Y/Z after: "+labNumber(run.momentumAfterKgMps.x)+
+                        " / "+labNumber(run.momentumAfterKgMps.y)+" / "+
+                        labNumber(run.momentumAfterKgMps.z)+" kg·m/s")
+                    Text("Angular momentum Z before/after: "+
+                        labNumber(run.angularMomentumBeforeKgM2PerS.z)+" / "+
+                        labNumber(run.angularMomentumAfterKgM2PerS.z)+" kg·m²/s")
+                    Text("Energy before/after/lost: "+labNumber(run.energyBeforeJ)+
+                        " / "+labNumber(run.energyAfterJ)+" / "+
+                        labNumber(run.dissipatedEnergyJ)+" J")
+                    Canvas(Modifier.fillMaxWidth().height(120.dp)
+                        .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                        .semantics{
+                            contentDescription="Real 3D sphere impact XY projection; X Y Z coordinates are shown below"
+                        }){
+                        val start=run.sample(0.0)
+                        val last=run.sample(run.durationSeconds)
+                        val xs=listOf(start.firstCentreM.x,start.secondCentreM.x,
+                            last.firstCentreM.x,last.secondCentreM.x,
+                            motion.firstCentreM.x,motion.secondCentreM.x)
+                        val ys=listOf(start.firstCentreM.y,start.secondCentreM.y,
+                            last.firstCentreM.y,last.secondCentreM.y,
+                            motion.firstCentreM.y,motion.secondCentreM.y)
+                        val rangeX=(xs.maxOrNull()!!-xs.minOrNull()!!+
+                            run.firstRadiusM+run.secondRadiusM).coerceAtLeast(0.001)
+                        val rangeY=(ys.maxOrNull()!!-ys.minOrNull()!!+
+                            run.firstRadiusM+run.secondRadiusM).coerceAtLeast(0.001)
+                        val extentX=xs.minOrNull()!!-run.firstRadiusM
+                        val extentY=ys.minOrNull()!!-run.firstRadiusM
+                        val factorX=size.width*0.85f/rangeX.toFloat()
+                        val factorY=size.height*0.8f/rangeY.toFloat()
+                        fun loc(v:NativeLabVector)=Offset(
+                            size.width*0.07f+(v.x-extentX).toFloat()*factorX,
+                            size.height*0.91f-(v.y-extentY).toFloat()*factorY)
+                        drawCircle(Color(0xFF69C3C3),
+                            run.firstRadiusM.toFloat()*minOf(factorX,factorY),
+                            loc(motion.firstCentreM))
+                        drawCircle(Color(0xFFF2B877),
+                            run.secondRadiusM.toFloat()*minOf(factorX,factorY),
+                            loc(motion.secondCentreM))
+                    }
+                    Text("First sphere centre X/Y/Z: "+
+                        labNumber(motion.firstCentreM.x)+" / "+
+                        labNumber(motion.firstCentreM.y)+" / "+
+                        labNumber(motion.firstCentreM.z)+" m")
+                    Text("Second sphere centre X/Y/Z: "+
+                        labNumber(motion.secondCentreM.x)+" / "+
+                        labNumber(motion.secondCentreM.y)+" / "+
+                        labNumber(motion.secondCentreM.z)+" m")
+                    Slider(value=sphereTime,onValueChange={
+                        spherePlaying=false;sphereTime=it
+                    },valueRange=0f..run.durationSeconds.toFloat(),
+                        modifier=Modifier.semantics{contentDescription="Explore spatial impact time"})
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={spherePlaying=!spherePlaying}){
+                            Text(if(spherePlaying)"Pause 3D impact" else "Play 3D impact")
+                        }
+                        OutlinedButton(onClick={spherePlaying=false;sphereTime=0f}){
+                            Text("Reset 3D impact")
+                        }
+                        OutlinedButton(onClick={
+                            sphereSpeed=if(sphereSpeed==0.1f)1f
+                                else if(sphereSpeed==1f)4f else 0.1f
+                        }){Text("Time "+labNumber(sphereSpeed.toDouble())+"×")}
+                    }
+                    OutlinedButton(onClick={
+                        sphereEvidencePicker.launch("world-lab-spatial-sphere-impact.json")
+                    }){Text("Export 3D impact evidence")}
+                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                }
                 Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
                 Text("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.",
                     style=MaterialTheme.typography.bodySmall)
@@ -1358,3 +1514,11 @@ fun NativeWorldLabForm() {
 }
 private fun labNumber(n:Double?):String =
     n?.takeIf{it.isFinite()}?.let{"%.5g".format(Locale.US,it)}?:"Unknown"
+
+private fun nativeLabImpactVelocity(text:String):NativeLabVector {
+    val values=text.split(",").map{it.trim().toDouble()}
+    require(values.size==3&&values.all{it.isFinite()}){
+        "Provide three finite X,Y,Z velocity components separated by commas"
+    }
+    return NativeLabVector(values[0],values[1],values[2])
+}
