@@ -154,12 +154,13 @@ object NativeAnalytics {
         val oldSubject = secureGetString(context, SUBJECT_KEY)
         val subject = oldSubject ?: UUID.randomUUID().toString()
         if (granted) {
+            // Persist the revocable installation ID before asking the server to grant consent.
+            securePutString(context, SUBJECT_KEY, subject)
             post(
                 "/api/analytics/consent",
                 JSONObject().put("subjectId", subject).put("platform", "android")
                     .put("granted", true).put("policyVersion", POLICY_VERSION),
             )
-            securePutString(context, SUBJECT_KEY, subject)
             store.edit().putString(CONSENT_KEY, "granted").apply()
             secureRemove(context, REVOKE_KEY)
         } else {
