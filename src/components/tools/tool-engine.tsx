@@ -108,7 +108,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     case "seo":
       return <SeoEngine op={tool.engine.op} />;
     case "file-converter":
-      return <FileConverterEngine op={tool.engine.op} />;
+      return <FileConverterEngine op={tool.engine.op} toolId={tool.id} />;
     case "developer":
       return <DeveloperEngine op={tool.engine.op} tool={tool} />;
     case "pdf":
