@@ -354,6 +354,7 @@ struct NativeWorldLabView:View {
             Button("Discard and continue",role:.destructive){
                 if pendingReplacement=="new" {newProject()}
                 else if pendingReplacement=="open" {loadSavedProject()}
+                else if pendingReplacement=="open-selected" {openSelectedProject()}
                 else if pendingReplacement=="import" {importing=true}
                 pendingReplacement=""
             }
