@@ -82,6 +82,12 @@ struct NativeWorldLabView:View {
     @State private var gravitySelectedIds:Set<String>=[]
     @State private var gravityDuration=30.0
     @State private var gravitySteps=480
+    @State private var scientificRecordIds:[String]=[]
+    @State private var scientificRecordTitles:[String:String]=[:]
+    @State private var selectedScientificRecordId=""
+    @State private var exportingStoredScientificEvidence=false
+    @State private var storedEvidenceFile:NativeWorldLabJsonFile?
+    @State private var confirmingStoredScienceDelete=false
     @State private var gravityRun:NativeGravityRun?
     @State private var gravityTime=0.0
     @State private var gravityPlaying=false
@@ -148,7 +154,68 @@ struct NativeWorldLabView:View {
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
+    private let savedScience=NativeWorldLabScientificEvidenceStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private func refreshScientificEvidence(){
+        guard let project else{
+            scientificRecordIds=[];scientificRecordTitles=[:];return
+        }
+        do{
+            let records=try savedScience.list(project.id)
+            scientificRecordIds=records.map{$0.id}
+            scientificRecordTitles=Dictionary(uniqueKeysWithValues:records.map{
+                ($0.id,$0.kind+" · "+$0.createdAt)
+            })
+        }catch{problem=error.localizedDescription}
+    }
+    private func retainGravityEvidence(){
+        guard let project,let run=gravityRun else{return}
+        do{
+            _ = try savedScience.saveGravity(run,project:project)
+            refreshScientificEvidence()
+            problem="Gravity evidence preserved in private device history."
+        }catch{problem=error.localizedDescription}
+    }
+    private func retainMaterialHeatEvidence(){
+        guard let project,let run=heatTransferRun else{return}
+        do{
+            _ = try savedScience.saveHeat(run,project:project)
+            refreshScientificEvidence()
+            problem="Invented material heat evidence preserved on this device."
+        }catch{problem=error.localizedDescription}
+    }
+    @ViewBuilder private func scientificEvidenceLibrary(
+        project:NativeWorldLabProject)->some View {
+        Text("Recorded scientific evidence").font(.headline)
+        Text("Private gravity and thermal history. Save the invention "+
+             "first; records are never silently uploaded or overwritten.")
+            .font(.caption).foregroundStyle(.secondary)
+        Button("Refresh scientific history"){refreshScientificEvidence()}
+            .buttonStyle(.bordered)
+        if scientificRecordIds.isEmpty {
+            Text("No recorded gravity or material-contact studies on this device.")
+                .font(.caption)
+        }
+        ForEach(scientificRecordIds,id:\.self){id in
+            VStack(alignment:.leading,spacing:5){
+                Text(scientificRecordTitles[id] ?? id).font(.caption)
+                HStack {
+                    Button("Export"){
+                        do{
+                            let bytes=try savedScience.read(project.id,id)
+                            storedEvidenceFile=NativeWorldLabJsonFile(content:bytes)
+                            selectedScientificRecordId=id
+                            exportingStoredScientificEvidence=true
+                        }catch{problem=error.localizedDescription}
+                    }
+                    Button("Discard",role:.destructive){
+                        selectedScientificRecordId=id
+                        confirmingStoredScienceDelete=true
+                    }
+                }.buttonStyle(.bordered)
+            }
+        }
+    }
     private var materialHeatEvidenceDocument:NativeWorldLabJsonFile? {
         guard let run=heatTransferRun,let bytes=try? JSONEncoder().encode(run) else {
             return nil
@@ -271,6 +338,7 @@ struct NativeWorldLabView:View {
             try localProjects.deleteDraft(current.id)
             savedSnapshot=data;editHistory.clear();problem=""
             refreshSavedProjects();refreshRecoveryDrafts()
+            refreshScientificEvidence()
         }catch{problem=error.localizedDescription}
     }
     private var input:NativeLabInput {
@@ -444,7 +512,8 @@ struct NativeWorldLabView:View {
     }
     private var sceneSettingsView:some View {
         coreView
-        .onAppear{redraw();lastTick=Date();refreshSavedProjects();refreshRecoveryDrafts()}
+        .onAppear{redraw();lastTick=Date();refreshSavedProjects();
+            refreshRecoveryDrafts();refreshScientificEvidence()}
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
         .onChange(of:dropTime){_ in applyDropPosition()}
@@ -478,6 +547,7 @@ struct NativeWorldLabView:View {
         .onChange(of:fluidFraction){_ in hydroRun=nil }
         .onChange(of:projectData){_ in
             scheduleRecoveryDraft()
+            refreshScientificEvidence()
             gravityRun=nil;gravityPlaying=false;gravityTime=0
             heatTransferRun=nil;heatTransferPlaying=false;heatTransferTime=0
             // Never reuse a prior computed trajectory after geometry/material edits.
@@ -487,6 +557,21 @@ struct NativeWorldLabView:View {
             groupPlaying=false;groupRun=nil;groupTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
+        }
+        .confirmationDialog("Discard saved scientific evidence?",
+            isPresented:$confirmingStoredScienceDelete,titleVisibility:.visible){
+            Button("Discard scientific record",role:.destructive){
+                if let project {
+                    do{
+                        try savedScience.delete(project.id,selectedScientificRecordId)
+                        refreshScientificEvidence()
+                        problem="Removed this local scientific record only."
+                    }catch{problem=error.localizedDescription}
+                }
+            }
+            Button("Cancel",role:.cancel){}
+        }message:{
+            Text("The invention and exported files remain unchanged.")
         }
         .confirmationDialog("Discard cached World Lab draft?",
             isPresented:$confirmingDraftDelete,titleVisibility:.visible){
@@ -575,6 +660,12 @@ struct NativeWorldLabView:View {
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingStoredScientificEvidence,
+            document:storedEvidenceFile,contentType:.json,
+            defaultFilename:"world-lab-scientific-evidence"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+                storedEvidenceFile=nil
             }
         .fileExporter(isPresented:$exportingHeatTransfer,
             document:materialHeatEvidenceDocument,contentType:.json,
@@ -1143,6 +1234,7 @@ Text("Invent chemical heat").font(.headline)
         solidGroupSphereContent(project:project)
         solidGravityContent(project:project)
         solidHeatTransferContent(project:project)
+        scientificEvidenceLibrary(project:project)
         solidSphereImpactContent(project:project,solid:solid)
         solidCollisionContent(project:project,solid:solid)
         solidBeamContent(project:project,solid:solid)
@@ -1258,6 +1350,7 @@ Text("Invent chemical heat").font(.headline)
                     updateHeatTransferScene()
                 }
                 Button("Export heat evidence"){exportingHeatTransfer=true}
+                Button("Keep on device"){retainMaterialHeatEvidence()}
             }.buttonStyle(.bordered)
             Picker("Thermal playback speed",selection:$heatTransferSpeed){
                 ForEach([0.1,1.0,5.0,10.0],id:\.self){rate in
@@ -1374,6 +1467,7 @@ Text("Invent chemical heat").font(.headline)
                     gravityPlaying=false;gravityTime=0;updateGravityScene()
                 }
                 Button("Export gravity evidence"){exportingGravityEvidence=true}
+                Button("Keep on device"){retainGravityEvidence()}
             }.buttonStyle(.bordered)
             Picker("Gravity playback speed",selection:$gravityRate){
                 ForEach([0.1,1.0,5.0,10.0],id:\.self){rate in
