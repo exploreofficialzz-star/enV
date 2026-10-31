@@ -115,8 +115,9 @@ enum NativeWorldLabEditor {
                   let gates=networks[index]["gates"] as? [[String:Any]] else {
                 throw NativeWorldLabError.invalid("Unknown digital indicator")
             }
-            let known=inputs.compactMap{$0["id"] as? String}+
-                gates.compactMap{$0["id"] as? String}
+            let inputIds=inputs.compactMap{$0["id"] as? String}
+            let gateIds=gates.compactMap{$0["id"] as? String}
+            let known=inputIds+gateIds
             guard known.contains(sourceNodeId) else {
                 throw NativeWorldLabError.invalid(
                     "Digital indicator must read an existing switch or gate")
