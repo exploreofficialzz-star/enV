@@ -65,6 +65,72 @@ object NativeWorldLabEditor {
                         .put("positiveNodeId","supply").put("negativeNodeId","ground")
                         .put("resistanceOhm",100.0))))
         }
+    fun addCircuitNode(source:String,label:String,id:String=UUID.randomUUID().toString()):String =
+        edit(source){project->
+            val title=label.trim()
+            require(title.isNotEmpty()&&title.length<=80){"A wire junction needs a short name"}
+            val network=project.getJSONArray("networks").getJSONObject(0)
+            val nodes=network.getJSONArray("nodes")
+            require(nodes.length()<24){"Circuit supports at most 24 electrical nodes"}
+            require((0 until nodes.length()).none{nodes.getJSONObject(it).getString("id")==id}){
+                "Duplicate wire junction ID"
+            }
+            nodes.put(JSONObject().put("id",id).put("label",title))
+        }
+    fun addCircuitResistor(source:String,positive:String,negative:String,
+        resistanceOhm:Double=200.0,id:String=UUID.randomUUID().toString()):String =
+        edit(source){project->
+            require(resistanceOhm.isFinite()&&resistanceOhm in 0.01..1e9){
+                "Resistance must be a bounded, positive Ohmic assumption"
+            }
+            val network=project.getJSONArray("networks").getJSONObject(0)
+            val nodes=network.getJSONArray("nodes")
+            val ids=(0 until nodes.length()).map{nodes.getJSONObject(it).getString("id")}
+            require(positive in ids&&negative in ids&&positive!=negative){
+                "Connect two different existing node terminals"
+            }
+            val components=network.getJSONArray("components")
+            require(components.length()<48 && (0 until components.length()).none{
+                components.getJSONObject(it).getString("id")==id
+            }){"The resistor ID or component capacity is invalid"}
+            components.put(JSONObject().put("id",id).put("kind","resistor")
+                .put("positiveNodeId",positive).put("negativeNodeId",negative)
+                .put("resistanceOhm",resistanceOhm))
+        }
+    fun rewireCircuitPart(source:String,id:String,positive:String,negative:String):String =
+        edit(source){project->
+            val network=project.getJSONArray("networks").getJSONObject(0)
+            val nodes=network.getJSONArray("nodes")
+            val nodeIds=(0 until nodes.length()).map{nodes.getJSONObject(it).getString("id")}
+            require(positive in nodeIds&&negative in nodeIds&&positive!=negative){
+                "Component terminals must connect different real nodes"
+            }
+            val parts=network.getJSONArray("components")
+            val index=(0 until parts.length()).firstOrNull{
+                parts.getJSONObject(it).getString("id")==id
+            }?:error("Selected circuit part no longer exists")
+            parts.getJSONObject(index).put("positiveNodeId",positive)
+                .put("negativeNodeId",negative)
+        }
+    fun removeUnusedCircuitNode(source:String,id:String):String=edit(source){project->
+        val network=project.getJSONArray("networks").getJSONObject(0)
+        require(id!=network.getString("groundNodeId")){"Ground cannot be removed"}
+        val nodes=network.getJSONArray("nodes")
+        require(nodes.length()>2){"At least two electrical nodes are required"}
+        val parts=network.getJSONArray("components")
+        require((0 until parts.length()).none{
+            val part=parts.getJSONObject(it)
+            part.getString("positiveNodeId")==id||part.getString("negativeNodeId")==id
+        }){"Unwire every component before removing this node"}
+        val remaining=JSONArray()
+        var removed=false
+        for(i in 0 until nodes.length()){
+            val node=nodes.getJSONObject(i)
+            if(node.getString("id")==id)removed=true else remaining.put(node)
+        }
+        require(removed){"Wire junction does not exist"}
+        network.put("nodes",remaining)
+    }
     fun addParallelCircuitResistor(source:String):String=edit(source){root->
         val networks=root.getJSONArray("networks")
         require(networks.length()>0)

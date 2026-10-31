@@ -70,6 +70,9 @@ fun NativeWorldLabForm() {
     var deviceName by remember { mutableStateOf("") }
     var deviceAssumption by remember { mutableStateOf("") }
     var deviceResistance by remember { mutableStateOf("") }
+    var junctionName by remember { mutableStateOf("") }
+    var positiveWire by remember { mutableStateOf("supply") }
+    var negativeWire by remember { mutableStateOf("ground") }
     var selected by remember { mutableIntStateOf(0) }
     var hydroRun by remember { mutableStateOf<NativeLabHydroResult?>(null) }
     var fluidDensity by remember { mutableStateOf(1000.0) }
@@ -380,6 +383,62 @@ fun NativeWorldLabForm() {
                 }
                 Text("A new material has no electrical law unless you explicitly assume one.",
                     style=MaterialTheme.typography.bodySmall)
+                Text("Connect more parts and wires",style=MaterialTheme.typography.titleSmall)
+                OutlinedTextField(value=junctionName,onValueChange={junctionName=it},
+                    label={Text("New junction name")},singleLine=true)
+                OutlinedButton(onClick={
+                    applyProjectEdit{NativeWorldLabEditor.addCircuitNode(it,junctionName)}
+                    junctionName=""
+                },enabled=junctionName.isNotBlank()&&net.nodes.size<24){
+                    Text("Add wire junction")
+                }
+                net.nodes.forEach{node->
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        Text(node.label,modifier=Modifier.weight(1f))
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.removeUnusedCircuitNode(it,node.id)
+                        }},enabled=net.nodes.size>2&&node.id!=net.groundNodeId&&
+                            net.components.none{
+                                it.positiveNodeId==node.id||it.negativeNodeId==node.id
+                            }){Text("Remove unused")}
+                    }
+                }
+                fun cycleWire(current:String,exclude:String):String{
+                    val candidates=net.nodes.map{it.id}.filter{it!=exclude}
+                    val pos=candidates.indexOf(current)
+                    return candidates[(pos+1).coerceAtLeast(0)%candidates.size]
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={
+                        positiveWire=cycleWire(positiveWire,negativeWire)
+                    }){Text("From: "+(net.nodes.firstOrNull{it.id==positiveWire}?.label?:"Choose"))}
+                    OutlinedButton(onClick={
+                        negativeWire=cycleWire(negativeWire,positiveWire)
+                    }){Text("To: "+(net.nodes.firstOrNull{it.id==negativeWire}?.label?:"Choose"))}
+                }
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.addCircuitResistor(it,positiveWire,negativeWire)
+                }},enabled=net.components.size<48&&positiveWire!=negativeWire&&
+                    net.nodes.any{it.id==positiveWire}&&net.nodes.any{it.id==negativeWire}){
+                    Text("Connect 200 Ω resistor")
+                }
+                net.components.forEach{part->
+                    Text((if(part.kind=="dc-source")"Source" else part.name?:part.kind)+
+                        " · "+part.positiveNodeId+" → "+part.negativeNodeId,
+                        style=MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.rewireCircuitPart(it,part.id,
+                                cycleWire(part.positiveNodeId,part.negativeNodeId),
+                                part.negativeNodeId)
+                        }}){Text("Change from")}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.rewireCircuitPart(it,part.id,
+                                part.positiveNodeId,
+                                cycleWire(part.negativeNodeId,part.positiveNodeId))
+                        }}){Text("Change to")}
+                    }
+                }
                 net.components.filter{it.kind=="dc-source"||it.kind=="resistor"}.forEach{part->
                     Text((if(part.kind=="dc-source")"Voltage: " else "Resistance: ")+
                         labNumber(part.voltageV?:part.resistanceOhm)+

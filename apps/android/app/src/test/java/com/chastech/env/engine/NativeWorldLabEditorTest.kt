@@ -48,6 +48,25 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.positionSolid(json,"a",listOf(Double.NaN,0.0,0.0))
         }
     }
+    @Test fun wiredSeriesNetworkUsesActualNativeJunctionsAndConservesPower(){
+        var json=NativeWorldLabEditor.addStarterCircuit(NativeWorldLabEditor.blank())
+        json=NativeWorldLabEditor.addCircuitNode(json,"Middle",id="middle")
+        json=NativeWorldLabEditor.rewireCircuitPart(json,"load","supply","middle")
+        json=NativeWorldLabEditor.addCircuitResistor(
+            json,"middle","ground",200.0,id="series-load")
+        val p=NativeWorldLabProjectCodec.decode(json)
+        val run=NativeWorldLabDc.solve(p.networks.first(),p)
+        assertEquals(6.0,run.nodeVoltagesV["middle"]!!,1e-10)
+        assertEquals(0.03,run.branchCurrentsA["load"]!!,1e-10)
+        assertEquals(0.03,run.branchCurrentsA["series-load"]!!,1e-10)
+        assertEquals(0.0,run.powerResidualW,1e-10)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.removeUnusedCircuitNode(json,"middle")
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.rewireCircuitPart(json,"load","middle","middle")
+        }
+    }
     @Test fun rejectsWrongShapeBadDimensionsDanglingMaterialsAndUntrustedNames(){
         val initial=fixture()
         assertThrows(IllegalArgumentException::class.java){

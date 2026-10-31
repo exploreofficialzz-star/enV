@@ -288,3 +288,7 @@ release-candidate evidence bundle are unfinished.
 
 - The advanced Web circuit editor now adds bounded named node junctions, supports connecting resistors across any two distinct existing nodes, rewires actual source/resistor/hypothetical terminals, and removes only electrically unused nodes. No fake visual crossings are introduced; existing multi-node topology list displays real graph connections. The DC solver already handles arbitrary connected nodal networks via MNA; series-voltage-divider and Kirchhoff conservation regressions are authored and registered for later CI.
 - Existing portable schema/strict native parsers continue to accept graph edits from imported JSON. Native graphical arbitrary-node authoring remains unimplemented and will require separate UIKit/Compose integration; no claim of complete parity or finished electronics made.
+
+## Android native multi-node wiring (2026-10-31)
+
+- Kotlin project editors now add named circuit junctions, add resistors across chosen nodes, rewire either component terminal and safely delete only unused non-ground nodes. Compose includes an advanced node/terminal panel with touch-oriented controls, preserving all native project validation and scientific result invalidation. Regression source covers a real 9V 100Ω+200Ω series divider (6V intermediate node, 30mA current) and rejects dangling terminal edits. Build/test audit deferred per requested build-first sequence.
