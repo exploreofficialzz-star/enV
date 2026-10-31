@@ -307,6 +307,10 @@ class NativeWorldLabScienceTest {
         assertEquals("env-world-lab-multi-sphere-impact",evidence.getString("format"))
         assertEquals("hypothetical-user-assumed",evidence.getString("materialEvidence"))
         assertEquals(2,evidence.getJSONArray("events").length())
+        val lastEvidence=evidence.getJSONArray("events").getJSONObject(1)
+        assertEquals(run.finalEnergyJ,lastEvidence.getDouble("totalEnergyAfterJ"),1e-9)
+        val lastMomentum=lastEvidence.getJSONArray("totalMomentumAfterKgMps")
+        assertEquals(run.finalMomentum.x,lastMomentum.getDouble(0),1e-9)
         assertThrows(IllegalArgumentException::class.java){
             NativeWorldLabMultiSphere.evaluate(project,initial,-1.0)
         }
