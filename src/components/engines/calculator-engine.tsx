@@ -8,6 +8,7 @@ import { CalcInputError, isBlank } from "@/lib/calc/numeric";
 import { DEFAULT_DISPLAY, applyDisplaySettings, buildCalculationSummary, describeOutput, type DisplaySettings } from "@/lib/calc/display";
 import { calculators, type CalcOutput } from "@/lib/engines/formulas";
 import { runOfflineMeteredOperationIfSelected } from "@/lib/billing/offline-client";
+import { recordToolExecutionResult } from "@/lib/analytics/client";
 import { Clock3, RotateCcw, Trash2, X } from "lucide-react";
 
 type CalcError = { message: string; /** Name of the input the error is about, when known. */ field: string | null };
@@ -53,6 +54,7 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
 
   const run = async () => {
     if (!def || isRunning) return;
+    const startedAt = Date.now();
     setIsRunning(true);
     try {
       const missing = fields.find((field) => field.type !== "select" && !/\boptional\b/i.test(`${field.label} ${field.hint ?? ""}`) && isBlank(values[field.name]));
@@ -83,12 +85,14 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
         values: { ...values },
       };
       setHistory((items) => [item, ...items].slice(0, 5));
+      if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "calculation");
     } catch (e) {
       const reference = e instanceof CalcInputError ? e.field : undefined;
       const target = reference ? fields.find((field) => field.name === reference || field.label === reference) : undefined;
       setComputed(null);
       setStatus("");
       setError({ message: e instanceof Error ? e.message : "Could not calculate. Check your inputs.", field: target?.name ?? null });
+      if (toolId) recordToolExecutionResult(toolId, "failure", Date.now() - startedAt, "calculation", e instanceof CalcInputError ? "INPUT_VALIDATION_FAILED" : "CALCULATION_FAILED");
     } finally {
       setIsRunning(false);
     }

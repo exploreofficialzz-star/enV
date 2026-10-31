@@ -6,6 +6,7 @@ import {
   type OfflineTransactionRecord,
 } from "./offline-protocol";
 import eligibleTools from "../../data/offline-eligible-tools.json";
+import { recordAnalyticsEvent } from "../analytics/client";
 
 type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number }[] };
 const offlineEligibleTools = eligibleTools as EligibleToolsIndex;
@@ -681,7 +682,7 @@ export async function requestWebOfflineAllowance(input: { requestedSubunits: num
 }
 
 /** Send the persisted, retry-safe batch and acknowledge records only after server confirmation. */
-export async function synchronizeWebOfflineAllowance(allowanceId: string, finalize = false) {
+async function synchronizeWebOfflineAllowanceInternal(allowanceId: string, finalize = false) {
   if (finalize) {
     const statusResponse = await fetch("/api/billing/offline/status", { credentials: "same-origin", headers: { accept: "application/json" } });
     const statusPayload = await statusResponse.json().catch(() => null) as { ok?: boolean; data?: { enabled?: boolean; code?: string }; message?: string } | null;
@@ -730,6 +731,34 @@ export async function synchronizeWebOfflineAllowance(allowanceId: string, finali
   }
   await acknowledgeOfflineSyncBatch(allowanceId, batch.batchId, payload.data.status, batch.checkpointSequence);
   return payload.data;
+}
+
+/** Observe only the server-confirmed sync result; telemetry must never alter wallet accounting. */
+export async function synchronizeWebOfflineAllowance(allowanceId: string, finalize = false) {
+  const recordOutcome = (success: boolean, errorCode?: string) => {
+    try {
+      recordAnalyticsEvent({
+        name: success ? "offline_sync_succeeded" : "offline_sync_failed",
+        outcome: success ? "success" : "failure",
+        ...(errorCode ? { errorCode } : {}),
+        properties: { surface: "wallet" },
+      });
+    } catch {
+      // Optional telemetry must never affect the signed local journal or server acknowledgement.
+    }
+  };
+  try {
+    const result = await synchronizeWebOfflineAllowanceInternal(allowanceId, finalize);
+    if (result.status === "needs_recovery" || ("retryable" in result && result.retryable === true)) {
+      recordOutcome(false, "OFFLINE_RECOVERY_REQUIRED");
+    } else {
+      recordOutcome(true);
+    }
+    return result;
+  } catch (error) {
+    recordOutcome(false, error instanceof OfflineClientError && /^[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : "OFFLINE_SYNC_FAILED");
+    throw error;
+  }
 }
 
 /** Retry selected local records after reconnect/reload. This function never finalizes an

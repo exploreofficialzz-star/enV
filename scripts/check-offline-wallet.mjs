@@ -152,8 +152,12 @@ for (const phrase of ["billing_offline_sync_batches", "billing_security_rate_lim
 }
 assert.ok(crypto.includes("timingSafeEqual") && crypto.includes("createPublicKey") && crypto.includes("ieee-p1363"), "Token MAC comparison / native and WebCrypto signature verification required.");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
-assert.ok(iosProject.includes("OfflineWalletNativeAPI.swift in Sources") && iosProject.includes("path = OfflineWalletNativeAPI.swift") &&
-  iosProject.includes("D30000000000000000000004); runOnlyForDeploymentPostprocessing = 0; };"),
+const iosAppSourcesBuildPhase = iosProject.match(
+  /C50000000000000000000002 \/\* App Sources \*\/ = \{isa = PBXSourcesBuildPhase;[\s\S]*?\};/,
+)?.[0] ?? "";
+assert.ok(iosProject.includes("OfflineWalletNativeAPI.swift in Sources") &&
+  iosProject.includes("path = OfflineWalletNativeAPI.swift") &&
+  /files = \([^)]*\bD30000000000000000000004\b[^)]*\);/.test(iosAppSourcesBuildPhase),
   "The native iOS transport must be part of the Xcode application Sources build phase, not just present on disk.");
 const androidNativeScreen = read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
 assert.ok(androidNativeScreen.includes("import androidx.compose.material3.AlertDialog") &&
@@ -189,9 +193,19 @@ assert.ok(webClient.includes("Atomically reserve a stable batch ID") && webClien
 assert.ok(webClient.includes("ALLOWANCE_REPLAY_CONFLICT") && webClient.includes("A replayed server issue response must never reset a local spent balance") &&
   webClient.includes("OFFLINE_ACKNOWLEDGEMENT_FAILED") && webClient.includes('current.status !== "finishing"'),
   "Web allowance replay, signature persistence, and server acknowledgements must preserve the durable journal state.");
-const webSyncMethod = webClient.slice(webClient.indexOf("export async function synchronizeWebOfflineAllowance"), webClient.indexOf("export async function reportWebOfflineAllowanceLost"));
-assert.ok(webSyncMethod.includes("safe idempotent retry") && !webSyncMethod.includes("objectStore(\"transactions\").delete"),
-  "Web repairable rejections must keep transaction rows intact while rotating only the saved batch envelope.");
+const webSyncStart = webClient.indexOf("async function synchronizeWebOfflineAllowanceInternal");
+const webSyncEnd = webClient.indexOf("/** Observe only the server-confirmed sync result", webSyncStart);
+const webSyncMethod = webClient.slice(webSyncStart, webSyncEnd);
+const webAcknowledgementStart = webClient.indexOf("export async function acknowledgeOfflineSyncBatch");
+const webAcknowledgementEnd = webClient.indexOf("/** Request a server reservation", webAcknowledgementStart);
+const webAcknowledgementMethod = webClient.slice(webAcknowledgementStart, webAcknowledgementEnd);
+assert.ok(webSyncStart >= 0 && webSyncEnd > webSyncStart &&
+  webSyncMethod.includes("safe idempotent retry") &&
+  webSyncMethod.includes("allowance.pendingBatch = undefined") &&
+  !webSyncMethod.includes('objectStore("transactions").delete') &&
+  webAcknowledgementMethod.includes('resultStatus !== "syncing" && resultStatus !== "reconciled"') &&
+  webAcknowledgementMethod.includes('tx.objectStore("transactions").delete'),
+  "Web repairable rejections must preserve transaction rows; row deletion is allowed only after durable server acknowledgement.");
 assert.ok(!webClient.includes("allowance.spentSubunits += row.reservedSubunits;\n          if (input.outcome === \"succeeded\")"), "Failed-operation outcome must not refund its reservation.");
 
 const syncRoute = read("server/routes/api/billing/offline/sync.post.ts");
@@ -254,7 +268,7 @@ assert.ok(rewardsMigration.includes("billing_reward_events") && rewardsServer.in
   paystackServer.includes("verifyAndCreditPaystackReference"),
   "Reward attribution and deposits must use server-side verification, signed video attribution and idempotent event records.");
 const webIssueFunction = webClient.slice(webClient.indexOf("export async function requestWebOfflineAllowance"), webClient.indexOf("/** Send the persisted, retry-safe batch"));
-const webSyncFunction = webClient.slice(webClient.indexOf("export async function synchronizeWebOfflineAllowance"), webClient.indexOf("/** Retry selected local records"));
+const webSyncFunction = webSyncMethod;
 assert.ok(webIssueFunction.includes("/api/billing/offline/allowances") && webIssueFunction.includes("requestedSubunits: input.requestedSubunits") &&
   webIssueFunction.includes("idempotencyKey: input.idempotencyKey") && webIssueFunction.includes("publicKeyJwk: key.publicKeyJwk"),
   "The Web client must send the server's complete, idempotent allowance-issuance contract.");

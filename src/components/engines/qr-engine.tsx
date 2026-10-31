@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { recordToolExecutionResult } from "@/lib/analytics/client";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { downloadBlob, downloadText } from "@/lib/utils";
@@ -147,7 +148,7 @@ function approxVersion(length: number, level: string) {
   return Math.min(40, Math.max(1, Math.ceil(length / (factor * 20))));
 }
 
-export function QrEngine({ preset }: { preset: string }) {
+export function QrEngine({ preset, toolId }: { preset: string; toolId?: string }) {
   const fieldPreset = ["high-error", "low-error"].includes(preset) ? "text" : preset;
   const fields = ["size", "version", "capacity"].includes(preset) ? [] : (COMMON_FIELDS[fieldPreset] ?? COMMON_FIELDS.text);
   const defaults = useMemo(() => Object.fromEntries(fields.map((f) => [f.name, String(f.defaultValue ?? "")])), [fields]);
@@ -159,33 +160,34 @@ export function QrEngine({ preset }: { preset: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
+    const startedAt = Date.now();
     try {
       setError(null); setInfo(null); setBatch([]); setUrl(null); setSvg("");
       const inputError = qrInputError(preset, vals);
       if (inputError) throw new Error(inputError);
       if (preset === "size") {
         const modules = Number(vals.modules || 21); const modulePx = Number(vals.modulePx || 4);
-        setInfo(`${modules} modules × ${modulePx}px = ${modules * modulePx}px before quiet-zone margin.`); return;
+        setInfo(`${modules} modules × ${modulePx}px = ${modules * modulePx}px before quiet-zone margin.`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "qr_calculation"); return;
       }
       if (preset === "version") {
-        setInfo(`Estimated QR version: ${approxVersion((vals.text || "").length, vals.level || "M")} for ${vals.level || "M"} error correction. Actual version depends on encoding mode and content.`); return;
+        setInfo(`Estimated QR version: ${approxVersion((vals.text || "").length, vals.level || "M")} for ${vals.level || "M"} error correction. Actual version depends on encoding mode and content.`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "qr_calculation"); return;
       }
       if (preset === "capacity") {
         const version = Math.min(40, Math.max(1, Number(vals.version || 1))); const level = vals.level || "M";
         const cap = Math.max(10, Math.floor(version * version * 18 * ({L:1,M:.8,Q:.65,H:.5} as Record<string,number>)[level]));
-        setInfo(`Approximate alphanumeric capacity for version ${version} / ${level}: about ${cap} characters. This is a planning estimate, not the QR standard's exact byte table.`); return;
+        setInfo(`Approximate alphanumeric capacity for version ${version} / ${level}: about ${cap} characters. This is a planning estimate, not the QR standard's exact byte table.`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "qr_calculation"); return;
       }
       if (preset === "inspect") {
         const p = vals.payload || "";
         if (!p.trim()) throw new Error("Enter a QR payload to inspect.");
         const kind = p.startsWith("WIFI:") ? "Wi-Fi" : p.startsWith("BEGIN:VCARD") ? "vCard" : p.startsWith("BEGIN:VEVENT") ? "Calendar event" : p.startsWith("mailto:") ? "Email" : p.startsWith("tel:") ? "Phone" : p.startsWith("sms:") ? "SMS" : p.startsWith("geo:") ? "Location" : p.startsWith("bitcoin:") ? "Bitcoin payment" : /^https?:\/\//i.test(p) ? "URL" : "Plain text";
-        setInfo(`Detected payload type: ${kind}. Length: ${p.length} characters.`); return;
+        setInfo(`Detected payload type: ${kind}. Length: ${p.length} characters.`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "qr_inspection"); return;
       }
       const QR = await import("qrcode");
       if (preset === "batch") {
         const items = (vals.items || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
         const outputs = await Promise.all(items.map((x) => QR.toDataURL(x, { width: 320, margin: 1 })));
-        setBatch(outputs); setInfo(`Generated ${outputs.length} QR codes locally.`); return;
+        setBatch(outputs); setInfo(`Generated ${outputs.length} QR codes locally.`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "qr_generation"); return;
       }
       const data = payloadFor(preset === "styled" ? "text" : preset, vals);
       if (!data.trim()) throw new Error("Enter something to encode.");
@@ -201,7 +203,11 @@ export function QrEngine({ preset }: { preset: string }) {
         setUrl(await QR.toDataURL(data, opts));
         setInfo(`Encoded ${data.length} characters using error correction ${level}.`);
       }
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not generate the QR code."); }
+      if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "qr_generation");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not generate the QR code.");
+      if (toolId) recordToolExecutionResult(toolId, "failure", Date.now() - startedAt, "qr_generation", "QR_GENERATION_FAILED");
+    }
   };
 
   return <div className="space-y-4">
@@ -218,21 +224,22 @@ export function QrEngine({ preset }: { preset: string }) {
   </div>;
 }
 
-export function BarcodeEngine({ format }: { format: string }) {
+export function BarcodeEngine({ format, toolId }: { format: string; toolId?: string }) {
   const [value, setValue] = useState(() => initialBarcodeValue(format));
   const [error, setError] = useState<string | null>(null);
   const [svg, setSvg] = useState("");
   const [result, setResult] = useState<string | null>(null);
 
   const run = async () => {
+    const startedAt = Date.now();
     try {
       setError(null); setResult(null); setSvg("");
       if (["gtin-validator","ean13-check","upc-check","isbn-check"].includes(format)) {
-        if (format === "gtin-validator") { const r = validateGtin(value); setResult(`${r.valid ? "Valid" : "Invalid"}: ${r.message}`); return; }
+        if (format === "gtin-validator") { const r = validateGtin(value); setResult(`${r.valid ? "Valid" : "Invalid"}: ${r.message}`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "barcode_validation"); return; }
         const digits = value.replace(/\D/g, "");
         const body = format === "upc-check" ? digits.slice(0, 11) : format === "ean13-check" || format === "isbn-check" ? digits.slice(0, 12) : digits.slice(0, -1);
         const d = checkDigit(body); if (d === null) throw new Error("Enter numeric digits.");
-        setResult(`Calculated check digit: ${d}. ${digits.length ? `Supplied check digit: ${digits.at(-1) ?? "—"}.` : ""}`); return;
+        setResult(`Calculated check digit: ${d}. ${digits.length ? `Supplied check digit: ${digits.at(-1) ?? "—"}.` : ""}`); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "barcode_validation"); return;
       }
       const JsBarcode = (await import("jsbarcode")).default;
       const doc = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -245,7 +252,11 @@ export function BarcodeEngine({ format }: { format: string }) {
       JsBarcode(doc, format === "isbn" ? clean.replace(/^ISBN(?:-13)?:?/i, "") : clean, { format: fmt, displayValue: true, font: "monospace", height: 80, margin: 8, width: 2 });
       const markup = new XMLSerializer().serializeToString(doc);
       setSvg(markup);
-    } catch (e) { setError(e instanceof Error ? e.message : "Invalid barcode value for this format."); }
+      if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "barcode_generation");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Invalid barcode value for this format.");
+      if (toolId) recordToolExecutionResult(toolId, "failure", Date.now() - startedAt, "barcode_generation", "BARCODE_GENERATION_FAILED");
+    }
   };
 
   return <div className="space-y-4">

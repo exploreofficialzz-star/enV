@@ -217,6 +217,9 @@ struct ToolDetailView: View {
                 }
                 .padding(.top, 40)
 
+                ToolCommunityPanel(toolID: tool.id)
+                    .padding(.top, 26)
+
                 if !allRelatedTools.isEmpty {
                     enVCharacterSpacedText("Related tools")
                         .font(.envScaled(size: 18, weight: .semibold))
@@ -265,7 +268,11 @@ struct ToolDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isToolFullscreen ? .hidden : .visible, for: .navigationBar)
         .statusBarHidden(isToolFullscreen)
-        .onAppear { store.recordRecent(tool.id) }
+        .onAppear {
+            store.recordRecent(tool.id)
+            NativeAnalyticsClient.record("tool_viewed", toolID: tool.id)
+            Task { try? await NativeAnalyticsClient.flush() }
+        }
         .fullScreenCover(isPresented: $isToolFullscreen) {
             ToolFullscreenContainer(toolName: tool.name) {
                 toolInterface.environment(\.musicSandboxFullscreen, true)
@@ -291,7 +298,7 @@ struct ToolDetailView: View {
                         : "This tool is available in the Web product and is not executable natively.")
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
-                    if !tool.isPlanned, let webURL = URL(string: "https://envtools.store/tools/\(tool.category)/\(tool.slug)") {
+                    if !tool.isPlanned, let webURL = URL(string: "https://ios.envtools.store/tools/\(tool.category)/\(tool.slug)") {
                         Link("Open in Web", destination: webURL)
                             .font(.envScaled(size: 14, weight: .semibold))
                             .accessibilityHint("Opens this tool in your default web browser")
@@ -424,6 +431,397 @@ private struct ToolFullscreenContainer<Content: View>: View {
     }
 }
 
+
+// MARK: - Native tool discussions
+
+private struct NativeCommunityCounts: Decodable {
+    let comments: Int
+    let likes: Int
+    let dislikes: Int
+    let views: Int
+    let views30Days: Int
+}
+
+private struct NativeCommunityComment: Decodable, Identifiable {
+    let id: String
+    let parentId: String?
+    let body: String
+    let authorLabel: String
+    let identityMode: String
+    let createdAt: String
+    let isMine: Bool
+}
+
+private struct NativeCommunityFeedData: Decodable {
+    let toolId: String
+    let counts: NativeCommunityCounts
+    let myReaction: String?
+    let comments: [NativeCommunityComment]
+}
+
+private struct NativeCommunityFeedEnvelope: Decodable {
+    let ok: Bool
+    let data: NativeCommunityFeedData?
+}
+
+private enum NativeCommunityClient {
+    static var baseURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
+              let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else { return nil }
+        return url
+    }
+
+    static func feed(toolID: String, visitorID: String) async throws -> NativeCommunityFeedData {
+        guard let base = baseURL else { throw URLError(.badURL) }
+        var components = URLComponents(url: base.appendingPathComponent("api").appendingPathComponent("community"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "toolId", value: toolID),
+            URLQueryItem(name: "visitorId", value: visitorID)
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+        let data = try await perform(URLRequest(url: url))
+        let envelope = try JSONDecoder().decode(NativeCommunityFeedEnvelope.self, from: data)
+        guard envelope.ok, let result = envelope.data else { throw URLError(.cannotParseResponse) }
+        return result
+    }
+
+    static func post(_ endpoint: String, payload: [String: Any]) async throws {
+        guard let base = baseURL else { throw URLError(.badURL) }
+        let url = endpoint.split(separator: "/").reduce(base) { $0.appendingPathComponent(String($1)) }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 25
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        _ = try await perform(request)
+    }
+
+    private static func perform(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        guard (200...299).contains(http.statusCode) else {
+            let payload = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let message = payload?["message"] as? String ?? "Tool discussions are temporarily unavailable."
+            throw NSError(domain: "enVCommunity", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        return data
+    }
+}
+
+private enum NativeCommunityIdentity {
+    static var visitorID: String {
+        let key = "env.community.visitor.v1"
+        if let existing = UserDefaults.standard.string(forKey: key),
+           UUID(uuidString: existing) != nil {
+            return existing.lowercased()
+        }
+        let created = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(created, forKey: key)
+        return created
+    }
+}
+
+struct ToolCommunityPanel: View {
+    let toolID: String
+
+    @State private var visitorID = NativeCommunityIdentity.visitorID
+    @State private var feed: NativeCommunityFeedData?
+    @State private var loading = true
+    @State private var enabled = true
+    @State private var isSending = false
+    @State private var commentText = ""
+    @State private var publicIdentity = false
+    @State private var displayName = ""
+    @State private var replyTo: String?
+    @State private var reportTarget: NativeCommunityComment?
+    @State private var showingReportOptions = false
+    @State private var notice: String?
+    @State private var errorMessage: String?
+
+    private let reportReasons = ["spam", "harassment", "misinformation", "inappropriate", "other"]
+
+    private var rootComments: [NativeCommunityComment] {
+        (feed?.comments ?? []).filter { $0.parentId == nil }
+    }
+
+    private var communityHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                enVCharacterSpacedText("Community")
+                    .font(.envScaled(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("Discuss this tool with other users.")
+                    .font(.envScaled(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+            }
+            Spacer()
+            Button("Refresh") { Task { await refresh() } }
+                .font(.envScaled(size: 12, weight: .semibold))
+                .disabled(loading)
+        }
+    }
+
+    private var reactionBar: some View {
+        HStack(spacing: 8) {
+            Button { Task { await react("like") } } label: {
+                Label("\(feed?.counts.likes ?? 0)", systemImage: "hand.thumbsup")
+                    .font(.envScaled(size: 13, weight: .medium))
+                    .foregroundStyle(feed?.myReaction == "like" ? Color.envAccent : Color.envInk)
+                    .padding(.horizontal, 11).padding(.vertical, 8)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+            }.buttonStyle(.plain)
+            Button { Task { await react("dislike") } } label: {
+                Label("\(feed?.counts.dislikes ?? 0)", systemImage: "hand.thumbsdown")
+                    .font(.envScaled(size: 13, weight: .medium))
+                    .foregroundStyle(feed?.myReaction == "dislike" ? Color.envAccent : Color.envInk)
+                    .padding(.horizontal, 11).padding(.vertical, 8)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+            }.buttonStyle(.plain)
+            enVCharacterSpacedText("\(feed?.counts.views ?? 0) views")
+                .font(.envScaled(size: 11, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+        }
+    }
+
+    private var commentComposer: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            enVCharacterSpacedText(replyTo == nil ? "Join the discussion" : "Write a reply")
+                .font(.envScaled(size: 14, weight: .semibold))
+                .foregroundStyle(Color.envInk)
+            if replyTo != nil {
+                HStack {
+                    enVCharacterSpacedText("Replying to a comment")
+                        .font(.envScaled(size: 12, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                    Spacer()
+                    Button("Cancel") { replyTo = nil }
+                        .font(.envScaled(size: 12, weight: .medium))
+                }
+            }
+            TextEditor(text: $commentText)
+                .font(.envScaled(size: 14, weight: .regular))
+                .frame(minHeight: 90, maxHeight: 150)
+                .padding(7)
+                .scrollContentBackground(.hidden)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                .onChange(of: commentText) { value in
+                    if value.count > 2000 { commentText = String(value.prefix(2000)) }
+                }
+            HStack(spacing: 8) {
+                Button { publicIdentity.toggle() } label: {
+                    Label(publicIdentity ? "Display name" : "Anonymous", systemImage: publicIdentity ? "person" : "person.crop.circle")
+                        .font(.envScaled(size: 12, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                Spacer()
+                enVCharacterSpacedText("\(commentText.count)/2000")
+                    .font(.envScaled(size: 10, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                Button { Task { await submitComment() } } label: {
+                    Label(isSending ? "Posting…" : "Post", systemImage: "paperplane")
+                        .font(.envScaled(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 9))
+                }
+                .buttonStyle(.plain)
+                .disabled(isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
+            }
+            if publicIdentity {
+                TextField("Choose a public display name", text: $displayName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.envScaled(size: 14, weight: .regular))
+                    .onChange(of: displayName) { value in
+                        if value.count > 32 { displayName = String(value.prefix(32)) }
+                    }
+            }
+            enVCharacterSpacedText("Anonymous hides your display name, not the private abuse-prevention record. Never post passwords or payment details.")
+                .font(.envScaled(size: 10, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+        }
+        .padding(12)
+        .background(Color.envSurface2.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var commentFeed: some View {
+        if loading && feed == nil {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 14)
+        } else if rootComments.isEmpty {
+            enVCharacterSpacedText("No comments yet. Start the discussion.")
+                .font(.envScaled(size: 13, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .frame(maxWidth: .infinity).padding(.vertical, 18)
+        } else {
+            ForEach(rootComments) { comment in
+                commentCard(comment)
+                ForEach((feed?.comments ?? []).filter { $0.parentId == comment.id }) { reply in
+                    commentCard(reply, nested: true)
+                }
+            }
+        }
+    }
+
+    var body: some View {
+        Group {
+            if enabled {
+                VStack(alignment: .leading, spacing: 14) {
+                    communityHeader
+                    reactionBar
+                    commentComposer
+                    if let notice {
+                        enVCharacterSpacedText(notice)
+                            .font(.envScaled(size: 12, weight: .medium))
+                            .foregroundStyle(Color.envAccent)
+                    }
+                    if let errorMessage {
+                        enVCharacterSpacedText(errorMessage)
+                            .font(.envScaled(size: 12, weight: .regular))
+                            .foregroundStyle(Color.red)
+                    }
+                    commentFeed
+                }
+                .padding(16)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                .confirmationDialog("Report this comment", isPresented: $showingReportOptions, titleVisibility: .visible) {
+                    ForEach(reportReasons, id: \.self) { reason in
+                        Button(reason.capitalized) {
+                            guard let comment = reportTarget else { return }
+                            Task { await report(comment.id, reason: reason) }
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { reportTarget = nil }
+                }
+                .task(id: toolID) { await refresh() }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func commentCard(_ comment: NativeCommunityComment, nested: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                enVCharacterSpacedText(comment.authorLabel + (comment.isMine ? " · You" : ""))
+                    .font(.envScaled(size: nested ? 11 : 12, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                Spacer()
+                if !nested && !comment.isMine {
+                    Button("Reply") { replyTo = comment.id }
+                        .font(.envScaled(size: 11, weight: .medium))
+                }
+            }
+            Text(comment.body)
+                .font(.envScaled(size: nested ? 12 : 13, weight: .regular))
+                .foregroundStyle(Color.envInk)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+            HStack(spacing: 12) {
+                if comment.isMine {
+                    Button("Remove") { Task { await remove(comment.id) } }
+                        .font(.envScaled(size: 10, weight: .medium))
+                        .foregroundStyle(.red)
+                } else {
+                    Button("Report") { reportTarget = comment; showingReportOptions = true }
+                        .font(.envScaled(size: 10, weight: .medium))
+                    Button("Block") { Task { await block(comment.id) } }
+                        .font(.envScaled(size: 10, weight: .medium))
+                }
+            }
+        }
+        .padding(12)
+        .padding(.leading, nested ? 10 : 0)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(nested ? Color.envSurface2.opacity(0.45) : Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .leading) {
+            if nested { Rectangle().fill(Color.envBorder).frame(width: 2) }
+        }
+    }
+
+    @MainActor
+    private func refresh() async {
+        loading = true
+        do {
+            let data = try await NativeCommunityClient.feed(toolID: toolID, visitorID: visitorID)
+            feed = data
+            errorMessage = nil
+            try await NativeCommunityClient.post("api/community/view", payload: ["toolId": toolID, "visitorId": visitorID])
+        } catch {
+            if error.localizedDescription.localizedCaseInsensitiveContains("not enabled") {
+                enabled = false
+            } else {
+                errorMessage = error.localizedDescription
+            }
+        }
+        loading = false
+    }
+
+    @MainActor
+    private func react(_ reaction: String) async {
+        do {
+            try await NativeCommunityClient.post("api/community/reactions", payload: ["toolId": toolID, "visitorId": visitorID, "reaction": reaction])
+            NativeAnalyticsClient.record("reaction_created", toolID: toolID, outcome: "success")
+            await refresh()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func submitComment() async {
+        let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        isSending = true
+        defer { isSending = false }
+        let payload: [String: Any] = [
+            "toolId": toolID,
+            "visitorId": visitorID,
+            "idempotencyKey": UUID().uuidString.lowercased(),
+            "body": text,
+            "identityMode": publicIdentity ? "public" : "anonymous",
+            "displayName": publicIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
+            "parentId": replyTo as Any? ?? NSNull()
+        ]
+        do {
+            try await NativeCommunityClient.post("api/community/comments", payload: payload)
+            NativeAnalyticsClient.record("comment_created", toolID: toolID, outcome: "success")
+            commentText = ""
+            replyTo = nil
+            notice = "Your comment was posted."
+            await refresh()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func report(_ commentID: String, reason: String) async {
+        do {
+            try await NativeCommunityClient.post("api/community/reports", payload: ["commentId": commentID, "visitorId": visitorID, "reason": reason])
+            notice = "Report sent to the moderation team."
+            reportTarget = nil
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func block(_ commentID: String) async {
+        do {
+            try await NativeCommunityClient.post("api/community/blocks", payload: ["commentId": commentID, "visitorId": visitorID])
+            notice = "The author is now hidden from your discussion view."
+            await refresh()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func remove(_ commentID: String) async {
+        do {
+            try await NativeCommunityClient.post("api/community/comments/delete", payload: ["commentId": commentID, "visitorId": visitorID])
+            notice = "Your comment was removed."
+            await refresh()
+        } catch { errorMessage = error.localizedDescription }
+    }
+}
+
 struct ToolDestinationView: View {
     @EnvironmentObject private var store: CatalogStore
     let tool: Tool
@@ -533,6 +931,14 @@ struct NativeFamilyToolView: View {
     let tool: Tool
     var initialDeveloperMode: String? = nil
     var initialDeveloperAction: String? = nil
+    @State private var executionTracker: NativeToolExecutionTracker
+
+    init(tool: Tool, initialDeveloperMode: String? = nil, initialDeveloperAction: String? = nil) {
+        self.tool = tool
+        self.initialDeveloperMode = initialDeveloperMode
+        self.initialDeveloperAction = initialDeveloperAction
+        _executionTracker = State(initialValue: NativeToolExecutionTracker(toolID: tool.id))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -556,6 +962,7 @@ struct NativeFamilyToolView: View {
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
+        .environment(\.nativeToolExecutionTracker, executionTracker)
     }
 }
 
@@ -572,7 +979,13 @@ private struct NativeBackendExportDocument: FileDocument {
 
 private struct NativeBackendToolView: View {
     let tool: Tool
+    @State private var executionTracker: NativeToolExecutionTracker
     @State private var input = ""
+
+    init(tool: Tool) {
+        self.tool = tool
+        _executionTracker = State(initialValue: NativeToolExecutionTracker(toolID: tool.id))
+    }
     @State private var options = "{}"
     @State private var pages = "1"
     @State private var watermarkText = "enV"
@@ -666,12 +1079,14 @@ private struct NativeBackendToolView: View {
         .fileExporter(isPresented: $showTextExporter, document: NativePlainTextDocument(text: output), contentType: .plainText, defaultFilename: "env-\(tool.id).txt") { result in
             if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
         }
+        .environment(\.nativeToolExecutionTracker, executionTracker)
     }
 
     private func operationLabel(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
     private func reset() { files = []; output = ""; outputData = nil; error = nil }
     private func run() async {
         if isDocument && files.isEmpty { error = "Choose the document or file required by this tool."; return }
+        executionTracker.start()
         working = true; defer { working = false }; output = ""; outputData = nil; error = nil
         do {
             let requestOptions: String
@@ -688,7 +1103,11 @@ private struct NativeBackendToolView: View {
             } else if let text = result.text { output = text }
             else { output = "Output ready: \(result.fileName ?? tool.id) · \(result.data?.count ?? 0) bytes" }
             error = nil
-        } catch let caughtError { output = ""; outputData = nil; error = caughtError.localizedDescription }
+            executionTracker.finish(success: true)
+        } catch let caughtError {
+            output = ""; outputData = nil; error = caughtError.localizedDescription
+            executionTracker.finish(success: false)
+        }
     }
 }
 
@@ -5583,14 +6002,56 @@ private enum NativeSimpleError: Error, LocalizedError {
     var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
 }
 
+private struct NativeToolExecutionTrackerKey: EnvironmentKey {
+    static let defaultValue: NativeToolExecutionTracker? = nil
+}
+
+private extension EnvironmentValues {
+    var nativeToolExecutionTracker: NativeToolExecutionTracker? {
+        get { self[NativeToolExecutionTrackerKey.self] }
+        set { self[NativeToolExecutionTrackerKey.self] = newValue }
+    }
+}
+
+@MainActor
+private final class NativeToolExecutionTracker {
+    private let toolID: String
+    private var startedAt: Date?
+    private var resultRecorded = false
+
+    init(toolID: String) { self.toolID = toolID }
+
+    func start() {
+        startedAt = Date()
+        resultRecorded = false
+        NativeAnalyticsClient.record("tool_started", toolID: toolID)
+        Task { try? await NativeAnalyticsClient.flush() }
+    }
+
+    func finish(success: Bool) {
+        guard let startedAt, !resultRecorded else { return }
+        resultRecorded = true
+        let duration = Int(min(3_600_000, max(0, Date().timeIntervalSince(startedAt) * 1000)))
+        NativeAnalyticsClient.record(
+            success ? "tool_completed" : "tool_failed",
+            toolID: toolID,
+            outcome: success ? "success" : "failure",
+            durationMs: duration,
+            errorCode: success ? nil : "NATIVE_TOOL_FAILED"
+        )
+        Task { try? await NativeAnalyticsClient.flush() }
+    }
+}
+
 private struct NativeActionRow: View {
+    @Environment(\.nativeToolExecutionTracker) private var executionTracker
     let output: String
     let run: () -> Void
     let reset: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Button("Run", action: run).buttonStyle(.borderedProminent)
+            Button("Run") { executionTracker?.start(); run() }.buttonStyle(.borderedProminent)
             Button("Reset", action: reset).buttonStyle(.bordered)
             Button { UIPasteboard.general.string = output } label: {
                 HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy") }
@@ -5600,6 +6061,7 @@ private struct NativeActionRow: View {
 }
 
 private struct NativeOutputView: View {
+    @Environment(\.nativeToolExecutionTracker) private var executionTracker
     let output: String
     let error: String?
 
@@ -5613,6 +6075,12 @@ private struct NativeOutputView: View {
                     .frame(minHeight: 130)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.35)))
             }
+        }
+        .onChange(of: output) { value in
+            if !value.isEmpty { executionTracker?.finish(success: true) }
+        }
+        .onChange(of: error) { value in
+            if value != nil { executionTracker?.finish(success: false) }
         }
     }
 }

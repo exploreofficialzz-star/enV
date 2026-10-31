@@ -11,7 +11,7 @@ const documentsRoute = read("server/routes/api/backend/documents.post.ts");
 
 // Generic web custom-backend contract: one freeform input, no option fields, JSON {}.
 assert.match(web, /placeholder="Enter the input required by this tool/);
-assert.match(web, /options:\{\}/);
+assert.match(web, /options:\s*\{\s*\}/);
 assert.match(web, /Running…/);
 assert.match(web, /env-\$\{toolId\}\.txt/);
 

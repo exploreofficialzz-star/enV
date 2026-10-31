@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Logo } from "@/components/brand/logo";
+import { ProductUpdatesBanner } from "@/components/layout/product-updates-banner";
 import { SearchBox } from "@/components/tools/search-box";
 import { ToolCard } from "@/components/tools/tool-card";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
@@ -38,6 +39,7 @@ function Home() {
     <AppShell>
       <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
       <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-1 text-center sm:px-6 sm:pt-1">
+        <ProductUpdatesBanner />
         <Logo size="hero" />
         <SearchBox
           large

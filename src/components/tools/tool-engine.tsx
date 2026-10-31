@@ -97,9 +97,9 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     case "color":
       return <ColorEngine op={tool.engine.op} toolId={tool.id} />;
     case "qr":
-      return <QrEngine preset={tool.engine.preset} />;
+      return <QrEngine preset={tool.engine.preset} toolId={tool.id} />;
     case "barcode":
-      return <BarcodeEngine format={tool.engine.format} />;
+      return <BarcodeEngine format={tool.engine.format} toolId={tool.id} />;
     case "image":
       return <ImageEngine op={tool.engine.op} category={tool.category} toolId={tool.id} />;
     case "cssgen":
@@ -113,7 +113,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     case "seo":
       return <SeoEngine op={tool.engine.op} />;
     case "file-converter":
-      return <FileConverterEngine op={tool.engine.op} />;
+      return <FileConverterEngine op={tool.engine.op} toolId={tool.id} />;
     case "developer":
       return <DeveloperEngine op={tool.engine.op} tool={tool} />;
     case "pdf":
