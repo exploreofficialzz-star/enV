@@ -50,6 +50,25 @@ const songMetadataAnalyzerTool: ToolMeta = {
   isNew: true,
 };
 
+const designHexColorConverterTool: ToolMeta = {
+  id: "hex-color-converter",
+  name: "HEX Color Converter",
+  slug: "hex-color-converter",
+  description: "Convert HEX to RGB, HSL, and HSV with live output in the other supported color formats.",
+  category: "design",
+  keywords: ["hex", "color", "converter", "rgb", "hsl", "hsv", "hsb", "cmyk"],
+  tags: ["hex", "color", "converter", "rgb"],
+  icon: "Palette",
+  popularity: 86,
+  featured: false,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: ["color-picker", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter", "palette-generator"],
+  engine: { type: "color", op: "picker" },
+};
+
 const allTools: ToolMeta[] = [
   // Web aliases share the sandbox; the source catalogue also serves native apps,
   // whose independent analyzer screens retain their existing descriptions.
@@ -58,6 +77,7 @@ const allTools: ToolMeta[] = [
     : tool.id === "audio-analyze-studio"
       ? { ...tool, name: songMetadataAnalyzerTool.name, description: songMetadataAnalyzerTool.description, keywords: [...tool.keywords, "dataset", "sandbox", "drafts", "folders"] }
       : tool),
+  ...(!catalogTools.some((tool) => tool.id === designHexColorConverterTool.id) ? [designHexColorConverterTool] : []),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !catalogTools.some((tool) => tool.id === extension.id)),
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
