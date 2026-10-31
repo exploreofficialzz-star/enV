@@ -15,6 +15,7 @@ import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitN
   from "@/lib/world-lab/network-graph";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
+import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
   summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
@@ -207,6 +208,8 @@ export default function WorldLab() {
   const measurementTarget=project?.entities.find(e=>e.id===measureTargetId)??null;
   const measurement=selectedEntity&&measurementTarget&&selectedEntity.id!==measurementTarget.id
     ?measureSolidCenters(selectedEntity,measurementTarget):null;
+  const spatialClearance=measurement&&selectedEntity&&measurementTarget
+    ?inspectWorldLabSpatialClearance(selectedEntity,measurementTarget):null;
   const canUndo=editHistory.current.past.length>0,canRedo=editHistory.current.future.length>0;
   void editEpoch;
   const selectedDrop = dropRun && selectedEntity?.id === dropRun.source.entityId
@@ -1781,7 +1784,14 @@ export default function WorldLab() {
                     <p>Center-to-center: {measurement.centerDistanceMeters.toFixed(4)} m</p>
                     <p>Horizontal distance: {measurement.horizontalDistanceMeters.toFixed(4)} m</p>
                     <p>Offset X/Y/Z: {measurement.deltaMeters.map(v=>v.toFixed(3)).join(" / ")} m</p>
-                    <p className="text-muted-foreground">Geometry only, not surface clearance or collision measurement.</p>
+                    {spatialClearance&&<>
+                      <p>AABB clearance lower bound: {spatialClearance.gapLowerBoundMeters.toFixed(4)} m</p>
+                      <p>Bounds status: {spatialClearance.status.replaceAll("-"," ")}</p>
+                      {spatialClearance.status==="box-intersection"&&<p>
+                        Box overlap X/Y/Z: {spatialClearance.overlapDepthMeters.map(x=>x.toFixed(4)).join(" / ")} m
+                      </p>}
+                      <p className="text-muted-foreground">{spatialClearance.validity}</p>
+                    </>}
                   </div>}
                 </div>
                 <label>Material assumption
