@@ -187,7 +187,7 @@ object NativeAnalytics {
         val store = prefs(context)
         if (!BuildConfig.ANALYTICS_ENABLED || store.getString(CONSENT_KEY, "unset") != "granted") return
         val subject = runCatching { secureGetString(context, SUBJECT_KEY) }.getOrNull() ?: return
-        if (name !in setOf("app_opened","tool_viewed","tool_started","tool_completed","tool_failed","tool_cancelled","tool_abandoned","feedback_submitted","update_viewed","offline_sync_succeeded","offline_sync_failed")) return
+        if (name !in setOf("app_opened","tool_viewed","tool_started","tool_completed","tool_failed","tool_cancelled","tool_abandoned","feedback_submitted","comment_created","reaction_created","update_viewed","offline_sync_succeeded","offline_sync_failed")) return
         val (online, networkType) = network(context)
         val metrics = context.resources.displayMetrics
         val widthDp = metrics.widthPixels / metrics.density
