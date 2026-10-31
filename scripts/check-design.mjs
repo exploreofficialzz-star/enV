@@ -28,8 +28,7 @@ const cssGradient = read("src/lib/engines/css-gradient.ts");
 const cssGradientTests = read("src/lib/engines/css-gradient.test.ts");
 const palette = read("src/lib/engines/design-palette.ts");
 const paletteTests = read("src/lib/engines/design-palette.test.ts");
-const palette = read("src/lib/engines/design-palette.ts");
-const paletteTests = read("src/lib/engines/design-palette.test.ts");
+
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const accessibilityEngine = read("src/components/engines/accessibility-engine.tsx");
