@@ -150,7 +150,7 @@ private enum NativeAnalyticsKeychain {
         return String(data: data, encoding: .utf8)
     }
 
-    static func write(_ value: String, account: String) {
+    static func write(_ value: String, account: String) -> Bool {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -161,11 +161,16 @@ private enum NativeAnalyticsKeychain {
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
-        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
-            var added = query
-            attributes.forEach { added[$0.key] = $0.value }
-            SecItemAdd(added as CFDictionary, nil)
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+        guard updateStatus == errSecItemNotFound else { return false }
+        var added = query
+        attributes.forEach { added[$0.key] = $0.value }
+        let addStatus = SecItemAdd(added as CFDictionary, nil)
+        if addStatus == errSecDuplicateItem {
+            return SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecSuccess
         }
+        return addStatus == errSecSuccess
     }
 
     static func remove(account: String) {
@@ -216,20 +221,19 @@ enum NativeAnalyticsClient {
             return queue
         }
         if let legacy = defaults.array(forKey: queueKey) as? [[String: Any]] {
-            writeQueue(legacy)
-            defaults.removeObject(forKey: queueKey)
+            if writeQueue(legacy) {
+                defaults.removeObject(forKey: queueKey)
+                return legacy
+            }
             return legacy
         }
         return []
     }
 
-    private static func writeQueue(_ queue: [[String: Any]]) {
+    private static func writeQueue(_ queue: [[String: Any]]) -> Bool {
         guard let data = try? JSONSerialization.data(withJSONObject: queue),
-              let value = String(data: data, encoding: .utf8) else {
-            NativeAnalyticsKeychain.remove(account: NativeAnalyticsKeychain.queueAccount)
-            return
-        }
-        NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.queueAccount)
+              let value = String(data: data, encoding: .utf8) else { return false }
+        return NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.queueAccount)
     }
 
     private static func readPendingRevocation() -> String? {
@@ -238,8 +242,12 @@ enum NativeAnalyticsClient {
     }
 
     private static func storePendingRevocation(_ value: String) {
-        NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.revokeAccount)
-        defaults.removeObject(forKey: revokeKey)
+        if NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.revokeAccount) {
+            defaults.removeObject(forKey: revokeKey)
+        } else {
+            // Retain a retryable fallback rather than losing a pending withdrawal.
+            defaults.set(value, forKey: revokeKey)
+        }
     }
 
     private static func clearPendingRevocation() {
@@ -272,7 +280,9 @@ enum NativeAnalyticsClient {
         let subject = oldSubject ?? UUID().uuidString.lowercased()
         if granted {
             // Keep the local revocation identifier before the server records consent.
-            NativeAnalyticsKeychain.write(subject, account: NativeAnalyticsKeychain.subjectAccount)
+            guard NativeAnalyticsKeychain.write(subject, account: NativeAnalyticsKeychain.subjectAccount) else {
+                throw NSError(domain: "enVAnalytics", code: errSecNotAvailable, userInfo: [NSLocalizedDescriptionKey: "Secure device storage is unavailable. Analytics consent was not enabled."])
+            }
             try await postConsent(subject, granted: true)
             defaults.set("granted", forKey: choiceKey)
             clearPendingRevocation()
@@ -316,7 +326,7 @@ enum NativeAnalyticsClient {
         if let errorCode, errorCode.range(of: "^[A-Z0-9_]{1,64}$", options: .regularExpression) != nil { event["errorCode"] = errorCode }
         var queue = readQueue()
         queue.append(event)
-        writeQueue(Array(queue.suffix(maxQueue)))
+        _ = writeQueue(Array(queue.suffix(maxQueue)))
     }
 
     static func flush() async throws {
@@ -348,7 +358,7 @@ enum NativeAnalyticsClient {
         guard (200...299).contains(http.statusCode), envelope?["ok"] as? Bool == true else {
             throw NSError(domain: "enVAnalytics", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: envelope?["message"] as? String ?? "Analytics events were not accepted."])
         }
-        writeQueue(Array(queue.dropFirst(batch.count)))
+        _ = writeQueue(Array(queue.dropFirst(batch.count)))
     }
 
     private static func postConsent(_ subject: String, granted: Bool) async throws {
