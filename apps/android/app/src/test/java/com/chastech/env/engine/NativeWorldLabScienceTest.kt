@@ -196,4 +196,42 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun twoInventedSolidsCollideConservingMomentumAndLosingOnlyAssumedEnergy(){
+        var p=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="left")
+        p=NativeWorldLabEditor.addSolid(p,"box",id="right")
+        p=NativeWorldLabEditor.positionSolid(p,"left",listOf(0.0,0.5,2.0))
+        p=NativeWorldLabEditor.positionSolid(p,"right",listOf(3.0,0.5,2.0))
+        p=NativeWorldLabEditor.addHypotheticalMaterial(p,"Invented dense foam",2.0,id="matter")
+        p=NativeWorldLabEditor.assignMaterial(p,"left","matter")
+        p=NativeWorldLabEditor.assignMaterial(p,"right","matter")
+        val project=NativeWorldLabProjectCodec.decode(p)
+        val elastic=NativeWorldLabCollision.evaluate(project,"right","left",2.0,0.0,1.0)
+        assertEquals(1.0,elastic.impactTimeSeconds,1e-12)
+        assertEquals(0.0,elastic.leftFinalVelocityMps,1e-12)
+        assertEquals(2.0,elastic.rightFinalVelocityMps,1e-12)
+        assertEquals(4.0,elastic.impulseNs,1e-12)
+        assertEquals(0.0,elastic.dissipatedEnergyJ,1e-12)
+        assertEquals(1.0,elastic.sample(1.0).rightCenterXM-
+            elastic.sample(1.0).leftCenterXM,1e-12)
+        val plastic=NativeWorldLabCollision.evaluate(project,"left","right",2.0,0.0,0.0)
+        assertEquals(1.0,plastic.leftFinalVelocityMps,1e-12)
+        assertEquals(1.0,plastic.rightFinalVelocityMps,1e-12)
+        assertEquals(2.0,plastic.dissipatedEnergyJ,1e-12)
+        assertEquals(plastic.momentumBeforeKgMps,plastic.momentumAfterKgMps,1e-12)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabCollision.evaluate(project,"left","right",0.0,2.0,0.5)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabCollision.evaluate(project,"left","right",2.0,0.0,2.0)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabCollision.evaluate(project,"left","right",2.0,0.0,0.5,0.2)
+        }
+        val unknown=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.assignMaterial(p,"right",null))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabCollision.evaluate(unknown,"left","right",2.0,0.0,0.5)
+        }
+    }
+
 }
