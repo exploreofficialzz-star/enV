@@ -6,6 +6,7 @@ import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
 import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
+import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,14 +38,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "repeating", label: "Repeat gradient", type: "select", defaultValue: "no", options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
   ],
   shadow: [
-    { name: "preset", label: "Shadow preset", type: "select", defaultValue: "soft", options: [{ value: "subtle", label: "Subtle" }, { value: "soft", label: "Soft elevation" }, { value: "medium", label: "Medium" }, { value: "hard", label: "Hard" }, { value: "glow", label: "Glow" }, { value: "inset", label: "Inset" }, { value: "custom", label: "Custom" }] },
-    { name: "layers", label: "Layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }] },
-    { name: "x", label: "Horizontal offset", type: "number", defaultValue: 0, min: -80, max: 80, suffix: "px" },
-    { name: "y", label: "Vertical offset", type: "number", defaultValue: 8, min: -80, max: 80, suffix: "px" },
-    { name: "blur", label: "Blur", type: "number", defaultValue: 24, min: 0, max: 160, suffix: "px" },
-    { name: "spread", label: "Spread", type: "number", defaultValue: 0, min: -40, max: 80, suffix: "px" },
-    { name: "color", label: "Shadow color", type: "color", defaultValue: "#202a3b" },
-    { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
+    { name: "preset", label: "Start with a shadow preset", type: "select", defaultValue: "soft", options: [{ value: "subtle", label: "Subtle elevation" }, { value: "soft", label: "Soft elevation" }, { value: "medium", label: "Medium elevation" }, { value: "hard", label: "Hard shadow" }, { value: "glow", label: "Colour glow" }, { value: "inset", label: "Inset depth" }, { value: "custom", label: "Custom layer" }] },
   ],
   "text-shadow": [
     { name: "layers", label: "Shadow layers", type: "select", defaultValue: "1", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }, { value: "4", label: "4 layers" }] },
@@ -117,7 +111,8 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "dist", label: "Shadow distance", type: "number", defaultValue: 10, min: 1, max: 40, suffix: "px" },
   ],
   pattern: [
-    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }] },
+    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }, { value: "rings", label: "Concentric rings" }, { value: "chevron", label: "Chevron" }, { value: "hexagons", label: "Hexagons" }, { value: "crosshatch", label: "Crosshatch" }, { value: "checkerboard", label: "Checkerboard" }] },
+    { name: "rotation", label: "Pattern rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Pattern color", type: "color", defaultValue: "#0d9f8a" },
     { name: "size", label: "Pattern size", type: "number", defaultValue: 24, min: 6, max: 160, suffix: "px" },
     { name: "opacity", label: "Opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
@@ -202,6 +197,7 @@ function cssFor(
   values: Record<string, string>,
   gradientStops: GradientStop[] = [],
   gradientOverlay: { enabled: boolean; color: string; x: number; y: number } = { enabled: false, color: "#ffffff", x: 24, y: 20 },
+  shadowLayers: ShadowLayer[] = createShadowPreset("soft"),
 ) {
   if (family === "gradient") {
     const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
@@ -231,35 +227,7 @@ function cssFor(
     return { css, style: { background: fallback, backgroundImage: enhancedImage } };
   }
   if (family === "shadow") {
-    const preset = values.preset ?? "soft";
-    const count = Number(values.layers ?? 2);
-    const presets: Record<string, { x: number; y: number; blur: number; spread: number; alpha: number; inset?: boolean }> = {
-      subtle: { x: 0, y: 1, blur: 3, spread: 0, alpha: 0.12 },
-      soft: { x: 0, y: 7, blur: 24, spread: -4, alpha: 0.14 },
-      medium: { x: 0, y: 12, blur: 32, spread: -5, alpha: 0.18 },
-      hard: { x: 0, y: 10, blur: 0, spread: 0, alpha: 0.24 },
-      glow: { x: 0, y: 0, blur: 28, spread: 2, alpha: 0.36 },
-      inset: { x: 0, y: 3, blur: 9, spread: -3, alpha: 0.22, inset: true },
-      custom: { x: 0, y: 8, blur: 24, spread: 0, alpha: 0.18 },
-    };
-    const presetValues = presets[preset] ?? presets.soft;
-    const opacity = numberValue(values, "opacity", presetValues.alpha, 0, 1);
-    const x = numberValue(values, "x", presetValues.x, -80, 80);
-    const y = numberValue(values, "y", presetValues.y, -80, 80);
-    const blur = numberValue(values, "blur", presetValues.blur, 0, 160);
-    const spread = numberValue(values, "spread", presetValues.spread, -40, 80);
-    const color = values.color ?? "#202a3b";
-    const parsedColor = parseCssColor(color);
-    const layers = Array.from({ length: clamp(count, 1, 3) }, (_, index) => {
-      const scale = 1 + index * 0.55;
-      const alpha = opacity / (index + 1);
-      const inset = presetValues.inset ? "inset " : "";
-      const shadowColor = parsedColor
-        ? `rgba(${Math.round(parsedColor.r)}, ${Math.round(parsedColor.g)}, ${Math.round(parsedColor.b)}, ${alpha.toFixed(3)})`
-        : color;
-      return `${inset}${x * scale}px ${y * scale}px ${blur * scale}px ${spread * scale}px ${shadowColor}`;
-    });
-    const boxShadow = layers.join(", ");
+    const boxShadow = buildBoxShadow(shadowLayers);
     return { css: `box-shadow: ${boxShadow};`, style: { boxShadow } };
   }
   if (family === "text-shadow") {
@@ -352,7 +320,7 @@ function cssFor(
   if (family === "pattern") {
     const size = numberValue(values, "size", 24, 6, 160);
     const opacity = numberValue(values, "opacity", 0.14, 0, 1);
-    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a", (values.pattern ?? "diagonal") as import("@/lib/engines/svg-generators").PatternStyle);
+    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a", (values.pattern ?? "diagonal") as import("@/lib/engines/svg-generators").PatternStyle, numberValue(values, "rotation", 0, 0, 360));
     const backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
     return { css: `background-image: ${backgroundImage};\nbackground-size: ${size}px ${size}px;`, style: { backgroundImage, backgroundSize: `${size}px ${size}px` }, svg };
   }
@@ -401,6 +369,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     return true;
   }), [allFields, family, values.colorSpace, values.kind]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
+  const [shadowLayers, setShadowLayers] = useState<ShadowLayer[]>(() => createShadowPreset("soft"));
   const [gradientGlow, setGradientGlow] = useState(false);
   const [glowColor, setGlowColor] = useState("#ffffff");
   const [glowX, setGlowX] = useState(24);
@@ -409,6 +378,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   useEffect(() => {
     setValues(initialValues(allFields));
     setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop })));
+    setShadowLayers(createShadowPreset("soft"));
     setGradientGlow(false);
     setGlowColor("#ffffff");
     setGlowX(24);
@@ -416,7 +386,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     setSampleText("Continue");
   }, [family, allFields]);
   const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
-  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, values]);
+  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay, shadowLayers), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, shadowLayers, values]);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "text-shadow";
@@ -537,35 +507,66 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
               </section>
             </section>
           ) : null}
-          <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((previous) => {
-            const next = { ...previous, [name]: value };
-            if (family === "border" && name === "radius") {
-              next.topLeft = value;
-              next.topRight = value;
-              next.bottomRight = value;
-              next.bottomLeft = value;
-            }
-            if (name === "preset") {
-              const presets: Record<string, { x: number; y: number; blur: number; spread: number; alpha: number }> = {
-                subtle: { x: 0, y: 1, blur: 3, spread: 0, alpha: 0.12 },
-                soft: { x: 0, y: 7, blur: 24, spread: -4, alpha: 0.14 },
-                medium: { x: 0, y: 12, blur: 32, spread: -5, alpha: 0.18 },
-                hard: { x: 0, y: 10, blur: 0, spread: 0, alpha: 0.24 },
-                glow: { x: 0, y: 0, blur: 28, spread: 2, alpha: 0.36 },
-                inset: { x: 0, y: 3, blur: 9, spread: -3, alpha: 0.22 },
-                custom: { x: 0, y: 8, blur: 24, spread: 0, alpha: 0.18 },
-              };
-              const selected = presets[value];
-              if (selected) {
-                next.x = String(selected.x);
-                next.y = String(selected.y);
-                next.blur = String(selected.blur);
-                next.spread = String(selected.spread);
-                next.opacity = String(selected.alpha);
+          {family === "shadow" ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="shadow-stack-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="shadow-stack-heading" className="text-sm font-semibold text-fg">Independent shadow layers</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">Edit each layer separately. Disabled layers stay in the stack so you can compare variations.</p>
+                </div>
+                <Button type="button" size="sm" onClick={() => setShadowLayers((previous) => [...previous, { ...createShadowPreset("custom")[0], id: "shadow-" + Date.now() }])} disabled={shadowLayers.length >= 5}>Add layer ({shadowLayers.length}/5)</Button>
+              </div>
+              <div className="space-y-3">
+                {shadowLayers.map((layer, index) => (
+                  <div key={layer.id} className="space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-fg">
+                        <input type="checkbox" checked={layer.enabled} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, enabled: event.target.checked } : item))} className="size-4 accent-accent" />
+                        Layer {index + 1}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className="flex min-h-10 items-center gap-2 text-xs text-muted">
+                          <input type="checkbox" checked={layer.inset} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, inset: event.target.checked } : item))} className="size-4 accent-accent" />
+                          Inset
+                        </label>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => previous.filter((item) => item.id !== layer.id))} aria-label={"Remove shadow layer " + (index + 1)}>Remove</Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <label className="space-y-1 text-xs text-muted">Color
+                        <Input type="color" value={layer.color} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, color: event.target.value } : item))} className="h-10 w-full p-1" aria-label={"Shadow layer " + (index + 1) + " color"} />
+                      </label>
+                      {([
+                        ["x", "X offset", -100, 100],
+                        ["y", "Y offset", -100, 100],
+                        ["blur", "Blur", 0, 200],
+                        ["spread", "Spread", -100, 100],
+                        ["opacity", "Opacity", 0, 1],
+                      ] as const).map(([key, label, min, max]) => (
+                        <label key={key} className="space-y-1 text-xs text-muted">{label}
+                          <Input type="number" value={String(layer[key])} min={min} max={max} step={key === "opacity" ? 0.01 : 1} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, [key]: Number(event.target.value) } : item))} className="h-10 font-mono text-xs" aria-label={"Shadow layer " + (index + 1) + " " + label} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {shadowLayers.length === 0 ? <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted">No shadow layers. Add one to create a shadow, or keep the stack empty for <code>box-shadow: none</code>.</p> : null}
+              </div>
+            </section>
+          ) : null}
+          <FieldGrid fields={fields} values={values} onChange={(name, value) => {
+            setValues((previous) => {
+              const next = { ...previous, [name]: value };
+              if (family === "border" && name === "radius") {
+                next.topLeft = value;
+                next.topRight = value;
+                next.bottomRight = value;
+                next.bottomLeft = value;
               }
-            }
-            return next;
-          })} />
+              return next;
+            });
+            if (family === "shadow" && name === "preset") setShadowLayers(createShadowPreset(value));
+          }} />
           {isText ? (
             <label className="block space-y-1.5">
               <Label htmlFor="design-preview-text">Preview text</Label>
