@@ -10,6 +10,7 @@ import {
   evaluateContrast,
   getContrastTargets,
   parseCssColor,
+  resolveRenderedPair,
   rgbToHsl,
   suggestContrastCorrections,
   toHex,
@@ -22,6 +23,14 @@ import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-v
 import { buildDesignPaletteExport, createColorShadeScale, type PaletteExportFormat } from "@/lib/engines/design-palette";
 
 type Harmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
+const DEFAULT_VISION_COLORS = [
+  { label: "Error", color: "#D94B4B" },
+  { label: "Success", color: "#229968" },
+  { label: "Warning", color: "#E4AA32" },
+  { label: "Information", color: "#347FC4" },
+  { label: "Accent", color: "#8B5BC7" },
+  { label: "Neutral", color: "#697386" },
+];
 
 const CONVERTER_DEFAULTS: Record<string, string> = {
   "hex-converter": "#0d9f8a",
@@ -189,6 +198,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [harmony, setHarmony] = useState<Harmony>("analogous");
   const [target, setTarget] = useState<ContrastTarget>("normal-aa");
   const [visionMode, setVisionMode] = useState<ColorVisionMode>("deuteranopia");
+  const [visionColors, setVisionColors] = useState(DEFAULT_VISION_COLORS);
   const [converterValue, setConverterValue] = useState(() => CONVERTER_DEFAULTS[toolId ?? ""] ?? "#0d9f8a");
   const [lockedSwatches, setLockedSwatches] = useState<Record<number, string>>({});
   const [previewMode, setPreviewMode] = useState<"light" | "dark">("light");
@@ -263,6 +273,10 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value) }))
     : [], [foreground, background]);
   const activeCheck = contrastChecks.find((item) => item.value === target);
+  const previewPair = useMemo(
+    () => foreground && background ? resolveRenderedPair(foreground, background) : null,
+    [foreground, background],
+  );
   const correction = foreground && background
     ? suggestContrastCorrections(foreground, background, target)
     : null;
@@ -341,7 +355,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
         {foreground && background ? (
           <>
             <div className="overflow-hidden rounded-xl border border-border">
-              <div className="px-5 py-8 text-center" style={{ background: toHex(background), color: toHex(foreground) }}>
+              <div className="px-5 py-8 text-center" style={{ background: previewPair ? toHex(previewPair.background) : "#ffffff", color: previewPair ? toHex(previewPair.foreground) : "#111827" }}>
                 <p className="text-2xl font-semibold">The quick brown fox</p>
                 <p className="mt-2 text-sm">Normal body text · 16px</p>
                 <p className="mt-4 text-3xl font-bold">Aa</p>
@@ -394,12 +408,11 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   }
 
   if (op === "colorblind") {
-    const examples = [["Error", "#D94B4B"], ["Success", "#229968"], ["Warning", "#E4AA32"], ["Information", "#347FC4"], ["Accent", "#8B5BC7"], ["Neutral", "#697386"]];
     return (
       <div className="space-y-5">
         <div>
-          <p className="text-sm font-semibold text-fg">Preview a sample interface palette</p>
-          <p className="mt-1 text-xs leading-5 text-muted">Compare common color-vision deficiency simulations. Labels remain visible so meaning is not communicated by color alone.</p>
+          <p className="text-sm font-semibold text-fg">Test your own interface colors</p>
+          <p className="mt-1 text-xs leading-5 text-muted">Edit the sample roles or paste your own palette. Every change is simulated locally in the selected color-vision mode.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Label htmlFor="vision-mode">Simulate</Label>
@@ -409,9 +422,18 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
             <option value="tritanopia">Tritanopia · blue-cone</option>
             <option value="achromatopsia">Achromatopsia · grayscale</option>
           </Select>
+          <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => setVisionColors(DEFAULT_VISION_COLORS.map((item) => ({ ...item })))}>Reset sample colors</Button>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {visionColors.map((item, index) => (
+            <div key={item.label} className="flex min-w-0 items-center gap-3 rounded-xl border border-border p-3">
+              <Input type="color" value={item.color} onChange={(event) => setVisionColors((previous) => previous.map((color, i) => i === index ? { ...color, color: event.target.value } : color))} className="h-11 w-14 shrink-0 p-1" aria-label={`Choose ${item.label} color`} />
+              <div className="min-w-0 flex-1"><Label className="text-xs">{item.label}</Label><p className="mt-1 truncate font-mono text-[11px] text-muted">{item.color.toUpperCase()}</p></div>
+            </div>
+          ))}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {examples.map(([label, source]) => {
+          {visionColors.map(({ label, color: source }) => {
             const simulated = simulateColorVision(source, visionMode) ?? source;
             return (
               <div key={label} className="overflow-hidden rounded-xl border border-border">
