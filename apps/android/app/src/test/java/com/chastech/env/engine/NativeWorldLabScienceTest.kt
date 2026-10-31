@@ -317,4 +317,50 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun disjointSimultaneousSphereImpactsConserveEnergyAndReplayTogether(){
+        var json=NativeWorldLabEditor.blank()
+        for(i in 0..3)json=NativeWorldLabEditor.addSolid(json,"sphere",id="s-$i")
+        json=NativeWorldLabEditor.addHypotheticalMaterial(json,"Invented gel",12/Math.PI,id="gel")
+        val positions=listOf(-4.0,-1.0,4.0,10.0)
+        for(i in 0..3){
+            json=NativeWorldLabEditor.positionSolid(json,"s-$i",listOf(positions[i],0.5,0.0))
+            json=NativeWorldLabEditor.assignMaterial(json,"s-$i","gel")
+        }
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val speeds=mapOf(
+            "s-0" to NativeLabVector(2.0,0.0,0.0),
+            "s-2" to NativeLabVector(5.0,0.0,0.0))
+        for(coefficient in listOf(1.0,0.5)){
+            val run=NativeWorldLabMultiSphere.evaluate(project,speeds,coefficient,1.5)
+            assertEquals(2,run.events.size)
+            assertEquals(1.0,run.events[0].atSeconds,1e-10)
+            assertEquals(1.0,run.events[1].atSeconds,1e-10)
+            assertEquals(0,run.sample(0.99).completedEvents)
+            val atContact=run.sample(1.0)
+            assertEquals(2,atContact.completedEvents)
+            assertEquals(1.0+coefficient,atContact.objects[1].velocityMps.x,1e-9)
+            assertEquals((1.0+coefficient)*2.5,atContact.objects[3].velocityMps.x,1e-9)
+            assertEquals(run.initialEnergyJ-run.finalEnergyJ,run.dissipationJ,1e-9)
+            assertEquals(run.initialMomentum.x,run.finalMomentum.x,1e-9)
+        }
+    }
+
+    @Test fun sharedSphereSimultaneousImpactIsExplicitlyRejected(){
+        var json=NativeWorldLabEditor.blank()
+        for(i in 0..2)json=NativeWorldLabEditor.addSolid(json,"sphere",id="s-$i")
+        json=NativeWorldLabEditor.addHypotheticalMaterial(json,"Invented gel",12/Math.PI,id="gel")
+        for(i in 0..2){
+            json=NativeWorldLabEditor.positionSolid(json,"s-$i",
+                listOf(-4.0+3*i,0.5,0.0))
+            json=NativeWorldLabEditor.assignMaterial(json,"s-$i","gel")
+        }
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val speeds=mapOf(
+            "s-0" to NativeLabVector(2.0,0.0,0.0),
+            "s-2" to NativeLabVector(-2.0,0.0,0.0))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabMultiSphere.evaluate(project,speeds,1.0,2.0)
+        }
+    }
+
 }
