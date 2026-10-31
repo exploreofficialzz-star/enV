@@ -2943,7 +2943,7 @@ private fun InputField(value: String, onValueChange: (String) -> Unit, label: St
     OutlinedTextField(value, onValueChange, modifier.fillMaxWidth().then(if (tall) Modifier.height(170.dp) else Modifier), label = { Text(label) }, placeholder = placeholder?.let { { Text(it) } }, minLines = minLines, singleLine = singleLine)
 }
 
-private class NativeToolExecutionTelemetry(
+internal class NativeToolExecutionTelemetry(
     private val context: Context,
     private val toolId: String,
     private val flush: () -> Unit,
@@ -2975,7 +2975,7 @@ private class NativeToolExecutionTelemetry(
     }
 }
 
-private val LocalNativeToolExecutionTelemetry = staticCompositionLocalOf<NativeToolExecutionTelemetry?> { null }
+internal val LocalNativeToolExecutionTelemetry = staticCompositionLocalOf<NativeToolExecutionTelemetry?> { null }
 
 @Composable
 private fun ActionRow(onRun: () -> Unit, onReset: () -> Unit) {
