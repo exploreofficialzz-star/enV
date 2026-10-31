@@ -63,6 +63,38 @@ try{
   await page.getByRole("button",{name:"Record hypothetical material"}).click();
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
 
+  // A separately invented high-modulus material must give a real,
+  // geometry-dependent elastic response, with a portable assumption trail.
+  await page.getByRole("textbox",{name:"Material name"}).fill("Invented stiff matter");
+  await page.getByRole("spinbutton",{name:/Assumed density/}).fill("2");
+  await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("200000000000");
+  await page.getByRole("button",{name:"Record hypothetical material"}).click();
+  await page.getByRole("combobox",{name:"Material assumption"})
+    .selectOption({label:"Invented stiff matter"});
+  await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("0.1");
+  await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("0.05");
+  await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("1000");
+  await page.getByRole("button",{name:"Calculate elastic bending"}).click();
+  await page.getByText(/Free-end deflection:/).waitFor();
+  const structuralDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export assumed bending evidence"}).click();
+  const structuralStream=await (await structuralDownload).createReadStream();
+  let structuralJson="";
+  for await(const chunk of structuralStream)structuralJson+=chunk.toString();
+  const structural=JSON.parse(structuralJson);
+  assert.equal(structural.format,"env-world-lab-structural-bending");
+  assert.equal(structural.materialEvidence,"hypothetical-user-assumed");
+  assert.ok(Math.abs(structural.maximumTipDeflectionM-0.0032)<1e-12);
+  assert.ok(Math.abs(structural.maximumBendingStressPa-24e6)<1e-4);
+  await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("2000");
+  await page.getByRole("button",{name:"Export assumed bending evidence"})
+    .waitFor({state:"hidden"});
+  // Restore the main reference project before the existing motion scenarios.
+  await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("1");
+  await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("1");
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+
+
   // A user-invented Boolean indicator must drive the same measured-by-model
   // electromechanical solver, with portable source-revision evidence.
   await page.getByRole("button",{name:"Drive with invented logic: Indicator Q"}).click();
