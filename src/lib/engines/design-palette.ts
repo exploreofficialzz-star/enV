@@ -63,7 +63,9 @@ export function createHarmonyPalette(color: RgbaColor, harmony: PaletteHarmony, 
       return fromHsl(hsl.h, hsl.s, 0.12 + progress * 0.76);
     });
   }
-  const offsets = HARMONY_OFFSETS[harmony];
+  const offsets = harmony === "analogous"
+    ? Array.from({ length: safeCount }, (_, index) => -40 + (80 * index) / (safeCount - 1))
+    : HARMONY_OFFSETS[harmony];
   return Array.from({ length: safeCount }, (_, index) => {
     const cycle = Math.floor(index / offsets.length);
     const lightnessShift = cycle === 0 ? 0 : (cycle % 2 ? 1 : -1) * Math.min(0.12, cycle * 0.04);

@@ -51,7 +51,7 @@ const checks = [
   ["Layered text shadow controls", cssEngine.includes("Shadow layers") && cssEngine.includes("textShadow") && cssEngine.includes("rgba(")],
   ["Neumorphism accessibility usage guidance", cssEngine.includes("Neumorphic effects can make controls")],
   ["Palette semantic roles and token exports", palette.includes("buildDesignPaletteExport") && ["css", "scss", "tailwind", "json", "tokens"].every((format) => palette.includes(`format === "${format}"`))],
-  ["Palette locking, sharing and image extraction", ["Lock color", "Copy share link", "Extract colors from an image", "Light preview", "Dark preview"].every((label) => colorEngine.includes(label))],
+  ["Palette locking, sharing and image extraction", ["Lock color", "Copy share link", "Extract colors from an image", "Light preview", "Dark preview", "Try a smaller image", "context.drawImage(image, offsetX"].every((label) => colorEngine.includes(label))],
   ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports") && paletteTests.includes("selectable counts from three to eight")],
   ["Strict HSV / HSB / CMYK parser and tested converters", designColor.includes("parsePercentOrUnit") && designColor.includes("hs[VB]") && designColorTests.includes("HSV and HSB accept percentages") && designColorTests.includes("CMYK accepts percentage")],
   ["Layered shadow presets and opacity control", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from") && cssEngine.includes("Shadow opacity")],

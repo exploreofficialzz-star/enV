@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette } from "./design-palette.ts";
-import { parseCssColor, toHex } from "./accessibility-color.ts";
+import { parseCssColor, rgbToHsl, toHex } from "./accessibility-color.ts";
 
 const colors = {
   primary: "#0d9f8a",
@@ -54,4 +54,9 @@ test("harmony palette generator respects selectable counts from three to eight",
     }
   }
   assert.equal(new Set(createHarmonyPalette(source, "triadic", 3).map(toHex)).size, 3);
+  const sourceHue = rgbToHsl(source).h;
+  const analogous = createHarmonyPalette(source, "analogous", 3).map((swatch) => rgbToHsl(swatch).h);
+  const hueDelta = (hue: number) => ((hue - sourceHue + 540) % 360) - 180;
+  assert.ok(Math.abs(hueDelta(analogous[0]) + 40) < 1);
+  assert.ok(Math.abs(hueDelta(analogous[2]) - 40) < 1);
 });

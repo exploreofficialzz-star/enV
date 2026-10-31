@@ -59,7 +59,18 @@ function extractImageColors(file: File): Promise<string[]> {
         canvas.height = 72;
         const context = canvas.getContext("2d", { willReadFrequently: true });
         if (!context) throw new Error("This browser could not read the selected image.");
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const sourceWidth = image.naturalWidth || image.width;
+        const sourceHeight = image.naturalHeight || image.height;
+        if (!sourceWidth || !sourceHeight || sourceWidth * sourceHeight > 40_000_000) {
+          throw new Error("This image is too large to sample safely. Try a smaller image.");
+        }
+        const scale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight);
+        const drawWidth = sourceWidth * scale;
+        const drawHeight = sourceHeight * scale;
+        const offsetX = (canvas.width - drawWidth) / 2;
+        const offsetY = (canvas.height - drawHeight) / 2;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
         const counts = new Map<string, number>();
         for (let index = 0; index < pixels.length; index += 4) {
