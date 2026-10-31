@@ -111,10 +111,10 @@ function decodeMultipleImageCodes(
   const decoded = new Map<string, ReturnType<MultiFormatReader["decodeWithState"]>>();
   let attempts = 0;
 
-  // Decode the whole frame first, then overlapping quadrants. A single ZXing
-  // reader only returns one result per frame; overlapping tiles let separate
-  // labels/codes be found without slicing through a symbol on a hard midline.
-  while (pendingRegions.length && attempts < 24 && decoded.size < 50) {
+  // Decode the full image first, then split along its longest axis. Splitting
+  // both axes at once cuts long retail barcodes (and square QR symbols) in half.
+  // Overlapping strips keep complete codes plus quiet zones inside at least one tile.
+  while (pendingRegions.length && attempts < 32 && decoded.size < 50) {
     const region = pendingRegions.shift();
     if (!region || region.width < 64 || region.height < 64) continue;
     const regionKey = `${region.left}:${region.top}:${region.width}:${region.height}`;
@@ -133,24 +133,26 @@ function decodeMultipleImageCodes(
       // A tile without a code is normal; other tiles still get decoded.
     }
 
-    if (region.depth >= 2 || region.width < 180 || region.height < 180) continue;
-    const middleX = Math.floor(region.width / 2);
-    const middleY = Math.floor(region.height / 2);
-    const overlapX = Math.max(8, Math.round(region.width * 0.08));
-    const overlapY = Math.max(8, Math.round(region.height * 0.08));
-    const leftWidth = Math.min(region.width, middleX + overlapX);
-    const rightOffset = Math.max(0, middleX - overlapX);
-    const topHeight = Math.min(region.height, middleY + overlapY);
-    const bottomOffset = Math.max(0, middleY - overlapY);
-    const rightWidth = region.width - rightOffset;
-    const bottomHeight = region.height - bottomOffset;
-
-    pendingRegions.push(
-      { left: region.left, top: region.top, width: leftWidth, height: topHeight, depth: region.depth + 1 },
-      { left: region.left + rightOffset, top: region.top, width: rightWidth, height: topHeight, depth: region.depth + 1 },
-      { left: region.left, top: region.top + bottomOffset, width: leftWidth, height: bottomHeight, depth: region.depth + 1 },
-      { left: region.left + rightOffset, top: region.top + bottomOffset, width: rightWidth, height: bottomHeight, depth: region.depth + 1 },
-    );
+    if (region.depth >= 3 || region.width < 160 || region.height < 160) continue;
+    if (region.width >= region.height && region.width >= 240) {
+      const middle = Math.floor(region.width / 2);
+      const overlap = Math.max(24, Math.round(region.width * 0.24));
+      const firstWidth = Math.min(region.width, middle + overlap);
+      const secondOffset = Math.max(0, middle - overlap);
+      pendingRegions.push(
+        { left: region.left, top: region.top, width: firstWidth, height: region.height, depth: region.depth + 1 },
+        { left: region.left + secondOffset, top: region.top, width: region.width - secondOffset, height: region.height, depth: region.depth + 1 },
+      );
+    } else if (region.height > region.width && region.height >= 240) {
+      const middle = Math.floor(region.height / 2);
+      const overlap = Math.max(24, Math.round(region.height * 0.24));
+      const firstHeight = Math.min(region.height, middle + overlap);
+      const secondOffset = Math.max(0, middle - overlap);
+      pendingRegions.push(
+        { left: region.left, top: region.top, width: region.width, height: firstHeight, depth: region.depth + 1 },
+        { left: region.left, top: region.top + secondOffset, width: region.width, height: region.height - secondOffset, depth: region.depth + 1 },
+      );
+    }
   }
 
   return [...decoded.values()];
