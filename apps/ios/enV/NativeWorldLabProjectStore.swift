@@ -247,6 +247,36 @@ struct NativeWorldLabScientificEvidenceStore {
         }
         return record
     }
+    func validateEnvelope(_ bytes:Data,projectId:String)throws {
+        _ = try inspect(bytes,expectedId:nil,expectedProject:projectId)
+    }
+    func importRecord(_ data:Data,projectId:String)throws{
+        let record=try inspect(data,expectedId:nil,expectedProject:projectId)
+        let current=try NativeWorldLabProjectStore(directory:root).read(projectId).1
+        guard let revision=record["projectRevision"] as? Int,
+              revision<=current.revision,let id=record["id"] as? String else {
+            throw NativeWorldLabError.invalid("Imported science is newer than the invention")
+        }
+        let destination=try file(projectId,id)
+        let directory=try folder(projectId)
+        let manager=FileManager.default
+        try manager.createDirectory(at:directory,withIntermediateDirectories:true)
+        if manager.fileExists(atPath:destination.path){
+            let existing=try read(projectId,id)
+            guard (try JSONSerialization.jsonObject(with:existing) as? NSDictionary)?
+                .isEqual(to:record) == true else {
+                throw NativeWorldLabError.invalid(
+                    "A different immutable record already uses this scientific ID")
+            }
+            return
+        }
+        let count=try manager.contentsOfDirectory(at:directory,
+            includingPropertiesForKeys:nil).filter{$0.pathExtension=="json"}.count
+        guard count<Self.maxRecords else {
+            throw NativeWorldLabError.invalid("Science evidence quota reached")
+        }
+        try data.write(to:destination,options:.atomic)
+    }
     @discardableResult private func store<T:Encodable>(
         _ result:T,kind:String,project:NativeWorldLabProject)throws->String {
         let current=try NativeWorldLabProjectStore(directory:root).read(project.id).1
@@ -324,5 +354,156 @@ struct NativeWorldLabScientificEvidenceStore {
     func delete(_ projectId:String,_ recordId:String)throws {
         _ = try read(projectId,recordId)
         try FileManager.default.removeItem(at:try file(projectId,recordId))
+    }
+}
+
+
+/// Portable cross-client v1/v2 archive. Uninterpreted legacy numerical records
+/// are retained for re-export; no native code is executed from archived JSON.
+struct NativeWorldLabPortableArchiveContent {
+    let projectData:Data
+    let project:NativeWorldLabProject
+    let legacyRuns:[[String:Any]]
+    let scientificRecords:[Data]
+}
+struct NativeWorldLabPortableArchiveStore {
+    static let maxBytes=24*1024*1024
+    let root:URL
+    init(directory:URL?=nil){
+        root=directory ?? NativeWorldLabProjectStore().directory
+    }
+    private func validID(_ value:String)->Bool {
+        value.range(of:"^[A-Za-z0-9_-]{1,120}$",
+            options:.regularExpression) != nil
+    }
+    private func legacyFile(_ id:String)throws->URL {
+        guard validID(id) else {
+            throw NativeWorldLabError.invalid("Invalid portable project ID")
+        }
+        return root.appendingPathComponent("PortableNumericalRuns",isDirectory:true)
+            .appendingPathComponent(id+".json")
+    }
+    func decode(_ bytes:Data)throws->NativeWorldLabPortableArchiveContent {
+        guard bytes.count<=Self.maxBytes,
+              let archive=try JSONSerialization.jsonObject(with:bytes) as? [String:Any],
+              let format=archive["format"] as? String,
+              format=="env-world-lab-archive",
+              let version=archive["schemaVersion"] as? Int,
+              version==1 || version==2,
+              Set(archive.keys)==(version==1 ?
+                Set(["format","schemaVersion","project","recordedRuns"]) :
+                Set(["format","schemaVersion","project","recordedRuns",
+                    "scientificEvidence"])),
+              let rawProject=archive["project"] as? [String:Any],
+              let runs=archive["recordedRuns"] as? [[String:Any]],
+              runs.count<=20 else {
+            throw NativeWorldLabError.invalid(
+                "World Lab archive version, metadata or size is unsupported")
+        }
+        let data=try JSONSerialization.data(withJSONObject:rawProject,options:[.sortedKeys])
+        guard data.count<=NativeWorldLabProject.maxBytes else {
+            throw NativeWorldLabError.invalid("Archive project exceeds 1 MB")
+        }
+        let project=try NativeWorldLabProject.decode(data)
+        let rawScience:[[String:Any]]
+        if version==1 {rawScience=[]}
+        else {
+            guard let science=archive["scientificEvidence"] as? [[String:Any]],
+                  science.count<=20 else {
+                throw NativeWorldLabError.invalid("Too many scientific archive records")
+            }
+            rawScience=science
+        }
+        let evidence=NativeWorldLabScientificEvidenceStore(directory:root)
+        var ids=Set<String>()
+        for entry in runs {
+            guard Set(entry.keys)==Set(["projectId","run"]),
+                  entry["projectId"] as? String==project.id,
+                  let run=entry["run"] as? [String:Any],
+                  let id=run["id"] as? String,validID(id),
+                  ids.insert(id).inserted,
+                  run["format"] as? String=="env-world-lab-run",
+                  run["schemaVersion"] as? Int==1,
+                  run["evidence"] as? String=="physics-model-computed",
+                  let samples=run["samples"] as? [Any],
+                  (2...50001).contains(samples.count),
+                  try JSONSerialization.data(withJSONObject:entry).count<=8*1024*1024
+            else {
+                throw NativeWorldLabError.invalid(
+                    "Imported numerical evidence is malformed or duplicated")
+            }
+        }
+        let scienceRecords=try rawScience.map{ item -> Data in
+            guard let id=item["id"] as? String,ids.insert(id).inserted,
+                  item["projectId"] as? String==project.id,
+                  let revision=item["projectRevision"] as? Int,
+                  revision<=project.revision else {
+                throw NativeWorldLabError.invalid(
+                    "Scientific evidence identity or revision mismatch")
+            }
+            let blob=try JSONSerialization.data(withJSONObject:item,options:[.sortedKeys])
+            try evidence.validateEnvelope(blob,projectId:project.id)
+            return blob
+        }
+        return NativeWorldLabPortableArchiveContent(projectData:data,
+            project:project,legacyRuns:runs,scientificRecords:scienceRecords)
+    }
+    func export(_ projectData:Data)throws->Data {
+        let project=try NativeWorldLabProject.decode(projectData)
+        let file=try legacyFile(project.id)
+        let manager=FileManager.default
+        var legacy:[[String:Any]]=[]
+        if manager.fileExists(atPath:file.path){
+            let attrs=try manager.attributesOfItem(atPath:file.path)
+            guard let size=(attrs[.size] as? NSNumber)?.intValue,size<=Self.maxBytes else {
+                throw NativeWorldLabError.invalid("Stored numerical history is oversized")
+            }
+            let data=try Data(contentsOf:file)
+            guard let list=try JSONSerialization.jsonObject(with:data) as? [[String:Any]]
+            else {
+                throw NativeWorldLabError.invalid("Stored historical experiment list invalid")
+            }
+            legacy=list
+        }
+        let science=NativeWorldLabScientificEvidenceStore(directory:root)
+        let records=try science.list(project.id).map{
+            try JSONSerialization.jsonObject(with:science.read(project.id,$0.id))
+        }
+        let raw=try JSONSerialization.jsonObject(with:projectData)
+        let archive:[String:Any]=[
+            "format":"env-world-lab-archive","schemaVersion":2,
+            "project":raw,"recordedRuns":legacy,"scientificEvidence":records
+        ]
+        let bytes=try JSONSerialization.data(withJSONObject:archive,options:[.sortedKeys])
+        _ = try decode(bytes)
+        return bytes
+    }
+    func importArchive(_ data:Data)throws->NativeWorldLabPortableArchiveContent {
+        let imported=try decode(data)
+        let local=NativeWorldLabProjectStore(directory:root)
+        if (try? local.read(imported.project.id)) != nil {
+            throw NativeWorldLabError.invalid(
+                "An invention with this identifier already exists on this device")
+        }
+        let manager=FileManager.default
+        // Keep an original source backup first, so any interrupted multi-file
+        // import can be retried without losing the user's evidence.
+        let archiveFolder=root.appendingPathComponent(
+            "ImportedPortableArchives",isDirectory:true)
+        try manager.createDirectory(at:archiveFolder,withIntermediateDirectories:true)
+        try data.write(to:archiveFolder.appendingPathComponent(
+            imported.project.id+".json"),options:.atomic)
+        let historical=try legacyFile(imported.project.id)
+        try manager.createDirectory(at:historical.deletingLastPathComponent(),
+            withIntermediateDirectories:true)
+        let legacy=try JSONSerialization.data(withJSONObject:imported.legacyRuns,
+            options:[.sortedKeys])
+        try legacy.write(to:historical,options:.atomic)
+        _ = try local.save(imported.projectData)
+        let history=NativeWorldLabScientificEvidenceStore(directory:root)
+        for item in imported.scientificRecords {
+            try history.importRecord(item,projectId:imported.project.id)
+        }
+        return imported
     }
 }
