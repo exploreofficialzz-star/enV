@@ -279,3 +279,7 @@ release-candidate evidence bundle are unfinished.
 ## Android native spatial authoring and measurement (2026-10-31)
 
 - Added validated Kotlin `positionSolid`/`snapSolid` SI editor operations and separate pure `measureCenters` geometry calculations. The Compose screen now exposes selectable grid spacing, snap-center and measurement between the selected and a changeable second solid; numeric vertical, horizontal and 3D offsets are distinguished from physical contact. Regression cases cover strict portable roundtrips, invalid positioning and 3-4-12 centre separation. Native iOS and full CI acceptance remain distinct.
+
+## iOS native spatial authoring parity (2026-10-31)
+
+- Swift now has strict SI `positionSolid`, `snapSolid` and independent center-distance/horizontal displacement calculations, with a native picker for grid sizes and target solid and a geometry-only disclaimer. Added XCTest cases for 3D Pythagorean distance, grid roundtrip and rejecting nonfinite/unsupported positions. These are native source integrations; simulator/XCTest acceptance is deferred to the full audit.

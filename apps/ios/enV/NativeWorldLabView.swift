@@ -40,6 +40,8 @@ struct NativeWorldLabView:View {
     @State private var deviceName=""
     @State private var deviceAssumption=""
     @State private var deviceResistance=""
+    @State private var gridSpacing=0.5
+    @State private var measureTargetId=""
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
@@ -328,6 +330,40 @@ struct NativeWorldLabView:View {
                                     $0,id:solid.id,dimensionsMeters:scaled)}
                             }
                         }.buttonStyle(.bordered)
+                        Text("Position and measure").font(.headline)
+                        HStack {
+                            Picker("Grid spacing",selection:$gridSpacing) {
+                                Text("0.1 m").tag(0.1)
+                                Text("0.5 m").tag(0.5)
+                                Text("1 m").tag(1.0)
+                                Text("5 m").tag(5.0)
+                            }.pickerStyle(.menu).accessibilityLabel("Grid snap spacing")
+                            Button("Snap center"){
+                                applyProject{try NativeWorldLabEditor.snapSolid(
+                                    $0,id:solid.id,gridMeters:gridSpacing)}
+                            }.buttonStyle(.bordered)
+                        }
+                        let others=project.entities.filter{$0.id != solid.id}
+                        if !others.isEmpty {
+                            Picker("Measure to",selection:$measureTargetId){
+                                Text("Choose another solid").tag("")
+                                ForEach(others,id:\.id){candidate in
+                                    Text(candidate.name).tag(candidate.id)
+                                }
+                            }.pickerStyle(.menu)
+                                .accessibilityLabel("Measure distance to solid")
+                            if let other=others.first(where:{$0.id==measureTargetId}),
+                               let measurement=try? NativeWorldLabEditor.measureCenters(
+                                  project,fromId:solid.id,toId:other.id) {
+                                value("Center distance",measurement.centerDistanceM,"m")
+                                value("Horizontal distance",measurement.horizontalDistanceM,"m")
+                                value("X offset",measurement.offsetXM,"m")
+                                value("Y offset",measurement.offsetYM,"m")
+                                value("Z offset",measurement.offsetZM,"m")
+                                Text("Geometry only; not surface clearance or collision.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
                         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
                         value("Assumed mass",assumedMass,"kg")
                         Text("Try floating your invention").font(.headline)

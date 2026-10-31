@@ -3,6 +3,15 @@ import Foundation
 /// Portable v1 project creation and editing with strict validation on *every*
 /// mutation. Unknown matter remains a user assumption, not observed science.
 enum NativeWorldLabEditor {
+    struct GeometryMeasurement {
+        let fromId:String
+        let toId:String
+        let offsetXM:Double
+        let offsetYM:Double
+        let offsetZM:Double
+        let centerDistanceM:Double
+        let horizontalDistanceM:Double
+    }
     private static func encode(_ root:[String:Any]) throws -> Data {
         // JSONSerialization can raise an Objective-C exception, rather than a
         // Swift Error, when an NSNumber holds NaN/Infinity. Always reject
@@ -210,6 +219,50 @@ enum NativeWorldLabEditor {
             throw NativeWorldLabError.invalid("Dimensions must be three finite SI measurements between 0.001 and 10,000 m")
         }
         return try editSolid(data,id:id){$0["dimensionsMeters"]=dimensionsMeters}
+    }
+    static func positionSolid(_ data:Data,id:String,positionMeters:[Double]) throws -> Data {
+        guard positionMeters.count==3,
+              positionMeters.allSatisfy({$0.isFinite && abs($0)<=100000}) else {
+            throw NativeWorldLabError.invalid("Position needs three bounded SI coordinates")
+        }
+        return try editSolid(data,id:id){$0["positionMeters"]=positionMeters}
+    }
+    static func snapSolid(_ data:Data,id:String,gridMeters:Double) throws -> Data {
+        guard gridMeters.isFinite,gridMeters>=0.001,gridMeters<=100 else {
+            throw NativeWorldLabError.invalid("Grid spacing must be 0.001–100 metres")
+        }
+        let project=try NativeWorldLabProject.decode(data)
+        guard let solid=project.entities.first(where:{$0.id==id}) else {
+            throw NativeWorldLabError.invalid("Selected solid is missing")
+        }
+        let result=try solid.positionMeters.map{value -> Double in
+            let raw=(value/gridMeters).rounded()*gridMeters
+            let rounded=(raw*1e6).rounded()/1e6
+            guard rounded.isFinite,abs(rounded)<=100000 else {
+                throw NativeWorldLabError.invalid("Snapped position outside local world")
+            }
+            return rounded
+        }
+        return try positionSolid(data,id:id,positionMeters:result)
+    }
+    static func measureCenters(_ project:NativeWorldLabProject,
+                               fromId:String,toId:String) throws -> GeometryMeasurement {
+        guard fromId != toId,
+              let a=project.entities.first(where:{$0.id==fromId}),
+              let b=project.entities.first(where:{$0.id==toId}) else {
+            throw NativeWorldLabError.invalid("Choose two distinct existing solids")
+        }
+        let x=b.positionMeters[0]-a.positionMeters[0]
+        let y=b.positionMeters[1]-a.positionMeters[1]
+        let z=b.positionMeters[2]-a.positionMeters[2]
+        let horizontal=hypot(x,z)
+        let threeDimensional=hypot(horizontal,y)
+        guard horizontal.isFinite,threeDimensional.isFinite else {
+            throw NativeWorldLabError.invalid("Geometric distance outside finite bounds")
+        }
+        return GeometryMeasurement(fromId:fromId,toId:toId,
+            offsetXM:x,offsetYM:y,offsetZM:z,
+            centerDistanceM:threeDimensional,horizontalDistanceM:horizontal)
     }
     static func assignMaterial(_ data:Data,solidId:String,materialId:String?) throws -> Data {
         try editSolid(data,id:solidId){$0["materialId"]=materialId.map{$0 as Any} ?? NSNull()}

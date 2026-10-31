@@ -19,6 +19,28 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(parsed.materials[0].densityKgM3),440)
         XCTAssertGreaterThan(parsed.entities[0].volumeMetersCubed,4)
     }
+    func testPortableGridSnappingAndEuclideanMeasurements() throws {
+        var data=try NativeWorldLabEditor.blank()
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"b")
+        data=try NativeWorldLabEditor.positionSolid(
+            data,id:"a",positionMeters:[0.24,-0.26,2.49])
+        data=try NativeWorldLabEditor.snapSolid(data,id:"a",gridMeters:0.5)
+        let first=try XCTUnwrap(NativeWorldLabProject.decode(data)
+            .entities.first(where:{$0.id=="a"}))
+        XCTAssertEqual(first.positionMeters,[0,-0.5,2.5])
+        data=try NativeWorldLabEditor.positionSolid(
+            data,id:"b",positionMeters:[3,3.5,14.5])
+        let parsed=try NativeWorldLabProject.decode(data)
+        let distance=try NativeWorldLabEditor.measureCenters(
+            parsed,fromId:"a",toId:"b")
+        XCTAssertEqual(distance.centerDistanceM,13,accuracy:1e-12)
+        XCTAssertEqual(distance.horizontalDistanceM,hypot(3,12),accuracy:1e-12)
+        XCTAssertThrowsError(try NativeWorldLabEditor.snapSolid(
+            data,id:"a",gridMeters:0))
+        XCTAssertThrowsError(try NativeWorldLabEditor.positionSolid(
+            data,id:"a",positionMeters:[Double.nan,0,0]))
+    }
     func testSchemaEnforcedForEveryMutation() throws {
         let data=try NativeWorldLabEditor.blank()
         XCTAssertThrowsError(try NativeWorldLabEditor.addSolid(data,shape:"freeform"))
