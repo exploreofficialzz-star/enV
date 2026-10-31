@@ -189,7 +189,7 @@ enum NativeWorldLabActuator {
             modelVersion:i.thermal == nil ? "1.0.0" : "1.1.0",
             validity:i.thermal == nil ?
                 "Bounded 1D R-L actuator with hypothetical parameters; not certified." :
-                "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, "+
+                "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, " +
                 "cooling and resistance; not measured or certified.")
     }
 

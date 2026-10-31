@@ -572,7 +572,7 @@ struct NativeLabFluidMotionRun {
     let samples:[NativeLabFluidMotionSample]
     let stepSeconds:Double
     let evidence="physics-model-computed"
-    let validity="One-dimensional Archimedes displacement with an assumed fixed fluid plane, "+
+    let validity="One-dimensional Archimedes displacement with an assumed fixed fluid plane, " +
         "viscous drag and bottom contact; no real fluid flow, waves or verified material."
 }
 enum NativeWorldLabFluidMotion {
@@ -717,7 +717,7 @@ struct NativeChemicalThermalResult {
     let samples:[NativeChemicalThermalSample]
     let stepSeconds:Double
     let evidence="physics-model-computed"
-    let validity="Well-mixed hypothetical first-order Arrhenius reaction and thermal energy balance; "+
+    let validity="Well-mixed hypothetical first-order Arrhenius reaction and thermal energy balance; " +
         "no identified substance, reaction selectivity, measured matter or safety certification."
 }
 enum NativeWorldLabChemicalThermal {
@@ -751,13 +751,12 @@ enum NativeWorldLabChemicalThermal {
         }
         let dt=i.durationSeconds/Double(stepCount)
         func rate(_ n:Double,_ t:Double)->Double {
-            return i.preExponentialPerS*exp(-i.activationEnergyJPerMol/
-                (8.31446261815324*max(1,t)))*n
+            return i.preExponentialPerS*exp(-i.activationEnergyJPerMol / (8.31446261815324*max(1,t)))*n
         }
         func derivative(_ s:[Double])->[Double]{
             let reactionRate=rate(s[0],s[1])
             let cooling=i.coolingConductanceWPerK*(s[1]-i.ambientTemperatureK)
-            let heat=i.reactionHeatReleasedJPerMol*reactionRate+
+            let heat=i.reactionHeatReleasedJPerMol*reactionRate +
                 i.externalHeatingW-cooling
             return [-reactionRate,heat/i.heatCapacityJPerK]
         }
@@ -787,7 +786,7 @@ enum NativeWorldLabChemicalThermal {
             let residual=released+external-stored-cumulativeCooling
             guard [n,temp,product,reactionRate,released,external,stored,
                    cooling,residual].allSatisfy({$0.isFinite}),
-                  n>=-1e-6,n<=i.initialReactantMol+1e-6,
+                  n >= -1e-6,n<=i.initialReactantMol+1e-6,
                   temp>=150,temp<=2000 else {
                 throw NativeWorldLabError.invalid("Thermal reaction left bounded numerical conditions")
             }
@@ -800,7 +799,7 @@ enum NativeWorldLabChemicalThermal {
                 storedThermalEnergyJ:stored,energyResidualJ:residual))
             if j==stepCount {break}
             let next=advance(state)
-            guard next.allSatisfy({$0.isFinite}),next[0]>=-1e-6,
+            guard next.allSatisfy({$0.isFinite}),next[0] >= -1e-6,
                   next[0]<=i.initialReactantMol+1e-6,next[1]>=150,next[1]<=2000 else {
                 throw NativeWorldLabError.invalid("Reaction solver is unstable under these assumptions")
             }

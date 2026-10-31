@@ -12,7 +12,7 @@ test("visual assembly preserves portable group and moves only its two member pos
  const p=createWorldLabAssembly(source(),"group","Two parts",["left","right"]);
  const moved=moveWorldLabAssembly(p,"group",[1,0,-2]);
  assert.equal(moved.entities[0].positionMeters[0],p.entities[0].positionMeters[0]+1);
- assert.equal(moved.entities[1].positionMeters[2],p.entities[1].positionMeters[2]-2);
+ assert.ok(Math.abs(moved.entities[1].positionMeters[2]-(p.entities[1].positionMeters[2]-2))<1e-9);
  assert.deepEqual(moved.entities[2],p.entities[2]);
  assert.deepEqual(parseWorldLabProject(JSON.parse(serializeWorldLabProject(moved))).assemblies,moved.assemblies);
  const undone=ungroupWorldLabAssembly(moved,"group");

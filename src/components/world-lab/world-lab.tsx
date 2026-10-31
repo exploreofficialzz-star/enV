@@ -1441,7 +1441,7 @@ export default function WorldLab() {
                 }}>Add wire junction</button>
             </div>
             <div className="mt-2 space-y-1">
-              {project.networks[0].nodes.map(node=><div className="flex items-center justify-between gap-2 text-xs"
+              {project.networks?.[0]?.nodes.map(node=><div className="flex items-center justify-between gap-2 text-xs"
                 key={node.id}>
                 <span>{node.label}{node.id===project.networks![0].groundNodeId?" (ground)":""}</span>
                 <button type="button" className={buttonClass}
@@ -1500,7 +1500,7 @@ export default function WorldLab() {
                     value={part.positiveNodeId}
                     onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
                       rewireCircuitPart(n,part.id,e.target.value,part.negativeNodeId))}))}>
-                    {project.networks[0].nodes.map(node=>
+                    {project.networks?.[0]?.nodes.map(node=>
                       <option key={node.id} value={node.id}>{node.label}</option>)}
                   </select>
                 </label>
@@ -1509,7 +1509,7 @@ export default function WorldLab() {
                     value={part.negativeNodeId}
                     onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
                       rewireCircuitPart(n,part.id,part.positiveNodeId,e.target.value))}))}>
-                    {project.networks[0].nodes.map(node=>
+                    {project.networks?.[0]?.nodes.map(node=>
                       <option key={node.id} value={node.id}>{node.label}</option>)}
                   </select>
                 </label>

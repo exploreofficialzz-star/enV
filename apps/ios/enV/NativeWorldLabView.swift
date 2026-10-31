@@ -244,10 +244,208 @@ struct NativeWorldLabView:View {
                     Text("Unsaved on this device. Save locally or export JSON to preserve these changes.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if let project {
+                if let project { projectContent(project) }
+                if !problem.isEmpty {Text(problem).foregroundStyle(.red)}
+                Text("Model 1.0.0 · computed with assumed parameters · not a safety assessment.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }.padding(14)
+        }
+        .onAppear{redraw();lastTick=Date()}
+        .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
+        .onChange(of:seconds){_ in redraw()}
+        .onChange(of:dropTime){_ in applyDropPosition()}
+        .onChange(of:fluidTime){_ in applyFluidPosition()}
+        .onChange(of:motorTime){_ in applyMotorPosition()}
+        .onChange(of:seeInside){_ in redraw()}
+        .onChange(of:mass){_ in redraw()}
+        .onChange(of:resistance){_ in redraw()}
+        .onChange(of:diffusivity){_ in redraw()}
+        .onChange(of:projectData){_ in
+            // Never reuse a prior computed trajectory after geometry/material edits.
+            fluidPlaying=false;fluidMotion=nil;fluidTime=0
+            dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
+            motorPlaying=false;motorRun=nil;motorEntityId=nil;motorTime=0;redraw()
+        }
+        .onReceive(timer){now in
+            let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
+            lastTick=now
+            if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
+            if motorPlaying,let run=motorRun {
+                motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
+                if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
+            }
+            if chemicalPlaying,let run=chemicalRun {
+                chemicalTime=min(run.samples.last?.timeSeconds ?? 6,
+                    chemicalTime+dt)
+                if chemicalTime >= (run.samples.last?.timeSeconds ?? 6){
+                    chemicalPlaying=false
+                }
+            }
+            if fluidPlaying,let run=fluidMotion {
+                fluidTime=min(run.samples.last?.timeSeconds ?? 4,fluidTime+dt)
+                if fluidTime >= (run.samples.last?.timeSeconds ?? 4) {
+                    fluidPlaying=false
+                }
+            }
+            if dropPlaying,let run=dropRun {
+                dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
+                if dropTime >= (run.samples.last?.timeSeconds ?? 6){dropPlaying=false}
+            }
+        }
+        .confirmationDialog("Discard unsaved changes?",isPresented:$confirmation,
+                            titleVisibility:.visible) {
+            Button("Discard and continue",role:.destructive){
+                if pendingReplacement=="new" {newProject()}
+                else if pendingReplacement=="open" {loadSavedProject()}
+                else if pendingReplacement=="import" {importing=true}
+                pendingReplacement=""
+            }
+            Button("Keep editing",role:.cancel){pendingReplacement=""}
+        } message: {
+            Text("Save locally or export JSON first if you want to keep the current changes.")
+        }
+        .fileExporter(isPresented:$exporting,
+            document:projectData.map{NativeWorldLabJsonFile(content:$0)},
+            contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
+            do {
+                let url=try response.get()
+                let accessed=url.startAccessingSecurityScopedResource()
+                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
+                // File-size metadata must be available and bounded before
+                // allocating memory for untrusted imported project contents.
+                let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+                guard let length=(attributes[.size] as? NSNumber)?.intValue,
+                      length<=NativeWorldLabProject.maxBytes else {
+                    throw NativeWorldLabError.invalid("Project files must be 1 MB or smaller.")
+                }
+                let data=try Data(contentsOf:url)
+                project=try NativeWorldLabProject.decode(data)
+                projectData=data
+                savedSnapshot=nil
+                editHistory.clear()
+                selected=0;problem="";redraw()
+            }catch{problem=error.localizedDescription}
+        }
+    }
+    private func value(_ name: String, _ amount: Double?, _ unit: String) -> some View {
+        let displayed: String
+        if let amount = amount {
+            displayed = String(format: "%.5g", amount)
+        } else {
+            displayed = "Unknown"
+        }
+        let caption = name + ": " + displayed + " " + unit
+        return Text(verbatim: caption).font(.subheadline)
+    }
+
+    @ViewBuilder private func projectContent(_ project:NativeWorldLabProject)->some View {
+
                     Text(project.title+" · "+String(project.entities.count)+" solids")
                         .font(.headline)
-                    Text("Invent chemical heat").font(.headline)
+                    chemicalContent()
+                    Text("Connected DC circuits").font(.headline)
+                    if let circuit=project.networks?.first { circuitContent(circuit,project:project) }else {
+                        Button("Build first circuit"){
+                            applyProject{try NativeWorldLabEditor.starterCircuit($0)}
+                        }.buttonStyle(.bordered)
+                    }
+                    HStack(spacing:8){
+                        Button("Add cube"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"box")}}
+                        Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}
+                        Button("Add cylinder"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"cylinder")}}
+                    }.buttonStyle(.bordered).disabled(project.entities.count>=200)
+                    Text("Build from visual parts").font(.headline)
+                    Text("Connect solid shapes for coordinated movement, not a calculated mechanical joint.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let chosen=solid {
+                        let available=project.entities.filter{candidate in
+                            candidate.id != chosen.id &&
+                            !(project.assemblies ?? []).contains(where:{
+                                $0.entityIds.contains(candidate.id)
+                            })
+                        }
+                        TextField("Assembly name",text:$assemblyName)
+                            .textFieldStyle(.roundedBorder)
+                        Picker("Second part",selection:$assemblySecondId){
+                            Text("Choose a second solid").tag("")
+                            ForEach(available,id:\.id){candidate in
+                                Text(candidate.name).tag(candidate.id)
+                            }
+                        }.pickerStyle(.menu)
+                        Button("Group these parts"){
+                            applyProject{try NativeWorldLabEditor.createVisualAssembly(
+                                $0,name:assemblyName,
+                                entityIds:[chosen.id,assemblySecondId])}
+                        }.buttonStyle(.bordered)
+                            .disabled(assemblySecondId.isEmpty ||
+                                !available.contains(where:{$0.id==assemblySecondId}) ||
+                                assemblyName.isEmpty ||
+                                (project.assemblies?.count ?? 0)>=50 ||
+                                (project.assemblies ?? []).contains(where:{
+                                    $0.entityIds.contains(chosen.id)
+                                }))
+                    }
+                    ForEach(project.assemblies ?? [],id:\.id){group in
+                        VStack(alignment:.leading,spacing:6){
+                            Text(group.name+" · "+String(group.entityIds.count)+" parts")
+                                .font(.subheadline)
+                            HStack {
+                                ForEach(0..<3,id:\.self){axis in
+                                    Button("Move +"+["X","Y","Z"][axis]){
+                                        var delta=[0.0,0.0,0.0]
+                                        delta[axis]=0.5
+                                        applyProject{try NativeWorldLabEditor.moveVisualAssembly(
+                                            $0,id:group.id,deltaMeters:delta)}
+                                    }
+                                }
+                            }.buttonStyle(.bordered)
+                            Button("Ungroup safely"){
+                                applyProject{try NativeWorldLabEditor.ungroupVisualAssembly(
+                                    $0,id:group.id)}
+                            }.buttonStyle(.bordered)
+                        }
+                    }
+                    HStack {
+                        Button("Undo"){travelEdit(false)}.disabled(!editHistory.canUndo)
+                        Button("Redo"){travelEdit(true)}.disabled(!editHistory.canRedo)
+                    }.buttonStyle(.bordered)
+                    if let solid { solidContent(project:project,solid:solid) }
+                    TextField("Invented material name",text:$inventedName)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Assumed density in kg/m³ (optional)",text:$inventedDensity)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    Button("Save invented material") {
+                        do {
+                            guard !inventedName.trimmingCharacters(in:.whitespaces).isEmpty else{
+                                throw NativeWorldLabError.invalid("Name your invented material.")
+                            }
+                            let density:Double?
+                            if inventedDensity.trimmingCharacters(in:.whitespaces).isEmpty{
+                                density=nil
+                            }else if let number=Double(inventedDensity){density=number}
+                            else {throw NativeWorldLabError.invalid("Density must be a finite number.")}
+                            let id=UUID().uuidString
+                            applyProject {old in
+                                let first=try NativeWorldLabEditor.addHypotheticalMaterial(
+                                    old,name:inventedName,densityKgM3:density,id:id)
+                                if let solid {
+                                    return try NativeWorldLabEditor.assignMaterial(
+                                        first,solidId:solid.id,materialId:id)
+                                }
+                                return first
+                            }
+                            if problem.isEmpty {inventedName="";inventedDensity=""}
+                        }catch{problem=error.localizedDescription}
+                    }.buttonStyle(.borderedProminent)
+                    Text("Imported geometry is not structurally or chemically simulated. The spring uses only a separately assumed lumped mass.")
+                        .font(.caption).foregroundStyle(.secondary)
+                
+    }
+    @ViewBuilder private func chemicalContent()->some View {
+Text("Invent chemical heat").font(.headline)
                     Text("Invent assumed reaction properties; the model cannot identify real chemicals.")
                         .font(.caption).foregroundStyle(.secondary)
                     value("Assumed heat released",reactionHeat,"J/mol")
@@ -299,8 +497,11 @@ struct NativeWorldLabView:View {
                         }.buttonStyle(.bordered)
                         Text(chemical.validity).font(.caption).foregroundStyle(.secondary)
                     }
-                    Text("Connected DC circuits").font(.headline)
-                    if let circuit=project.networks?.first {
+                    
+    }
+    @ViewBuilder private func circuitContent(_ circuit:NativeLabCircuitNetwork,
+        project:NativeWorldLabProject)->some View {
+
                         Text(circuit.name+" · "+String(circuit.components.count)+" wired parts")
                             .font(.caption)
                         HStack {
@@ -463,72 +664,11 @@ struct NativeWorldLabView:View {
                             }
                             Text(run.validity).font(.caption).foregroundStyle(.secondary)
                         }
-                    }else {
-                        Button("Build first circuit"){
-                            applyProject{try NativeWorldLabEditor.starterCircuit($0)}
-                        }.buttonStyle(.bordered)
-                    }
-                    HStack(spacing:8){
-                        Button("Add cube"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"box")}}
-                        Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}
-                        Button("Add cylinder"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"cylinder")}}
-                    }.buttonStyle(.bordered).disabled(project.entities.count>=200)
-                    Text("Build from visual parts").font(.headline)
-                    Text("Connect solid shapes for coordinated movement, not a calculated mechanical joint.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if let chosen=solid {
-                        let available=project.entities.filter{candidate in
-                            candidate.id != chosen.id &&
-                            !(project.assemblies ?? []).contains(where:{
-                                $0.entityIds.contains(candidate.id)
-                            })
-                        }
-                        TextField("Assembly name",text:$assemblyName)
-                            .textFieldStyle(.roundedBorder)
-                        Picker("Second part",selection:$assemblySecondId){
-                            Text("Choose a second solid").tag("")
-                            ForEach(available,id:\.id){candidate in
-                                Text(candidate.name).tag(candidate.id)
-                            }
-                        }.pickerStyle(.menu)
-                        Button("Group these parts"){
-                            applyProject{try NativeWorldLabEditor.createVisualAssembly(
-                                $0,name:assemblyName,
-                                entityIds:[chosen.id,assemblySecondId])}
-                        }.buttonStyle(.bordered)
-                            .disabled(assemblySecondId.isEmpty ||
-                                !available.contains(where:{$0.id==assemblySecondId}) ||
-                                assemblyName.isEmpty ||
-                                (project.assemblies?.count ?? 0)>=50 ||
-                                (project.assemblies ?? []).contains(where:{
-                                    $0.entityIds.contains(chosen.id)
-                                }))
-                    }
-                    ForEach(project.assemblies ?? [],id:\.id){group in
-                        VStack(alignment:.leading,spacing:6){
-                            Text(group.name+" · "+String(group.entityIds.count)+" parts")
-                                .font(.subheadline)
-                            HStack {
-                                ForEach(0..<3,id:\.self){axis in
-                                    Button("Move +"+["X","Y","Z"][axis]){
-                                        var delta=[0.0,0.0,0.0]
-                                        delta[axis]=0.5
-                                        applyProject{try NativeWorldLabEditor.moveVisualAssembly(
-                                            $0,id:group.id,deltaMeters:delta)}
-                                    }
-                                }
-                            }.buttonStyle(.bordered)
-                            Button("Ungroup safely"){
-                                applyProject{try NativeWorldLabEditor.ungroupVisualAssembly(
-                                    $0,id:group.id)}
-                            }.buttonStyle(.bordered)
-                        }
-                    }
-                    HStack {
-                        Button("Undo"){travelEdit(false)}.disabled(!editHistory.canUndo)
-                        Button("Redo"){travelEdit(true)}.disabled(!editHistory.canRedo)
-                    }.buttonStyle(.bordered)
-                    if let solid {
+                    
+    }
+    @ViewBuilder private func solidContent(project:NativeWorldLabProject,
+        solid:NativeLabSolid)->some View {
+
                         HStack {
                             Button("Previous"){selected=max(0,selected-1)}.disabled(selected==0)
                             Spacer()
@@ -792,132 +932,9 @@ struct NativeWorldLabView:View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                    }
-                    TextField("Invented material name",text:$inventedName)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Assumed density in kg/m³ (optional)",text:$inventedDensity)
-                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
-                    Button("Save invented material") {
-                        do {
-                            guard !inventedName.trimmingCharacters(in:.whitespaces).isEmpty else{
-                                throw NativeWorldLabError.invalid("Name your invented material.")
-                            }
-                            let density:Double?
-                            if inventedDensity.trimmingCharacters(in:.whitespaces).isEmpty{
-                                density=nil
-                            }else if let number=Double(inventedDensity){density=number}
-                            else {throw NativeWorldLabError.invalid("Density must be a finite number.")}
-                            let id=UUID().uuidString
-                            applyProject {old in
-                                let first=try NativeWorldLabEditor.addHypotheticalMaterial(
-                                    old,name:inventedName,densityKgM3:density,id:id)
-                                if let solid {
-                                    return try NativeWorldLabEditor.assignMaterial(
-                                        first,solidId:solid.id,materialId:id)
-                                }
-                                return first
-                            }
-                            if problem.isEmpty {inventedName="";inventedDensity=""}
-                        }catch{problem=error.localizedDescription}
-                    }.buttonStyle(.borderedProminent)
-                    Text("Imported geometry is not structurally or chemically simulated. The spring uses only a separately assumed lumped mass.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if !problem.isEmpty {Text(problem).foregroundStyle(.red)}
-                Text("Model 1.0.0 · computed with assumed parameters · not a safety assessment.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }.padding(14)
-        }
-        .onAppear{redraw();lastTick=Date()}
-        .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
-        .onChange(of:seconds){_ in redraw()}
-        .onChange(of:dropTime){_ in applyDropPosition()}
-        .onChange(of:fluidTime){_ in applyFluidPosition()}
-        .onChange(of:motorTime){_ in applyMotorPosition()}
-        .onChange(of:seeInside){_ in redraw()}
-        .onChange(of:mass){_ in redraw()}
-        .onChange(of:resistance){_ in redraw()}
-        .onChange(of:diffusivity){_ in redraw()}
-        .onChange(of:projectData){_ in
-            // Never reuse a prior computed trajectory after geometry/material edits.
-            fluidPlaying=false;fluidMotion=nil;fluidTime=0
-            dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
-            motorPlaying=false;motorRun=nil;motorEntityId=nil;motorTime=0;redraw()
-        }
-        .onReceive(timer){now in
-            let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
-            lastTick=now
-            if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
-            if motorPlaying,let run=motorRun {
-                motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
-                if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
-            }
-            if chemicalPlaying,let run=chemicalRun {
-                chemicalTime=min(run.samples.last?.timeSeconds ?? 6,
-                    chemicalTime+dt)
-                if chemicalTime >= (run.samples.last?.timeSeconds ?? 6){
-                    chemicalPlaying=false
-                }
-            }
-            if fluidPlaying,let run=fluidMotion {
-                fluidTime=min(run.samples.last?.timeSeconds ?? 4,fluidTime+dt)
-                if fluidTime >= (run.samples.last?.timeSeconds ?? 4) {
-                    fluidPlaying=false
-                }
-            }
-            if dropPlaying,let run=dropRun {
-                dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
-                if dropTime >= (run.samples.last?.timeSeconds ?? 6){dropPlaying=false}
-            }
-        }
-        .confirmationDialog("Discard unsaved changes?",isPresented:$confirmation,
-                            titleVisibility:.visible) {
-            Button("Discard and continue",role:.destructive){
-                if pendingReplacement=="new" {newProject()}
-                else if pendingReplacement=="open" {loadSavedProject()}
-                else if pendingReplacement=="import" {importing=true}
-                pendingReplacement=""
-            }
-            Button("Keep editing",role:.cancel){pendingReplacement=""}
-        } message: {
-            Text("Save locally or export JSON first if you want to keep the current changes.")
-        }
-        .fileExporter(isPresented:$exporting,
-            document:projectData.map{NativeWorldLabJsonFile(content:$0)},
-            contentType:.json,defaultFilename:"world-lab-project"){result in
-                if case .failure(let error)=result {problem=error.localizedDescription}
-            }
-        .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
-            do {
-                let url=try response.get()
-                let accessed=url.startAccessingSecurityScopedResource()
-                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
-                // File-size metadata must be available and bounded before
-                // allocating memory for untrusted imported project contents.
-                let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
-                guard let length=(attributes[.size] as? NSNumber)?.intValue,
-                      length<=NativeWorldLabProject.maxBytes else {
-                    throw NativeWorldLabError.invalid("Project files must be 1 MB or smaller.")
-                }
-                let data=try Data(contentsOf:url)
-                project=try NativeWorldLabProject.decode(data)
-                projectData=data
-                savedSnapshot=nil
-                editHistory.clear()
-                selected=0;problem="";redraw()
-            }catch{problem=error.localizedDescription}
-        }
+                    
     }
-    private func value(_ name: String, _ amount: Double?, _ unit: String) -> some View {
-        let displayed: String
-        if let amount = amount {
-            displayed = String(format: "%.5g", amount)
-        } else {
-            displayed = "Unknown"
-        }
-        let caption = name + ": " + displayed + " " + unit
-        return Text(verbatim: caption).font(.subheadline)
-    }
+
     private func applyMotorPosition(){
         guard let run=motorRun,let id=motorEntityId,
               let solid=project?.entities.first(where:{$0.id==id}),
@@ -933,8 +950,7 @@ struct NativeWorldLabView:View {
                 recursively:false),!run.samples.isEmpty else {return}
         let index=max(0,min(run.samples.count-1,
             Int((fluidTime/run.stepSeconds).rounded())))
-        node.position.y=Float(solid.dimensionsMeters[1]/2+
-            run.samples[index].bottomHeightM)
+        node.position.y=Float(solid.dimensionsMeters[1]/2 + run.samples[index].bottomHeightM)
     }
     private func applyDropPosition() {
         guard let run=dropRun,let id=dropEntityId,

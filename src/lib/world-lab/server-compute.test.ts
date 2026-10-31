@@ -15,7 +15,7 @@ test("bounded dispatcher computes static liquid without trusting any author-supp
  const r=runBoundedWorldLabOperation({kind:"hydrostatics",project:fixture(),
    entityId:"solid",fluidDensityKgM3:1000,immersionDepthM:0.5});
  assert.equal(r.kind,"hydrostatics");
- assert.equal(r.outcome.projectRevision,0);
+ assert.equal(r.projectRevision,0);
  assert.equal(r.outcome.evidence,"physics-model-computed");
  assert.throws(()=>runBoundedWorldLabOperation({kind:"hydrostatics",
    project:fixture(),entityId:"solid",fluidDensityKgM3:1000,
@@ -29,7 +29,7 @@ test("bounded dispatcher calculates a connected passive circuit and a short moto
    entityId:"solid",thermal:true,forceConstantNPerA:8});
  assert.equal(motor.kind,"wired-motor");
  assert.equal(motor.outcome.evidence,"physics-model-computed");
- assert.equal(motor.outcome.projectRevision,project.revision);
+ assert.equal(motor.projectRevision,project.revision);
 });
 test("bounded dispatcher rejects unauthorised input fields and extreme workloads",()=>{
  const project=fixture();
