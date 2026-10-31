@@ -21,6 +21,9 @@ import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabProjectCodec
 import com.chastech.env.engine.NativeWorldLabHydrostatics
+import com.chastech.env.engine.NativeWorldLabFluidMotion
+import com.chastech.env.engine.NativeLabFluidMotionInput
+import com.chastech.env.engine.NativeLabFluidMotionRun
 import com.chastech.env.engine.NativeLabHydroResult
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
@@ -75,6 +78,11 @@ fun NativeWorldLabForm() {
     var negativeWire by remember { mutableStateOf("ground") }
     var selected by remember { mutableIntStateOf(0) }
     var hydroRun by remember { mutableStateOf<NativeLabHydroResult?>(null) }
+    var fluidMotion by remember { mutableStateOf<NativeLabFluidMotionRun?>(null) }
+    var fluidFrame by remember { mutableIntStateOf(0) }
+    var fluidPlaying by remember { mutableStateOf(false) }
+    var waterSurfaceHeight by remember { mutableFloatStateOf(1f) }
+    var fluidDrag by remember { mutableFloatStateOf(200f) }
     var fluidDensity by remember { mutableStateOf(1000.0) }
     var immersionFraction by remember { mutableFloatStateOf(0.5f) }
     var dropRun by remember { mutableStateOf<NativeDropResult?>(null) }
@@ -113,7 +121,7 @@ fun NativeWorldLabForm() {
             val parsed=NativeWorldLabProjectCodec.decode(next)
             projectJson=next
             project=parsed
-            dcRun=null;wiredMotor=null;hydroRun=null
+            dcRun=null;wiredMotor=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
@@ -193,6 +201,15 @@ fun NativeWorldLabForm() {
         if(requestImport){
             requestImport=false
             picker.launch(arrayOf("application/json","text/plain","*/*"))
+        }
+    }
+    LaunchedEffect(fluidPlaying,fluidMotion) {
+        while(fluidPlaying){
+            delay(40)
+            val run=fluidMotion?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04/run.stepSeconds).toInt())
+            fluidFrame=(fluidFrame+stride).coerceAtMost(run.samples.lastIndex)
+            if(fluidFrame>=run.samples.lastIndex)fluidPlaying=false
         }
     }
     LaunchedEffect(dropPlaying,dropSpeed,dropRun) {
@@ -531,6 +548,51 @@ fun NativeWorldLabForm() {
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
                 Text("Try floating your invention",style=MaterialTheme.typography.titleSmall)
+                Text("Fluid surface above ground: "+labNumber(waterSurfaceHeight.toDouble())+" m")
+                Slider(value=waterSurfaceHeight,onValueChange={
+                    waterSurfaceHeight=it;fluidPlaying=false;fluidMotion=null
+                },valueRange=0f..5f,
+                    modifier=Modifier.semantics {contentDescription="Liquid surface height"})
+                Text("Assumed fluid drag: "+labNumber(fluidDrag.toDouble())+" N·s/m")
+                Slider(value=fluidDrag,onValueChange={
+                    fluidDrag=it;fluidPlaying=false;fluidMotion=null
+                },valueRange=0f..1000f,
+                    modifier=Modifier.semantics {contentDescription="Assumed viscous damping"})
+                OutlinedButton(onClick={
+                    runCatching{
+                        val start=(solid.positionMeters.y-solid.dimensionsMeters.y/2)
+                            .coerceAtLeast(0.0)
+                        fluidMotion=NativeWorldLabFluidMotion.evaluate(
+                            project!!,solid.id,NativeLabFluidMotionInput(
+                                fluidDensity,waterSurfaceHeight.toDouble(),start,
+                                fluidDrag.toDouble()))
+                        fluidFrame=0;fluidPlaying=true;warning=""
+                    }.onFailure{fluidMotion=null;fluidPlaying=false
+                        warning=it.message?:"Buoyant motion cannot be calculated"}
+                }){Text("Simulate floating or sinking")}
+                fluidMotion?.takeIf{it.projectId==project!!.id&&
+                    it.projectRevision==project!!.revision&&it.entityId==solid.id}?.let{motion->
+                    val observation=motion.samples[fluidFrame.coerceIn(0,motion.samples.lastIndex)]
+                    Text("Fluid simulation: "+labNumber(observation.timeSeconds)+" seconds")
+                    Text("Bottom height: "+labNumber(observation.bottomHeightM)+" m")
+                    Text("Velocity: "+labNumber(observation.velocityMps)+" m/s")
+                    Text("Buoyancy: "+labNumber(observation.buoyancyForceN)+" N")
+                    Text("Submerged depth: "+labNumber(observation.immersionDepthM)+" m")
+                    Text("Energy residual: "+labNumber(observation.energyResidualJ)+" J")
+                    Slider(value=fluidFrame.toFloat()/motion.samples.lastIndex,
+                        onValueChange={fluidPlaying=false
+                            fluidFrame=(it*motion.samples.lastIndex).toInt()},
+                        modifier=Modifier.semantics {contentDescription="Explore fluid motion time"})
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        OutlinedButton(onClick={fluidPlaying=!fluidPlaying}){
+                            Text(if(fluidPlaying)"Pause fluid" else "Play fluid")
+                        }
+                        OutlinedButton(onClick={fluidPlaying=false;fluidFrame=0}){
+                            Text("Reset fluid")
+                        }
+                    }
+                    Text(motion.validity,style=MaterialTheme.typography.bodySmall)
+                }
                 Text("Assumed fluid density: "+labNumber(fluidDensity)+" kg/m³")
                 Slider(value=fluidDensity.toFloat(),onValueChange={
                     fluidDensity=it.toDouble();hydroRun=null

@@ -301,3 +301,7 @@ release-candidate evidence bundle are unfinished.
 
 - Added a Web fluid motion experiment that advances an invented solid's vertical position using immersed primitive geometry at each timestep, Archimedes force, gravity, assumed linear viscous drag, and an inelastic ground constraint. Sampled results report submergence, velocity, buoyancy, external fluid work, damping loss and a mechanical energy residual, with pause/step/slow/fast/seek and evidence JSON. In the existing Babylon scene, the selected mesh follows actual computed height and an explicitly illustrative blue flat-water plane follows user-assumed liquid level.
 - The model is 1D and bounded; it does not simulate Navier–Stokes flow, hydrodynamic stability, waves, turbulence, structural failure, measured density, or certify a real invention. Numeric regression cases are registered but broad release CI was explicitly deferred. Native parity is not claimed.
+
+## Android coupled buoyancy and motion source parity (2026-10-31)
+
+- Added a standalone native Kotlin 1D floating/sinking solver using upright box/cylinder/sphere immersed volume per step, assumed fluid density, gravity, bounded linear drag, RK4 state evolution, floor contact, cumulative fluid work, dissipation and mechanical energy residual. Compose has native start/play/pause/seek and numeric force/time readouts with result invalidation. Kotlin reference cases are authored. Full Android device rendering and numerical CI acceptance remain pending the consolidated audit.

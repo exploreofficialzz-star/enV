@@ -91,6 +91,26 @@ class NativeWorldLabProjectTest {
         assertEquals(0.45,result.branchCurrentsA[invented.id]!!,1e-10)
         assertEquals(0.0,result.powerResidualW,1e-8)
     }
+    @Test fun nativeBuoyantDynamicsChangesSubmergenceOverTime(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="float")
+        json=NativeWorldLabEditor.addHypotheticalMaterial(
+            json,"Assumed buoyant matter",500.0,id="foam")
+        json=NativeWorldLabEditor.assignMaterial(json,"float","foam")
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val input=NativeLabFluidMotionInput(
+            1000.0,1.0,0.0,200.0,durationSeconds=3.0)
+        val run=NativeWorldLabFluidMotion.evaluate(project,"float",input)
+        assertTrue(run.samples.size>500)
+        assertEquals(1.0,run.samples.first().displacedVolumeM3,1e-12)
+        assertTrue(run.samples[150].bottomHeightM>0)
+        assertTrue(run.samples[150].immersionDepthM<1)
+        assertTrue(run.samples.all{it.energyResidualJ.isFinite()})
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabFluidMotion.evaluate(project,"float",
+                input.copy(linearDragNsPerM=Double.NaN))
+        }
+    }
     @Test fun rejectsUntrustedAttributesAndInvalidGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(

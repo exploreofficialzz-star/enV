@@ -352,3 +352,116 @@ object NativeWorldLabHydrostatics {
             fluidDensityKgM3,immersionDepthM,volume,force,pressure,net,draft,status)
     }
 }
+
+/** 1D immersed primitive motion, no hydrodynamic velocity-field simulation. */
+data class NativeLabFluidMotionInput(
+    val fluidDensityKgM3:Double,
+    val waterSurfaceHeightM:Double,
+    val startingBottomHeightM:Double,
+    val linearDragNsPerM:Double,
+    val gravityMps2:Double=9.80665,
+    val durationSeconds:Double=4.0
+)
+data class NativeLabFluidMotionSample(
+    val timeSeconds:Double,val bottomHeightM:Double,val velocityMps:Double,
+    val immersionDepthM:Double,val displacedVolumeM3:Double,
+    val buoyancyForceN:Double,val dragForceN:Double,
+    val weightForceN:Double,val kineticEnergyJ:Double,val gravitationalEnergyJ:Double,
+    val cumulativeBuoyancyWorkJ:Double,val dissipatedEnergyJ:Double,
+    val energyResidualJ:Double,val grounded:Boolean
+)
+data class NativeLabFluidMotionRun(
+    val projectId:String,val projectRevision:Int,val entityId:String,
+    val materialId:String,val massKg:Double,
+    val input:NativeLabFluidMotionInput,
+    val samples:List<NativeLabFluidMotionSample>,val stepSeconds:Double,
+    val evidence:String="physics-model-computed",
+    val validity:String="One-dimensional buoyancy of an upright solid in a fixed fluid surface; "+
+        "assumed linear damping and inelastic bottom; no flow, waves or validated real matter."
+)
+object NativeWorldLabFluidMotion {
+    fun evaluate(p:NativeWorldLabProject,id:String,input:NativeLabFluidMotionInput,
+        requestedStepSeconds:Double=1.0/240):NativeLabFluidMotionRun {
+        fun bounded(v:Double,lo:Double,hi:Double,label:String){
+            require(v.isFinite() && v in lo..hi){"$label outside bounded fluid model"}
+        }
+        bounded(input.fluidDensityKgM3,0.01,25000.0,"Fluid density")
+        bounded(input.waterSurfaceHeightM,0.0,20.0,"Fluid surface")
+        bounded(input.startingBottomHeightM,0.0,20.0,"Initial height")
+        bounded(input.linearDragNsPerM,0.0,10000.0,"Assumed drag")
+        bounded(input.gravityMps2,0.0,100.0,"Gravity")
+        bounded(input.durationSeconds,0.1,12.0,"Duration")
+        bounded(requestedStepSeconds,0.0001,0.05,"Solver step")
+        val solid=p.entities.firstOrNull{it.id==id}
+            ?:error("Selected solid is missing")
+        val material=p.materials.firstOrNull{it.id==solid.materialId}
+            ?:error("Motion needs an explicit hypothetical mass assumption")
+        val density=material.densityKgM3?:error("Unknown matter has no supplied density")
+        val mass=solid.volumeMetersCubed()*density
+        bounded(mass,0.001,10000.0,"Invention mass")
+        val rate=maxOf(1.0,input.linearDragNsPerM/mass)
+        val steps=kotlin.math.ceil(input.durationSeconds/
+            kotlin.math.min(requestedStepSeconds,0.05/rate)).toInt()
+        require(steps<=50000){"Specialized stiff-fluid solver required"}
+        val dt=input.durationSeconds/steps
+        data class Force(val depth:Double,val displaced:Double,val buoyancy:Double,
+            val drag:Double,val weight:Double,val acceleration:Double)
+        fun forces(h:Double,v:Double):Force {
+            val depth=(input.waterSurfaceHeightM-kotlin.math.max(0.0,h))
+                .coerceIn(0.0,solid.dimensionsMeters.y)
+            val displaced=NativeWorldLabHydrostatics.displacedVolume(solid,depth)
+            val buoyancy=input.fluidDensityKgM3*input.gravityMps2*displaced
+            val weight=mass*input.gravityMps2
+            val drag=-input.linearDragNsPerM*v
+            return Force(depth,displaced,buoyancy,drag,weight,
+                (buoyancy+drag-weight)/mass)
+        }
+        fun derivative(s:DoubleArray):DoubleArray {
+            val f=forces(s[0],s[1])
+            return if(s[0]<=0.0&&s[1]<=0.0&&f.buoyancy<=f.weight)
+                doubleArrayOf(0.0,0.0)
+            else doubleArrayOf(s[1],f.acceleration)
+        }
+        fun advance(s:DoubleArray):DoubleArray {
+            val k1=derivative(s)
+            fun shifted(k:DoubleArray,f:Double)=doubleArrayOf(
+                s[0]+dt*k[0]*f,s[1]+dt*k[1]*f)
+            val k2=derivative(shifted(k1,0.5))
+            val k3=derivative(shifted(k2,0.5))
+            val k4=derivative(shifted(k3,1.0))
+            return doubleArrayOf(
+                s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6.0,
+                s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6.0)
+        }
+        var s=doubleArrayOf(input.startingBottomHeightM,0.0)
+        var buoyancyWork=0.0;var dissipated=0.0
+        val initial=mass*input.gravityMps2*s[0]
+        val samples=ArrayList<NativeLabFluidMotionSample>(steps+1)
+        for(j in 0..steps){
+            val h=s[0];val v=s[1];val f=forces(h,v)
+            val ke=0.5*mass*v*v
+            val pe=mass*input.gravityMps2*h
+            val residual=initial+buoyancyWork-ke-pe-dissipated
+            require(listOf(h,v,ke,pe,residual,buoyancyWork,dissipated,f.buoyancy).all{
+                it.isFinite()} && h<=1000 && kotlin.math.abs(v)<=10000){
+                "Fluid motion exceeded its finite numerical range"
+            }
+            samples.add(NativeLabFluidMotionSample(j*dt,h,v,f.depth,
+                f.displaced,f.buoyancy,f.drag,f.weight,ke,pe,
+                buoyancyWork,dissipated,residual,h==0.0&&v==0.0))
+            if(j==steps)break
+            val raw=advance(s)
+            val next=if(raw[0]<0.0||(raw[0]==0.0&&raw[1]<0.0))
+                doubleArrayOf(0.0,0.0) else raw
+            val after=forces(next[0],next[1])
+            buoyancyWork+=0.5*(f.buoyancy+after.buoyancy)*(next[0]-h)
+            dissipated+=0.5*dt*input.linearDragNsPerM*(v*v+next[1]*next[1])
+            if(next[0]==0.0&&next[1]==0.0&&(h>0.0||v<0.0)&&raw[1]<0)
+                dissipated+=0.5*mass*raw[1]*raw[1]
+            s=next
+        }
+        return NativeLabFluidMotionRun(p.id,p.revision,id,material.id,mass,
+            input,samples,dt)
+    }
+}
+
