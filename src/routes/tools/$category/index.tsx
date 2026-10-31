@@ -6,6 +6,7 @@ import { ToolCard } from "@/components/tools/tool-card";
 import { getToolsByCategory } from "@/lib/registry";
 import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
+import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
 import type { CategoryId } from "@/types/tool";
 
 export const Route = createFileRoute("/tools/$category/")({ component: Category });
@@ -32,8 +33,14 @@ function Category() {
               <div className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2"><a href="/tools/business/ops-studio?mode=meeting-agenda" className="block"><h3 className="font-semibold">Ops Studio</h3><p className="mt-1 text-sm text-muted">Agendas, minutes, signatures and clearly marked payslip demos.</p></a><div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs">{[["Agenda", "meeting-agenda"], ["Minutes", "meeting-minutes"], ["Signature", "email-signature"], ["Payslip demo", "payslip"]].map(([label, mode]) => <a key={mode} className="min-h-10 inline-flex items-center underline underline-offset-2" href={`/tools/business/ops-studio?mode=${mode}`}>{label}</a>)}</div></div>
             </div><div className="mb-3 mt-8"><h2 className="text-xl font-semibold">All business tools</h2><p className="mt-1 text-sm text-muted">Legacy slugs are preserved for direct links and bookmarks.</p></div></div> : null}
             {category === "developer" ? <div className="mt-7"><div className="mb-3"><h2 className="text-xl font-semibold">Developer Studios</h2><p className="mt-1 text-sm text-muted">Focused studios for related developer tasks. Search still finds individual tools and opens the matching mode here.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{developerStudios.map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div></div> : null}
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{legacyTools.slice(0, visibleCount).map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>
-            {visibleCount < legacyTools.length ? <div className="mt-4 flex justify-end"><button type="button" onClick={() => setVisibleCount((count) => Math.min(count + 6, legacyTools.length))} className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] hover:bg-surface-2">See more tools <ArrowRight className="size-4 text-accent" aria-hidden="true" /></button></div> : null}
+            {category === "design" ? (
+              <DesignCategoryExplorer tools={tools} />
+            ) : (
+              <>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{legacyTools.slice(0, visibleCount).map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>
+                {visibleCount < legacyTools.length ? <div className="mt-4 flex justify-end"><button type="button" onClick={() => setVisibleCount((count) => Math.min(count + 6, legacyTools.length))} className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] hover:bg-surface-2">See more tools <ArrowRight className="size-4 text-accent" aria-hidden="true" /></button></div> : null}
+              </>
+            )}
           </>}
         </>
       </section>

@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10025,
-    "active": 10025,
+    "total": 10029,
+    "active": 10029,
     "planned": 0,
-    "offlineNative": 7782,
+    "offlineNative": 7786,
     "backendNative": 1614,
     "webOnly": 629,
     "missingActive": 629,
     "divergentActive": 0,
-    "fullyExecutable": 9396
+    "fullyExecutable": 9400
   },
   "tools": [
     {
@@ -90235,6 +90235,42 @@
       "status": "active",
       "category": "audio",
       "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "age-calculator",
+      "name": "Age Calculator",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "date-calculator",
+      "name": "Date Calculator",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "duration-calculator",
+      "name": "Duration Calculator",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "meeting-time-planner",
+      "name": "Meeting Time Planner",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
       "android": "offline-native",
       "ios": "offline-native"
     }
