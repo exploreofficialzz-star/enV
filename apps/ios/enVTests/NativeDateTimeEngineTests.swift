@@ -139,16 +139,25 @@ final class NativeDateTimeEngineTests: XCTestCase {
     }
 
     func testLeapBirthdayReturnsToFebruary29InTheNextLeapYear() throws {
-        let now = ISO8601DateFormatter().date(from: "2023-03-01T12:00:00Z")!
         let utcZone = TimeZone(secondsFromGMT: 0)!
-        let defaultRule = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+        let before = ISO8601DateFormatter().date(from: "2023-02-27T12:00:00Z")!
+        let beforeDefault = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
             "birth": "2000-02-29"
-        ], now: now, localTimeZone: utcZone)
-        let marchFirstRule = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+        ], now: before, localTimeZone: utcZone)
+        let beforeMarchFirst = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
             "birth": "2000-02-29", "leapBirthday": "mar-1"
-        ], now: now, localTimeZone: utcZone)
-        XCTAssertTrue(defaultRule.output.contains("Days until birthday: 365"))
-        XCTAssertTrue(marchFirstRule.output.contains("Days until birthday: 366"))
+        ], now: before, localTimeZone: utcZone)
+        XCTAssertTrue(beforeDefault.output.contains("Days until birthday: 1"))
+        XCTAssertTrue(beforeMarchFirst.output.contains("Days until birthday: 2"))
+        let after = ISO8601DateFormatter().date(from: "2023-03-02T12:00:00Z")!
+        let afterDefault = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29"
+        ], now: after, localTimeZone: utcZone)
+        let afterMarchFirst = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29", "leapBirthday": "mar-1"
+        ], now: after, localTimeZone: utcZone)
+        XCTAssertTrue(afterDefault.output.contains("Days until birthday: 364"))
+        XCTAssertTrue(afterMarchFirst.output.contains("Days until birthday: 364"))
     }
 
     func testMeetingPlannerSupportsSundayToThursdayWorkweeks() throws {

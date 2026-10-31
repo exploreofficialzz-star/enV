@@ -37,9 +37,12 @@ const birthdayDefault = runDateTime("birthday", { birth: "2000-02-29" }, fixedNo
 assert.equal(birthdayDefault[0].value, "44");
 const birthdayMarchFirst = runDateTime("birthday", { birth: "2000-02-29", leapBirthday: "mar-1" }, fixedNow);
 assert.equal(birthdayMarchFirst[0].value, "45");
-const leapBirthdayAfterNonLeapDate = new Date("2023-03-01T12:00:00Z");
-assert.equal(runDateTime("birthday", { birth: "2000-02-29" }, leapBirthdayAfterNonLeapDate)[0].value, "365");
-assert.equal(runDateTime("birthday", { birth: "2000-02-29", leapBirthday: "mar-1" }, leapBirthdayAfterNonLeapDate)[0].value, "366");
+const beforeLeapBirthday = new Date("2023-02-27T12:00:00Z");
+assert.equal(runDateTime("birthday", { birth: "2000-02-29" }, beforeLeapBirthday)[0].value, "1");
+assert.equal(runDateTime("birthday", { birth: "2000-02-29", leapBirthday: "mar-1" }, beforeLeapBirthday)[0].value, "2");
+const afterLeapBirthday = new Date("2023-03-02T12:00:00Z");
+assert.equal(runDateTime("birthday", { birth: "2000-02-29" }, afterLeapBirthday)[0].value, "364");
+assert.equal(runDateTime("birthday", { birth: "2000-02-29", leapBirthday: "mar-1" }, afterLeapBirthday)[0].value, "364");
 
 const countdown = runDateTime("countdown", { target: "2025-01-15T13:00:00Z" }, fixedNow);
 assert.equal(countdown.find((row) => row.label === "Total seconds")?.value, "3600");

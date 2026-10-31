@@ -171,18 +171,29 @@ class NativeDateTimeEngineTest {
     }
 
     @Test fun leapBirthdayReturnsToFebruary29InTheNextLeapYear() {
-        val now = Instant.parse("2023-03-01T12:00:00Z")
         val utc = java.time.ZoneId.of("UTC")
-        val defaultRule = NativeDateTimeEngine.run(
+        val before = Instant.parse("2023-02-27T12:00:00Z")
+        val beforeDefault = NativeDateTimeEngine.run(
             "birthday-countdown", options = mapOf("birth" to "2000-02-29"),
-            now = now, localTimeZone = utc
+            now = before, localTimeZone = utc
         )
-        val marchFirstRule = NativeDateTimeEngine.run(
+        val beforeMarchFirst = NativeDateTimeEngine.run(
             "birthday-countdown", options = mapOf("birth" to "2000-02-29", "leapBirthday" to "mar-1"),
-            now = now, localTimeZone = utc
+            now = before, localTimeZone = utc
         )
-        assertTrue(defaultRule.output.contains("Days until birthday: 365"))
-        assertTrue(marchFirstRule.output.contains("Days until birthday: 366"))
+        assertTrue(beforeDefault.output.contains("Days until birthday: 1"))
+        assertTrue(beforeMarchFirst.output.contains("Days until birthday: 2"))
+        val after = Instant.parse("2023-03-02T12:00:00Z")
+        val afterDefault = NativeDateTimeEngine.run(
+            "birthday-countdown", options = mapOf("birth" to "2000-02-29"),
+            now = after, localTimeZone = utc
+        )
+        val afterMarchFirst = NativeDateTimeEngine.run(
+            "birthday-countdown", options = mapOf("birth" to "2000-02-29", "leapBirthday" to "mar-1"),
+            now = after, localTimeZone = utc
+        )
+        assertTrue(afterDefault.output.contains("Days until birthday: 364"))
+        assertTrue(afterMarchFirst.output.contains("Days until birthday: 364"))
     }
 
     @Test fun negativeSubsecondUnixValuesUseFloorSemantics() {
