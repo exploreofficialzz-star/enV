@@ -32,6 +32,9 @@ export function recordToolExecutionResult(
  const name = outcome === "success" ? "tool_completed"
   : outcome === "failure" ? "tool_failed"
   : outcome === "cancelled" ? "tool_cancelled" : "tool_abandoned";
+ if (typeof window !== "undefined") {
+  window.dispatchEvent(new CustomEvent("env-tool-execution-result", { detail: { toolId, outcome } }));
+ }
  recordAnalyticsEvent({
   name, toolId, outcome, durationMs:Math.max(0,Math.min(3600000,Math.round(durationMs))),
   ...(errorCode ? {errorCode} : {}),
