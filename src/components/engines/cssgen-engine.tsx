@@ -4,6 +4,8 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const BASE_FIELDS: Record<string, UiField[]> = {
   gradient: [
