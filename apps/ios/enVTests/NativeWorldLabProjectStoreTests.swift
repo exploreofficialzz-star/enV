@@ -23,6 +23,26 @@ final class NativeWorldLabProjectStoreTests:XCTestCase {
         XCTAssertThrowsError(try store.save(a))
         XCTAssertEqual(try store.read(initial.id).0,b)
     }
+    func testBrowseDeleteAndMultipleEditsWithExpectedSavedRevision() throws {
+        let store=try temporaryStore()
+        defer {try? FileManager.default.removeItem(at:store.directory)}
+        let first=try NativeWorldLabEditor.blank(title:"First")
+        let initial=try store.save(first)
+        var edited=try NativeWorldLabEditor.addSolid(first,shape:"box",id:"a")
+        edited=try NativeWorldLabEditor.addSolid(edited,shape:"sphere",id:"b")
+        XCTAssertThrowsError(try store.save(edited))
+        _ = try store.save(edited,expectedSavedRevision:initial.revision)
+        XCTAssertEqual(try store.read(initial.id).1.entities.count,2)
+        let second=try store.save(NativeWorldLabEditor.blank(title:"Second"))
+        XCTAssertEqual(try store.listProjects().count,2)
+        XCTAssertThrowsError(try store.save(edited,expectedSavedRevision:0))
+        try store.delete(second.id)
+        XCTAssertEqual(try store.loadLatest()?.1.id,initial.id)
+        XCTAssertEqual(try store.listProjects().count,1)
+        XCTAssertThrowsError(try store.delete("../escape"))
+        try store.delete(initial.id)
+        XCTAssertNil(try store.loadLatest())
+    }
     func testCorruptedFileFailsClosedWithoutInventedRecovery() throws {
         let store=try temporaryStore()
         defer{try? FileManager.default.removeItem(at:store.directory)}
