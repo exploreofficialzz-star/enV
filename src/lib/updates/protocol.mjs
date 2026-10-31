@@ -39,7 +39,12 @@ export function validateUpdateAction(value) {
     if (typeof value.updateId !== "string" || !uuidPattern.test(value.updateId)) throw new TypeError("updateId must be a UUID.");
     return { action, updateId: value.updateId.toLowerCase() };
   }
-  if (action === "update" && (typeof value.updateId !== "string" || !uuidPattern.test(value.updateId))) throw new TypeError("updateId must be a UUID.");
+  let updateId = null;
+  if (action === "update") {
+    const rawUpdateId = value.updateId;
+    if (typeof rawUpdateId !== "string" || !uuidPattern.test(rawUpdateId)) throw new TypeError("updateId must be a UUID.");
+    updateId = rawUpdateId.toLowerCase();
+  }
   const title = plainText(value.title, "title", 5, 120);
   const summary = plainText(value.summary, "summary", 10, 240);
   const body = plainText(value.body, "body", 1, 6000);
@@ -55,7 +60,7 @@ export function validateUpdateAction(value) {
   const expiresAt = date(value.expiresAt, "expiresAt");
   if (startsAt && expiresAt && Date.parse(expiresAt) <= Date.parse(startsAt)) throw new TypeError("expiresAt must be later than startsAt.");
   return {
-    action, updateId: action === "update" ? value.updateId.toLowerCase() : null,
+    action, updateId,
     slug, title, summary, body, type: value.type,
     severity: value.severity ?? "info", platformScope, channels: targetChannels,
     minimumVersion, startsAt, expiresAt,
