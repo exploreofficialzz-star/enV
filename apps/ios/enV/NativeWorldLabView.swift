@@ -65,6 +65,16 @@ struct NativeWorldLabView:View {
     @State private var spherePlaying=false
     @State private var sphereSpeed=1.0
     @State private var exportingSphereImpact=false
+    @State private var gravitySpeeds:[String:String]=[:]
+    @State private var gravitySelectionTouched=false
+    @State private var gravitySelectedIds:Set<String>=[]
+    @State private var gravityDuration=30.0
+    @State private var gravitySteps=480
+    @State private var gravityRun:NativeGravityRun?
+    @State private var gravityTime=0.0
+    @State private var gravityPlaying=false
+    @State private var gravityRate=1.0
+    @State private var exportingGravityEvidence=false
     @State private var groupSpeeds:[String:String]=[:]
     @State private var groupRestitution=1.0
     @State private var groupRun:NativeGroupSphereRun?
@@ -127,6 +137,10 @@ struct NativeWorldLabView:View {
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private var gravityEvidenceDocument:NativeWorldLabJsonFile? {
+        guard let run=gravityRun,let bytes=try? JSONEncoder().encode(run) else{return nil}
+        return NativeWorldLabJsonFile(content:bytes)
+    }
     private var groupEvidenceDocument:NativeWorldLabJsonFile? {
         guard let run=groupRun,
               let data=try? JSONEncoder().encode(run) else {return nil}
@@ -446,6 +460,7 @@ struct NativeWorldLabView:View {
         .onChange(of:fluidFraction){_ in hydroRun=nil }
         .onChange(of:projectData){_ in
             scheduleRecoveryDraft()
+            gravityRun=nil;gravityPlaying=false;gravityTime=0
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             beamRun=nil
@@ -489,6 +504,11 @@ struct NativeWorldLabView:View {
                     fluidPlaying=false
                 }
             }
+            if gravityPlaying,let run=gravityRun {
+                gravityTime=min(run.durationSeconds,gravityTime+dt*gravityRate)
+                updateGravityScene()
+                if gravityTime>=run.durationSeconds {gravityPlaying=false}
+            }
             if groupPlaying,let run=groupRun {
                 groupTime=min(run.durationSeconds,groupTime+dt*groupPlaybackRate)
                 updateGroupSphereScene()
@@ -529,6 +549,11 @@ struct NativeWorldLabView:View {
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingGravityEvidence,
+            document:gravityEvidenceDocument,contentType:.json,
+            defaultFilename:"world-lab-newtonian-gravity-evidence"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
         .fileExporter(isPresented:$exportingGroupEvidence,
@@ -1059,6 +1084,7 @@ Text("Invent chemical heat").font(.headline)
         solid:NativeLabSolid)->some View {
         solidPlacementContent(project:project,solid:solid)
         solidGroupSphereContent(project:project)
+        solidGravityContent(project:project)
         solidSphereImpactContent(project:project,solid:solid)
         solidCollisionContent(project:project,solid:solid)
         solidBeamContent(project:project,solid:solid)
@@ -1073,6 +1099,122 @@ Text("Invent chemical heat").font(.headline)
         }
     }
 
+    private func updateGravityScene(){
+        guard let run=gravityRun,let frame=try? run.sample(gravityTime) else{return}
+        for (index,body) in run.bodies.enumerated() {
+            guard frame.positionsM.indices.contains(index),
+                  let node=scene.rootNode.childNode(
+                      withName:"lab-solid-"+body.entityId,recursively:false) else{continue}
+            let pos=frame.positionsM[index]
+            node.position=SCNVector3(Float(pos[0]),Float(pos[1]),Float(pos[2]))
+        }
+    }
+    @ViewBuilder private func solidGravityContent(
+        project:NativeWorldLabProject)->some View {
+        let spheres=project.entities.filter{$0.shape=="sphere"}
+        let defaults=Set(spheres.prefix(2).map{$0.id})
+        let selected=gravitySelectionTouched ? gravitySelectedIds : defaults
+        Text("Explore invented gravity").font(.headline)
+        Text("Genuine local Newtonian attraction, computed from each sphere's "+
+             "invented density and starting velocity. Nothing is uploaded "+
+             "and no measured planet or impact is inferred.")
+            .font(.caption).foregroundStyle(.secondary)
+        if spheres.count<2 {
+            Text("Create at least two spheres with invented material density.")
+                .font(.caption)
+        }else{
+            ScrollView(.vertical){
+                VStack(alignment:.leading,spacing:8){
+                    ForEach(spheres,id:\.id){sphere in
+                        Toggle(sphere.name,isOn:Binding(
+                            get:{selected.contains(sphere.id)},
+                            set:{enabled in
+                                gravitySelectionTouched=true
+                                var next=selected
+                                if enabled {next.insert(sphere.id)}
+                                else {next.remove(sphere.id)}
+                                gravitySelectedIds=next
+                                gravityRun=nil;gravityPlaying=false
+                            }))
+                        if selected.contains(sphere.id) {
+                            TextField("X,Y,Z initial speed (m/s)",
+                                text:Binding(
+                                    get:{gravitySpeeds[sphere.id] ?? "0,0,0"},
+                                    set:{value in
+                                        gravitySpeeds[sphere.id]=value
+                                        gravityRun=nil;gravityPlaying=false
+                                    }))
+                                .textFieldStyle(.roundedBorder)
+                                .accessibilityLabel("Gravity starting velocity "+sphere.id)
+                        }
+                    }
+                }
+            }.frame(maxHeight:230)
+            HStack {
+                TextField("Duration (seconds)",value:$gravityDuration,format:.number)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Gravity duration seconds")
+                TextField("Integration steps",value:$gravitySteps,format:.number)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Gravity integration steps")
+            }
+            Button("Calculate local gravity"){
+                do {
+                    let ordered=spheres.filter{selected.contains($0.id)}
+                    var velocityMap=[String:[Double]]()
+                    for body in ordered {
+                        velocityMap[body.id]=try nativeSphereVelocity(
+                            gravitySpeeds[body.id] ?? "0,0,0")
+                    }
+                    let result=try NativeWorldLabGravity.evaluate(project,
+                        ids:ordered.map{$0.id},velocities:velocityMap,
+                        durationSeconds:gravityDuration,integrationSteps:gravitySteps)
+                    gravityRun=result;gravityTime=0;gravityPlaying=false
+                    groupRun=nil;groupPlaying=false
+                    sphereRun=nil;spherePlaying=false
+                    collisionRun=nil;collisionPlaying=false
+                    problem="";redraw();updateGravityScene()
+                }catch{
+                    gravityRun=nil;gravityPlaying=false;problem=error.localizedDescription
+                }
+            }.buttonStyle(.bordered)
+                .disabled(selected.count<2 || selected.count>8)
+            if selected.count>8 {
+                Text("The native solver supports up to 8 bodies offline. "+
+                     "Reduce the selection; no automatic cloud upload occurs.")
+                    .font(.caption)
+            }
+        }
+        if let run=gravityRun,run.projectId==project.id,
+           run.projectRevision==project.revision {
+            value("Numerical energy drift",run.energyDriftFraction*100,"%")
+            Text("Simulated gravity time: "+
+                 String(format:"%.2f",gravityTime)+" seconds")
+                .font(.caption)
+            Slider(value:$gravityTime,in:0...run.durationSeconds,
+                onEditingChanged:{editing in
+                    if editing {gravityPlaying=false}
+                    updateGravityScene()
+                })
+                .accessibilityLabel("Gravitational simulation timeline")
+                .onChange(of:gravityTime){_ in updateGravityScene()}
+            HStack {
+                Button(gravityPlaying ? "Pause gravity":"Play gravity"){
+                    gravityPlaying.toggle()
+                }
+                Button("Reset gravity"){
+                    gravityPlaying=false;gravityTime=0;updateGravityScene()
+                }
+                Button("Export gravity evidence"){exportingGravityEvidence=true}
+            }.buttonStyle(.bordered)
+            Picker("Gravity playback speed",selection:$gravityRate){
+                ForEach([0.1,1.0,5.0,10.0],id:\.self){rate in
+                    Text(String(format:"%.1f×",rate)).tag(rate)
+                }
+            }.pickerStyle(.segmented)
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+        }
+    }
     private func updateGroupSphereScene() {
         guard let run=groupRun,let frame=try? run.sample(groupTime) else{return}
         for object in frame.objects {
