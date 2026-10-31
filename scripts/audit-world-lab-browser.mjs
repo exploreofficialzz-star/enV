@@ -290,6 +290,43 @@ try{
   await page.getByRole("button",{name:"Start / Recalculate"}).click();
   await page.getByText("Capacitor voltage",{exact:true}).waitFor();
   await context.setOffline(false);
+
+  // Off-axis impact of two independently invented spheres in the same Babylon
+  // scene, checked against conservation and a real timestamped JSON artifact.
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("0");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("3");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("1");
+  await page.getByRole("combobox",{name:"Material assumption"})
+    .selectOption({label:"Invented foam"});
+  // First sphere is second in the project; the new one is third.
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:2});
+  await page.getByRole("combobox",{name:"Other sphere for 3D impact"})
+    .selectOption({index:1});
+  await page.getByRole("button",{name:"Calculate three-dimensional sphere impact"}).click();
+  await page.getByText(/Contact normal X\/Y\/Z:/).waitFor();
+  const spatialDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export 3D impact evidence"}).click();
+  let spatialJson="";
+  for await(const chunk of await (await spatialDownload).createReadStream())
+    spatialJson+=chunk.toString();
+  const spatial=JSON.parse(spatialJson);
+  assert.equal(spatial.format,"env-world-lab-sphere-impact-3d");
+  assert.equal(spatial.assumptionEvidence,"hypothetical-user-assumed");
+  assert.ok(Math.abs(spatial.impactTimeSeconds-(3-Math.sqrt(0.75))/2)<1e-8);
+  for(let i=0;i<3;i++){
+    assert.ok(Math.abs(spatial.momentumBeforeKgMps[i]-spatial.momentumAfterKgMps[i])<1e-8);
+    assert.ok(Math.abs(spatial.angularMomentumBeforeKgM2PerS[i]-
+      spatial.angularMomentumAfterKgM2PerS[i])<1e-8);
+  }
+  assert.ok(Math.abs(spatial.energyBeforeJ-spatial.energyAfterJ-
+    spatial.dissipatedEnergyJ)<1e-8);
+  const earlySphereCoords=await page.getByText(/Computed world coordinates, first/).innerText();
+  await page.getByRole("slider",{name:"Explore three-dimensional impact time"}).fill("2");
+  const laterSphereCoords=await page.getByText(/Computed world coordinates, first/).innerText();
+  assert.notEqual(earlySphereCoords,laterSphereCoords);
+  await page.getByRole("button",{name:"Reset 3D impact"}).click();
   const legacy={format:"env-3d-game",version:1,id:"old",name:"Old",assets:[],objects:[{
     id:"old-cube",name:"Old cube",kind:"box",position:{x:0,y:0.5,z:0},rotation:{x:0,y:0,z:0},
     scale:{x:2,y:2,z:2},color:"#778899",visible:true,locked:false,collider:true,player:false,speed:3,
