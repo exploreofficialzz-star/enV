@@ -64,6 +64,8 @@ struct NativeLabMaterial: Decodable {
     let densityKgM3: Double?
     let youngModulusPa: Double?
     let evidence: String
+    let thermalConductivityWPerMK:Double?
+    let specificHeatJPerKgK:Double?
 }
 struct NativeLabSolid: Decodable {
     let id: String
@@ -221,7 +223,8 @@ struct NativeWorldLabProject: Decodable {
                                 "color","materialId","scientificRole","opacity"])
         }
         for o in materials {
-            try requireKeys(o, ["id","name","densityKgM3","youngModulusPa","evidence"])
+            try requireKeys(o, ["id","name","densityKgM3","youngModulusPa",
+                "thermalConductivityWPerMK","specificHeatJPerKgK","evidence"])
         }
         if root.keys.contains("networks") && !(root["networks"] is [[String:Any]]) {
             throw NativeWorldLabError.invalid("Circuit networks must be an array of objects")
@@ -437,7 +440,11 @@ struct NativeWorldLabProject: Decodable {
             try validateId(m.id); try validateName(m.name)
             guard m.evidence == "hypothetical-user-assumed",
                   m.densityKgM3.map({ $0.isFinite && $0 >= 0.001 && $0 <= 1e9 }) ?? true,
-                  m.youngModulusPa.map({ $0.isFinite && $0 >= 0 && $0 <= 1e15 }) ?? true else {
+                  m.youngModulusPa.map({ $0.isFinite && $0 >= 0 && $0 <= 1e15 }) ?? true,
+                  m.thermalConductivityWPerMK.map({$0.isFinite && $0 >= 1e-6 &&
+                      $0 <= 1e6}) ?? true,
+                  m.specificHeatJPerKgK.map({$0.isFinite && $0 >= 0.01 &&
+                      $0 <= 1e7}) ?? true else {
                 throw NativeWorldLabError.invalid("Unsupported material assumption")
             }
         }

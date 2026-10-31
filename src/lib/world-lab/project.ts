@@ -18,6 +18,8 @@ const materialSchema = z.object({
   name: z.string().trim().min(1).max(120),
   densityKgM3: scalar.min(0.001).max(1e9).nullable(),
   youngModulusPa: scalar.min(0).max(1e15).nullable(),
+  thermalConductivityWPerMK: scalar.min(1e-6).max(1e6).nullable().optional(),
+  specificHeatJPerKgK: scalar.min(0.01).max(1e7).nullable().optional(),
   evidence: z.literal("hypothetical-user-assumed"),
 }).strict();
 const entitySchema = z.object({
@@ -244,14 +246,21 @@ export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number)
 /** Change an inventor's assumptions, never rewrite an invented material's identity. */
 export function reviseWorldLabMaterial(
   raw:WorldLabProject,id:string,
-  assumptions:Pick<WorldLabMaterial,"name"|"densityKgM3"|"youngModulusPa">,
+  assumptions:Pick<WorldLabMaterial,"name"|"densityKgM3"|"youngModulusPa"> &
+    Partial<Pick<WorldLabMaterial,"thermalConductivityWPerMK"|"specificHeatJPerKgK">>,
 ):WorldLabProject {
   const project=parseWorldLabProject(raw);
   if(!project.materials.some(material=>material.id===id))
     throw new Error("The invented material to revise does not exist.");
+  const previous=project.materials.find(material=>material.id===id)!;
   const updated=materialSchema.parse({
-    id,name:assumptions.name,densityKgM3:assumptions.densityKgM3,
-    youngModulusPa:assumptions.youngModulusPa,evidence:"hypothetical-user-assumed",
+    ...previous,name:assumptions.name,densityKgM3:assumptions.densityKgM3,
+    youngModulusPa:assumptions.youngModulusPa,
+    thermalConductivityWPerMK:assumptions.thermalConductivityWPerMK===undefined?
+      previous.thermalConductivityWPerMK:assumptions.thermalConductivityWPerMK,
+    specificHeatJPerKgK:assumptions.specificHeatJPerKgK===undefined?
+      previous.specificHeatJPerKgK:assumptions.specificHeatJPerKgK,
+    evidence:"hypothetical-user-assumed",
   });
   return parseWorldLabProject({...project,
     materials:project.materials.map(material=>material.id===id?updated:material),

@@ -225,6 +225,8 @@ export default function WorldLab() {
   const [editingMaterialId,setEditingMaterialId]=useState<string|null>(null);
   const [density, setDensity] = useState("");
   const [youngModulus, setYoungModulus] = useState("");
+  const [thermalConductivity,setThermalConductivity]=useState("");
+  const [specificHeat,setSpecificHeat]=useState("");
   const [beamLoadN,setBeamLoadN]=useState(1000);
   const [beamRun,setBeamRun]=useState<StructuralBendingEvidence|null>(null);
   const [collisionOtherId,setCollisionOtherId]=useState("");
@@ -1571,6 +1573,12 @@ export default function WorldLab() {
   }
   function addMaterial() {
     try {
+      const k=thermalConductivity.trim()===""?null:Number(thermalConductivity);
+      const cp=specificHeat.trim()===""?null:Number(specificHeat);
+      if(k!==null&&(!Number.isFinite(k)||k<1e-6||k>1e6))
+        throw new Error("Assumed conductivity must be 0.000001–1,000,000 W/(m·K).");
+      if(cp!==null&&(!Number.isFinite(cp)||cp<0.01||cp>1e7))
+        throw new Error("Assumed heat capacity must be 0.01–10,000,000 J/(kg·K).");
       const proposed = validateNovelMaterial({
         name: materialName.trim(), densityKgM3: density.trim() === "" ? null : Number(density),
         youngModulusPa: youngModulus.trim() === "" ? null : Number(youngModulus),
@@ -1580,18 +1588,21 @@ export default function WorldLab() {
         mutateProject(current=>reviseWorldLabMaterial(current,editingMaterialId,{
           name:proposed.name,densityKgM3:proposed.densityKgM3,
           youngModulusPa:proposed.youngModulusPa,
+          thermalConductivityWPerMK:k,specificHeatJPerKgK:cp,
         }));
         setMessage("Invented material assumptions revised; older simulated results are invalidated.");
       }else{
         mutateProject(current=>({...current,materials:[...current.materials,{
           id:crypto.randomUUID(),name:proposed.name,
           densityKgM3:proposed.densityKgM3,youngModulusPa:proposed.youngModulusPa,
+          thermalConductivityWPerMK:k,specificHeatJPerKgK:cp,
           evidence:proposed.provenance,
         }]}));
         setMessage("Hypothetical material saved. Density and Young's modulus can drive bounded physics.");
       }
       setEditingMaterialId(null);
       setMaterialName("");setDensity("");setYoungModulus("");
+      setThermalConductivity("");setSpecificHeat("");
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Invalid material proposal.");
@@ -3281,6 +3292,14 @@ export default function WorldLab() {
             <label className="text-sm">Assumed Young's modulus (Pa), optional<input className={inputLabel}
               type="number" min="0" max="1000000000000000" step="any" value={youngModulus}
               onChange={(event) => setYoungModulus(event.target.value)} /></label>
+            <label className="text-sm">Assumed thermal conductivity (W/m·K), optional
+              <input className={inputLabel} type="number" min="0.000001"
+                max="1000000" step="any" value={thermalConductivity}
+                onChange={event=>setThermalConductivity(event.target.value)}/></label>
+            <label className="text-sm">Assumed specific heat (J/kg·K), optional
+              <input className={inputLabel} type="number" min="0.01"
+                max="10000000" step="any" value={specificHeat}
+                onChange={event=>setSpecificHeat(event.target.value)}/></label>
           </div>
           <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>
             {editingMaterialId?"Save revised assumptions":"Record hypothetical material"}
@@ -3299,6 +3318,10 @@ export default function WorldLab() {
                     setEditingMaterialId(material.id);setMaterialName(material.name);
                     setDensity(material.densityKgM3===null?"":String(material.densityKgM3));
                     setYoungModulus(material.youngModulusPa===null?"":String(material.youngModulusPa));
+                    setThermalConductivity(material.thermalConductivityWPerMK==null?
+                      "":String(material.thermalConductivityWPerMK));
+                    setSpecificHeat(material.specificHeatJPerKgK==null?
+                      "":String(material.specificHeatJPerKgK));
                   }}>Revise assumptions</button>
               </li>)}
             </ul>
