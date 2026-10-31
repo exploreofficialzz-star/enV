@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { blankWorldLabProject, importLegacyGameScene, newSolid, parseWorldLabProject,
-  readWorldLabProjectJson, serializeWorldLabProject, solidQuantities, MAX_PROJECT_JSON_BYTES } from "./project.ts";
+  readWorldLabProjectJson, serializeWorldLabProject, solidQuantities, reviseWorldLabMaterial, MAX_PROJECT_JSON_BYTES } from "./project.ts";
 const now="2026-10-30T13:00:00Z";
 test("portable project JSON roundtrip preserves precise local-ENU frame and units",()=>{
   const project=blankWorldLabProject("lab-1",now);
@@ -65,4 +65,23 @@ test("networks are optional for v1 legacy projects and strict when supplied",()=
   const {networks,...legacy}=p;
   assert.equal(parseWorldLabProject(legacy).networks,undefined);
   assert.throws(()=>parseWorldLabProject({...p,networks:[{id:"bad"}]}),/Invalid/);
+});
+
+test("invented matter can be revised without changing its identity or inventing evidence",()=>{
+  const p=blankWorldLabProject("inventor",now);
+  p.materials.push({id:"new-matter",name:"Unknown",densityKgM3:null,
+    youngModulusPa:null,evidence:"hypothetical-user-assumed"});
+  p.entities.push({...newSolid("beam","box",0),materialId:"new-matter"});
+  const before=structuredClone(p);
+  const revised=reviseWorldLabMaterial(p,"new-matter",{
+    name:"Revised matter",densityKgM3:45,youngModulusPa:2500});
+  assert.equal(revised.materials[0].id,"new-matter");
+  assert.equal(revised.materials[0].evidence,"hypothetical-user-assumed");
+  assert.equal(revised.entities[0].materialId,"new-matter");
+  assert.equal(revised.materials[0].youngModulusPa,2500);
+  assert.deepEqual(p,before);
+  assert.throws(()=>reviseWorldLabMaterial(p,"missing",{
+    name:"No",densityKgM3:1,youngModulusPa:1}),/does not exist/);
+  assert.throws(()=>reviseWorldLabMaterial(p,"new-matter",{
+    name:"Invalid",densityKgM3:Number.NaN,youngModulusPa:1}));
 });
