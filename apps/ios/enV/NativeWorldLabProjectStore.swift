@@ -19,7 +19,7 @@ struct NativeWorldLabProjectStore {
         return directory.appendingPathComponent(id+".json",isDirectory:false)
     }
     private var recent:URL { directory.appendingPathComponent("recent-id",isDirectory:false) }
-    @discardableResult func save(_ data:Data) throws -> NativeWorldLabProject {
+    @discardableResult func save(_ data:Data,expectedSavedRevision:Int?=nil) throws -> NativeWorldLabProject {
         let project=try NativeWorldLabProject.decode(data)
         let manager=FileManager.default
         try manager.createDirectory(at:directory,withIntermediateDirectories:true)
@@ -34,9 +34,17 @@ struct NativeWorldLabProjectStore {
             let previous=try NativeWorldLabProject.decode(previousData)
             // Skipping revision numbers may hide a divergent edit history;
             // fail closed rather than silently replacing local work.
-            guard project.revision == previous.revision + 1 ||
-                    (project.revision == previous.revision && previousData == data) else {
-                throw NativeWorldLabError.invalid("A newer local revision exists. Export or resolve the conflict first.")
+            let unchanged = project.revision == previous.revision && previousData == data
+            let permittedEdit:Bool
+            if let expectedSavedRevision {
+                permittedEdit = expectedSavedRevision == previous.revision &&
+                    project.revision > previous.revision
+            } else {
+                permittedEdit = project.revision == previous.revision + 1
+            }
+            guard previous.id == project.id, unchanged || permittedEdit else {
+                throw NativeWorldLabError.invalid(
+                    "Saved project revision changed. Review it before replacing any existing work.")
             }
         }else{
             let entries=try manager.contentsOfDirectory(at:directory,includingPropertiesForKeys:nil)
@@ -49,6 +57,45 @@ struct NativeWorldLabProjectStore {
         try Data(project.id.utf8).write(to:recent,options:.atomic)
         return project
     }
+    /// Enumerate private-device projects and validate each complete portable document.
+    func listProjects() throws -> [NativeWorldLabProject] {
+        let manager=FileManager.default
+        guard manager.fileExists(atPath:directory.path) else{return []}
+        let urls=try manager.contentsOfDirectory(
+            at:directory,includingPropertiesForKeys:[.contentModificationDateKey],
+            options:[.skipsHiddenFiles]).filter{$0.pathExtension=="json"}
+        guard urls.count<=Self.maxLocalProjects else {
+            throw NativeWorldLabError.invalid("Local World Lab project capacity is inconsistent")
+        }
+        let sorted=urls.sorted{
+            (try? $0.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate)
+                ?? .distantPast >
+            (try? $1.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate)
+                ?? .distantPast
+        }
+        return try sorted.map{try read($0.deletingPathExtension().lastPathComponent).1}
+    }
+    /// A delete is explicit and never silently removes a second saved project.
+    func delete(_ id:String) throws {
+        _ = try read(id)
+        let manager=FileManager.default
+        try manager.removeItem(at:try file(id))
+        if manager.fileExists(atPath:recent.path){
+            let pointer=try Data(contentsOf:recent)
+            guard pointer.count<=120,let recentId=String(data:pointer,encoding:.ascii) else {
+                throw NativeWorldLabError.invalid("Corrupt recent-project pointer")
+            }
+            if recentId==id {
+                let remaining=try listProjects()
+                if let next=remaining.first {
+                    try Data(next.id.utf8).write(to:recent,options:.atomic)
+                }else{
+                    try manager.removeItem(at:recent)
+                }
+            }
+        }
+    }
+
     func read(_ id:String) throws -> (Data,NativeWorldLabProject) {
         let url=try file(id)
         let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
