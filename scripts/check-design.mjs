@@ -28,11 +28,12 @@ const cssGradient = read("src/lib/engines/css-gradient.ts");
 const cssGradientTests = read("src/lib/engines/css-gradient.test.ts");
 const palette = read("src/lib/engines/design-palette.ts");
 const paletteTests = read("src/lib/engines/design-palette.test.ts");
+const designColor = read("src/lib/engines/design-color.ts");
+const designColorTests = read("src/lib/engines/design-color.test.ts");
 const palette = read("src/lib/engines/design-palette.ts");
 const paletteTests = read("src/lib/engines/design-palette.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
-const accessibilityEngine = read("src/components/engines/accessibility-engine.tsx");
 const checks = [
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
@@ -49,6 +50,7 @@ const checks = [
   ["Palette semantic roles and token exports", palette.includes("buildDesignPaletteExport") && ["css", "scss", "tailwind", "json", "tokens"].every((format) => palette.includes(`format === "${format}"`))],
   ["Palette locking, sharing and image extraction", ["Lock color", "Copy share link", "Extract colors from an image", "Light preview", "Dark preview"].every((label) => colorEngine.includes(label))],
   ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports")],
+  ["Strict HSV / HSB / CMYK parser and tested converters", designColor.includes("parsePercentOrUnit") && designColor.includes("hs[VB]") && designColorTests.includes("HSV and HSB accept percentages") && designColorTests.includes("CMYK accepts percentage")],
   ["Layered shadow presets and opacity control", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from") && cssEngine.includes("Shadow opacity")],
   ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
