@@ -49,7 +49,7 @@ class NativeWorldLabEvidenceStore(private val root:File){
         when(kind){
             "newton-gravity"->{
                 require(result.getString("format")=="env-world-lab-newton-gravity"&&
-                    result.getJSONArray("bodies").length() in 2..8&&
+                    result.getJSONArray("bodies").length() in 2..32&&
                     result.getJSONArray("frames").length() in 2..241){
                     "Invalid native gravity evidence dimensions"}
             }

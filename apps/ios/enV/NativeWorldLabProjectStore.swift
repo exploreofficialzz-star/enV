@@ -231,7 +231,7 @@ struct NativeWorldLabScientificEvidenceStore {
         if kind=="newton-gravity" {
             guard result["format"] as? String=="env-world-lab-newton-gravity",
                   let bodies=result["bodies"] as? [[String:Any]],
-                  (2...8).contains(bodies.count),
+                  (2...32).contains(bodies.count),
                   let frames=result["frames"] as? [[String:Any]],
                   (2...241).contains(frames.count) else {
                 throw NativeWorldLabError.invalid("Unsupported gravitational record")

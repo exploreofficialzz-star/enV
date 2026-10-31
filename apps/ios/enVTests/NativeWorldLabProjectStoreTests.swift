@@ -90,5 +90,45 @@ final class NativeWorldLabProjectStoreTests:XCTestCase {
         XCTAssertTrue(try store.listDrafts().isEmpty)
         XCTAssertEqual(try store.read(saved.id).0,original)
     }
+    func testPortableV2ArchiveRoundtripPreservesNativeScientificRecord() throws {
+        let first=FileManager.default.temporaryDirectory.appendingPathComponent(
+            "world-lab-archive-first-"+UUID().uuidString,isDirectory:true)
+        let second=FileManager.default.temporaryDirectory.appendingPathComponent(
+            "world-lab-archive-second-"+UUID().uuidString,isDirectory:true)
+        defer{
+            try? FileManager.default.removeItem(at:first)
+            try? FileManager.default.removeItem(at:second)
+        }
+        var projectData=try NativeWorldLabEditor.blank()
+        projectData=try NativeWorldLabEditor.addSolid(projectData,shape:"sphere",id:"orbit-one")
+        projectData=try NativeWorldLabEditor.addSolid(projectData,shape:"sphere",id:"orbit-two")
+        projectData=try NativeWorldLabEditor.positionSolid(projectData,
+            id:"orbit-one",positionMeters:[0,0.5,0])
+        projectData=try NativeWorldLabEditor.positionSolid(projectData,
+            id:"orbit-two",positionMeters:[20,0.5,0])
+        projectData=try NativeWorldLabEditor.addHypotheticalMaterial(projectData,
+            name:"Assumed matter",densityKgM3:100000,id:"material")
+        projectData=try NativeWorldLabEditor.assignMaterial(projectData,
+            solidId:"orbit-one",materialId:"material")
+        projectData=try NativeWorldLabEditor.assignMaterial(projectData,
+            solidId:"orbit-two",materialId:"material")
+        let project=try NativeWorldLabProject.decode(projectData)
+        _ = try NativeWorldLabProjectStore(directory:first).save(projectData)
+        let run=try NativeWorldLabGravity.evaluate(project,
+            ids:["orbit-one","orbit-two"],velocities:[:],
+            durationSeconds:1,integrationSteps:40)
+        _ = try NativeWorldLabScientificEvidenceStore(directory:first)
+            .saveGravity(run,project:project)
+        let portable=try NativeWorldLabPortableArchiveStore(directory:first)
+            .export(projectData)
+        let opened=try NativeWorldLabPortableArchiveStore(directory:second)
+            .importArchive(portable)
+        XCTAssertEqual(opened.project.id,project.id)
+        XCTAssertEqual(try NativeWorldLabScientificEvidenceStore(directory:second)
+            .list(project.id).count,1)
+        XCTAssertThrowsError(try NativeWorldLabPortableArchiveStore(directory:second)
+            .importArchive(portable))
+    }
+
 }
 

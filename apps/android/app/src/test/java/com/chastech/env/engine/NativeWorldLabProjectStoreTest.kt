@@ -101,5 +101,35 @@ class NativeWorldLabProjectStoreTest {
             assertEquals(original,store.read(saved.id).json)
         }finally{root.deleteRecursively()}
     }
+    @Test fun completeNativeArchiveRoundtripPreservesInventedProjectAndScience(){
+        val first=Files.createTempDirectory("world-lab-archive-export").toFile()
+        val second=Files.createTempDirectory("world-lab-archive-import").toFile()
+        try{
+            var source=NativeWorldLabEditor.blank()
+            source=NativeWorldLabEditor.addSolid(source,"sphere",id="orbit-one")
+            source=NativeWorldLabEditor.addSolid(source,"sphere",id="orbit-two")
+            source=NativeWorldLabEditor.positionSolid(source,"orbit-one",listOf(0.0,0.5,0.0))
+            source=NativeWorldLabEditor.positionSolid(source,"orbit-two",listOf(20.0,0.5,0.0))
+            source=NativeWorldLabEditor.addHypotheticalMaterial(source,
+                "Invented mass",100000.0,id="material")
+            source=NativeWorldLabEditor.assignMaterial(source,"orbit-one","material")
+            source=NativeWorldLabEditor.assignMaterial(source,"orbit-two","material")
+            val project=NativeWorldLabProjectCodec.decode(source)
+            NativeWorldLabProjectStore(first).save(source)
+            val model=NativeWorldLabGravity.evaluate(project,
+                listOf("orbit-one","orbit-two"),emptyMap(),1.0,40)
+            NativeWorldLabEvidenceStore(first).save(project,
+                NativeWorldLabEvidenceJson.gravity(model))
+            val portable=NativeWorldLabPortableArchiveStore(first).export(source)
+            assertEquals(2,org.json.JSONObject(portable).getInt("schemaVersion"))
+            val restored=NativeWorldLabPortableArchiveStore(second).import(portable)
+            assertEquals(project.id,restored.project.id)
+            assertEquals(1,NativeWorldLabEvidenceStore(second).list(project.id).size)
+            assertThrows(IllegalArgumentException::class.java){
+                NativeWorldLabPortableArchiveStore(second).import(portable)
+            }
+        }finally{first.deleteRecursively();second.deleteRecursively()}
+    }
+
 }
 

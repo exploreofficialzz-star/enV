@@ -536,3 +536,21 @@ release-candidate evidence bundle are unfinished.
 - Kotlin and Swift regression test sources were added for preservation,
   ownership and deletion. No execution, simulator acceptance, migrations,
   production push or release verification is claimed.
+
+
+## Cross-platform complete archive import/export
+- Android Kotlin and iOS Swift can now import/export the v2 portable invention
+  envelope, including up to 20 typed saved gravitation/thermal records and
+  up to 20 pre-existing Web model runs. Earlier v1 numerical-run archives
+  remain importable. Legacy Web numerical records are preserved for re-export
+  without pretending the native engines understand or compute them.
+- Both native importers use strict project schema parsing, owner/project IDs,
+  record size/count constraints and explicit no-overwrite policies for
+  preexisting inventions. Android and iOS store imported legacy model runs
+  privately for future archive export; iOS retains the original imported
+  archive file and Android retains its legacy numerical record array.
+  Multi-file native import is not fully transactional on power loss, so
+  the native UX must not claim database-atomic cross-file import.
+- Native archive source regression cases cover an invention's original
+  assumed-mass gravity evidence and no-overwrite reimport. Builds, devices,
+  provider login and CI have not yet been verified or released.

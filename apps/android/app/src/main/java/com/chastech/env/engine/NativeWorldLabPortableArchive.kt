@@ -6,6 +6,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.nio.file.AtomicMoveNotSupportedException
 import java.util.UUID
 
 /**
@@ -97,7 +98,11 @@ class NativeWorldLabPortableArchiveStore(private val root:File){
         val destination=file(content.project.id)
         try{
             temp.writeText(content.numericalRuns.toString(),StandardCharsets.UTF_8)
-            Files.move(temp.toPath(),destination.toPath(),StandardCopyOption.ATOMIC_MOVE)
+            try{
+                Files.move(temp.toPath(),destination.toPath(),StandardCopyOption.ATOMIC_MOVE)
+            }catch(_:AtomicMoveNotSupportedException){
+                Files.move(temp.toPath(),destination.toPath())
+            }
         }finally{temp.delete()}
         NativeWorldLabProjectStore(root).save(content.projectJson)
         val history=NativeWorldLabEvidenceStore(root)
