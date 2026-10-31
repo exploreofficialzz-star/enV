@@ -62,6 +62,24 @@ try{
   await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("50");
   await page.getByRole("button",{name:"Record hypothetical material"}).click();
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+
+  // A user-invented Boolean indicator must drive the same measured-by-model
+  // electromechanical solver, with portable source-revision evidence.
+  await page.getByRole("button",{name:"Drive with invented logic: Indicator Q"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByText("Invented logic output: 1 (assumed Boolean)").waitFor();
+  const linkedEvent=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export linked digital-to-motion evidence"}).click();
+  const linkedStream=await (await linkedEvent).createReadStream();
+  let linkedJson="";
+  for await(const chunk of linkedStream)linkedJson+=chunk.toString();
+  const linked=JSON.parse(linkedJson);
+  assert.equal(linked.format,"env-world-lab-digital-motor-run");
+  assert.equal(linked.logicBit,1);
+  assert.equal(linked.motor.input.supplyVoltageV,24);
+  assert.equal(linked.projectRevision,linked.motor.source.projectRevision);
+  assert.ok(linked.motor.samples.some(s=>s.heightM>0&&s.coilCurrentA>0));
+
   await page.getByRole("button",{name:"Drop this solid"}).click();
   await page.getByRole("button",{name:"Pause drop"}).click();
   await page.getByText(/Model result.*hypothetical user assumed/).waitFor();
