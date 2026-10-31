@@ -16,11 +16,14 @@ const userLookup = createSessionLookup({
   },
   timeoutMs: 2500,
 });
-function configSecret() {
-  if (process.env.ANALYTICS_ENABLED !== "true") throw new AnalyticsError("ANALYTICS_DISABLED", "Product analytics is disabled.", 503);
+function signingSecret() {
   const secret = process.env.ANALYTICS_HASH_SECRET?.trim() ?? "";
   if (secret.length < 32) throw new AnalyticsError("ANALYTICS_NOT_CONFIGURED", "Analytics signing is not configured.", 503);
   return secret;
+}
+function configSecret() {
+  if (process.env.ANALYTICS_ENABLED !== "true") throw new AnalyticsError("ANALYTICS_DISABLED", "Product analytics is disabled.", 503);
+  return signingSecret();
 }
 function digest(value: string, secret: string) { return createHmac("sha256", secret).update(value).digest("hex"); }
 function authorized(request: Request, expected: string | undefined) {
@@ -107,10 +110,14 @@ export function revokeAnalyticsDashboardSession() {
 }
 
 export async function saveAnalyticsConsent(request: Request, input: unknown) {
-  const secret = configSecret();
+  // Consent withdrawal remains available even when collection is switched off.
+  const secret = signingSecret();
   let body;
   try { body = validateConsentPayload(input); }
   catch (error) { throw new AnalyticsError("INVALID_CONSENT", error instanceof Error ? error.message : "Invalid consent.", 400); }
+  if (body.granted && process.env.ANALYTICS_ENABLED !== "true") {
+    throw new AnalyticsError("ANALYTICS_DISABLED", "Product analytics is disabled and cannot accept new consent grants.", 503);
+  }
   const subject = digest(body.subjectId, secret);
   const userId = await userLookup(request).catch(() => null);
   const sql = await getSql();
