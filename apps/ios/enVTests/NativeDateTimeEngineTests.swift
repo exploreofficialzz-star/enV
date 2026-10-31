@@ -116,7 +116,7 @@ final class NativeDateTimeEngineTests: XCTestCase {
         let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
             "date": "2024-01-13", "zones": "Lagos, London", "sourceTz": "Lagos"
         ], now: fixedNow)
-        XCTAssertTrue(result.output.contains("No shared Monday-Friday working-hours slots"))
+        XCTAssertTrue(result.output.contains("No shared working-hours slots found on the selected weekdays"))
         XCTAssertFalse(result.output.contains("Option 1:"))
     }
 
