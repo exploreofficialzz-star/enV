@@ -63,6 +63,33 @@ try{
   await page.getByRole("button",{name:"Record hypothetical material"}).click();
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
 
+  // In the SAME 3D scene, invent mass for the second shape and run a
+  // central two-object impact. Prove momentum conservation and time playback.
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Cube"});
+  await page.getByRole("combobox",{name:"Other solid to collide with"}).selectOption({label:/Sphere/});
+  await page.getByRole("spinbutton",{name:"Collision restitution"}).fill("1");
+  await page.getByRole("button",{name:"Calculate two-body collision"}).click();
+  await page.getByText(/Impact time: 1.2500 s/).waitFor();
+  const impactDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export collision evidence"}).click();
+  let impactJson="";
+  for await(const fragment of await (await impactDownload).createReadStream())
+    impactJson+=fragment.toString();
+  const impactEvidence=JSON.parse(impactJson);
+  assert.equal(impactEvidence.format,"env-world-lab-object-collision");
+  assert.equal(impactEvidence.leftMassKg>0,true);
+  assert.ok(Math.abs(impactEvidence.impactTimeSeconds-1.25)<1e-10);
+  assert.ok(Math.abs(impactEvidence.momentumAfterKgMps-
+    impactEvidence.momentumBeforeKgMps)<1e-10);
+  assert.ok(Math.abs(impactEvidence.dissipatedEnergyJ)<1e-10);
+  const earlyCentres=await page.getByText(/Live centre X, left\/right:/).innerText();
+  await page.getByRole("slider",{name:"Explore collision time"}).fill("2");
+  const lateCentres=await page.getByText(/Live centre X, left\/right:/).innerText();
+  assert.notEqual(lateCentres,earlyCentres);
+  await page.getByRole("button",{name:"Reset collision"}).click();
+
   // A separately invented high-modulus material must give a real,
   // geometry-dependent elastic response, with a portable assumption trail.
   await page.getByRole("textbox",{name:"Material name"}).fill("Invented stiff matter");
