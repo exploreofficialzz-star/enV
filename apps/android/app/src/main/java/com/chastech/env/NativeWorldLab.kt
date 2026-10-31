@@ -44,6 +44,8 @@ import com.chastech.env.engine.NativeActuatorResult
 import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
+import com.chastech.env.engine.NativeWorldLabDigitalMotor
+import com.chastech.env.engine.NativeDigitalMotorResult
 import com.chastech.env.engine.NativeWorldLabNetworkMotor
 import com.chastech.env.engine.NativeLabNetworkMotorRun
 import kotlin.math.PI
@@ -106,6 +108,7 @@ fun NativeWorldLabForm() {
     var dropSpeed by remember { mutableFloatStateOf(1f) }
     var motorResult by remember { mutableStateOf<NativeActuatorResult?>(null) }
     var wiredMotor by remember { mutableStateOf<NativeLabNetworkMotorRun?>(null) }
+    var digitalMotor by remember { mutableStateOf<NativeDigitalMotorResult?>(null) }
     var motorAudit by remember { mutableStateOf<NativeActuatorNumericalAudit?>(null) }
     var motorEntityId by remember { mutableStateOf<String?>(null) }
     var motorFrame by remember { mutableIntStateOf(0) }
@@ -148,7 +151,7 @@ fun NativeWorldLabForm() {
             editHistory.record(previous,next)
             projectJson=next
             project=parsed
-            dcRun=null;wiredMotor=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
+            dcRun=null;wiredMotor=null;digitalMotor=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
@@ -281,7 +284,7 @@ fun NativeWorldLabForm() {
     LaunchedEffect(projectJson) {
         // Edited/imported geometry and materials invalidate earlier hypothetical drop results.
         dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
-        motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0
+        motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0;digitalMotor=null
     }
     LaunchedEffect(requestImport) {
         if(requestImport){
@@ -994,7 +997,7 @@ fun NativeWorldLabForm() {
                                 thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
                             val result=NativeWorldLabActuator.evaluate(input)
                             motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
-                            motorResult=result;wiredMotor=null;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                            motorResult=result;wiredMotor=null;digitalMotor=null;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
                             dropPlaying=false;playing=false;warning=""
                         }.onFailure{warning=it.message?:"This powered mechanism is outside the local solver limits."}
                     }) { Text("Power this solid") }
@@ -1009,12 +1012,34 @@ fun NativeWorldLabForm() {
                                 val input=NativeActuatorInput(massKg=derivedMass,
                                     supplyVoltageV=sourceVoltage,
                                     thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
-                                wiredMotor=connected;motorResult=connected.motor
+                                wiredMotor=connected;digitalMotor=null;motorResult=connected.motor
                                 motorAudit=NativeWorldLabActuator.numericalAudit(input,connected.motor)
                                 motorEntityId=solid.id;motorFrame=0;motorPlaying=true
                                 dropPlaying=false;playing=false;warning=""
                             }.onFailure{warning=it.message?:"Connected motor cannot be calculated."}
                         }){Text("Wire motor to circuit")}
+                    }
+                    project!!.digitalNetworks.firstOrNull()?.let{logic->
+                        logic.outputs.forEach{output->
+                            OutlinedButton(onClick={
+                                runCatching {
+                                    val run=NativeWorldLabDigitalMotor.evaluate(
+                                        project!!,logic.id,output.id,solid.id,
+                                        derivedMass,thermal=motorThermalEnabled)
+                                    val selfCheck=NativeWorldLabActuator.numericalAudit(
+                                        run.input,run.motor)
+                                    digitalMotor=run;wiredMotor=null
+                                    motorResult=run.motor;motorAudit=selfCheck
+                                    motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                                    dropPlaying=false;playing=false;warning=""
+                                }.onFailure{cause->
+                                    digitalMotor=null
+                                    warning=cause.message?:"Invented digital motor cannot run"
+                                }
+                            }){
+                                Text("Drive with invented logic: "+output.label)
+                            }
+                        }
                     }
                     if(motorEntityId==solid.id && motorResult!=null){
                         val run=checkNotNull(motorResult)
@@ -1027,6 +1052,14 @@ fun NativeWorldLabForm() {
                             drawLine(Color.LightGray,Offset(0f,y),Offset(size.width,y),strokeWidth=3f)
                             drawCircle(Color(0xFF69C3C3),size.minDimension*0.09f,
                                 Offset(size.width/2,y-frac*size.height*0.72f))
+                        }
+                        digitalMotor?.takeIf{it.projectId==project!!.id &&
+                            it.projectRevision==project!!.revision &&
+                            it.entityId==solid.id && it.motor===run}?.let{linked->
+                            Text("Invented logic output: "+linked.logicBit)
+                            Text("Applied ideal voltage: "+
+                                labNumber(linked.input.supplyVoltageV)+" V")
+                            Text(linked.validity,style=MaterialTheme.typography.bodySmall)
                         }
                         Text("Electrical current: "+labNumber(sample.currentA)+" A")
                         Text("Powered height: "+labNumber(sample.heightM)+" m")
