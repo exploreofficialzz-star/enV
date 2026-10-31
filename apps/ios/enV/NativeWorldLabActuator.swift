@@ -347,3 +347,68 @@ enum NativeWorldLabDigitalMotor {
             outputId:outputId,entityId:entityId,logicBit:bit,input:input,motor:motor)
     }
 }
+
+
+/// Analytic beam response under an explicit invented stiffness assumption.
+struct NativeLabBeamBendingResult {
+    let projectId:String
+    let projectRevision:Int
+    let entityId:String
+    let materialId:String
+    let forceN:Double
+    let lengthM:Double
+    let depthM:Double
+    let widthM:Double
+    let assumedYoungModulusPa:Double
+    let secondMomentM4:Double
+    let bendingStiffnessNm2:Double
+    let tipDeflectionM:Double
+    let maximumStressPa:Double
+    let surfaceStrain:Double
+    let evidence="physics-model-computed"
+    let materialEvidence="hypothetical-user-assumed"
+    let validity="Ideal homogeneous isotropic linearly elastic rectangular cantilever, static point load and fixed support. Assumed Young's modulus is not measured. No material fracture, yield limit, buckling, fatigue, torsion, shear, safety factor or certification is predicted."
+}
+enum NativeWorldLabStructural {
+    static func bending(_ project:NativeWorldLabProject,
+        entityId:String,forceN:Double)throws->NativeLabBeamBendingResult {
+        guard forceN.isFinite,forceN>=0,forceN<=1e8 else {
+            throw NativeWorldLabError.invalid("Cantilever tip load must be finite and between 0 and 100,000,000 N")
+        }
+        guard let solid=project.entities.first(where:{$0.id==entityId}) else {
+            throw NativeWorldLabError.invalid("Select a solid for beam bending")
+        }
+        guard solid.shape=="box" else {
+            throw NativeWorldLabError.invalid("Only rectangular box beams are supported")
+        }
+        guard let material=project.materials.first(where:{$0.id==solid.materialId}),
+              let young=material.youngModulusPa,young>0 else {
+            throw NativeWorldLabError.invalid("Assign a hypothetical positive Young's modulus")
+        }
+        let length=solid.dimensionsMeters[0]
+        let depth=solid.dimensionsMeters[1]
+        let width=solid.dimensionsMeters[2]
+        guard length/depth>=5 else {
+            throw NativeWorldLabError.invalid("Beam length must be at least five times its depth")
+        }
+        let secondMoment=width*depth*depth*depth/12
+        let stiffness=young*secondMoment
+        let displacement=forceN*length*length*length/(3*stiffness)
+        let stress=forceN*length*depth/(2*secondMoment)
+        let strain=stress/young
+        guard [secondMoment,stiffness,displacement,stress,strain].allSatisfy({$0.isFinite}),
+              stiffness>0 else {
+            throw NativeWorldLabError.invalid("Bending exceeds finite numerical limits")
+        }
+        guard displacement<=length*0.1,strain<=0.01 else {
+            throw NativeWorldLabError.invalid("Bending exceeds the small-deformation reference domain")
+        }
+        return NativeLabBeamBendingResult(projectId:project.id,
+            projectRevision:project.revision,entityId:solid.id,
+            materialId:material.id,forceN:forceN,lengthM:length,
+            depthM:depth,widthM:width,assumedYoungModulusPa:young,
+            secondMomentM4:secondMoment,bendingStiffnessNm2:stiffness,
+            tipDeflectionM:displacement,maximumStressPa:stress,
+            surfaceStrain:strain)
+    }
+}
