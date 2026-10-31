@@ -1937,6 +1937,137 @@ export default function WorldLab() {
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
                 <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                  aria-label="Three-dimensional sphere impact experiment">
+                  <h3 className="text-sm font-semibold">Collide invented spheres in three dimensions</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Two actual 3D spheres travel in straight lines from their positions in this world.
+                    Calculate their first contact and the exact normal impulse, with invented
+                    density and restitution assumptions. Off-axis strikes change all three axes.
+                    No gravity, spin, fracture, friction or second collision is inferred.
+                  </p>
+                  {selectedEntity.shape!=="sphere"&&
+                    <p className="text-xs">Select a sphere to use this spatial physics model.</p>}
+                  <label className="mt-2 block text-xs">Other sphere
+                    <select className={inputLabel} aria-label="Other sphere for 3D impact"
+                      value={sphereOther?.shape==="sphere"&&
+                        sphereOther.id!==selectedEntity.id?sphereOtherId:""}
+                      onChange={e=>{
+                        setSphereOtherId(e.target.value);setSphereRun(null);setSpherePlaying(false);
+                      }}>
+                      <option value="">Choose an invented sphere</option>
+                      {project?.entities.filter(e=>e.shape==="sphere"&&e.id!==selectedEntity.id)
+                        .map(e=><option key={e.id} value={e.id}>
+                          {e.name} · {e.id.slice(0,8)}</option>)}
+                    </select>
+                  </label>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {([0,1,2] as const).map(i=><label className="text-xs" key={"a"+i}>
+                      First {["X","Y","Z"][i]} speed (m/s)
+                      <input type="number" className={inputLabel} step="any" min={-100} max={100}
+                        aria-label={"First sphere "+["X","Y","Z"][i]+" velocity"}
+                        value={sphereFirstVelocity[i]} onChange={e=>{
+                          const next=[...sphereFirstVelocity] as [number,number,number];
+                          next[i]=Number(e.target.value);setSphereFirstVelocity(next);
+                          setSphereRun(null);setSpherePlaying(false);
+                        }}/>
+                    </label>)}
+                    {([0,1,2] as const).map(i=><label className="text-xs" key={"b"+i}>
+                      Second {["X","Y","Z"][i]} speed (m/s)
+                      <input type="number" className={inputLabel} step="any" min={-100} max={100}
+                        aria-label={"Second sphere "+["X","Y","Z"][i]+" velocity"}
+                        value={sphereSecondVelocity[i]} onChange={e=>{
+                          const next=[...sphereSecondVelocity] as [number,number,number];
+                          next[i]=Number(e.target.value);setSphereSecondVelocity(next);
+                          setSphereRun(null);setSpherePlaying(false);
+                        }}/>
+                    </label>)}
+                  </div>
+                  <label className="mt-2 block text-xs">Assumed 3D restitution (0–1)
+                    <input type="number" className={inputLabel} step={0.05} min={0} max={1}
+                      aria-label="Three-dimensional collision restitution"
+                      value={sphereRestitution} onChange={e=>{
+                        setSphereRestitution(Number(e.target.value));setSphereRun(null);setSpherePlaying(false);
+                      }}/>
+                  </label>
+                  <button type="button" className={buttonClass+" mt-2"}
+                    disabled={selectedEntity.shape!=="sphere"||!sphereOther||sphereOther.shape!=="sphere"}
+                    onClick={()=>{
+                      if(!project||!sphereOther)return;
+                      try{
+                        const run=solveSphereImpact3d(project,selectedEntity.id,
+                          sphereOther.id,sphereFirstVelocity,sphereSecondVelocity,sphereRestitution);
+                        setSphereRun(run);setSphereTime(0);setSpherePlaying(false);
+                        setCollisionRun(null);setCollisionPlaying(false);
+                        setMessage("Calculated an isolated spatial contact and audited momentum, angular momentum and energy.");
+                        setError("");
+                      }catch(cause){
+                        setSphereRun(null);setSpherePlaying(false);
+                        setError(cause instanceof Error?cause.message:"Unsupported spatial collision.");
+                      }
+                    }}>Calculate three-dimensional sphere impact</button>
+                  {selectedSphereRun && (selectedSphereRun.firstEntityId===selectedEntity.id||
+                    selectedSphereRun.secondEntityId===selectedEntity.id)&&(
+                    <div className="mt-3 space-y-2 text-xs"
+                      aria-label="Verified three-dimensional impact results">
+                      <p>Impact: {metric(selectedSphereRun.impactTimeSeconds,"s")} ·
+                        masses: {metric(selectedSphereRun.firstMassKg,"kg")} /
+                        {metric(selectedSphereRun.secondMassKg,"kg")}</p>
+                      <p>Contact normal X/Y/Z:
+                        {selectedSphereRun.impactNormal.map(v=>v.toPrecision(4)).join(" / ")}</p>
+                      <p>Impulse X/Y/Z (N·s):
+                        {selectedSphereRun.impulseNs.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                      <p>Final first sphere velocity X/Y/Z (m/s):
+                        {selectedSphereRun.firstFinalVelocityMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                      <p>Final second sphere velocity X/Y/Z (m/s):
+                        {selectedSphereRun.secondFinalVelocityMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                      <p>Momentum X/Y/Z before (kg·m/s):
+                        {selectedSphereRun.momentumBeforeKgMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                      <p>Momentum X/Y/Z after (kg·m/s):
+                        {selectedSphereRun.momentumAfterKgMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                      <p>Angular momentum before/after (kg·m²/s):
+                        {selectedSphereRun.angularMomentumBeforeKgM2PerS.map(v=>v.toPrecision(5)).join(" / ")} /
+                        {selectedSphereRun.angularMomentumAfterKgM2PerS.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                      <p>Energy: {metric(selectedSphereRun.energyBeforeJ,"J")} before,
+                        {metric(selectedSphereRun.energyAfterJ,"J")} after,
+                        {metric(selectedSphereRun.dissipatedEnergyJ,"J")} dissipated.</p>
+                      <label className="block">Spatial collision time: {sphereTime.toFixed(2)} s
+                        <input type="range" className="w-full"
+                          aria-label="Explore three-dimensional impact time"
+                          min={0} max={selectedSphereRun.durationSeconds} step={0.01}
+                          value={sphereTime} onChange={e=>{
+                            setSpherePlaying(false);setSphereTime(Number(e.target.value));
+                          }}/>
+                      </label>
+                      {sphereSample&&<p>Computed world coordinates, first /
+                        second sphere (metres):
+                        {sphereSample.firstCentreM.map(v=>v.toPrecision(4)).join(" / ")} ;
+                        {sphereSample.secondCentreM.map(v=>v.toPrecision(4)).join(" / ")}
+                      </p>}
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={buttonClass}
+                          onClick={()=>setSpherePlaying(v=>!v)}>
+                          {spherePlaying?"Pause 3D impact":"Play 3D impact"}
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setSpherePlaying(false);setSphereTime(0);}}>
+                          Reset 3D impact
+                        </button>
+                        <select className={inputLabel} aria-label="Three-dimensional collision playback rate"
+                          value={spherePlaybackRate} onChange={e=>setSpherePlaybackRate(Number(e.target.value))}>
+                          <option value={0.1}>0.1× slow</option>
+                          <option value={1}>1×</option>
+                          <option value={4}>4×</option>
+                        </select>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>downloadJson("world-lab-spatial-sphere-impact.json",selectedSphereRun)}>
+                          Export 3D impact evidence
+                        </button>
+                      </div>
+                      <p className="text-muted-foreground">{selectedSphereRun.validity}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3"
                   aria-label="Object-to-object impact experiment">
                   <h3 className="text-sm font-semibold">Collide two invented solids</h3>
                   <p className="text-xs text-muted-foreground">
