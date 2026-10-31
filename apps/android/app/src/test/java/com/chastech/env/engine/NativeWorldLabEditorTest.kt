@@ -114,6 +114,19 @@ class NativeWorldLabEditorTest {
         assertEquals("input_a",project.digitalNetworks[0].outputs[0].sourceNodeId)
         assertEquals(1,NativeWorldLabDigitalLogic.evaluate(
             project.digitalNetworks[0])["output_q"])
+        json=NativeWorldLabEditor.addDigitalGate(
+            json,"invented","My next device","Assumed one-input inverter",
+            listOf("invented_gate"),id="next-gate")
+        json=NativeWorldLabEditor.digitalTruthBit(json,"invented","next-gate",1,1)
+        json=NativeWorldLabEditor.digitalOutputSource(
+            json,"invented","output_q","next-gate")
+        assertEquals(2,NativeWorldLabProjectCodec.decode(json).digitalNetworks[0].gates.size)
+        assertEquals(1,NativeWorldLabDigitalLogic.evaluate(
+            NativeWorldLabProjectCodec.decode(json).digitalNetworks[0])["output_q"])
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.addDigitalGate(
+                json,"invented","Broken","Assumed",listOf("missing"))
+        }
         assertThrows(IllegalArgumentException::class.java){
             NativeWorldLabEditor.digitalOutputSource(
                 json,"invented","output_q","does-not-exist")
