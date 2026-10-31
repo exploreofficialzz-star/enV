@@ -342,7 +342,11 @@ function calendarSpan(from: Date, to: Date) {
 }
 
 function addDateSpan(start: Date, options: Record<string, string>, multiplier = 1): Date {
-  const direction = options.direction === "subtract" ? -1 : 1;
+  const rawDirection = options.direction?.trim() ?? "";
+  if (rawDirection && rawDirection !== "add" && rawDirection !== "subtract") {
+    throw new Error("Direction must be add or subtract.");
+  }
+  const direction = rawDirection === "subtract" ? -1 : 1;
   const amount = (key: string) => {
     const parsed = Number(options[key] || 0);
     if (!Number.isFinite(parsed)) throw new Error(`Enter a valid number for ${key}.`);
@@ -426,10 +430,12 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
       const startMinutes = a.hour * 60 + a.minute;
       const endMinutes = b.hour * 60 + b.minute;
       const sameLocalDay = a.year === b.year && a.month === b.month && a.day === b.day;
-      return { choice, a, startMinutes, endMinutes, sameLocalDay };
+      const localWeekday = new Date(utcDateTimeMilliseconds(a.year, a.month - 1, a.day)).getUTCDay();
+      const weekday = localWeekday >= 1 && localWeekday <= 5;
+      return { choice, a, startMinutes, endMinutes, sameLocalDay, weekday };
     });
-    const suitable = localTimes.every(({ startMinutes, endMinutes, sameLocalDay }) =>
-      sameLocalDay && startMinutes >= workStartMinutes && endMinutes <= workEndMinutes
+    const suitable = localTimes.every(({ startMinutes, endMinutes, sameLocalDay, weekday }) =>
+      weekday && sameLocalDay && startMinutes >= workStartMinutes && endMinutes <= workEndMinutes
     );
     if (suitable) {
       slots.push({
@@ -440,10 +446,10 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
       });
     }
   }
-  if (!slots.length) return [{ label: "Available slots", value: "No shared working-hours slots found for that date and these working-hour settings." }];
+  if (!slots.length) return [{ label: "Available slots", value: "No shared Monday-Friday working-hours slots found for that date and these working-hour settings." }];
   const shown = slots.slice(0, 8);
   const rows: DateTimeRow[] = [
-    { label: "Available slots", value: `${slots.length} matching slots; showing the first ${shown.length}. This checks working hours, not personal calendar free/busy.` },
+    { label: "Available slots", value: `${slots.length} matching Monday-Friday slots; showing the first ${shown.length}. This checks working hours, not personal calendar free/busy.` },
     ...shown.map((slot, index) => ({ label: `Option ${index + 1}`, value: slot.value })),
   ];
   const first = shown[0].instant;

@@ -93,6 +93,10 @@ class NativeDateTimeEngineTest {
             throw AssertionError("invalid date unit accepted")
         } catch (_: IllegalArgumentException) { }
         try {
+            NativeDateTimeEngine.run("date-calculator", options = mapOf("start" to "2024-01-01", "days" to "1", "direction" to "ad"), now = fixedNow)
+            throw AssertionError("invalid date direction accepted")
+        } catch (_: IllegalArgumentException) { }
+        try {
             NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
                 "date" to "2024-01-15", "zones" to "Lagos, London", "sourceTz" to "Lagos", "durationMinutes" to "abc"
             ), now = fixedNow)
@@ -105,6 +109,14 @@ class NativeDateTimeEngineTest {
             ), now = fixedNow)
             throw AssertionError("overnight window must not be reported as supported")
         } catch (_: IllegalArgumentException) { }
+    }
+
+    @Test fun meetingPlannerDoesNotOfferWeekendSlots() {
+        val result = NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
+            "date" to "2024-01-13", "zones" to "Lagos, London", "sourceTz" to "Lagos"
+        ), now = fixedNow)
+        assertTrue(result.output.contains("No shared Monday-Friday working-hours slots"))
+        assertFalse(result.output.contains("Option 1:"))
     }
 
     @Test fun worldClockAcceptsUnambiguousIanaCityAliases() {

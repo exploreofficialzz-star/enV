@@ -72,7 +72,11 @@ assert.equal(runDateTime("world-clock", { zones: "Stockholm, Kathmandu, Brisbane
 assert.throws(() => runDateTime("world-clock", { zones: "A city that is not real" }), /Unknown city or time zone/);
 assert.equal(runDateTime("weekday", { value: "0001-01-01" })[0].value, "Monday");
 assert.throws(() => runDateTime("workday", { start: "2024-01-08", days: "1.5" }), /whole number/);
-assert.throws(() => runDateTime("business-days", { from: "2000-01-01", to: "3002-01-01" }), /range is too large/);
+assert.throws(() => runDateTime("business-days", { from: "2000-01-01", to: "3003-01-01" }), /range is too large/);
+assert.throws(() => runDateTime("date-add", { start: "2024-01-01", days: "1", direction: "ad" }), /Direction must be add or subtract/);
+assert.equal(runDateTime("meeting-planner", {
+  date: "2024-01-13", zones: "Lagos, London", sourceTz: "Lagos"
+}).some((row) => row.label === "Option 1"), false);
 assert.throws(() => runDateTime("meeting-planner", {
   date: "2024-01-15", zones: "Lagos, London", sourceTz: "Lagos", durationMinutes: "abc"
 }), /Meeting length/);

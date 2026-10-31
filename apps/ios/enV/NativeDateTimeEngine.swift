@@ -67,7 +67,7 @@ public enum NativeDateTimeEngine {
             let unitValues = try ["years", "months", "weeks", "days"].map { key -> Int in
                 let raw = (options[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 if raw.isEmpty { return 0 }
-                guard let value = Int(raw) else { throw NativeDateTimeError.invalidOperation("(key) must be a whole number.") }
+                guard let value = Int(raw) else { throw NativeDateTimeError.invalidOperation("\(key) must be a whole number.") }
                 return value
             }
             guard unitValues.contains(where: { $0 != 0 }) else { throw NativeDateTimeError.invalidOperation("Enter at least one date unit to add or subtract.") }
@@ -400,7 +400,7 @@ public enum NativeDateTimeEngine {
         let raw = value.components(separatedBy: CharacterSet(charactersIn: ",;\n\r"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         guard !raw.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter at least one city or IANA time zone.") }
-        guard raw.count <= limit else { throw NativeDateTimeError.invalidOperation("Enter no more than (limit) cities or time zones.") }
+        guard raw.count <= limit else { throw NativeDateTimeError.invalidOperation("Enter no more than \(limit) cities or time zones.") }
         var seen = Set<String>()
         var result: [ZoneChoice] = []
         for item in raw {
@@ -432,7 +432,13 @@ public enum NativeDateTimeEngine {
     }
 
     private static func addDateSpan(_ start: Date, options: [String: String]) throws -> Date {
-        let direction = options["direction"] == "subtract" ? -1 : 1
+        let rawDirection = (options["direction"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let direction: Int
+        switch rawDirection {
+        case "", "add": direction = 1
+        case "subtract": direction = -1
+        default: throw NativeDateTimeError.invalidOperation("Direction must be add or subtract.")
+        }
         let cal = calendar(.gregorian)
         var result = start
         for component in [Calendar.Component.year, .month, .weekOfYear, .day] {
@@ -541,7 +547,7 @@ public enum NativeDateTimeEngine {
             let raw = (options[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if raw.isEmpty { return fallback }
             guard let value = Int(raw), (minimum...maximum).contains(value) else {
-                throw NativeDateTimeError.invalidOperation("(label) must be a whole number from (minimum) to (maximum).")
+                throw NativeDateTimeError.invalidOperation("\(label) must be a whole number from \(minimum) to \(maximum).")
             }
             return value
         }
@@ -577,7 +583,11 @@ public enum NativeDateTimeEngine {
                 let sameDay = a.year == b.year && a.month == b.month && a.day == b.day
                 let localStart = (a.hour ?? 0) * 60 + (a.minute ?? 0)
                 let localEnd = (b.hour ?? 0) * 60 + (b.minute ?? 0)
-                if !sameDay || localStart < startMinutes || localEnd > endMinutes { suitable = false; break }
+                let weekday = cal.component(.weekday, from: cursor)
+                if !sameDay || !(2...6).contains(weekday) || localStart < startMinutes || localEnd > endMinutes {
+                    suitable = false
+                    break
+                }
                 let time = String(format: "%02d:%02d", a.hour ?? 0, a.minute ?? 0)
                 localValues.append((item.label, "\(time) (\(offsetLabel(cursor, zone: item.zone)))"))
             }
@@ -587,11 +597,11 @@ public enum NativeDateTimeEngine {
             cursor = cursor.addingTimeInterval(Double(interval * 60))
         }
         guard !slots.isEmpty else {
-            return result(("Available slots", "No shared working-hours slots found. This checks working hours, not personal calendar free/busy."))
+            return result(("Available slots", "No shared Monday-Friday working-hours slots found. This checks working hours, not personal calendar free/busy."))
         }
         let shown = Array(slots.prefix(8))
         var output: [(String, String)] = [
-            ("Available slots", "\(slots.count) matching slots; showing the first \(shown.count). This checks working hours, not personal calendar free/busy.")
+            ("Available slots", "\(slots.count) matching Monday-Friday slots; showing the first \(shown.count). This checks working hours, not personal calendar free/busy.")
         ]
         for (index, slot) in shown.enumerated() { output.append(("Option \(index + 1)", slot.1)) }
         let first = shown[0].0

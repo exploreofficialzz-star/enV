@@ -93,6 +93,9 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-calculator", options: [
             "start": "2024-01-01", "days": "abc"
         ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-calculator", options: [
+            "start": "2024-01-01", "days": "1", "direction": "ad"
+        ], now: fixedNow))
         XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
             "date": "2024-01-15", "zones": "Lagos, London", "sourceTz": "Lagos", "durationMinutes": "abc"
         ], now: fixedNow))
@@ -100,6 +103,14 @@ final class NativeDateTimeEngineTests: XCTestCase {
             "date": "2024-01-15", "zones": "Lagos, London", "sourceTz": "Lagos",
             "workStart": "20:00", "workEnd": "08:00"
         ], now: fixedNow))
+    }
+
+    func testMeetingPlannerDoesNotOfferWeekendSlots() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-13", "zones": "Lagos, London", "sourceTz": "Lagos"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("No shared Monday-Friday working-hours slots"))
+        XCTAssertFalse(result.output.contains("Option 1:"))
     }
 
     func testWorldClockAcceptsUnambiguousIanaCityAliases() throws {

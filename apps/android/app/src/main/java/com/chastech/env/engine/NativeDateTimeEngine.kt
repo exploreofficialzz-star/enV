@@ -267,7 +267,12 @@ object NativeDateTimeEngine {
     }
 
     private fun addDateSpan(start: LocalDate, options: Map<String, String>): LocalDate {
-        val direction = if (options["direction"] == "subtract") -1L else 1L
+        val rawDirection = options["direction"]?.trim().orEmpty()
+        val direction = when (rawDirection) {
+            "", "add" -> 1L
+            "subtract" -> -1L
+            else -> throw IllegalArgumentException("Direction must be add or subtract.")
+        }
         fun amount(key: String): Long = (options[key]?.toLongOrNull() ?: 0L) * direction
         return start.plusYears(amount("years")).plusMonths(amount("months"))
             .plusWeeks(amount("weeks")).plusDays(amount("days"))
@@ -402,7 +407,7 @@ object NativeDateTimeEngine {
                 val aMinutes = a.hour * 60 + a.minute
                 val bMinutes = b.hour * 60 + b.minute
                 val sameDay = a.toLocalDate() == b.toLocalDate()
-                Triple(choice, a, sameDay && aMinutes >= startMinutes && bMinutes <= endMinutes)
+                Triple(choice, a, sameDay && a.dayOfWeek.value in 1..5 && aMinutes >= startMinutes && bMinutes <= endMinutes)
             }
             if (local.all { it.third }) {
                 val label = local.joinToString(" | ") { (choice, time, _) ->
@@ -412,9 +417,9 @@ object NativeDateTimeEngine {
             }
             cursor = cursor.plusSeconds(interval * 60L)
         }
-        if (slots.isEmpty()) return rows("Available slots" to "No shared working-hours slots found. This checks working hours, not personal calendar free/busy.")
+        if (slots.isEmpty()) return rows("Available slots" to "No shared Monday-Friday working-hours slots found. This checks working hours, not personal calendar free/busy.")
         val shown = slots.take(8)
-        val rows = mutableListOf(Row("Available slots", "${slots.size} matching slots; showing the first ${shown.size}. This checks working hours, not personal calendar free/busy."))
+        val rows = mutableListOf(Row("Available slots", "${slots.size} matching Monday-Friday slots; showing the first ${shown.size}. This checks working hours, not personal calendar free/busy."))
         shown.forEachIndexed { index, slot -> rows += Row("Option ${index + 1}", slot.second) }
         val first = shown.first().first
         val finish = first.plusSeconds(duration * 60L)
