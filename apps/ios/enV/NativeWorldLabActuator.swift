@@ -726,3 +726,274 @@ enum NativeWorldLabSphereImpact {
             energyBeforeJ:eBefore,energyAfterJ:eAfter,dissipatedEnergyJ:lost)
     }
 }
+
+
+/// Local exact event-based multi-sphere physics. All mass/restitution assumptions
+/// are user-defined, with only isolated smooth hard-sphere binary contacts.
+private struct GroupVector {
+    let x:Double
+    let y:Double
+    let z:Double
+    init(_ a:[Double]) {x=a[0];y=a[1];z=a[2]}
+    init(_ x:Double,_ y:Double,_ z:Double){self.x=x;self.y=y;self.z=z}
+    static func +(a:Self,b:Self)->Self{Self(a.x+b.x,a.y+b.y,a.z+b.z)}
+    static func -(a:Self,b:Self)->Self{Self(a.x-b.x,a.y-b.y,a.z-b.z)}
+    static func *(a:Self,k:Double)->Self{Self(a.x*k,a.y*k,a.z*k)}
+    func dot(_ b:Self)->Double{x*b.x+y*b.y+z*b.z}
+    func cross(_ b:Self)->Self {
+        Self(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x)
+    }
+    var length:Double{sqrt(dot(self))}
+    var finite:Bool{x.isFinite && y.isFinite && z.isFinite}
+    var values:[Double]{[x,y,z]}
+}
+struct NativeGroupSphereStart:Encodable {
+    let entityId:String
+    let materialId:String
+    let radiusM:Double
+    let massKg:Double
+    let positionM:[Double]
+    let velocityMps:[Double]
+}
+struct NativeGroupSphereEvent:Encodable {
+    let atSeconds:Double
+    let firstEntityId:String
+    let secondEntityId:String
+    let contactNormal:[Double]
+    let impulseNs:[Double]
+    let energyLostJ:Double
+}
+struct NativeGroupSphereSample {
+    let entityId:String
+    let positionM:[Double]
+    let velocityMps:[Double]
+}
+struct NativeGroupFrame {
+    let timeSeconds:Double
+    let completedEvents:Int
+    let objects:[NativeGroupSphereSample]
+}
+struct NativeGroupSphereRun:Encodable {
+    let format="env-world-lab-multi-sphere-impact"
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let materialEvidence="hypothetical-user-assumed"
+    let projectId:String
+    let projectRevision:Int
+    let initial:[NativeGroupSphereStart]
+    let restitution:Double
+    let durationSeconds:Double
+    let events:[NativeGroupSphereEvent]
+    let totalInitialEnergyJ:Double
+    let totalFinalEnergyJ:Double
+    let totalDissipatedEnergyJ:Double
+    let initialMomentumKgMps:[Double]
+    let finalMomentumKgMps:[Double]
+    let initialAngularMomentumKgM2PerS:[Double]
+    let finalAngularMomentumKgM2PerS:[Double]
+    let validity="Exact event-driven free-flight hard spheres (2–12), with isolated frictionless binary contacts. No simultaneous impact resolution, external gravity, rotation, friction, walls, joints, deformation, fracture or measured material properties. Inertial densities and restitution are user-assumed."
+
+    func sample(_ t:Double)throws->NativeGroupFrame{
+        guard t.isFinite,t>=0,t<=durationSeconds else {
+            throw NativeWorldLabError.invalid("Group sample is outside run duration")
+        }
+        var positions=Dictionary(uniqueKeysWithValues:initial.map{
+            ($0.entityId,GroupVector($0.positionM))
+        })
+        var speeds=Dictionary(uniqueKeysWithValues:initial.map{
+            ($0.entityId,GroupVector($0.velocityMps))
+        })
+        let masses=Dictionary(uniqueKeysWithValues:initial.map{
+            ($0.entityId,$0.massKg)
+        })
+        var elapsed=0.0
+        var completed=0
+        func advance(_ dt:Double){
+            for (id,pos) in positions {
+                if let speed=speeds[id] {positions[id]=pos+speed*dt}
+            }
+        }
+        for event in events {
+            if event.atSeconds>t {break}
+            advance(event.atSeconds-elapsed)
+            elapsed=event.atSeconds
+            completed+=1
+            let impulse=GroupVector(event.impulseNs)
+            if let v=speeds[event.firstEntityId],let m=masses[event.firstEntityId]{
+                speeds[event.firstEntityId]=v-impulse*(1/m)
+            }
+            if let v=speeds[event.secondEntityId],let m=masses[event.secondEntityId]{
+                speeds[event.secondEntityId]=v+impulse*(1/m)
+            }
+        }
+        advance(t-elapsed)
+        return NativeGroupFrame(timeSeconds:t,completedEvents:completed,
+            objects:initial.map{start in
+                NativeGroupSphereSample(entityId:start.entityId,
+                    positionM:positions[start.entityId]?.values ?? start.positionM,
+                    velocityMps:speeds[start.entityId]?.values ?? start.velocityMps)
+            })
+    }
+}
+enum NativeWorldLabMultiSphere {
+    private struct Moving {
+        let id:String
+        let materialId:String
+        let radius:Double
+        let mass:Double
+        var position:GroupVector
+        var velocity:GroupVector
+    }
+    private static let tolerance=1e-8
+    private static func momentum(_ bodies:[Moving])->GroupVector {
+        bodies.reduce(GroupVector(0,0,0)){$0+$1.velocity*$1.mass}
+    }
+    private static func angular(_ bodies:[Moving])->GroupVector {
+        bodies.reduce(GroupVector(0,0,0)){
+            $0+$1.position.cross($1.velocity)*$1.mass
+        }
+    }
+    private static func energy(_ bodies:[Moving])->Double {
+        bodies.reduce(0.0){$0+0.5*$1.mass*$1.velocity.dot($1.velocity)}
+    }
+    private static func nextContact(_ a:Moving,_ b:Moving)throws->Double?{
+        let d=b.position-a.position
+        let v=b.velocity-a.velocity
+        let radius=a.radius+b.radius
+        let c=d.dot(d)-radius*radius
+        guard c >= -tolerance else {
+            throw NativeWorldLabError.invalid("Sphere overlap preceded an impact event")
+        }
+        let aa=v.dot(v)
+        let bb=2*d.dot(v)
+        if aa<=1e-18 || bb>=(-1e-12){return nil}
+        let disc=bb*bb-4*aa*c
+        if disc<0 {return nil}
+        let t=(-bb-sqrt(max(0,disc)))/(2*aa)
+        if t<=tolerance || (d+v*t).dot(v)>=(-1e-10){return nil}
+        return t
+    }
+    static func evaluate(_ project:NativeWorldLabProject,
+        velocities:[String:[Double]],restitution:Double,
+        durationSeconds:Double=5)throws->NativeGroupSphereRun{
+        let spheres=project.entities.filter{$0.shape=="sphere"}
+        guard (2...12).contains(spheres.count),restitution.isFinite,
+              restitution>=0,restitution<=1,durationSeconds.isFinite,
+              durationSeconds>0,durationSeconds<=30 else {
+            throw NativeWorldLabError.invalid("Group requires 2–12 spheres, finite restitution 0–1 and duration (0,30]")
+        }
+        let ids=Set(spheres.map{$0.id})
+        guard Set(velocities.keys).isSubset(of:ids) else {
+            throw NativeWorldLabError.invalid("Unrecognized sphere velocity ID")
+        }
+        var bodies=[Moving]()
+        for sphere in spheres {
+            guard let material=project.materials.first(where:{$0.id==sphere.materialId}),
+                  let density=material.densityKgM3 else {
+                throw NativeWorldLabError.invalid("Every invented sphere needs a positive assumed density")
+            }
+            let mass=density*sphere.volumeMetersCubed
+            let velocity=velocities[sphere.id] ?? [0,0,0]
+            guard mass.isFinite,mass>=0.001,mass<=10000,velocity.count==3,
+                  velocity.allSatisfy({$0.isFinite}) else {
+                throw NativeWorldLabError.invalid("Sphere mass or velocity is outside finite supported bounds")
+            }
+            let v=GroupVector(velocity)
+            guard v.length<=100 else {
+                throw NativeWorldLabError.invalid("Invented sphere speed exceeds 100 m/s")
+            }
+            bodies.append(Moving(id:sphere.id,materialId:material.id,
+                radius:sphere.dimensionsMeters[0]/2,mass:mass,
+                position:GroupVector(sphere.positionMeters),velocity:v))
+        }
+        for i in bodies.indices {
+            for j in (i+1)..<bodies.count {
+                guard (bodies[j].position-bodies[i].position).length>
+                    bodies[i].radius+bodies[j].radius+tolerance else {
+                    throw NativeWorldLabError.invalid("Group spheres must start separated, not touching")
+                }
+            }
+        }
+        let initial=bodies.map{
+            NativeGroupSphereStart(entityId:$0.id,materialId:$0.materialId,
+                radiusM:$0.radius,massKg:$0.mass,
+                positionM:$0.position.values,velocityMps:$0.velocity.values)
+        }
+        let energyInitially=energy(bodies)
+        let pInitially=momentum(bodies)
+        let lInitially=angular(bodies)
+        var events=[NativeGroupSphereEvent]()
+        var time=0.0
+        var lossTotal=0.0
+        while time<durationSeconds-tolerance {
+            var shortest=Double.infinity
+            var ties=[(Int,Int)]()
+            for i in bodies.indices {
+                for j in (i+1)..<bodies.count {
+                    guard let dt=try nextContact(bodies[i],bodies[j]),
+                          time+dt<=durationSeconds+tolerance else {continue}
+                    if dt<shortest-tolerance {
+                        shortest=dt;ties=[(i,j)]
+                    }else if abs(dt-shortest)<=tolerance {ties.append((i,j))}
+                }
+            }
+            if !shortest.isFinite {break}
+            guard ties.count==1,events.count<128 else {
+                throw NativeWorldLabError.invalid("Simultaneous contacts or event-limit case is unsupported")
+            }
+            let (i,j)=ties[0]
+            for k in bodies.indices {
+                bodies[k].position=bodies[k].position+bodies[k].velocity*shortest
+            }
+            time+=shortest
+            let d=bodies[j].position-bodies[i].position
+            let distance=d.length
+            guard abs(distance-bodies[i].radius-bodies[j].radius)<1e-6 else {
+                throw NativeWorldLabError.invalid("Sphere contact geometry failed")
+            }
+            let normal=d*(1/distance)
+            let closing=(bodies[j].velocity-bodies[i].velocity).dot(normal)
+            guard closing < (-1e-10) else {
+                throw NativeWorldLabError.invalid("Contact is not closing along its normal")
+            }
+            let beforeEnergy=energy(bodies)
+            let beforeP=momentum(bodies)
+            let beforeL=angular(bodies)
+            let mi=bodies[i].mass
+            let mj=bodies[j].mass
+            let impulse=normal*(-(1+restitution)*closing/(1/mi+1/mj))
+            bodies[i].velocity=bodies[i].velocity-impulse*(1/mi)
+            bodies[j].velocity=bodies[j].velocity+impulse*(1/mj)
+            let afterEnergy=energy(bodies)
+            let loss=0.5*mi*mj/(mi+mj)*(1-restitution*restitution)*closing*closing
+            guard [afterEnergy,loss].allSatisfy({$0.isFinite}),
+                  (beforeP-momentum(bodies)).length<=1e-8*max(1,beforeP.length),
+                  (beforeL-angular(bodies)).length<=1e-8*max(1,beforeL.length),
+                  abs(beforeEnergy-afterEnergy-loss)<=1e-8*max(1,beforeEnergy) else {
+                throw NativeWorldLabError.invalid("Multi-sphere impulse conservation audit failed")
+            }
+            lossTotal+=loss
+            events.append(NativeGroupSphereEvent(atSeconds:time,
+                firstEntityId:bodies[i].id,secondEntityId:bodies[j].id,
+                contactNormal:normal.values,impulseNs:impulse.values,
+                energyLostJ:loss))
+        }
+        let finalEnergy=energy(bodies)
+        let finalP=momentum(bodies)
+        let finalL=angular(bodies)
+        guard (finalP-pInitially).length<=1e-7*max(1,pInitially.length),
+              (finalL-lInitially).length<=1e-7*max(1,lInitially.length),
+              abs(energyInitially-finalEnergy-lossTotal)<=1e-7*max(1,energyInitially) else {
+            throw NativeWorldLabError.invalid("Multi-sphere group conservation audit failed")
+        }
+        return NativeGroupSphereRun(projectId:project.id,
+            projectRevision:project.revision,initial:initial,
+            restitution:restitution,durationSeconds:durationSeconds,
+            events:events,totalInitialEnergyJ:energyInitially,
+            totalFinalEnergyJ:finalEnergy,totalDissipatedEnergyJ:lossTotal,
+            initialMomentumKgMps:pInitially.values,
+            finalMomentumKgMps:finalP.values,
+            initialAngularMomentumKgM2PerS:lInitially.values,
+            finalAngularMomentumKgM2PerS:finalL.values)
+    }
+}
