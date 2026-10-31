@@ -399,7 +399,7 @@ function unixTimestampRows(raw: string): DateTimeRow[] {
     { label: "Local", value: date.toString() },
     { label: "Unix seconds", value: seconds.toString() },
     { label: "Unix milliseconds", value: millis.toString() },
-    { label: "Unix microseconds", value: (totalNanoseconds / 1_000n).toString() },
+    { label: "Unix microseconds", value: floorDiv(totalNanoseconds, 1_000n).toString() },
     { label: "Unix nanoseconds", value: totalNanoseconds.toString() },
   ];
 }

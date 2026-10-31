@@ -443,6 +443,11 @@ object NativeDateTimeEngine {
         return time.hour * 60 + time.minute
     }
 
+    private fun floorDivide(value: BigInteger, divisor: BigInteger): BigInteger {
+        val division = value.divideAndRemainder(divisor)
+        return if (value.signum() < 0 && division[1].signum() != 0) division[0].subtract(BigInteger.ONE) else division[0]
+    }
+
     private fun unixRows(value: String): Result {
         val raw = value.trim()
         if (raw.isEmpty()) throw IllegalArgumentException("Enter a date or timestamp.")
@@ -474,8 +479,8 @@ object NativeDateTimeEngine {
             "ISO UTC" to DateTimeFormatter.ISO_INSTANT.format(instant),
             "Local" to localizedMedium(instant, ZoneId.systemDefault(), Locale.getDefault()),
             "Unix seconds" to instant.epochSecond.toString(),
-            "Unix milliseconds" to totalNanos.divide(BigInteger("1000000")).toString(),
-            "Unix microseconds" to totalNanos.divide(BigInteger("1000")).toString(),
+            "Unix milliseconds" to floorDivide(totalNanos, BigInteger("1000000")).toString(),
+            "Unix microseconds" to floorDivide(totalNanos, BigInteger("1000")).toString(),
             "Unix nanoseconds" to totalNanos.toString()
         )
     }

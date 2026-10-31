@@ -91,6 +91,10 @@ assert.throws(() => runDateTime("meeting-planner", {
 const micros = runDateTime("unix", { value: "1704067200000000" });
 assert.equal(micros.find((row) => row.label === "Detected precision")?.value, "microseconds");
 assert.equal(micros.find((row) => row.label === "Unix seconds")?.value, "1704067200");
+const negativeNanosecond = runDateTime("unix", { value: "-00000000000000001" });
+assert.equal(negativeNanosecond.find((row) => row.label === "ISO UTC")?.value, "1969-12-31T23:59:59.999999999Z");
+assert.equal(negativeNanosecond.find((row) => row.label === "Unix milliseconds")?.value, "-1");
+assert.equal(negativeNanosecond.find((row) => row.label === "Unix microseconds")?.value, "-1");
 const unixBatch = runDateTime("unix", { value: "1704067200, 1704153600000" });
 assert.equal(unixBatch.length, 2);
 assert.equal(unixBatch[0].label, "Timestamp 1");

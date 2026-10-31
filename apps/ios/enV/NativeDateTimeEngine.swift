@@ -287,18 +287,45 @@ public enum NativeDateTimeEngine {
             }
             totalNanos = Int64(nanos.rounded())
         }
-        let seconds = Double(totalNanos) / 1_000_000_000
-        let date = Date(timeIntervalSince1970: seconds)
-        let unixSeconds = Int64(floor(seconds))
+        let divisor: Int64 = 1_000_000_000
+        var wholeSeconds = totalNanos / divisor
+        var nanosRemainder = totalNanos % divisor
+        if nanosRemainder < 0 {
+            wholeSeconds -= 1
+            nanosRemainder += divisor
+        }
+        let date = Date(timeIntervalSince1970: Double(totalNanos) / 1_000_000_000)
         return result(
             ("Detected precision", precision),
-            ("ISO UTC", isoString(date)),
+            ("ISO UTC", isoStringFromUnixNanoseconds(totalNanos)),
             ("Local", date.description(with: Locale.current)),
-            ("Unix seconds", String(unixSeconds)),
-            ("Unix milliseconds", String(totalNanos / 1_000_000)),
-            ("Unix microseconds", String(totalNanos / 1_000)),
+            ("Unix seconds", String(wholeSeconds)),
+            ("Unix milliseconds", String(floorDivide(totalNanos, by: 1_000_000))),
+            ("Unix microseconds", String(floorDivide(totalNanos, by: 1_000))),
             ("Unix nanoseconds", String(totalNanos))
         )
+    }
+    private static func floorDivide(_ value: Int64, by divisor: Int64) -> Int64 {
+        let quotient = value / divisor
+        let remainder = value % divisor
+        return remainder < 0 ? quotient - 1 : quotient
+    }
+    private static func isoStringFromUnixNanoseconds(_ value: Int64) -> String {
+        let divisor: Int64 = 1_000_000_000
+        var wholeSeconds = value / divisor
+        var nanos = value % divisor
+        if nanos < 0 {
+            wholeSeconds -= 1
+            nanos += divisor
+        }
+        let baseDate = Date(timeIntervalSince1970: Double(wholeSeconds))
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar(.gregorian)
+        formatter.timeZone = utc
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        let fraction = String(nanos).padding(toLength: 9, withPad: "0", startingAt: 0)
+        return "\(formatter.string(from: baseDate)).\(fraction)Z"
     }
     private static func localizedMedium(_ date: Date, zone: TimeZone, locale: Locale) -> String { let f = DateFormatter(); f.locale = locale; f.timeZone = zone; f.dateStyle = .medium; f.timeStyle = .medium; return f.string(from: date) }
     private static func isoString(_ date: Date) -> String { let f = ISO8601DateFormatter(); f.timeZone = utc; f.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]; return f.string(from: date) }

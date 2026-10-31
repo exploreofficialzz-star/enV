@@ -145,6 +145,15 @@ class NativeDateTimeEngineTest {
         assertTrue(meeting.contains("DTSTAMP:"))
     }
 
+    @Test fun negativeSubsecondUnixValuesUseFloorSemantics() {
+        val result = NativeDateTimeEngine.run("unix-timestamp-converter", options = mapOf(
+            "value" to "-00000000000000001"
+        ), now = fixedNow)
+        assertTrue(result.output.contains("ISO UTC: 1969-12-31T23:59:59.999999999Z"))
+        assertTrue(result.output.contains("Unix milliseconds: -1"))
+        assertTrue(result.output.contains("Unix microseconds: -1"))
+    }
+
     @Test fun unixTimestampBatchConvertsLocallyAndEnforcesLimit() {
         val result = NativeDateTimeEngine.run("unix-timestamp-converter", options = mapOf(
             "value" to "1704067200, 1704153600000"

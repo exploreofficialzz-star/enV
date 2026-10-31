@@ -131,6 +131,15 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow).output, "Result: 2024-01-05 Friday")
     }
 
+    func testNegativeSubsecondUnixValuesUseFloorSemantics() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
+            "value": "-00000000000000001"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("ISO UTC: 1969-12-31T23:59:59.999999999Z"))
+        XCTAssertTrue(result.output.contains("Unix milliseconds: -1"))
+        XCTAssertTrue(result.output.contains("Unix microseconds: -1"))
+    }
+
     func testUnixTimestampBatchConvertsLocallyAndEnforcesLimit() throws {
         let result = try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
             "value": "1704067200, 1704153600000"
