@@ -3,6 +3,7 @@ import { CATEGORY_MAP } from "@/data/categories";
 import type { CategoryId, ToolMeta } from "@/types/tool";
 import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessibility-studios";
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
+import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
 
 const musicDownloaderTool: ToolMeta = {
   id: "music-downloader",
@@ -73,6 +74,7 @@ const allTools: ToolMeta[] = [
     }
     return webTool;
   }),
+  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !catalogTools.some((tool) => tool.id === extension.id)),
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
 ];
