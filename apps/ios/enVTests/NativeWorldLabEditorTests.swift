@@ -98,6 +98,20 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertEqual(try NativeWorldLabProject.decode(data).entities.count,3)
         XCTAssertEqual(try NativeWorldLabProject.decode(data).assemblies?.count,0)
     }
+    func testDigitalIndicatorCanReadAnInventedSwitchAndRejectUnknownSource() throws {
+        var data=try NativeWorldLabEditor.startDigitalInvention(
+            NativeWorldLabEditor.blank(),id:"invented")
+        data=try NativeWorldLabEditor.digitalOutputSource(
+            data,networkId:"invented",outputId:"output_q",sourceNodeId:"input_a")
+        data=try NativeWorldLabEditor.digitalSwitch(
+            data,networkId:"invented",inputId:"input_a",value:true)
+        let project=try NativeWorldLabProject.decode(data)
+        let network=try XCTUnwrap(project.digitalNetworks?.first)
+        XCTAssertEqual(network.outputs[0].sourceNodeId,"input_a")
+        XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(network)["output_q"],1)
+        XCTAssertThrowsError(try NativeWorldLabEditor.digitalOutputSource(
+            data,networkId:"invented",outputId:"output_q",sourceNodeId:"absent"))
+    }
     func testSchemaEnforcedForEveryMutation() throws {
         let data=try NativeWorldLabEditor.blank()
         XCTAssertThrowsError(try NativeWorldLabEditor.addSolid(data,shape:"freeform"))
