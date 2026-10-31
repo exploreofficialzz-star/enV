@@ -7,8 +7,7 @@
     "nf3": "0.3.17",
     "zod": "$zod",
     "fast-uri": "3.1.9",
-    "undici": "6.29.1",
-    "sharp": "0.35.5"
+    "undici": "6.29.1"
   },
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
@@ -172,8 +171,7 @@
     "vite": "^8.3.3",
     "zod": "^4.4.0",
     "zustand": "^5.0.0",
-    "babylonjs-serializers": "9.32.1",
-    "@huggingface/transformers": "3.8.1"
+    "babylonjs-serializers": "9.32.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
