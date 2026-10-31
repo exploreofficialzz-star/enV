@@ -138,6 +138,19 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow).output, "Result: 2024-01-05 Friday")
     }
 
+    func testLeapBirthdayReturnsToFebruary29InTheNextLeapYear() throws {
+        let now = ISO8601DateFormatter().date(from: "2023-03-01T12:00:00Z")!
+        let utcZone = TimeZone(secondsFromGMT: 0)!
+        let defaultRule = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29"
+        ], now: now, localTimeZone: utcZone)
+        let marchFirstRule = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29", "leapBirthday": "mar-1"
+        ], now: now, localTimeZone: utcZone)
+        XCTAssertTrue(defaultRule.output.contains("Days until birthday: 365"))
+        XCTAssertTrue(marchFirstRule.output.contains("Days until birthday: 366"))
+    }
+
     func testMeetingPlannerSupportsSundayToThursdayWorkweeks() throws {
         let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
             "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos",

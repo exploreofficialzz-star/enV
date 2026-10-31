@@ -170,6 +170,21 @@ class NativeDateTimeEngineTest {
         assertTrue(meeting.contains("DTSTAMP:"))
     }
 
+    @Test fun leapBirthdayReturnsToFebruary29InTheNextLeapYear() {
+        val now = Instant.parse("2023-03-01T12:00:00Z")
+        val utc = java.time.ZoneId.of("UTC")
+        val defaultRule = NativeDateTimeEngine.run(
+            "birthday-countdown", options = mapOf("birth" to "2000-02-29"),
+            now = now, localTimeZone = utc
+        )
+        val marchFirstRule = NativeDateTimeEngine.run(
+            "birthday-countdown", options = mapOf("birth" to "2000-02-29", "leapBirthday" to "mar-1"),
+            now = now, localTimeZone = utc
+        )
+        assertTrue(defaultRule.output.contains("Days until birthday: 365"))
+        assertTrue(marchFirstRule.output.contains("Days until birthday: 366"))
+    }
+
     @Test fun negativeSubsecondUnixValuesUseFloorSemantics() {
         val result = NativeDateTimeEngine.run("unix-timestamp-converter", options = mapOf(
             "value" to "-00000000000000001"

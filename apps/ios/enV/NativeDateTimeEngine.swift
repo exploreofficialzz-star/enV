@@ -171,20 +171,19 @@ public enum NativeDateTimeEngine {
             let birth = try dateOnly(options["birth"] ?? input, label: "birth date")
             let today = deviceToday(now, in: localTimeZone)
             let parts = calendar(.gregorian).dateComponents([.month, .day], from: birth)
-            var month = parts.month ?? 1
-            var day = parts.day ?? 1
+            let month = parts.month ?? 1
+            let day = parts.day ?? 1
             let year = calendar(.gregorian).component(.year, from: today)
-            if month == 2 && day == 29 && !isLeapYear(year) && options["leapBirthday"] == "mar-1" {
-                month = 3; day = 1
-            } else if month == 2 && day == 29 && !isLeapYear(calendar(.gregorian).component(.year, from: today)) {
-                day = 28
+            func birthdayInYear(_ targetYear: Int) -> Date {
+                if month == 2 && day == 29 && !isLeapYear(targetYear) {
+                    let adjustedMonth = options["leapBirthday"] == "mar-1" ? 3 : 2
+                    let adjustedDay = options["leapBirthday"] == "mar-1" ? 1 : 28
+                    return calendar(.gregorian).date(from: DateComponents(year: targetYear, month: adjustedMonth, day: adjustedDay))!
+                }
+                return calendar(.gregorian).date(from: DateComponents(year: targetYear, month: month, day: day))!
             }
-            var next = calendar(.gregorian).date(from: DateComponents(year: year, month: month, day: day))!
-            if next < today {
-                let nextYear = year + 1
-                if month == 2 && day == 29 && !isLeapYear(nextYear) { day = 28 }
-                next = calendar(.gregorian).date(from: DateComponents(year: nextYear, month: month, day: day))!
-            }
+            var next = birthdayInYear(year)
+            if next < today { next = birthdayInYear(year + 1) }
             return result(("Days until birthday", String(calendar(.gregorian).dateComponents([.day], from: today, to: next).day ?? 0)))
         case "time-until":
             let target = try dateOnly(options["target"] ?? options["value"] ?? "", label: "target date")

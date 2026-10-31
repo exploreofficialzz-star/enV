@@ -255,19 +255,16 @@ object NativeDateTimeEngine {
     private fun birthday(value: String, now: Instant, options: Map<String, String>, localTimeZone: ZoneId): Result {
         val birth = parseDate(value, "birth date")
         val today = now.atZone(localTimeZone).toLocalDate()
-        var month = birth.monthValue
-        var day = birth.dayOfMonth
-        if (month == 2 && day == 29 && !Year.isLeap(today.year.toLong()) && options["leapBirthday"] == "mar-1") {
-            month = 3; day = 1
-        } else if (month == 2 && day == 29 && !Year.isLeap(today.year.toLong())) {
-            day = 28
+        val month = birth.monthValue
+        val day = birth.dayOfMonth
+        fun birthdayInYear(year: Int): LocalDate {
+            if (month == 2 && day == 29 && !Year.isLeap(year.toLong())) {
+                return if (options["leapBirthday"] == "mar-1") LocalDate.of(year, 3, 1) else LocalDate.of(year, 2, 28)
+            }
+            return LocalDate.of(year, month, day)
         }
-        var next = LocalDate.of(today.year, month, day)
-        if (!next.isAfter(today)) {
-            val nextYear = today.year + 1
-            val nextDay = if (month == 2 && day == 29 && !Year.isLeap(nextYear.toLong())) 28 else day
-            next = LocalDate.of(nextYear, month, nextDay)
-        }
+        var next = birthdayInYear(today.year)
+        if (next.isBefore(today)) next = birthdayInYear(today.year + 1)
         return rows("Days until birthday" to ChronoUnit.DAYS.between(today, next).toString())
     }
 

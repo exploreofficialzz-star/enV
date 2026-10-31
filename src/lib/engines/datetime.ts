@@ -656,14 +656,18 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
       
       const today = localDayStart(now);
       const thisYear = today.getFullYear();
-      let month = birth.getMonth();
-      let day = birth.getDate();
-      if (month === 1 && day === 29 && !isLeapYear(localCalendarDate(thisYear, 5, 1))) {
-        if (opts.leapBirthday === "mar-1") { month = 2; day = 1; }
-        else day = 28;
-      }
-      let next = localCalendarDate(thisYear, month, day);
-      if (next < today) next = localCalendarDate(thisYear + 1, month, day);
+      const month = birth.getMonth();
+      const day = birth.getDate();
+      const birthdayInYear = (year: number) => {
+        if (month === 1 && day === 29 && !isLeapYear(localCalendarDate(year, 5, 1))) {
+          return opts.leapBirthday === "mar-1"
+            ? localCalendarDate(year, 2, 1)
+            : localCalendarDate(year, 1, 28);
+        }
+        return localCalendarDate(year, month, day);
+      };
+      let next = birthdayInYear(thisYear);
+      if (next < today) next = birthdayInYear(thisYear + 1);
       return [{ label: "Days until birthday", value: String(differenceInCalendarDays(next, today)) }];
     }
     case "time-until": {
