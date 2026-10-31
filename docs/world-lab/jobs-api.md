@@ -30,3 +30,7 @@ Supported hypothetical `chemical-thermal` operations include a fully specified
 reactant, thermal capacity, ambient cooling and external heating fields.
 No chemical name, measured reactivity, complex mechanism or user-executable
 code is inferred. This migration/worker expansion remains disabled and unverified.
+
+## 3D multiple hard-sphere job (migration 0012)
+
+The authenticated queue also accepts `kind="multi-sphere"`, a strictly parsed portable project containing 2–12 non-overlapping spheres with assumed densities, a map of entity IDs to finite X/Y/Z velocities no faster than 100 m/s, restitution 0–1, and simulation duration 0.01–5 s. The worker executes the same bounded event-driven Web reference solver and returns the complete impulse, conservation, evidence, and time-of-contact record. Disjoint simultaneous impacts are supported; shared-sphere simultaneous contacts remain unsupported rather than guessed. The Web queue surface can submit the open group assumptions, poll, cancel, and export resulting immutable evidence. This is not a generic remote physics service or an FMI plugin. Migration 0012 extends the database job-kind constraint, and workers plus feature flags must remain disabled until authenticated deployment is audited.

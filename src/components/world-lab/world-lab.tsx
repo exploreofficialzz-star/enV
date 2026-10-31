@@ -156,7 +156,7 @@ export default function WorldLab() {
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
-  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal">("hydrostatics");
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteError,setRemoteError]=useState("");
   const [remoteBusy,setRemoteBusy]=useState(false);
@@ -1134,9 +1134,15 @@ export default function WorldLab() {
     if(!remoteJobsEnabled||!project||remoteBusy)return;
     setRemoteBusy(true);setRemoteError("");
     try{
-      if(remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&!selectedEntityId)
+      if(remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&!selectedEntityId)
         throw new Error("Select an invented solid before submitting this experiment.");
-      const body=remoteKind==="dc-network"?{kind:remoteKind,project}:
+      const body=remoteKind==="multi-sphere"?{
+        kind:remoteKind,project,
+        velocities:Object.fromEntries(groupSpheres.map((s,i)=>[
+          s.id,groupVelocities[s.id]??(i===0?[2,0,0]:[0,0,0]),
+        ])),
+        restitution:groupRestitution,durationSeconds:5,
+      }:remoteKind==="dc-network"?{kind:remoteKind,project}:
         remoteKind==="chemical-thermal"?{kind:remoteKind,project,chemicalInput}:
         remoteKind==="hydrostatics"?{
           kind:remoteKind,project,entityId:selectedEntityId,
@@ -1545,10 +1551,12 @@ export default function WorldLab() {
             <option value="dc-network">Connected DC circuit</option>
             <option value="wired-motor">Circuit-powered lifting machine</option>
             <option value="chemical-thermal">Hypothetical chemical heating</option>
+            <option value="multi-sphere">3D moving sphere contacts</option>
           </select>
           <button type="button" className={buttonClass} disabled={remoteBusy||!project||
-              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&!selectedEntity)||
-              (remoteKind!=="hydrostatics"&&!project?.networks?.[0])}
+              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&!selectedEntity)||
+              (remoteKind==="multi-sphere"&&(groupSpheres.length<2||groupSpheres.length>12))||
+              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&!project?.networks?.[0])}
             onClick={()=>{void submitRemoteJob();}}>
             {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
           </button>

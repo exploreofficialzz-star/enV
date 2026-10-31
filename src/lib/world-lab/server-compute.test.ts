@@ -59,3 +59,28 @@ test("authenticated dispatcher accepts bounded hypothetical reaction data, rejec
  assert.throws(()=>runBoundedWorldLabOperation({kind:"chemical-thermal",
   project,chemicalInput:{...input,initialTemperatureK:Infinity}}),/Initial temperature/);
 });
+
+test("remote group collision reuses computed 3D event history and rejects unsafe vector inputs",()=>{
+  const project=fixture();
+  project.entities=[];
+  project.materials[0].densityKgM3=12/Math.PI;
+  for(let i=0;i<3;i++){
+    const sphere=newSolid("ball-"+i,"sphere",i);
+    sphere.materialId="foam";
+    sphere.positionMeters=[-4+3*i,0.5,0];
+    project.entities.push(sphere);
+  }
+  const run=runBoundedWorldLabOperation({kind:"multi-sphere",project,
+    velocities:{"ball-0":[2,0,0]},restitution:1,durationSeconds:4});
+  assert.equal(run.kind,"multi-sphere");
+  if(run.kind!=="multi-sphere")throw new Error("Wrong operation");
+  assert.equal(run.outcome.events.length,2);
+  assert.equal(run.outcome.totalDissipatedEnergyJ,0);
+  assert.throws(()=>runBoundedWorldLabOperation({kind:"multi-sphere",project,
+    velocities:{"ball-0":[Infinity,0,0]},restitution:1,durationSeconds:4}),/finite/);
+  assert.throws(()=>runBoundedWorldLabOperation({kind:"multi-sphere",project,
+    velocities:{"ball-0":[2,0,0]},restitution:1,durationSeconds:10}),/duration/);
+  assert.throws(()=>runBoundedWorldLabOperation({kind:"multi-sphere",project,
+    velocities:{"ball-0":[2,0,0]},restitution:1,durationSeconds:4,
+    arbitraryCode:"unsafe"}),/Group collisions accept only/);
+});

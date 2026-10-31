@@ -3,13 +3,15 @@ import {calculateHydrostatics} from "./hydrostatics.ts";
 import {solveDcNetwork} from "./network.ts";
 import {runNetworkMotorExperiment} from "./network-motor.ts";
 import {runChemicalThermal,type ReactionThermalInput} from "./chemical-thermal.ts";
+import {runMultiSphereCollisions} from "./multi-sphere-collision.ts";
+import type {Vec3} from "./sphere-collision-3d.ts";
 
 /**
  * The authenticated HTTP layer controls access. This dispatcher only accepts
  * bounded scientific methods and user-supplied local projects. It never reads
  * or mutates other tenants' projects and executes no uploaded scripts/assets.
  */
-export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal";
+export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere";
 const finiteBound=(n:unknown,min:number,max:number,name:string)=>{
   if(typeof n!=="number"||!Number.isFinite(n)||n<min||n>max)
     throw new Error(name+" is outside the supported finite scientific domain.");
@@ -30,19 +32,43 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   projectRevision:number;
   outcome:ReturnType<typeof calculateHydrostatics>|
     ReturnType<typeof solveDcNetwork>|ReturnType<typeof runNetworkMotorExperiment>|
-    ReturnType<typeof runChemicalThermal>;
+    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>;
 }> {
   if(!input||typeof input!=="object"||Array.isArray(input))
     throw new Error("Scientific request must be a JSON object.");
   const data=input as Record<string,unknown>;
   const kind=data.kind;
-  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal"].includes(String(kind)))
+  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere"].includes(String(kind)))
     throw new Error("Requested scientific model is not available.");
   exactKeys(data,["kind","project","entityId","fluidDensityKgM3",
-    "immersionDepthM","forceConstantNPerA","thermal","chemicalInput"]);
+    "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
+    "velocities","restitution","durationSeconds"]);
+  if(kind!=="multi-sphere"&&
+    ["velocities","restitution","durationSeconds"].some(key=>data[key]!==undefined))
+    throw new Error("Sphere settings cannot be supplied to unrelated calculations.");
   const project:WorldLabProject=parseWorldLabProject(data.project);
   let outcome;
-  if(kind==="chemical-thermal"){
+  if(kind==="multi-sphere"){
+    if(Object.keys(data).some(key=>!["kind","project","velocities","restitution",
+      "durationSeconds"].includes(key)))
+      throw new Error("Group collisions accept only velocities, restitution and duration.");
+    const raw=data.velocities;
+    if(!raw||typeof raw!=="object"||Array.isArray(raw)||
+      Object.keys(raw).length>12)
+      throw new Error("Supply up to twelve explicit sphere velocity vectors.");
+    const velocities:Record<string,Vec3>={};
+    for(const [id,value] of Object.entries(raw)){
+      identifier(id);
+      if(!Array.isArray(value)||value.length!==3||
+        !value.every(v=>typeof v==="number"&&Number.isFinite(v))||
+        Math.hypot(...value)>100)
+        throw new Error("Sphere starting speeds require finite X/Y/Z components, at most 100 m/s.");
+      velocities[id]=value as Vec3;
+    }
+    outcome=runMultiSphereCollisions(project,velocities,
+      finiteBound(data.restitution,0,1,"Sphere restitution"),
+      finiteBound(data.durationSeconds,0.01,5,"Sphere remote duration"));
+  }else if(kind==="chemical-thermal"){
     if(data.entityId!==undefined||data.fluidDensityKgM3!==undefined||
       data.immersionDepthM!==undefined||data.forceConstantNPerA!==undefined||
       data.thermal!==undefined)
