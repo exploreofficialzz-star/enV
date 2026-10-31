@@ -345,7 +345,17 @@ try{
   await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
   await page.getByRole("button",{name:"Calculate all sphere contacts"}).click();
-  await page.getByText("Actual computed contacts: 2").waitFor({timeout:10000});
+  try{
+    await page.getByText("Actual computed contacts: 2").waitFor({timeout:10000});
+  }catch(error){
+    const panel=await page.locator('[aria-label="Multiple moving sphere impact experiment"]')
+      .innerText().catch(()=>"<panel missing>");
+    const status=await page.locator("body").innerText();
+    console.error("MULTI_SPHERE_BROWSER_DIAGNOSTIC:",JSON.stringify({
+      panel:panel.slice(-2200),errors:status.match(/(unsupported|separated|overlap|Error:|invalid|computed contacts|group collision)/gi)?.slice(-24),
+    }));
+    throw error;
+  }
   const groupDownload=page.waitForEvent("download");
   await page.getByRole("button",{name:"Export group impact evidence"}).click();
   let groupJson="";
