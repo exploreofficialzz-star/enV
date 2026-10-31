@@ -47,3 +47,23 @@ test("tool outcome event names override untrusted outcome labels",()=>{
  assert.equal(make("tool_cancelled","success").outcome,"cancelled");
  assert.equal(make("tool_abandoned","success").outcome,"abandoned");
 });
+
+test("offline synchronization events accept only bounded, content-free outcome metadata",()=>{
+ const envelope={subjectId,platform:"ios",policyVersion:ANALYTICS_POLICY_VERSION};
+ const success=validateEventsPayload({...envelope,events:[{
+  eventId,name:"offline_sync_succeeded",outcome:"success",durationMs:1250,
+  isOffline:false,networkType:"wifi",properties:{surface:"wallet"},
+ }]});
+ assert.equal(success.events[0].name,"offline_sync_succeeded");
+ assert.equal(success.events[0].properties.surface,"wallet");
+ const failure=validateEventsPayload({...envelope,events:[{
+  eventId:"4ea9a990-d232-4ec5-9e5f-2c81dcf5ac42",name:"offline_sync_failed",
+  outcome:"failure",errorCode:"OFFLINE_NETWORK_FAILED",properties:{surface:"wallet"},
+ }]});
+ assert.equal(failure.events[0].errorCode,"OFFLINE_NETWORK_FAILED");
+ assert.equal(failure.events[0].toolId,null);
+ assert.throws(()=>validateEventsPayload({...envelope,events:[{
+  eventId:"82c69e80-43e2-4a2a-9b39-5d5dbabe9f63",name:"offline_sync_failed",
+  errorCode:"Network failed: bearer token leaked",
+ }]}),/machine-readable/);
+});
