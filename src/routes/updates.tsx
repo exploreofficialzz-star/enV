@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Bell, CalendarDays } from "lucide-react";
+import { recordAnalyticsEvent } from "@/lib/analytics/client";
 
 export const Route = createFileRoute("/updates")({ component: UpdatesPage });
 
@@ -38,7 +39,9 @@ function UpdatesPage() {
     }).then(async response => {
       const payload = await response.json() as { ok?: boolean; data?: { updates?: ProductUpdate[] }; message?: string };
       if (!response.ok || payload.ok !== true) throw new Error(payload.message || "Updates are not available right now.");
-      setUpdates(Array.isArray(payload.data?.updates) ? payload.data.updates : []);
+      const items = Array.isArray(payload.data?.updates) ? payload.data.updates : [];
+      setUpdates(items);
+      if (items.length) recordAnalyticsEvent({ name: "update_viewed", outcome: "success", properties: { surface: "updates_feed" } });
     }).catch(error => {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setProblem(error instanceof Error ? error.message : "Updates are not available right now.");
