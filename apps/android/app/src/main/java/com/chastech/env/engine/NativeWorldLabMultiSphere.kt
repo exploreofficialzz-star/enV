@@ -7,7 +7,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-/** Bounded event-driven 3D frictionless binary sphere impacts. No simultaneous contacts. */
+/** Bounded event-driven 3D frictionless binary sphere impacts. Disjoint simultaneous pairs allowed; shared-sphere multi-contacts rejected. */
 private data class MV(val x:Double,val y:Double,val z:Double) {
     operator fun plus(o:MV)=MV(x+o.x,y+o.y,z+o.z)
     operator fun minus(o:MV)=MV(x-o.x,y-o.y,z-o.z)
@@ -40,7 +40,7 @@ data class NativeGroupRun(
     val initialMomentum:NativeLabVector,val finalMomentum:NativeLabVector,
     val initialAngular:NativeLabVector,val finalAngular:NativeLabVector,
     val validity:String="Event-driven free-flight model for 2–12 ideal hard spheres, "+
-        "with single isolated frictionless binary collisions. No simultaneous contacts, "+
+        "with frictionless isolated or disjoint simultaneous binary collisions. No shared-sphere multi-contacts, "+
         "gravity, spin, friction, breakage, material heating, deformation or stacks. "+
         "Invented densities and restitution are assumptions, not measurements."
 ) {
@@ -165,31 +165,39 @@ object NativeWorldLabMultiSphere {
                 else if(abs(dt-shortest)<=EPS)pairs.add(i to j)
             }
             if(!shortest.isFinite())break
-            require(pairs.size==1){"Simultaneous multi-contact is not modeled"}
-            require(events.size<MAX_EVENTS){"Sphere event cap reached"}
-            val (i,j)=pairs.single()
+            // Equal-time contacts on distinct spheres commute. A shared
+            // participant is an unresolved true multi-contact, so reject it.
+            val participants=mutableSetOf<Int>()
+            for((i,j) in pairs){
+                require(participants.add(i)&&participants.add(j)){
+                    "Simultaneous shared-sphere multi-contact is not modeled"
+                }
+            }
+            require(events.size+pairs.size<=MAX_EVENTS){"Sphere event cap reached"}
             for(o in objects)o.pos=o.pos+o.vel*shortest
             time+=shortest
-            val a=objects[i];val b=objects[j]
-            val sep=b.pos-a.pos;val distance=sep.norm()
-            require(abs(distance-a.radius-b.radius)<1e-6){"Inconsistent sphere contact position"}
-            val n=sep*(1/distance)
-            val closing=(b.vel-a.vel).dot(n)
-            require(closing < -1e-10){"Impact must close along normal"}
-            val impulse=n*(-(1+restitution)*closing/(1/a.mass+1/b.mass))
-            val energyBefore=energy(objects);val pBefore=p(objects);val lBefore=l(objects)
-            a.vel=a.vel-impulse*(1/a.mass);b.vel=b.vel+impulse*(1/b.mass)
-            val energyAfter=energy(objects)
-            val loss=0.5*a.mass*b.mass/(a.mass+b.mass)*
-                (1-restitution*restitution)*closing*closing
-            require(listOf(energyAfter,loss).all{it.isFinite()}&&
-                (pBefore-p(objects)).norm()<=1e-8*max(1.0,pBefore.norm())&&
-                (lBefore-l(objects)).norm()<=1e-8*max(1.0,lBefore.norm())&&
-                abs(energyBefore-energyAfter-loss)<=1e-8*max(1.0,energyBefore)){
-                "Conservation audit failed for sphere impact"
+            for((i,j) in pairs){
+                val a=objects[i];val b=objects[j]
+                val sep=b.pos-a.pos;val distance=sep.norm()
+                require(abs(distance-a.radius-b.radius)<1e-6){"Inconsistent sphere contact position"}
+                val n=sep*(1/distance)
+                val closing=(b.vel-a.vel).dot(n)
+                require(closing < -1e-10){"Impact must close along normal"}
+                val impulse=n*(-(1+restitution)*closing/(1/a.mass+1/b.mass))
+                val energyBefore=energy(objects);val pBefore=p(objects);val lBefore=l(objects)
+                a.vel=a.vel-impulse*(1/a.mass);b.vel=b.vel+impulse*(1/b.mass)
+                val energyAfter=energy(objects)
+                val loss=0.5*a.mass*b.mass/(a.mass+b.mass)*
+                    (1-restitution*restitution)*closing*closing
+                require(listOf(energyAfter,loss).all{it.isFinite()}&&
+                    (pBefore-p(objects)).norm()<=1e-8*max(1.0,pBefore.norm())&&
+                    (lBefore-l(objects)).norm()<=1e-8*max(1.0,lBefore.norm())&&
+                    abs(energyBefore-energyAfter-loss)<=1e-8*max(1.0,energyBefore)){
+                    "Conservation audit failed for sphere impact"
+                }
+                lostTotal+=loss
+                events.add(NativeGroupEvent(time,a.id,b.id,n.xyz(),impulse.xyz(),loss))
             }
-            lostTotal+=loss
-            events.add(NativeGroupEvent(time,a.id,b.id,n.xyz(),impulse.xyz(),loss))
         }
         val finalE=energy(objects);val finalP=p(objects);val finalL=l(objects)
         require((finalP-initialP).norm()<=1e-7*max(1.0,initialP.norm())&&
