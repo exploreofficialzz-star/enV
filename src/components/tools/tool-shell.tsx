@@ -35,6 +35,9 @@ export function ToolShell({
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
   const toolStartedRef = useRef(false);
+  const toolFinishedRef = useRef(false);
+  const toolAbandonmentRecordedRef = useRef(false);
+  const toolStartedAtRef = useRef<number | null>(null);
   const toolViewedAtRef = useRef(Date.now());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
@@ -57,8 +60,39 @@ export function ToolShell({
     recordRecent(tool.id);
     setVisibleRelatedCount(6);
     toolStartedRef.current = false;
+    toolFinishedRef.current = false;
+    toolAbandonmentRecordedRef.current = false;
+    toolStartedAtRef.current = null;
     toolViewedAtRef.current = Date.now();
   }, [tool.id, recordRecent]);
+
+  useEffect(() => {
+    const onExecutionResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ toolId?: string; outcome?: string }>).detail;
+      if (detail?.toolId === tool.id && ["success", "failure", "cancelled"].includes(detail.outcome ?? "")) {
+        toolFinishedRef.current = true;
+      }
+    };
+    const reportAbandoned = () => {
+      if (!toolStartedRef.current || toolFinishedRef.current || toolAbandonmentRecordedRef.current) return;
+      toolAbandonmentRecordedRef.current = true;
+      const startedAt = toolStartedAtRef.current ?? toolViewedAtRef.current;
+      recordAnalyticsEvent({
+        name: "tool_abandoned",
+        toolId: tool.id,
+        outcome: "abandoned",
+        durationMs: Math.max(0, Date.now() - startedAt),
+        properties: { stage: "exit_without_recorded_result" },
+      });
+    };
+    window.addEventListener("env-tool-execution-result", onExecutionResult);
+    window.addEventListener("pagehide", reportAbandoned);
+    return () => {
+      reportAbandoned();
+      window.removeEventListener("env-tool-execution-result", onExecutionResult);
+      window.removeEventListener("pagehide", reportAbandoned);
+    };
+  }, [tool.id]);
 
   useEffect(() => {
     const syncFullscreen = () => {
@@ -186,19 +220,22 @@ export function ToolShell({
           if (!(target instanceof HTMLElement) || !target.closest("button,input,textarea,select,[role=button],[contenteditable=true]")) return;
           if (target.closest(".env-tool-fullscreen__toolbar")) return;
           toolStartedRef.current = true;
-          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(Date.now());
+          toolStartedAtRef.current = Date.now();
+          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
           recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_interaction" } });
         }}
         onInputCapture={() => {
           if (toolStartedRef.current) return;
           toolStartedRef.current = true;
-          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(Date.now());
+          toolStartedAtRef.current = Date.now();
+          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
           recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_input" } });
         }}
         onSubmitCapture={() => {
           if (toolStartedRef.current) return;
           toolStartedRef.current = true;
-          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(Date.now());
+          toolStartedAtRef.current = Date.now();
+          if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
           recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "form_submit" } });
         }}
       >
