@@ -92,7 +92,7 @@ function UserBehaviorDashboard() {
       setSummary(null);
       setProblem(error instanceof Error ? error.message : "Analytics could not be loaded.");
     } finally { setLoading(false); }
-  }
+  }, []);
 
   useEffect(() => {
     if (enabled) void loadSummary();
@@ -126,7 +126,6 @@ function UserBehaviorDashboard() {
     }
   }
 
-  const dailyChart = summary.daily.slice(-90);\n  const maxDaily = Math.max(1, ...dailyChart.map(row => row.events));
   if (!enabled) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
@@ -154,6 +153,8 @@ function UserBehaviorDashboard() {
   }
 
   const o = summary.overview;
+  const dailyChart = summary.daily.slice(-90);
+  const maxDaily = Math.max(1, ...dailyChart.map(row => row.events));
   const maxToolViews = Math.max(1, ...summary.tools.map(row => row.views));
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
