@@ -7,6 +7,7 @@ import { CssGenEngine } from "@/components/engines/cssgen-engine";
 import { ImageEngine } from "@/components/engines/image-engine";
 import { MockupEngine, PostEngine } from "@/components/engines/mockup-engine";
 import { QrEngine, BarcodeEngine } from "@/components/engines/qr-engine";
+import { BarcodeReaderEngine } from "@/components/engines/barcode-reader-engine";
 import { TextEngine, CodecEngine, GeneratorEngine, DateTimeEngine, SeoEngine } from "@/components/engines/io-engines";
 import { ComingSoonPanel } from "@/components/tools/coming-soon";
 import { DocumentEngine } from "@/components/engines/document-engine";
@@ -70,6 +71,10 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
   if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
   if (tool.id === "music-downloader") return <MusicDownloaderEngine />;
   if (tool.id === "song-metadata-analyzer") return <AiMusicDataSandbox />;
+  // The reader extends the existing payload inspector route with real QR and barcode decoding.
+  if (tool.id === "qr-payload-inspector") return <BarcodeReaderEngine />;
+  // The E-commerce family is implemented by its shared local workflow engine.
+  if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;
   if (tool.status === "planned") return <ComingSoonPanel tool={tool} />;
   if (tool.requiresBackend && tool.engine.type === "custom") return <BackendToolEngine toolId={tool.id} category={tool.category} />;
   // Accessibility Studios must override legacy per-tool engine metadata (for example,
@@ -145,7 +150,6 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
       if (tool.category === "streaming") return <StreamingEngine toolId={tool.id} />;
       if (tool.category === "marketing") return <MarketingEngine toolId={tool.id} />;
       if (tool.category === "webdesign") return <WebDesignEngine toolId={tool.id} />;
-      if (tool.category === "ecommerce") return <EcommerceEngine toolId={tool.id} />;
       if (tool.category === "career") return <CareerEngine toolId={tool.id} />;
       if (tool.category === "relationships") return <RelationshipEngine toolId={tool.id} />;
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;

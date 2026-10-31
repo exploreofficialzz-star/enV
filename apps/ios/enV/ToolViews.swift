@@ -515,7 +515,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id)
+        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
         default: return false
         }
     }
@@ -545,14 +545,14 @@ struct NativeFamilyToolView: View {
             case "codec": if NativeCodecEngine.operation(forToolID: tool.id) != nil { NativeCodecToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "color": if NativeColorEngine.operation(forToolID: tool.id) != nil { NativeColorToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "datetime": if NativeDateTimeEngine.operation(forToolID: tool.id) != nil { NativeDateTimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "barcode", "qr": if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "barcode", "qr": if tool.id == "qr-payload-inspector" { NativeBarcodeReaderView() } else if NativeBarcodeEngine.supports(tool) { NativeBarcodeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "image": if NativeImageEngine.supports(tool) { NativeImageToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "mime": if NativeMimeEngine.operation(forToolID: tool.id) != nil { NativeMimeToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "converter": if NativeConverterEngine.operation(for: tool) != nil { NativeConverterToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode, initialAction: initialDeveloperAction) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
@@ -6319,6 +6319,7 @@ enum NativeBackendEngine {
         if tool.engine.type=="mime" && NativeMimeEngine.operation(forToolID:tool.id) != nil { return false }
         if tool.engine.type=="datetime" && NativeDateTimeEngine.operation(forToolID: tool.id) != nil { return false }
         if NativeBarcodeEngine.supports(tool) { return false }
+        if NativeEcommerceEngine.supports(tool) { return false }
         if NativeFileConverterEngine.supports(tool) { return false }
         return backendIDs.contains(tool.id) || categoryBackend.contains(tool.category) || ["developer","image","audio","video","mockup","post","pdf","document-backend"].contains(tool.engine.type)
     }
