@@ -159,6 +159,11 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         XCTAssertEqual(elastic.leftFinalVelocityMps,0,accuracy:1e-12)
         XCTAssertEqual(elastic.rightFinalVelocityMps,2,accuracy:1e-12)
         XCTAssertEqual(elastic.impulseNs,4,accuracy:1e-12)
+        let nativeJson=try JSONSerialization.jsonObject(
+            with:JSONEncoder().encode(elastic)) as? [String:Any]
+        XCTAssertEqual(nativeJson?["format"] as? String,"env-world-lab-object-collision")
+        XCTAssertEqual(nativeJson?["inputEvidence"] as? String,"hypothetical-user-assumed")
+        XCTAssertEqual(nativeJson?["projectRevision"] as? Int,project.revision)
         XCTAssertEqual(elastic.dissipatedEnergyJ,0,accuracy:1e-12)
         let atContact=try elastic.sample(1)
         XCTAssertEqual(atContact.rightCenterXM-atContact.leftCenterXM,1,accuracy:1e-12)
