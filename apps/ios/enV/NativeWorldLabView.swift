@@ -42,6 +42,14 @@ struct NativeWorldLabView:View {
     @State private var editingMaterialId:String?
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
+    @State private var collisionOtherId=""
+    @State private var collisionLeftSpeed="2"
+    @State private var collisionRightSpeed="0"
+    @State private var collisionRestitution=0.5
+    @State private var collisionRun:NativeLabCollisionResult?
+    @State private var collisionTime=0.0
+    @State private var collisionPlaying=false
+    @State private var collisionSpeed=1.0
     @State private var deviceName=""
     @State private var deviceAssumption=""
     @State private var deviceResistance=""
@@ -205,6 +213,7 @@ struct NativeWorldLabView:View {
             dcRun=nil;wiredMotor=nil;digitalMotor=nil;hydroRun=nil
             fluidPlaying=false;fluidMotion=nil
             dropPlaying=false;dropRun=nil;motorPlaying=false;motorRun=nil
+            collisionPlaying=false;collisionRun=nil;collisionTime=0
             selected=min(selected,max(0,restored.entities.count-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
@@ -341,6 +350,7 @@ struct NativeWorldLabView:View {
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             beamRun=nil
+            collisionPlaying=false;collisionRun=nil;collisionTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
         }
@@ -371,6 +381,11 @@ struct NativeWorldLabView:View {
                 if fluidTime >= (run.samples.last?.timeSeconds ?? 4) {
                     fluidPlaying=false
                 }
+            }
+            if collisionPlaying,let run=collisionRun {
+                collisionTime=min(run.durationSeconds,collisionTime+dt*collisionSpeed)
+                updateCollisionScene()
+                if collisionTime>=run.durationSeconds {collisionPlaying=false}
             }
             if dropPlaying,let run=dropRun {
                 dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
@@ -907,6 +922,7 @@ Text("Invent chemical heat").font(.headline)
     @ViewBuilder private func solidContent(project:NativeWorldLabProject,
         solid:NativeLabSolid)->some View {
         solidPlacementContent(project:project,solid:solid)
+        solidCollisionContent(project:project,solid:solid)
         solidBeamContent(project:project,solid:solid)
         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
                                 value("Assumed mass",assumedMass,"kg")
@@ -916,6 +932,97 @@ Text("Invent chemical heat").font(.headline)
             solidEnergyControlsContent(project:project,solid:solid,derived:derived)
             solidMotorReadoutContent(project:project,solid:solid)
             solidDropReadoutContent(project:project,solid:solid)
+        }
+    }
+
+    private func updateCollisionScene() {
+        guard let run=collisionRun,
+              let state=try? run.sample(collisionTime) else {return}
+        scene.rootNode.childNode(withName:"lab-solid-"+run.leftEntityId,
+            recursively:false)?.position.x=Float(state.leftCenterXM)
+        scene.rootNode.childNode(withName:"lab-solid-"+run.rightEntityId,
+            recursively:false)?.position.x=Float(state.rightCenterXM)
+    }
+
+    @ViewBuilder private func solidCollisionContent(
+        project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
+        let other=project.entities.first(where:{$0.id==collisionOtherId})
+        Text("Collide two invented solids").font(.headline)
+        Text("Single 1D central impact along X between shapes with aligned Y/Z centres. Hypothetical densities give masses; no spin, fracture or other 3D contacts.")
+            .font(.caption).foregroundStyle(.secondary)
+        Picker("Other solid to collide with",selection:$collisionOtherId){
+            Text("Choose another solid").tag("")
+            ForEach(project.entities.filter{$0.id != solid.id},id:\.id){item in
+                Text(item.name).tag(item.id)
+            }
+        }.pickerStyle(.menu)
+        TextField("Left object speed m/s",text:$collisionLeftSpeed)
+            .keyboardType(.numbersAndPunctuation).textFieldStyle(.roundedBorder)
+            .onChange(of:collisionLeftSpeed){_ in
+                collisionRun=nil;collisionPlaying=false;redraw()
+            }
+        TextField("Right object speed m/s",text:$collisionRightSpeed)
+            .keyboardType(.numbersAndPunctuation).textFieldStyle(.roundedBorder)
+            .onChange(of:collisionRightSpeed){_ in
+                collisionRun=nil;collisionPlaying=false;redraw()
+            }
+        value("Assumed impact restitution",collisionRestitution,"")
+        Slider(value:$collisionRestitution,in:0...1)
+            .accessibilityLabel("Collision restitution")
+            .onChange(of:collisionRestitution){_ in
+                collisionRun=nil;collisionPlaying=false;redraw()
+            }
+        Button("Calculate two-body collision"){
+            do {
+                guard let other,other.id != solid.id,
+                      let left=Double(collisionLeftSpeed),
+                      let right=Double(collisionRightSpeed) else {
+                    throw NativeWorldLabError.invalid("Choose two solids and finite starting speeds")
+                }
+                let run=try NativeWorldLabCollision.evaluate(project,
+                    firstId:solid.id,secondId:other.id,
+                    velocityLeftMps:left,velocityRightMps:right,
+                    restitution:collisionRestitution)
+                collisionRun=run;collisionTime=0;collisionPlaying=false
+                problem="";redraw();updateCollisionScene()
+            }catch{collisionRun=nil;collisionPlaying=false;problem=error.localizedDescription}
+        }.buttonStyle(.bordered).disabled(other==nil||other?.id==solid.id)
+        if let run=collisionRun,run.projectId==project.id,
+           run.projectRevision==project.revision,
+           (run.leftEntityId==solid.id||run.rightEntityId==solid.id){
+            value("Left assumed mass",run.leftMassKg,"kg")
+            value("Right assumed mass",run.rightMassKg,"kg")
+            value("Impact time",run.impactTimeSeconds,"s")
+            value("Impulse",run.impulseNs,"N·s")
+            value("Left velocity after impact",run.leftFinalVelocityMps,"m/s")
+            value("Right velocity after impact",run.rightFinalVelocityMps,"m/s")
+            value("Momentum before",run.momentumBeforeKgMps,"kg·m/s")
+            value("Momentum after",run.momentumAfterKgMps,"kg·m/s")
+            value("Kinetic energy before",run.energyBeforeJ,"J")
+            value("Kinetic energy after",run.energyAfterJ,"J")
+            value("Dissipated energy",run.dissipatedEnergyJ,"J")
+            if let state=try? run.sample(collisionTime){
+                value("Left X position",state.leftCenterXM,"m")
+                value("Right X position",state.rightCenterXM,"m")
+            }
+            Text("Collision time: "+String(format:"%.2f",collisionTime)+" s")
+            Slider(value:$collisionTime,in:0...run.durationSeconds,
+                onEditingChanged:{editing in
+                    if editing {collisionPlaying=false}
+                    updateCollisionScene()
+                }).accessibilityLabel("Explore collision time")
+            HStack {
+                Button(collisionPlaying ? "Pause collision":"Play collision"){
+                    collisionPlaying.toggle()
+                }
+                Button("Reset collision"){
+                    collisionPlaying=false;collisionTime=0;updateCollisionScene()
+                }
+            }.buttonStyle(.bordered)
+            Picker("Collision playback speed",selection:$collisionSpeed){
+                Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
+            }.pickerStyle(.segmented)
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
         }
     }
 
