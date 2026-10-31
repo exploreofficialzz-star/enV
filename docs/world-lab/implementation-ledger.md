@@ -392,3 +392,10 @@ release-candidate evidence bundle are unfinished.
   mathematical evidence with retained hypothetical validity labeling; no
   silicon or experimental measurement is claimed. Database migration 0013
   extends the server job kind constraint.
+
+- The Web digital invention studio now lets inventors add 3–12 switches without
+  manually editing JSON, and advertises the chosen local/backend capability
+  before a full sweep. A user confirmation explicitly authorizes sending
+  portable project inputs to the authenticated job queue, and the existing
+  worker polling/export/cancel UI handles the result. Absent backend credentials,
+  the larger verification remains honestly unavailable rather than fabricated.

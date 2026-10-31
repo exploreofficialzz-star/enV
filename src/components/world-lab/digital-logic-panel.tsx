@@ -1,13 +1,21 @@
 import {useMemo,useState} from "react";
 import type {WorldLabProject} from "@/lib/world-lab/project";
+import {planWorldLabDigitalVerification} from "@/lib/world-lab/execution-policy";
 import {appendDigitalGate,setDigitalInput,setDigitalTruthBit,
-  solveDigitalLogic,setDigitalOutputSource,starterDigitalNetwork,verifyDigitalTruthTable} from "@/lib/world-lab/digital-logic";
+  solveDigitalLogic,setDigitalOutputSource,starterDigitalNetwork,verifyDigitalTruthTable,
+  appendDigitalInput} from "@/lib/world-lab/digital-logic";
 type Props={
   project:WorldLabProject|null;
   mutateProject:(fn:(p:WorldLabProject)=>WorldLabProject)=>void;
+  cloudConfigured:boolean;
+  cloudBusy:boolean;
+  remoteJobStatus:string|null;
+  onCloudVerify:(networkId:string)=>void;
 };
 const button="rounded-md border border-border px-3 py-2 text-xs";
-export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
+export function WorldLabDigitalLogicPanel({
+  project,mutateProject,cloudConfigured,cloudBusy,remoteJobStatus,onCloudVerify,
+}:Props){
   const [name,setName]=useState("New invented gate");
   const [assumption,setAssumption]=useState("User-defined combinational behavior");
   const [sourceA,setSourceA]=useState("input_a");
@@ -15,6 +23,8 @@ export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
   const [error,setError]=useState("");
   const [showCases,setShowCases]=useState(false);
   const net=project?.digitalNetworks?.[0];
+  const execution=project&&net?
+    planWorldLabDigitalVerification(project,net.id,cloudConfigured):null;
   const result=useMemo(()=>{
     if(!project||!net)return null;
     try{return solveDigitalLogic(project,net.id);}
@@ -51,6 +61,20 @@ export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
             mutateProject(p=>setDigitalInput(p,net.id,input.id,e.target.checked))}/>
           {input.label}: {input.value?"1":"0"}
         </label>)}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span>{net.inputs.length} / 12 switches</span>
+        <button type="button" className={button} disabled={net.inputs.length>=12}
+          onClick={()=>{
+            try{
+              mutateProject(p=>appendDigitalInput(p,net.id,crypto.randomUUID(),
+                "Switch "+(net.inputs.length+1)));
+              setError("");
+            }catch(cause){setError(cause instanceof Error?cause.message:
+              "Cannot add this digital switch.");}
+          }}>
+          Add another switch
+        </button>
       </div>
       {net.gates.map(gate=><details key={gate.id}
         className="rounded border border-border p-2" open={gate.id==="invented_gate"}>
@@ -114,9 +138,18 @@ export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
           Connect invented gate
         </button>
       </details>
-      <button type="button" className={button} onClick={()=>setShowCases(x=>!x)}>
-        {showCases?"Hide complete logic test":"Test every switch combination"}
-      </button>
+      <p className="text-muted-foreground">{execution?.reason}</p>
+      {execution?.target==="device" &&
+        <button type="button" className={button} onClick={()=>setShowCases(x=>!x)}>
+          {showCases?"Hide complete logic test":"Test every switch combination locally"}
+        </button>}
+      {execution?.target==="account-worker" &&
+        <button type="button" className={button} disabled={cloudBusy}
+          onClick={()=>onCloudVerify(net.id)}>
+          {cloudBusy?"Submitting…":"Send for full cloud check ("+execution.calculatedCases+" cases)"}
+        </button>}
+      {execution?.target==="account-worker"&&remoteJobStatus&&
+        <p role="status">Account science job: {remoteJobStatus}</p>}
       {showCases&&sweep&&<div className="rounded border border-border p-2"
         aria-label="Exhaustive digital truth-table evidence">
         <p>Verified {sweep.cases.length} mathematical input combinations

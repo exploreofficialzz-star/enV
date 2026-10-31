@@ -160,7 +160,7 @@ export default function WorldLab() {
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
-  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere">("hydrostatics");
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteError,setRemoteError]=useState("");
   const [remoteBusy,setRemoteBusy]=useState(false);
@@ -1160,26 +1160,33 @@ export default function WorldLab() {
       setCloudError(error instanceof Error?error.message:"Backup was not deleted.");
     }finally{setCloudBusy(false);}
   }
-  async function submitRemoteJob(){
+  async function submitRemoteJob(selectedKind=remoteKind){
     if(!remoteJobsEnabled||!project||remoteBusy)return;
+    if(!window.confirm("Send this portable invention and the selected scientific assumptions "+
+      "to your authenticated account's science worker? The cloud retains its job inputs and "+
+      "evidence according to server retention; your local invention is not replaced."))return;
+    setRemoteKind(selectedKind);
     setRemoteBusy(true);setRemoteError("");
     try{
-      if(remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&!selectedEntityId)
+      if(selectedKind!=="dc-network"&&selectedKind!=="chemical-thermal"&&selectedKind!=="multi-sphere"&&
+        selectedKind!=="exhaustive-logic"&&!selectedEntityId)
         throw new Error("Select an invented solid before submitting this experiment.");
-      const body=remoteKind==="multi-sphere"?{
+      const body=selectedKind==="exhaustive-logic"?{
+        kind:selectedKind,project,networkId:project.digitalNetworks?.[0]?.id,
+      }:selectedKind==="multi-sphere"?{
         kind:remoteKind,project,
         velocities:Object.fromEntries(groupSpheres.map((s,i)=>[
           s.id,groupVelocities[s.id]??(i===0?[2,0,0]:[0,0,0]),
         ])),
         restitution:groupRestitution,durationSeconds:5,
-      }:remoteKind==="dc-network"?{kind:remoteKind,project}:
-        remoteKind==="chemical-thermal"?{kind:remoteKind,project,chemicalInput}:
-        remoteKind==="hydrostatics"?{
-          kind:remoteKind,project,entityId:selectedEntityId,
+      }:selectedKind==="dc-network"?{kind:selectedKind,project}:
+        selectedKind==="chemical-thermal"?{kind:selectedKind,project,chemicalInput}:
+        selectedKind==="hydrostatics"?{
+          kind:selectedKind,project,entityId:selectedEntityId,
           fluidDensityKgM3:fluidDensity,
           immersionDepthM:Math.min(fluidDepth,selectedEntity?.dimensionsMeters[1]??0),
         }:{
-          kind:remoteKind,project,entityId:selectedEntityId,
+          kind:selectedKind,project,entityId:selectedEntityId,
           forceConstantNPerA:actuatorConstant,thermal:actuatorHeatEnabled,
         };
       const response=await fetch("/api/world-lab/jobs",{
@@ -1655,11 +1662,14 @@ export default function WorldLab() {
             <option value="wired-motor">Circuit-powered lifting machine</option>
             <option value="chemical-thermal">Hypothetical chemical heating</option>
             <option value="multi-sphere">3D moving sphere contacts</option>
+            <option value="exhaustive-logic">Full invented digital truth-table check</option>
           </select>
           <button type="button" className={buttonClass} disabled={remoteBusy||!project||
-              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&!selectedEntity)||
+              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&!selectedEntity)||
+              (remoteKind==="exhaustive-logic"&&
+                ((project?.digitalNetworks?.[0]?.inputs.length??0)<9))||
               (remoteKind==="multi-sphere"&&(groupSpheres.length<2||groupSpheres.length>12))||
-              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&!project?.networks?.[0])}
+              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&!project?.networks?.[0])}
             onClick={()=>{void submitRemoteJob();}}>
             {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
           </button>
@@ -1755,7 +1765,12 @@ export default function WorldLab() {
           <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
         </div>}
       </section>
-      <WorldLabDigitalLogicPanel project={project} mutateProject={mutateProject}/>
+      <WorldLabDigitalLogicPanel project={project} mutateProject={mutateProject}
+        cloudConfigured={remoteJobsEnabled} cloudBusy={remoteBusy}
+        remoteJobStatus={remoteJob?.kind==="exhaustive-logic"&&
+          remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
+          ?remoteJob.status:null}
+        onCloudVerify={()=>{void submitRemoteJob("exhaustive-logic");}}/>
       <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
         <h3 className="text-sm font-semibold">Connect electricity</h3>
         <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>
