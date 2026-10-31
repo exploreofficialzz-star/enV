@@ -38,7 +38,7 @@ export function buildPatternSvg(size: number, opacity: number, color: string, pa
     cross: `<path d="M${center} 0V${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
     horizontal: `<path d="M0 ${center}H${safeSize}" ${stroke}/>`,
   };
-  const safePattern = pattern in patternShapes ? pattern : "diagonal";
+  const safePattern = Object.prototype.hasOwnProperty.call(patternShapes, pattern) ? pattern : "diagonal";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}">${patternShapes[safePattern]}</svg>`;
 }
 

@@ -24,6 +24,9 @@ test("pattern generator clamps settings and rejects unsafe color values", () => 
   assert.doesNotMatch(svg, /<script>/);
   const variants = (["dots", "grid", "diagonal", "cross", "horizontal"] as const).map((kind) => buildPatternSvg(28, 0.5, "#123456", kind));
   assert.equal(new Set(variants).size, 5);
+  const unsafeVariant = buildPatternSvg(28, 0.5, "#123456", "__proto__" as never);
+  assert.match(unsafeVariant, /<path /);
+  assert.doesNotMatch(unsafeVariant, /\[object Object\]/);
 });
 
 test("wave geometry responds to frequency, phase, layers and transparent canvas", () => {

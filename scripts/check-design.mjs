@@ -42,7 +42,7 @@ const checks = [
   ["HSV conversion implementation", designColor.includes("function rgbToHsv") && designColor.includes("function hsvToRgb")],
   ["Palette harmony controls", colorEngine.includes("Split complementary") && colorEngine.includes("Monochromatic")],
   ["Distinct WCAG target checks and WCAG report", colorEngine.includes("getContrastTargets()") && colorEngine.includes("evaluateContrast") && colorEngine.includes("WCAG contrast report")],
-  ["Custom transparent-color canvas and report details", colorEngine.includes("Page / canvas behind transparency") && colorEngine.includes("Success criterion {item.result.criterion}") && colorEngine.includes("actual {item.result.ratio.toFixed(2)}:1")],
+  ["Custom transparent-color canvas and report details", colorEngine.includes("Page / canvas behind transparency") && colorEngine.includes("Success criterion {item.result.criterion}") && colorEngine.includes("Actual {item.result.ratio.toFixed(2)}:1")],
   ["Published CVD simulation utility", colorVision.includes("simulateColorVision") && colorVision.includes("protanopia") && colorVision.includes("tritanopia")],
   ["CVD regression tests", tests.includes("color vision simulations preserve neutral black and white")],
   ["Design color-vision simulator uses shared CVD model", colorEngine.includes('from "@/lib/engines/color-vision"') && colorEngine.includes("simulateColorVision(source, visionMode)")],
