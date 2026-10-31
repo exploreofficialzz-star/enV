@@ -452,7 +452,7 @@ struct NativeLabCollisionResult {
     let dissipatedEnergyJ:Double
     let evidence="physics-model-computed"
     let inputEvidence="hypothetical-user-assumed"
-    let validity="Single instantaneous, frictionless central impact of ideal rigid boxes sharing Y/Z centres. No rotations, ground friction, 3D joint constraints, deformable contact, breakage, fatigue or secondary impacts. Both inertial masses come from invented user-assumed densities; restitution is not measured."
+    let validity="Single instantaneous, frictionless central impact of ideal rigid primitives sharing Y/Z centres. No rotations, ground friction, 3D joint constraints, deformable contact, breakage, fatigue or secondary impacts. Both inertial masses come from invented user-assumed densities; restitution is not measured."
     func sample(_ time:Double)throws->NativeLabCollisionSample {
         guard time.isFinite,time>=0,time<=durationSeconds else {
             throw NativeWorldLabError.invalid("Collision playback time is outside simulation")
@@ -476,8 +476,9 @@ enum NativeWorldLabCollision {
               let b=project.entities.first(where:{$0.id==secondId}) else {
             throw NativeWorldLabError.invalid("Choose two different existing physical solids")
         }
-        guard a.shape=="box",b.shape=="box" else {
-            throw NativeWorldLabError.invalid("Central impact supports two rectangular boxes only")
+        guard ["box","sphere","cylinder"].contains(a.shape),
+              ["box","sphere","cylinder"].contains(b.shape) else {
+            throw NativeWorldLabError.invalid("Central impact supports box, sphere or cylinder primitives")
         }
         let left=a.positionMeters[0]<b.positionMeters[0] ? a:b
         let right=left.id==a.id ? b:a
