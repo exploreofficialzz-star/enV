@@ -301,3 +301,50 @@ object NativeWorldLabEditor {
             arr.getJSONObject(found).put("materialId",materialId?:JSONObject.NULL)
         }
 }
+
+/** Revision-monotonic 50-edit undo/redo for native unsaved World Lab authoring. */
+class NativeWorldLabEditHistory {
+    private val past=java.util.ArrayDeque<String>()
+    private val future=java.util.ArrayDeque<String>()
+    val canUndo:Boolean get()=past.isNotEmpty()
+    val canRedo:Boolean get()=future.isNotEmpty()
+    fun clear(){past.clear();future.clear()}
+    fun record(before:String,after:String){
+        val old=NativeWorldLabProjectCodec.decode(before)
+        val next=NativeWorldLabProjectCodec.decode(after)
+        require(old.id==next.id && old.schemaVersion==next.schemaVersion &&
+            next.revision>old.revision){"History edits require one advancing project"}
+        past.addLast(before)
+        while(past.size>50)past.removeFirst()
+        future.clear()
+    }
+    private fun restore(snapshot:String,current:String):String{
+        val target=NativeWorldLabProjectCodec.decode(snapshot)
+        val active=NativeWorldLabProjectCodec.decode(current)
+        require(target.id==active.id && target.schemaVersion==active.schemaVersion){
+            "Undo cannot restore another project"
+        }
+        require(active.revision<1_000_000_000){"Project revision capacity reached"}
+        val root=JSONObject(snapshot)
+        root.put("revision",active.revision+1)
+        root.put("updatedAt",Instant.now().toString())
+        val json=root.toString()
+        NativeWorldLabProjectCodec.decode(json)
+        return json
+    }
+    fun undo(current:String):String?{
+        val snapshot=past.peekLast()?:return null
+        val next=restore(snapshot,current)
+        past.removeLast();future.addFirst(current)
+        while(future.size>50)future.removeLast()
+        return next
+    }
+    fun redo(current:String):String?{
+        val snapshot=future.peekFirst()?:return null
+        val next=restore(snapshot,current)
+        future.removeFirst();past.addLast(current)
+        while(past.size>50)past.removeFirst()
+        return next
+    }
+}
+

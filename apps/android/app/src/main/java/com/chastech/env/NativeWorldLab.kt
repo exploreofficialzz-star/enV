@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.NativeLabInput
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
+import com.chastech.env.engine.NativeWorldLabEditHistory
 import com.chastech.env.engine.NativeWorldLabProjectCodec
 import com.chastech.env.engine.NativeWorldLabHydrostatics
 import com.chastech.env.engine.NativeWorldLabFluidMotion
@@ -66,6 +67,7 @@ fun NativeWorldLabForm() {
     var projectJson by remember { mutableStateOf<String?>(null) }
     var dcRun by remember { mutableStateOf<NativeLabDcResult?>(null) }
     var savedSnapshot by remember { mutableStateOf<String?>(null) }
+    val editHistory=remember { NativeWorldLabEditHistory() }
     var confirmation by remember { mutableStateOf<String?>(null) }
     var requestImport by remember { mutableStateOf(false) }
     var proposedName by remember { mutableStateOf("") }
@@ -119,6 +121,7 @@ fun NativeWorldLabForm() {
             val previous=projectJson?:error("Create or import a project first.")
             val next=transform(previous)
             val parsed=NativeWorldLabProjectCodec.decode(next)
+            editHistory.record(previous,next)
             projectJson=next
             project=parsed
             dcRun=null;wiredMotor=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
@@ -126,11 +129,26 @@ fun NativeWorldLabForm() {
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
     }
+    fun travelEdit(redo:Boolean){
+        runCatching{
+            val current=projectJson?:error("Open a project before changing its history")
+            val recovered=if(redo)editHistory.redo(current) else editHistory.undo(current)
+            if(recovered!=null){
+                val parsed=NativeWorldLabProjectCodec.decode(recovered)
+                projectJson=recovered;project=parsed
+                dcRun=null;wiredMotor=null;hydroRun=null
+                fluidPlaying=false;fluidMotion=null
+                selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
+            }
+            warning=""
+        }.onFailure{warning=it.message?:"This edit cannot be restored safely"}
+    }
     fun newProject(){
         runCatching {
             val json=NativeWorldLabEditor.blank()
             val parsed=NativeWorldLabProjectCodec.decode(json)
             project=parsed;projectJson=json;savedSnapshot=null;selected=0;warning=""
+            editHistory.clear()
         }.onFailure{warning=it.message?:"Could not create a World Lab project."}
     }
     fun loadSavedProject(){
@@ -141,6 +159,7 @@ fun NativeWorldLabForm() {
                     else {
                         projectJson=stored.json;project=NativeWorldLabProjectCodec.decode(stored.json)
                         savedSnapshot=stored.json;selected=0;warning=""
+                        editHistory.clear()
                     }
                 }.onFailure{warning=it.message?:"The saved project could not be recovered safely."}
         }
@@ -500,6 +519,14 @@ fun NativeWorldLabForm() {
                             Text(label)
                         }
                     }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={travelEdit(false)},enabled=editHistory.canUndo){
+                    Text("Undo")
+                }
+                OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
+                    Text("Redo")
+                }
             }
             if(solid!=null) {
                 Row {

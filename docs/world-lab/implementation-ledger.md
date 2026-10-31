@@ -309,3 +309,7 @@ release-candidate evidence bundle are unfinished.
 ## iOS time-dependent fluid/mechanics and SceneKit presentation (2026-10-31)
 
 - Swift now evolves an upright invented solid across the assumed level liquid using 1D RK4, actual primitive displaced volume, gravity, hypothetical linear damping, ground collision, external buoyancy work and numerical mechanical energy balance. SwiftUI controls include solver start, time seek/step/pause/play and force readouts; SceneKit shows a translucent flat assumed-water plane and drives the solid's Y position from recorded solver samples. XCTest cases authored for an assumed light solid and invalid drag. This is bounded reference science with native source integration, not tested device physics; final CI deferred per user request.
+
+## Android revision-safe invention history (2026-10-31)
+
+- Added native 50-step bounded undo/redo for complete validated portable World Lab JSON state. An undo restores a historical design **with a new monotonic revision** and updated timestamp, so persisted owner/project revisions are never rolled backward; redo is cleared by new edits. Compose exposes touch-friendly Undo/Redo and invalidates computed fluid/electrical results after travel. Tests authored for roundtrip and monotonic revisions; comprehensive CI remains deferred.

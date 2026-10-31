@@ -67,6 +67,23 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.rewireCircuitPart(json,"load","middle","middle")
         }
     }
+    @Test fun nativeHistoryUndoRedoKeepsRevisionsMonotonic(){
+        val history=NativeWorldLabEditHistory()
+        val base=NativeWorldLabEditor.blank()
+        val edit=NativeWorldLabEditor.addSolid(base,"box",id="object")
+        history.record(base,edit)
+        assertTrue(history.canUndo)
+        val undone=history.undo(edit)!!
+        val parsed=NativeWorldLabProjectCodec.decode(undone)
+        assertEquals(0,parsed.entities.size)
+        assertEquals(2,parsed.revision)
+        val restored=history.redo(undone)!!
+        assertEquals(1,NativeWorldLabProjectCodec.decode(restored).entities.size)
+        assertEquals(3,NativeWorldLabProjectCodec.decode(restored).revision)
+        history.clear()
+        assertFalse(history.canUndo)
+        assertFalse(history.canRedo)
+    }
     @Test fun rejectsWrongShapeBadDimensionsDanglingMaterialsAndUntrustedNames(){
         val initial=fixture()
         assertThrows(IllegalArgumentException::class.java){
