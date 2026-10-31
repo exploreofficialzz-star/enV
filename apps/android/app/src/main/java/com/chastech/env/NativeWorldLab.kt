@@ -83,6 +83,7 @@ fun NativeWorldLabForm() {
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
     var proposedModulus by remember { mutableStateOf("") }
+    var editingMaterialId by remember { mutableStateOf<String?>(null) }
     var beamForce by remember { mutableStateOf("1000") }
     var beamRun by remember { mutableStateOf<NativeLabBeamBendingResult?>(null) }
     var deviceName by remember { mutableStateOf("") }
@@ -900,6 +901,12 @@ fun NativeWorldLabForm() {
                     Text(clearance.validity,style=MaterialTheme.typography.bodySmall)
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
+                if(material!=null) OutlinedButton(onClick={
+                    editingMaterialId=material.id
+                    proposedName=material.name
+                    proposedDensity=material.densityKgM3?.toString()?:""
+                    proposedModulus=material.youngModulusPa?.toString()?:""
+                }){Text("Revise this material's assumptions")}
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
                 Text("Assumed Young's modulus: "+labNumber(material?.youngModulusPa)+" Pa")
                 Text("Calculate how an invented elastic beam bends",
@@ -1176,15 +1183,29 @@ fun NativeWorldLabForm() {
                     require(proposedName.isNotBlank()){"Name your invented material first."}
                     val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
-                    val id=java.util.UUID.randomUUID().toString()
-                    val edited=NativeWorldLabEditor.addHypotheticalMaterial(
-                        requireNotNull(projectJson),proposedName,density,youngModulusPa=modulus,id=id)
-                    val linked=solid?.let{NativeWorldLabEditor.assignMaterial(edited,it.id,id)}?:edited
-                    projectJson=linked
-                    project=NativeWorldLabProjectCodec.decode(linked)
-                    proposedName="";proposedDensity="";proposedModulus="";beamRun=null;warning=""
-                }.onFailure{warning=it.message?:"Hypothetical material was not saved."}
-            }){Text("Save invented material")}
+                    val materialId=editingMaterialId
+                    val freshId=java.util.UUID.randomUUID().toString()
+                    val previous=projectJson
+                    applyProjectEdit{json->
+                        if(materialId!=null){
+                            NativeWorldLabEditor.reviseHypotheticalMaterial(
+                                json,materialId,proposedName,density,modulus)
+                        }else{
+                            val proposed=NativeWorldLabEditor.addHypotheticalMaterial(
+                                json,proposedName,density,youngModulusPa=modulus,id=freshId)
+                            solid?.let{NativeWorldLabEditor.assignMaterial(
+                                proposed,it.id,freshId)}?:proposed
+                        }
+                    }
+                    if(projectJson!=previous){
+                        proposedName="";proposedDensity="";proposedModulus=""
+                        editingMaterialId=null;beamRun=null
+                    }
+                }.onFailure{warning=it.message?:"Material edit was not saved."}
+            }){Text(if(editingMaterialId==null)"Save invented material" else "Save revised material")}
+            if(editingMaterialId!=null)OutlinedButton(onClick={
+                editingMaterialId=null;proposedName="";proposedDensity="";proposedModulus=""
+            }){Text("Cancel material revision")}
             Text("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.",
                 style=MaterialTheme.typography.bodySmall)
         }
