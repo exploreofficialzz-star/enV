@@ -512,7 +512,7 @@ public enum NativeDateTimeEngine {
 
     private static func weekendDays(_ options: [String: String]) throws -> Set<Int> {
         let raw = (options["weekendDays"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if raw.isEmpty { return [1, 7] }
+        if raw.isEmpty { return [0, 6] }
         let parts = raw.split(whereSeparator: { $0 == "," || $0.isWhitespace })
         guard !parts.isEmpty else {
             throw NativeDateTimeError.invalidOperation("Weekend days must be numbers from 0 (Sunday) to 6 (Saturday).")
