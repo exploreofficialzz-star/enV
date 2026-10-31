@@ -53,6 +53,11 @@ struct NativeWorldLabView:View {
     @State private var opticalSecondId=""
     @State private var opticalAngle="30"
     @State private var opticalRun:NativeOpticalInterfaceRun?
+    @State private var opticalRayRun:NativeOpticalSceneRay?
+    @State private var opticalRayOrigin="-4,0,0"
+    @State private var opticalRayDirection="1,0,0"
+    @State private var opticalRayDistance="10"
+    @State private var opticalRayContacts="8"
     @State private var editingMaterialId:String?
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
@@ -1287,6 +1292,7 @@ Text("Invent chemical heat").font(.headline)
         solidGroupSphereContent(project:project)
         solidGravityContent(project:project)
         solidOpticsContent(project:project)
+        solidOpticalSceneContent(project:project)
         solidHeatTransferContent(project:project)
         scientificEvidenceLibrary(project:project)
         solidSphereImpactContent(project:project,solid:solid)
@@ -1470,6 +1476,97 @@ Text("Invent chemical heat").font(.headline)
         }else{
             Text("Invent at least two materials and add their assumed refractive indices.")
                 .font(.caption)
+        }
+    }
+    private func rayVector(_ string:String)throws->[Double]{
+        let values=string.split(separator:",",omittingEmptySubsequences:false).map{
+            Double($0.trimmingCharacters(in:.whitespacesAndNewlines))
+        }
+        guard values.count==3,values.allSatisfy({$0?.isFinite == true}) else{
+            throw NativeWorldLabError.invalid(
+                "Ray origin and direction need exactly three finite X,Y,Z values.")
+        }
+        return values.compactMap{$0}
+    }
+    @ViewBuilder private func solidOpticalSceneContent(
+        project:NativeWorldLabProject)->some View{
+        let optical=project.entities.filter{item in
+            item.scientificRole=="reference-solid"&&
+            ["box","sphere"].contains(item.shape)&&
+            project.materials.contains(where:{
+                $0.id==item.materialId && $0.refractiveIndex != nil
+            })
+        }
+        Text("Trace light through invented 3D solids").font(.headline)
+        Text("Native geometry-derived primary-ray optics. The actual invented "+
+             "box and sphere positions determine the intersections. "+
+             "Additional reflected branches, absorption and diffraction "+
+             "are not simulated.")
+            .font(.caption).foregroundStyle(.secondary)
+        Text("Optically configured solids: "+String(optical.count)).font(.caption)
+        if let target=optical.first {
+            Button("Aim at "+target.name){
+                let x=target.positionMeters[0],y=target.positionMeters[1]
+                let z=target.positionMeters[2]
+                let base=max(2,target.dimensionsMeters[0])
+                opticalRayOrigin=[x-2*base,y,z].map{String($0)}.joined(separator:",")
+                opticalRayDirection="1,0,0"
+                opticalRayDistance=String(min(1000,base*5))
+                opticalRayRun=nil;redraw()
+            }.buttonStyle(.bordered)
+        }
+        TextField("Light origin X,Y,Z metres",text:$opticalRayOrigin)
+            .textFieldStyle(.roundedBorder)
+            .onChange(of:opticalRayOrigin){_ in opticalRayRun=nil;redraw()}
+        TextField("Ray travel direction X,Y,Z",text:$opticalRayDirection)
+            .textFieldStyle(.roundedBorder)
+            .onChange(of:opticalRayDirection){_ in opticalRayRun=nil;redraw()}
+        HStack{
+            TextField("Distance in metres",text:$opticalRayDistance)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of:opticalRayDistance){_ in opticalRayRun=nil;redraw()}
+            TextField("Maximum boundaries",text:$opticalRayContacts)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of:opticalRayContacts){_ in opticalRayRun=nil;redraw()}
+        }
+        Button("Trace invented 3D ray locally"){
+            do{
+                guard let distance=Double(opticalRayDistance),
+                    let limit=Int(opticalRayContacts) else{
+                    throw NativeWorldLabError.invalid(
+                        "Enter a finite distance and integer boundary limit.")
+                }
+                let input=NativeOpticalSceneInput(
+                    originMeters:try rayVector(opticalRayOrigin),
+                    direction:try rayVector(opticalRayDirection),
+                    maximumDistanceMeters:distance,maximumInterfaces:limit)
+                opticalRayRun=try NativeWorldLabOpticalScene.trace(project,input:input)
+                problem="Computed geometry-aware optical intersections locally."
+                redraw()
+            }catch{opticalRayRun=nil;problem=error.localizedDescription;redraw()}
+        }.buttonStyle(.bordered)
+            .disabled(optical.isEmpty)
+        if let run=opticalRayRun,run.projectId==project.id,
+            run.projectRevision==project.revision {
+            value("Remaining primary light",run.finalPrimaryRayPowerFraction*100,"%")
+            value("Untraced reflected light",
+                  run.accountedLostBranchPowerFraction*100,"%")
+            Text("Computed path segments: "+String(run.segments.count))
+                .font(.caption)
+            ForEach(run.segments.indices,id:\.self){i in
+                let step=run.segments[i]
+                Text("\(i+1). "+step.kind+" · "+String(
+                    format:"%.3f m",step.travelMeters))
+                    .font(.caption)
+            }
+            Button("Keep invented 3D ray evidence with project"){
+                do {
+                    _ = try savedScience.saveOpticalScene(run,project:project)
+                    refreshScientificEvidence()
+                    problem="Saved portable 3D ray evidence with this invention."
+                }catch{problem=error.localizedDescription}
+            }.buttonStyle(.bordered)
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
         }
     }
     private func updateGravityScene(){
@@ -2341,6 +2438,31 @@ Text("Invent chemical heat").font(.headline)
                     red:0.2+0.8*t,green:0.3+0.55*t,blue:0.55,alpha:1)
                 cell.position=SCNVector3(Float((Double(i)-10)*0.116),1.05,0)
                 next.rootNode.addChildNode(cell)
+            }
+        }
+        if let run=opticalRayRun,let project,
+           run.projectId==project.id,run.projectRevision==project.revision {
+            for (index,part) in run.segments.enumerated(){
+                if part.kind=="limit" {continue}
+                let start=part.startMeters,end=part.endMeters
+                guard start.count==3,end.count==3,
+                      zip(start,end).contains(where:{abs($0.0-$0.1)>1e-6})
+                else {continue}
+                let points=[
+                    SCNVector3(Float(start[0]),Float(start[1]),Float(start[2])),
+                    SCNVector3(Float(end[0]),Float(end[1]),Float(end[2]))
+                ]
+                let source=SCNGeometrySource(vertices:points)
+                let element=SCNGeometryElement(indices:[Int32(0),Int32(1)],
+                    primitiveType:.line)
+                let geometry=SCNGeometry(sources:[source],elements:[element])
+                geometry.firstMaterial?.lightingModel = .constant
+                geometry.firstMaterial?.diffuse.contents =
+                    part.kind=="total-internal-reflection" ?
+                        UIColor.systemOrange:UIColor.systemCyan
+                let pathNode=SCNNode(geometry:geometry)
+                pathNode.name="invented-optical-ray-"+String(index)
+                next.rootNode.addChildNode(pathNode)
             }
         }
         let camera=SCNNode()

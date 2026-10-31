@@ -651,3 +651,10 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
   segment and export a portable project/revision-bound scientific evidence
   envelope. It is not a path-rendered Android AR camera or fully branched
   optical renderer; local ray evidence history is still an independent export.
+
+- Native iOS geometry-aware primary ray tracing is wired into the SwiftUI
+  invented-solid editor with editable origin/direction/distance/interface budget
+  and an aim-at-solid shortcut. Calculated paths appear as SceneKit line
+  segments against actual authored 3D solids, and versioned evidence is
+  retained via the existing private scientific store and complete archives.
+  The separate Swift solver source is explicitly registered with Xcode.

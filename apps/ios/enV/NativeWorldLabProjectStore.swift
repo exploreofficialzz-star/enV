@@ -242,6 +242,41 @@ struct NativeWorldLabScientificEvidenceStore {
                   samples.count==121 else {
                 throw NativeWorldLabError.invalid("Unsupported material heat record")
             }
+        }else if kind=="optical-scene-ray" {
+            guard result["format"] as? String=="env-world-lab-optical-scene-ray",
+                result["modelVersion"] as? String=="1.0.0",
+                let input=result["input"] as? [String:Any],
+                let limit=input["maximumInterfaces"] as? Int,
+                (1...16).contains(limit),
+                let maxDistance=input["maximumDistanceMeters"] as? Double,
+                maxDistance.isFinite,(0.1...1000).contains(maxDistance),
+                let origin=input["originMeters"] as? [Double],
+                let direction=input["direction"] as? [Double],
+                origin.count==3,direction.count==3,
+                (origin+direction).allSatisfy({$0.isFinite && abs($0)<=100000}),
+                let paths=result["segments"] as? [[String:Any]],
+                (1...18).contains(paths.count),
+                let remaining=result["finalPrimaryRayPowerFraction"] as? Double,
+                remaining.isFinite,(0...1).contains(remaining),
+                let discarded=result["accountedLostBranchPowerFraction"] as? Double,
+                discarded.isFinite,(0...1.000001).contains(discarded) else{
+                throw NativeWorldLabError.invalid("Unsupported 3D optical ray evidence")
+            }
+            for path in paths {
+                guard let start=path["startMeters"] as? [Double],
+                    let end=path["endMeters"] as? [Double],
+                    start.count==3,end.count==3,
+                    (start+end).allSatisfy({$0.isFinite&&abs($0)<=100000}),
+                    let kind=path["kind"] as? String,
+                    ["transmitted","total-internal-reflection","escaped","limit"]
+                        .contains(kind),
+                    let distance=path["travelMeters"] as? Double,
+                    distance.isFinite,distance>=0,
+                    let power=path["survivingRayPowerFraction"] as? Double,
+                    power.isFinite,(0...1).contains(power) else{
+                    throw NativeWorldLabError.invalid("Invalid optical ray segment")
+                }
+            }
         }else if kind=="interface-optics" {
             guard result["format"] as? String=="env-world-lab-interface-optics",
                   result["modelVersion"] as? String=="1.0.0",
@@ -344,6 +379,10 @@ struct NativeWorldLabScientificEvidenceStore {
     @discardableResult func saveOptics(_ run:NativeOpticalInterfaceRun,
         project:NativeWorldLabProject)throws->String {
         try store(run,kind:"interface-optics",project:project)
+    }
+    @discardableResult func saveOpticalScene(_ run:NativeOpticalSceneRay,
+        project:NativeWorldLabProject)throws->String {
+        try store(run,kind:"optical-scene-ray",project:project)
     }
     func read(_ projectId:String,_ recordId:String)throws->Data {
         let url=try file(projectId,recordId)
