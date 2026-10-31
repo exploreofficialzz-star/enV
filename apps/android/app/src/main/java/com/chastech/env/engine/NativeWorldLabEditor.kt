@@ -50,6 +50,47 @@ object NativeWorldLabEditor {
         NativeWorldLabProjectCodec.decode(json)
         return json
     }
+    fun startDigitalInvention(source:String,
+        id:String=UUID.randomUUID().toString()):String=edit(source){p->
+        val list=p.optJSONArray("digitalNetworks")?:JSONArray().also{p.put("digitalNetworks",it)}
+        require(list.length()<8){"Maximum eight digital inventions"}
+        list.put(JSONObject().put("id",id).put("name","My invented logic")
+            .put("inputs",JSONArray()
+                .put(JSONObject().put("id","input_a").put("label","Switch A").put("value",false))
+                .put(JSONObject().put("id","input_b").put("label","Switch B").put("value",false)))
+            .put("gates",JSONArray().put(JSONObject()
+                .put("id","invented_gate").put("name","Invented NAND")
+                .put("assumption","User-assumed NAND behavior")
+                .put("evidence","hypothetical-user-assumed")
+                .put("inputNodeIds",JSONArray(listOf("input_a","input_b")))
+                .put("truthTable",JSONArray(listOf(1,1,1,0)))))
+            .put("outputs",JSONArray().put(JSONObject()
+                .put("id","output_q").put("label","Indicator")
+                .put("sourceNodeId","invented_gate")))
+    }
+    fun digitalSwitch(source:String,networkId:String,inputId:String,value:Boolean):String=
+        edit(source){p->
+            val nets=p.getJSONArray("digitalNetworks")
+            val n=(0 until nets.length()).map{nets.getJSONObject(it)}
+                .firstOrNull{it.getString("id")==networkId}?:error("Unknown digital network")
+            val inputs=n.getJSONArray("inputs")
+            val input=(0 until inputs.length()).map{inputs.getJSONObject(it)}
+                .firstOrNull{it.getString("id")==inputId}?:error("Unknown digital input")
+            input.put("value",value)
+        }
+    fun digitalTruthBit(source:String,networkId:String,gateId:String,
+        row:Int,bit:Int):String=edit(source){p->
+        require(bit in 0..1){"Digital output must be zero or one"}
+        val nets=p.getJSONArray("digitalNetworks")
+        val n=(0 until nets.length()).map{nets.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==networkId}?:error("Unknown digital network")
+        val gs=n.getJSONArray("gates")
+        val g=(0 until gs.length()).map{gs.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==gateId}?:error("Unknown digital gate")
+        val table=g.getJSONArray("truthTable")
+        require(row in 0 until table.length()){"Digital row is outside truth table"}
+        table.put(row,bit)
+    }
     fun addStarterCircuit(source:String,id:String=UUID.randomUUID().toString()):String =
         edit(source){root->
             val networks=root.optJSONArray("networks")?:JSONArray().also{root.put("networks",it)}

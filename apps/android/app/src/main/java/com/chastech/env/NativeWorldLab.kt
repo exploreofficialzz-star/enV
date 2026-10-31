@@ -29,6 +29,7 @@ import com.chastech.env.engine.NativeWorldLabFluidMotion
 import com.chastech.env.engine.NativeLabFluidMotionInput
 import com.chastech.env.engine.NativeLabFluidMotionRun
 import com.chastech.env.engine.NativeLabHydroResult
+import com.chastech.env.engine.NativeWorldLabDigitalLogic
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
@@ -401,6 +402,46 @@ fun NativeWorldLabForm() {
                 style=MaterialTheme.typography.bodySmall)
         if(project!=null){
             Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
+            Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
+                style=MaterialTheme.typography.bodySmall)
+            if(project!!.digitalNetworks.isEmpty()){
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.startDigitalInvention(it)
+                }}){Text("Start invented logic")}
+            }else {
+                val digital=project!!.digitalNetworks.first()
+                digital.inputs.forEach{input->
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        Checkbox(checked=input.value,onCheckedChange={value->
+                            applyProjectEdit{NativeWorldLabEditor.digitalSwitch(
+                                it,digital.id,input.id,value)}
+                        })
+                        Text(input.label+" = "+if(input.value)"1" else "0")
+                    }
+                }
+                digital.gates.forEach{gate->
+                    Text(gate.name+" · "+gate.assumption,
+                        style=MaterialTheme.typography.bodySmall)
+                    gate.truthTable.forEachIndexed{index,bit->
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            Text(index.toString(2).padStart(gate.inputNodeIds.size,'0')+" → "+bit)
+                            OutlinedButton(onClick={applyProjectEdit{
+                                NativeWorldLabEditor.digitalTruthBit(
+                                    it,digital.id,gate.id,index,1-bit)
+                            }}){Text("Toggle")}
+                        }
+                    }
+                }
+                runCatching{NativeWorldLabDigitalLogic.evaluate(digital)}
+                    .onSuccess{result->
+                        digital.outputs.forEach{output->
+                            Text(output.label+": "+(result[output.id]?:0),
+                                style=MaterialTheme.typography.bodyMedium)
+                        }
+                    }.onFailure{Text("Digital model cannot be evaluated.",
+                        color=MaterialTheme.colorScheme.error)}
+            }
             Text("Invent chemical heat",style=MaterialTheme.typography.titleSmall)
             Text("Hypothetical chemistry only. Reaction rate and heat feedback use your assumptions.",
                 style=MaterialTheme.typography.bodySmall)

@@ -341,10 +341,49 @@ struct NativeWorldLabView:View {
         return Text(verbatim: caption).font(.subheadline)
     }
 
+    @ViewBuilder private func digitalContent(_ project:NativeWorldLabProject)->some View {
+        Text("Invent digital logic").font(.headline)
+        Text("Boolean truth tables from your assumptions, not measured chip behavior.")
+            .font(.caption).foregroundStyle(.secondary)
+        if let network=project.digitalNetworks?.first {
+            ForEach(network.inputs,id:\.id){input in
+                Toggle(input.label,isOn:Binding(
+                    get:{input.value},
+                    set:{newValue in
+                        applyProject{try NativeWorldLabEditor.digitalSwitch(
+                            $0,networkId:network.id,inputId:input.id,value:newValue)}
+                    }))
+            }
+            ForEach(network.gates,id:\.id){gate in
+                Text(gate.name+" · "+gate.assumption).font(.caption)
+                ForEach(Array(gate.truthTable.enumerated()),id:\.offset){index,bit in
+                    HStack{
+                        Text(String(repeating:"0",count:max(0,gate.inputNodeIds.count - String(index,radix:2).count)) + String(index,radix:2))
+                        Spacer()
+                        Button("Output "+String(bit)+" · toggle"){
+                            applyProject{try NativeWorldLabEditor.digitalTruthBit(
+                                $0,networkId:network.id,gateId:gate.id,
+                                row:index,bit:1-bit)}
+                        }.buttonStyle(.bordered)
+                    }
+                }
+            }
+            if let values=try? NativeWorldLabDigitalLogic.evaluate(network) {
+                ForEach(network.outputs,id:\.id){output in
+                    Text(output.label+": "+String(values[output.id] ?? 0))
+                }
+            }else {Text("Digital network could not be calculated.")}
+        }else {
+            Button("Start invented logic"){
+                applyProject{try NativeWorldLabEditor.startDigitalInvention($0)}
+            }.buttonStyle(.bordered)
+        }
+    }
     @ViewBuilder private func projectContent(_ project:NativeWorldLabProject)->some View {
 
                     Text(project.title+" · "+String(project.entities.count)+" solids")
                         .font(.headline)
+                    digitalContent(project)
                     chemicalContent()
                     Text("Connected DC circuits").font(.headline)
                     if let circuit=project.networks?.first { circuitContent(circuit,project:project) }else {

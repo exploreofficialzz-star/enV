@@ -50,6 +50,59 @@ enum NativeWorldLabEditor {
             "digitalNetworks":[],
         ])
     }
+    static func startDigitalInvention(_ data:Data,
+        id:String=UUID().uuidString)throws->Data {
+        try mutate(data){root in
+            var networks=(root["digitalNetworks"] as? [[String:Any]]) ?? []
+            guard networks.count<8 else {
+                throw NativeWorldLabError.invalid("Maximum eight digital inventions")
+            }
+            let inputs:[[String:Any]]=[
+                ["id":"input_a","label":"Switch A","value":false],
+                ["id":"input_b","label":"Switch B","value":false]]
+            let gate:[String:Any]=["id":"invented_gate","name":"Invented NAND",
+                "assumption":"User-assumed NAND behavior",
+                "evidence":"hypothetical-user-assumed",
+                "inputNodeIds":["input_a","input_b"],"truthTable":[1,1,1,0]]
+            let output:[String:Any]=["id":"output_q","label":"Indicator",
+                "sourceNodeId":"invented_gate"]
+            networks.append(["id":id,"name":"My invented logic",
+                "inputs":inputs,"gates":[gate],"outputs":[output]])
+            root["digitalNetworks"]=networks
+        }
+    }
+    static func digitalSwitch(_ data:Data,networkId:String,
+        inputId:String,value:Bool)throws->Data {
+        try mutate(data){root in
+            guard var networks=root["digitalNetworks"] as? [[String:Any]],
+                  let idx=networks.firstIndex(where:{$0["id"] as? String==networkId}),
+                  var inputs=networks[idx]["inputs"] as? [[String:Any]],
+                  let inputIndex=inputs.firstIndex(where:{$0["id"] as? String==inputId}) else {
+                throw NativeWorldLabError.invalid("Digital switch not found")
+            }
+            inputs[inputIndex]["value"]=value
+            networks[idx]["inputs"]=inputs
+            root["digitalNetworks"]=networks
+        }
+    }
+    static func digitalTruthBit(_ data:Data,networkId:String,gateId:String,
+        row:Int,bit:Int)throws->Data {
+        try mutate(data){root in
+            guard bit==0 || bit==1,
+                  var networks=root["digitalNetworks"] as? [[String:Any]],
+                  let idx=networks.firstIndex(where:{$0["id"] as? String==networkId}),
+                  var gates=networks[idx]["gates"] as? [[String:Any]],
+                  let gateIndex=gates.firstIndex(where:{$0["id"] as? String==gateId}),
+                  var table=gates[gateIndex]["truthTable"] as? [Int],
+                  table.indices.contains(row) else {
+                throw NativeWorldLabError.invalid("Digital truth-table row is invalid")
+            }
+            table[row]=bit
+            gates[gateIndex]["truthTable"]=table
+            networks[idx]["gates"]=gates
+            root["digitalNetworks"]=networks
+        }
+    }
     static func starterCircuit(_ data:Data,id:String=UUID().uuidString) throws -> Data {
         try mutate(data){root in
             var networks=(root["networks"] as? [[String:Any]]) ?? []

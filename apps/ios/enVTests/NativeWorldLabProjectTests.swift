@@ -2,6 +2,31 @@ import XCTest
 @testable import enV
 
 final class NativeWorldLabProjectTests: XCTestCase {
+    func testNativeDigitalTruthTableInventAndRejectCycles() throws {
+        let start=try NativeWorldLabEditor.startDigitalInvention(
+            NativeWorldLabEditor.blank())
+        let first=try NativeWorldLabProject.decode(start)
+        let network=try XCTUnwrap(first.digitalNetworks?.first)
+        XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(network)["output_q"],1)
+        let setA=try NativeWorldLabEditor.digitalSwitch(start,
+            networkId:network.id,inputId:"input_a",value:true)
+        let setB=try NativeWorldLabEditor.digitalSwitch(setA,
+            networkId:network.id,inputId:"input_b",value:true)
+        XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(
+            XCTUnwrap(NativeWorldLabProject.decode(setB).digitalNetworks?.first))["output_q"],0)
+        let edited=try NativeWorldLabEditor.digitalTruthBit(setB,
+            networkId:network.id,gateId:"invented_gate",row:3,bit:1)
+        XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(
+            XCTUnwrap(NativeWorldLabProject.decode(edited).digitalNetworks?.first))["output_q"],1)
+        var corrupt=try XCTUnwrap(JSONSerialization.jsonObject(with:setB) as? [String:Any])
+        var networks=try XCTUnwrap(corrupt["digitalNetworks"] as? [[String:Any]])
+        var gates=try XCTUnwrap(networks[0]["gates"] as? [[String:Any]])
+        gates[0]["inputNodeIds"]=["invented_gate","input_b"]
+        networks[0]["gates"]=gates;corrupt["digitalNetworks"]=networks
+        XCTAssertThrowsError(try NativeWorldLabProject.decode(
+            JSONSerialization.data(withJSONObject:corrupt)))
+    }
+
     private func sharedFixture() throws -> Data {
         let url=try XCTUnwrap(Bundle(for: Self.self).url(forResource:"world-lab-project-v1",withExtension:"json"))
         return try Data(contentsOf:url)

@@ -4,6 +4,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NativeWorldLabProjectTest {
+    @Test fun nativeDigitalTruthTableCanBeEditedWithoutExecutingUntrustedCode(){
+        val blank=NativeWorldLabEditor.startDigitalInvention(NativeWorldLabEditor.blank())
+        val initial=NativeWorldLabProjectCodec.decode(blank).digitalNetworks.first()
+        assertEquals(1,NativeWorldLabDigitalLogic.evaluate(initial)["output_q"])
+        val switched=NativeWorldLabEditor.digitalSwitch(
+            NativeWorldLabEditor.digitalSwitch(blank,initial.id,"input_a",true),
+            initial.id,"input_b",true)
+        val parsed=NativeWorldLabProjectCodec.decode(switched).digitalNetworks.first()
+        assertEquals(0,NativeWorldLabDigitalLogic.evaluate(parsed)["output_q"])
+        val invented=NativeWorldLabEditor.digitalTruthBit(switched,initial.id,"invented_gate",3,1)
+        assertEquals(1,NativeWorldLabDigitalLogic.evaluate(
+            NativeWorldLabProjectCodec.decode(invented).digitalNetworks.first())["output_q"])
+        val corrupt=org.json.JSONObject(switched)
+        corrupt.getJSONArray("digitalNetworks").getJSONObject(0)
+            .getJSONArray("gates").getJSONObject(0)
+            .put("inputNodeIds",org.json.JSONArray(listOf("invented_gate","input_b")))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabProjectCodec.decode(corrupt.toString())
+        }
+    }
+
     private fun fixture(): String =
         requireNotNull(javaClass.classLoader?.getResourceAsStream("world-lab-project-v1.json"))
             .bufferedReader().use { it.readText() }
