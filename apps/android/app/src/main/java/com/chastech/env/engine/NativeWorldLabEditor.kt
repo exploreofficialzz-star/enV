@@ -178,6 +178,55 @@ object NativeWorldLabEditor {
                 ?:error("This solid was not found.")
             arr.getJSONObject(found).put("dimensionsMeters",JSONArray(dimensions))
         }
+
+    fun positionSolid(source:String,id:String,positionMeters:List<Double>):String =
+        edit(source){project->
+            require(positionMeters.size==3 && positionMeters.all{
+                it.isFinite() && it in -100000.0..100000.0
+            }){"Position needs three bounded SI coordinates"}
+            val arr=project.getJSONArray("entities")
+            val index=(0 until arr.length()).firstOrNull{
+                arr.getJSONObject(it).getString("id")==id
+            }?:error("Selected invention no longer exists")
+            arr.getJSONObject(index).put("positionMeters",JSONArray(positionMeters))
+        }
+    fun snapSolid(source:String,id:String,gridMeters:Double):String {
+        require(gridMeters.isFinite() && gridMeters in 0.001..100.0) {
+            "Grid spacing must be 0.001 to 100 metres"
+        }
+        val p=NativeWorldLabProjectCodec.decode(source)
+        val solid=p.entities.firstOrNull{it.id==id}?:error("Selected invention is missing")
+        val position=listOf(
+            solid.positionMeters.x,solid.positionMeters.y,solid.positionMeters.z
+        ).map{value->
+            val snapped=kotlin.math.round(value/gridMeters)*gridMeters
+            val rounded=kotlin.math.round(snapped*1e6)/1e6
+            require(rounded.isFinite() && rounded in -100000.0..100000.0){
+                "Snapped coordinate is outside the local world"
+            }
+            rounded
+        }
+        return positionSolid(source,id,position)
+    }
+    data class GeometryMeasurement(
+        val fromId:String,val toId:String,
+        val offsetXM:Double,val offsetYM:Double,val offsetZM:Double,
+        val centerDistanceM:Double,val horizontalDistanceM:Double
+    )
+    fun measureCenters(p:NativeWorldLabProject,fromId:String,toId:String):GeometryMeasurement {
+        require(fromId!=toId){"Choose two distinct solids for measurement"}
+        val a=p.entities.firstOrNull{it.id==fromId}?:error("Starting solid is missing")
+        val b=p.entities.firstOrNull{it.id==toId}?:error("Target solid is missing")
+        val dx=b.positionMeters.x-a.positionMeters.x
+        val dy=b.positionMeters.y-a.positionMeters.y
+        val dz=b.positionMeters.z-a.positionMeters.z
+        val horizontal=kotlin.math.hypot(dx,dz)
+        val threeDimensional=kotlin.math.hypot(horizontal,dy)
+        require(horizontal.isFinite()&&threeDimensional.isFinite()) {
+            "Geometric distance exceeds the supported numeric range"
+        }
+        return GeometryMeasurement(fromId,toId,dx,dy,dz,threeDimensional,horizontal)
+    }
     fun assignMaterial(source:String,solidId:String,materialId:String?):String =
         edit(source){project->
             val arr=project.getJSONArray("entities")

@@ -275,3 +275,7 @@ release-candidate evidence bundle are unfinished.
 
 - Integrated a 50-entry, project-local undo/redo history into Web edits of solids, invented materials and circuit graphs. All snapshots validate the strict portable format; redo is discarded on a new edit, and save/import/new/open reset the in-memory undo timeline without altering saved experiment evidence. Editing and reversing invalidate active solver results, not archived evidence.
 - Added SI grid snap for selected solid center and center-to-center/horizontal/delta displacement measurement between two created objects, with geometry-only disclaimers and touch-friendly controls. Regression tests registered for the consolidated audit. Kotlin/Swift affordance parity is not claimed yet.
+
+## Android native spatial authoring and measurement (2026-10-31)
+
+- Added validated Kotlin `positionSolid`/`snapSolid` SI editor operations and separate pure `measureCenters` geometry calculations. The Compose screen now exposes selectable grid spacing, snap-center and measurement between the selected and a changeable second solid; numeric vertical, horizontal and 3D offsets are distinguished from physical contact. Regression cases cover strict portable roundtrips, invalid positioning and 3-4-12 centre separation. Native iOS and full CI acceptance remain distinct.

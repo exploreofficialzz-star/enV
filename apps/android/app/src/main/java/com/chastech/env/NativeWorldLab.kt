@@ -88,6 +88,8 @@ fun NativeWorldLabForm() {
     var motorThermalEnabled by remember { mutableStateOf(false) }
     var motorSpeed by remember { mutableFloatStateOf(1f) }
     var warning by remember { mutableStateOf("") }
+    var snapMeters by remember { mutableStateOf(0.5) }
+    var measurementTargetIndex by remember { mutableIntStateOf(0) }
     val model=when(kind) {
         "spring"->NativeLabInput.Spring(massKg=mass.toDouble(),springNPerM=spring.toDouble())
         "rc"->NativeLabInput.RC(resistanceOhm=resistance.toDouble())
@@ -443,6 +445,29 @@ fun NativeWorldLabForm() {
                         val scaled=solid.dimensionsMeters.let{listOf(it.x,it.y,it.z)}.map{(it*1.1).coerceAtMost(10000.0)}
                         applyProjectEdit{NativeWorldLabEditor.resizeSolid(it,solid.id,scaled)}
                     }){Text("Larger")}
+                }
+                Text("Place with precision",style=MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={
+                        snapMeters=when(snapMeters){0.1->0.5;0.5->1.0;1.0->5.0;else->0.1}
+                    }){Text("Grid "+labNumber(snapMeters)+" m")}
+                    OutlinedButton(onClick={
+                        applyProjectEdit{NativeWorldLabEditor.snapSolid(it,solid.id,snapMeters)}
+                    }){Text("Snap center")}
+                }
+                val alternatives=project!!.entities.filter{it.id!=solid.id}
+                if(alternatives.isNotEmpty()){
+                    val target=alternatives[measurementTargetIndex%alternatives.size]
+                    OutlinedButton(onClick={
+                        measurementTargetIndex=(measurementTargetIndex+1)%alternatives.size
+                    }){Text("Measure to: "+target.name+" (change)")}
+                    val measured=NativeWorldLabEditor.measureCenters(project!!,solid.id,target.id)
+                    Text("Center distance: "+labNumber(measured.centerDistanceM)+" m")
+                    Text("Horizontal distance: "+labNumber(measured.horizontalDistanceM)+" m")
+                    Text("Offset X/Y/Z: "+labNumber(measured.offsetXM)+" / "+
+                        labNumber(measured.offsetYM)+" / "+labNumber(measured.offsetZM)+" m")
+                    Text("Center distances are geometry only, not surface clearance.",
+                        style=MaterialTheme.typography.bodySmall)
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
