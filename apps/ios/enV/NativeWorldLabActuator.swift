@@ -762,6 +762,8 @@ struct NativeGroupSphereEvent:Encodable {
     let contactNormal:[Double]
     let impulseNs:[Double]
     let energyLostJ:Double
+    let totalEnergyAfterJ:Double
+    let totalMomentumAfterKgMps:[Double]
 }
 struct NativeGroupSphereSample {
     let entityId:String
@@ -985,7 +987,8 @@ enum NativeWorldLabMultiSphere {
                 events.append(NativeGroupSphereEvent(atSeconds:time,
                     firstEntityId:bodies[i].id,secondEntityId:bodies[j].id,
                     contactNormal:normal.values,impulseNs:impulse.values,
-                    energyLostJ:loss))
+                    energyLostJ:loss,totalEnergyAfterJ:afterEnergy,
+                    totalMomentumAfterKgMps:momentum(bodies).values))
             }
         }
         let finalEnergy=energy(bodies)
