@@ -30,8 +30,6 @@ const palette = read("src/lib/engines/design-palette.ts");
 const paletteTests = read("src/lib/engines/design-palette.test.ts");
 const designColor = read("src/lib/engines/design-color.ts");
 const designColorTests = read("src/lib/engines/design-color.test.ts");
-const palette = read("src/lib/engines/design-palette.ts");
-const paletteTests = read("src/lib/engines/design-palette.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -39,7 +37,7 @@ const checks = [
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],
-  ["HSV conversion implementation", colorEngine.includes("function rgbToHsv") && colorEngine.includes("function hsvToRgb")],
+  ["HSV conversion implementation", designColor.includes("function rgbToHsv") && designColor.includes("function hsvToRgb")],
   ["Palette harmony controls", colorEngine.includes("Split complementary") && colorEngine.includes("Monochromatic")],
   ["Distinct WCAG target checks", colorEngine.includes("getContrastTargets()") && colorEngine.includes("evaluateContrast")],
   ["Published CVD simulation utility", colorVision.includes("simulateColorVision") && colorVision.includes("protanopia") && colorVision.includes("tritanopia")],
