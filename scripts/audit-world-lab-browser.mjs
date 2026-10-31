@@ -330,16 +330,17 @@ try{
   // A full three-sphere chain now uses THREE real movable scene objects.
   // The event solver must find two distinct sequential contacts, not fake a
   // single two-sphere trajectory as multi-body physics.
-  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:1});
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:2});
   await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("-4");
   await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
   await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
   await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
-  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:2});
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:3});
   await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("-1");
   await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
   await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
   await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:4});
   await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("2");
   await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
   await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
