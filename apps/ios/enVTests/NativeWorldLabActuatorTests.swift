@@ -106,4 +106,35 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         XCTAssertEqual(atOne.currentA,expected,accuracy:1e-7)
         XCTAssertEqual(atOne.heightM,0)
     }
+    func testInventedModulusDrivesAnalyticalBeamResponseWithoutClaimingStrength() throws {
+        let blank=try NativeWorldLabEditor.blank()
+        let withBox=try NativeWorldLabEditor.addSolid(blank,shape:"box",id:"beam")
+        let resized=try NativeWorldLabEditor.resizeSolid(
+            withBox,id:"beam",dimensionsMeters:[2,0.1,0.05])
+        let material=try NativeWorldLabEditor.addHypotheticalMaterial(
+            resized,name:"Invented solid",densityKgM3:nil,
+            youngModulusPa:2e11,id:"invented-matter")
+        let linked=try NativeWorldLabEditor.assignMaterial(
+            material,solidId:"beam",materialId:"invented-matter")
+        let project=try NativeWorldLabProject.decode(linked)
+        let r=try NativeWorldLabStructural.bending(
+            project,entityId:"beam",forceN:1000)
+        XCTAssertEqual(r.tipDeflectionM,0.0032,accuracy:1e-12)
+        XCTAssertEqual(r.maximumStressPa,24e6,accuracy:1e-4)
+        XCTAssertEqual(r.surfaceStrain,0.00012,accuracy:1e-12)
+        XCTAssertEqual(r.materialEvidence,"hypothetical-user-assumed")
+        XCTAssertEqual(r.projectRevision,project.revision)
+        XCTAssertThrowsError(try NativeWorldLabStructural.bending(
+            project,entityId:"beam",forceN:1e8))
+        XCTAssertThrowsError(try NativeWorldLabStructural.bending(
+            project,entityId:"beam",forceN:Double.nan))
+        let unknown=try NativeWorldLabEditor.addHypotheticalMaterial(
+            linked,name:"Unknown substance",densityKgM3:nil,
+            youngModulusPa:nil,id:"unknown")
+        let changed=try NativeWorldLabEditor.assignMaterial(
+            unknown,solidId:"beam",materialId:"unknown")
+        XCTAssertThrowsError(try NativeWorldLabStructural.bending(
+            NativeWorldLabProject.decode(changed),entityId:"beam",forceN:1000))
+    }
+
 }
