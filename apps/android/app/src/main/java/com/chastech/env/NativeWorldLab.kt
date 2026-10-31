@@ -33,6 +33,8 @@ import com.chastech.env.engine.NativeWorldLabSpatial
 import com.chastech.env.engine.NativeWorldLabDigitalLogic
 import com.chastech.env.engine.NativeWorldLabStructural
 import com.chastech.env.engine.NativeLabBeamBendingResult
+import com.chastech.env.engine.NativeWorldLabCollision
+import com.chastech.env.engine.NativeLabCollisionResult
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
@@ -86,6 +88,14 @@ fun NativeWorldLabForm() {
     var editingMaterialId by remember { mutableStateOf<String?>(null) }
     var beamForce by remember { mutableStateOf("1000") }
     var beamRun by remember { mutableStateOf<NativeLabBeamBendingResult?>(null) }
+    var collisionTargetIndex by remember { mutableIntStateOf(0) }
+    var collisionLeftSpeed by remember { mutableStateOf("2") }
+    var collisionRightSpeed by remember { mutableStateOf("0") }
+    var collisionRestitution by remember { mutableFloatStateOf(0.5f) }
+    var collisionRun by remember { mutableStateOf<NativeLabCollisionResult?>(null) }
+    var collisionTime by remember { mutableFloatStateOf(0f) }
+    var collisionPlaying by remember { mutableStateOf(false) }
+    var collisionSpeed by remember { mutableFloatStateOf(1f) }
     var deviceName by remember { mutableStateOf("") }
     var deviceAssumption by remember { mutableStateOf("") }
     var deviceResistance by remember { mutableStateOf("") }
@@ -291,6 +301,7 @@ fun NativeWorldLabForm() {
         // Edited/imported geometry and materials invalidate earlier hypothetical drop results.
         dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
         motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0;digitalMotor=null
+        collisionPlaying=false;collisionRun=null;collisionTime=0f
     }
     LaunchedEffect(requestImport) {
         if(requestImport){
@@ -323,6 +334,15 @@ fun NativeWorldLabForm() {
             val stride=kotlin.math.max(1,kotlin.math.round(0.04f*dropSpeed/result.stepSeconds).toInt())
             dropFrame=(dropFrame+stride).coerceAtMost(result.samples.lastIndex)
             if(dropFrame==result.samples.lastIndex)dropPlaying=false
+        }
+    }
+    LaunchedEffect(collisionPlaying,collisionSpeed,collisionRun) {
+        while(collisionPlaying){
+            delay(40)
+            val run=collisionRun?:break
+            collisionTime=(collisionTime+0.04f*collisionSpeed)
+                .coerceAtMost(run.durationSeconds.toFloat())
+            if(collisionTime>=run.durationSeconds.toFloat())collisionPlaying=false
         }
     }
     LaunchedEffect(motorPlaying,motorSpeed,motorResult) {
@@ -899,6 +919,75 @@ fun NativeWorldLabForm() {
                         Text("Overlap X/Y/Z: "+clearance.overlapDepthMeters
                             .joinToString(" / "){labNumber(it)}+" m")
                     Text(clearance.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
+                Text("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.",
+                    style=MaterialTheme.typography.bodySmall)
+                val collisionCandidates=project!!.entities.filter{it.id!=solid.id}
+                if(collisionCandidates.isNotEmpty()){
+                    val other=collisionCandidates[collisionTargetIndex%collisionCandidates.size]
+                    OutlinedButton(onClick={
+                        collisionTargetIndex=(collisionTargetIndex+1)%collisionCandidates.size
+                        collisionRun=null;collisionPlaying=false
+                    }){Text("Collide with: "+other.name+" (change)")}
+                    OutlinedTextField(value=collisionLeftSpeed,
+                        onValueChange={collisionLeftSpeed=it;collisionRun=null;collisionPlaying=false},
+                        label={Text("Left object speed (m/s)")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=collisionRightSpeed,
+                        onValueChange={collisionRightSpeed=it;collisionRun=null;collisionPlaying=false},
+                        label={Text("Right object speed (m/s)")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    Text("Assumed restitution: "+labNumber(collisionRestitution.toDouble()))
+                    Slider(value=collisionRestitution,onValueChange={
+                        collisionRestitution=it;collisionRun=null;collisionPlaying=false
+                    },valueRange=0f..1f,
+                        modifier=Modifier.semantics{contentDescription="Collision restitution"})
+                    OutlinedButton(onClick={
+                        runCatching{
+                            collisionRun=NativeWorldLabCollision.evaluate(
+                                project!!,solid.id,other.id,
+                                collisionLeftSpeed.toDouble(),collisionRightSpeed.toDouble(),
+                                collisionRestitution.toDouble())
+                            collisionTime=0f;collisionPlaying=false;warning=""
+                        }.onFailure{collisionRun=null;collisionPlaying=false
+                            warning=it.message?:"Invalid two-body collision assumptions"}
+                    }){Text("Calculate two-body collision")}
+                } else Text("Add another solid and assign an assumed material to each.")
+                collisionRun?.takeIf{run->
+                    run.projectId==project!!.id&&run.projectRevision==project!!.revision&&
+                    (run.leftEntityId==solid.id||run.rightEntityId==solid.id)
+                }?.let{run->
+                    val state=run.sample(collisionTime.toDouble()
+                        .coerceIn(0.0,run.durationSeconds))
+                    Text("Impact at "+labNumber(run.impactTimeSeconds)+" s")
+                    Text("Impulse: "+labNumber(run.impulseNs)+" N·s")
+                    Text("Post-impact left/right speed: "+
+                        labNumber(run.leftFinalVelocityMps)+" / "+
+                        labNumber(run.rightFinalVelocityMps)+" m/s")
+                    Text("Momentum before/after: "+labNumber(run.momentumBeforeKgMps)+
+                        " / "+labNumber(run.momentumAfterKgMps)+" kg·m/s")
+                    Text("Kinetic energy before/after: "+labNumber(run.energyBeforeJ)+
+                        " / "+labNumber(run.energyAfterJ)+" J")
+                    Text("Dissipated kinetic energy: "+labNumber(run.dissipatedEnergyJ)+" J")
+                    Text("Left/right centre X at this time: "+
+                        labNumber(state.leftCenterXM)+" / "+labNumber(state.rightCenterXM)+" m")
+                    Slider(value=collisionTime,onValueChange={
+                        collisionPlaying=false;collisionTime=it
+                    },valueRange=0f..run.durationSeconds.toFloat(),
+                        modifier=Modifier.semantics{contentDescription="Explore collision time"})
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={collisionPlaying=!collisionPlaying}){
+                            Text(if(collisionPlaying)"Pause collision" else "Play collision")
+                        }
+                        OutlinedButton(onClick={collisionPlaying=false;collisionTime=0f}){
+                            Text("Reset collision")
+                        }
+                        OutlinedButton(onClick={
+                            collisionSpeed=if(collisionSpeed==0.1f)1f else if(collisionSpeed==1f)4f else 0.1f
+                        }){Text("Time "+labNumber(collisionSpeed.toDouble())+"×")}
+                    }
+                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 if(material!=null) OutlinedButton(onClick={
