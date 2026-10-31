@@ -26,6 +26,7 @@ const cssEngine = read("src/components/engines/cssgen-engine.tsx");
 const colorVision = read("src/lib/engines/color-vision.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
+const accessibilityEngine = read("src/components/engines/accessibility-engine.tsx");
 const checks = [
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
@@ -36,6 +37,7 @@ const checks = [
   ["Distinct WCAG target checks", colorEngine.includes("getContrastTargets()") && colorEngine.includes("evaluateContrast")],
   ["Published CVD simulation utility", colorVision.includes("simulateColorVision") && colorVision.includes("protanopia") && colorVision.includes("tritanopia")],
   ["CVD regression tests", tests.includes("color vision simulations preserve neutral black and white")],
+  ["Accessibility Studio uses shared CVD model", accessibilityEngine.includes('from "@/lib/engines/color-vision"') && accessibilityEngine.includes("return simulateColorVision(hex, type);")],
   ["Gradient modes and three stops", cssEngine.includes("radial-gradient") && cssEngine.includes("conic-gradient") && cssEngine.includes("values.via")],
   ["Layered shadow presets", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],

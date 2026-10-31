@@ -82,6 +82,7 @@ The upgrade direction is to preserve the compact nature of enV while making ever
 - Palette generation adds harmony choices and a sample interface preview.
 - Contrast UI uses separate WCAG text and non-text requirements plus alpha-aware calculation and adjustment suggestions.
 - Color-vision simulation is separated into a reusable local utility and has regression tests for neutral endpoints, valid outputs and distinct modes.
+- The active Accessibility Studio's multi-surface and side-by-side color-vision previews also use that same shared simulation utility, so legacy simulator routes and the newer studio cannot silently diverge.
 - Gradient generator gains linear/radial/conic modes and three stops.
 - Box shadow generator gains presets, inset treatment and multiple coordinated layers.
 - Button/card/border/glass/neumorphic generators gain more real-world controls; button output includes hover/focus rules.
