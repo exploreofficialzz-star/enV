@@ -685,3 +685,130 @@ enum NativeWorldLabFluidMotion {
     }
 }
 
+/// Native Swift well-mixed hypothetical Arrhenius kinetics with thermal feedback.
+struct NativeChemicalThermalInput {
+    var initialReactantMol:Double=1
+    var initialTemperatureK:Double=300
+    var ambientTemperatureK:Double=300
+    var preExponentialPerS:Double=0.5
+    var activationEnergyJPerMol:Double=10000
+    var reactionHeatReleasedJPerMol:Double=50000
+    var heatCapacityJPerK:Double=500
+    var coolingConductanceWPerK:Double=5
+    var externalHeatingW:Double=0
+    var durationSeconds:Double=6
+}
+struct NativeChemicalThermalSample {
+    let timeSeconds:Double
+    let reactantRemainingMol:Double
+    let productFormedMol:Double
+    let reactionRateMolPerS:Double
+    let temperatureK:Double
+    let reactionPowerW:Double
+    let coolingPowerW:Double
+    let cumulativeChemicalHeatJ:Double
+    let cumulativeExternalHeatJ:Double
+    let cumulativeCoolingJ:Double
+    let storedThermalEnergyJ:Double
+    let energyResidualJ:Double
+}
+struct NativeChemicalThermalResult {
+    let input:NativeChemicalThermalInput
+    let samples:[NativeChemicalThermalSample]
+    let stepSeconds:Double
+    let evidence="physics-model-computed"
+    let validity="Well-mixed hypothetical first-order Arrhenius reaction and thermal energy balance; "+
+        "no identified substance, reaction selectivity, measured matter or safety certification."
+}
+enum NativeWorldLabChemicalThermal {
+    static func evaluate(_ i:NativeChemicalThermalInput,
+                         requestedStepSeconds:Double=1.0/120)throws->NativeChemicalThermalResult {
+        func bounded(_ value:Double,_ lower:Double,_ upper:Double,
+                     _ field:String)throws {
+            guard value.isFinite,value>=lower,value<=upper else {
+                throw NativeWorldLabError.invalid("\(field) outside assumed chemical domain")
+            }
+        }
+        try bounded(i.initialReactantMol,0.001,10000,"Reactant")
+        try bounded(i.initialTemperatureK,200,1200,"Initial temperature")
+        try bounded(i.ambientTemperatureK,200,1200,"Ambient temperature")
+        try bounded(i.preExponentialPerS,0,100000,"Frequency factor")
+        try bounded(i.activationEnergyJPerMol,0,200000,"Activation energy")
+        try bounded(i.reactionHeatReleasedJPerMol,-1e6,1e6,"Reaction heat")
+        try bounded(i.heatCapacityJPerK,1,1e6,"Thermal capacity")
+        try bounded(i.coolingConductanceWPerK,0,10000,"Cooling")
+        try bounded(i.externalHeatingW,-10000,10000,"External heating")
+        try bounded(i.durationSeconds,0.1,60,"Duration")
+        try bounded(requestedStepSeconds,0.0001,0.05,"Solver step")
+        let rateScale=i.preExponentialPerS*exp(
+            -i.activationEnergyJPerMol/(8.31446261815324*2000))
+        let stiffness=max(1,max(rateScale,
+            i.coolingConductanceWPerK/i.heatCapacityJPerK))
+        let stepCount=Int(ceil(i.durationSeconds/min(
+            requestedStepSeconds,0.04/stiffness)))
+        guard stepCount<=50000 else {
+            throw NativeWorldLabError.invalid("A specialized stiff chemistry solver is required")
+        }
+        let dt=i.durationSeconds/Double(stepCount)
+        func rate(_ n:Double,_ t:Double)->Double {
+            return i.preExponentialPerS*exp(-i.activationEnergyJPerMol/
+                (8.31446261815324*max(1,t)))*n
+        }
+        func derivative(_ s:[Double])->[Double]{
+            let reactionRate=rate(s[0],s[1])
+            let cooling=i.coolingConductanceWPerK*(s[1]-i.ambientTemperatureK)
+            let heat=i.reactionHeatReleasedJPerMol*reactionRate+
+                i.externalHeatingW-cooling
+            return [-reactionRate,heat/i.heatCapacityJPerK]
+        }
+        func advance(_ s:[Double])->[Double]{
+            let k1=derivative(s)
+            func shifted(_ k:[Double],_ factor:Double)->[Double]{
+                return [s[0]+dt*k[0]*factor,s[1]+dt*k[1]*factor]
+            }
+            let k2=derivative(shifted(k1,0.5))
+            let k3=derivative(shifted(k2,0.5))
+            let k4=derivative(shifted(k3,1))
+            return [s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
+                s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6]
+        }
+        var state=[i.initialReactantMol,i.initialTemperatureK]
+        var cumulativeCooling=0.0
+        var output:[NativeChemicalThermalSample]=[]
+        output.reserveCapacity(stepCount+1)
+        for j in 0...stepCount {
+            let n=state[0],temp=state[1]
+            let product=i.initialReactantMol-n
+            let reactionRate=rate(n,temp)
+            let released=i.reactionHeatReleasedJPerMol*product
+            let external=i.externalHeatingW*Double(j)*dt
+            let stored=i.heatCapacityJPerK*(temp-i.initialTemperatureK)
+            let cooling=i.coolingConductanceWPerK*(temp-i.ambientTemperatureK)
+            let residual=released+external-stored-cumulativeCooling
+            guard [n,temp,product,reactionRate,released,external,stored,
+                   cooling,residual].allSatisfy({$0.isFinite}),
+                  n>=-1e-6,n<=i.initialReactantMol+1e-6,
+                  temp>=150,temp<=2000 else {
+                throw NativeWorldLabError.invalid("Thermal reaction left bounded numerical conditions")
+            }
+            output.append(NativeChemicalThermalSample(
+                timeSeconds:Double(j)*dt,reactantRemainingMol:n,
+                productFormedMol:product,reactionRateMolPerS:reactionRate,
+                temperatureK:temp,reactionPowerW:reactionRate*i.reactionHeatReleasedJPerMol,
+                coolingPowerW:cooling,cumulativeChemicalHeatJ:released,
+                cumulativeExternalHeatJ:external,cumulativeCoolingJ:cumulativeCooling,
+                storedThermalEnergyJ:stored,energyResidualJ:residual))
+            if j==stepCount {break}
+            let next=advance(state)
+            guard next.allSatisfy({$0.isFinite}),next[0]>=-1e-6,
+                  next[0]<=i.initialReactantMol+1e-6,next[1]>=150,next[1]<=2000 else {
+                throw NativeWorldLabError.invalid("Reaction solver is unstable under these assumptions")
+            }
+            let nextCooling=i.coolingConductanceWPerK*(next[1]-i.ambientTemperatureK)
+            cumulativeCooling+=0.5*dt*(cooling+nextCooling)
+            state=[max(0,min(i.initialReactantMol,next[0])),next[1]]
+        }
+        return NativeChemicalThermalResult(input:i,samples:output,stepSeconds:dt)
+    }
+}
+

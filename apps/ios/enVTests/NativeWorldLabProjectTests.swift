@@ -122,6 +122,18 @@ final class NativeWorldLabProjectTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabProject.decode(
             JSONSerialization.data(withJSONObject:root)))
     }
+    func testNativeChemicalReactionThermalFeedbackAndEnergy() throws {
+        var input=NativeChemicalThermalInput()
+        input.activationEnergyJPerMol=0
+        input.coolingConductanceWPerK=0
+        input.durationSeconds=4
+        let run=try NativeWorldLabChemicalThermal.evaluate(input)
+        XCTAssertGreaterThan(try XCTUnwrap(run.samples.last?.productFormedMol),0.5)
+        XCTAssertGreaterThan(try XCTUnwrap(run.samples.last?.temperatureK),300)
+        XCTAssertLessThan(abs(try XCTUnwrap(run.samples.last?.energyResidualJ)),1e-4)
+        input.heatCapacityJPerK=0
+        XCTAssertThrowsError(try NativeWorldLabChemicalThermal.evaluate(input))
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))

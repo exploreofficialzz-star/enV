@@ -341,3 +341,7 @@ release-candidate evidence bundle are unfinished.
 ## Android native chemical–thermal coupling (2026-10-31)
 
 - Implemented native Kotlin independent bounded 0D first-order Arrhenius conversion with reaction heat, bulk thermal capacity, Newton cooling and optional external heat input. Each time sample reports reactant/product, temperature, rate, heat flows and conservation residual. Compose offers assumed kinetics/enthalpy/heater controls and time playback, with explicit hypothetical/unknown-chemistry labels. Numerical regression source checks reaction conversion, heating, energy and invalid heat capacity; the full CI/device audit remains pending.
+
+## iOS native chemical–thermal feedback source parity (2026-10-31)
+
+- Added independent native Swift zero-dimensional Arrhenius conversion coupled to bulk temperature, reaction enthalpy, ambient cooling and external heating, with RK4, conservation residual, and strict numerical/stiffness limits. SwiftUI presents explicit hypothetical rate, heat and heater inputs with play/pause/seek/step, and results link to computed conversion, temperature, power and energy. Native XCTest source checks exothermic conservation and invalid heat capacity. Full iOS simulator build still pending user-requested consolidated acceptance audit.

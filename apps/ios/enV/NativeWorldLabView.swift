@@ -52,6 +52,12 @@ struct NativeWorldLabView:View {
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
     @State private var selected=0
+    @State private var chemicalRun:NativeChemicalThermalResult?
+    @State private var chemicalTime=0.0
+    @State private var chemicalPlaying=false
+    @State private var reactionHeat=50000.0
+    @State private var reactionFactor=0.5
+    @State private var reactionHeater=0.0
     @State private var hydroRun:NativeLabHydroResult?
     @State private var fluidMotion:NativeLabFluidMotionRun?
     @State private var fluidTime=0.0
@@ -241,6 +247,58 @@ struct NativeWorldLabView:View {
                 if let project {
                     Text(project.title+" · "+String(project.entities.count)+" solids")
                         .font(.headline)
+                    Text("Invent chemical heat").font(.headline)
+                    Text("Invent assumed reaction properties; the model cannot identify real chemicals.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    value("Assumed heat released",reactionHeat,"J/mol")
+                    Slider(value:$reactionHeat,in:-50000...100000)
+                        .accessibilityLabel("Hypothetical reaction heat")
+                    value("Assumed reaction factor",reactionFactor,"1/s")
+                    Slider(value:$reactionFactor,in:0...5)
+                        .accessibilityLabel("Hypothetical reaction factor")
+                    value("External heater",reactionHeater,"W")
+                    Slider(value:$reactionHeater,in:-200...200)
+                        .accessibilityLabel("External reaction heater power")
+                    Button("Calculate reaction temperature"){
+                        do {
+                            var input=NativeChemicalThermalInput()
+                            input.reactionHeatReleasedJPerMol=reactionHeat
+                            input.preExponentialPerS=reactionFactor
+                            input.externalHeatingW=reactionHeater
+                            chemicalRun=try NativeWorldLabChemicalThermal.evaluate(input)
+                            chemicalTime=0;chemicalPlaying=true;problem=""
+                        }catch{
+                            chemicalRun=nil;chemicalPlaying=false
+                            problem=error.localizedDescription
+                        }
+                    }.buttonStyle(.bordered)
+                    if let chemical=chemicalRun,!chemical.samples.isEmpty {
+                        let index=max(0,min(chemical.samples.count-1,
+                            Int((chemicalTime/chemical.stepSeconds).rounded())))
+                        let observation=chemical.samples[index]
+                        value("Reaction time",observation.timeSeconds,"s")
+                        value("Converted amount",observation.productFormedMol,"mol")
+                        value("Computed temperature",observation.temperatureK,"K")
+                        value("Reaction thermal power",observation.reactionPowerW,"W")
+                        value("Energy residual",observation.energyResidualJ,"J")
+                        Slider(value:$chemicalTime,
+                            in:0...(chemical.samples.last?.timeSeconds ?? 6)) { editing in
+                            if editing {chemicalPlaying=false}
+                        }.accessibilityLabel("Explore chemical time")
+                        HStack {
+                            Button(chemicalPlaying ? "Pause reaction":"Play reaction"){
+                                chemicalPlaying.toggle()
+                            }
+                            Button("Reset reaction"){chemicalPlaying=false;chemicalTime=0}
+                            Button("Step reaction"){
+                                chemicalPlaying=false
+                                chemicalTime=min(
+                                    chemical.samples.last?.timeSeconds ?? 6,
+                                    chemicalTime+chemical.stepSeconds)
+                            }
+                        }.buttonStyle(.bordered)
+                        Text(chemical.validity).font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("Connected DC circuits").font(.headline)
                     if let circuit=project.networks?.first {
                         Text(circuit.name+" · "+String(circuit.components.count)+" wired parts")
@@ -793,6 +851,13 @@ struct NativeWorldLabView:View {
             if motorPlaying,let run=motorRun {
                 motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
                 if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
+            }
+            if chemicalPlaying,let run=chemicalRun {
+                chemicalTime=min(run.samples.last?.timeSeconds ?? 6,
+                    chemicalTime+dt)
+                if chemicalTime >= (run.samples.last?.timeSeconds ?? 6){
+                    chemicalPlaying=false
+                }
             }
             if fluidPlaying,let run=fluidMotion {
                 fluidTime=min(run.samples.last?.timeSeconds ?? 4,fluidTime+dt)
