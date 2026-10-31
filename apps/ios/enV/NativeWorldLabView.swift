@@ -53,6 +53,9 @@ struct NativeWorldLabView:View {
     @State private var chosenSavedId=""
     @State private var confirmingDelete=false
     @State private var digitalNewGateName="Invented device"
+    @State private var digitalAssumption="User-assumed Boolean behavior"
+    @State private var digitalSourceA="input_a"
+    @State private var digitalSourceB=""
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
@@ -446,18 +449,33 @@ struct NativeWorldLabView:View {
                     }
                 }
             }
-            TextField("Name your next invented digital gate",text:$digitalNewGateName)
+            TextField("Name your invented digital gate",text:$digitalNewGateName)
                 .textFieldStyle(.roundedBorder)
+            TextField("Assumed Boolean behavior",text:$digitalAssumption)
+                .textFieldStyle(.roundedBorder)
+            Picker("First digital input",selection:$digitalSourceA){
+                ForEach(network.inputs,id:\.id){node in Text(node.label).tag(node.id)}
+                ForEach(network.gates,id:\.id){node in Text(node.name).tag(node.id)}
+            }.pickerStyle(.menu)
+            Picker("Optional second digital input",selection:$digitalSourceB){
+                Text("None").tag("")
+                ForEach(network.inputs,id:\.id){node in Text(node.label).tag(node.id)}
+                ForEach(network.gates,id:\.id){node in Text(node.name).tag(node.id)}
+            }.pickerStyle(.menu)
+            let available=network.inputs.map(\.id)+network.gates.map(\.id)
+            let ports=[digitalSourceA]+(digitalSourceB.isEmpty ? [] : [digitalSourceB])
             Button("Connect a new invented gate"){
-                guard let preceding=network.gates.last else{return}
                 applyProject{try NativeWorldLabEditor.addDigitalGate(
                     $0,networkId:network.id,name:digitalNewGateName,
-                    assumption:"User-assumed one-input truth table",
-                    inputNodeIds:[preceding.id])}
+                    assumption:digitalAssumption,inputNodeIds:ports)}
             }.buttonStyle(.bordered)
                 .disabled(digitalNewGateName.trimmingCharacters(
-                    in:.whitespacesAndNewlines).isEmpty || network.gates.count>=32)
-            Text("Each gate reads the previous gate. Change its Boolean rows, then connect an indicator.")
+                    in:.whitespacesAndNewlines).isEmpty ||
+                    digitalAssumption.trimmingCharacters(
+                    in:.whitespacesAndNewlines).isEmpty ||
+                    network.gates.count>=32 || Set(ports).count != ports.count ||
+                    !ports.allSatisfy({available.contains($0)}))
+            Text("Choose upstream signals, edit each truth-table row, and connect an indicator.")
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(network.outputs,id:\.id){output in
                 Picker(output.label+" reads",selection:Binding<String>(
