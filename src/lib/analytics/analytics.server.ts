@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createSessionLookup } from "../ai/server/session";
 import { getSql } from "../db";
 import { ANALYTICS_POLICY_VERSION, classifyReferrer, classifyUserAgent, validateConsentPayload, validateEventsPayload } from "./protocol.mjs";
+import { buildDailyAnalyticsReport } from "./daily-report.mjs";
 
 export class AnalyticsError extends Error {
   constructor(readonly code: string, message: string, readonly status = 400) { super(message); this.name = "AnalyticsError"; }
@@ -184,7 +185,7 @@ export async function getAnalyticsSummary(request: Request) {
   configSecret();
   if (!authorized(request, process.env.ANALYTICS_ADMIN_TOKEN) && !validDashboardCookie(request)) throw new AnalyticsError("ANALYTICS_ADMIN_UNAUTHORIZED", "Developer analytics access is required.", 401);
   const sql = await getSql();
-  const [overview,daily,tools,platforms,devices,browsers,networks,referrers,failures] = await Promise.all([
+  const [overview,daily,tools,platforms,devices,browsers,networks,referrers,failures,dailyReports] = await Promise.all([
     sql.query(`select count(*) total_events,count(distinct anonymous_subject_digest) installations,count(distinct user_id) signed_in_users,
       count(distinct session_digest) sessions,count(distinct tool_id) tools_used,count(*) filter(where outcome='failure') failures
       from product_analytics_events where received_at>=now()-interval '30 days'`),
@@ -205,6 +206,8 @@ export async function getAnalyticsSummary(request: Request) {
       sql.query(`select ${column} name,count(*) events from product_analytics_events where received_at>=now()-interval '30 days' group by ${column} order by events desc`)),
     sql.query(`select tool_id,coalesce(error_code,'UNSPECIFIED') code,count(*) count from product_analytics_events
       where received_at>=now()-interval '30 days' and outcome='failure' group by tool_id,error_code order by count desc limit 30`),
+    sql.query(`select report_day,report_data,generated_at from product_analytics_daily_reports
+      where report_day>=current_date-29 order by report_day desc limit 30`),
   ]);
   const num=(v:unknown)=>{const n=Number(v??0);return Number.isSafeInteger(n)&&n>=0?n:0;};
   const breakdown=(rows:Array<Record<string,unknown>>)=>rows.map(r=>({name:String(r.name??"unknown"),events:num(r.events)}));
@@ -218,6 +221,11 @@ export async function getAnalyticsSummary(request: Request) {
     platforms:breakdown(platforms),devices:breakdown(devices),browsers:breakdown(browsers),networks:breakdown(networks),
     searchSources:breakdown(referrers),
     failureCodes:failures.map(r=>({toolId:String(r.tool_id??""),code:String(r.code),count:num(r.count)})),
+    dailyReports:dailyReports.map(r=>({
+      reportDay:String(r.report_day).slice(0,10),
+      generatedAt:new Date(String(r.generated_at)).toISOString(),
+      reportData:typeof r.report_data==='string' ? JSON.parse(r.report_data) : r.report_data,
+    })),
   };
 }
 export async function runAnalyticsRetention(request: Request) {
@@ -249,11 +257,66 @@ export async function runAnalyticsRetention(request: Request) {
       captured_at=now()
     returning snapshot_day`,
   );
+  // Persist privacy-safe daily reports before raw analytics events are pruned.
+  const [overviewRows,toolRows,platformRows,failureRows,previousDay] = await Promise.all([
+    sql.query(`select to_char(received_at::date,'YYYY-MM-DD') report_day,
+      count(*)::bigint events,count(distinct anonymous_subject_digest)::bigint installations,
+      count(distinct session_digest)::bigint sessions,count(distinct tool_id)::bigint tools_used,
+      count(*) filter(where event_name='tool_viewed')::bigint views,
+      count(*) filter(where event_name='tool_started')::bigint starts,
+      count(*) filter(where event_name='tool_completed')::bigint completed,
+      count(*) filter(where outcome='failure')::bigint failed,
+      count(*) filter(where event_name='tool_cancelled')::bigint cancelled,
+      count(*) filter(where event_name='tool_abandoned')::bigint abandoned,
+      count(*) filter(where is_offline)::bigint offline_events
+      from product_analytics_events where received_at<current_date
+      group by received_at::date order by received_at::date`),
+    sql.query(`select to_char(received_at::date,'YYYY-MM-DD') report_day,tool_id,
+      count(*) filter(where event_name='tool_viewed')::bigint views,
+      count(*) filter(where event_name='tool_started')::bigint starts,
+      count(*) filter(where event_name='tool_completed')::bigint completed,
+      count(*) filter(where outcome='failure')::bigint failed,
+      count(*) filter(where event_name='tool_abandoned')::bigint abandoned
+      from product_analytics_events where received_at<current_date and tool_id is not null
+      group by received_at::date,tool_id`),
+    sql.query(`select to_char(received_at::date,'YYYY-MM-DD') report_day,platform,count(*)::bigint events
+      from product_analytics_events where received_at<current_date group by received_at::date,platform`),
+    sql.query(`select to_char(received_at::date,'YYYY-MM-DD') report_day,tool_id,
+      coalesce(error_code,'UNSPECIFIED') code,count(*)::bigint count
+      from product_analytics_events where received_at<current_date and outcome='failure'
+      group by received_at::date,tool_id,error_code`),
+    sql.query(`select to_char(current_date-1,'YYYY-MM-DD') report_day`),
+  ]);
+  const dayKeys = new Set([
+    ...overviewRows.map(row=>String(row.report_day).slice(0,10)),
+    String(previousDay[0]?.report_day ?? '').slice(0,10),
+  ].filter(day=>/^\\d{4}-\\d{2}-\\d{2}$/.test(day)));
+  const rowsForDay = (rows,day) => rows.filter(row=>String(row.report_day).slice(0,10)===day);
+  let dailyReportsSaved=0;
+  for (const day of dayKeys) {
+    const overview=overviewRows.find(row=>String(row.report_day).slice(0,10)===day) ?? {};
+    const report=buildDailyAnalyticsReport({
+      day, generatedAt:new Date().toISOString(),
+      overview:{events:overview.events,installations:overview.installations,sessions:overview.sessions,
+        toolsUsed:overview.tools_used,views:overview.views,starts:overview.starts,completed:overview.completed,
+        failed:overview.failed,cancelled:overview.cancelled,abandoned:overview.abandoned,offlineEvents:overview.offline_events},
+      tools:rowsForDay(toolRows,day).map(row=>({toolId:row.tool_id,views:row.views,starts:row.starts,completed:row.completed,failed:row.failed,abandoned:row.abandoned})),
+      platforms:rowsForDay(platformRows,day).map(row=>({platform:row.platform,events:row.events})),
+      failures:rowsForDay(failureRows,day).map(row=>({toolId:row.tool_id,code:row.code,count:row.count})),
+    });
+    await sql.query(`insert into product_analytics_daily_reports(report_day,schema_version,report_data,generated_at)
+      values($1,$2,$3::jsonb,now())
+      on conflict(report_day) do update set schema_version=excluded.schema_version,
+        report_data=excluded.report_data,generated_at=excluded.generated_at`,
+      [day,report.schemaVersion,JSON.stringify(report)]);
+    dailyReportsSaved+=1;
+  }
   const events=await sql.query("delete from product_analytics_events where received_at<now()-($1*interval '1 day') returning event_id",[days]);
   const limits=await sql.query("delete from product_analytics_rate_limits where window_minute<$1 returning subject_digest",[Math.floor(Date.now()/60000)-1440]);
   const adminLimits=await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1 returning subject_digest",[Math.floor(Date.now()/900000)-96]);
   const oldSnapshots=await sql.query("delete from product_analytics_daily_snapshots where snapshot_day<current_date-730 returning snapshot_day");
-  return {retainedDays:days,aggregateHistoryDays:730,snapshotsCaptured:snapshots.length,deletedEvents:events.length,
-    deletedRateLimitRows:limits.length,deletedAdminRateLimitRows:adminLimits.length,deletedOldSnapshots:oldSnapshots.length,
-    completedAt:new Date().toISOString()};
+  const oldReports=await sql.query("delete from product_analytics_daily_reports where report_day<current_date-730 returning report_day");
+  return {retainedDays:days,aggregateHistoryDays:730,snapshotsCaptured:snapshots.length,dailyReportsSaved,
+    deletedEvents:events.length,deletedRateLimitRows:limits.length,deletedAdminRateLimitRows:adminLimits.length,
+    deletedOldSnapshots:oldSnapshots.length,deletedOldReports:oldReports.length,completedAt:new Date().toISOString()};
 }
