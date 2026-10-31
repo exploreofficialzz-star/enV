@@ -28,3 +28,15 @@ existing saved projects. Both the currently edited project and its run history
 stay untouched. This is a user-requested transfer, not background live sync
 or a silent cloud merge; numerical run records are not part of cloud project
 backups. Requires explicit backup feature flags and migrations 0010–0011.
+
+
+### Scientific evidence account backup (migration 0017)
+Owner-scoped `POST /api/world-lab/projects/:id/evidence` accepts one validated
+science record, `GET /api/world-lab/projects/:id/evidence` lists only metadata,
+`GET /:id/evidence/:evidenceId` retrieves the full immutable document and
+`DELETE /:id/evidence/:evidenceId` removes only that document. The evidence
+must belong to an already backed-up authenticated invention and a project
+revision no newer than the stored project backup. The 20-record/16 MB quotas
+avoid unbounded account storage. These records are not cloud-worker jobs;
+they persist until explicitly deleted or the parent project is deleted.
+The user must opt in to upload via the Web interface.

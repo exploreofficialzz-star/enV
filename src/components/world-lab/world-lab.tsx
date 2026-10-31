@@ -9,11 +9,13 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
   putLocalWorldLabArchive, saveLocalWorldLabRun,
   listLocalWorldLabDrafts, saveLocalWorldLabDraft, deleteLocalWorldLabDraft,
   listLocalWorldLabScientificEvidence,deleteLocalWorldLabScientificEvidence,
+  saveLocalWorldLabScientificEvidence,
   type WorldLabDraft } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import {parseWorldLabArchive,serializeWorldLabArchive,WORLD_LAB_ARCHIVE_MAX_BYTES}
   from "@/lib/world-lab/portable-archive";
-import {newScientificEvidenceRecord,type ScientificEvidenceRecord,
+import {newScientificEvidenceRecord,parseScientificEvidenceRecord,
+  type ScientificEvidenceRecord,
   type ScientificEvidenceResult} from "@/lib/world-lab/scientific-evidence";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
@@ -70,11 +72,17 @@ type WorldLabCloudVersion=Readonly<{
   projectId:string;title:string;projectRevision:number;
   serverRevision:number;createdAt:string;
 }>;
+type WorldLabCloudScience=Readonly<{
+  id:string;projectId:string;kind:"newton-gravity"|"material-heat";
+  projectRevision:number;createdAt:string;uploadedAt:string;
+}>;
 type WorldLabCloudReply=Readonly<{
   ok?:boolean;code?:string;error?:string;
   backup?:WorldLabCloudSummary;backups?:WorldLabCloudSummary[];
   version?:WorldLabCloudVersion;versions?:WorldLabCloudVersion[];
   project?:unknown;
+  evidence?:WorldLabCloudScience[]|ScientificEvidenceRecord;
+  id?:string;
 }>;
 type SceneHandles = {
   engine: B.Engine;
@@ -166,6 +174,8 @@ export default function WorldLab() {
   const [cloudRevisionTokens,setCloudRevisionTokens]=useState<Record<string,number>>({});
   const [cloudHistoryFor,setCloudHistoryFor]=useState<string|null>(null);
   const [cloudVersions,setCloudVersions]=useState<Record<string,WorldLabCloudVersion[]>>({});
+  const [cloudScienceFor,setCloudScienceFor]=useState<string|null>(null);
+  const [cloudScience,setCloudScience]=useState<Record<string,WorldLabCloudScience[]>>({});
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
@@ -1157,6 +1167,116 @@ export default function WorldLab() {
         "Cloud invention could not be copied to this device.");
     }finally{setCloudBusy(false);}
   }
+  async function loadAccountScience(id:string){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+encodeURIComponent(id)+
+        "/evidence",{credentials:"same-origin",cache:"no-store"});
+      const data=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!Array.isArray(data.evidence))
+        throw new Error(data.error||data.code||"Account scientific evidence list is unavailable.");
+      setCloudScience(old=>({...old,[id]:data.evidence as WorldLabCloudScience[]}));
+      setCloudScienceFor(id);
+      setCloudStatus("Loaded account-owned scientific evidence without changing this device.");
+    }catch(cause){
+      setCloudError(cause instanceof Error?cause.message:"Account evidence is unavailable.");
+    }finally{setCloudBusy(false);}
+  }
+  async function uploadAccountScience(id:string,latestRevision:number){
+    if(!cloudBackupsEnabled||cloudBusy||!project||
+      project.id!==id||scientificEvidence.length===0)return;
+    const records=scientificEvidence.filter(r=>r.projectId===id&&
+      r.projectRevision<=latestRevision);
+    if(records.length===0){
+      setCloudError("Back up the matching project revision before uploading these experiments.");
+      return;
+    }
+    if(!window.confirm("Upload "+records.length+
+      " recorded hypothetical scientific experiments to your private account? "+
+      "The evidence will remain stored until explicitly deleted."))return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      for(const record of records){
+        const response=await fetch("/api/world-lab/projects/"+
+          encodeURIComponent(id)+"/evidence",{
+          method:"POST",credentials:"same-origin",
+          headers:{"content-type":"application/json"},
+          body:JSON.stringify({evidence:record}),
+        });
+        const data=await response.json() as WorldLabCloudReply;
+        if(!response.ok||!data.ok)
+          throw new Error(data.error||data.code||
+            "An account evidence upload was rejected. Earlier records may have been saved.");
+      }
+      setCloudStatus("Uploaded "+records.length+
+        " selected science records; local projects and saved runs remain unchanged.");
+      const refresh=await fetch("/api/world-lab/projects/"+
+        encodeURIComponent(id)+"/evidence",{credentials:"same-origin",cache:"no-store"});
+      const result=await refresh.json() as WorldLabCloudReply;
+      if(refresh.ok&&Array.isArray(result.evidence)){
+        setCloudScience(prev=>({...prev,[id]:result.evidence as WorldLabCloudScience[]}));
+        setCloudScienceFor(id);
+      }
+    }catch(cause){
+      setCloudError(cause instanceof Error?cause.message:
+        "Scientific account upload failed. Device evidence is unchanged.");
+    }finally{setCloudBusy(false);}
+  }
+  async function getAccountScienceRecord(id:string,evidenceId:string,keep=false){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+
+        encodeURIComponent(id)+"/evidence/"+encodeURIComponent(evidenceId),{
+          credentials:"same-origin",cache:"no-store",
+        });
+      const data=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!data.evidence||Array.isArray(data.evidence))
+        throw new Error(data.error||data.code||"Scientific evidence cannot be retrieved.");
+      const record=parseScientificEvidenceRecord(data.evidence);
+      if(record.id!==evidenceId||record.projectId!==id)
+        throw new Error("Cloud scientific record has mismatched identity.");
+      if(keep){
+        if(!project||project.id!==id||savedRevision===null)
+          throw new Error("Open a locally saved copy of the matching invention first.");
+        if(record.projectRevision>savedRevision)
+          throw new Error("This evidence was computed from a newer project revision. "+
+            "Restore that revision first.");
+        await saveLocalWorldLabScientificEvidence(record);
+        setScientificEvidence(old=>old.some(x=>x.id===record.id)?
+          old:[...old,record].sort((a,b)=>a.createdAt.localeCompare(b.createdAt)));
+        setCloudStatus("Added the selected immutable record to local device history.");
+      }else{
+        downloadJson("world-lab-science-"+evidenceId+".json",record);
+        setCloudStatus("Downloaded the selected account scientific evidence.");
+      }
+    }catch(cause){
+      setCloudError(cause instanceof Error?cause.message:
+        "Scientific evidence retrieval failed.");
+    }finally{setCloudBusy(false);}
+  }
+  async function removeAccountScience(id:string,evidenceId:string){
+    if(!cloudBackupsEnabled||cloudBusy||
+      !window.confirm("Delete this cloud scientific evidence permanently? "+
+        "Downloaded or device-local copies are unaffected."))return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+
+        encodeURIComponent(id)+"/evidence/"+encodeURIComponent(evidenceId),{
+          method:"DELETE",credentials:"same-origin",
+        });
+      const data=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!data.ok)
+        throw new Error(data.error||data.code||"The account record was not deleted.");
+      setCloudScience(prev=>({...prev,
+        [id]:(prev[id]??[]).filter(r=>r.id!==evidenceId)}));
+      setCloudStatus("Deleted account evidence. Saved device copies were not modified.");
+    }catch(cause){
+      setCloudError(cause instanceof Error?cause.message:
+        "Cloud scientific evidence deletion failed.");
+    }finally{setCloudBusy(false);}
+  }
   async function loadAccountBackupVersions(id:string){
     if(!cloudBackupsEnabled||cloudBusy)return;
     setCloudBusy(true);setCloudError("");
@@ -1207,6 +1327,8 @@ export default function WorldLab() {
       setCloudBackups(previous=>previous.filter(x=>x.projectId!==id));
       setCloudRevisionTokens(previous=>{const next={...previous};delete next[id];return next;});
       setCloudVersions(previous=>{const next={...previous};delete next[id];return next;});
+      setCloudScience(previous=>{const next={...previous};delete next[id];return next;});
+      setCloudScienceFor(previous=>previous===id?null:previous);
       setCloudHistoryFor(previous=>previous===id?null:previous);
       setCloudStatus("Account backup deleted. Device-local inventions were not touched.");
     }catch(error){
@@ -1764,6 +1886,16 @@ export default function WorldLab() {
               View history
             </button>
             <button type="button" className={buttonClass} disabled={cloudBusy}
+              onClick={()=>{void loadAccountScience(backup.projectId);}}>
+              Account scientific records
+            </button>
+            {project?.id===backup.projectId&&scientificEvidence.length>0&&
+              <button type="button" className={buttonClass} disabled={cloudBusy}
+                onClick={()=>{void uploadAccountScience(
+                  backup.projectId,backup.projectRevision);}}>
+                Upload saved scientific evidence
+              </button>}
+            <button type="button" className={buttonClass} disabled={cloudBusy}
               onClick={()=>{void deleteAccountBackup(backup.projectId,backup.serverRevision);}}>
               Delete cloud copy
             </button>
@@ -1777,6 +1909,30 @@ export default function WorldLab() {
                 Prepare update to this version
               </button>}
           </div>
+          {cloudScienceFor===backup.projectId&&
+            <div className="mt-2 space-y-2" aria-label={"Account scientific records for "+backup.title}>
+              {(cloudScience[backup.projectId]??[]).length===0&&
+                <p>No account scientific evidence is stored for this invention.</p>}
+              {(cloudScience[backup.projectId]??[]).map(record=>
+                <div key={record.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2">
+                  <span>{record.kind} · revision {record.projectRevision}</span>
+                  <button type="button" className={buttonClass} disabled={cloudBusy}
+                    onClick={()=>{void getAccountScienceRecord(backup.projectId,record.id);}}>
+                    Download evidence
+                  </button>
+                  {project?.id===backup.projectId&&savedRevision!==null&&
+                    <button type="button" className={buttonClass} disabled={cloudBusy}
+                      onClick={()=>{void getAccountScienceRecord(
+                        backup.projectId,record.id,true);}}>
+                      Keep on this device
+                    </button>}
+                  <button type="button" className={buttonClass} disabled={cloudBusy}
+                    onClick={()=>{void removeAccountScience(backup.projectId,record.id);}}>
+                    Delete account copy
+                  </button>
+                </div>)}
+            </div>}
           {cloudHistoryFor===backup.projectId&&
             <div className="mt-2 space-y-2" aria-label={"Backup history for "+backup.title}>
               {!(cloudVersions[backup.projectId]?.length)&&

@@ -507,3 +507,17 @@ release-candidate evidence bundle are unfinished.
   Prior schema-v1 archives remain importable. This is not a universal archive
   of every solver type yet; native Android/iOS have their own portable model
   evidence exports and still lack combined archive import/export.
+
+
+## Explicit account scientific backup (migration 0017)
+- Uploaded scientific records have strict 2 MB item, 20 record and 16 MB
+  per-project account quotas, with immutable IDs and matching authenticated
+  project ownership. Cloud backup deletion cascades to these records; individual
+  evidence can be removed without deleting a project.
+- The Web workspace explicitly asks before uploading its recorded gravity or
+  material heat results. It can list metadata, retrieve full evidence, delete
+  an account copy, download a JSON record and import one into an existing
+  saved local invention with matching ID and non-future revision. Nothing
+  silently replaces local material hypotheses or measured data.
+- The account API and database migration 0017 are source implemented only,
+  disabled by default and not yet deployed or verified.
