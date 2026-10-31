@@ -2,26 +2,26 @@ import {parseWorldLabProject,serializeWorldLabProject,
   type WorldLabProject} from "./project.ts";
 import {MAX_STORED_RUNS_PER_PROJECT,parseStoredWorldLabRun,serializeStoredWorldLabRun}
   from "./run-record.ts";
+import {MAX_SCIENCE_EVIDENCE_PER_PROJECT,parseScientificEvidenceRecord,
+  type ScientificEvidenceRecord} from "./scientific-evidence.ts";
 import type {LabRun} from "./model.ts";
 
-/**
- * Portable, project-owned scientific run archive.
- * A self-contained Web interchange document, not a signed measurement
- * or an implicit device/cloud synchronization protocol.
- */
+/** v2 adds immutable typed scientific records without breaking portable v1. */
 export const WORLD_LAB_ARCHIVE_MAX_BYTES=24*1024*1024;
 export type WorldLabPortableArchive=Readonly<{
-  format:"env-world-lab-archive";schemaVersion:1;
+  format:"env-world-lab-archive";schemaVersion:2;
   project:WorldLabProject;
   recordedRuns:readonly Readonly<{projectId:string;run:LabRun}>[];
+  scientificEvidence:readonly ScientificEvidenceRecord[];
 }>;
-function envelope(project:WorldLabProject,runs:readonly LabRun[]):WorldLabPortableArchive{
-  if(runs.length>MAX_STORED_RUNS_PER_PROJECT)
-    throw new Error("An archive can contain at most 20 scientific runs.");
+function envelope(project:WorldLabProject,runs:readonly LabRun[],
+    records:readonly ScientificEvidenceRecord[]):WorldLabPortableArchive{
+  if(runs.length>MAX_STORED_RUNS_PER_PROJECT||
+    records.length>MAX_SCIENCE_EVIDENCE_PER_PROJECT)
+    throw new Error("Archive experiment history exceeds its supported model quotas.");
   const ids=new Set<string>();
   const recordedRuns=runs.map(input=>{
     const run=parseStoredWorldLabRun(input);
-    // Trigger the same per-run 8 MB size guard as IndexedDB storage.
     serializeStoredWorldLabRun(run);
     if(ids.has(run.id))throw new Error("An archive cannot contain duplicate run IDs.");
     ids.add(run.id);
@@ -29,15 +29,24 @@ function envelope(project:WorldLabProject,runs:readonly LabRun[]):WorldLabPortab
       throw new Error("Recorded scientific mass source belongs to another project.");
     return {projectId:project.id,run};
   });
-  return {format:"env-world-lab-archive",schemaVersion:1,project,recordedRuns};
+  const scientificEvidence=records.map(input=>{
+    const record=parseScientificEvidenceRecord(input);
+    if(record.projectId!==project.id)
+      throw new Error("Scientific evidence belongs to another project.");
+    if(ids.has(record.id))
+      throw new Error("An archive cannot contain duplicate scientific record IDs.");
+    ids.add(record.id);
+    return record;
+  });
+  return {format:"env-world-lab-archive",schemaVersion:2,
+    project,recordedRuns,scientificEvidence};
 }
 export function serializeWorldLabArchive(source:WorldLabProject,
-    runs:readonly LabRun[]):string{
-  // Check the inner project's independent portable 1 MB envelope.
+    runs:readonly LabRun[],records:readonly ScientificEvidenceRecord[]=[]):string{
   const project=parseWorldLabProject(JSON.parse(serializeWorldLabProject(source)));
-  const json=JSON.stringify(envelope(project,runs));
+  const json=JSON.stringify(envelope(project,runs,records));
   if(new TextEncoder().encode(json).byteLength>WORLD_LAB_ARCHIVE_MAX_BYTES)
-    throw new Error("Complete archive exceeds 24 MB. Export individual runs instead.");
+    throw new Error("Complete archive exceeds 24 MB; export individual records instead.");
   return json;
 }
 export function parseWorldLabArchive(json:string):WorldLabPortableArchive{
@@ -47,9 +56,16 @@ export function parseWorldLabArchive(json:string):WorldLabPortableArchive{
   if(!decoded||typeof decoded!=="object"||Array.isArray(decoded))
     throw new Error("Scientific archive must be an object.");
   const input=decoded as Record<string,unknown>;
-  if(input.format!=="env-world-lab-archive"||input.schemaVersion!==1||
-    Object.keys(input).some(k=>!["format","schemaVersion","project","recordedRuns"].includes(k))||
-    !Array.isArray(input.recordedRuns)||input.recordedRuns.length>MAX_STORED_RUNS_PER_PROJECT)
+  if(input.format!=="env-world-lab-archive"||
+    (input.schemaVersion!==1&&input.schemaVersion!==2)||
+    Object.keys(input).some(k=>
+      !["format","schemaVersion","project","recordedRuns",...(input.schemaVersion===2?
+        ["scientificEvidence"]:[])].includes(k))||
+    !Array.isArray(input.recordedRuns)||
+    input.recordedRuns.length>MAX_STORED_RUNS_PER_PROJECT||
+    (input.schemaVersion===2&&
+      (!Array.isArray(input.scientificEvidence)||
+      input.scientificEvidence.length>MAX_SCIENCE_EVIDENCE_PER_PROJECT)))
     throw new Error("Unsupported scientific archive envelope.");
   const project=parseWorldLabProject(input.project);
   serializeWorldLabProject(project);
@@ -64,7 +80,8 @@ export function parseWorldLabArchive(json:string):WorldLabPortableArchive{
       throw new Error("Archive scientific run belongs to another project.");
     runs.push(parseStoredWorldLabRun(entry.run));
   }
-  // Reuses uniqueness, provenance and per-run resource validation.
-  const normalized=envelope(project,runs);
-  return normalized;
+  const records=(input.schemaVersion===2?
+    input.scientificEvidence as unknown[]:[]).map(parseScientificEvidenceRecord);
+  // The exact same duplicate and provenance checks guard imported snapshots.
+  return envelope(project,runs,records);
 }

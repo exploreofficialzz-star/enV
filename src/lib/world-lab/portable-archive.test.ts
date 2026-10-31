@@ -29,3 +29,17 @@ test("archive fails closed on duplicate events, foreign ownership and unsupporte
   record.executables=[{command:"unsafe"}];
   assert.throws(()=>parseWorldLabArchive(JSON.stringify(record)),/Unsupported/);
 });
+
+test("v2 includes typed scientific evidence and still reads legacy v1 archives",()=>{
+ const project=blankWorldLabProject("portable","2026-10-31T00:00:00Z");
+ const v2=JSON.parse(serializeWorldLabArchive(project,[]));
+ assert.equal(v2.schemaVersion,2);
+ assert.deepEqual(v2.scientificEvidence,[]);
+ const old={format:"env-world-lab-archive",schemaVersion:1,
+   project,recordedRuns:[]};
+ const imported=parseWorldLabArchive(JSON.stringify(old));
+ assert.equal(imported.schemaVersion,2);
+ assert.deepEqual(imported.scientificEvidence,[]);
+ assert.throws(()=>parseWorldLabArchive(JSON.stringify({...old,scientificEvidence:[]})),
+   /Unsupported/);
+});
