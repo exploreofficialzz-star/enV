@@ -106,8 +106,8 @@ class NativeGamePlaybackTest {
         }
         val afterCapture = automation.executeShellCommand("screencap -p /sdcard/Download/env-game-after.png")
         ParcelFileDescriptor.AutoCloseInputStream(afterCapture).use { it.readBytes() }
-        image.recycle()
-        after.recycle()
+        val screenWidth = image.width
+        val screenHeight = image.height
         assertTrue("Touch movement did not change the rendered scene; changed samples=$changed", changed > 25)
         // The Godot runtime is isolated in :game_preview. Exit it before the test
         // runner uninstalls the app, so the native graphics process releases EGL
@@ -119,8 +119,8 @@ class NativeGamePlaybackTest {
             android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
         ) == true
         if (!exitedByAccessibility) {
-            val exitX = image.width * 92 / 100
-            val exitY = image.height * 10 / 100
+            val exitX = screenWidth * 92 / 100
+            val exitY = screenHeight * 10 / 100
             val exitTap = automation.executeShellCommand("input tap $exitX $exitY")
             ParcelFileDescriptor.AutoCloseInputStream(exitTap).use { it.readBytes() }
         }
@@ -139,5 +139,7 @@ class NativeGamePlaybackTest {
             returnedToPreview
         )
         println("Native game exited cleanly before instrumentation cleanup")
+        image.recycle()
+        after.recycle()
     }
 }
