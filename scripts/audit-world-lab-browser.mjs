@@ -102,7 +102,10 @@ try{
     revisedJson+=part.toString();
   const revisedBeam=JSON.parse(revisedJson);
   assert.equal(revisedBeam.materialId,structural.materialId);
-  assert.ok(revisedBeam.projectRevision>structural.projectRevision);
+  // Unsaved Web edits retain their saved baseline revision. The evidence
+  // records the exact physical assumptions and must not reuse stale outputs.
+  assert.equal(structural.assumedYoungModulusPa,2e11);
+  assert.equal(revisedBeam.assumedYoungModulusPa,1e11);
   assert.ok(Math.abs(revisedBeam.maximumTipDeflectionM-0.0064)<1e-12);
 
   // Restore the main reference project before the existing motion scenarios.
