@@ -157,7 +157,7 @@ function cssFor(family: string, values: Record<string, string>, gradientStops: G
       stops: normalized,
     });
     const fallback = normalized[0]?.color ?? "#0d9f8a";
-    return { css: `background: ${fallback};\\nbackground: ${background};`, style: { background } };
+    return { css: `background: ${fallback};\nbackground: ${background};`, style: { background } };
   }
   if (family === "shadow") {
     const preset = values.preset ?? "soft";
