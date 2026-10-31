@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as B from "babylonjs";
 import {
   blankWorldLabProject, importLegacyGameScene, newSolid, parseWorldLabProject,
-  readWorldLabProjectJson, serializeWorldLabProject, solidQuantities,
+  readWorldLabProjectJson, serializeWorldLabProject, solidQuantities, reviseWorldLabMaterial,
   type WorldLabEntity, type WorldLabProject,
 } from "@/lib/world-lab/project";
 import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRuns,
@@ -201,6 +201,7 @@ export default function WorldLab() {
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
   const [materialName, setMaterialName] = useState("");
+  const [editingMaterialId,setEditingMaterialId]=useState<string|null>(null);
   const [density, setDensity] = useState("");
   const [youngModulus, setYoungModulus] = useState("");
   const [beamLoadN,setBeamLoadN]=useState(1000);
@@ -1211,13 +1212,22 @@ export default function WorldLab() {
         youngModulusPa: youngModulus.trim() === "" ? null : Number(youngModulus),
         provenance: "hypothetical-user-assumed",
       });
-      mutateProject(current=>({...current,materials:[...current.materials,{
-        id:crypto.randomUUID(),name:proposed.name,
-        densityKgM3:proposed.densityKgM3,youngModulusPa:proposed.youngModulusPa,
-        evidence:proposed.provenance,
-      }]}));
-      setMaterialName(""); setDensity(""); setYoungModulus("");
-      setMessage("Hypothetical material saved. Density can supply mass and Young\'s modulus can drive a bounded ideal cantilever experiment; unknown properties remain unknown.");
+      if(editingMaterialId){
+        mutateProject(current=>reviseWorldLabMaterial(current,editingMaterialId,{
+          name:proposed.name,densityKgM3:proposed.densityKgM3,
+          youngModulusPa:proposed.youngModulusPa,
+        }));
+        setMessage("Invented material assumptions revised; older simulated results are invalidated.");
+      }else{
+        mutateProject(current=>({...current,materials:[...current.materials,{
+          id:crypto.randomUUID(),name:proposed.name,
+          densityKgM3:proposed.densityKgM3,youngModulusPa:proposed.youngModulusPa,
+          evidence:proposed.provenance,
+        }]}));
+        setMessage("Hypothetical material saved. Density and Young's modulus can drive bounded physics.");
+      }
+      setEditingMaterialId(null);
+      setMaterialName("");setDensity("");setYoungModulus("");
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Invalid material proposal.");
@@ -2435,7 +2445,7 @@ export default function WorldLab() {
           ) : <p className="mt-3 text-sm">No model results yet. Press Start to run a calculation.</p>}
         </section>
         <section className="rounded-xl border border-border p-4" aria-label="New material proposal">
-          <h2 className="text-lg font-semibold">Invent a material</h2>
+          <h2 className="text-lg font-semibold">{editingMaterialId?"Revise material assumptions":"Invent a material"}</h2>
           <p className="text-xs text-muted-foreground">
             Propose a material not in any catalog. Unknown properties remain unknown;
             no strength, chemistry or physical success is predicted by this reference model.
@@ -2450,11 +2460,25 @@ export default function WorldLab() {
               type="number" min="0" max="1000000000000000" step="any" value={youngModulus}
               onChange={(event) => setYoungModulus(event.target.value)} /></label>
           </div>
-          <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>Record hypothetical material</button>
+          <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>
+            {editingMaterialId?"Save revised assumptions":"Record hypothetical material"}
+          </button>
+          {editingMaterialId&&<button type="button" className={buttonClass+" mt-3 ml-2"}
+            onClick={()=>{
+              setEditingMaterialId(null);setMaterialName("");setDensity("");setYoungModulus("");
+            }}>Cancel material edit</button>
           {materials.length > 0 && (
             <ul className="mt-3 list-inside list-disc text-sm">
               {materials.map((material) => <li key={material.id}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
-                modulus {material.youngModulusPa === null ? "Unknown" : metric(material.youngModulusPa,"Pa")} · Hypothetical / User-assumed</li>)}
+                modulus {material.youngModulusPa === null ? "Unknown" : metric(material.youngModulusPa,"Pa")} · Hypothetical / User-assumed
+                <button type="button" className={buttonClass+" ml-2"}
+                  aria-label={"Revise assumptions for "+material.name}
+                  onClick={()=>{
+                    setEditingMaterialId(material.id);setMaterialName(material.name);
+                    setDensity(material.densityKgM3===null?"":String(material.densityKgM3));
+                    setYoungModulus(material.youngModulusPa===null?"":String(material.youngModulusPa));
+                  }}>Revise assumptions</button>
+              </li>)}
             </ul>
           )}
         </section>
