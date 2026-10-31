@@ -3,7 +3,7 @@ import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,11 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "kind", label: "Gradient type", type: "select", defaultValue: "linear", options: [{ value: "linear", label: "Linear" }, { value: "radial", label: "Radial" }, { value: "conic", label: "Conic" }] },
     { name: "angle", label: "Angle", type: "number", defaultValue: 135, min: 0, max: 360, suffix: "deg" },
     { name: "shape", label: "Radial shape", type: "select", defaultValue: "circle", options: [{ value: "circle", label: "Circle" }, { value: "ellipse", label: "Ellipse" }] },
-    { name: "position", label: "Gradient center", type: "select", defaultValue: "center", options: [{ value: "center", label: "Center" }, { value: "top", label: "Top" }, { value: "top right", label: "Top right" }, { value: "right", label: "Right" }, { value: "bottom right", label: "Bottom right" }, { value: "bottom", label: "Bottom" }, { value: "bottom left", label: "Bottom left" }, { value: "left", label: "Left" }, { value: "top left", label: "Top left" }] },
+    { name: "radialSize", label: "Radial size", type: "select", defaultValue: "farthest-corner", options: [{ value: "closest-side", label: "Closest side" }, { value: "farthest-side", label: "Farthest side" }, { value: "closest-corner", label: "Closest corner" }, { value: "farthest-corner", label: "Farthest corner" }] },
+    { name: "centerX", label: "Center horizontal", type: "number", defaultValue: 50, min: 0, max: 100, suffix: "%" },
+    { name: "centerY", label: "Center vertical", type: "number", defaultValue: 50, min: 0, max: 100, suffix: "%" },
+    { name: "colorSpace", label: "Color interpolation", type: "select", defaultValue: "srgb", options: [{ value: "srgb", label: "Standard sRGB" }, { value: "srgb-linear", label: "Linear sRGB" }, { value: "oklab", label: "OKLab · perceptual" }, { value: "oklch", label: "OKLCH · perceptual" }, { value: "lab", label: "CIELAB" }, { value: "lch", label: "CIELCH" }, { value: "display-p3", label: "Display P3" }, { value: "hsl", label: "HSL" }, { value: "hwb", label: "HWB" }] },
+    { name: "hueMethod", label: "Hue direction", type: "select", defaultValue: "shorter", options: [{ value: "shorter", label: "Shorter hue" }, { value: "longer", label: "Longer hue" }, { value: "increasing", label: "Increasing hue" }, { value: "decreasing", label: "Decreasing hue" }] },
     { name: "repeating", label: "Repeat gradient", type: "select", defaultValue: "no", options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
   ],
   shadow: [
@@ -63,6 +67,8 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   card: [
     { name: "bg", label: "Card background", type: "color", defaultValue: "#ffffff" },
     { name: "border", label: "Border color", type: "color", defaultValue: "#e7e5e4" },
+    { name: "text", label: "Heading color", type: "color", defaultValue: "#111827" },
+    { name: "muted", label: "Body text color", type: "color", defaultValue: "#475569" },
     { name: "radius", label: "Corner radius", type: "number", defaultValue: 20, min: 0, max: 64, suffix: "px" },
     { name: "pad", label: "Padding", type: "number", defaultValue: 20, min: 0, max: 80, suffix: "px" },
     { name: "shadow", label: "Shadow strength", type: "select", defaultValue: "soft", options: [{ value: "none", label: "None" }, { value: "soft", label: "Soft" }, { value: "strong", label: "Strong" }] },
@@ -143,21 +149,38 @@ function makeNoiseDataUrl(color: string, density: number): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-function cssFor(family: string, values: Record<string, string>, gradientStops: GradientStop[] = []) {
+function cssFor(
+  family: string,
+  values: Record<string, string>,
+  gradientStops: GradientStop[] = [],
+  gradientOverlay: { enabled: boolean; color: string; x: number; y: number } = { enabled: false, color: "#ffffff", x: 24, y: 20 },
+) {
   if (family === "gradient") {
     const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
     const angle = numberValue(values, "angle", 135, 0, 360);
     const normalized = normalizeGradientStops(gradientStops);
-    const background = buildCssGradient({
+    const position = `${numberValue(values, "centerX", 50, 0, 100)}% ${numberValue(values, "centerY", 50, 0, 100)}%`;
+    const gradientOptions = {
       kind,
       angle,
-      shape: values.shape === "ellipse" ? "ellipse" : "circle",
-      position: values.position ?? "center",
+      shape: values.shape === "ellipse" ? "ellipse" as const : "circle" as const,
+      size: values.radialSize as "closest-side" | "farthest-side" | "closest-corner" | "farthest-corner" | undefined,
+      position,
       repeating: values.repeating === "yes",
+      colorSpace: values.colorSpace as import("@/lib/engines/css-gradient").GradientColorSpace,
+      hueMethod: values.hueMethod as import("@/lib/engines/css-gradient").GradientHueMethod,
       stops: normalized,
-    });
+    };
+    const enhanced = buildCssGradient(gradientOptions);
+    const fallbackGradient = buildCssGradient({ ...gradientOptions, colorSpace: "srgb" });
     const fallback = normalized[0]?.color ?? "#0d9f8a";
-    return { css: `background: ${fallback};\nbackground: ${background};`, style: { background } };
+    const glow = gradientOverlay.enabled
+      ? `radial-gradient(circle at ${gradientOverlay.x}% ${gradientOverlay.y}%, ${gradientOverlay.color} 0%, transparent 58%)`
+      : "";
+    const fallbackImage = [glow, fallbackGradient].filter(Boolean).join(", ");
+    const enhancedImage = [glow, enhanced].filter(Boolean).join(", ");
+    const css = `background: ${fallback};\nbackground-image: ${fallbackImage};${enhanced === fallbackGradient ? "" : `\nbackground-image: ${enhancedImage}; /* Modern browsers: perceptual color interpolation */`}`;
+    return { css, style: { background: fallback, backgroundImage: enhancedImage } };
   }
   if (family === "shadow") {
     const preset = values.preset ?? "soft";
@@ -219,8 +242,8 @@ function cssFor(family: string, values: Record<string, string>, gradientStops: G
     const radius = numberValue(values, "radius", 20, 0, 64);
     const pad = numberValue(values, "pad", 20, 0, 80);
     const shadow = values.shadow === "none" ? "none" : values.shadow === "strong" ? "0 14px 36px rgb(22 24 29 / 0.18)" : "0 8px 24px rgb(22 24 29 / 0.08)";
-    const css = `.env-card {\n  background: ${values.bg};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  padding: ${pad}px;\n  box-shadow: ${shadow};\n}`;
-    return { css, style: { background: values.bg, border: `1px solid ${values.border}`, borderRadius: `${radius}px`, padding: `${pad}px`, boxShadow: shadow } };
+    const css = `.env-card {\n  background: ${values.bg};\n  color: ${values.text ?? "#111827"};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  padding: ${pad}px;\n  box-shadow: ${shadow};\n}\n.env-card__description { color: ${values.muted ?? "#475569"}; }`;
+    return { css, style: { background: values.bg, color: values.text ?? "#111827", border: `1px solid ${values.border}`, borderRadius: `${radius}px`, padding: `${pad}px`, boxShadow: shadow } };
   }
   if (family === "badge") {
     const radius = numberValue(values, "radius", 999, 0, 999);
@@ -245,8 +268,12 @@ function cssFor(family: string, values: Record<string, string>, gradientStops: G
     const alpha = numberValue(values, "alpha", 0.16, 0, 1);
     const borderAlpha = numberValue(values, "borderAlpha", 0.35, 0, 1);
     const tint = values.tint ?? "#ffffff";
-    const background = `color-mix(in srgb, ${tint} ${Math.round(alpha * 100)}%, transparent)`;
-    const border = `1px solid color-mix(in srgb, ${tint} ${Math.round(borderAlpha * 100)}%, transparent)`;
+    const parsedTint = parseCssColor(tint);
+    const rgba = (opacity: number) => parsedTint
+      ? `rgba(${Math.round(parsedTint.r)}, ${Math.round(parsedTint.g)}, ${Math.round(parsedTint.b)}, ${opacity.toFixed(3)})`
+      : `rgba(255, 255, 255, ${opacity.toFixed(3)})`;
+    const background = rgba(alpha);
+    const border = `1px solid ${rgba(borderAlpha)}`;
     const css = `background: ${background};\nbackdrop-filter: blur(${blur}px);\n-webkit-backdrop-filter: blur(${blur}px);\nborder: ${border};`;
     return { css, style: { background, backdropFilter: `blur(${blur}px)`, border, borderRadius: "16px" } };
   }
@@ -309,7 +336,7 @@ function cssFor(family: string, values: Record<string, string>, gradientStops: G
   const density = numberValue(values, "density", 1.1, 0.1, 3);
   const dataUrl = makeNoiseDataUrl(values.color ?? "#111827", density);
   const css = `.env-noise {\n  position: relative;\n  isolation: isolate;\n}\n.env-noise::after {\n  content: "";\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n  opacity: ${opacity};\n  background-image: ${dataUrl};\n}`;
-  return { css, style: { backgroundImage: dataUrl, backgroundSize: "160px 160px", opacity } };
+  return { css, style: { backgroundColor: "#e2e8f0", backgroundImage: dataUrl, backgroundSize: "160px 160px" } };
 }
 
 export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
@@ -318,13 +345,19 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [values, setValues] = useState(() => initialValues(allFields));
   const fields = useMemo(() => family !== "gradient" ? allFields : allFields.filter((field) => {
     if (field.name === "angle" && values.kind === "radial") return false;
-    if (field.name === "shape" && values.kind !== "radial") return false;
-    if (field.name === "position" && values.kind === "linear") return false;
+    if ((field.name === "shape" || field.name === "radialSize") && values.kind !== "radial") return false;
+    if ((field.name === "centerX" || field.name === "centerY") && values.kind === "linear") return false;
+    if (field.name === "hueMethod" && !["hsl", "hwb", "lch", "oklch"].includes(values.colorSpace ?? "srgb")) return false;
     return true;
   }), [allFields, family, values.kind]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
+  const [gradientGlow, setGradientGlow] = useState(false);
+  const [glowColor, setGlowColor] = useState("#ffffff");
+  const [glowX, setGlowX] = useState(24);
+  const [glowY, setGlowY] = useState(20);
   const [sampleText, setSampleText] = useState("Continue");
-  const output = useMemo(() => cssFor(family, values, gradientStops), [family, gradientStops, values]);
+  const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
+  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, values]);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "text-shadow";
@@ -385,7 +418,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
           <p className="mt-1 text-xs leading-5 text-muted">Change a setting to update the preview and export automatically. Processing stays in your browser.</p>
         </div>
         {family === "blob" ? <Button type="button" size="sm" variant="outline" onClick={randomizeShape}>Randomize shape</Button> : null}
-        {family === "gradient" ? <Button type="button" size="sm" variant="outline" onClick={() => { setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop }))); setValues((previous) => ({ ...previous, kind: "linear", angle: "135", shape: "circle", position: "center", repeating: "no" })); }}>Reset gradient</Button> : null}
+        {family === "gradient" ? <Button type="button" size="sm" variant="outline" onClick={() => { setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop }))); setGradientGlow(false); setGlowColor("#ffffff"); setGlowX(24); setGlowY(20); setValues((previous) => ({ ...previous, kind: "linear", angle: "135", shape: "circle", radialSize: "farthest-corner", centerX: "50", centerY: "50", colorSpace: "srgb", hueMethod: "shorter", repeating: "no" })); }}>Reset gradient</Button> : null}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
@@ -416,6 +449,10 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                     </label>
                     <Input type="number" min={0} max={100} value={stop.position} onChange={(event) => setGradientStops((previous) => previous.map((item) => item.id === stop.id ? { ...item, position: clamp(Number(event.target.value) || 0, 0, 100) } : item))} className="h-10 font-mono text-xs" aria-label={`Stop ${index + 1} position percentage`} />
                     <Button type="button" size="sm" variant="ghost" onClick={() => setGradientStops((previous) => previous.filter((item) => item.id !== stop.id))} disabled={gradientStops.length <= 2} aria-label={`Remove stop ${index + 1}`}>Remove</Button>
+                    <div className="col-span-2 flex justify-end gap-1 sm:col-span-4">
+                      <Button type="button" size="sm" variant="ghost" disabled={index === 0} aria-label={`Move stop ${index + 1} earlier`} onClick={() => setGradientStops((previous) => moveGradientStop(previous, stop.id, -1))}>Move earlier</Button>
+                      <Button type="button" size="sm" variant="ghost" disabled={index === sortedGradientStops.length - 1} aria-label={`Move stop ${index + 1} later`} onClick={() => setGradientStops((previous) => moveGradientStop(previous, stop.id, 1))}>Move later</Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -428,6 +465,17 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                   {GRADIENT_PRESETS.map((preset) => <Button key={preset.name} type="button" size="sm" variant="ghost" onClick={() => loadGradientPreset(preset.name)}>{preset.name}</Button>)}
                 </div>
               </div>
+              <section className="space-y-3 rounded-lg bg-surface-2 p-3" aria-labelledby="gradient-overlay-heading">
+                <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-fg">
+                  <input type="checkbox" checked={gradientGlow} onChange={(event) => setGradientGlow(event.target.checked)} className="size-4 accent-accent" />
+                  Add a second soft gradient layer
+                </label>
+                {gradientGlow ? <>
+                  <div className="flex items-center justify-between gap-3"><Label htmlFor="gradient-glow-color">Overlay color</Label><Input id="gradient-glow-color" type="color" value={glowColor} onChange={(event) => setGlowColor(event.target.value)} className="h-10 w-16 p-1" /></div>
+                  <label className="block space-y-1 text-xs text-muted">Horizontal position · {glowX}%<input type="range" min="0" max="100" value={glowX} onChange={(event) => setGlowX(Number(event.target.value))} className="min-h-9 w-full accent-accent" /></label>
+                  <label className="block space-y-1 text-xs text-muted">Vertical position · {glowY}%<input type="range" min="0" max="100" value={glowY} onChange={(event) => setGlowY(Number(event.target.value))} className="min-h-9 w-full accent-accent" /></label>
+                </> : <p className="text-xs text-muted">Layer a soft radial glow over the main gradient for richer hero and background treatments.</p>}
+              </section>
             </section>
           ) : null}
           <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((previous) => {
@@ -477,7 +525,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             ) : family === "card" ? (
               <div className="w-full max-w-xs" style={output.style}>
                 <p className="text-base font-semibold text-slate-900">A card preview</p>
-                <p className="mt-2 text-sm text-slate-600">See how spacing, surface and depth work together in a real component.</p>
+                <p className="env-card__description mt-2 text-sm" style={{ color: values.muted ?? "#475569" }}>See how spacing, surface and depth work together in a real component.</p>
                 <span className="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Learn more</span>
               </div>
             ) : family === "input" ? (
