@@ -131,6 +131,18 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow).output, "Result: 2024-01-05 Friday")
     }
 
+    func testUnixTimestampBatchConvertsLocallyAndEnforcesLimit() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
+            "value": "1704067200, 1704153600000"
+        ], now: fixedNow)
+        XCTAssertEqual(result.rows.count, 2)
+        XCTAssertTrue(result.output.contains("Timestamp 1:"))
+        XCTAssertTrue(result.output.contains("Timestamp 2:"))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
+            "value": (1...101).map { _ in "1704067200" }.joined(separator: ",")
+        ], now: fixedNow))
+    }
+
     func testRepeatedDaylightSavingTimeChoosesEarlierOccurrenceAndExplainsIt() throws {
         let result = try NativeDateTimeEngine.run(toolID: "timezone-converter", options: [
             "time": "2024-11-03T01:30", "fromTz": "America/New_York", "toTz": "UTC"

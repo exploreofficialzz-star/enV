@@ -141,7 +141,23 @@ public enum NativeDateTimeEngine {
             }
             return NativeDateTimeResult(rows: rows.map { NativeDateTimeRow(label: $0.0, value: $0.1) })
         case "unix":
-            return try unix(options["value"] ?? input)
+            let values = (options["value"] ?? input)
+                .components(separatedBy: CharacterSet(charactersIn: ",;\\n\\r"))
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard !values.isEmpty else { throw NativeDateTimeError.invalidOperation("Enter a date or Unix timestamp.") }
+            guard values.count <= 100 else { throw NativeDateTimeError.invalidOperation("Batch conversion is limited to 100 timestamps.") }
+            if values.count == 1 { return try unix(values[0]) }
+            var rows: [NativeDateTimeRow] = []
+            for (index, value) in values.enumerated() {
+                let converted = try unix(value)
+                guard converted.rows.count >= 7 else { throw NativeDateTimeError.invalidOperation("Could not convert timestamp batch item.") }
+                rows.append(NativeDateTimeRow(
+                    label: "Timestamp \\(index + 1)",
+                    value: "\\(converted.rows[1].value) | \\(converted.rows[6].value) ns"
+                ))
+            }
+            return NativeDateTimeResult(rows: rows)
         case "format":
             let date = try parseDate(options["value"] ?? input, label: "date")
             return result(("Formatted", format(date, pattern: options["pattern"] ?? "yyyy-MM-dd")))
