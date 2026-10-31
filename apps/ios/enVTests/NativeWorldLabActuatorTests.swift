@@ -191,4 +191,55 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             velocityLeftMps:2,velocityRightMps:0,restitution:0.5))
     }
 
+    func testObliqueThreeDimensionalInventedSphereImpactAndConservation() throws {
+        var json=try NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.blank(),shape:"sphere",id:"a")
+        json=try NativeWorldLabEditor.addSolid(json,shape:"sphere",id:"b")
+        json=try NativeWorldLabEditor.positionSolid(
+            json,id:"a",positionMeters:[0,0.5,0])
+        json=try NativeWorldLabEditor.positionSolid(
+            json,id:"b",positionMeters:[3,1,0])
+        json=try NativeWorldLabEditor.addHypotheticalMaterial(
+            json,name:"Invented sphere matter",densityKgM3:6/Double.pi,id:"invented")
+        json=try NativeWorldLabEditor.assignMaterial(
+            json,solidId:"a",materialId:"invented")
+        json=try NativeWorldLabEditor.assignMaterial(
+            json,solidId:"b",materialId:"invented")
+        let p=try NativeWorldLabProject.decode(json)
+        let run=try NativeWorldLabSphereImpact.evaluate(
+            p,firstId:"a",secondId:"b",
+            firstVelocityMps:[2,0,0],secondVelocityMps:[0,0,0],restitution:0.65)
+        XCTAssertEqual(run.impactTimeSeconds,(3-sqrt(0.75))/2,accuracy:1e-10)
+        XCTAssertEqual(run.firstMassKg,1,accuracy:1e-10)
+        XCTAssertEqual(run.secondMassKg,1,accuracy:1e-10)
+        for i in 0..<3 {
+            XCTAssertEqual(run.momentumAfterKgMps[i],run.momentumBeforeKgMps[i],
+                accuracy:1e-10)
+            XCTAssertEqual(run.angularMomentumAfterKgM2PerS[i],
+                run.angularMomentumBeforeKgM2PerS[i],accuracy:1e-10)
+        }
+        XCTAssertEqual(run.energyBeforeJ,
+            run.energyAfterJ+run.dissipatedEnergyJ,accuracy:1e-10)
+        let at=try run.sample(run.impactTimeSeconds)
+        XCTAssertEqual(hypot(at.firstCentreM[0]-at.secondCentreM[0],
+            at.firstCentreM[1]-at.secondCentreM[1]),1,accuracy:1e-10)
+        let evidence=try JSONSerialization.jsonObject(
+            with:JSONEncoder().encode(run)) as? [String:Any]
+        XCTAssertEqual(evidence?["format"] as? String,"env-world-lab-sphere-impact-3d")
+        XCTAssertEqual(evidence?["assumptionEvidence"] as? String,
+            "hypothetical-user-assumed")
+        XCTAssertThrowsError(try NativeWorldLabSphereImpact.evaluate(
+            p,firstId:"a",secondId:"b",
+            firstVelocityMps:[0,0,0],secondVelocityMps:[0,0,0],restitution:0.5))
+        XCTAssertThrowsError(try NativeWorldLabSphereImpact.evaluate(
+            p,firstId:"a",secondId:"b",
+            firstVelocityMps:[2,0,0],secondVelocityMps:[0,0,0],restitution:1.5))
+        let unknown=try NativeWorldLabEditor.assignMaterial(
+            json,solidId:"b",materialId:nil)
+        XCTAssertThrowsError(try NativeWorldLabSphereImpact.evaluate(
+            NativeWorldLabProject.decode(unknown),
+            firstId:"a",secondId:"b",
+            firstVelocityMps:[2,0,0],secondVelocityMps:[0,0,0],restitution:0.5))
+    }
+
 }
