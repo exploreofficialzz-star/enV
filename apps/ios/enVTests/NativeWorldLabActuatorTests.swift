@@ -137,4 +137,53 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             NativeWorldLabProject.decode(changed),entityId:"beam",forceN:1000))
     }
 
+    func testTwoInventedRigidBodiesExchangeImpulseAndConserveMomentum() throws {
+        var p=try NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.blank(),shape:"box",id:"left")
+        p=try NativeWorldLabEditor.addSolid(p,shape:"box",id:"right")
+        p=try NativeWorldLabEditor.positionSolid(
+            p,id:"left",positionMeters:[0,0.5,2])
+        p=try NativeWorldLabEditor.positionSolid(
+            p,id:"right",positionMeters:[3,0.5,2])
+        p=try NativeWorldLabEditor.addHypotheticalMaterial(
+            p,name:"Invented dense foam",densityKgM3:2,id:"matter")
+        p=try NativeWorldLabEditor.assignMaterial(
+            p,solidId:"left",materialId:"matter")
+        p=try NativeWorldLabEditor.assignMaterial(
+            p,solidId:"right",materialId:"matter")
+        let project=try NativeWorldLabProject.decode(p)
+        let elastic=try NativeWorldLabCollision.evaluate(
+            project,firstId:"right",secondId:"left",
+            velocityLeftMps:2,velocityRightMps:0,restitution:1)
+        XCTAssertEqual(elastic.impactTimeSeconds,1,accuracy:1e-12)
+        XCTAssertEqual(elastic.leftFinalVelocityMps,0,accuracy:1e-12)
+        XCTAssertEqual(elastic.rightFinalVelocityMps,2,accuracy:1e-12)
+        XCTAssertEqual(elastic.impulseNs,4,accuracy:1e-12)
+        XCTAssertEqual(elastic.dissipatedEnergyJ,0,accuracy:1e-12)
+        let atContact=try elastic.sample(1)
+        XCTAssertEqual(atContact.rightCenterXM-atContact.leftCenterXM,1,accuracy:1e-12)
+        let plastic=try NativeWorldLabCollision.evaluate(
+            project,firstId:"left",secondId:"right",
+            velocityLeftMps:2,velocityRightMps:0,restitution:0)
+        XCTAssertEqual(plastic.leftFinalVelocityMps,1,accuracy:1e-12)
+        XCTAssertEqual(plastic.rightFinalVelocityMps,1,accuracy:1e-12)
+        XCTAssertEqual(plastic.dissipatedEnergyJ,2,accuracy:1e-12)
+        XCTAssertEqual(plastic.momentumAfterKgMps,plastic.momentumBeforeKgMps,accuracy:1e-12)
+        XCTAssertThrowsError(try NativeWorldLabCollision.evaluate(
+            project,firstId:"left",secondId:"right",
+            velocityLeftMps:0,velocityRightMps:2,restitution:0.5))
+        XCTAssertThrowsError(try NativeWorldLabCollision.evaluate(
+            project,firstId:"left",secondId:"right",
+            velocityLeftMps:2,velocityRightMps:0,restitution:2))
+        XCTAssertThrowsError(try NativeWorldLabCollision.evaluate(
+            project,firstId:"left",secondId:"right",
+            velocityLeftMps:2,velocityRightMps:0,restitution:0.5,durationSeconds:0.2))
+        let unassigned=try NativeWorldLabEditor.assignMaterial(
+            p,solidId:"right",materialId:nil)
+        XCTAssertThrowsError(try NativeWorldLabCollision.evaluate(
+            NativeWorldLabProject.decode(unassigned),
+            firstId:"left",secondId:"right",
+            velocityLeftMps:2,velocityRightMps:0,restitution:0.5))
+    }
+
 }
