@@ -535,7 +535,10 @@ public enum NativeDateTimeEngine {
 
     private static func isWorkingDay(_ date: Date, weekends: Set<Int>, excluded: Set<Date>) -> Bool {
         let cal = calendar(.gregorian)
-        return !weekends.contains(cal.component(.weekday, from: date)) && !excluded.contains(cal.startOfDay(for: date))
+        // Public inputs and the Web/Android engines number Sunday as 0 through Saturday as 6.
+        // Foundation's Calendar uses Sunday=1 through Saturday=7, so normalize before matching.
+        let weekendIndex = cal.component(.weekday, from: date) - 1
+        return !weekends.contains(weekendIndex) && !excluded.contains(cal.startOfDay(for: date))
     }
 
     private static func countWorkingDays(from: Date, to: Date, options: [String: String], includeEnd: Bool) throws -> Int {
