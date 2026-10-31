@@ -587,3 +587,8 @@ release-candidate evidence bundle are unfinished.
   Each native editor includes its own local Fresnel/Snell calculation UI,
   without WebView or automatic network transfer. Cross-platform archive
   persistence of native optical result records remains unfinished.
+
+- Registered the standalone Swift optics solver in the Xcode project source
+  target explicitly, and connected the Web optical result to an illustrative
+  Babylon.js incident/reflected/refracted ray overlay. Each scene edit disposes
+  prior rays; the overlay does not imply tracing against invented solid geometry.

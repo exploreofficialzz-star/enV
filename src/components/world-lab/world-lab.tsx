@@ -132,6 +132,7 @@ function downloadJson(name: string, data: unknown) {
 export default function WorldLab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<SceneHandles | null>(null);
+  const opticalLinesRef=useRef<B.LinesMesh[]>([]);
   const lastFrame = useRef<number | null>(null);
   const restoreRunsEpoch = useRef(0);
   const [graphicsError, setGraphicsError] = useState("");
@@ -1042,7 +1043,40 @@ export default function WorldLab() {
     if (next.length() > OBSERVER_BOUNDS_METRES.maxRadius || next.y < OBSERVER_BOUNDS_METRES.minHeight) return;
     camera.position.copyFrom(next);
   }
+  function drawOpticalReference(run:import("@/lib/world-lab/optics").OpticalInterfaceRun|null){
+    for(const item of opticalLinesRef.current)item.dispose();
+    opticalLinesRef.current=[];
+    const current=sceneRef.current;
+    if(!run||!current)return;
+    const incident=run.incidentAngleDegrees*Math.PI/180;
+    const reflected=run.reflectedAngleDegrees*Math.PI/180;
+    const origin=new B.Vector3(0,0,0);
+    const add=(name:string,coordinates:B.Vector3[],color:B.Color3)=>{
+      const line=B.MeshBuilder.CreateLines(name,{points:coordinates,
+        updatable:false},current.scene);
+      line.color=color;line.isPickable=false;
+      opticalLinesRef.current.push(line);
+    };
+    // The origin and metre-scale lengths are illustrative, not actual
+    // positions or dimensions of any inventor-authored solid.
+    add("optics-interface-normal",[
+      new B.Vector3(0,-4,0),new B.Vector3(0,4,0),
+    ],new B.Color3(0.7,0.7,0.7));
+    add("optics-incident",[
+      new B.Vector3(-4*Math.cos(incident),-4*Math.sin(incident),0),origin,
+    ],new B.Color3(1,0.9,0.2));
+    add("optics-reflected",[
+      origin,new B.Vector3(-4*Math.cos(reflected),4*Math.sin(reflected),0),
+    ],new B.Color3(1,0.55,0.1));
+    if(run.transmittedAngleDegrees!==null){
+      const a=run.transmittedAngleDegrees*Math.PI/180;
+      add("optics-refracted",[
+        origin,new B.Vector3(4*Math.cos(a),4*Math.sin(a),0),
+      ],new B.Color3(0.2,0.85,1));
+    }
+  }
   function invalidateWorldLabResults(){
+    drawOpticalReference(null);
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
     setFluidMotionPlaying(false);setFluidMotionRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
@@ -2188,7 +2222,7 @@ export default function WorldLab() {
           }
         }}/>
       <WorldLabOpticsPanel project={project} mutateProject={mutateProject}
-        onKeepEvidence={keepScientificEvidence}/>
+        onKeepEvidence={keepScientificEvidence} onVisualize={drawOpticalReference}/>
       <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
         cloudEnabled={remoteJobsEnabled}
         cloudBusy={remoteBusy}

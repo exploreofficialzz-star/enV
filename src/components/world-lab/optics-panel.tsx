@@ -7,10 +7,11 @@ type Props={
   project:WorldLabProject|null;
   mutateProject:(edit:(p:WorldLabProject)=>WorldLabProject)=>void;
   onKeepEvidence:(result:OpticalInterfaceRun)=>void;
+  onVisualize:(run:OpticalInterfaceRun|null)=>void;
 };
 const field="rounded border border-border bg-bg px-2 py-1 text-sm";
 const button="rounded border border-border px-3 py-2 text-sm";
-export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence}:Props){
+export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence,onVisualize}:Props){
   const [source,setSource]=useState("");
   const [destination,setDestination]=useState("");
   const [editMaterial,setEditMaterial]=useState("");
@@ -38,7 +39,7 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence}:Props
           refractiveIndex:index,
         });
       });
-      setResult(null);setError("");
+      setResult(null);onVisualize(null);setError("");
     }catch(cause){setError(cause instanceof Error?cause.message:"Invalid optical assumption.");}
   };
   return <section className="mb-3 rounded-xl border border-border p-3"
@@ -97,9 +98,10 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence}:Props
       <button className={button} type="button" onClick={()=>{
         if(!project)return;
         try{
-          setResult(calculateOpticalInterface(parseWorldLabProject(project),
-            first,second,angle));setError("");
-        }catch(cause){setResult(null);
+          const next=calculateOpticalInterface(parseWorldLabProject(project),
+            first,second,angle);
+          setResult(next);onVisualize(next);setError("");
+        }catch(cause){setResult(null);onVisualize(null);
           setError(cause instanceof Error?cause.message:"Unsupported light model.");}
       }}>Calculate ideal light interface locally</button>
     </div>}
@@ -115,6 +117,7 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence}:Props
       <button className={button} type="button" onClick={()=>onKeepEvidence(current)}>
         Keep optical evidence with invention
       </button>
+      <p className="text-muted-foreground">The drawn rays are an XY-plane illustration at the origin, not a collision or optical trace through your 3D solids.</p>
       <p className="text-muted-foreground">{current.validity}</p>
     </div>}
     {error&&<p role="alert" className="mt-2 text-xs">{error}</p>}
