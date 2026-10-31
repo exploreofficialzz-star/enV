@@ -407,6 +407,30 @@ export function DateTimeEngine({ op }: { op: string }) {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<{ label: string; value: string }[]>([]);
 
+  useEffect(() => {
+    if (op !== "timezone" && op !== "meeting-planner" && op !== "countdown") return;
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const localDateTime = `${localDate}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const oneHour = new Date(now.getTime() + 60 * 60 * 1000);
+    const countdownTarget = `${oneHour.getFullYear()}-${pad(oneHour.getMonth() + 1)}-${pad(oneHour.getDate())}T${pad(oneHour.getHours())}:${pad(oneHour.getMinutes())}`;
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    setOpts((current) => {
+      if (op === "timezone") return {
+        ...current,
+        time: current.time || localDateTime,
+        fromTz: current.fromTz || localZone,
+      };
+      if (op === "meeting-planner") return {
+        ...current,
+        date: current.date || localDate,
+        sourceTz: current.sourceTz || localZone,
+      };
+      return { ...current, target: current.target || countdownTarget };
+    });
+  }, [op]);
+
   const live = op === "countdown" || op === "world-clock";
   useEffect(() => {
     if (!live) return;
