@@ -11,6 +11,8 @@ import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
 import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/world-lab/network";
+import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitNode}
+  from "@/lib/world-lab/network-graph";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
   snapSolidPosition,measureSolidCenters} from "@/lib/world-lab/edit-history";
@@ -134,6 +136,10 @@ export default function WorldLab() {
   const [dropPlaybackRate, setDropPlaybackRate] = useState(1);
   const [dcRun,setDcRun]=useState<DcNetworkResult|null>(null);
   const [wiredMotorRun,setWiredMotorRun]=useState<NetworkMotorRun|null>(null);
+  const [newCircuitNodeLabel,setNewCircuitNodeLabel]=useState("");
+  const [wirePositive,setWirePositive]=useState("supply");
+  const [wireNegative,setWireNegative]=useState("ground");
+  const [wireResistance,setWireResistance]=useState(200);
   const [inventedDeviceName,setInventedDeviceName]=useState("");
   const [inventedDeviceAssumption,setInventedDeviceAssumption]=useState("");
   const [inventedDeviceResistance,setInventedDeviceResistance]=useState("");
@@ -1106,6 +1112,106 @@ export default function WorldLab() {
             }}>Add parallel resistor</button>
             <button type="button" className={buttonClass} onClick={calculateCircuit}>Calculate circuit</button>
           </div>
+          <details className="mt-2 rounded-lg border border-border p-2" aria-label="Advanced circuit wiring">
+            <summary className="cursor-pointer text-xs font-medium">Connect more parts and wires</summary>
+            <p className="mt-2 text-xs text-muted-foreground">
+              A wire is a shared named node. Place components between two different
+              nodes; unconnected nodes cannot be calculated until wired.
+            </p>
+            <div className="mt-2 flex flex-wrap items-end gap-2">
+              <label className="text-xs">New wire junction name
+                <input className={inputLabel} aria-label="New electrical node label"
+                  maxLength={80} value={newCircuitNodeLabel}
+                  onChange={e=>setNewCircuitNodeLabel(e.target.value)}/>
+              </label>
+              <button type="button" className={buttonClass}
+                disabled={!newCircuitNodeLabel.trim()||project.networks[0].nodes.length>=24}
+                onClick={()=>{
+                  mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                    addCircuitNode(n,crypto.randomUUID(),newCircuitNodeLabel))}));
+                  setNewCircuitNodeLabel("");
+                }}>Add wire junction</button>
+            </div>
+            <div className="mt-2 space-y-1">
+              {project.networks[0].nodes.map(node=><div className="flex items-center justify-between gap-2 text-xs"
+                key={node.id}>
+                <span>{node.label}{node.id===project.networks![0].groundNodeId?" (ground)":""}</span>
+                <button type="button" className={buttonClass}
+                  disabled={node.id===project.networks![0].groundNodeId||
+                    project.networks![0].nodes.length<=2||
+                    project.networks![0].components.some(c=>
+                      c.positiveNodeId===node.id||c.negativeNodeId===node.id)}
+                  onClick={()=>mutateProject(p=>({...p,
+                    networks:(p.networks??[]).map((n,i)=>i?n:removeUnusedCircuitNode(n,node.id)),
+                  }))}>Remove unused</button>
+              </div>)}
+            </div>
+            <p className="mt-2 text-xs font-medium">Add resistor between two chosen junctions</p>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <label className="text-xs">Positive-side junction
+                <select className={inputLabel} aria-label="New resistor positive node"
+                  value={project.networks[0].nodes.some(n=>n.id===wirePositive)?wirePositive:""}
+                  onChange={e=>setWirePositive(e.target.value)}>
+                  <option value="">Choose node</option>
+                  {project.networks[0].nodes.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
+                </select>
+              </label>
+              <label className="text-xs">Negative-side junction
+                <select className={inputLabel} aria-label="New resistor negative node"
+                  value={project.networks[0].nodes.some(n=>n.id===wireNegative)?wireNegative:""}
+                  onChange={e=>setWireNegative(e.target.value)}>
+                  <option value="">Choose node</option>
+                  {project.networks[0].nodes.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
+                </select>
+              </label>
+              <label className="text-xs">Assumed resistance (Ω)
+                <input className={inputLabel} aria-label="New wired resistor ohms"
+                  type="number" min={0.01} max={1000000000}
+                  value={wireResistance} onChange={e=>setWireResistance(Number(e.target.value))}/>
+              </label>
+              <button type="button" className={buttonClass}
+                disabled={project.networks[0].components.length>=48||
+                  !project.networks[0].nodes.some(n=>n.id===wirePositive)||
+                  !project.networks[0].nodes.some(n=>n.id===wireNegative)||
+                  wirePositive===wireNegative||!Number.isFinite(wireResistance)||
+                  wireResistance<0.01||wireResistance>1e9}
+                onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                  addCircuitResistor(n,crypto.randomUUID(),wirePositive,wireNegative,wireResistance))}))}>
+                Connect resistor
+              </button>
+            </div>
+            <p className="mt-3 text-xs font-medium">Rewire existing components</p>
+            {project.networks[0].components.map(part=><div key={part.id}
+              className="mt-2 rounded border border-border p-2">
+              <p className="text-xs font-medium">
+                {part.kind==="dc-source"?"Source":part.kind==="resistor"?"Resistor":part.name}
+              </p>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <label className="text-xs">Positive terminal
+                  <select className={inputLabel} aria-label={"Positive node for "+part.id}
+                    value={part.positiveNodeId}
+                    onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                      rewireCircuitPart(n,part.id,e.target.value,part.negativeNodeId))}))}>
+                    {project.networks[0].nodes.map(node=>
+                      <option key={node.id} value={node.id}>{node.label}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs">Negative terminal
+                  <select className={inputLabel} aria-label={"Negative node for "+part.id}
+                    value={part.negativeNodeId}
+                    onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                      rewireCircuitPart(n,part.id,part.positiveNodeId,e.target.value))}))}>
+                    {project.networks[0].nodes.map(node=>
+                      <option key={node.id} value={node.id}>{node.label}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>)}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Calculations use these node connections and conservation equations.
+              This is a bounded DC reference, not a general transient circuit solver.
+            </p>
+          </details>
           <details className="mt-2">
             <summary className="cursor-pointer text-xs">Invent an unknown electrical device</summary>
             <label className="block text-xs">Name

@@ -283,3 +283,8 @@ release-candidate evidence bundle are unfinished.
 ## iOS native spatial authoring parity (2026-10-31)
 
 - Swift now has strict SI `positionSolid`, `snapSolid` and independent center-distance/horizontal displacement calculations, with a native picker for grid sizes and target solid and a geometry-only disclaimer. Added XCTest cases for 3D Pythagorean distance, grid roundtrip and rejecting nonfinite/unsupported positions. These are native source integrations; simulator/XCTest acceptance is deferred to the full audit.
+
+## Portable multi-node circuit wiring authoring (2026-10-31)
+
+- The advanced Web circuit editor now adds bounded named node junctions, supports connecting resistors across any two distinct existing nodes, rewires actual source/resistor/hypothetical terminals, and removes only electrically unused nodes. No fake visual crossings are introduced; existing multi-node topology list displays real graph connections. The DC solver already handles arbitrary connected nodal networks via MNA; series-voltage-divider and Kirchhoff conservation regressions are authored and registered for later CI.
+- Existing portable schema/strict native parsers continue to accept graph edits from imported JSON. Native graphical arbitrary-node authoring remains unimplemented and will require separate UIKit/Compose integration; no claim of complete parity or finished electronics made.
