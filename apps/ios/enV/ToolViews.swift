@@ -608,7 +608,7 @@ struct ToolCommunityPanel: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                .onChange(of: commentText) { _, value in
+                .onChange(of: commentText) { value in
                     if value.count > 2000 { commentText = String(value.prefix(2000)) }
                 }
             HStack(spacing: 8) {
@@ -635,7 +635,7 @@ struct ToolCommunityPanel: View {
                 TextField("Choose a public display name", text: $displayName)
                     .textFieldStyle(.roundedBorder)
                     .font(.envScaled(size: 14, weight: .regular))
-                    .onChange(of: displayName) { _, value in
+                    .onChange(of: displayName) { value in
                         if value.count > 32 { displayName = String(value.prefix(32)) }
                     }
             }
