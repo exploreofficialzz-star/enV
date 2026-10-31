@@ -308,7 +308,7 @@ enum NativeAnalyticsClient {
     static func record(_ name: String, toolID: String? = nil, outcome: String = "unknown", durationMs: Int? = nil, errorCode: String? = nil) {
         startNetworkMonitor()
         guard isEnabled, choice == "granted", NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) != nil else { return }
-        let allowed = Set(["app_opened", "tool_viewed", "tool_started", "tool_completed", "tool_failed", "tool_cancelled", "tool_abandoned", "feedback_submitted", "update_viewed", "offline_sync_succeeded", "offline_sync_failed"])
+        let allowed = Set(["app_opened", "tool_viewed", "tool_started", "tool_completed", "tool_failed", "tool_cancelled", "tool_abandoned", "feedback_submitted", "comment_created", "reaction_created", "update_viewed", "offline_sync_succeeded", "offline_sync_failed"])
         guard allowed.contains(name) else { return }
         var event: [String: Any] = [
             "eventId": UUID().uuidString.lowercased(),
