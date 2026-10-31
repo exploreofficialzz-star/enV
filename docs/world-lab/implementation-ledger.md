@@ -623,3 +623,16 @@ release-candidate evidence bundle are unfinished.
   saved revision bounds, index/angle/power domains, non-executable exact
   fields and an immutable 20-record quota; a conflicting record ID fails
   closed. This is user-triggered import/export, not automatic cloud sync.
+
+
+## Actual invented-solid optical geometry
+- Added a bounded primary-ray tracer for optically characterized reference
+  boxes and spheres in their authored 3D positions. It follows Snell/Fresnel
+  transmission or total internal reflection at each intersected boundary and
+  tracks the explicitly discarded reflected power. It rejects invalid
+  vectors, overlapping/nested media, interior starting points and ambiguous
+  coincident intersections; angular and event domains remain finite.
+- Optical scene rays have strictly parsed portable project/revision-bound
+  scientific evidence. This is a *single-primary-ray* approximation, not
+  branch-complete rendering, scattering, absorption or confirmed optical
+  behavior of actual substances. Native geometry tracing remains unimplemented.
