@@ -76,6 +76,28 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertFalse(history.canUndo)
         XCTAssertFalse(history.canRedo)
     }
+    func testNativeAssemblyGroupMoveAndNondestructiveUngroup() throws {
+        var data=try NativeWorldLabEditor.blank()
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"b")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"c")
+        data=try NativeWorldLabEditor.createVisualAssembly(
+            data,name:"Assembly",entityIds:["a","b"],id:"group")
+        let before=try NativeWorldLabProject.decode(data)
+        data=try NativeWorldLabEditor.moveVisualAssembly(
+            data,id:"group",deltaMeters:[1,0,-2])
+        let after=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(after.entities[0].positionMeters[0],
+            before.entities[0].positionMeters[0]+1,accuracy:1e-12)
+        XCTAssertEqual(after.entities[1].positionMeters[2],
+            before.entities[1].positionMeters[2]-2,accuracy:1e-12)
+        XCTAssertEqual(after.entities[2].positionMeters,before.entities[2].positionMeters)
+        XCTAssertThrowsError(try NativeWorldLabEditor.createVisualAssembly(
+            data,name:"Overlap",entityIds:["a","c"]))
+        data=try NativeWorldLabEditor.ungroupVisualAssembly(data,id:"group")
+        XCTAssertEqual(try NativeWorldLabProject.decode(data).entities.count,3)
+        XCTAssertEqual(try NativeWorldLabProject.decode(data).assemblies?.count,0)
+    }
     func testSchemaEnforcedForEveryMutation() throws {
         let data=try NativeWorldLabEditor.blank()
         XCTAssertThrowsError(try NativeWorldLabEditor.addSolid(data,shape:"freeform"))

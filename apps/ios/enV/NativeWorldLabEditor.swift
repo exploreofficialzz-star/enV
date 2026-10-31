@@ -70,6 +70,56 @@ enum NativeWorldLabEditor {
             root["networks"]=networks
         }
     }
+    static func createVisualAssembly(_ data:Data,name:String,entityIds:[String],
+                                     id:String=UUID().uuidString) throws->Data {
+        try mutate(data){root in
+            let title=name.trimmingCharacters(in:.whitespacesAndNewlines)
+            var groups=(root["assemblies"] as? [[String:Any]]) ?? []
+            guard !title.isEmpty,title.count<=120,
+                  (2...30).contains(entityIds.count),groups.count<50 else {
+                throw NativeWorldLabError.invalid("Groups require 2–30 real solids and a name")
+            }
+            groups.append(["id":id,"name":title,"entityIds":entityIds])
+            root["assemblies"]=groups
+        }
+    }
+    static func moveVisualAssembly(_ data:Data,id:String,
+                                   deltaMeters:[Double]) throws->Data {
+        try mutate(data){root in
+            guard deltaMeters.count==3,
+                  deltaMeters.allSatisfy({$0.isFinite && abs($0)<=1000}),
+                  let groups=root["assemblies"] as? [[String:Any]],
+                  let group=groups.first(where:{$0["id"] as? String==id}),
+                  let members=group["entityIds"] as? [String],
+                  var entities=root["entities"] as? [[String:Any]] else {
+                throw NativeWorldLabError.invalid("Select a valid assembly and bounded displacement")
+            }
+            let included=Set(members)
+            for index in entities.indices {
+                guard let solidId=entities[index]["id"] as? String,
+                      included.contains(solidId),
+                      let current=entities[index]["positionMeters"] as? [Double],
+                      current.count==3 else {continue}
+                let moved=zip(current,deltaMeters).map { pair in
+                    round((pair.0+pair.1)*1e6)/1e6
+                }
+                guard moved.allSatisfy({$0.isFinite && abs($0)<=100000}) else {
+                    throw NativeWorldLabError.invalid("Group would leave the portable world")
+                }
+                entities[index]["positionMeters"]=moved
+            }
+            root["entities"]=entities
+        }
+    }
+    static func ungroupVisualAssembly(_ data:Data,id:String)throws->Data {
+        try mutate(data){root in
+            guard let groups=root["assemblies"] as? [[String:Any]],
+                  groups.contains(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Visual group is missing")
+            }
+            root["assemblies"]=groups.filter{$0["id"] as? String != id}
+        }
+    }
     static func addCircuitNode(_ data:Data,label:String,
                                id:String=UUID().uuidString) throws -> Data {
         try mutate(data){root in
