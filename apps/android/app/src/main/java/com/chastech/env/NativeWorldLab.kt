@@ -114,6 +114,7 @@ fun NativeWorldLabForm() {
     var assemblyName by remember { mutableStateOf("My invention") }
     var secondAssemblyIndex by remember { mutableIntStateOf(0) }
     var assemblyMoveStep by remember { mutableStateOf(0.5) }
+    var digitalShowCases by remember { mutableStateOf(false) }
     var snapMeters by remember { mutableStateOf(0.5) }
     var measurementTargetIndex by remember { mutableIntStateOf(0) }
     val model=when(kind) {
@@ -432,6 +433,22 @@ fun NativeWorldLabForm() {
                             }}){Text("Toggle")}
                         }
                     }
+                }
+                OutlinedButton(onClick={digitalShowCases=!digitalShowCases}){
+                    Text(if(digitalShowCases)"Hide all logic cases" else "Check every input combination")
+                }
+                if(digitalShowCases) {
+                    runCatching{NativeWorldLabDigitalLogic.truthTable(digital)}
+                        .onSuccess{cases->
+                            Text("Checked "+cases.size+" Boolean combinations (assumed truth tables)")
+                            cases.take(16).forEachIndexed{index,outputs->
+                                Text(index.toString(2).padStart(digital.inputs.size,'0')+
+                                    " → "+digital.outputs.joinToString(""){(outputs[it.id]?:0).toString()},
+                                    style=MaterialTheme.typography.bodySmall)
+                            }
+                            if(cases.size>16)Text("First 16 shown; complete test is bounded at 256.")
+                        }.onFailure{Text("Exhaustive check requires at most eight switches.",
+                            color=MaterialTheme.colorScheme.error)}
                 }
                 runCatching{NativeWorldLabDigitalLogic.evaluate(digital)}
                     .onSuccess{result->

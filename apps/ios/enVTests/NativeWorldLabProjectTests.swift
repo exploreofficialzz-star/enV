@@ -8,6 +8,8 @@ final class NativeWorldLabProjectTests: XCTestCase {
         let first=try NativeWorldLabProject.decode(start)
         let network=try XCTUnwrap(first.digitalNetworks?.first)
         XCTAssertEqual(try NativeWorldLabDigitalLogic.evaluate(network)["output_q"],1)
+        XCTAssertEqual(try NativeWorldLabDigitalLogic.truthTable(network)
+            .map{$0["output_q"]},[1,1,1,0])
         let setA=try NativeWorldLabEditor.digitalSwitch(start,
             networkId:network.id,inputId:"input_a",value:true)
         let setB=try NativeWorldLabEditor.digitalSwitch(setA,

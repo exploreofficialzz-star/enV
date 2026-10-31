@@ -48,6 +48,7 @@ struct NativeWorldLabView:View {
     @State private var measureTargetId=""
     @State private var assemblyName="My invention"
     @State private var assemblySecondId=""
+    @State private var digitalShowCases=false
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
@@ -367,6 +368,30 @@ struct NativeWorldLabView:View {
                                 row:index,bit:1-bit)}
                         }.buttonStyle(.bordered)
                     }
+                }
+            }
+            Button(digitalShowCases ? "Hide all logic cases":"Check every input combination"){
+                digitalShowCases.toggle()
+            }.buttonStyle(.bordered)
+            if digitalShowCases {
+                if let cases=try? NativeWorldLabDigitalLogic.truthTable(network) {
+                    Text("Checked "+String(cases.count)+" assumed Boolean combinations.")
+                        .font(.caption)
+                    ForEach(0..<min(16,cases.count),id:\.self){index in
+                        let label=String(repeating:"0",
+                            count:max(0,network.inputs.count-String(index,radix:2).count))+
+                            String(index,radix:2)
+                        let bits=network.outputs.map{String(cases[index][$0.id] ?? 0)}
+                            .joined()
+                        Text(label+" → "+bits).font(.caption.monospaced())
+                    }
+                    if cases.count>16 {
+                        Text("First 16 shown. Full limit is 256 input cases.")
+                            .font(.caption)
+                    }
+                }else {
+                    Text("Exhaustive check supports at most eight switches.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             if let values=try? NativeWorldLabDigitalLogic.evaluate(network) {

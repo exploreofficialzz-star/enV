@@ -8,6 +8,8 @@ class NativeWorldLabProjectTest {
         val blank=NativeWorldLabEditor.startDigitalInvention(NativeWorldLabEditor.blank())
         val initial=NativeWorldLabProjectCodec.decode(blank).digitalNetworks.first()
         assertEquals(1,NativeWorldLabDigitalLogic.evaluate(initial)["output_q"])
+        assertEquals(listOf(1,1,1,0),NativeWorldLabDigitalLogic.truthTable(initial)
+            .map{it["output_q"]})
         val switched=NativeWorldLabEditor.digitalSwitch(
             NativeWorldLabEditor.digitalSwitch(blank,initial.id,"input_a",true),
             initial.id,"input_b",true)

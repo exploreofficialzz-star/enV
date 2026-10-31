@@ -10,11 +10,11 @@ extra chapters. The source books are topic/evidence catalogs, not executable
 scientific solver implementations.
 
 Source SHA-256:
-- Master prompt PDF: \`67bc02c90c6795d4b2d94102af9407e09e29cf42ea77db176e7403c1f9f0d293\`
-- Source ZIP: \`553778563cf4afa4f716687024306ed2ba98b0223fee2213a9fa4c42a8f33e33\`
-- Master markdown: \`dafa99bfa11313f653811867502e1ea030b44071d1328e81a887bf24a704f5a4\`
-- Specialist markdown: \`015e30f5bc950d53e9279a81dccd62649e135a785e839976219a577ae52dcdf3\`
-- Verified calculations CSV: \`922dd4d95e07b7925a1c8de7940bdf8dff98f83e4ec142d335fe5a16cbc53997\`
+- Master prompt PDF: `67bc02c90c6795d4b2d94102af9407e09e29cf42ea77db176e7403c1f9f0d293`
+- Source ZIP: `553778563cf4afa4f716687024306ed2ba98b0223fee2213a9fa4c42a8f33e33`
+- Master markdown: `dafa99bfa11313f653811867502e1ea030b44071d1328e81a887bf24a704f5a4`
+- Specialist markdown: `015e30f5bc950d53e9279a81dccd62649e135a785e839976219a577ae52dcdf3`
+- Verified calculations CSV: `922dd4d95e07b7925a1c8de7940bdf8dff98f83e4ec142d335fe5a16cbc53997`
 
 ## Implemented reference and interchange capabilities (release still gated)
 
@@ -66,7 +66,7 @@ native UI parity, security release gate or device validation exists in this slic
 
 ## Baseline repository status
 
-At main commit \`f9d78deffd02c14e56448ed565279e4970cdcc17\`, CI was
+At main commit `f9d78deffd02c14e56448ed565279e4970cdcc17`, CI was
 already failing: Developer Studio route smoke hard-coded 13 routes although
 the current catalog defines 14, and Android release packaging exhausted
 the Gradle Java heap. The initial dependency audit reported vulnerabilities; a later isolated
@@ -108,7 +108,7 @@ Record new failures separately from these pre-existing failures.
 ## Migration and compatibility rule
 
 Do not yet delete or rename Artboard Studio in the visible catalog. It has
-game-scene project format \`env-3d-game\` (v1), not the science project
+game-scene project format `env-3d-game` (v1), not the science project
 format and native parity that The World Lab requires. Preserve the UX/UI
 Studio and its Artboard handoff until explicit compatible adapters, project
 import tests, and Web/Android/iOS quality gates pass. A deliberate feature
@@ -353,3 +353,11 @@ release-candidate evidence bundle are unfinished.
 ## Web owner-scoped project backup controls (2026-10-31)
 
 - Added a separately gated account backup panel with authenticated owner list, conditional optimistic-revision save, and download-only recovery to JSON. Cloud `serverRevision` stays independent from local project revision, and a stale expected revision receives a conflict rather than losing remote changes. Existing local IndexedDB autosave/import/export is unchanged; no automatic remote restoration or local overwrite. Both build-time VITE_WORLD_LAB_PROJECT_SYNC_ENABLED and runtime WORLD_LAB_PROJECT_SYNC_ENABLED must be explicitly activated only after migration 0010/ownership/security/deployment acceptance.
+
+
+## Bounded hypothetical digital logic and exhaustive signal checks (2026-10-31)
+
+- Added optional, strictly validated `digitalNetworks` in the portable World Lab v1 JSON interchange. Each invention includes 1–12 Boolean input switches, 1–32 sequentially connected user-assumed truth-table gates with 1–4 ports, and 1–16 outputs; only acyclic dependency order is accepted. The schema rejects injected scripts, unknown fields, incomplete truth tables, overlapping IDs, cycles and dangling output sources. Older projects without digital networks remain valid.
+- Web now exposes native DOM Boolean switches, editable individual truth-table rows, two-input chained gate creation, computed output indicators, and full mathematical enumeration for inventions with up to eight inputs (256 combinations). An exhaustive run is a separate downloadable JSON evidence record; it is explicitly *not* device measurement. The basic case supports a user-defined NAND gate as a regression fixture.
+- Android uses an independent native Kotlin decoder and deterministic Boolean evaluator; Compose offers switch toggles, truth-table row edits, and a capped all-input-case check. iOS uses its own strict Swift portable decoder, evaluator, revisioned editor, and SwiftUI controls for the same bounded features. Regression cases exercise assumed NAND, changed user behavior, four-case results, and rejected cyclic wiring. No native engine executes imported code; digital circuits are declarative truth tables.
+- Limitations: this is combinational Boolean math, not flip-flops, timing, transistors, semiconductor effects, CPU or radio behavior, electrical power, wire delay, synthesis or verified silicon. Full platform CI for the latest development head is required before acceptance. The repository-wide dependency audit currently reports a newly published transitive dev-tool `minimatch` advisory; do not treat that as resolved or lower the security gate. The PR remains draft and the legacy Artboard remains intact.
