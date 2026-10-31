@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
+import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
 import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "blur", label: "Blur", type: "number", defaultValue: 24, min: 0, max: 160, suffix: "px" },
     { name: "spread", label: "Spread", type: "number", defaultValue: 0, min: -40, max: 80, suffix: "px" },
     { name: "color", label: "Shadow color", type: "color", defaultValue: "#202a3b" },
+    { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
   ],
   "text-shadow": [
     { name: "x", label: "Horizontal offset", type: "number", defaultValue: 2, min: -40, max: 40, suffix: "px" },
@@ -144,9 +146,51 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function makeNoiseDataUrl(color: string, density: number): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="${density}" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#n)" fill="${color}"/></svg>`;
+function makeNoiseDataUrl(color: string, density: number, strength = 1): string {
+  const parsed = parseCssColor(color);
+  const red = (parsed?.r ?? 17) / 255;
+  const green = (parsed?.g ?? 24) / 255;
+  const blue = (parsed?.b ?? 39) / 255;
+  const matrix = `${red} 0 0 0 0 0 ${green} 0 0 0 0 0 ${blue} 0 0 0 0 0 1 0`;
+  const safeDensity = clamp(density, 0.1, 3);
+  const safeStrength = clamp(strength, 0, 1);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="${safeDensity}" numOctaves="2" stitchTiles="stitch" result="noise"/><feColorMatrix in="noise" type="matrix" values="${matrix}"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="${safeStrength}"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+function downloadSvgAsPng(svg: string, filename: string): void {
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  const image = new Image();
+  image.onload = () => {
+    const viewBox = svg.match(/viewBox="([\d.\-\s]+)"/)?.[1].trim().split(/\s+/).map(Number);
+    const sourceWidth = viewBox?.[2] && Number.isFinite(viewBox[2]) ? viewBox[2] : image.naturalWidth || 512;
+    const sourceHeight = viewBox?.[3] && Number.isFinite(viewBox[3]) ? viewBox[3] : image.naturalHeight || 512;
+    const width = Math.min(2048, Math.max(256, Math.round(sourceWidth)));
+    const height = Math.min(2048, Math.max(1, Math.round(width * sourceHeight / sourceWidth)));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      URL.revokeObjectURL(svgUrl);
+      return;
+    }
+    context.drawImage(image, 0, 0, width, height);
+    URL.revokeObjectURL(svgUrl);
+    canvas.toBlob((png) => {
+      if (!png) return;
+      const pngUrl = URL.createObjectURL(png);
+      const link = document.createElement("a");
+      link.href = pngUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
+    }, "image/png");
+  };
+  image.onerror = () => URL.revokeObjectURL(svgUrl);
+  image.src = svgUrl;
 }
 
 function cssFor(
@@ -195,6 +239,7 @@ function cssFor(
       custom: { x: 0, y: 8, blur: 24, spread: 0, alpha: 0.18 },
     };
     const presetValues = presets[preset] ?? presets.soft;
+    const opacity = numberValue(values, "opacity", presetValues.alpha, 0, 1);
     const x = numberValue(values, "x", presetValues.x, -80, 80);
     const y = numberValue(values, "y", presetValues.y, -80, 80);
     const blur = numberValue(values, "blur", presetValues.blur, 0, 160);
@@ -203,7 +248,7 @@ function cssFor(
     const parsedColor = parseCssColor(color);
     const layers = Array.from({ length: clamp(count, 1, 3) }, (_, index) => {
       const scale = 1 + index * 0.55;
-      const alpha = Math.max(0.02, presetValues.alpha / (index + 1));
+      const alpha = opacity / (index + 1);
       const inset = presetValues.inset ? "inset " : "";
       const shadowColor = parsedColor
         ? `rgba(${Math.round(parsedColor.r)}, ${Math.round(parsedColor.g)}, ${Math.round(parsedColor.b)}, ${alpha.toFixed(3)})`
@@ -335,8 +380,9 @@ function cssFor(
   const opacity = numberValue(values, "opacity", 0.08, 0, 1);
   const density = numberValue(values, "density", 1.1, 0.1, 3);
   const dataUrl = makeNoiseDataUrl(values.color ?? "#111827", density);
+  const previewDataUrl = makeNoiseDataUrl(values.color ?? "#111827", density, opacity);
   const css = `.env-noise {\n  position: relative;\n  isolation: isolate;\n}\n.env-noise::after {\n  content: "";\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n  opacity: ${opacity};\n  background-image: ${dataUrl};\n}`;
-  return { css, style: { backgroundColor: "#e2e8f0", backgroundImage: dataUrl, backgroundSize: "160px 160px" } };
+  return { css, style: { backgroundColor: "#e2e8f0", backgroundImage: previewDataUrl, backgroundSize: "160px 160px" } };
 }
 
 export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
@@ -481,14 +527,14 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
           <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((previous) => {
             const next = { ...previous, [name]: value };
             if (name === "preset") {
-              const presets: Record<string, { x: number; y: number; blur: number; spread: number }> = {
-                subtle: { x: 0, y: 1, blur: 3, spread: 0 },
-                soft: { x: 0, y: 7, blur: 24, spread: -4 },
-                medium: { x: 0, y: 12, blur: 32, spread: -5 },
-                hard: { x: 0, y: 10, blur: 0, spread: 0 },
-                glow: { x: 0, y: 0, blur: 28, spread: 2 },
-                inset: { x: 0, y: 3, blur: 9, spread: -3 },
-                custom: { x: 0, y: 8, blur: 24, spread: 0 },
+              const presets: Record<string, { x: number; y: number; blur: number; spread: number; alpha: number }> = {
+                subtle: { x: 0, y: 1, blur: 3, spread: 0, alpha: 0.12 },
+                soft: { x: 0, y: 7, blur: 24, spread: -4, alpha: 0.14 },
+                medium: { x: 0, y: 12, blur: 32, spread: -5, alpha: 0.18 },
+                hard: { x: 0, y: 10, blur: 0, spread: 0, alpha: 0.24 },
+                glow: { x: 0, y: 0, blur: 28, spread: 2, alpha: 0.36 },
+                inset: { x: 0, y: 3, blur: 9, spread: -3, alpha: 0.22 },
+                custom: { x: 0, y: 8, blur: 24, spread: 0, alpha: 0.18 },
               };
               const selected = presets[value];
               if (selected) {
@@ -496,6 +542,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                 next.y = String(selected.y);
                 next.blur = String(selected.blur);
                 next.spread = String(selected.spread);
+                next.opacity = String(selected.alpha);
               }
             }
             return next;
@@ -521,7 +568,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             style={family === "glass" ? { background: "linear-gradient(135deg,#0d9f8a,#1d3557)" } : family === "wave" ? { background: values.background } : undefined}
           >
             {generatedSvg ? (
-              <div className="w-full max-w-xl" dangerouslySetInnerHTML={{ __html: generatedSvg }} />
+              <div className="w-full max-w-xl [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: generatedSvg }} />
             ) : family === "card" ? (
               <div className="w-full max-w-xs" style={output.style}>
                 <p className="text-base font-semibold text-slate-900">A card preview</p>
@@ -555,6 +602,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             <p className="mt-1 text-xs text-muted">{generatedSvg ? "Scalable vector artwork (SVG)." : "Copy or download the generated CSS."}</p>
           </div>
         </div>
+        {generatedSvg ? <div className="mb-3 flex flex-wrap gap-2"><CopyButton text={generatedSvg} label="Copy SVG" /><Button type="button" variant="outline" size="sm" onClick={() => downloadSvgAsPng(generatedSvg, `env-${family}-design.png`)}>Download PNG</Button></div> : null}
         <CodeResult code={code} filename={`env-${family}-design.${generatedSvg ? "svg" : "css"}`} />
       </div>
     </div>
