@@ -729,7 +729,7 @@ enum NativeWorldLabSphereImpact {
 
 
 /// Local exact event-based multi-sphere physics. All mass/restitution assumptions
-/// are user-defined, with only isolated smooth hard-sphere binary contacts.
+/// are user-defined, with isolated or disjoint simultaneous smooth hard-sphere impacts.
 private struct GroupVector {
     let x:Double
     let y:Double
@@ -791,7 +791,7 @@ struct NativeGroupSphereRun:Encodable {
     let finalMomentumKgMps:[Double]
     let initialAngularMomentumKgM2PerS:[Double]
     let finalAngularMomentumKgM2PerS:[Double]
-    let validity="Exact event-driven free-flight hard spheres (2–12), with isolated frictionless binary contacts. No simultaneous impact resolution, external gravity, rotation, friction, walls, joints, deformation, fracture or measured material properties. Inertial densities and restitution are user-assumed."
+    let validity="Exact event-driven free-flight hard spheres (2–12), with isolated or disjoint simultaneous frictionless binary contacts. No shared-sphere multi-contact resolution, external gravity, rotation, friction, walls, joints, deformation, fracture or measured material properties. Inertial densities and restitution are user-assumed."
 
     func sample(_ t:Double)throws->NativeGroupFrame{
         guard t.isFinite,t>=0,t<=durationSeconds else {
@@ -937,45 +937,56 @@ enum NativeWorldLabMultiSphere {
                 }
             }
             if !shortest.isFinite {break}
-            guard ties.count==1,events.count<128 else {
-                throw NativeWorldLabError.invalid("Simultaneous contacts or event-limit case is unsupported")
+            // Contacts on disjoint sphere pairs can occur at one instant.
+            // A shared sphere would require an unvalidated multi-contact law.
+            var participants=Set<Int>()
+            for (i,j) in ties {
+                guard participants.insert(i).inserted,
+                      participants.insert(j).inserted else {
+                    throw NativeWorldLabError.invalid(
+                        "Simultaneous shared-sphere multi-contact is unsupported")
+                }
             }
-            let (i,j)=ties[0]
+            guard events.count+ties.count<=128 else {
+                throw NativeWorldLabError.invalid("Sphere event-limit case is unsupported")
+            }
             for k in bodies.indices {
                 bodies[k].position=bodies[k].position+bodies[k].velocity*shortest
             }
             time+=shortest
-            let d=bodies[j].position-bodies[i].position
-            let distance=d.length
-            guard abs(distance-bodies[i].radius-bodies[j].radius)<1e-6 else {
-                throw NativeWorldLabError.invalid("Sphere contact geometry failed")
+            for (i,j) in ties {
+                let d=bodies[j].position-bodies[i].position
+                let distance=d.length
+                guard abs(distance-bodies[i].radius-bodies[j].radius)<1e-6 else {
+                    throw NativeWorldLabError.invalid("Sphere contact geometry failed")
+                }
+                let normal=d*(1/distance)
+                let closing=(bodies[j].velocity-bodies[i].velocity).dot(normal)
+                guard closing < (-1e-10) else {
+                    throw NativeWorldLabError.invalid("Contact is not closing along its normal")
+                }
+                let beforeEnergy=energy(bodies)
+                let beforeP=momentum(bodies)
+                let beforeL=angular(bodies)
+                let mi=bodies[i].mass
+                let mj=bodies[j].mass
+                let impulse=normal*(-(1+restitution)*closing/(1/mi+1/mj))
+                bodies[i].velocity=bodies[i].velocity-impulse*(1/mi)
+                bodies[j].velocity=bodies[j].velocity+impulse*(1/mj)
+                let afterEnergy=energy(bodies)
+                let loss=0.5*mi*mj/(mi+mj)*(1-restitution*restitution)*closing*closing
+                guard [afterEnergy,loss].allSatisfy({$0.isFinite}),
+                      (beforeP-momentum(bodies)).length<=1e-8*max(1,beforeP.length),
+                      (beforeL-angular(bodies)).length<=1e-8*max(1,beforeL.length),
+                      abs(beforeEnergy-afterEnergy-loss)<=1e-8*max(1,beforeEnergy) else {
+                    throw NativeWorldLabError.invalid("Multi-sphere impulse conservation audit failed")
+                }
+                lossTotal+=loss
+                events.append(NativeGroupSphereEvent(atSeconds:time,
+                    firstEntityId:bodies[i].id,secondEntityId:bodies[j].id,
+                    contactNormal:normal.values,impulseNs:impulse.values,
+                    energyLostJ:loss))
             }
-            let normal=d*(1/distance)
-            let closing=(bodies[j].velocity-bodies[i].velocity).dot(normal)
-            guard closing < (-1e-10) else {
-                throw NativeWorldLabError.invalid("Contact is not closing along its normal")
-            }
-            let beforeEnergy=energy(bodies)
-            let beforeP=momentum(bodies)
-            let beforeL=angular(bodies)
-            let mi=bodies[i].mass
-            let mj=bodies[j].mass
-            let impulse=normal*(-(1+restitution)*closing/(1/mi+1/mj))
-            bodies[i].velocity=bodies[i].velocity-impulse*(1/mi)
-            bodies[j].velocity=bodies[j].velocity+impulse*(1/mj)
-            let afterEnergy=energy(bodies)
-            let loss=0.5*mi*mj/(mi+mj)*(1-restitution*restitution)*closing*closing
-            guard [afterEnergy,loss].allSatisfy({$0.isFinite}),
-                  (beforeP-momentum(bodies)).length<=1e-8*max(1,beforeP.length),
-                  (beforeL-angular(bodies)).length<=1e-8*max(1,beforeL.length),
-                  abs(beforeEnergy-afterEnergy-loss)<=1e-8*max(1,beforeEnergy) else {
-                throw NativeWorldLabError.invalid("Multi-sphere impulse conservation audit failed")
-            }
-            lossTotal+=loss
-            events.append(NativeGroupSphereEvent(atSeconds:time,
-                firstEntityId:bodies[i].id,secondEntityId:bodies[j].id,
-                contactNormal:normal.values,impulseNs:impulse.values,
-                energyLostJ:loss))
         }
         let finalEnergy=energy(bodies)
         let finalP=momentum(bodies)
