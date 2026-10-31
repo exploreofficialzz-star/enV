@@ -21,6 +21,23 @@ export async function chooseAnalyticsConsent(granted:boolean){
  const current=old??id();if(!current)throw new Error("This browser cannot create a secure analytics installation ID.");
  await postConsent(current,true);set(KEYS.subject,current);set(KEYS.choice,"granted");void flushAnalyticsEvents();
 }
+export type ToolExecutionOutcome = "success" | "failure" | "cancelled" | "abandoned";
+export function recordToolExecutionResult(
+ toolId:string,
+ outcome:ToolExecutionOutcome,
+ durationMs:number,
+ resultKind:string,
+ errorCode?:string,
+){
+ const name = outcome === "success" ? "tool_completed"
+  : outcome === "failure" ? "tool_failed"
+  : outcome === "cancelled" ? "tool_cancelled" : "tool_abandoned";
+ recordAnalyticsEvent({
+  name, toolId, outcome, durationMs:Math.max(0,Math.min(3600000,Math.round(durationMs))),
+  ...(errorCode ? {errorCode} : {}),
+  properties:{result_kind:resultKind},
+ });
+}
 export function recordAnalyticsEvent(event:Omit<AnalyticsEventInput,"eventId"|"occurredAt">){
  if(typeof window==="undefined"||getAnalyticsConsent()!=="granted")return;
  const subjectId=subject(),sessionId=session(),eventId=id();if(!subjectId||!sessionId||!eventId)return;
