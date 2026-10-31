@@ -5,8 +5,8 @@ const catalogMatch = catalogSource.match(/const catalogJson = \[([\s\S]*?)\]\.jo
 assert.ok(catalogMatch, "catalog JSON literal is present");
 const tools = JSON.parse(JSON.parse(`[${catalogMatch[1]}]`).join(""));
 
-const expectedWebExempt = ["accessibility", "audio", "business", "calculators", "developer", "ecommerce", "qr", "video"];
-const expectedNativeExempt = ["accessibility", "audio", "business", "calculators", "developer", "ecommerce", "qr", "video"];
+const expectedWebExempt = ["accessibility", "audio", "business", "calculators", "datetime", "developer", "ecommerce", "qr", "video"]
+const expectedNativeExempt = ["accessibility", "audio", "business", "calculators", "datetime", "developer", "ecommerce", "qr", "video"]
 const webPolicy = fs.readFileSync(new URL("../src/lib/production-notice.ts", import.meta.url), "utf8");
 const android = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
 const ios = fs.readFileSync(new URL("../apps/ios/enV/CatalogCore.swift", import.meta.url), "utf8");
