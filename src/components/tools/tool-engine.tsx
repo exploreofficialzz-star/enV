@@ -92,9 +92,9 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     case "color":
       return <ColorEngine op={tool.engine.op} />;
     case "qr":
-      return <QrEngine preset={tool.engine.preset} />;
+      return <QrEngine preset={tool.engine.preset} toolId={tool.id} />;
     case "barcode":
-      return <BarcodeEngine format={tool.engine.format} />;
+      return <BarcodeEngine format={tool.engine.format} toolId={tool.id} />;
     case "image":
       return <ImageEngine op={tool.engine.op} category={tool.category} toolId={tool.id} />;
     case "cssgen":
