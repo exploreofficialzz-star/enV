@@ -67,12 +67,11 @@ struct NativeWorldLabProjectStore {
         guard urls.count<=Self.maxLocalProjects else {
             throw NativeWorldLabError.invalid("Local World Lab project capacity is inconsistent")
         }
-        let sorted=urls.sorted{
-            (try? $0.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate)
-                ?? .distantPast >
-            (try? $1.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate)
-                ?? .distantPast
+        let dated=try urls.map { url -> (URL,Date) in
+            let attributes=try url.resourceValues(forKeys:[.contentModificationDateKey])
+            return (url,attributes.contentModificationDate ?? .distantPast)
         }
+        let sorted=dated.sorted{$0.1 > $1.1}.map{$0.0}
         return try sorted.map{try read($0.deletingPathExtension().lastPathComponent).1}
     }
     /// A delete is explicit and never silently removes a second saved project.
