@@ -242,4 +242,46 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             firstVelocityMps:[2,0,0],secondVelocityMps:[0,0,0],restitution:0.5))
     }
 
+    func testThreeSphereSuccessiveContactsTransferMomentumAndKeepEvidence() throws {
+        var json=try NativeWorldLabEditor.blank()
+        for i in 0..<3 {
+            json=try NativeWorldLabEditor.addSolid(json,shape:"sphere",id:"s-\(i)")
+        }
+        json=try NativeWorldLabEditor.addHypotheticalMaterial(
+            json,name:"Invented gel",densityKgM3:12/Double.pi,id:"gel")
+        for i in 0..<3 {
+            json=try NativeWorldLabEditor.positionSolid(
+                json,id:"s-\(i)",positionMeters:[-4+Double(3*i),0.5,0])
+            json=try NativeWorldLabEditor.assignMaterial(
+                json,solidId:"s-\(i)",materialId:"gel")
+        }
+        let project=try NativeWorldLabProject.decode(json)
+        let run=try NativeWorldLabMultiSphere.evaluate(
+            project,velocities:["s-0":[2,0,0]],restitution:1)
+        XCTAssertEqual(run.events.count,2)
+        XCTAssertEqual(run.events[0].atSeconds,1,accuracy:1e-10)
+        XCTAssertEqual(run.events[1].atSeconds,2,accuracy:1e-10)
+        XCTAssertEqual(run.totalInitialEnergyJ,run.totalFinalEnergyJ,accuracy:1e-9)
+        XCTAssertEqual(run.totalDissipatedEnergyJ,0,accuracy:1e-9)
+        XCTAssertEqual(run.initialMomentumKgMps[0],
+            run.finalMomentumKgMps[0],accuracy:1e-9)
+        let end=try run.sample(3)
+        XCTAssertEqual(end.completedEvents,2)
+        XCTAssertEqual(end.objects[2].velocityMps[0],2,accuracy:1e-9)
+        XCTAssertEqual(end.objects[0].velocityMps[0],0,accuracy:1e-9)
+        let evidence=try JSONSerialization.jsonObject(
+            with:JSONEncoder().encode(run)) as? [String:Any]
+        XCTAssertEqual(evidence?["format"] as? String,
+            "env-world-lab-multi-sphere-impact")
+        XCTAssertEqual(evidence?["materialEvidence"] as? String,
+            "hypothetical-user-assumed")
+        XCTAssertThrowsError(try NativeWorldLabMultiSphere.evaluate(
+            project,velocities:["s-0":[2,0,0]],restitution:2))
+        let unknown=try NativeWorldLabEditor.assignMaterial(
+            json,solidId:"s-1",materialId:nil)
+        XCTAssertThrowsError(try NativeWorldLabMultiSphere.evaluate(
+            NativeWorldLabProject.decode(unknown),
+            velocities:["s-0":[2,0,0]],restitution:1))
+    }
+
 }
