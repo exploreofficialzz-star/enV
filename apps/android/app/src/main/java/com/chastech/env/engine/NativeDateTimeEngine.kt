@@ -49,7 +49,7 @@ object NativeDateTimeEngine {
         "berlin" to "Europe/Berlin", "cairo" to "Africa/Cairo", "chicago" to "America/Chicago",
         "delhi" to "Asia/Kolkata", "dubai" to "Asia/Dubai", "dublin" to "Europe/Dublin",
         "hongkong" to "Asia/Hong_Kong", "istanbul" to "Europe/Istanbul", "jakarta" to "Asia/Jakarta",
-        "johannesburg" to "Africa/Johannesburg", "lagos" to "Africa/Lagos", "lisbon" to "Europe/Lisbon",
+        "kathmandu" to "Asia/Katmandu", "johannesburg" to "Africa/Johannesburg", "lagos" to "Africa/Lagos", "lisbon" to "Europe/Lisbon",
         "london" to "Europe/London", "los angeles" to "America/Los_Angeles", "madrid" to "Europe/Madrid",
         "manila" to "Asia/Manila", "melbourne" to "Australia/Melbourne", "mumbai" to "Asia/Kolkata",
         "nairobi" to "Africa/Nairobi", "new delhi" to "Asia/Kolkata", "new york" to "America/New_York",
