@@ -66,8 +66,10 @@ function validDashboardCookie(request: Request) {
   } catch { return false; }
 }
 function networkSubject(request: Request, secret: string) {
-  const forwarded=request.headers.get("x-vercel-forwarded-for")??request.headers.get("x-forwarded-for")??request.headers.get("cf-connecting-ip")??"unknown";
-  const address=forwarded.split(",").at(-1)?.trim().slice(0,128)||"unknown";
+  // Do not let client-supplied forwarding headers select the admin throttle bucket.
+  const forwarded=request.headers.get("x-vercel-forwarded-for");
+  const address=forwarded?.split(",").at(-1)?.trim().slice(0,128);
+  if(!address)throw new AnalyticsError("ANALYTICS_ADMIN_RATE_LIMIT_UNAVAILABLE","Secure dashboard sign-in throttling is unavailable. Please retry later.",503);
   return createHmac("sha256",secret).update("analytics-admin-network:"+address).digest("hex");
 }
 export async function createAnalyticsDashboardSession(request: Request, input: unknown) {
