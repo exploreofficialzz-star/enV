@@ -85,8 +85,8 @@ object NativeAnalytics {
         }
         // One-time migration from the pre-encryption preference file.
         val legacy = legacyPrefs(context).getString(key, null) ?: return null
-        securePutString(context, key, legacy)
-        legacyPrefs(context).edit().remove(key).apply()
+        val migrated = runCatching { securePutString(context, key, legacy) }.isSuccess
+        if (migrated) legacyPrefs(context).edit().remove(key).apply()
         return legacy
     }
 
@@ -181,12 +181,12 @@ object NativeAnalytics {
         }
     }
 
-    fun consentChoice(context: Context): String = consentChoiceValue(context)
+    fun consentChoice(context: Context): String = runCatching { consentChoiceValue(context) }.getOrDefault("unset")
 
     fun record(context: Context, name: String, toolId: String? = null, outcome: String = "unknown", durationMs: Long? = null, errorCode: String? = null) {
         val store = prefs(context)
         if (!BuildConfig.ANALYTICS_ENABLED || store.getString(CONSENT_KEY, "unset") != "granted") return
-        val subject = secureGetString(context, SUBJECT_KEY) ?: return
+        val subject = runCatching { secureGetString(context, SUBJECT_KEY) }.getOrNull() ?: return
         if (name !in setOf("app_opened","tool_viewed","tool_started","tool_completed","tool_failed","tool_cancelled","tool_abandoned","feedback_submitted","update_viewed","offline_sync_succeeded","offline_sync_failed")) return
         val (online, networkType) = network(context)
         val metrics = context.resources.displayMetrics
@@ -206,17 +206,19 @@ object NativeAnalytics {
         if (toolId != null) item.put("toolId", toolId)
         if (durationMs != null && durationMs in 0..3_600_000) item.put("durationMs", durationMs)
         if (errorCode != null && errorCode.matches(Regex("[A-Z0-9_]{1,64}"))) item.put("errorCode", errorCode)
-        synchronized(this) {
-            val queue = runCatching { JSONArray(secureGetString(context, QUEUE_KEY) ?: "[]") }.getOrElse { JSONArray() }
-            queue.put(item)
-            val bounded = JSONArray()
-            for (i in (queue.length() - MAX_QUEUE).coerceAtLeast(0) until queue.length()) {
-                val event = queue.optJSONObject(i) ?: continue
-                val date = event.optString("occurredAt")
-                val timestamp = runCatching { java.time.Instant.parse(date).toEpochMilli() }.getOrDefault(0L)
-                if (timestamp >= System.currentTimeMillis() - MAX_AGE_MS) bounded.put(event)
+        runCatching {
+            synchronized(this) {
+                val queue = JSONArray(secureGetString(context, QUEUE_KEY) ?: "[]")
+                queue.put(item)
+                val bounded = JSONArray()
+                for (i in (queue.length() - MAX_QUEUE).coerceAtLeast(0) until queue.length()) {
+                    val event = queue.optJSONObject(i) ?: continue
+                    val date = event.optString("occurredAt")
+                    val timestamp = runCatching { java.time.Instant.parse(date).toEpochMilli() }.getOrDefault(0L)
+                    if (timestamp >= System.currentTimeMillis() - MAX_AGE_MS) bounded.put(event)
+                }
+                securePutString(context, QUEUE_KEY, bounded.toString())
             }
-            securePutString(context, QUEUE_KEY, bounded.toString())
         }
     }
 
@@ -246,6 +248,6 @@ object NativeAnalytics {
     }
 
     fun startNewSession(context: Context) {
-        securePutString(context, SESSION_KEY, UUID.randomUUID().toString())
+        runCatching { securePutString(context, SESSION_KEY, UUID.randomUUID().toString()) }
     }
 }
