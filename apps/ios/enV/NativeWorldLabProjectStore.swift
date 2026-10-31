@@ -34,11 +34,16 @@ struct NativeWorldLabProjectStore {
             let previous=try NativeWorldLabProject.decode(previousData)
             // Skipping revision numbers may hide a divergent edit history;
             // fail closed rather than silently replacing local work.
+            if let expectedSavedRevision {
+                guard expectedSavedRevision == previous.revision else {
+                    throw NativeWorldLabError.invalid(
+                        "A stale expected local project revision cannot be saved.")
+                }
+            }
             let unchanged = project.revision == previous.revision && previousData == data
             let permittedEdit:Bool
-            if let expectedSavedRevision {
-                permittedEdit = expectedSavedRevision == previous.revision &&
-                    project.revision > previous.revision
+            if expectedSavedRevision != nil {
+                permittedEdit = project.revision > previous.revision
             } else {
                 permittedEdit = project.revision == previous.revision + 1
             }
