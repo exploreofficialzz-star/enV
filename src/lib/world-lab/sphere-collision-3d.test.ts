@@ -60,7 +60,7 @@ test("3D sphere model strictly rejects no contact, invalid mass and malformed ph
   assert.throws(()=>solveSphereImpact3d(p,"a","b",[2,0,0],[0,0,0],-0.1),/restitution/);
   assert.throws(()=>solveSphereImpact3d(p,"a","b",[NaN,0,0],[0,0,0],0.5),/finite/);
   assert.throws(()=>solveSphereImpact3d(p,"a","b",[-2,0,0],[0,0,0],0.5),/approaching/);
-  assert.throws(()=>solveSphereImpact3d(p,"a","b",[0,2,0],[0,0,0],0.5),/miss/);
+  assert.throws(()=>solveSphereImpact3d(p,"a","b",[2,1.5,0],[0,0,0],0.5),/miss/);
   assert.throws(()=>solveSphereImpact3d(p,"a","b",[2,0,0],[0,0,0],0.5,0.1),/duration/);
   const run=solveSphereImpact3d(p,"a","b",[2,0,0],[0,0,0],0.5);
   assert.throws(()=>sampleSphereImpact3d(run,-1),/outside/);
