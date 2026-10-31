@@ -38,7 +38,7 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
         }
     }
 
-    @Synchronized fun save(json: String): WorldLabSavedLocal {
+    @Synchronized fun save(json: String, expectedSavedRevision: Int? = null): WorldLabSavedLocal {
         val bytes = json.toByteArray(StandardCharsets.UTF_8)
         require(bytes.size <= NativeWorldLabProjectCodec.MAX_BYTES) { "World Lab local project exceeds 1 MB." }
         val project = NativeWorldLabProjectCodec.decode(json)
@@ -51,9 +51,15 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
             val previous = NativeWorldLabProjectCodec.decode(previousJson)
             // Require the exact next revision: accepting a skipped revision would
             // silently overwrite divergent, independently edited histories.
-            require(project.revision.toLong() == previous.revision.toLong() + 1 ||
-                (project.revision == previous.revision && json == previousJson)) {
-                "This project has a newer local revision. Export or resolve the conflict before replacing it."
+            require(previous.id == project.id) { "Saved file has a mismatched project identity." }
+            val unchanged = project.revision == previous.revision && json == previousJson
+            val authorizedEdits = if (expectedSavedRevision != null) {
+                expectedSavedRevision == previous.revision && project.revision > previous.revision
+            } else {
+                project.revision.toLong() == previous.revision.toLong() + 1
+            }
+            require(unchanged || authorizedEdits) {
+                "Saved project revision changed. Open the stored version or export your changes before replacing it."
             }
         } else {
             val count = storageDir.listFiles()?.count { it.isFile && it.extension == "json" } ?: 0
@@ -70,6 +76,38 @@ class NativeWorldLabProjectStore(private val appFilesDir: File) {
         require(pointer.length() <= 120) { "Corrupt saved-project pointer." }
         val id = pointer.readText(StandardCharsets.US_ASCII)
         return read(id)
+    }
+
+    /** List real validated private-device projects, never untrusted filenames or loose metadata. */
+    @Synchronized fun listProjects(): List<WorldLabSavedLocal> {
+        if (!storageDir.isDirectory) return emptyList()
+        val entries = storageDir.listFiles()?.filter { it.isFile && it.extension == "json" }
+            ?: error("Cannot read private World Lab projects.")
+        require(entries.size <= MAX_LOCAL_PROJECTS) { "Local project capacity is inconsistent." }
+        return entries.sortedByDescending { it.lastModified() }
+            .map { read(it.name.removeSuffix(".json")) }
+    }
+
+    /** Destructive action is explicit; remaining documents are never silently removed. */
+    @Synchronized fun delete(id: String) {
+        read(id) // Revalidate path, payload and stored identity before deletion.
+        require(projectFile(id).delete()) { "Could not delete the selected project." }
+        val pointer = File(storageDir, "recent-id")
+        if (pointer.exists()) {
+            require(pointer.length() <= 120) { "Corrupt saved-project pointer." }
+            if (pointer.readText(StandardCharsets.US_ASCII) == id) {
+                val next = storageDir.listFiles()?.filter {
+                    it.isFile && it.extension == "json"
+                }?.maxByOrNull { it.lastModified() }
+                if (next == null) {
+                    require(pointer.delete()) { "Cannot clear the recent-project pointer." }
+                } else {
+                    val recentId = next.name.removeSuffix(".json")
+                    read(recentId)
+                    writeAtomically(pointer, recentId.toByteArray(StandardCharsets.US_ASCII))
+                }
+            }
+        }
     }
 
     @Synchronized fun read(id: String): WorldLabSavedLocal {
