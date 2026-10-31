@@ -1010,3 +1010,157 @@ enum NativeWorldLabMultiSphere {
             finalAngularMomentumKgM2PerS:finalL.values)
     }
 }
+
+ 
+// Local Newtonian reference using the native Swift project decoder.
+// This is not a GR solver or measured astronomy.
+struct NativeGravityBody:Encodable {
+    let entityId:String
+    let massKg:Double
+    let radiusM:Double
+    let initialPositionM:[Double]
+    let initialVelocityMps:[Double]
+}
+struct NativeGravityFrame:Encodable {
+    let timeSeconds:Double
+    let positionsM:[[Double]]
+    let velocitiesMps:[[Double]]
+    let totalEnergyJ:Double
+    let energyDriftJ:Double
+    let totalMomentumKgMps:[Double]
+}
+struct NativeGravityRun:Encodable {
+    let projectId:String
+    let projectRevision:Int
+    let bodies:[NativeGravityBody]
+    let durationSeconds:Double
+    let integrationSteps:Int
+    let frames:[NativeGravityFrame]
+    let initialEnergyJ:Double
+    let finalEnergyJ:Double
+    let energyDriftFraction:Double
+    let validity:String
+    func sample(_ t:Double)throws->NativeGravityFrame {
+        guard t.isFinite else {throw NativeWorldLabError.invalid("Gravity time must be finite")}
+        let time=max(0,min(durationSeconds,t))
+        if time<=0{return frames[0]}
+        if time>=durationSeconds{return frames[frames.count-1]}
+        let hi=max(1,frames.firstIndex(where:{$0.timeSeconds>=time}) ?? frames.count-1)
+        let a=frames[hi-1],b=frames[hi]
+        let k=(time-a.timeSeconds)/(b.timeSeconds-a.timeSeconds)
+        func blend(_ x:[Double],_ y:[Double])->[Double]{
+            (0..<3).map{x[$0]+(y[$0]-x[$0])*k}
+        }
+        return NativeGravityFrame(timeSeconds:time,
+            positionsM:zip(a.positionsM,b.positionsM).map{blend($0,$1)},
+            velocitiesMps:zip(a.velocitiesMps,b.velocitiesMps).map{blend($0,$1)},
+            totalEnergyJ:a.totalEnergyJ+(b.totalEnergyJ-a.totalEnergyJ)*k,
+            energyDriftJ:a.energyDriftJ+(b.energyDriftJ-a.energyDriftJ)*k,
+            totalMomentumKgMps:blend(a.totalMomentumKgMps,b.totalMomentumKgMps))
+    }
+}
+enum NativeWorldLabGravity {
+    static let G=6.67430e-11
+    private static func forces(_ p:[GroupVector],_ bodies:[NativeGravityBody])throws->([GroupVector],Double) {
+        var accel=Array(repeating:GroupVector(0,0,0),count:p.count)
+        var potential=0.0
+        for i in p.indices {
+            for j in (i+1)..<p.count {
+                let d=p[j]-p[i],r=d.length
+                guard r.isFinite && r>bodies[i].radiusM+bodies[j].radiusM+1e-9 else {
+                    throw NativeWorldLabError.invalid("Gravity bodies touched or overlapped; impacts are not modeled")
+                }
+                let scale=G/(r*r*r)
+                guard scale.isFinite else {
+                    throw NativeWorldLabError.invalid("Newtonian gravity force overflow")
+                }
+                accel[i]=accel[i]+d*(scale*bodies[j].massKg)
+                accel[j]=accel[j]-d*(scale*bodies[i].massKg)
+                potential-=G*bodies[i].massKg*bodies[j].massKg/r
+            }
+        }
+        guard potential.isFinite && accel.allSatisfy({$0.finite}) else {
+            throw NativeWorldLabError.invalid("Newtonian gravity exceeded finite bounds")
+        }
+        return (accel,potential)
+    }
+    private static func audit(_ p:[GroupVector],_ v:[GroupVector],
+        _ b:[NativeGravityBody])throws->([GroupVector],Double,GroupVector) {
+        let (a,potential)=try forces(p,b)
+        var energy=potential,momentum=GroupVector(0,0,0)
+        for i in v.indices {
+            energy+=0.5*b[i].massKg*v[i].dot(v[i])
+            momentum=momentum+v[i]*b[i].massKg
+        }
+        guard energy.isFinite && momentum.finite else {
+            throw NativeWorldLabError.invalid("Gravity energy or momentum overflow")
+        }
+        return (a,energy,momentum)
+    }
+    static func evaluate(_ project:NativeWorldLabProject,
+        ids:[String],velocities:[String:[Double]],
+        durationSeconds:Double=30,integrationSteps:Int=480)throws->NativeGravityRun {
+        guard ids.count>=2 && ids.count<=8 && Set(ids).count==ids.count,
+              durationSeconds.isFinite && durationSeconds>=0.1 &&
+              durationSeconds<=3600 && integrationSteps>=2 && integrationSteps<=1200,
+              velocities.keys.allSatisfy({ids.contains($0)}) else {
+            throw NativeWorldLabError.invalid("Native gravity requires 2–8 spheres and valid step limits")
+        }
+        let bodies=try ids.map{ id -> NativeGravityBody in
+            guard let solid=project.entities.first(where:{$0.id==id}),
+                  solid.shape=="sphere",
+                  let material=project.materials.first(where:{$0.id==solid.materialId}),
+                  let density=material.densityKgM3 else {
+                throw NativeWorldLabError.invalid("Gravity sphere or assumed matter missing")
+            }
+            let mass=solid.volumeMetersCubed*density
+            let speed=velocities[id] ?? [0,0,0]
+            guard mass.isFinite && mass>=0.001 && mass<=1e24,
+                  speed.count==3 && speed.allSatisfy({$0.isFinite}),
+                  GroupVector(speed).length<=1e6 else {
+                throw NativeWorldLabError.invalid("Unsupported assumed mass or gravity speed")
+            }
+            return NativeGravityBody(entityId:id,massKg:mass,
+                radiusM:solid.dimensionsMeters[0]/2,
+                initialPositionM:solid.positionMeters,initialVelocityMps:speed)
+        }
+        var positions=bodies.map{GroupVector($0.initialPositionM)}
+        var speeds=bodies.map{GroupVector($0.initialVelocityMps)}
+        let start=try audit(positions,speeds,bodies)
+        var acceleration=start.0
+        let dt=durationSeconds/Double(integrationSteps)
+        let stride=max(1,(integrationSteps+239)/240)
+        var frames:[NativeGravityFrame]=[]
+        func snapshot(_ step:Int)throws {
+            let sample=try audit(positions,speeds,bodies)
+            frames.append(NativeGravityFrame(timeSeconds:Double(step)*dt,
+                positionsM:positions.map{$0.values},velocitiesMps:speeds.map{$0.values},
+                totalEnergyJ:sample.1,energyDriftJ:sample.1-start.1,
+                totalMomentumKgMps:sample.2.values))
+        }
+        try snapshot(0)
+        for step in 1...integrationSteps {
+            let nextPos=positions.indices.map{i in
+                positions[i]+speeds[i]*dt+acceleration[i]*(0.5*dt*dt)
+            }
+            let nextA=try forces(nextPos,bodies).0
+            let nextV=speeds.indices.map{i in
+                speeds[i]+(acceleration[i]+nextA[i])*(0.5*dt)
+            }
+            positions=nextPos;speeds=nextV;acceleration=nextA
+            if step%stride==0 || step==integrationSteps {try snapshot(step)}
+        }
+        let final=try audit(positions,speeds,bodies)
+        let drift=abs(final.1-start.1)/max(1,abs(start.1))
+        let typical=max(1,bodies.reduce(0){$0+$1.massKg*GroupVector($1.initialVelocityMps).length})
+        guard drift<=0.05 && (final.2-start.2).length<=1e-7*typical else {
+            throw NativeWorldLabError.invalid("Gravity numerical conservation audit failed")
+        }
+        return NativeGravityRun(projectId:project.id,projectRevision:project.revision,
+            bodies:bodies,durationSeconds:durationSeconds,integrationSteps:integrationSteps,
+            frames:frames,initialEnergyJ:start.1,finalEnergyJ:final.1,
+            energyDriftFraction:drift,
+            validity:"Newtonian point-mass gravity with invented density, Verlet integration "+
+                "and conservation audit. No measurements, relativistic dynamics, impacts or tides.")
+    }
+}
