@@ -210,6 +210,11 @@ class NativeWorldLabScienceTest {
         assertEquals(0.0,elastic.leftFinalVelocityMps,1e-12)
         assertEquals(2.0,elastic.rightFinalVelocityMps,1e-12)
         assertEquals(4.0,elastic.impulseNs,1e-12)
+        val nativeEvidence=org.json.JSONObject(elastic.toEvidenceJson())
+        assertEquals("env-world-lab-object-collision",nativeEvidence.getString("format"))
+        assertEquals("hypothetical-user-assumed",nativeEvidence.getString("inputEvidence"))
+        assertEquals(project.revision,nativeEvidence.getInt("projectRevision"))
+        assertEquals(4.0,nativeEvidence.getDouble("impulseNs"),1e-12)
         assertEquals(0.0,elastic.dissipatedEnergyJ,1e-12)
         assertEquals(1.0,elastic.sample(1.0).rightCenterXM-
             elastic.sample(1.0).leftCenterXM,1e-12)
