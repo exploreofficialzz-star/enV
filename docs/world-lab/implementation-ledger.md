@@ -521,3 +521,18 @@ release-candidate evidence bundle are unfinished.
   silently replaces local material hypotheses or measured data.
 - The account API and database migration 0017 are source implemented only,
   disabled by default and not yet deployed or verified.
+
+
+## Native scientific evidence libraries (2026-10-31 source batch)
+- Android now has an app-private, immutable native JSON evidence store with
+  20-record/2 MB bounds, file identity validation, atomic writes and explicit
+  save/export/discard controls connected to local gravity and heat panels.
+- iOS now has an app-private science library with atomic immutable records,
+  matching quotas, safe local project linkage, per-record export and explicit
+  deletion. Both platforms retain independent native numerical solvers.
+- The native gravitation metadata now includes invented material identifiers
+  and initial/final linear momentum, while native heat exports include the
+  original Kelvin inputs. These improve cross-platform evidence provenance.
+- Kotlin and Swift regression test sources were added for preservation,
+  ownership and deletion. No execution, simulator acceptance, migrations,
+  production push or release verification is claimed.

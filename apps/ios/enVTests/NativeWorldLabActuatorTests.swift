@@ -425,4 +425,39 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             firstTemperatureK:400,secondTemperatureK:300))
     }
 
+    func testSwiftScientificEvidenceLibraryPersistsAndSeparatesInventions() throws {
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(
+            "world-lab-native-science-"+UUID().uuidString,isDirectory:true)
+        defer{try? FileManager.default.removeItem(at:root)}
+        var bytes=try NativeWorldLabEditor.blank()
+        bytes=try NativeWorldLabEditor.addSolid(bytes,shape:"sphere",id:"gravity-one")
+        bytes=try NativeWorldLabEditor.addSolid(bytes,shape:"sphere",id:"gravity-two")
+        bytes=try NativeWorldLabEditor.positionSolid(bytes,id:"gravity-one",
+            positionMeters:[0,0.5,0])
+        bytes=try NativeWorldLabEditor.positionSolid(bytes,id:"gravity-two",
+            positionMeters:[20,0.5,0])
+        bytes=try NativeWorldLabEditor.addHypotheticalMaterial(bytes,
+            name:"Invented mass",densityKgM3:100000,id:"matter")
+        bytes=try NativeWorldLabEditor.assignMaterial(bytes,
+            solidId:"gravity-one",materialId:"matter")
+        bytes=try NativeWorldLabEditor.assignMaterial(bytes,
+            solidId:"gravity-two",materialId:"matter")
+        let project=try NativeWorldLabProject.decode(bytes)
+        _ = try NativeWorldLabProjectStore(directory:root).save(bytes)
+        let run=try NativeWorldLabGravity.evaluate(project,
+            ids:["gravity-one","gravity-two"],velocities:[:],
+            durationSeconds:4,integrationSteps:120)
+        let store=NativeWorldLabScientificEvidenceStore(directory:root)
+        let id=try store.saveGravity(run,project:project)
+        XCTAssertEqual(try store.list(project.id).count,1)
+        let record=try JSONSerialization.jsonObject(with:store.read(project.id,id))
+            as? [String:Any]
+        XCTAssertEqual(record?["kind"] as? String,"newton-gravity")
+        XCTAssertThrowsError(try store.read("../escape",id))
+        try store.delete(project.id,id)
+        XCTAssertTrue(try store.list(project.id).isEmpty)
+        XCTAssertEqual(try NativeWorldLabProjectStore(directory:root).read(project.id)
+            .1.id,project.id)
+    }
+
 }

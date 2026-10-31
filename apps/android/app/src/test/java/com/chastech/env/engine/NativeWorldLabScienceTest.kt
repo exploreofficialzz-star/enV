@@ -430,4 +430,33 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun privateScienceLibraryKeepsImmutableGravityEvidenceOnAndroid(){
+        val root=java.nio.file.Files.createTempDirectory("world-lab-science").toFile()
+        try{
+            var json=NativeWorldLabEditor.blank()
+            json=NativeWorldLabEditor.addSolid(json,"sphere",id="gravity-one")
+            json=NativeWorldLabEditor.addSolid(json,"sphere",id="gravity-two")
+            json=NativeWorldLabEditor.positionSolid(json,"gravity-one",listOf(0.0,0.5,0.0))
+            json=NativeWorldLabEditor.positionSolid(json,"gravity-two",listOf(20.0,0.5,0.0))
+            json=NativeWorldLabEditor.addHypotheticalMaterial(json,
+                "Invented density",100000.0,id="matter")
+            json=NativeWorldLabEditor.assignMaterial(json,"gravity-one","matter")
+            json=NativeWorldLabEditor.assignMaterial(json,"gravity-two","matter")
+            val project=NativeWorldLabProjectCodec.decode(json)
+            NativeWorldLabProjectStore(root).save(json)
+            val run=NativeWorldLabGravity.evaluate(project,
+                listOf("gravity-one","gravity-two"),emptyMap(),4.0,120)
+            val history=NativeWorldLabEvidenceStore(root)
+            val id=history.save(project,NativeWorldLabEvidenceJson.gravity(run))
+            assertEquals(1,history.list(project.id).size)
+            assertEquals("newton-gravity",history.read(project.id,id).getString("kind"))
+            assertThrows(IllegalArgumentException::class.java){
+                history.read("../escape",id)
+            }
+            history.delete(project.id,id)
+            assertTrue(history.list(project.id).isEmpty())
+            assertEquals(project.id,NativeWorldLabProjectStore(root).read(project.id).id)
+        }finally{root.deleteRecursively()}
+    }
+
 }
