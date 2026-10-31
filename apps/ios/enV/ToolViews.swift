@@ -931,6 +931,14 @@ struct NativeFamilyToolView: View {
     let tool: Tool
     var initialDeveloperMode: String? = nil
     var initialDeveloperAction: String? = nil
+    @State private var executionTracker: NativeToolExecutionTracker
+
+    init(tool: Tool, initialDeveloperMode: String? = nil, initialDeveloperAction: String? = nil) {
+        self.tool = tool
+        self.initialDeveloperMode = initialDeveloperMode
+        self.initialDeveloperAction = initialDeveloperAction
+        _executionTracker = State(initialValue: NativeToolExecutionTracker(toolID: tool.id))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -954,6 +962,7 @@ struct NativeFamilyToolView: View {
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
+        .environment(\.nativeToolExecutionTracker, executionTracker)
     }
 }
 
@@ -970,7 +979,13 @@ private struct NativeBackendExportDocument: FileDocument {
 
 private struct NativeBackendToolView: View {
     let tool: Tool
+    @State private var executionTracker: NativeToolExecutionTracker
     @State private var input = ""
+
+    init(tool: Tool) {
+        self.tool = tool
+        _executionTracker = State(initialValue: NativeToolExecutionTracker(toolID: tool.id))
+    }
     @State private var options = "{}"
     @State private var pages = "1"
     @State private var watermarkText = "enV"
@@ -1064,12 +1079,14 @@ private struct NativeBackendToolView: View {
         .fileExporter(isPresented: $showTextExporter, document: NativePlainTextDocument(text: output), contentType: .plainText, defaultFilename: "env-\(tool.id).txt") { result in
             if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
         }
+        .environment(\.nativeToolExecutionTracker, executionTracker)
     }
 
     private func operationLabel(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
     private func reset() { files = []; output = ""; outputData = nil; error = nil }
     private func run() async {
         if isDocument && files.isEmpty { error = "Choose the document or file required by this tool."; return }
+        executionTracker.start()
         working = true; defer { working = false }; output = ""; outputData = nil; error = nil
         do {
             let requestOptions: String
@@ -1086,7 +1103,11 @@ private struct NativeBackendToolView: View {
             } else if let text = result.text { output = text }
             else { output = "Output ready: \(result.fileName ?? tool.id) · \(result.data?.count ?? 0) bytes" }
             error = nil
-        } catch let caughtError { output = ""; outputData = nil; error = caughtError.localizedDescription }
+            executionTracker.finish(success: true)
+        } catch let caughtError {
+            output = ""; outputData = nil; error = caughtError.localizedDescription
+            executionTracker.finish(success: false)
+        }
     }
 }
 
@@ -5981,14 +6002,56 @@ private enum NativeSimpleError: Error, LocalizedError {
     var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
 }
 
+private struct NativeToolExecutionTrackerKey: EnvironmentKey {
+    static let defaultValue: NativeToolExecutionTracker? = nil
+}
+
+private extension EnvironmentValues {
+    var nativeToolExecutionTracker: NativeToolExecutionTracker? {
+        get { self[NativeToolExecutionTrackerKey.self] }
+        set { self[NativeToolExecutionTrackerKey.self] = newValue }
+    }
+}
+
+@MainActor
+private final class NativeToolExecutionTracker {
+    private let toolID: String
+    private var startedAt: Date?
+    private var resultRecorded = false
+
+    init(toolID: String) { self.toolID = toolID }
+
+    func start() {
+        startedAt = Date()
+        resultRecorded = false
+        NativeAnalyticsClient.record("tool_started", toolID: toolID)
+        Task { try? await NativeAnalyticsClient.flush() }
+    }
+
+    func finish(success: Bool) {
+        guard let startedAt, !resultRecorded else { return }
+        resultRecorded = true
+        let duration = Int(min(3_600_000, max(0, Date().timeIntervalSince(startedAt) * 1000)))
+        NativeAnalyticsClient.record(
+            success ? "tool_completed" : "tool_failed",
+            toolID: toolID,
+            outcome: success ? "success" : "failure",
+            durationMs: duration,
+            errorCode: success ? nil : "NATIVE_TOOL_FAILED"
+        )
+        Task { try? await NativeAnalyticsClient.flush() }
+    }
+}
+
 private struct NativeActionRow: View {
+    @Environment(\.nativeToolExecutionTracker) private var executionTracker
     let output: String
     let run: () -> Void
     let reset: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Button("Run", action: run).buttonStyle(.borderedProminent)
+            Button("Run") { executionTracker?.start(); run() }.buttonStyle(.borderedProminent)
             Button("Reset", action: reset).buttonStyle(.bordered)
             Button { UIPasteboard.general.string = output } label: {
                 HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy") }
@@ -5998,6 +6061,7 @@ private struct NativeActionRow: View {
 }
 
 private struct NativeOutputView: View {
+    @Environment(\.nativeToolExecutionTracker) private var executionTracker
     let output: String
     let error: String?
 
@@ -6011,6 +6075,12 @@ private struct NativeOutputView: View {
                     .frame(minHeight: 130)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.35)))
             }
+        }
+        .onChange(of: output) { value in
+            if !value.isEmpty { executionTracker?.finish(success: true) }
+        }
+        .onChange(of: error) { value in
+            if value != nil { executionTracker?.finish(success: false) }
         }
     }
 }
