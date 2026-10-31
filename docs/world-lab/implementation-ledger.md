@@ -399,3 +399,9 @@ release-candidate evidence bundle are unfinished.
   portable project inputs to the authenticated job queue, and the existing
   worker polling/export/cancel UI handles the result. Absent backend credentials,
   the larger verification remains honestly unavailable rather than fabricated.
+
+- Added a separate remote 25-case coupled chemical thermal sensitivity sweep,
+  with honest status for out-of-domain model variants and explicit assumption
+  factors, for larger multi-experiment workloads. It does not simulate chemical
+  structures or measure reaction safety. The account worker and migration 0014
+  remain undeployed until accepted.

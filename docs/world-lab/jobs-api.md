@@ -57,3 +57,16 @@ fetch one prior job's full evidence with the existing owner-gated GET /jobs/:id.
 This is durable account-job retrieval, not implicit project synchronization;
 inventions never silently replace local documents. A previous calculation
 remains only as long as the backing database retains it.
+
+## Hypothetical chemical sensitivity grids (migration 0014)
+
+The worker can execute `chemical-sweep` with one explicit, validated 0D
+Arrhenius/thermal assumption record. A deterministic 5×5 grid varies the
+declared frequency factor and reaction heat independently by 0.5, 0.75,
+1, 1.25, and 1.5. Each accepted numerical scenario returns final reactant,
+product, temperature, peak temperature and energy residual summaries.
+Unsupported assumption variants produce `outside-domain`/null fields, not
+fabricated temperatures. The parent project is included for provenance and
+no externally supplied executable code is allowed. The 25-case grid is
+a mathematical sensitivity analysis, not uncertainty probabilities or
+real chemical safety validation. The cloud choice requires consent.

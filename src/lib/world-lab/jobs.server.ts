@@ -31,7 +31,7 @@ function inspect(input:unknown){
     throw new WorldLabJobError("INVALID_JOB","Supply a scientific operation and portable project.");
   const body=input as Record<string,unknown>;
   if(body.kind!=="hydrostatics"&&body.kind!=="dc-network"&&body.kind!=="wired-motor"&&
-     body.kind!=="chemical-thermal"&&body.kind!=="multi-sphere"&&body.kind!=="exhaustive-logic")
+     body.kind!=="chemical-thermal"&&body.kind!=="multi-sphere"&&body.kind!=="exhaustive-logic"&&body.kind!=="chemical-sweep")
     throw new WorldLabJobError("INVALID_JOB","Choose one supported scientific model.");
   const allowed=new Set(["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
@@ -39,7 +39,7 @@ function inspect(input:unknown){
   if(Object.keys(body).some(k=>!allowed.has(k)))
     throw new WorldLabJobError("INVALID_JOB","Unknown scientific job input field.");
   const project=parseWorldLabProject(body.project);
-  if(body.kind!=="dc-network"&&body.kind!=="chemical-thermal"&&body.kind!=="multi-sphere"&&body.kind!=="exhaustive-logic"&&!safeId(body.entityId))
+  if(body.kind!=="dc-network"&&body.kind!=="chemical-thermal"&&body.kind!=="multi-sphere"&&body.kind!=="exhaustive-logic"&&body.kind!=="chemical-sweep"&&!safeId(body.entityId))
     throw new WorldLabJobError("INVALID_JOB","Select a valid project solid.");
   const json=JSON.stringify(body);
   if(Buffer.byteLength(json,"utf8")>60*1024)

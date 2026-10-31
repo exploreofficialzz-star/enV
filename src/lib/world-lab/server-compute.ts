@@ -6,13 +6,14 @@ import {runChemicalThermal,type ReactionThermalInput} from "./chemical-thermal.t
 import {runMultiSphereCollisions} from "./multi-sphere-collision.ts";
 import type {Vec3} from "./sphere-collision-3d.ts";
 import {verifyDigitalTruthTablePacked} from "./digital-logic.ts";
+import {runChemicalAssumptionSweep} from "./chemical-sweep.ts";
 
 /**
  * The authenticated HTTP layer controls access. This dispatcher only accepts
  * bounded scientific methods and user-supplied local projects. It never reads
  * or mutates other tenants' projects and executes no uploaded scripts/assets.
  */
-export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic";
+export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep";
 const finiteBound=(n:unknown,min:number,max:number,name:string)=>{
   if(typeof n!=="number"||!Number.isFinite(n)||n<min||n>max)
     throw new Error(name+" is outside the supported finite scientific domain.");
@@ -33,13 +34,13 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   projectRevision:number;
   outcome:ReturnType<typeof calculateHydrostatics>|
     ReturnType<typeof solveDcNetwork>|ReturnType<typeof runNetworkMotorExperiment>|
-    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>|ReturnType<typeof verifyDigitalTruthTablePacked>;
+    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>|ReturnType<typeof verifyDigitalTruthTablePacked>|ReturnType<typeof runChemicalAssumptionSweep>;
 }> {
   if(!input||typeof input!=="object"||Array.isArray(input))
     throw new Error("Scientific request must be a JSON object.");
   const data=input as Record<string,unknown>;
   const kind=data.kind;
-  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere","exhaustive-logic"].includes(String(kind)))
+  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere","exhaustive-logic","chemical-sweep"].includes(String(kind)))
     throw new Error("Requested scientific model is not available.");
   exactKeys(data,["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
@@ -51,7 +52,21 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
     throw new Error("Digital network identifier is only accepted for digital verification.");
   const project:WorldLabProject=parseWorldLabProject(data.project);
   let outcome;
-  if(kind==="exhaustive-logic"){
+  if(kind==="chemical-sweep"){
+    if(Object.keys(data).some(key=>!["kind","project","chemicalInput"].includes(key)))
+      throw new Error("Chemical sensitivity jobs accept only a bounded baseline input.");
+    if(!data.chemicalInput||typeof data.chemicalInput!=="object"||
+      Array.isArray(data.chemicalInput))
+      throw new Error("Chemical sweep requires explicit bounded kinetic assumptions.");
+    const parameters=data.chemicalInput as Record<string,unknown>;
+    const fields=["initialReactantMol","initialTemperatureK","ambientTemperatureK",
+      "preExponentialPerS","activationEnergyJPerMol","reactionHeatReleasedJPerMol",
+      "heatCapacityJPerK","coolingConductanceWPerK","externalHeatingW","durationSeconds"];
+    if(Object.keys(parameters).length!==fields.length||
+      Object.keys(parameters).some(field=>!fields.includes(field)))
+      throw new Error("Unexpected or missing thermal sensitivity inputs.");
+    outcome=runChemicalAssumptionSweep(parameters as unknown as ReactionThermalInput);
+  }else if(kind==="exhaustive-logic"){
     if(Object.keys(data).some(key=>!["kind","project","networkId"].includes(key)))
       throw new Error("Exhaustive digital logic only accepts an invented network identifier.");
     const id=identifier(data.networkId);

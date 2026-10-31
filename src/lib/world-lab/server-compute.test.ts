@@ -103,3 +103,21 @@ test("authenticated backend exhaustively evaluates all 12 digital switches in pa
  assert.throws(()=>runBoundedWorldLabOperation({
    kind:"exhaustive-logic",project,networkId:"logic",executable:"evil"}),/only accepts/);
 });
+
+test("cloud dispatcher returns a bounded actual 25-case coupled chemical sensitivity result",()=>{
+ const project=fixture();
+ const input={
+   initialReactantMol:1,initialTemperatureK:300,ambientTemperatureK:300,
+   preExponentialPerS:0.4,activationEnergyJPerMol:10000,
+   reactionHeatReleasedJPerMol:40000,heatCapacityJPerK:500,
+   coolingConductanceWPerK:4,externalHeatingW:0,durationSeconds:2,
+ };
+ const result=runBoundedWorldLabOperation({kind:"chemical-sweep",project,chemicalInput:input});
+ assert.equal(result.kind,"chemical-sweep");
+ if(!("scenarioCount" in result.outcome))throw new Error("Missing chemical parameter grid");
+ assert.equal(result.outcome.scenarioCount,25);
+ assert.equal(result.outcome.evidence,"physics-model-computed");
+ assert.throws(()=>runBoundedWorldLabOperation({
+   kind:"chemical-sweep",project,chemicalInput:input,scripting:"unsafe",
+ }),/sensitivity jobs accept only/);
+});

@@ -161,7 +161,7 @@ export default function WorldLab() {
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
-  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic">("hydrostatics");
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic"|"chemical-sweep">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteHistory,setRemoteHistory]=useState<RemoteWorldLabJob[]>([]);
   const [remoteHistoryBusy,setRemoteHistoryBusy]=useState(false);
@@ -1172,9 +1172,11 @@ export default function WorldLab() {
     setRemoteBusy(true);setRemoteError("");
     try{
       if(selectedKind!=="dc-network"&&selectedKind!=="chemical-thermal"&&selectedKind!=="multi-sphere"&&
-        selectedKind!=="exhaustive-logic"&&!selectedEntityId)
+        selectedKind!=="exhaustive-logic"&&selectedKind!=="chemical-sweep"&&!selectedEntityId)
         throw new Error("Select an invented solid before submitting this experiment.");
-      const body=selectedKind==="exhaustive-logic"?{
+      const body=selectedKind==="chemical-sweep"?{
+        kind:selectedKind,project,chemicalInput,
+      }:selectedKind==="exhaustive-logic"?{
         kind:selectedKind,project,networkId:project.digitalNetworks?.[0]?.id,
       }:selectedKind==="multi-sphere"?{
         kind:remoteKind,project,
@@ -1695,13 +1697,14 @@ export default function WorldLab() {
             <option value="chemical-thermal">Hypothetical chemical heating</option>
             <option value="multi-sphere">3D moving sphere contacts</option>
             <option value="exhaustive-logic">Full invented digital truth-table check</option>
+            <option value="chemical-sweep">Chemical model: 25 assumption combinations</option>
           </select>
           <button type="button" className={buttonClass} disabled={remoteBusy||!project||
-              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&!selectedEntity)||
+              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&!selectedEntity)||
               (remoteKind==="exhaustive-logic"&&
                 ((project?.digitalNetworks?.[0]?.inputs.length??0)<9))||
               (remoteKind==="multi-sphere"&&(groupSpheres.length<2||groupSpheres.length>12))||
-              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&!project?.networks?.[0])}
+              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&!project?.networks?.[0])}
             onClick={()=>{void submitRemoteJob();}}>
             {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
           </button>
