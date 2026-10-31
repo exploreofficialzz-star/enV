@@ -14,7 +14,7 @@ export function PlatformLanding({ platform }: { platform: "android" | "ios" }) {
         The native enV app stays native. Tools that run only in the Web product open here in your system browser, while native-ready tools continue to run inside the app.
       </p>
       <div className="mt-7 flex flex-wrap gap-3">
-        <Link to="/tools" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white">
+        <Link to="/tools" search={{ q: "" }} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white">
           Browse tools <ArrowRight className="size-4" />
         </Link>
         <Link to="/" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-fg">
