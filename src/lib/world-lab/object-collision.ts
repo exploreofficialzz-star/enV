@@ -1,7 +1,7 @@
 import {parseWorldLabProject,solidQuantities,type WorldLabProject} from "./project.ts";
 
 /**
- * Event-exact, ONE-dimensional frictionless central impact between two boxes.
+ * Event-exact, ONE-dimensional frictionless central impact between two primitives.
  * Two rigid centres stay on the same Y/Z lane. Finite material densities provide
  * assumed inertial masses. This does not solve arbitrary 3D rigid-body dynamics,
  * rotating contacts, breaking matter, deformation, or continuous contact stacks.
@@ -42,8 +42,8 @@ export function calculateObjectCollision(raw:WorldLabProject,entityAId:string,
   const pair=[project.entities.find(s=>s.id===entityAId),
     project.entities.find(s=>s.id===entityBId)];
   if(!pair[0]||!pair[1])throw new Error("Both collision solids must exist.");
-  if(pair.some(x=>x?.shape!=="box"))
-    throw new Error("The central-impact reference currently accepts two rectangular box solids.");
+  if(pair.some(x=>!["box","sphere","cylinder"].includes(x!.shape)))
+    throw new Error("The central-impact reference currently supports box, sphere or cylinder primitives.");
   const [left,right]=[pair[0],pair[1]].sort((a,b)=>a.positionMeters[0]-b.positionMeters[0]);
   if(left.positionMeters[0]===right.positionMeters[0])
     throw new Error("Two solids must have distinct initial X centres.");
@@ -97,9 +97,9 @@ export function calculateObjectCollision(raw:WorldLabProject,entityAId:string,
     leftFinalVelocityMps:afterL,rightFinalVelocityMps:afterR,impulseNs:impulse,
     momentumBeforeKgMps:momentumBefore,momentumAfterKgMps:momentumAfter,
     energyBeforeJ:energyBefore,energyAfterJ:energyAfter,dissipatedEnergyJ:dissipated,
-    validity:"Single instantaneous frictionless central collision of two ideal rigid boxes, "+
+    validity:"Single instantaneous frictionless central collision of two ideal rigid primitives, "+
       "aligned Y/Z centres, no ground friction, rotation, gravity over the horizontal "+
-      "interval, air drag or secondary contacts. Rectangular X extents set first contact. "+
+      "interval, air drag or secondary contacts. Analytic X half-extents set first contact. "+
       "Both masses come from user-assumed densities. Restitution is user-assumed. "+
       "Post-impact motion is free at constant velocity; this does not certify "+
       "invented-material survival, deformation or real-world safety.",
