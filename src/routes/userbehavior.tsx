@@ -27,6 +27,18 @@ type Summary = {
   networks: Breakdown[];
   searchSources: Breakdown[];
   failureCodes: Array<{ toolId: string; code: string; count: number }>;
+  dailyReports: Array<{
+    reportDay: string;
+    generatedAt: string;
+    reportData: {
+      headline?: string;
+      totals?: { events?: number; installations?: number; sessions?: number; toolsUsed?: number; views?: number; starts?: number; completed?: number; failed?: number; cancelled?: number; abandoned?: number; offlineEvents?: number };
+      tools?: Array<{ toolId: string; views: number; starts: number; completed: number; failed: number; abandoned: number }>;
+      platforms?: Array<{ platform: string; events: number }>;
+      topFailures?: Array<{ toolId: string; code: string; count: number }>;
+      interpretation?: string;
+    };
+  }>;
 };
 
 async function readPayload<T>(response: Response): Promise<T> {
@@ -115,6 +127,12 @@ function downloadAnalyticsReport(summary: Summary) {
     [],
     ["Failure codes", "Tool ID", "Count"],
     ...summary.failureCodes.map(row => [row.code, row.toolId, row.count]),
+    [],
+    ["Daily reports", "Events", "Tool views", "Started", "Completed", "Failed", "Abandoned", "Offline events"],
+    ...summary.dailyReports.map(row => {
+      const t = row.reportData.totals ?? {};
+      return [row.reportDay, t.events ?? 0, t.views ?? 0, t.starts ?? 0, t.completed ?? 0, t.failed ?? 0, t.abandoned ?? 0, t.offlineEvents ?? 0];
+    }),
   ];
   const csv = "\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -281,6 +299,53 @@ function UserBehaviorDashboard() {
           ) : <p className="mt-3 text-xs text-muted">No failure codes recorded.</p>}
         </section>
       </div>
+
+      <section className="mt-4 rounded-xl border border-border bg-surface p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-fg">Automatically generated daily reports</h2>
+            <p className="mt-1 text-xs text-muted">Aggregate-only records retained for 730 days. Reports are written before raw events are pruned.</p>
+          </div>
+          <span className="text-xs text-muted">{summary.dailyReports.length} retained in this view</span>
+        </div>
+        {summary.dailyReports.length ? (
+          <div className="mt-3 divide-y divide-border">
+            {summary.dailyReports.map(row => {
+              const t = row.reportData.totals ?? {};
+              const failures = row.reportData.topFailures ?? [];
+              return (
+                <article key={row.reportDay} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-fg">{row.reportDay}</p>
+                      <p className="mt-1 text-xs text-muted">{row.reportData.headline ?? "Daily activity report"}</p>
+                    </div>
+                    <span className="text-[10px] text-muted">Generated {new Date(row.generatedAt).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+                    {[
+                      ["Events", t.events ?? 0],
+                      ["Views", t.views ?? 0],
+                      ["Started", t.starts ?? 0],
+                      ["Completed", t.completed ?? 0],
+                      ["Failed", t.failed ?? 0],
+                      ["Abandoned", t.abandoned ?? 0],
+                      ["Offline", t.offlineEvents ?? 0],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg bg-surface-2 px-2 py-2">
+                        <p className="text-[10px] text-muted">{label}</p>
+                        <p className="mt-1 text-sm font-semibold tabular-nums text-fg">{Number(value).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {failures.length ? <p className="mt-2 text-[11px] text-muted">Most common issue: {failures[0].toolId || "General"} · {failures[0].code} · {failures[0].count} occurrences</p> : null}
+                  {row.reportData.interpretation ? <p className="mt-2 text-[10px] leading-5 text-muted">{row.reportData.interpretation}</p> : null}
+                </article>
+              );
+            })}
+          </div>
+        ) : <p className="mt-3 text-xs text-muted">No completed daily reports yet. The next scheduled retention run creates the previous day’s report.</p>}
+      </section>
 
       <p className="mt-6 text-[11px] text-muted">Generated {new Date(summary.generatedAt).toLocaleString()}. Metrics include only users who opted in. The current window is limited to 30 days of raw event data.</p>
     </main>
