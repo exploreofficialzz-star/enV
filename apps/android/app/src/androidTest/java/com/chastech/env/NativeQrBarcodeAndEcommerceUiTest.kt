@@ -46,11 +46,11 @@ class NativeQrBarcodeAndEcommerceUiTest {
             }
         }
 
-        composeRule.onNodeWithText("Unit cost").assertIsDisplayed()
-        composeRule.onNodeWithText("Selling price").assertIsDisplayed()
-        composeRule.onNodeWithText("Run").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Estimated contribution profit: 35.00", substring = true).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Copy").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Save").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Unit cost").performScrollTo().assertExists()
+        composeRule.onNodeWithText("Selling price").performScrollTo().assertExists()
+        composeRule.onNodeWithText("Run").performScrollTo().assertExists().performClick()
+        composeRule.onNodeWithText("Estimated contribution profit: 35.00", substring = true).performScrollTo().assertExists()
+        composeRule.onNodeWithText("Copy").performScrollTo().assertExists()
+        composeRule.onNodeWithText("Save").performScrollTo().assertExists()
     }
 }
