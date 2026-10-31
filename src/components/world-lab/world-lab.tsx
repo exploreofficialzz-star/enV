@@ -17,6 +17,7 @@ import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
+import {calculateObjectCollision,sampleObjectCollision,type ObjectCollisionRun} from "@/lib/world-lab/object-collision";
 import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
   summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
@@ -206,9 +207,24 @@ export default function WorldLab() {
   const [youngModulus, setYoungModulus] = useState("");
   const [beamLoadN,setBeamLoadN]=useState(1000);
   const [beamRun,setBeamRun]=useState<StructuralBendingEvidence|null>(null);
+  const [collisionOtherId,setCollisionOtherId]=useState("");
+  const [collisionLeftSpeed,setCollisionLeftSpeed]=useState(2);
+  const [collisionRightSpeed,setCollisionRightSpeed]=useState(0);
+  const [collisionRestitution,setCollisionRestitution]=useState(0.5);
+  const [collisionRun,setCollisionRun]=useState<ObjectCollisionRun|null>(null);
+  const [collisionTime,setCollisionTime]=useState(0);
+  const [collisionPlaying,setCollisionPlaying]=useState(false);
+  const [collisionPlaybackRate,setCollisionPlaybackRate]=useState(1);
   const materials = project?.materials ?? [];
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
+  const collisionPartner=project?.entities.find(e=>e.id===collisionOtherId);
+  const selectedCollision=collisionRun &&project?.id===collisionRun.projectId &&
+    project?.revision===collisionRun.projectRevision &&
+    project.entities.some(e=>e.id===collisionRun.leftEntityId) &&
+    project.entities.some(e=>e.id===collisionRun.rightEntityId) ?collisionRun:null;
+  const collisionSample=selectedCollision?
+    sampleObjectCollision(selectedCollision,Math.min(collisionTime,selectedCollision.durationSeconds)):null;
   const selectedQuantities = selectedEntity ? solidQuantities(selectedEntity, selectedMaterial) : null;
   const chemicalSample=chemicalRun?sampleChemicalThermal(chemicalRun,chemicalTime):null;
   const measurementTarget=project?.entities.find(e=>e.id===measureTargetId)??null;
@@ -533,6 +549,35 @@ export default function WorldLab() {
     }
   }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project, currentRun, heat]);
 
+  useEffect(()=>{
+    if(!collisionPlaying||!selectedCollision)return;
+    let frame=0,previous=0;
+    const tick=(now:number)=>{
+      if(previous){
+        const elapsed=Math.min(0.05,(now-previous)/1000);
+        setCollisionTime(t=>Math.min(selectedCollision.durationSeconds,t+elapsed*collisionPlaybackRate));
+      }
+      previous=now;frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(frame);
+  },[collisionPlaying,selectedCollision,collisionPlaybackRate]);
+  useEffect(()=>{
+    if(selectedCollision&&collisionTime>=selectedCollision.durationSeconds)
+      setCollisionPlaying(false);
+  },[selectedCollision,collisionTime]);
+  useEffect(()=>{
+    const scene=sceneRef.current;
+    if(!scene)return;
+    for(const entity of project?.entities??[]){
+      const mesh=scene.addedShapes.get(entity.id);
+      if(!mesh)continue;
+      mesh.position.x=collisionSample && selectedCollision?.leftEntityId===entity.id
+        ?collisionSample.leftCenterXM:
+        collisionSample && selectedCollision?.rightEntityId===entity.id
+          ?collisionSample.rightCenterXM:entity.positionMeters[0];
+    }
+  },[collisionSample,selectedCollision,project]);
   useEffect(() => {
     if (!actuatorPlaying || !actuatorRun) return;
     let frame=0;
@@ -858,6 +903,7 @@ export default function WorldLab() {
     setFluidMotionPlaying(false);setFluidMotionRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
     setWiredMotorRun(null);setDigitalMotorRun(null);setBeamRun(null);setDcRun(null);setRemoteJob(null);
+    setCollisionPlaying(false);setCollisionRun(null);setCollisionTime(0);
   }
   function mutateProject(transform:(current:WorldLabProject)=>WorldLabProject){
     const current=projectForEdits.current;
