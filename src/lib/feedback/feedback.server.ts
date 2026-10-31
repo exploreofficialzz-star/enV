@@ -34,8 +34,11 @@ function cronMatches(request: Request) {
 }
 function reporterDigest(request: Request, userId: string | null, secret: string) {
   if (userId) return digest("user:" + userId, secret);
-  const forwarded = request.headers.get("x-vercel-forwarded-for") ?? request.headers.get("x-forwarded-for") ?? request.headers.get("cf-connecting-ip") ?? "unknown";
-  const address = forwarded.split(",").at(-1)?.trim().slice(0, 128) || "unknown";
+  // Only use Vercel's platform-injected address header. Generic forwarding headers
+  // can be supplied by clients and must not control abuse-limit identities.
+  const forwarded = request.headers.get("x-vercel-forwarded-for");
+  const address = forwarded?.split(",").at(-1)?.trim().slice(0, 128);
+  if (!address) throw new FeedbackError("FEEDBACK_RATE_LIMIT_UNAVAILABLE", "The secure abuse-control identity is unavailable. Please retry later.", 503);
   return digest("network:" + address, secret);
 }
 export async function createFeedbackTicket(request: Request, input: unknown) {
