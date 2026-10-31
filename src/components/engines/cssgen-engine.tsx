@@ -97,7 +97,9 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   ],
   wave: [
     { name: "amp", label: "Wave height", type: "number", defaultValue: 24, min: 0, max: 58, suffix: "px" },
-    { name: "fill", label: "Fill color", type: "color", defaultValue: "#0d9f8a" },
+    { name: "layers", label: "Wave layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }] },
+    { name: "fill", label: "Front wave", type: "color", defaultValue: "#0d9f8a" },
+    { name: "secondary", label: "Back wave", type: "color", defaultValue: "#7c4dff" },
     { name: "background", label: "Canvas color", type: "color", defaultValue: "#ffffff" },
   ],
   noise: [
@@ -251,19 +253,37 @@ function cssFor(family: string, values: Record<string, string>) {
   if (family === "blob") {
     const seed = numberValue(values, "seed", 7, 1, 999);
     const count = Number(values.points ?? 12);
-    const points = Array.from({ length: clamp(count, 8, 18) }, (_, index) => {
+    const coordinates = Array.from({ length: clamp(count, 8, 18) }, (_, index) => {
       const angle = (index / count) * Math.PI * 2;
       const radius = 34 + ((seed * (index + 3) * 13) % 20);
-      return `${50 + Math.cos(angle) * radius} ${50 + Math.sin(angle) * radius}`;
+      return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
+    });
+    const middle = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    const start = middle(coordinates[coordinates.length - 1], coordinates[0]);
+    const curve = coordinates.map((point, index) => {
+      const next = coordinates[(index + 1) % coordinates.length];
+      const end = middle(point, next);
+      return `Q ${point.x.toFixed(2)} ${point.y.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
     }).join(" ");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon fill="${values.color ?? "#0d9f8a"}" points="${points}"/></svg>`;
+    const path = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} ${curve} Z`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100"><path fill="${values.color ?? "#0d9f8a"}" d="${path}"/></svg>`;
     return { css: svg, style: {}, svg };
   }
   if (family === "wave") {
     const amplitude = numberValue(values, "amp", 24, 0, 58);
+    const layerCount = numberValue(values, "layers", 2, 1, 3);
     const fill = values.fill ?? "#0d9f8a";
+    const secondary = values.secondary ?? "#7c4dff";
     const background = values.background ?? "#ffffff";
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 160" preserveAspectRatio="none"><rect width="1440" height="160" fill="${background}"/><path fill="${fill}" d="M0 80 C240 ${80 - amplitude}, 480 ${80 + amplitude}, 720 80 S1200 ${80 - amplitude}, 1440 80 L1440 160 L0 160 Z"/></svg>`;
+    const paths = Array.from({ length: layerCount }, (_, index) => {
+      const offset = (layerCount - index - 1) * amplitude * 0.32;
+      const height = Math.max(4, amplitude * (1 - index * 0.16));
+      const base = 76 + offset;
+      const d = `M0 ${base} C240 ${base - height}, 480 ${base + height}, 720 ${base} S1200 ${base - height}, 1440 ${base} L1440 160 L0 160 Z`;
+      const color = index % 2 === 0 ? fill : secondary;
+      return `<path fill="${color}" opacity="${1 - index * 0.12}" d="${d}"/>`;
+    }).join("");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 160" preserveAspectRatio="none"><rect width="1440" height="160" fill="${background}"/>${paths}</svg>`;
     return { css: svg, style: {}, svg };
   }
   const opacity = numberValue(values, "opacity", 0.08, 0, 1);
