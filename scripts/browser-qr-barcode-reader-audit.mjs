@@ -81,7 +81,8 @@ async function combineQrAndBarcode(qrBytes, barcodeSvgBytes) {
     ]);
     const gap = 24;
     const canvas = document.createElement("canvas");
-    canvas.width = qr.naturalWidth + barcode.naturalWidth + gap;
+    // Left margin + inter-code gap + right margin are all 24px.
+    canvas.width = qr.naturalWidth + barcode.naturalWidth + gap * 3;
     canvas.height = Math.max(qr.naturalHeight, barcode.naturalHeight) + gap * 2;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Could not create a combined barcode fixture.");
