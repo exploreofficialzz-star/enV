@@ -104,6 +104,21 @@ class NativeWorldLabEditorTest {
         assertEquals(3,NativeWorldLabProjectCodec.decode(json).entities.size)
         assertTrue(NativeWorldLabProjectCodec.decode(json).assemblies.isEmpty())
     }
+    @Test fun digitalOutputsRewireToActualCombinationalNodesOnly(){
+        var json=NativeWorldLabEditor.startDigitalInvention(
+            NativeWorldLabEditor.blank(),id="invented")
+        json=NativeWorldLabEditor.digitalOutputSource(
+            json,"invented","output_q","input_a")
+        json=NativeWorldLabEditor.digitalSwitch(json,"invented","input_a",true)
+        val project=NativeWorldLabProjectCodec.decode(json)
+        assertEquals("input_a",project.digitalNetworks[0].outputs[0].sourceNodeId)
+        assertEquals(1,NativeWorldLabDigitalLogic.evaluate(
+            project.digitalNetworks[0])["output_q"])
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.digitalOutputSource(
+                json,"invented","output_q","does-not-exist")
+        }
+    }
     @Test fun rejectsWrongShapeBadDimensionsDanglingMaterialsAndUntrustedNames(){
         val initial=fixture()
         assertThrows(IllegalArgumentException::class.java){
