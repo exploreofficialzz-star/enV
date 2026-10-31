@@ -317,3 +317,7 @@ release-candidate evidence bundle are unfinished.
 ## iOS native revision-safe undo/redo (2026-10-31)
 
 - Added 50-step Swift source-history storage for v1 portable JSON, requiring strict pre/post-decoding and monotonic revision advancement. Each undo/redo restores a previous component/solid/material arrangement as **a new revision**, preserving auditability; a new edit clears redo, and new/open/save/import clear in-memory history. SwiftUI exposes native Undo/Redo, invalidates science outputs after state travel and restores the native SceneKit geometry. Tests authored; simulator validation remains pending final acceptance.
+
+## Portable multi-solid visual invention assemblies (2026-10-31)
+
+- Added optional `assemblies` to the strict v1 World Lab project schema, bounded to 50 groups with 2–30 unique solid members each, no overlap/dangling IDs, and no breakage for existing projects without the field. Pure, schema-validated group creation, displacement and ungrouping protect original entities; mass/volume summaries leave missing invented densities unknown and do not invent joints. Web has progressive disclosure to combine selected solids, move grouped solids together on X/Y/Z and separate without deleting parts. Deleting a selected solid safely drops membership or an undersized group. Numerical/model tests written and included in future consolidated audit. Native code still needs optional assembly preservation.

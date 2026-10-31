@@ -14,6 +14,8 @@ import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/wo
 import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitNode}
   from "@/lib/world-lab/network-graph";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
+import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
+  summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
   snapSolidPosition,measureSolidCenters} from "@/lib/world-lab/edit-history";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
@@ -110,6 +112,9 @@ export default function WorldLab() {
   const [editEpoch,setEditEpoch]=useState(0);
   const [gridStep,setGridStep]=useState(0.5);
   const [measureTargetId,setMeasureTargetId]=useState("");
+  const [assemblyName,setAssemblyName]=useState("My invention");
+  const [assemblySecondId,setAssemblySecondId]=useState("");
+  const [assemblyStep,setAssemblyStep]=useState(0.5);
   function setProject(value:WorldLabProject|null|
     ((current:WorldLabProject|null)=>WorldLabProject|null)){
     const next=typeof value==="function"?value(projectForEdits.current):value;
@@ -1354,6 +1359,76 @@ export default function WorldLab() {
               {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · not measured
             </p>
           </div>
+          <section className="mt-3 rounded-lg border border-border p-3" aria-label="Build interconnected visual assemblies">
+            <h3 className="text-sm font-semibold">Build an invention from parts</h3>
+            <p className="text-xs text-muted-foreground">
+              Group two created solids and move them together. This links their layout,
+              but does not invent a physical joint or certified rigidity.
+            </p>
+            {selectedEntity&&<div className="mt-2 grid grid-cols-2 gap-2">
+              <label className="text-xs">Assembly name
+                <input className={inputLabel} maxLength={120}
+                  aria-label="Assembly name" value={assemblyName}
+                  onChange={e=>setAssemblyName(e.target.value)}/>
+              </label>
+              <label className="text-xs">Second part
+                <select className={inputLabel} aria-label="Assembly second solid"
+                  value={assemblySecondId}
+                  onChange={e=>setAssemblySecondId(e.target.value)}>
+                  <option value="">Choose another solid</option>
+                  {project?.entities.filter(e=>e.id!==selectedEntity.id &&
+                    !(project?.assemblies??[]).some(a=>a.entityIds.includes(e.id))).map(e=>
+                      <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </label>
+              <button className={buttonClass} type="button"
+                disabled={!assemblyName.trim()||!assemblySecondId||
+                  (project?.assemblies?.length??0)>=50||
+                  (project?.assemblies??[]).some(a=>a.entityIds.includes(selectedEntity.id))}
+                onClick={()=>mutateProject(p=>createWorldLabAssembly(p,crypto.randomUUID(),
+                  assemblyName,[selectedEntity.id,assemblySecondId]))}>
+                Connect these visual parts
+              </button>
+            </div>}
+            {project?.assemblies?.map(a=>{
+              const details=summarizeWorldLabAssembly(project,a.id);
+              return <div key={a.id} className="mt-2 rounded border border-border p-2 text-xs">
+                <p className="font-medium">{a.name} · {details.count} solids</p>
+                <p>Combined shape volumes: {details.volumeM3.toFixed(4)} m³</p>
+                <p>Assumed combined mass: {details.assumedMassKg===null?"Unknown":
+                  details.assumedMassKg.toFixed(3)+" kg"}</p>
+                <p className="text-muted-foreground">{details.validity}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  {(["X","Y","Z"] as const).map((axis,index)=><span key={axis}
+                    className="flex flex-wrap items-center gap-1">
+                    <button type="button" className={buttonClass}
+                      aria-label={"Move "+a.name+" negative "+axis}
+                      onClick={()=>mutateProject(p=>moveWorldLabAssembly(p,a.id,
+                        ([0,1,2] as const).map(i=>i===index?-assemblyStep:0) as [number,number,number]))}>
+                      −{axis}
+                    </button>
+                    <button type="button" className={buttonClass}
+                      aria-label={"Move "+a.name+" positive "+axis}
+                      onClick={()=>mutateProject(p=>moveWorldLabAssembly(p,a.id,
+                        ([0,1,2] as const).map(i=>i===index?assemblyStep:0) as [number,number,number]))}>
+                      +{axis}
+                    </button>
+                  </span>)}
+                  <button type="button" className={buttonClass}
+                    onClick={()=>mutateProject(p=>ungroupWorldLabAssembly(p,a.id))}>
+                    Disconnect group
+                  </button>
+                </div>
+              </div>;
+            })}
+            <label className="mt-2 block text-xs">Group movement increment (m)
+              <select className={inputLabel} aria-label="Assembly movement increment"
+                value={assemblyStep} onChange={e=>setAssemblyStep(Number(e.target.value))}>
+                <option value={0.1}>0.1</option><option value={0.5}>0.5</option>
+                <option value={1}>1</option><option value={5}>5</option>
+              </select>
+            </label>
+          </section>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
               onClick={() => setSeeInside((value) => !value)}>See Inside</button>
@@ -1368,7 +1443,11 @@ export default function WorldLab() {
             <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
               onClick={() => addShape("cylinder")}>Add cylinder</button>
             <button type="button" className={buttonClass} disabled={!selectedEntity}
-              onClick={() => {if(selectedEntity)mutateProject(p=>({...p,entities:p.entities.filter(e=>e.id!==selectedEntity.id)}));
+              onClick={() => {if(selectedEntity)mutateProject(p=>({...p,
+                entities:p.entities.filter(e=>e.id!==selectedEntity.id),
+                assemblies:(p.assemblies??[]).map(a=>({...a,entityIds:a.entityIds.filter(id=>
+                  id!==selectedEntity.id)})).filter(a=>a.entityIds.length>=2),
+              }));
                 setSelectedEntityId("");}}>Remove selected</button>
               <button type="button" className={buttonClass} disabled={!canUndo}
                 aria-label="Undo World Lab edit" onClick={()=>travelEdit("undo")}>Undo</button>
