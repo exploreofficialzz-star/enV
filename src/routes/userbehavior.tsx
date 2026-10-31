@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Activity, AlertTriangle, BarChart3, Monitor, LogOut, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
@@ -96,7 +96,7 @@ function UserBehaviorDashboard() {
 
   useEffect(() => {
     if (enabled) void loadSummary();
-  }, [enabled]);
+  }, [enabled, loadSummary]);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
