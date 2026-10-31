@@ -550,3 +550,179 @@ enum NativeWorldLabCollision {
             energyAfterJ:energyAfter,dissipatedEnergyJ:lost)
     }
 }
+
+
+/// A single frictionless first-contact impulse for two nonrotating spherical solids.
+struct NativeSphereImpactSample {
+    let timeSeconds:Double
+    let firstCentreM:[Double]
+    let secondCentreM:[Double]
+    let firstVelocityMps:[Double]
+    let secondVelocityMps:[Double]
+    let collided:Bool
+}
+struct NativeSphereImpactResult:Encodable {
+    let format="env-world-lab-sphere-impact-3d"
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let assumptionEvidence="hypothetical-user-assumed"
+    let projectId:String
+    let projectRevision:Int
+    let firstEntityId:String
+    let secondEntityId:String
+    let firstMaterialId:String
+    let secondMaterialId:String
+    let initialFirstCentreM:[Double]
+    let initialSecondCentreM:[Double]
+    let firstInitialVelocityMps:[Double]
+    let secondInitialVelocityMps:[Double]
+    let firstFinalVelocityMps:[Double]
+    let secondFinalVelocityMps:[Double]
+    let firstRadiusM:Double
+    let secondRadiusM:Double
+    let firstMassKg:Double
+    let secondMassKg:Double
+    let impactTimeSeconds:Double
+    let durationSeconds:Double
+    let restitution:Double
+    let impactNormal:[Double]
+    let impulseNs:[Double]
+    let momentumBeforeKgMps:[Double]
+    let momentumAfterKgMps:[Double]
+    let angularMomentumBeforeKgM2PerS:[Double]
+    let angularMomentumAfterKgM2PerS:[Double]
+    let energyBeforeJ:Double
+    let energyAfterJ:Double
+    let dissipatedEnergyJ:Double
+    let validity="One first contact of two ideal smooth, nonrotating rigid spheres in force-free 3D space; instantaneous frictionless normal impulse. No gravitation, obstacles, walls, spin, rolling, deformability, fracture, or secondary contact. Density and restitution are invented user assumptions, not measured evidence."
+    func sample(_ time:Double)throws->NativeSphereImpactSample {
+        guard time.isFinite,time>=0,time<=durationSeconds else {
+            throw NativeWorldLabError.invalid("Sphere playback time is outside simulated interval")
+        }
+        let before=min(time,impactTimeSeconds)
+        let after=max(0,time-impactTimeSeconds)
+        func trajectory(_ p:[Double],_ v:[Double],_ w:[Double])->[Double] {
+            (0..<3).map{i in p[i]+v[i]*before+w[i]*after}
+        }
+        return NativeSphereImpactSample(timeSeconds:time,
+            firstCentreM:trajectory(initialFirstCentreM,
+                firstInitialVelocityMps,firstFinalVelocityMps),
+            secondCentreM:trajectory(initialSecondCentreM,
+                secondInitialVelocityMps,secondFinalVelocityMps),
+            firstVelocityMps:time<impactTimeSeconds ? firstInitialVelocityMps:firstFinalVelocityMps,
+            secondVelocityMps:time<impactTimeSeconds ? secondInitialVelocityMps:secondFinalVelocityMps,
+            collided:time>=impactTimeSeconds)
+    }
+}
+enum NativeWorldLabSphereImpact {
+    private static func add(_ a:[Double],_ b:[Double])->[Double] {
+        (0..<3).map{i in a[i]+b[i]}
+    }
+    private static func sub(_ a:[Double],_ b:[Double])->[Double] {
+        (0..<3).map{i in a[i]-b[i]}
+    }
+    private static func scale(_ a:[Double],_ value:Double)->[Double] {
+        a.map{$0*value}
+    }
+    private static func dot(_ a:[Double],_ b:[Double])->Double {
+        (0..<3).reduce(0){sum,i in sum+a[i]*b[i]}
+    }
+    private static func norm(_ a:[Double])->Double {sqrt(dot(a,a))}
+    private static func cross(_ a:[Double],_ b:[Double])->[Double] {
+        [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
+    }
+    static func evaluate(_ project:NativeWorldLabProject,
+        firstId:String,secondId:String,
+        firstVelocityMps:[Double],secondVelocityMps:[Double],
+        restitution:Double,durationSeconds:Double=4)throws->NativeSphereImpactResult {
+        guard firstId != secondId,
+              let a=project.entities.first(where:{$0.id==firstId}),
+              let b=project.entities.first(where:{$0.id==secondId}),
+              a.shape=="sphere",b.shape=="sphere" else {
+            throw NativeWorldLabError.invalid("Real spatial contact needs two distinct spheres")
+        }
+        guard firstVelocityMps.count==3,secondVelocityMps.count==3,
+              firstVelocityMps.allSatisfy({$0.isFinite}),
+              secondVelocityMps.allSatisfy({$0.isFinite}),
+              norm(firstVelocityMps)<=100,norm(secondVelocityMps)<=100,
+              restitution.isFinite,restitution>=0,restitution<=1,
+              durationSeconds.isFinite,durationSeconds>0,durationSeconds<=30 else {
+            throw NativeWorldLabError.invalid("Sphere velocities <=100 m/s, restitution 0–1 and duration (0,30] s")
+        }
+        let pa=a.positionMeters
+        let pb=b.positionMeters
+        let ra=a.dimensionsMeters[0]/2
+        let rb=b.dimensionsMeters[0]/2
+        let d=sub(pb,pa)
+        let rel=sub(secondVelocityMps,firstVelocityMps)
+        let radius=ra+rb
+        guard norm(d)>radius+1e-9 else {
+            throw NativeWorldLabError.invalid("Spheres must start separated, never touching or overlapping")
+        }
+        let qa=dot(rel,rel)
+        let qb=2*dot(d,rel)
+        let qc=dot(d,d)-radius*radius
+        guard qa>0,qb<0 else {
+            throw NativeWorldLabError.invalid("Sphere velocities must initially approach")
+        }
+        let discriminant=qb*qb-4*qa*qc
+        guard discriminant>=0 else {
+            throw NativeWorldLabError.invalid("These spheres miss one another")
+        }
+        let hit=(-qb-sqrt(discriminant))/(2*qa)
+        guard hit.isFinite,hit>=0,hit<=durationSeconds else {
+            throw NativeWorldLabError.invalid("No 3D sphere collision occurs within duration")
+        }
+        let n=scale(add(d,scale(rel,hit)),1/radius)
+        let closing=dot(rel,n)
+        guard abs(norm(n)-1)<=1e-7,closing < -1e-10 else {
+            throw NativeWorldLabError.invalid("Sphere contact is non-inward or lacks geometric validity")
+        }
+        guard let matA=project.materials.first(where:{$0.id==a.materialId}),
+              let matB=project.materials.first(where:{$0.id==b.materialId}),
+              let rhoA=matA.densityKgM3,let rhoB=matB.densityKgM3 else {
+            throw NativeWorldLabError.invalid("Both spheres require assumed invented densities")
+        }
+        let ma=rhoA*a.volumeMetersCubed
+        let mb=rhoB*b.volumeMetersCubed
+        guard ma.isFinite,mb.isFinite,ma>=0.001,mb>=0.001,
+              ma<=10000,mb<=10000 else {
+            throw NativeWorldLabError.invalid("Sphere inertial mass must be 0.001–10000 kg")
+        }
+        let impulse=scale(n,-(1+restitution)*closing/(1/ma+1/mb))
+        let va=sub(firstVelocityMps,scale(impulse,1/ma))
+        let vb=add(secondVelocityMps,scale(impulse,1/mb))
+        let pBefore=add(scale(firstVelocityMps,ma),scale(secondVelocityMps,mb))
+        let pAfter=add(scale(va,ma),scale(vb,mb))
+        let eBefore=0.5*(ma*dot(firstVelocityMps,firstVelocityMps)+mb*dot(secondVelocityMps,secondVelocityMps))
+        let eAfter=0.5*(ma*dot(va,va)+mb*dot(vb,vb))
+        let lost=0.5*ma*mb/(ma+mb)*(1-restitution*restitution)*closing*closing
+        let hitA=add(pa,scale(firstVelocityMps,hit))
+        let hitB=add(pb,scale(secondVelocityMps,hit))
+        let angularBefore=add(scale(cross(hitA,firstVelocityMps),ma),
+            scale(cross(hitB,secondVelocityMps),mb))
+        let angularAfter=add(scale(cross(hitA,va),ma),scale(cross(hitB,vb),mb))
+        let tol=1e-8
+        guard (impulse+va+vb+pBefore+pAfter+angularBefore+angularAfter).allSatisfy({$0.isFinite}),
+              [eBefore,eAfter,lost].allSatisfy({$0.isFinite}),
+              norm(sub(pBefore,pAfter))<=tol*max(1,norm(pBefore)),
+              norm(sub(angularBefore,angularAfter))<=tol*max(1,norm(angularBefore)),
+              abs(eBefore-eAfter-lost)<=tol*max(1,eBefore),
+              eAfter<=eBefore+tol*max(1,eBefore) else {
+            throw NativeWorldLabError.invalid("3D contact violated energy or momentum conservation")
+        }
+        return NativeSphereImpactResult(projectId:project.id,
+            projectRevision:project.revision,firstEntityId:a.id,secondEntityId:b.id,
+            firstMaterialId:matA.id,secondMaterialId:matB.id,
+            initialFirstCentreM:pa,initialSecondCentreM:pb,
+            firstInitialVelocityMps:firstVelocityMps,secondInitialVelocityMps:secondVelocityMps,
+            firstFinalVelocityMps:va,secondFinalVelocityMps:vb,
+            firstRadiusM:ra,secondRadiusM:rb,firstMassKg:ma,secondMassKg:mb,
+            impactTimeSeconds:hit,durationSeconds:durationSeconds,restitution:restitution,
+            impactNormal:n,impulseNs:impulse,
+            momentumBeforeKgMps:pBefore,momentumAfterKgMps:pAfter,
+            angularMomentumBeforeKgM2PerS:angularBefore,
+            angularMomentumAfterKgM2PerS:angularAfter,
+            energyBeforeJ:eBefore,energyAfterJ:eAfter,dissipatedEnergyJ:lost)
+    }
+}
