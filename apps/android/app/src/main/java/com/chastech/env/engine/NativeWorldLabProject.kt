@@ -38,12 +38,16 @@ data class NativeLabCircuitNetwork(
     val id:String,val name:String,val groundNodeId:String,
     val nodes:List<NativeLabCircuitNode>,val components:List<NativeLabCircuitComponent>
 )
+data class NativeLabAssembly(
+    val id:String,val name:String,val entityIds:List<String>
+)
 data class NativeWorldLabProject(
     val id: String, val title: String, val revision: Int, val createdAt: String,
     val updatedAt: String, val cameraPositionMeters: NativeLabVector,
     val cameraLookingAtMeters: NativeLabVector, val entities: List<NativeLabSolid>,
     val materials: List<NativeLabMaterial>,
     val networks: List<NativeLabCircuitNetwork> = emptyList(),
+    val assemblies:List<NativeLabAssembly> = emptyList(),
 )
 object NativeWorldLabProjectCodec {
     const val MAX_BYTES=1024*1024
@@ -84,7 +88,8 @@ object NativeWorldLabProjectCodec {
         val essential=setOf("format","schemaVersion","id","title","revision","createdAt","updatedAt",
             "world","camera","entities","materials")
         val supplied=p.keys().asSequence().toSet()
-        require(supplied==essential || supplied==essential+setOf("networks")) {
+        require(supplied.subtract(setOf("networks","assemblies"))==essential &&
+            supplied.size<=essential.size+2) {
             "Unexpected World Lab project keys"
         }
         require(p.getString("format")=="env-world-lab" && p.getInt("schemaVersion")==1)
@@ -183,9 +188,34 @@ object NativeWorldLabProjectCodec {
             NativeLabCircuitNetwork(id(net,"id"),name(net,"name"),ground,nodes,components)
         }
         require(networks.map{it.id}.toSet().size==networks.size)
+        val rawGroups=if(p.has("assemblies"))p.getJSONArray("assemblies") else JSONArray()
+        require(rawGroups.length()<=50){"Portable assemblies exceed 50 groups"}
+        val entitySet=entities.map{it.id}.toSet()
+        val allMembers=mutableSetOf<String>()
+        val groupIds=mutableSetOf<String>()
+        val assemblies=(0 until rawGroups.length()).map{i->
+            val group=rawGroups.getJSONObject(i)
+            keys(group,setOf("id","name","entityIds"))
+            val groupId=id(group,"id")
+            require(groupIds.add(groupId)){"Duplicate assembly ID"}
+            val title=name(group,"name")
+            val rawMembers=group.getJSONArray("entityIds")
+            require(rawMembers.length() in 2..30){"Assemblies require 2–30 existing solids"}
+            val ids=(0 until rawMembers.length()).map{j->
+                val identity=rawMembers.getString(j)
+                require(validId.matches(identity)&&identity in entitySet){
+                    "Assembly includes an unknown solid"
+                }
+                require(allMembers.add(identity)){
+                    "One solid cannot belong to overlapping assemblies"
+                }
+                identity
+            }
+            NativeLabAssembly(groupId,title,ids)
+        }
         return NativeWorldLabProject(projectId,title,revision.toInt(),created,updated,
             vector(camera.getJSONArray("positionMeters")),
-            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks)
+            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks,assemblies)
     }
 }
 

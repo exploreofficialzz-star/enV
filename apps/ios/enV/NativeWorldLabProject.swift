@@ -66,6 +66,11 @@ struct NativeLabCircuitNetwork:Decodable {
     let nodes:[NativeLabCircuitNode]
     let components:[NativeLabCircuitComponent]
 }
+struct NativeLabAssembly:Decodable {
+    let id:String
+    let name:String
+    let entityIds:[String]
+}
 struct NativeWorldLabProject: Decodable {
     struct World: Decodable {
         let frame: String
@@ -89,6 +94,7 @@ struct NativeWorldLabProject: Decodable {
     let entities: [NativeLabSolid]
     let materials: [NativeLabMaterial]
     let networks: [NativeLabCircuitNetwork]?
+    let assemblies:[NativeLabAssembly]?
 
     static let maxBytes = 1_048_576
     static func decode(_ data: Data) throws -> NativeWorldLabProject {
@@ -100,7 +106,8 @@ struct NativeWorldLabProject: Decodable {
         let essential:Set<String>=["format","schemaVersion","id","title","revision",
             "createdAt","updatedAt","world","camera","entities","materials"]
         let keys=Set(root.keys)
-        guard keys==essential || keys==essential.union(["networks"]) else {
+        guard keys.subtracting(["networks","assemblies"])==essential &&
+              keys.count<=essential.count+2 else {
             throw NativeWorldLabError.invalid("Unexpected or missing World Lab JSON keys")
         }
         guard let world = root["world"] as? [String: Any],
@@ -199,6 +206,35 @@ struct NativeWorldLabProject: Decodable {
                                 "An invented component needs a bounded assumed Ohmic law")
                         }
                     }
+                }
+            }
+        }
+        if root.keys.contains("assemblies") && !(root["assemblies"] is [[String:Any]]) {
+            throw NativeWorldLabError.invalid("Assemblies must be bounded JSON objects")
+        }
+        let groups=(root["assemblies"] as? [[String:Any]]) ?? []
+        guard groups.count<=50 else {
+            throw NativeWorldLabError.invalid("Too many visual assemblies")
+        }
+        var groupIds:Set<String>=[]
+        var includedSolidIds:Set<String>=[]
+        let solidIds=Set(entities.compactMap{$0["id"] as? String})
+        for group in groups {
+            try requireKeys(group,["id","name","entityIds"])
+            guard let id=group["id"] as? String,
+                  let name=group["name"] as? String,
+                  let members=group["entityIds"] as? [String],
+                  (2...30).contains(members.count) else {
+                throw NativeWorldLabError.invalid("Assemblies need 2–30 actual solid IDs")
+            }
+            try validateId(id);try validateName(name)
+            guard groupIds.insert(id).inserted else {
+                throw NativeWorldLabError.invalid("Duplicate assembly identity")
+            }
+            for member in members {
+                try validateId(member)
+                guard solidIds.contains(member),includedSolidIds.insert(member).inserted else {
+                    throw NativeWorldLabError.invalid("Assembly has missing or overlapping solid")
                 }
             }
         }

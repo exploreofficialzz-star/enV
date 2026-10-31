@@ -110,6 +110,18 @@ final class NativeWorldLabProjectTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabFluidMotion.evaluate(
             project,entityId:"float",input:impossible))
     }
+    func testPortableAssemblyMembershipRejectsUnknownSolids() throws {
+        let original=try NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),
+                shape:"box",id:"a"),shape:"box",id:"b")
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:original) as? [String:Any])
+        root["assemblies"]=[["id":"group","name":"Two invented parts","entityIds":["a","b"]]]
+        let combined=try NativeWorldLabProject.decode(JSONSerialization.data(withJSONObject:root))
+        XCTAssertEqual(combined.assemblies?.first?.entityIds.count,2)
+        root["assemblies"]=[["id":"group","name":"Broken","entityIds":["a","missing"]]]
+        XCTAssertThrowsError(try NativeWorldLabProject.decode(
+            JSONSerialization.data(withJSONObject:root)))
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))

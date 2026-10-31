@@ -111,6 +111,19 @@ class NativeWorldLabProjectTest {
                 input.copy(linearDragNsPerM=Double.NaN))
         }
     }
+    @Test fun portableVisualAssembliesStayValidAndCannotLoseMembers(){
+        val root=org.json.JSONObject(NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="a"),"box",id="b"))
+        root.put("assemblies",org.json.JSONArray().put(org.json.JSONObject()
+            .put("id","group").put("name","Visual machine")
+            .put("entityIds",org.json.JSONArray().put("a").put("b"))))
+        assertEquals(1,NativeWorldLabProjectCodec.decode(root.toString()).assemblies.size)
+        root.getJSONArray("assemblies").getJSONObject(0)
+            .getJSONArray("entityIds").put("missing")
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabProjectCodec.decode(root.toString())
+        }
+    }
     @Test fun rejectsUntrustedAttributesAndInvalidGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(

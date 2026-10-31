@@ -321,3 +321,7 @@ release-candidate evidence bundle are unfinished.
 ## Portable multi-solid visual invention assemblies (2026-10-31)
 
 - Added optional `assemblies` to the strict v1 World Lab project schema, bounded to 50 groups with 2–30 unique solid members each, no overlap/dangling IDs, and no breakage for existing projects without the field. Pure, schema-validated group creation, displacement and ungrouping protect original entities; mass/volume summaries leave missing invented densities unknown and do not invent joints. Web has progressive disclosure to combine selected solids, move grouped solids together on X/Y/Z and separate without deleting parts. Deleting a selected solid safely drops membership or an undersized group. Numerical/model tests written and included in future consolidated audit. Native code still needs optional assembly preservation.
+
+## Native portable visual assembly schema parity (2026-10-31)
+
+- Kotlin and Swift strict project v1 decoders now accept optional visual assemblies with 2–30 member solids, no missing/duplicate/overlapping membership, and up to 50 named groups. Their native project creation includes an empty assembly list; imported older projects without the field remain accepted. Regression cases are authored for valid and dangling memberships. Native group-editing controls are separate from schema preservation, and no rigid mechanics are inferred from group labels.
