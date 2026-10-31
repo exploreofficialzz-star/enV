@@ -5,6 +5,13 @@ import {parseScientificEvidenceRecord,type ScientificEvidenceRecord}
   from "./scientific-evidence.ts";
 import {WorldLabBackupError} from "./project-backups.server.ts";
 
+function canonical(value:unknown):string{
+  if(Array.isArray(value))return "["+value.map(canonical).join(",")+"]";
+  if(value!==null&&typeof value==="object")
+    return "{"+Object.keys(value as Record<string,unknown>).sort().map(key=>
+      JSON.stringify(key)+":"+canonical((value as Record<string,unknown>)[key])).join(",")+"}";
+  return JSON.stringify(value);
+}
 const safe=(s:unknown):s is string=>typeof s==="string"&&
   /^[A-Za-z0-9_-]{1,120}$/.test(s);
 function required(){
@@ -67,7 +74,7 @@ export async function uploadOwnedWorldLabScienceEvidence(
       "WHERE user_id=$1 AND project_id=$2 AND evidence_id=$3",
       [user,projectId,record.id]);
     if(existing.length){
-      if(JSON.stringify(parseScientificEvidenceRecord(existing[0].evidence_json))!==raw)
+      if(canonical(parseScientificEvidenceRecord(existing[0].evidence_json))!==canonical(record))
         throw new WorldLabBackupError("EVIDENCE_CONFLICT",
           "An immutable scientific record with this ID was already uploaded.");
       return existing[0];

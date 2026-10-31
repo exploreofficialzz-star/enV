@@ -412,3 +412,61 @@ export async function deleteLocalWorldLabScientificEvidence(
     tx.onerror=()=>{db.close();reject(failure??new Error("Scientific evidence deletion interrupted."));};
   });
 }
+
+/** Explicitly keep retrieved account evidence in an existing local invention.
+ * This does not rewrite its local revision or any recorded calculation.
+ */
+export async function saveLocalWorldLabScientificEvidence(
+  source:ScientificEvidenceRecord):Promise<void>{
+  const record=parseScientificEvidenceRecord(source);
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction([STORE,EVIDENCE],"readwrite");
+    const projects=tx.objectStore(STORE);
+    const store=tx.objectStore(EVIDENCE);
+    let problem:Error|null=null;
+    const abort=(cause:unknown)=>{
+      problem=cause instanceof Error?cause:new Error("Cannot import scientific evidence.");
+      tx.abort();
+    };
+    const projectRequest=projects.get(record.projectId);
+    projectRequest.onsuccess=()=>{
+      try{
+        const project=projectRequest.result?
+          parseWorldLabProject(projectRequest.result):null;
+        if(!project||record.projectRevision>project.revision)
+          throw new Error("Save this invention and its corresponding revision "+
+            "before importing the scientific record.");
+        const previous=store.get(record.id);
+        previous.onsuccess=()=>{
+          try{
+            if(previous.result){
+              if(canonicalEvidence(parseScientificEvidenceRecord(previous.result))!==
+                 canonicalEvidence(record))
+                throw new Error("This evidence ID is already used by a different record.");
+              return;
+            }
+            const count=store.index("projectId").count(record.projectId);
+            count.onsuccess=()=>{
+              if(count.result>=MAX_SCIENCE_EVIDENCE_PER_PROJECT){
+                abort(new Error("The device already holds 20 additional scientific records."));
+                return;
+              }
+              store.add(record);
+            };
+          }catch(error){abort(error);}
+        };
+      }catch(error){abort(error);}
+    };
+    tx.oncomplete=()=>{db.close();resolve();};
+    tx.onabort=()=>{db.close();reject(problem??new Error("Scientific record import aborted."));};
+    tx.onerror=()=>{db.close();reject(problem??new Error("Scientific record import failed."));};
+  });
+}
+function canonicalEvidence(value:unknown):string{
+  if(Array.isArray(value))return "["+value.map(canonicalEvidence).join(",")+"]";
+  if(value!==null&&typeof value==="object")
+    return "{"+Object.keys(value as Record<string,unknown>).sort().map(k=>
+      JSON.stringify(k)+":"+canonicalEvidence((value as Record<string,unknown>)[k])).join(",")+"}";
+  return JSON.stringify(value);
+}

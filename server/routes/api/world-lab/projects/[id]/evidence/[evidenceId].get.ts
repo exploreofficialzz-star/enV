@@ -1,8 +1,8 @@
 import {defineHandler} from "nitro/h3";
 import {getOwnedWorldLabScienceEvidence}
-  from "../../../../../../src/lib/world-lab/science-evidence-backups.server";
+  from "../../../../../../../src/lib/world-lab/science-evidence-backups.server";
 import {authorizeBackupRequest,backupResponse}
-  from "../../../../../../src/lib/world-lab/project-backups-http.server";
+  from "../../../../../../../src/lib/world-lab/project-backups-http.server";
 export default defineHandler(async event=>{
   const auth=await authorizeBackupRequest(event.req);
   if(auth.error)return auth.error;

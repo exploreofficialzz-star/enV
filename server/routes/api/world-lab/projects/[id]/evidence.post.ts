@@ -1,10 +1,10 @@
 import {defineHandler} from "nitro/h3";
-import {readBoundedJsonObject} from "../../../../../src/lib/billing/bounded-json.server";
+import {readBoundedJsonObject} from "../../../../../../src/lib/billing/bounded-json.server";
 import {uploadOwnedWorldLabScienceEvidence}
-  from "../../../../../src/lib/world-lab/science-evidence-backups.server";
-import {WorldLabBackupError} from "../../../../../src/lib/world-lab/project-backups.server";
+  from "../../../../../../src/lib/world-lab/science-evidence-backups.server";
+import {WorldLabBackupError} from "../../../../../../src/lib/world-lab/project-backups.server";
 import {authorizeBackupRequest,backupResponse}
-  from "../../../../../src/lib/world-lab/project-backups-http.server";
+  from "../../../../../../src/lib/world-lab/project-backups-http.server";
 export default defineHandler(async event=>{
   const auth=await authorizeBackupRequest(event.req);
   if(auth.error)return auth.error;
