@@ -423,7 +423,9 @@ struct NativeLabCollisionSample {
     let rightVelocityMps:Double
     let collided:Bool
 }
-struct NativeLabCollisionResult {
+struct NativeLabCollisionResult:Encodable {
+    let format="env-world-lab-object-collision"
+    let modelVersion="1.0.0"
     let projectId:String
     let projectRevision:Int
     let leftEntityId:String
