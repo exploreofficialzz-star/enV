@@ -329,6 +329,21 @@ fun NativeWorldLabForm() {
             }
         }
     }
+    val archiveExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null)scope.launch {
+            runCatching{withContext(Dispatchers.IO){
+                val json=projectJson?:error("Create a World Lab invention first")
+                val portable=NativeWorldLabPortableArchiveStore(context.filesDir).export(json)
+                val bytes=portable.toByteArray(Charsets.UTF_8)
+                require(bytes.size<=24*1024*1024){"Archive exceeds 24 MB"}
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(bytes);it.flush()
+                }?:error("Cannot open portable archive export destination")
+            }}.onSuccess{warning="Complete portable invention archive exported."}
+                .onFailure{warning=it.message?:"Portable archive could not be exported"}
+        }
+    }
     val sphereEvidencePicker=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null){
@@ -370,15 +385,32 @@ fun NativeWorldLabForm() {
                     while(true) {
                         val read=input.read(buffer)
                         if(read<0)break
-                        require(out.size()+read<=NativeWorldLabProjectCodec.MAX_BYTES) {
-                            "Project must be 1 MB or smaller."
+                        require(out.size()+read<=24*1024*1024) {
+                            "Portable project or archive must be 24 MB or smaller."
                         }
                         out.write(buffer,0,read)
                     }
                 }?:error("File could not be opened.")
                 val json=out.toString(Charsets.UTF_8.name())
-                Pair(json,NativeWorldLabProjectCodec.decode(json))
-            } }.onSuccess { projectJson=it.first;project=it.second;savedSnapshot=null;selected=0;warning="";editHistory.clear() }
+                val format=org.json.JSONObject(json).optString("format")
+                if(format=="env-world-lab-archive"){
+                    val imported=NativeWorldLabPortableArchiveStore(context.filesDir).import(json)
+                    Triple(imported.projectJson,imported.project,true)
+                }else{
+                    require(out.size()<=NativeWorldLabProjectCodec.MAX_BYTES){
+                        "Standalone projects cannot exceed 1 MB"}
+                    Triple(json,NativeWorldLabProjectCodec.decode(json),false)
+                }
+            } }.onSuccess {
+                projectJson=it.first;project=it.second
+                savedSnapshot=if(it.third)it.first else null
+                selectedSavedId=it.second.id
+                selected=0;warning=if(it.third)
+                    "Portable project and scientific history imported and saved on device."
+                    else ""
+                editHistory.clear()
+                if(it.third)refreshSavedProjects()
+            }
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
     }
@@ -593,9 +625,13 @@ fun NativeWorldLabForm() {
             Button(onClick={askReplace("new")}){Text("New project")}
             OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
                 enabled=projectJson!=null){Text("Export JSON")}
+            OutlinedButton(onClick={
+                if(projectJson!=null)archiveExportPicker.launch(
+                    "world-lab-complete-archive.json")
+            },enabled=projectJson!=null){Text("Export complete archive")}
         }
         OutlinedButton(onClick={askReplace("import")}) {
-            Text("Import World Lab project JSON")
+            Text("Import project or complete archive JSON")
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             Button(onClick={
