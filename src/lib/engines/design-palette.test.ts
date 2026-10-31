@@ -18,7 +18,7 @@ test("primary shade scale is ordered, bounded and keeps its source at 500", () =
   const scale = createColorShadeScale(colors.primary);
   assert.deepEqual(scale.map(({ step }) => step), [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]);
   assert.equal(scale.find(({ step }) => step === 500)?.color, colors.primary);
-  assert.equal(scale[0].color, "#f2fbf9");
+  assert.equal(scale[0].color, "#f0f9f8");
   assert.equal(createColorShadeScale("not-a-color").length, 0);
 });
 

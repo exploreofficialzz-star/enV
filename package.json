@@ -101,7 +101,7 @@
     "check:modal-moss": "node scripts/check-modal-moss-music.mjs",
     "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts src/lib/media/song-backend.test.ts src/lib/media/song-intelligence.test.ts src/lib/media/song-stem-separation.test.ts src/lib/media/spleeter-audio.test.ts src/lib/engines/music-dataset-analysis.test.ts src/lib/engines/music-sandbox.test.ts src/lib/engines/music-sandbox-analysis.test.ts",
     "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs",
-    "check:design": "node scripts/check-design.mjs"
+    "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/design-palette.test.ts && node scripts/check-design.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

@@ -26,6 +26,10 @@ const cssEngine = read("src/components/engines/cssgen-engine.tsx");
 const colorVision = read("src/lib/engines/color-vision.ts");
 const cssGradient = read("src/lib/engines/css-gradient.ts");
 const cssGradientTests = read("src/lib/engines/css-gradient.test.ts");
+const palette = read("src/lib/engines/design-palette.ts");
+const paletteTests = read("src/lib/engines/design-palette.test.ts");
+const palette = read("src/lib/engines/design-palette.ts");
+const paletteTests = read("src/lib/engines/design-palette.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const accessibilityEngine = read("src/components/engines/accessibility-engine.tsx");
@@ -39,13 +43,16 @@ const checks = [
   ["Distinct WCAG target checks", colorEngine.includes("getContrastTargets()") && colorEngine.includes("evaluateContrast")],
   ["Published CVD simulation utility", colorVision.includes("simulateColorVision") && colorVision.includes("protanopia") && colorVision.includes("tritanopia")],
   ["CVD regression tests", tests.includes("color vision simulations preserve neutral black and white")],
-  ["Accessibility Studio uses shared CVD model", accessibilityEngine.includes('from "@/lib/engines/color-vision"') && accessibilityEngine.includes("return simulateColorVision(hex, type);")],
-  ["Gradient modes and editable stops", cssEngine.includes("Add stop (") && cssEngine.includes("Distribute evenly") && cssEngine.includes("Reverse") && cssEngine.includes("GRADIENT_PRESETS.map")],
-  ["Gradient stop engine and regression tests", cssGradient.includes("normalizeGradientStops") && cssGradient.includes("repeating-linear-gradient") && cssGradientTests.includes("radial and conic gradients emit their selected geometry")],
-  ["Layered shadow presets", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from")],
-  ["Button hover and input focus preview states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible")],
+  ["Design color-vision simulator uses shared CVD model", colorEngine.includes('from "@/lib/engines/color-vision"') && colorEngine.includes("simulateColorVision(source, visionMode)")],
+  ["Gradient modes and editable stops", cssEngine.includes("Add stop (") && cssEngine.includes("Distribute evenly") && cssEngine.includes("Reverse") && cssEngine.includes("GRADIENT_PRESETS.map") && cssEngine.includes("Move earlier") && cssEngine.includes("Add a second soft gradient layer")],
+  ["Gradient stop engine and regression tests", cssGradient.includes("normalizeGradientStops") && cssGradient.includes("moveGradientStop") && cssGradient.includes("oklch") && cssGradientTests.includes("perceptual interpolation and radial sizing")],
+  ["Palette semantic roles and token exports", palette.includes("buildDesignPaletteExport") && ["css", "scss", "tailwind", "json", "tokens"].every((format) => palette.includes(`format === "${format}"`))],
+  ["Palette locking, sharing and image extraction", ["Lock color", "Copy share link", "Extract colors from an image", "Light preview", "Dark preview"].every((label) => colorEngine.includes(label))],
+  ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports")],
+  ["Layered shadow presets and opacity control", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from") && cssEngine.includes("Shadow opacity")],
+  ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
-  ["SVG shape color controls", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??")],
+  ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
 if (design.length !== expectedIds.length || missing.length || unexpected.length || duplicates.length || invalid.length || badType.length || failedChecks.length) {
