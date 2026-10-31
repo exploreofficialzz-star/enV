@@ -116,7 +116,7 @@ export function solveSphereImpact3d(raw:WorldLabProject,firstId:string,secondId:
     firstEntityId:a.id,secondEntityId:b.id,
     firstMaterialId:maMaterial!.id,secondMaterialId:mbMaterial!.id,
     initialFirstCentreM:pA,initialSecondCentreM:pB,
-    firstInitialVelocityMps,secondInitialVelocityMps,
+    firstInitialVelocityMps:firstVelocityMps,secondInitialVelocityMps:secondVelocityMps,
     firstFinalVelocityMps:nextA,secondFinalVelocityMps:nextB,
     firstRadiusM:rA,secondRadiusM:rB,firstMassKg:ma,secondMassKg:mb,
     impactTimeSeconds:hit,durationSeconds,restitution,
