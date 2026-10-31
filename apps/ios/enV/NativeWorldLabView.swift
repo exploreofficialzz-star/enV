@@ -49,6 +49,7 @@ struct NativeWorldLabView:View {
     @State private var assemblyName="My invention"
     @State private var assemblySecondId=""
     @State private var digitalShowCases=false
+    @State private var digitalNewGateName="Invented device"
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
@@ -370,6 +371,19 @@ struct NativeWorldLabView:View {
                     }
                 }
             }
+            TextField("Name your next invented digital gate",text:$digitalNewGateName)
+                .textFieldStyle(.roundedBorder)
+            Button("Connect a new invented gate"){
+                guard let preceding=network.gates.last else{return}
+                applyProject{try NativeWorldLabEditor.addDigitalGate(
+                    $0,networkId:network.id,name:digitalNewGateName,
+                    assumption:"User-assumed one-input truth table",
+                    inputNodeIds:[preceding.id])}
+            }.buttonStyle(.bordered)
+                .disabled(digitalNewGateName.trimmingCharacters(
+                    in:.whitespacesAndNewlines).isEmpty || network.gates.count>=32)
+            Text("Each gate reads the previous gate. Change its Boolean rows, then connect an indicator.")
+                .font(.caption).foregroundStyle(.secondary)
             ForEach(network.outputs,id:\.id){output in
                 Picker(output.label+" reads",selection:Binding<String>(
                     get:{output.sourceNodeId},
