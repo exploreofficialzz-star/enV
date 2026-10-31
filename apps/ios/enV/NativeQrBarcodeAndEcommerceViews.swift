@@ -60,6 +60,7 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     nonisolated(unsafe) let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "com.chastech.env.barcode-camera")
     nonisolated(unsafe) private var configured = false
+    nonisolated(unsafe) private var cameraDevice: AVCaptureDevice?
     private var lastScanAtBySignature: [String: Date] = [:]
 
     func start() {
@@ -72,6 +73,7 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
                     guard let device = AVCaptureDevice.default(for: .video) else {
                         throw NativeBarcodeReaderError.cameraUnavailable
                     }
+                    cameraDevice = device
                     let input = try AVCaptureDeviceInput(device: device)
                     let output = AVCaptureMetadataOutput()
                     session.beginConfiguration()
@@ -99,6 +101,9 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
                         session.commitConfiguration()
                         throw error
                     }
+                }
+                guard let device = cameraDevice ?? AVCaptureDevice.default(for: .video) else {
+                    throw NativeBarcodeReaderError.cameraUnavailable
                 }
                 if !session.isRunning { session.startRunning() }
                 let running = session.isRunning
@@ -129,7 +134,7 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     func stop() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
-            if let device = AVCaptureDevice.default(for: .video),
+            if let device = cameraDevice,
                device.hasTorch, device.torchMode == .on,
                (try? device.lockForConfiguration()) != nil {
                 device.torchMode = .off
@@ -148,13 +153,13 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     func toggleTorch() {
         let enabled = !torchEnabled
         sessionQueue.async { [weak self] in
-            guard let self, let device = AVCaptureDevice.default(for: .video),
+            guard let self, let device = cameraDevice,
                   device.hasTorch, device.isTorchModeSupported(enabled ? .on : .off) else { return }
             do {
                 try device.lockForConfiguration()
                 defer { device.unlockForConfiguration() }
                 if enabled {
-                    try device.setTorchModeOn(level: device.maxAvailableTorchLevel)
+                    try device.setTorchModeOn(level: AVCaptureDevice.maxAvailableTorchLevel)
                 } else {
                     device.torchMode = .off
                 }
@@ -172,7 +177,7 @@ final class NativeBarcodeCameraScanner: NSObject, ObservableObject, AVCaptureMet
     func setZoom(_ requested: CGFloat) {
         let target = min(maxZoomFactor, max(1, requested))
         sessionQueue.async { [weak self] in
-            guard let self, let device = AVCaptureDevice.default(for: .video) else { return }
+            guard let self, let device = cameraDevice else { return }
             do {
                 try device.lockForConfiguration()
                 defer { device.unlockForConfiguration() }
