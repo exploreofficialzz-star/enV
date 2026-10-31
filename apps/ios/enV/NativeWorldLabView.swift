@@ -40,6 +40,9 @@ struct NativeWorldLabView:View {
     @State private var deviceName=""
     @State private var deviceAssumption=""
     @State private var deviceResistance=""
+    @State private var junctionName=""
+    @State private var positiveWire="supply"
+    @State private var negativeWire="ground"
     @State private var gridSpacing=0.5
     @State private var measureTargetId=""
     @State private var problem=""
@@ -266,6 +269,85 @@ struct NativeWorldLabView:View {
                             } ?? "No supported electrical law")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
+                        Text("Connect more parts and wire junctions").font(.headline)
+                        HStack {
+                            TextField("New junction name",text:$junctionName)
+                                .textFieldStyle(.roundedBorder)
+                            Button("Add junction"){
+                                applyProject{try NativeWorldLabEditor.addCircuitNode(
+                                    $0,label:junctionName)}
+                                junctionName=""
+                            }.disabled(junctionName.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ||
+                                circuit.nodes.count>=24)
+                        }.buttonStyle(.bordered)
+                        ForEach(circuit.nodes,id:\.id){node in
+                            HStack {
+                                Text(node.label).font(.caption)
+                                Spacer()
+                                Button("Remove unused"){
+                                    applyProject{try NativeWorldLabEditor.removeUnusedCircuitNode(
+                                        $0,id:node.id)}
+                                }.disabled(node.id==circuit.groundNodeId ||
+                                    circuit.nodes.count<=2 ||
+                                    circuit.components.contains(where:{
+                                        $0.positiveNodeId==node.id || $0.negativeNodeId==node.id
+                                    }))
+                            }.buttonStyle(.bordered)
+                        }
+                        HStack {
+                            Picker("From node",selection:$positiveWire){
+                                ForEach(circuit.nodes,id:\.id){node in
+                                    Text(node.label).tag(node.id)
+                                }
+                            }.pickerStyle(.menu)
+                            Picker("To node",selection:$negativeWire){
+                                ForEach(circuit.nodes,id:\.id){node in
+                                    Text(node.label).tag(node.id)
+                                }
+                            }.pickerStyle(.menu)
+                        }
+                        Button("Connect 200 Ω resistor"){
+                            applyProject{try NativeWorldLabEditor.addCircuitResistor(
+                                $0,positive:positiveWire,negative:negativeWire)}
+                        }.buttonStyle(.bordered)
+                            .disabled(positiveWire==negativeWire ||
+                                circuit.components.count>=48 ||
+                                !circuit.nodes.contains(where:{$0.id==positiveWire}) ||
+                                !circuit.nodes.contains(where:{$0.id==negativeWire}))
+                        Text("Edit existing component terminals").font(.subheadline)
+                        ForEach(circuit.components,id:\.id){part in
+                            Text(part.kind=="hypothetical-device"
+                                ? part.name ?? "Unknown invention" : part.kind)
+                                .font(.caption)
+                            HStack {
+                                Picker("Positive terminal",
+                                    selection:Binding<String>(
+                                        get:{part.positiveNodeId},
+                                        set:{value in
+                                            applyProject{try NativeWorldLabEditor.rewireCircuitPart(
+                                                $0,id:part.id,positive:value,
+                                                negative:part.negativeNodeId)}
+                                        })){
+                                    ForEach(circuit.nodes,id:\.id){node in
+                                        Text(node.label).tag(node.id)
+                                    }
+                                }.pickerStyle(.menu)
+                                Picker("Negative terminal",
+                                    selection:Binding<String>(
+                                        get:{part.negativeNodeId},
+                                        set:{value in
+                                            applyProject{try NativeWorldLabEditor.rewireCircuitPart(
+                                                $0,id:part.id,positive:part.positiveNodeId,
+                                                negative:value)}
+                                        })){
+                                    ForEach(circuit.nodes,id:\.id){node in
+                                        Text(node.label).tag(node.id)
+                                    }
+                                }.pickerStyle(.menu)
+                            }
+                        }
+                        Text("Only real shared circuit node IDs create connections; no measured wiring geometry is claimed.")
+                            .font(.caption).foregroundStyle(.secondary)
                         ForEach(circuit.components.filter{$0.kind=="dc-source"||$0.kind=="resistor"},
                             id:\.id){part in
                             HStack {

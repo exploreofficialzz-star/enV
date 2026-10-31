@@ -70,6 +70,77 @@ enum NativeWorldLabEditor {
             root["networks"]=networks
         }
     }
+    static func addCircuitNode(_ data:Data,label:String,
+                               id:String=UUID().uuidString) throws -> Data {
+        try mutate(data){root in
+            let name=label.trimmingCharacters(in:.whitespacesAndNewlines)
+            guard !name.isEmpty,name.count<=80,
+                  var networks=root["networks"] as? [[String:Any]],!networks.isEmpty,
+                  var nodes=networks[0]["nodes"] as? [[String:Any]],nodes.count<24,
+                  !nodes.contains(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Junction needs a unique name and available node capacity")
+            }
+            nodes.append(["id":id,"label":name])
+            networks[0]["nodes"]=nodes
+            root["networks"]=networks
+        }
+    }
+    static func addCircuitResistor(_ data:Data,positive:String,negative:String,
+                                   resistanceOhm:Double=200,
+                                   id:String=UUID().uuidString) throws -> Data {
+        try mutate(data){root in
+            guard resistanceOhm.isFinite,resistanceOhm>=0.01,resistanceOhm<=1e9,
+                  positive != negative,
+                  var networks=root["networks"] as? [[String:Any]],!networks.isEmpty,
+                  let nodes=networks[0]["nodes"] as? [[String:Any]],
+                  var components=networks[0]["components"] as? [[String:Any]],
+                  components.count<48,
+                  nodes.contains(where:{$0["id"] as? String==positive}),
+                  nodes.contains(where:{$0["id"] as? String==negative}),
+                  !components.contains(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Connect two distinct existing nodes with a bounded resistor")
+            }
+            components.append(["id":id,"kind":"resistor",
+                "positiveNodeId":positive,"negativeNodeId":negative,
+                "resistanceOhm":resistanceOhm])
+            networks[0]["components"]=components
+            root["networks"]=networks
+        }
+    }
+    static func rewireCircuitPart(_ data:Data,id:String,
+                                  positive:String,negative:String) throws -> Data {
+        try mutate(data){root in
+            guard positive != negative,
+                  var networks=root["networks"] as? [[String:Any]],!networks.isEmpty,
+                  let nodes=networks[0]["nodes"] as? [[String:Any]],
+                  var parts=networks[0]["components"] as? [[String:Any]],
+                  let partIndex=parts.firstIndex(where:{$0["id"] as? String==id}),
+                  nodes.contains(where:{$0["id"] as? String==positive}),
+                  nodes.contains(where:{$0["id"] as? String==negative}) else {
+                throw NativeWorldLabError.invalid("Both component terminals need distinct valid nodes")
+            }
+            parts[partIndex]["positiveNodeId"]=positive
+            parts[partIndex]["negativeNodeId"]=negative
+            networks[0]["components"]=parts
+            root["networks"]=networks
+        }
+    }
+    static func removeUnusedCircuitNode(_ data:Data,id:String) throws -> Data {
+        try mutate(data){root in
+            guard var networks=root["networks"] as? [[String:Any]],!networks.isEmpty,
+                  let nodes=networks[0]["nodes"] as? [[String:Any]],
+                  let components=networks[0]["components"] as? [[String:Any]],
+                  nodes.count>2,
+                  networks[0]["groundNodeId"] as? String != id,
+                  nodes.contains(where:{$0["id"] as? String==id}),
+                  !components.contains(where:{$0["positiveNodeId"] as? String==id ||
+                    $0["negativeNodeId"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Only disconnected non-ground nodes can be removed")
+            }
+            networks[0]["nodes"]=nodes.filter{$0["id"] as? String != id}
+            root["networks"]=networks
+        }
+    }
     static func addParallelResistor(_ data:Data) throws -> Data {
         try mutate(data){root in
             guard var networks=root["networks"] as? [[String:Any]],

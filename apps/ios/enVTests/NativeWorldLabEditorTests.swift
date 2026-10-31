@@ -41,6 +41,25 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.positionSolid(
             data,id:"a",positionMeters:[Double.nan,0,0]))
     }
+    func testNativeSeriesJunctionCircuitObeysKirchhoffPower() throws {
+        var data=try NativeWorldLabEditor.starterCircuit(
+            NativeWorldLabEditor.blank())
+        data=try NativeWorldLabEditor.addCircuitNode(data,label:"Middle",id:"middle")
+        data=try NativeWorldLabEditor.rewireCircuitPart(
+            data,id:"load",positive:"supply",negative:"middle")
+        data=try NativeWorldLabEditor.addCircuitResistor(
+            data,positive:"middle",negative:"ground",resistanceOhm:200,id:"load2")
+        let p=try NativeWorldLabProject.decode(data)
+        let result=try NativeWorldLabDc.solve(
+            XCTUnwrap(p.networks?.first),project:p)
+        XCTAssertEqual(try XCTUnwrap(result.nodeVoltagesV["middle"]),6,accuracy:1e-10)
+        XCTAssertEqual(try XCTUnwrap(result.branchCurrentsA["load"]),0.03,accuracy:1e-10)
+        XCTAssertEqual(try XCTUnwrap(result.branchCurrentsA["load2"]),0.03,accuracy:1e-10)
+        XCTAssertEqual(result.powerResidualW,0,accuracy:1e-10)
+        XCTAssertThrowsError(try NativeWorldLabEditor.removeUnusedCircuitNode(data,id:"middle"))
+        XCTAssertThrowsError(try NativeWorldLabEditor.rewireCircuitPart(
+            data,id:"load",positive:"middle",negative:"middle"))
+    }
     func testSchemaEnforcedForEveryMutation() throws {
         let data=try NativeWorldLabEditor.blank()
         XCTAssertThrowsError(try NativeWorldLabEditor.addSolid(data,shape:"freeform"))

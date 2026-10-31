@@ -292,3 +292,7 @@ release-candidate evidence bundle are unfinished.
 ## Android native multi-node wiring (2026-10-31)
 
 - Kotlin project editors now add named circuit junctions, add resistors across chosen nodes, rewire either component terminal and safely delete only unused non-ground nodes. Compose includes an advanced node/terminal panel with touch-oriented controls, preserving all native project validation and scientific result invalidation. Regression source covers a real 9V 100Ω+200Ω series divider (6V intermediate node, 30mA current) and rejects dangling terminal edits. Build/test audit deferred per requested build-first sequence.
+
+## iOS native multi-node circuit authoring (2026-10-31)
+
+- Added Swift native editor methods to create/remove bounded junctions, connect arbitrary resistors, and rewire actual component terminal IDs without dangling, same-node, ground-deletion, or resource-limit violations. SwiftUI exposes progressive connection controls and terminal pickers using the portable graph; source-based XCTest covers the 9V series divider/Kirchhoff power result and rejected invalid rewiring. All changes remain on draft PR #59 pending full native build and simulator verification.
