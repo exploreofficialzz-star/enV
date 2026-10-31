@@ -275,6 +275,11 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             "env-world-lab-multi-sphere-impact")
         XCTAssertEqual(evidence?["materialEvidence"] as? String,
             "hypothetical-user-assumed")
+        let lastEvent=try XCTUnwrap(try XCTUnwrap(evidence?["events"] as? [[String:Any]]).last)
+        XCTAssertEqual(lastEvent["totalEnergyAfterJ"] as? Double,
+            run.totalFinalEnergyJ,accuracy:1e-9)
+        let lastMomentum=try XCTUnwrap(lastEvent["totalMomentumAfterKgMps"] as? [Double])
+        XCTAssertEqual(lastMomentum[0],run.finalMomentumKgMps[0],accuracy:1e-9)
         XCTAssertThrowsError(try NativeWorldLabMultiSphere.evaluate(
             project,velocities:["s-0":[2,0,0]],restitution:2))
         let unknown=try NativeWorldLabEditor.assignMaterial(
