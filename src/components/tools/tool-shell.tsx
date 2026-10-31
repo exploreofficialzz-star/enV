@@ -65,14 +65,14 @@ export function ToolShell({
     });
   };
 
-  const executionTelemetry: ToolExecutionTelemetry = {
+  const executionTelemetry = useMemo<ToolExecutionTelemetry>(() => ({
     finish: (outcome: ToolExecutionOutcome, errorCode?: string) => {
       const startedAt = executionStartedAtRef.current;
       if (startedAt === null || executionFinishedRef.current) return;
       executionFinishedRef.current = true;
       recordToolExecutionResult(tool.id, outcome, Date.now() - startedAt, "shared_result", errorCode);
     },
-  };
+  }), [tool.id]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
@@ -254,7 +254,7 @@ export function ToolShell({
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
         onClickCapture={(event) => {
           const target = event.target;
-          if (!(target instanceof HTMLElement) || target.closest(".env-tool-fullscreen__toolbar")) return;
+          if (!(target instanceof Element) || target.closest(".env-tool-fullscreen__toolbar")) return;
           const action = target.closest("button,[role=button]");
           if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
           const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
