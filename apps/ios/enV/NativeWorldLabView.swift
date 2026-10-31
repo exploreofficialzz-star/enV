@@ -49,6 +49,9 @@ struct NativeWorldLabView:View {
     @State private var assemblyName="My invention"
     @State private var assemblySecondId=""
     @State private var digitalShowCases=false
+    @State private var savedProjects:[NativeWorldLabProject]=[]
+    @State private var chosenSavedId=""
+    @State private var confirmingDelete=false
     @State private var digitalNewGateName="Invented device"
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
@@ -93,6 +96,33 @@ struct NativeWorldLabView:View {
             projectData=data;savedSnapshot=nil;selected=0;editHistory.clear();problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
+    private func refreshSavedProjects(){
+        do {
+            savedProjects=try localProjects.listProjects()
+            if !savedProjects.contains(where:{$0.id==chosenSavedId}) {
+                chosenSavedId=savedProjects.first?.id ?? ""
+            }
+        }catch {problem=error.localizedDescription}
+    }
+    private func openSelectedProject(){
+        do {
+            guard !chosenSavedId.isEmpty else {
+                throw NativeWorldLabError.invalid("Choose a saved World Lab project.")
+            }
+            let result=try localProjects.read(chosenSavedId)
+            projectData=result.0;project=result.1;savedSnapshot=result.0
+            editHistory.clear();selected=0;problem="";redraw()
+        }catch {problem=error.localizedDescription}
+    }
+    private func deleteSelectedProject(){
+        do {
+            let deletedId=chosenSavedId
+            guard !deletedId.isEmpty else {return}
+            try localProjects.delete(deletedId)
+            if project?.id==deletedId {savedSnapshot=nil}
+            problem="";refreshSavedProjects()
+        }catch {problem=error.localizedDescription}
+    }
     private func loadSavedProject(){
         do {
             guard let saved=try localProjects.loadLatest() else {
@@ -107,6 +137,7 @@ struct NativeWorldLabView:View {
         if hasUnsavedWork {pendingReplacement=action;confirmation=true}
         else if action=="new" {newProject()}
         else if action=="open" {loadSavedProject()}
+        else if action=="open-selected" {openSelectedProject()}
         else if action=="import" {importing=true}
     }
     private func saveLocally(){
@@ -114,8 +145,11 @@ struct NativeWorldLabView:View {
             guard let data=projectData else {
                 throw NativeWorldLabError.invalid("Create or import a project before saving.")
             }
-            _ = try localProjects.save(data)
-            savedSnapshot=data;editHistory.clear();problem=""
+            let baseline=try savedSnapshot.map{try NativeWorldLabProject.decode($0)}
+            let current=try NativeWorldLabProject.decode(data)
+            let expected=baseline?.id==current.id ? baseline?.revision : nil
+            _ = try localProjects.save(data,expectedSavedRevision:expected)
+            savedSnapshot=data;editHistory.clear();problem="";refreshSavedProjects()
         }catch{problem=error.localizedDescription}
     }
     private var input:NativeLabInput {
@@ -242,6 +276,20 @@ struct NativeWorldLabView:View {
                         .buttonStyle(.borderedProminent).disabled(projectData==nil)
                     Button("Open last saved"){askToReplace("open")}.buttonStyle(.bordered)
                 }
+                if !savedProjects.isEmpty {
+                    Picker("Saved World Lab projects",selection:$chosenSavedId){
+                        ForEach(savedProjects,id:\.id){item in
+                            Text(item.title+" · rev "+String(item.revision)).tag(item.id)
+                        }
+                    }.pickerStyle(.menu)
+                    HStack {
+                        Button("Open selected project"){askToReplace("open-selected")}
+                            .buttonStyle(.bordered).disabled(chosenSavedId.isEmpty)
+                        Button("Delete selected saved project",role:.destructive){
+                            confirmingDelete=true
+                        }.buttonStyle(.bordered).disabled(chosenSavedId.isEmpty)
+                    }
+                }
                 if hasUnsavedWork {
                     Text("Unsaved on this device. Save locally or export JSON to preserve these changes.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -252,7 +300,7 @@ struct NativeWorldLabView:View {
                     .font(.caption2).foregroundStyle(.secondary)
             }.padding(14)
         }
-        .onAppear{redraw();lastTick=Date()}
+        .onAppear{redraw();lastTick=Date();refreshSavedProjects()}
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
         .onChange(of:dropTime){_ in applyDropPosition()}
@@ -267,6 +315,13 @@ struct NativeWorldLabView:View {
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;motorEntityId=nil;motorTime=0;redraw()
+        }
+        .confirmationDialog("Delete selected saved World Lab project?",
+            isPresented:$confirmingDelete,titleVisibility:.visible){
+            Button("Delete saved project",role:.destructive){deleteSelectedProject()}
+            Button("Cancel",role:.cancel){}
+        }message:{
+            Text("Only the selected local-device copy is deleted. Export JSON first if needed.")
         }
         .onReceive(timer){now in
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
