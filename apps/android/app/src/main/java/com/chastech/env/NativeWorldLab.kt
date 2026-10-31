@@ -276,6 +276,23 @@ fun NativeWorldLabForm() {
             }
         }
     }
+    val collisionEvidencePicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null){
+            val run=collisionRun
+            if(run!=null)scope.launch{
+                runCatching {withContext(Dispatchers.IO){
+                    val json=run.toEvidenceJson().toByteArray(Charsets.UTF_8)
+                    require(json.size<=NativeWorldLabProjectCodec.MAX_BYTES){
+                        "Collision evidence exceeds portable export size"
+                    }
+                    context.contentResolver.openOutputStream(uri,"wt")?.use{
+                        it.write(json);it.flush()
+                    }?:error("Could not open collision evidence destination")
+                }}.onFailure{warning=it.message?:"Collision evidence export failed"}
+            }
+        }
+    }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if(uri!=null)scope.launch {
             runCatching { withContext(Dispatchers.IO) {
@@ -987,6 +1004,9 @@ fun NativeWorldLabForm() {
                             collisionSpeed=if(collisionSpeed==0.1f)1f else if(collisionSpeed==1f)4f else 0.1f
                         }){Text("Time "+labNumber(collisionSpeed.toDouble())+"×")}
                     }
+                    OutlinedButton(onClick={
+                        collisionEvidencePicker.launch("world-lab-two-body-collision-evidence.json")
+                    }){Text("Export collision evidence")}
                     Text(run.validity,style=MaterialTheme.typography.bodySmall)
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
