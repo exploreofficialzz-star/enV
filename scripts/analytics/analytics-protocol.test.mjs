@@ -38,3 +38,12 @@ test("non-tool events do not require a tool identifier",()=>{
  const result=validateEventsPayload({subjectId,platform:"web",policyVersion:ANALYTICS_POLICY_VERSION,events:[{eventId,name:"app_opened"}]});
  assert.equal(result.events[0].toolId,null);
 });
+
+test("tool outcome event names override untrusted outcome labels",()=>{
+ const envelope={subjectId,platform:"web",policyVersion:ANALYTICS_POLICY_VERSION};
+ const make=(name,outcome)=>validateEventsPayload({...envelope,events:[{eventId,name,toolId:"qr-code-reader",outcome}]}).events[0];
+ assert.equal(make("tool_completed","failure").outcome,"success");
+ assert.equal(make("tool_failed","success").outcome,"failure");
+ assert.equal(make("tool_cancelled","success").outcome,"cancelled");
+ assert.equal(make("tool_abandoned","success").outcome,"abandoned");
+});
