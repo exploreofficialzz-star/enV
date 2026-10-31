@@ -65,7 +65,7 @@ fun NativeWorldLabMultiSpherePanel(
     }
     Text("Collide a group of spheres",style=MaterialTheme.typography.titleSmall)
     Text("Invent each sphere's starting speed. Consecutive 3D contacts transfer momentum and energy. "+
-        "Only isolated frictionless rigid impacts are modeled; concurrent impacts are rejected.",
+        "Frictionless isolated or independent simultaneous impacts are calculated; shared-sphere contacts are rejected.",
         style=MaterialTheme.typography.bodySmall)
     if(spheres.size !in 2..12){
         Text("Add 2–12 spherical objects and assign density to each.")
