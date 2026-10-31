@@ -256,3 +256,36 @@ object NativeWorldLabNetworkMotor {
         return NativeLabNetworkMotorRun(p.id,p.revision,n.id,entityId,dc,motor,samples)
     }
 }
+
+
+/** Model-only Boolean switch over the existing native electromechanical equations. */
+data class NativeDigitalMotorResult(
+    val projectId:String,val projectRevision:Int,val networkId:String,
+    val outputId:String,val entityId:String,val logicBit:Int,
+    val input:NativeActuatorInput,val motor:NativeActuatorResult,
+    val validity:String="User-assumed static Boolean logic switches an ideal voltage "+
+        "for one bounded 1D motor run. No real chip, switching transient, "+
+        "semiconductor, timing, measured material or safety certification."
+)
+object NativeWorldLabDigitalMotor {
+    fun evaluate(project:NativeWorldLabProject,networkId:String,outputId:String,
+        entityId:String,massKg:Double,energizedVoltageV:Double=24.0,
+        thermal:Boolean=false):NativeDigitalMotorResult {
+        require(energizedVoltageV.isFinite()&&energizedVoltageV in 0.0..1000.0){
+            "Assumed digital motor voltage outside bounded model"
+        }
+        require(project.entities.any{it.id==entityId}){"Selected physical invention is missing"}
+        val circuit=project.digitalNetworks.firstOrNull{it.id==networkId}
+            ?:error("Select an invented digital network")
+        require(circuit.outputs.any{it.id==outputId}){"Invented output does not exist"}
+        val bit=NativeWorldLabDigitalLogic.evaluate(circuit)[outputId]
+            ?:error("Invented indicator cannot be calculated")
+        require(bit==0||bit==1){"Invented indicator is not Boolean"}
+        val input=NativeActuatorInput(massKg=massKg,
+            supplyVoltageV=energizedVoltageV*bit,
+            thermal=if(thermal)NativeActuatorThermal() else null)
+        val motor=NativeWorldLabActuator.evaluate(input)
+        return NativeDigitalMotorResult(project.id,project.revision,networkId,
+            outputId,entityId,bit,input,motor)
+    }
+}
