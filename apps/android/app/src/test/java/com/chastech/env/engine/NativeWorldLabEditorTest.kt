@@ -123,6 +123,16 @@ class NativeWorldLabEditorTest {
         assertEquals(2,NativeWorldLabProjectCodec.decode(json).digitalNetworks[0].gates.size)
         assertEquals(1,NativeWorldLabDigitalLogic.evaluate(
             NativeWorldLabProjectCodec.decode(json).digitalNetworks[0])["output_q"])
+        json=NativeWorldLabEditor.addDigitalGate(
+            json,"invented","Invented two-input part","Assumed OR",
+            listOf("input_a","input_b"),id="two-input")
+        json=NativeWorldLabEditor.digitalTruthBit(json,"invented","two-input",1,1)
+        json=NativeWorldLabEditor.digitalTruthBit(json,"invented","two-input",2,1)
+        json=NativeWorldLabEditor.digitalTruthBit(json,"invented","two-input",3,1)
+        json=NativeWorldLabEditor.digitalOutputSource(
+            json,"invented","output_q","two-input")
+        assertEquals(1,NativeWorldLabDigitalLogic.evaluate(
+            NativeWorldLabProjectCodec.decode(json).digitalNetworks[0])["output_q"])
         assertThrows(IllegalArgumentException::class.java){
             NativeWorldLabEditor.addDigitalGate(
                 json,"invented","Broken","Assumed",listOf("missing"))
