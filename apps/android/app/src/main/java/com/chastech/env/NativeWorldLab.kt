@@ -101,6 +101,9 @@ fun NativeWorldLabForm() {
     var motorThermalEnabled by remember { mutableStateOf(false) }
     var motorSpeed by remember { mutableFloatStateOf(1f) }
     var warning by remember { mutableStateOf("") }
+    var assemblyName by remember { mutableStateOf("My invention") }
+    var secondAssemblyIndex by remember { mutableIntStateOf(0) }
+    var assemblyMoveStep by remember { mutableStateOf(0.5) }
     var snapMeters by remember { mutableStateOf(0.5) }
     var measurementTargetIndex by remember { mutableIntStateOf(0) }
     val model=when(kind) {
@@ -369,7 +372,7 @@ fun NativeWorldLabForm() {
                 val json=projectJson
                 if(json!=null)scope.launch{
                     runCatching { withContext(Dispatchers.IO){localProjects.save(json)} }
-                        .onSuccess{savedSnapshot=json;warning=""}
+                        .onSuccess{savedSnapshot=json;warning="";editHistory.clear()}
                         .onFailure{warning=it.message?:"Could not save the project locally."}
                 }
             },enabled=projectJson!=null){Text("Save locally")}
@@ -527,6 +530,45 @@ fun NativeWorldLabForm() {
                 OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
                     Text("Redo")
                 }
+            }
+            Text("Build from connected visual parts",style=MaterialTheme.typography.titleSmall)
+            Text("Group solids and move them together. A visual assembly is not a simulated joint.",
+                style=MaterialTheme.typography.bodySmall)
+            if(solid!=null){
+                val candidates=project!!.entities.filter{it.id!=solid.id &&
+                    project!!.assemblies.none{a->a.entityIds.contains(it.id)}}
+                if(candidates.isNotEmpty()){
+                    val other=candidates[secondAssemblyIndex%candidates.size]
+                    OutlinedTextField(value=assemblyName,onValueChange={assemblyName=it},
+                        label={Text("Invention group name")},singleLine=true)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={
+                            secondAssemblyIndex=(secondAssemblyIndex+1)%candidates.size
+                        }){Text("Second part: "+other.name)}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.createVisualAssembly(
+                                it,assemblyName,listOf(solid.id,other.id))
+                        }},enabled=project!!.assemblies.size<50&&assemblyName.isNotBlank()&&
+                            project!!.assemblies.none{it.entityIds.contains(solid.id)}){
+                            Text("Group parts")
+                        }
+                    }
+                }
+            }
+            project!!.assemblies.forEach{group->
+                Text(group.name+" · "+group.entityIds.size+" parts",
+                    style=MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    listOf(0 to "X",1 to "Y",2 to "Z").forEach{(axis,label)->
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.moveVisualAssembly(it,group.id,
+                                List(3){j->if(j==axis)assemblyMoveStep else 0.0})
+                        }}){Text("Move +"+label)}
+                    }
+                }
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.ungroupVisualAssembly(it,group.id)
+                }}){Text("Ungroup safely")}
             }
             if(solid!=null) {
                 Row {

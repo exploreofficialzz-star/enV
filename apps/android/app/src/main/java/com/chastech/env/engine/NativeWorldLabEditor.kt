@@ -66,6 +66,54 @@ object NativeWorldLabEditor {
                         .put("positiveNodeId","supply").put("negativeNodeId","ground")
                         .put("resistanceOhm",100.0))))
         }
+
+    fun createVisualAssembly(source:String,name:String,ids:List<String>,
+        id:String=UUID.randomUUID().toString()):String=edit(source){root->
+        require(name.isNotBlank()&&name.length<=120&&ids.size in 2..30){
+            "An assembly needs a name and two to thirty solids"
+        }
+        val groups=root.optJSONArray("assemblies")?:JSONArray().also{root.put("assemblies",it)}
+        require(groups.length()<50){"Maximum fifty visual assemblies per project"}
+        val members=JSONArray()
+        ids.forEach{members.put(it)}
+        groups.put(JSONObject().put("id",id).put("name",name.trim()).put("entityIds",members))
+    }
+    fun moveVisualAssembly(source:String,id:String,delta:List<Double>):String=edit(source){root->
+        require(delta.size==3&&delta.all{it.isFinite()&&it in -1000.0..1000.0}){
+            "Assembly movement needs bounded SI offsets"
+        }
+        val groups=root.getJSONArray("assemblies")
+        val group=(0 until groups.length()).map{groups.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}?:error("Visual assembly not found")
+        val ids=group.getJSONArray("entityIds")
+        val members=(0 until ids.length()).map{ids.getString(it)}.toSet()
+        val solids=root.getJSONArray("entities")
+        for(i in 0 until solids.length()){
+            val solid=solids.getJSONObject(i)
+            if(solid.getString("id") !in members)continue
+            val position=solid.getJSONArray("positionMeters")
+            val moved=JSONArray()
+            for(axis in 0..2){
+                val value=kotlin.math.round((position.getDouble(axis)+delta[axis])*1e6)/1e6
+                require(value.isFinite()&&value in -100000.0..100000.0){
+                    "Assembly moved beyond the portable world boundary"
+                }
+                moved.put(value)
+            }
+            solid.put("positionMeters",moved)
+        }
+    }
+    fun ungroupVisualAssembly(source:String,id:String):String=edit(source){root->
+        val groups=root.getJSONArray("assemblies")
+        val remaining=JSONArray()
+        var found=false
+        for(i in 0 until groups.length()){
+            val group=groups.getJSONObject(i)
+            if(group.getString("id")==id)found=true else remaining.put(group)
+        }
+        require(found){"This visual assembly is missing"}
+        root.put("assemblies",remaining)
+    }
     fun addCircuitNode(source:String,label:String,id:String=UUID.randomUUID().toString()):String =
         edit(source){project->
             val title=label.trim()

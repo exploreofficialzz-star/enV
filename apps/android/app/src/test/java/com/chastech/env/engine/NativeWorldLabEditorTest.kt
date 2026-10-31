@@ -84,6 +84,26 @@ class NativeWorldLabEditorTest {
         assertFalse(history.canUndo)
         assertFalse(history.canRedo)
     }
+    @Test fun groupingMovesOnlyMemberSolidsAndUngroupsWithoutDeleting(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="b")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="c")
+        json=NativeWorldLabEditor.createVisualAssembly(
+            json,"Assembly",listOf("a","b"),id="pair")
+        val start=NativeWorldLabProjectCodec.decode(json)
+        json=NativeWorldLabEditor.moveVisualAssembly(json,"pair",listOf(1.0,0.0,-2.0))
+        val moved=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(start.entities[0].positionMeters.x+1.0,moved.entities[0].positionMeters.x,1e-12)
+        assertEquals(start.entities[1].positionMeters.z-2.0,moved.entities[1].positionMeters.z,1e-12)
+        assertEquals(start.entities[2],moved.entities[2])
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.createVisualAssembly(json,"Overlapping",listOf("a","c"))
+        }
+        json=NativeWorldLabEditor.ungroupVisualAssembly(json,"pair")
+        assertEquals(3,NativeWorldLabProjectCodec.decode(json).entities.size)
+        assertTrue(NativeWorldLabProjectCodec.decode(json).assemblies.isEmpty())
+    }
     @Test fun rejectsWrongShapeBadDimensionsDanglingMaterialsAndUntrustedNames(){
         val initial=fixture()
         assertThrows(IllegalArgumentException::class.java){

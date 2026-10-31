@@ -325,3 +325,7 @@ release-candidate evidence bundle are unfinished.
 ## Native portable visual assembly schema parity (2026-10-31)
 
 - Kotlin and Swift strict project v1 decoders now accept optional visual assemblies with 2–30 member solids, no missing/duplicate/overlapping membership, and up to 50 named groups. Their native project creation includes an empty assembly list; imported older projects without the field remain accepted. Regression cases are authored for valid and dangling memberships. Native group-editing controls are separate from schema preservation, and no rigid mechanics are inferred from group labels.
+
+## Android native movable visual assemblies (2026-10-31)
+
+- Kotlin validated editors now create named groups of 2–30 existing solids, move all member centers by a consistent SI vector and remove group records without destroying member geometry. Compose offers group creation, touch movement on X/Y/Z, and ungroup controls; saved snapshot clears transient revision-aware undo history. The strict shared project parser prevents overlapping membership or dangling references. Native regression source covers group transform, immutable non-members and data preservation; broad CI remains deferred.
