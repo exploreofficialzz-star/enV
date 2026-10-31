@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 import Security
+import Network
+import Dispatch
 
 private func styledEnVUnit(_ label: String, unitSize: CGFloat) -> Text {
     var attributed = AttributedString(label)
@@ -184,6 +186,28 @@ enum NativeAnalyticsClient {
     private static let revokeKey = "env.analytics.revoke.v1"
     private static let maxQueue = 25
     private static let sessionID = UUID().uuidString.lowercased()
+    private static let networkQueue = DispatchQueue(label: "com.chastech.env.analytics.network")
+    private static var networkMonitor: NWPathMonitor?
+    private static var networkOnline: Bool?
+    private static var networkType = "unknown"
+
+    private static func startNetworkMonitor() {
+        guard networkMonitor == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            let online = path.status == .satisfied
+            let kind = path.usesInterfaceType(.wifi) ? "wifi"
+                : path.usesInterfaceType(.cellular) ? "cellular"
+                : path.usesInterfaceType(.wiredEthernet) ? "ethernet"
+                : "unknown"
+            Task { @MainActor in
+                networkOnline = online
+                networkType = kind
+            }
+        }
+        networkMonitor = monitor
+        monitor.start(queue: networkQueue)
+    }
 
     private static func readQueue() -> [[String: Any]] {
         if let raw = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.queueAccount),
@@ -235,6 +259,7 @@ enum NativeAnalyticsClient {
     }
 
     static func start() async {
+        startNetworkMonitor()
         guard isEnabled else { return }
         if choice == "granted" { record("app_opened") }
         // A pending opt-out revocation must retry even while consent is now denied.
@@ -269,6 +294,7 @@ enum NativeAnalyticsClient {
     }
 
     static func record(_ name: String, toolID: String? = nil, outcome: String = "unknown", durationMs: Int? = nil, errorCode: String? = nil) {
+        startNetworkMonitor()
         guard isEnabled, choice == "granted", NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) != nil else { return }
         let allowed = Set(["app_opened", "tool_viewed", "tool_started", "tool_completed", "tool_failed", "tool_cancelled", "tool_abandoned", "feedback_submitted", "update_viewed", "offline_sync_succeeded", "offline_sync_failed"])
         guard allowed.contains(name) else { return }
@@ -277,8 +303,8 @@ enum NativeAnalyticsClient {
             "name": name,
             "occurredAt": ISO8601DateFormatter().string(from: Date()),
             "outcome": outcome,
-            "isOffline": false,
-            "networkType": "unknown",
+            "isOffline": networkOnline == false,
+            "networkType": networkType,
             "networkEffectiveType": "unknown",
             "deviceClass": UIDevice.current.userInterfaceIdiom == .pad ? "tablet" : "phone",
             "appVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
