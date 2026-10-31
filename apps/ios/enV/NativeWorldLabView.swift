@@ -51,6 +51,15 @@ struct NativeWorldLabView:View {
     @State private var collisionTime=0.0
     @State private var collisionPlaying=false
     @State private var collisionSpeed=1.0
+    @State private var sphereOtherId=""
+    @State private var sphereFirstVelocity="2,0,0"
+    @State private var sphereSecondVelocity="0,0,0"
+    @State private var sphereRestitution=0.65
+    @State private var sphereRun:NativeSphereImpactResult?
+    @State private var sphereTime=0.0
+    @State private var spherePlaying=false
+    @State private var sphereSpeed=1.0
+    @State private var exportingSphereImpact=false
     @State private var deviceName=""
     @State private var deviceAssumption=""
     @State private var deviceResistance=""
@@ -106,6 +115,11 @@ struct NativeWorldLabView:View {
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private var sphereEvidenceDocument:NativeWorldLabJsonFile? {
+        guard let run=sphereRun,
+              let data=try? JSONEncoder().encode(run) else {return nil}
+        return NativeWorldLabJsonFile(content:data)
+    }
     private var collisionEvidenceDocument:NativeWorldLabJsonFile? {
         guard let run=collisionRun,
               let data=try? JSONEncoder().encode(run) else {return nil}
@@ -220,6 +234,7 @@ struct NativeWorldLabView:View {
             fluidPlaying=false;fluidMotion=nil
             dropPlaying=false;dropRun=nil;motorPlaying=false;motorRun=nil
             collisionPlaying=false;collisionRun=nil;collisionTime=0
+            spherePlaying=false;sphereRun=nil;sphereTime=0
             selected=min(selected,max(0,restored.entities.count-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
@@ -388,6 +403,11 @@ struct NativeWorldLabView:View {
                     fluidPlaying=false
                 }
             }
+            if spherePlaying,let run=sphereRun {
+                sphereTime=min(run.durationSeconds,sphereTime+dt*sphereSpeed)
+                updateSphereScene()
+                if sphereTime>=run.durationSeconds {spherePlaying=false}
+            }
             if collisionPlaying,let run=collisionRun {
                 collisionTime=min(run.durationSeconds,collisionTime+dt*collisionSpeed)
                 updateCollisionScene()
@@ -414,6 +434,11 @@ struct NativeWorldLabView:View {
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingSphereImpact,
+            document:sphereEvidenceDocument,contentType:.json,
+            defaultFilename:"world-lab-spatial-sphere-impact"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
         .fileExporter(isPresented:$exportingCollision,
@@ -933,6 +958,7 @@ Text("Invent chemical heat").font(.headline)
     @ViewBuilder private func solidContent(project:NativeWorldLabProject,
         solid:NativeLabSolid)->some View {
         solidPlacementContent(project:project,solid:solid)
+        solidSphereImpactContent(project:project,solid:solid)
         solidCollisionContent(project:project,solid:solid)
         solidBeamContent(project:project,solid:solid)
         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
@@ -943,6 +969,134 @@ Text("Invent chemical heat").font(.headline)
             solidEnergyControlsContent(project:project,solid:solid,derived:derived)
             solidMotorReadoutContent(project:project,solid:solid)
             solidDropReadoutContent(project:project,solid:solid)
+        }
+    }
+
+    private func nativeSphereVelocity(_ input:String)throws->[Double] {
+        let values=input.split(separator:",",omittingEmptySubsequences:false).compactMap {
+            Double($0.trimmingCharacters(in:.whitespacesAndNewlines))
+        }
+        guard values.count==3,values.allSatisfy({$0.isFinite}) else {
+            throw NativeWorldLabError.invalid("Provide three numeric X,Y,Z velocities separated by commas")
+        }
+        return values
+    }
+    private func updateSphereScene(){
+        guard let run=sphereRun,let sample=try? run.sample(sphereTime) else {return}
+        if let first=scene.rootNode.childNode(withName:"lab-solid-"+run.firstEntityId,
+            recursively:false) {
+            first.position=SCNVector3(Float(sample.firstCentreM[0]),
+                Float(sample.firstCentreM[1]),Float(sample.firstCentreM[2]))
+        }
+        if let second=scene.rootNode.childNode(withName:"lab-solid-"+run.secondEntityId,
+            recursively:false) {
+            second.position=SCNVector3(Float(sample.secondCentreM[0]),
+                Float(sample.secondCentreM[1]),Float(sample.secondCentreM[2]))
+        }
+    }
+
+    @ViewBuilder private func solidSphereImpactContent(
+        project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
+        let other=project.entities.first(where:{$0.id==sphereOtherId})
+        Text("Collide invented spheres in 3D").font(.headline)
+        Text("Real off-axis first contact for two smooth ideal spheres. User-assumed density and restitution; no gravity, rolling, breakage or other contacts.")
+            .font(.caption).foregroundStyle(.secondary)
+        Picker("Other sphere for 3D impact",selection:$sphereOtherId){
+            Text("Choose another sphere").tag("")
+            ForEach(project.entities.filter{$0.shape=="sphere"&&$0.id != solid.id},
+                id:\.id){item in
+                Text(item.name).tag(item.id)
+            }
+        }.pickerStyle(.menu)
+            .onChange(of:sphereOtherId){_ in
+                sphereRun=nil;spherePlaying=false;redraw()
+            }
+        TextField("First sphere velocity X,Y,Z in m/s",text:$sphereFirstVelocity)
+            .textFieldStyle(.roundedBorder).keyboardType(.numbersAndPunctuation)
+            .onChange(of:sphereFirstVelocity){_ in sphereRun=nil;spherePlaying=false;redraw()}
+        TextField("Second sphere velocity X,Y,Z in m/s",text:$sphereSecondVelocity)
+            .textFieldStyle(.roundedBorder).keyboardType(.numbersAndPunctuation)
+            .onChange(of:sphereSecondVelocity){_ in sphereRun=nil;spherePlaying=false;redraw()}
+        value("Assumed spatial restitution",sphereRestitution,"")
+        Slider(value:$sphereRestitution,in:0...1)
+            .accessibilityLabel("Three-dimensional restitution")
+            .onChange(of:sphereRestitution){_ in sphereRun=nil;spherePlaying=false;redraw()}
+        Button("Calculate three-dimensional sphere impact"){
+            do {
+                guard let other,other.id != solid.id else {
+                    throw NativeWorldLabError.invalid("Select a different sphere")
+                }
+                let initialA=try nativeSphereVelocity(sphereFirstVelocity)
+                let initialB=try nativeSphereVelocity(sphereSecondVelocity)
+                let run=try NativeWorldLabSphereImpact.evaluate(project,
+                    firstId:solid.id,secondId:other.id,
+                    firstVelocityMps:initialA,secondVelocityMps:initialB,
+                    restitution:sphereRestitution)
+                sphereRun=run;sphereTime=0;spherePlaying=false
+                collisionRun=nil;collisionPlaying=false;problem=""
+                redraw();updateSphereScene()
+            }catch {sphereRun=nil;spherePlaying=false;problem=error.localizedDescription}
+        }.buttonStyle(.bordered)
+            .disabled(solid.shape != "sphere"||other?.shape != "sphere"||other?.id==solid.id)
+        if let run=sphereRun,run.projectId==project.id,
+           run.projectRevision==project.revision,
+           (run.firstEntityId==solid.id||run.secondEntityId==solid.id) {
+            value("3D impact time",run.impactTimeSeconds,"s")
+            value("First mass",run.firstMassKg,"kg")
+            value("Second mass",run.secondMassKg,"kg")
+            Text("Impulse X/Y/Z (N·s): "+
+                run.impulseNs.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            Text("Final first velocity X/Y/Z (m/s): "+
+                run.firstFinalVelocityMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            Text("Final second velocity X/Y/Z (m/s): "+
+                run.secondFinalVelocityMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            Text("Momentum before X/Y/Z: "+
+                run.momentumBeforeKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            Text("Momentum after X/Y/Z: "+
+                run.momentumAfterKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            Text("Angular momentum before X/Y/Z: "+
+                run.angularMomentumBeforeKgM2PerS.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            Text("Angular momentum after X/Y/Z: "+
+                run.angularMomentumAfterKgM2PerS.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                .font(.caption)
+            value("Energy before",run.energyBeforeJ,"J")
+            value("Energy after",run.energyAfterJ,"J")
+            value("Dissipated energy",run.dissipatedEnergyJ,"J")
+            if let at=try? run.sample(sphereTime){
+                Text("First centre X/Y/Z (m): "+
+                    at.firstCentreM.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                    .font(.caption)
+                Text("Second centre X/Y/Z (m): "+
+                    at.secondCentreM.map{String(format:"%.4g",$0)}.joined(separator:" / "))
+                    .font(.caption)
+            }
+            Text("3D impact time: "+String(format:"%.2f",sphereTime)+" s")
+            Slider(value:$sphereTime,in:0...run.durationSeconds,
+                onEditingChanged:{editing in
+                    if editing {spherePlaying=false}
+                }).accessibilityLabel("Explore three-dimensional impact time")
+                .onChange(of:sphereTime){_ in updateSphereScene()}
+            HStack{
+                Button(spherePlaying ? "Pause 3D impact":"Play 3D impact"){
+                    spherePlaying.toggle()
+                }
+                Button("Reset 3D impact"){
+                    spherePlaying=false;sphereTime=0;updateSphereScene()
+                }
+            }.buttonStyle(.bordered)
+            Picker("3D collision playback rate",selection:$sphereSpeed){
+                Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
+            }.pickerStyle(.segmented)
+            Button("Export 3D impact evidence"){
+                exportingSphereImpact=true
+            }.buttonStyle(.bordered)
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
         }
     }
 
