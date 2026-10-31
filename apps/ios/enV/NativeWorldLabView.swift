@@ -38,6 +38,9 @@ struct NativeWorldLabView:View {
     @State private var pendingReplacement=""
     @State private var inventedName=""
     @State private var inventedDensity=""
+    @State private var inventedModulus=""
+    @State private var beamForce="1000"
+    @State private var beamRun:NativeLabBeamBendingResult?
     @State private var deviceName=""
     @State private var deviceAssumption=""
     @State private var deviceResistance=""
@@ -336,6 +339,7 @@ struct NativeWorldLabView:View {
         .onChange(of:projectData){_ in
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
+            beamRun=nil
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
         }
@@ -607,6 +611,8 @@ struct NativeWorldLabView:View {
                         .textFieldStyle(.roundedBorder)
                     TextField("Assumed density in kg/m³ (optional)",text:$inventedDensity)
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    TextField("Assumed Young's modulus in Pa (optional)",text:$inventedModulus)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
                     Button("Save invented material") {
                         do {
                             guard !inventedName.trimmingCharacters(in:.whitespaces).isEmpty else{
@@ -617,20 +623,28 @@ struct NativeWorldLabView:View {
                                 density=nil
                             }else if let number=Double(inventedDensity){density=number}
                             else {throw NativeWorldLabError.invalid("Density must be a finite number.")}
+                            let modulus:Double?
+                            if inventedModulus.trimmingCharacters(in:.whitespaces).isEmpty {
+                                modulus=nil
+                            }else if let value=Double(inventedModulus) {modulus=value}
+                            else {throw NativeWorldLabError.invalid("Young's modulus must be numeric")}
                             let id=UUID().uuidString
                             applyProject {old in
                                 let first=try NativeWorldLabEditor.addHypotheticalMaterial(
-                                    old,name:inventedName,densityKgM3:density,id:id)
+                                    old,name:inventedName,densityKgM3:density,
+                                    youngModulusPa:modulus,id:id)
                                 if let solid {
                                     return try NativeWorldLabEditor.assignMaterial(
                                         first,solidId:solid.id,materialId:id)
                                 }
                                 return first
                             }
-                            if problem.isEmpty {inventedName="";inventedDensity=""}
+                            if problem.isEmpty {
+                                inventedName="";inventedDensity="";inventedModulus=""
+                            }
                         }catch{problem=error.localizedDescription}
                     }.buttonStyle(.borderedProminent)
-                    Text("Imported geometry is not structurally or chemically simulated. The spring uses only a separately assumed lumped mass.")
+                    Text("An invented Young's modulus can power a bounded analytical beam model. Unknown strength, fractures and chemical behavior remain unverified.")
                         .font(.caption).foregroundStyle(.secondary)
                 
     }
@@ -859,6 +873,7 @@ Text("Invent chemical heat").font(.headline)
     @ViewBuilder private func solidContent(project:NativeWorldLabProject,
         solid:NativeLabSolid)->some View {
         solidPlacementContent(project:project,solid:solid)
+        solidBeamContent(project:project,solid:solid)
         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
                                 value("Assumed mass",assumedMass,"kg")
         solidFluidContent(project:project,solid:solid)
@@ -867,6 +882,37 @@ Text("Invent chemical heat").font(.headline)
             solidEnergyControlsContent(project:project,solid:solid,derived:derived)
             solidMotorReadoutContent(project:project,solid:solid)
             solidDropReadoutContent(project:project,solid:solid)
+        }
+    }
+
+    @ViewBuilder private func solidBeamContent(
+        project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
+        let chosen=project.materials.first(where:{$0.id==solid.materialId})
+        Text("Test hypothetical elastic beam bending").font(.headline)
+        Text("Assume a rectangular cantilever: X length, Y vertical depth, Z width, "+
+             "fixed at one end, with a static downward force at the free end.")
+            .font(.caption).foregroundStyle(.secondary)
+        value("Assumed Young's modulus",chosen?.youngModulusPa,"Pa")
+        TextField("Downward beam tip load in newtons",text:$beamForce)
+            .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+        Button("Calculate elastic bending"){
+            do {
+                guard let load=Double(beamForce) else {
+                    throw NativeWorldLabError.invalid("Tip load must be a finite number")
+                }
+                beamRun=try NativeWorldLabStructural.bending(project,
+                    entityId:solid.id,forceN:load)
+                problem=""
+            }catch {beamRun=nil;problem=error.localizedDescription}
+        }.buttonStyle(.bordered)
+            .disabled(solid.shape != "box" || (chosen?.youngModulusPa ?? 0)<=0)
+        if let run=beamRun,run.projectId==project.id,
+           run.projectRevision==project.revision,run.entityId==solid.id,
+           run.forceN==Double(beamForce) {
+            value("Free-end deflection",run.tipDeflectionM,"m")
+            value("Maximum bending stress",run.maximumStressPa,"Pa")
+            value("Maximum surface strain",run.surfaceStrain,"")
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
         }
     }
 
