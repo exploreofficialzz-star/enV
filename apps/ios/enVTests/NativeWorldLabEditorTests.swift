@@ -162,4 +162,29 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.assignMaterial(withSphere,solidId:"sphere",
                                                                       materialId:"missing"))
     }
+    func testInventedMaterialRevisionPreservesPortableSolidReference() throws {
+        var data=try NativeWorldLabEditor.addSolid(
+            NativeWorldLabEditor.blank(),shape:"box",id:"solid")
+        data=try NativeWorldLabEditor.addHypotheticalMaterial(
+            data,name:"Invented",densityKgM3:nil,
+            youngModulusPa:nil,id:"invented")
+        data=try NativeWorldLabEditor.assignMaterial(
+            data,solidId:"solid",materialId:"invented")
+        let before=try NativeWorldLabProject.decode(data)
+        let changed=try NativeWorldLabEditor.reviseHypotheticalMaterial(
+            data,id:"invented",name:"Changed hypothesis",
+            densityKgM3:45,youngModulusPa:2e11)
+        let after=try NativeWorldLabProject.decode(changed)
+        XCTAssertEqual(after.revision,before.revision+1)
+        XCTAssertEqual(after.entities.first?.materialId,"invented")
+        XCTAssertEqual(after.materials.first?.id,"invented")
+        XCTAssertEqual(after.materials.first?.evidence,"hypothetical-user-assumed")
+        XCTAssertEqual(after.materials.first?.youngModulusPa,2e11)
+        XCTAssertThrowsError(try NativeWorldLabEditor.reviseHypotheticalMaterial(
+            changed,id:"invented",name:"Invalid",
+            densityKgM3:Double.nan,youngModulusPa:1))
+        XCTAssertThrowsError(try NativeWorldLabEditor.reviseHypotheticalMaterial(
+            changed,id:"missing",name:"Unavailable",densityKgM3:1,youngModulusPa:1))
+    }
+
 }
