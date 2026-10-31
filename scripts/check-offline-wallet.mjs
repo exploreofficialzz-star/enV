@@ -152,8 +152,12 @@ for (const phrase of ["billing_offline_sync_batches", "billing_security_rate_lim
 }
 assert.ok(crypto.includes("timingSafeEqual") && crypto.includes("createPublicKey") && crypto.includes("ieee-p1363"), "Token MAC comparison / native and WebCrypto signature verification required.");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
-assert.ok(iosProject.includes("OfflineWalletNativeAPI.swift in Sources") && iosProject.includes("path = OfflineWalletNativeAPI.swift") &&
-  iosProject.includes("D30000000000000000000004); runOnlyForDeploymentPostprocessing = 0; };"),
+const iosAppSourcesBuildPhase = iosProject.match(
+  /C50000000000000000000002 \/\* App Sources \*\/ = \{isa = PBXSourcesBuildPhase;[\s\S]*?\};/,
+)?.[0] ?? "";
+assert.ok(iosProject.includes("OfflineWalletNativeAPI.swift in Sources") &&
+  iosProject.includes("path = OfflineWalletNativeAPI.swift") &&
+  /files = \([^)]*\bD30000000000000000000004\b[^)]*\);/.test(iosAppSourcesBuildPhase),
   "The native iOS transport must be part of the Xcode application Sources build phase, not just present on disk.");
 const androidNativeScreen = read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
 assert.ok(androidNativeScreen.includes("import androidx.compose.material3.AlertDialog") &&
