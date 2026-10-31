@@ -291,7 +291,7 @@ export async function runAnalyticsRetention(request: Request) {
     ...overviewRows.map(row=>String(row.report_day).slice(0,10)),
     String(previousDay[0]?.report_day ?? '').slice(0,10),
   ].filter(day=>/^\d{4}-\d{2}-\d{2}$/.test(day)));
-  const rowsForDay = (rows,day) => rows.filter(row=>String(row.report_day).slice(0,10)===day);
+  const rowsForDay = (rows: Array<Record<string, unknown>>, day: string) => rows.filter(row=>String(row.report_day).slice(0,10)===day);
   let dailyReportsSaved=0;
   for (const day of dayKeys) {
     const overview=overviewRows.find(row=>String(row.report_day).slice(0,10)===day) ?? {};
