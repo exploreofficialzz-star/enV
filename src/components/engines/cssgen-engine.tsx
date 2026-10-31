@@ -47,9 +47,11 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
   ],
   "text-shadow": [
+    { name: "layers", label: "Shadow layers", type: "select", defaultValue: "1", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }, { value: "4", label: "4 layers" }] },
     { name: "x", label: "Horizontal offset", type: "number", defaultValue: 2, min: -40, max: 40, suffix: "px" },
     { name: "y", label: "Vertical offset", type: "number", defaultValue: 3, min: -40, max: 40, suffix: "px" },
     { name: "blur", label: "Blur", type: "number", defaultValue: 8, min: 0, max: 80, suffix: "px" },
+    { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.72, min: 0, max: 1, step: 0.01 },
     { name: "color", label: "Shadow color", type: "color", defaultValue: "#202a3b" },
     { name: "textColor", label: "Text color", type: "color", defaultValue: "#ffffff" },
   ],
@@ -264,9 +266,19 @@ function cssFor(
     const x = numberValue(values, "x", 2, -40, 40);
     const y = numberValue(values, "y", 3, -40, 40);
     const blur = numberValue(values, "blur", 8, 0, 80);
-    const color = values.color ?? "#202a3b";
-    const textShadow = `${x}px ${y}px ${blur}px ${color}`;
-    return { css: `text-shadow: ${textShadow};\ncolor: ${values.textColor ?? "#ffffff"};`, style: { textShadow, color: values.textColor ?? "#ffffff" } };
+    const opacity = numberValue(values, "opacity", 0.72, 0, 1);
+    const color = parseCssColor(values.color ?? "#202a3b") ?? { r: 32, g: 42, b: 59, a: 1 };
+    const rgba = (alpha: number) => `rgba(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)}, ${clamp(alpha, 0, 1).toFixed(3)})`;
+    const layerCount = Math.round(numberValue(values, "layers", 1, 1, 4));
+    const shadows = Array.from({ length: layerCount }, (_, index) => {
+      const multiplier = index + 1;
+      const layerOpacity = opacity * (1 - index * 0.16);
+      const layerBlur = Math.max(0, blur * (1 - index * 0.2));
+      return `${x * multiplier}px ${y * multiplier}px ${layerBlur.toFixed(1)}px ${rgba(layerOpacity)}`;
+    });
+    const textShadow = shadows.join(", ");
+    const textColor = values.textColor ?? "#ffffff";
+    return { css: `text-shadow: ${textShadow};\ncolor: ${textColor};`, style: { textShadow, color: textColor } };
   }
   if (family === "border") {
     const width = numberValue(values, "width", 1, 0, 24);
@@ -598,6 +610,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
               <div className="size-36 bg-white" style={output.style} />
             )}
           </div>
+          {family === "neomorph" ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5 text-muted">Neumorphic effects can make controls and boundaries difficult to distinguish. Keep labels visible, retain clear focus indicators and verify text and control contrast before using this treatment in an interface.</p> : null}
           <p className="text-xs leading-5 text-muted">The preview shows the main visual treatment. Check the exported code in your target browser and project before shipping.</p>
         </div>
       </div>
