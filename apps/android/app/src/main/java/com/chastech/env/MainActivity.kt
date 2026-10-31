@@ -2352,7 +2352,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var workEnd by rememberSaveable(toolId) { mutableStateOf("17:00") }
     var meetingDuration by rememberSaveable(toolId) { mutableStateOf("30") }
     var intervalMinutes by rememberSaveable(toolId) { mutableStateOf("30") }
-    var value by rememberSaveable(toolId) { mutableStateOf(now.epochSecond.toString()) }
+    var value by rememberSaveable(toolId) { mutableStateOf(if (op == "unix") now.epochSecond.toString() else today) }
     var pattern by rememberSaveable(toolId) { mutableStateOf("yyyy-MM-dd") }
     var year by rememberSaveable(toolId) { mutableStateOf(LocalDate.now().year.toString()) }
     var birth by rememberSaveable(toolId) { mutableStateOf("") }
@@ -2452,7 +2452,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
                 target = if (op == "countdown") now.plusSeconds(3600).toString() else ""
                 zones = "Lagos\nLondon\nNew York\nTokyo"; time = java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()
                 fromTz = java.time.ZoneId.systemDefault().id; toTz = "America/New_York"; workStart = "09:00"; workEnd = "17:00"
-                meetingDuration = "30"; intervalMinutes = "30"; value = now.epochSecond.toString()
+                meetingDuration = "30"; intervalMinutes = "30"; value = if (op == "unix") now.epochSecond.toString() else today
                 pattern = "yyyy-MM-dd"; year = LocalDate.now().year.toString(); birth = ""; output = ""; error = ""
             }
         )
