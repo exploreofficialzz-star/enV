@@ -665,3 +665,9 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
   Android ray calculations can be retained with the saved invention and
   exported; document-picker imports now support either record type. Native
   iOS SceneKit ray segments explicitly assign a visible constant-color material.
+
+- Corrected the interface-budget off-by-one issue consistently in the
+  TypeScript, Kotlin and Swift real-geometry optical solvers. Android
+  now renders a bounded XY projection of genuine calculated 3D segments,
+  explicitly labeling that Z is not visible in this planar projection;
+  the exported evidence retains all X/Y/Z coordinates.

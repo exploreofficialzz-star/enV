@@ -51,10 +51,10 @@ enum NativeWorldLabOpticalScene {
         let normal:[Double]
     }
     private static func add(_ a:[Double],_ b:[Double])->[Double]{
-        zip(a,b).map(+)
+        zip(a,b).map{$0.0+$0.1}
     }
     private static func sub(_ a:[Double],_ b:[Double])->[Double]{
-        zip(a,b).map(-)
+        zip(a,b).map{$0.0-$0.1}
     }
     private static func scaled(_ a:[Double],_ factor:Double)->[Double]{
         a.map{$0*factor}
@@ -150,7 +150,7 @@ enum NativeWorldLabOpticalScene {
         var medium:String?
         var travelled=0.0,power=1.0,discarded=0.0
         var segments:[NativeOpticalSceneSegment]=[]
-        for step in 0...input.maximumInterfaces{
+        for step in 0..<input.maximumInterfaces{
             let remaining=input.maximumDistanceMeters-travelled
             if remaining<=epsilon{break}
             var collisions:[(Body,Hit)]=[]
@@ -211,7 +211,7 @@ enum NativeWorldLabOpticalScene {
                 add(scaled(direction,ratio),scaled(normal,ratio*cosI-cosT)))
             if !total {medium=entering ? body.id : nil}
             origin=add(end,scaled(direction,2*epsilon))
-            if step==input.maximumInterfaces{
+            if step==input.maximumInterfaces-1{
                 segments.append(NativeOpticalSceneSegment(startMeters:end,
                     endMeters:end,kind:"limit",entityId:nil,
                     travelMeters:0,incidentIndex:total ? n1 : n2,

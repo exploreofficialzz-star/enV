@@ -112,7 +112,7 @@ export function traceOpticalScene(raw:WorldLabProject,
   let position:Vec3=[...input.originMeters],direction=normalize(input.direction);
   let medium:string|null=null,travelled=0,power=1,discarded=0;
   const segments:OpticalRaySegment[]=[];
-  for(let iteration=0;iteration<=input.maximumInterfaces;iteration++){
+  for(let iteration=0;iteration<input.maximumInterfaces;iteration++){
     const remaining=input.maximumDistanceMeters-travelled;
     if(remaining<=EPS)break;
     const hits=bodies.map(body=>({body,hit:intersect(position,direction,body)}))
@@ -163,7 +163,7 @@ export function traceOpticalScene(raw:WorldLabProject,
       add(scale(direction,eta),scale(normal,eta*ci-ct)));
     if(!total)medium=entering?body.id:null;
     position=add(end,scale(direction,EPS*2));
-    if(iteration===input.maximumInterfaces){
+    if(iteration===input.maximumInterfaces-1){
       // The remaining planned distance is not travelled when the interface
       // budget is reached; report a zero-length termination marker.
       segments.push({startMeters:end,endMeters:end,kind:"limit",

@@ -2,10 +2,13 @@ package com.chastech.env
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.*
@@ -101,6 +104,32 @@ fun NativeWorldLabRayPanel(project:NativeWorldLabProject,onMessage:(String)->Uni
                 " · primary light: "+String.format(Locale.US,"%.2f",record.finalPower*100)+"%"+
                 " · excluded reflection: "+
                 String.format(Locale.US,"%.2f",record.discardedPower*100)+"%")
+            val points=record.segments.flatMap{listOf(it.start,it.end)}
+            val minX=points.minOf{it.x}
+            val maxX=points.maxOf{it.x}
+            val minY=points.minOf{it.y}
+            val maxY=points.maxOf{it.y}
+            val span=kotlin.math.max(1.0,kotlin.math.max(maxX-minX,maxY-minY))
+            Text("XY projection of real calculated 3D rays; Z is not visible here.",
+                style=MaterialTheme.typography.bodySmall)
+            Canvas(modifier=Modifier.fillMaxWidth().height(184.dp)){
+                fun pos(vector:NativeRayVector):Offset{
+                    val scale=0.9f*kotlin.math.min(size.width,size.height)/span.toFloat()
+                    return Offset(
+                        size.width*0.5f+
+                            (vector.x-(minX+maxX)/2).toFloat()*scale,
+                        size.height*0.5f-
+                            (vector.y-(minY+maxY)/2).toFloat()*scale)
+                }
+                for(segment in record.segments){
+                    if(segment.kind=="limit")continue
+                    drawLine(
+                        color=if(segment.kind=="total-internal-reflection")
+                            Color(0xFFFF9800) else Color(0xFF00BCD4),
+                        start=pos(segment.start),end=pos(segment.end),
+                        strokeWidth=3.dp.toPx())
+                }
+            }
             record.segments.take(16).forEachIndexed{index,part->
                 Text((index+1).toString()+": "+part.kind+
                     " · "+String.format(Locale.US,"%.3f",part.travelledMeters)+" m",

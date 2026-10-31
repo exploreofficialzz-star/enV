@@ -51,3 +51,13 @@ test("ray rejects invented media without optical evidence and interior origins",
 - Fixed optical energy accounting for zero-transmission interface cases,
   and fixed the interface-budget marker to report zero additional
   travelled distance instead of inventing untraced path length.
+
+test("interface budget counts actual crossings without solving an extra interface",()=>{
+ const p=source("box");
+ const run=traceOpticalScene(p,{originMeters:[-4,0,0],
+   direction:[1,0,0],maximumDistanceMeters:10,maximumInterfaces:1});
+ assert.equal(run.segments.filter(s=>s.kind==="transmitted").length,1);
+ assert.equal(run.segments[1].kind,"limit");
+ assert.equal(run.segments[1].travelMeters,0);
+ assert.ok(Math.abs(run.segments[0].endMeters[0]+1)<1e-8);
+});

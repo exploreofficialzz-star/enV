@@ -163,7 +163,7 @@ object NativeWorldLabOpticalScene {
         var power=1.0
         var reflectedPower=0.0
         val path=mutableListOf<NativeOpticalRaySegment>()
-        for(step in 0..interfaceLimit){
+        for(step in 0 until interfaceLimit){
             val left=distanceMeters-travelled
             if(left<=epsilon)break
             val hits=bodies.mapNotNull{body->
@@ -214,7 +214,7 @@ object NativeWorldLabOpticalScene {
                 (direction*ratio+normal*(ratio*cosine-cost)).unit()
             if(!total)medium=if(entering)body.id else null
             position=endpoint+direction*(2*epsilon)
-            if(step==interfaceLimit) {
+            if(step==interfaceLimit-1) {
                 path+=NativeOpticalRaySegment(endpoint,endpoint,
                     "limit",null,0.0,if(total)n1 else n2,null,0.0,1.0,power)
             }
