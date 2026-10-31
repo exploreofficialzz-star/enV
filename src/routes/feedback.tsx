@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { recordAnalyticsEvent } from "@/lib/analytics/client";
 
 export const Route = createFileRoute("/feedback")({ component: FeedbackPage });
 
@@ -71,6 +72,12 @@ function FeedbackPage() {
       const payload = await response.json() as { ok?: boolean; data?: FeedbackResponse; message?: string };
       if (!response.ok || payload.ok !== true || !payload.data) throw new Error(payload.message || "Your report could not be submitted.");
       setResult(payload.data);
+      recordAnalyticsEvent({
+        name: "feedback_submitted",
+        toolId: toolId.trim() || null,
+        outcome: "success",
+        properties: { category },
+      });
       try { sessionStorage.removeItem(keyName); } catch { /* The server accepted the report. */ }
       setTitle(""); setDescription(""); setToolId(""); setAppVersion("");
     } catch (error) {
