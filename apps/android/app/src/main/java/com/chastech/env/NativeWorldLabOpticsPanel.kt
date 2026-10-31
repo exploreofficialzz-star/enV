@@ -1,9 +1,13 @@
 package com.chastech.env
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.chastech.env.engine.NativeWorldLabOpticsEvidenceStore
 import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabOptics
@@ -18,6 +22,24 @@ fun NativeWorldLabOpticsPanel(project:NativeWorldLabProject,onMessage:(String)->
     var secondId by remember { mutableStateOf("") }
     var angle by remember { mutableStateOf("30") }
     var result by remember { mutableStateOf<NativeLabOpticsResult?>(null) }
+    val context=LocalContext.current
+    val store=remember(context){NativeWorldLabOpticsEvidenceStore(context.filesDir)}
+    var records by remember(project.id,project.revision){
+        mutableStateOf(runCatching{store.list(project.id)}.getOrDefault(emptyList()))
+    }
+    var chosenEvidence by remember { mutableStateOf("") }
+    val export=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null&&chosenEvidence.isNotEmpty()){
+            runCatching{
+                val text=store.read(project.id,chosenEvidence)
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(text.toByteArray(Charsets.UTF_8));it.flush()
+                }?:error("Cannot open the optical evidence destination.")
+            }.onSuccess{onMessage("Exported portable optical evidence.")}
+                .onFailure{onMessage(it.message?:"Optical export failed.")}
+        }
+    }
     val first=materials.firstOrNull{it.id==firstId}?:materials[0]
     val second=materials.firstOrNull{it.id==secondId&&it.id!=first.id}
         ?:materials.first{it.id!=first.id}
@@ -51,7 +73,21 @@ fun NativeWorldLabOpticsPanel(project:NativeWorldLabProject,onMessage:(String)->
                 "Transmitted: "+String.format("%.3f",run.transmittance*100)+"%")
             Text(if(run.totalInternalReflection)"Total internal reflection" else
                 "Refracted angle: "+String.format("%.3f",run.transmittedDegrees)+"°")
+            OutlinedButton(onClick={
+                runCatching{store.save(run)}.onSuccess{
+                    records=store.list(project.id)
+                    onMessage("Saved portable optical evidence locally.")
+                }.onFailure{onMessage(it.message?:"Optical record could not be saved.")}
+            }){Text("Keep optical evidence on device")}
             Text(run.validity,style=MaterialTheme.typography.bodySmall)
+        }
+        if(records.isNotEmpty()){
+            Text("Saved optical experiments: "+records.size,
+                style=MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick={
+                chosenEvidence=records.first()
+                export.launch("world-lab-optical-evidence-"+chosenEvidence+".json")
+            }){Text("Export latest optical evidence")}
         }
     }
 }

@@ -6,6 +6,8 @@ import kotlin.math.*
 data class NativeLabOpticsResult(
     val projectId:String,val projectRevision:Int,
     val firstMaterialId:String,val secondMaterialId:String,
+    val firstIndex:Double,val secondIndex:Double,
+    val sReflectance:Double,val pReflectance:Double,
     val incidentDegrees:Double,val transmittedDegrees:Double?,
     val criticalDegrees:Double?,val totalInternalReflection:Boolean,
     val reflectance:Double,val transmittance:Double,
@@ -28,14 +30,14 @@ object NativeWorldLabOptics {
         val sine=n1/n2*sin(angle)
         val total=sine>1
         val refracted=if(total)null else Math.toDegrees(asin(min(1.0,sine)))
-        val reflectance=if(total)1.0 else{
-            val ci=cos(angle);val ct=sqrt(max(0.0,1-sine*sine))
-            val rs=((n1*ci-n2*ct)/(n1*ci+n2*ct)).pow(2)
-            val rp=((n2*ci-n1*ct)/(n2*ci+n1*ct)).pow(2)
-            ((rs+rp)/2).coerceIn(0.0,1.0)
-        }
+        val ci=cos(angle)
+        val ct=if(total)0.0 else sqrt(max(0.0,1-sine*sine))
+        val rs=if(total)1.0 else ((n1*ci-n2*ct)/(n1*ci+n2*ct)).pow(2)
+        val rp=if(total)1.0 else ((n2*ci-n1*ct)/(n2*ci+n1*ct)).pow(2)
+        val reflectance=((rs+rp)/2).coerceIn(0.0,1.0)
         return NativeLabOpticsResult(project.id,project.revision,firstId,secondId,
-            angleDegrees,refracted,if(n1>n2)Math.toDegrees(asin(n2/n1)) else null,
+            n1,n2,rs,rp,angleDegrees,refracted,
+            if(n1>n2)Math.toDegrees(asin(n2/n1)) else null,
             total,reflectance,1-reflectance,
             "Lossless planar, isotropic nonmagnetic Fresnel/Snell model with assumed "+
             "refractive indices. No measured material properties, absorption, "+

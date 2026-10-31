@@ -606,3 +606,9 @@ release-candidate evidence bundle are unfinished.
   native scientific evidence store. Saved records are eligible for the
   existing native complete-archive interchange. The private store rejects
   malformed optical record bounds rather than trusting imported payloads.
+
+- Android has a separate capped app-private optical evidence store with
+  project-bound typed JSON and a system-document export action. The records
+  follow the same non-executable evidence envelope as Web/iOS; Android's
+  existing composite project archive does not yet merge these optical
+  records into one bundle, so explicit export remains necessary.
