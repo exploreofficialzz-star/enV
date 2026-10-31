@@ -10,7 +10,6 @@ import {
   evaluateContrast,
   getContrastTargets,
   resolveRenderedPair,
-  rgbToHsl,
   suggestContrastCorrections,
   toHex,
   toHslString,
