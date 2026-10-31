@@ -81,7 +81,7 @@ export function ToolShell({
         name: "tool_abandoned",
         toolId: tool.id,
         outcome: "abandoned",
-        durationMs: Math.max(0, Date.now() - startedAt),
+        durationMs: Math.min(3600000, Math.max(0, Date.now() - startedAt)),
         properties: { stage: "exit_without_recorded_result" },
       });
     };
@@ -222,21 +222,21 @@ export function ToolShell({
           toolStartedRef.current = true;
           toolStartedAtRef.current = Date.now();
           if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
-          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_interaction" } });
+          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.min(3600000, Math.max(0, Date.now() - toolViewedAtRef.current)), properties: { entry_point: "first_interaction" } });
         }}
         onInputCapture={() => {
           if (toolStartedRef.current) return;
           toolStartedRef.current = true;
           toolStartedAtRef.current = Date.now();
           if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
-          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "first_input" } });
+          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.min(3600000, Math.max(0, Date.now() - toolViewedAtRef.current)), properties: { entry_point: "first_input" } });
         }}
         onSubmitCapture={() => {
           if (toolStartedRef.current) return;
           toolStartedRef.current = true;
           toolStartedAtRef.current = Date.now();
           if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(toolStartedAtRef.current);
-          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.max(0, Date.now() - toolViewedAtRef.current), properties: { entry_point: "form_submit" } });
+          recordAnalyticsEvent({ name: "tool_started", toolId: tool.id, outcome: "unknown", durationMs: Math.min(3600000, Math.max(0, Date.now() - toolViewedAtRef.current)), properties: { entry_point: "form_submit" } });
         }}
       >
         {isMusicSandbox ? (
