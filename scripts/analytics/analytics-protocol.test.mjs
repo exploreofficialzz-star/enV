@@ -55,15 +55,21 @@ test("offline synchronization events accept only bounded, content-free outcome m
   isOffline:false,networkType:"wifi",properties:{surface:"wallet"},
  }]});
  assert.equal(success.events[0].name,"offline_sync_succeeded");
+ assert.equal(success.events[0].outcome,"success");
  assert.equal(success.events[0].properties.surface,"wallet");
  const failure=validateEventsPayload({...envelope,events:[{
   eventId:"4ea9a990-d232-4ec5-9e5f-2c81dcf5ac42",name:"offline_sync_failed",
   outcome:"failure",errorCode:"OFFLINE_NETWORK_FAILED",properties:{surface:"wallet"},
  }]});
  assert.equal(failure.events[0].errorCode,"OFFLINE_NETWORK_FAILED");
+ assert.equal(failure.events[0].outcome,"failure");
  assert.equal(failure.events[0].toolId,null);
  assert.throws(()=>validateEventsPayload({...envelope,events:[{
   eventId:"82c69e80-43e2-4a2a-9b39-5d5dbabe9f63",name:"offline_sync_failed",
   errorCode:"Network failed: bearer token leaked",
  }]}),/machine-readable/);
+ assert.equal(validateEventsPayload({...envelope,events:[{
+  eventId:"b3ac4a6d-0417-414e-8ef1-7bfc712d77e2",name:"offline_sync_failed",
+  outcome:"success",
+ }]}).events[0].outcome,"failure");
 });
