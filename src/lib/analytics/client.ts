@@ -6,7 +6,7 @@ const KEYS={choice:"env.analytics.choice.v1",subject:"env.analytics.subject.v1",
 let flush:Promise<void>|null=null;
 function storage(){try{return typeof window==="undefined"?null:window.localStorage;}catch{return null;}}
 function get(key:string){try{return storage()?.getItem(key)??null;}catch{return null;}}
-function set(key:string,value:string){try{storage()?.setItem(key,value);}catch{}}
+function set(key:string,value:string):boolean{try{const store=storage();if(!store)return false;store.setItem(key,value);return store.getItem(key)===value;}catch{return false;}}
 function remove(key:string){try{storage()?.removeItem(key);}catch{}}
 function id(){try{return typeof crypto!="undefined"&&crypto.randomUUID?crypto.randomUUID():null;}catch{return null;}}
 function subject(){return get(KEYS.subject);}
@@ -18,8 +18,17 @@ async function postConsent(subjectId:string,granted:boolean){const response=awai
 export async function chooseAnalyticsConsent(granted:boolean){
  const old=subject();
  if(!granted){set(KEYS.choice,"denied");remove(KEYS.queue);remove(KEYS.session);remove(KEYS.subject);if(old){try{await postConsent(old,false);remove(KEYS.revoke);}catch{set(KEYS.revoke,old);}}return;}
- const current=old??id();if(!current)throw new Error("This browser cannot create a secure analytics installation ID.");
- await postConsent(current,true);set(KEYS.subject,current);set(KEYS.choice,"granted");void flushAnalyticsEvents();
+ const current=old??id();
+ if(!current)throw new Error("This browser cannot create a secure analytics installation ID.");
+ // Persist the revocation identifier before the server records a grant.
+ if(!set(KEYS.subject,current))throw new Error("Secure browser storage is unavailable. Analytics consent was not enabled.");
+ await postConsent(current,true);
+ if(!set(KEYS.choice,"granted")){
+  try{await postConsent(current,false);remove(KEYS.subject);}
+  catch{set(KEYS.revoke,current);}
+  throw new Error("The browser could not save your analytics preference. Analytics was not enabled.");
+ }
+ void flushAnalyticsEvents();
 }
 export type ToolExecutionOutcome = "success" | "failure" | "cancelled" | "abandoned";
 export function recordToolExecutionResult(
