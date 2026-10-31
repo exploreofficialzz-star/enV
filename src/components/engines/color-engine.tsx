@@ -592,6 +592,26 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
           <Input id="design-color-picker" type="color" value={color ? colorInputValue(color) : "#0d9f8a"} onChange={(event) => setColorValue(event.target.value)} className="h-11 w-20 p-1" />
         </div>
       </div>
+      {toolId === "color-picker" && color ? (
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="design-color-alpha">Opacity / alpha</Label>
+            <span className="font-mono text-xs tabular-nums text-muted">{Math.round(color.a * 100)}%</span>
+          </div>
+          <input
+            id="design-color-alpha"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={Math.round(color.a * 100)}
+            onChange={(event) => setColorValue(`rgba(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)}, ${Number(event.target.value) / 100})`)}
+            className="min-h-9 w-full accent-accent"
+            aria-label="Color opacity"
+          />
+          <p className="text-xs text-muted">The HEX and RGB outputs include alpha when it is below 100%.</p>
+        </div>
+      ) : null}
       {color ? (
         <>
           <div className="flex items-center gap-4 rounded-xl border border-border p-4">
