@@ -219,7 +219,8 @@ export async function getAnalyticsSummary(request: Request) {
   };
 }
 export async function runAnalyticsRetention(request: Request) {
-  configSecret();
+  // Retention remains mandatory even when new analytics collection is disabled.
+  signingSecret();
   if (!authorized(request, process.env.CRON_SECRET)) throw new AnalyticsError("ANALYTICS_RETENTION_UNAUTHORIZED", "Scheduled job credential is invalid.", 401);
   const configured=Number(process.env.ANALYTICS_RETENTION_DAYS??90);
   const days=Number.isSafeInteger(configured)&&configured>=30&&configured<=365?configured:90;
