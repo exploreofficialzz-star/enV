@@ -370,6 +370,23 @@ struct NativeWorldLabView:View {
                     }
                 }
             }
+            ForEach(network.outputs,id:\.id){output in
+                Picker(output.label+" reads",selection:Binding<String>(
+                    get:{output.sourceNodeId},
+                    set:{newSource in
+                        applyProject{try NativeWorldLabEditor.digitalOutputSource(
+                            $0,networkId:network.id,outputId:output.id,
+                            sourceNodeId:newSource)}
+                    })){
+                    ForEach(network.inputs,id:\.id){input in
+                        Text(input.label).tag(input.id)
+                    }
+                    ForEach(network.gates,id:\.id){gate in
+                        Text(gate.name).tag(gate.id)
+                    }
+                }.pickerStyle(.menu)
+                    .accessibilityLabel("Wire "+output.label+" to digital node")
+            }
             Button(digitalShowCases ? "Hide all logic cases":"Check every input combination"){
                 digitalShowCases.toggle()
             }.buttonStyle(.bordered)
