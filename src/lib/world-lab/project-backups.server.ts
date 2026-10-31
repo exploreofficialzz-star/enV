@@ -6,6 +6,10 @@ export type WorldLabBackupRow={
   server_revision:number;project_json:WorldLabProject;
   created_at:Date|string;updated_at:Date|string;
 };
+export type WorldLabBackupVersionRow={
+  user_id:string;project_id:string;server_revision:number;project_revision:number;
+  project_title:string;project_json:WorldLabProject;created_at:Date|string;
+};
 export class WorldLabBackupError extends Error {
   constructor(readonly code:string,message:string){super(message);this.name="WorldLabBackupError";}
 }
@@ -37,6 +41,51 @@ export async function getOwnedWorldLabProject(user:string,id:string):
     [user,id]);
   return rows[0]??null;
 }
+/** Snapshot listing and retrieval never exposes another account's inventions. */
+export async function listOwnedWorldLabProjectVersions(user:string,id:string):
+ Promise<Omit<WorldLabBackupVersionRow,"project_json">[]>{
+  enabled();
+  if(!safe(user)||!safe(id))return [];
+  const sql=await getSql();
+  return sql.query<Omit<WorldLabBackupVersionRow,"project_json">>(
+    "SELECT user_id,project_id,server_revision,project_revision,project_title,created_at "+
+    "FROM public.world_lab_project_versions WHERE user_id=$1 AND project_id=$2 "+
+    "ORDER BY server_revision DESC LIMIT 20",[user,id]);
+}
+export async function getOwnedWorldLabProjectVersion(user:string,id:string,
+  revision:number):Promise<WorldLabBackupVersionRow|null>{
+  enabled();
+  if(!safe(user)||!safe(id)||!Number.isSafeInteger(revision)||
+    revision<1||revision>1000000000)return null;
+  const sql=await getSql();
+  const rows=await sql.query<WorldLabBackupVersionRow>(
+    "SELECT * FROM public.world_lab_project_versions "+
+    "WHERE user_id=$1 AND project_id=$2 AND server_revision=$3",
+    [user,id,revision]);
+  return rows[0]??null;
+}
+export async function deleteOwnedWorldLabProject(user:string,id:string,
+  expectedServerRevision:number):Promise<WorldLabBackupRow|null>{
+  enabled();
+  if(!safe(user)||!safe(id))return null;
+  if(!Number.isSafeInteger(expectedServerRevision)||expectedServerRevision<1||
+    expectedServerRevision>1000000000)
+    throw new WorldLabBackupError("INVALID_REVISION","Supply the current positive backup revision.");
+  const sql=await getSql();
+  return sql.transaction(async tx=>{
+    const rows=await tx.query<WorldLabBackupRow>(
+      "SELECT * FROM public.world_lab_projects WHERE user_id=$1 AND project_id=$2 FOR UPDATE",
+      [user,id]);
+    if(!rows[0])return null;
+    if(rows[0].server_revision!==expectedServerRevision)
+      throw new WorldLabBackupError("BACKUP_CONFLICT",
+        "Cloud backup changed; refresh the list before deletion.");
+    const deleted=await tx.query<WorldLabBackupRow>(
+      "DELETE FROM public.world_lab_projects WHERE user_id=$1 AND project_id=$2 RETURNING *",
+      [user,id]);
+    return deleted[0]??null;
+  });
+}
 export async function saveOwnedWorldLabProject(user:string,raw:unknown,
   expectedServerRevision:number|null):Promise<WorldLabBackupRow>{
   enabled();
@@ -58,6 +107,22 @@ export async function saveOwnedWorldLabProject(user:string,raw:unknown,
       "SELECT * FROM public.world_lab_projects "+
       "WHERE user_id=$1 AND project_id=$2 FOR UPDATE",[user,project.id]);
     const previous=rows[0]??null;
+    // Every accepted update creates an immutable server-revision snapshot.
+    // Keep only the most recent 20 snapshots to bound account storage.
+    const retain=async (row:WorldLabBackupRow)=>{
+      await tx.query(
+        "INSERT INTO public.world_lab_project_versions "+
+        "(user_id,project_id,server_revision,project_revision,project_title,project_json) "+
+        "VALUES($1,$2,$3,$4,$5,$6::jsonb)",
+        [user,row.project_id,row.server_revision,row.project_revision,
+          row.project_title,JSON.stringify(row.project_json)]);
+      await tx.query(
+        "DELETE FROM public.world_lab_project_versions WHERE user_id=$1 AND project_id=$2 "+
+        "AND server_revision NOT IN (SELECT server_revision FROM public.world_lab_project_versions "+
+        "WHERE user_id=$1 AND project_id=$2 ORDER BY server_revision DESC LIMIT 20)",
+        [user,row.project_id]);
+      return row;
+    };
     if((previous?.server_revision??null)!==expectedServerRevision)
       throw new WorldLabBackupError("BACKUP_CONFLICT",
         "Cloud version changed; review it before replacing anything.");
@@ -69,7 +134,7 @@ export async function saveOwnedWorldLabProject(user:string,raw:unknown,
         "server_revision=server_revision+1,project_json=$5::jsonb,updated_at=now() "+
         "WHERE user_id=$1 AND project_id=$2 RETURNING *",
         [user,project.id,project.title,project.revision,json]);
-      return saved[0];
+      return retain(saved[0]);
     }
     const counts=await tx.query<{count:number|string}>(
       "SELECT count(*)::int AS count FROM public.world_lab_projects WHERE user_id=$1",
@@ -81,6 +146,6 @@ export async function saveOwnedWorldLabProject(user:string,raw:unknown,
       "(user_id,project_id,project_title,project_revision,server_revision,project_json) "+
       "VALUES($1,$2,$3,$4,1,$5::jsonb) RETURNING *",
       [user,project.id,project.title,project.revision,json]);
-    return inserted[0];
+    return retain(inserted[0]);
   });
 }

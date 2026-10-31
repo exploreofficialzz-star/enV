@@ -54,9 +54,14 @@ type WorldLabCloudSummary=Readonly<{
   projectId:string;title:string;projectRevision:number;
   serverRevision:number;updatedAt:string;
 }>;
+type WorldLabCloudVersion=Readonly<{
+  projectId:string;title:string;projectRevision:number;
+  serverRevision:number;createdAt:string;
+}>;
 type WorldLabCloudReply=Readonly<{
   ok?:boolean;code?:string;error?:string;
   backup?:WorldLabCloudSummary;backups?:WorldLabCloudSummary[];
+  version?:WorldLabCloudVersion;versions?:WorldLabCloudVersion[];
   project?:unknown;
 }>;
 type SceneHandles = {
@@ -146,6 +151,8 @@ export default function WorldLab() {
   const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
   const [cloudBackups,setCloudBackups]=useState<WorldLabCloudSummary[]>([]);
   const [cloudRevisionTokens,setCloudRevisionTokens]=useState<Record<string,number>>({});
+  const [cloudHistoryFor,setCloudHistoryFor]=useState<string|null>(null);
+  const [cloudVersions,setCloudVersions]=useState<Record<string,WorldLabCloudVersion[]>>({});
   const [cloudBusy,setCloudBusy]=useState(false);
   const [cloudStatus,setCloudStatus]=useState("");
   const [cloudError,setCloudError]=useState("");
@@ -1067,6 +1074,62 @@ export default function WorldLab() {
       setCloudError(error instanceof Error?error.message:"Backup download failed.");
     }finally{setCloudBusy(false);}
   }
+  async function loadAccountBackupVersions(id:string){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+encodeURIComponent(id)+"/versions",{
+        credentials:"same-origin",cache:"no-store",
+      });
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.versions)
+        throw new Error(body.error||body.code||"Could not load backup history.");
+      setCloudVersions(previous=>({...previous,[id]:body.versions!}));
+      setCloudHistoryFor(id);
+      setCloudStatus("Loaded backup history. Your local invention was not changed.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:"Backup history unavailable.");
+    }finally{setCloudBusy(false);}
+  }
+  async function downloadAccountBackupVersion(id:string,revision:number){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+encodeURIComponent(id)+
+        "/versions/"+revision,{credentials:"same-origin",cache:"no-store"});
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.project||body.version?.serverRevision!==revision)
+        throw new Error(body.error||body.code||"Could not retrieve the selected snapshot.");
+      const archived=parseWorldLabProject(body.project);
+      if(archived.id!==id)throw new Error("Snapshot identity mismatch.");
+      downloadJson("world-lab-"+id+"-backup-"+revision+".json",archived);
+      setCloudStatus("Downloaded an immutable snapshot. The local editor was not overwritten.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:"Could not download this version.");
+    }finally{setCloudBusy(false);}
+  }
+  async function deleteAccountBackup(id:string,revision:number){
+    if(!cloudBackupsEnabled||cloudBusy||
+      !window.confirm("Delete this account backup and its version history? Local projects and downloaded files are not affected."))return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+encodeURIComponent(id),{
+        method:"DELETE",credentials:"same-origin",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({expectedServerRevision:revision}),
+      });
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.ok)
+        throw new Error(body.error||body.code||"Cloud backup deletion failed.");
+      setCloudBackups(previous=>previous.filter(x=>x.projectId!==id));
+      setCloudRevisionTokens(previous=>{const next={...previous};delete next[id];return next;});
+      setCloudVersions(previous=>{const next={...previous};delete next[id];return next;});
+      setCloudHistoryFor(previous=>previous===id?null:previous);
+      setCloudStatus("Account backup deleted. Device-local inventions were not touched.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:"Backup was not deleted.");
+    }finally{setCloudBusy(false);}
+  }
   async function submitRemoteJob(){
     if(!remoteJobsEnabled||!project||remoteBusy)return;
     setRemoteBusy(true);setRemoteError("");
@@ -1410,6 +1473,7 @@ export default function WorldLab() {
         <p className="text-xs text-muted-foreground">
           Cloud backup is separate from local saving. Updates require a matching
           cloud revision; downloads never silently overwrite your workspace.
+          The latest 20 saved cloud revisions are retained for explicit export.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <button className={buttonClass} type="button" disabled={cloudBusy}
@@ -1431,6 +1495,14 @@ export default function WorldLab() {
               onClick={()=>{void downloadAccountBackup(backup.projectId);}}>
               Download JSON safely
             </button>
+            <button type="button" className={buttonClass} disabled={cloudBusy}
+              onClick={()=>{void loadAccountBackupVersions(backup.projectId);}}>
+              View history
+            </button>
+            <button type="button" className={buttonClass} disabled={cloudBusy}
+              onClick={()=>{void deleteAccountBackup(backup.projectId,backup.serverRevision);}}>
+              Delete cloud copy
+            </button>
             {project?.id===backup.projectId&&
               <button type="button" className={buttonClass} disabled={cloudBusy}
                 onClick={()=>{
@@ -1441,6 +1513,21 @@ export default function WorldLab() {
                 Prepare update to this version
               </button>}
           </div>
+          {cloudHistoryFor===backup.projectId&&
+            <div className="mt-2 space-y-2" aria-label={"Backup history for "+backup.title}>
+              {!(cloudVersions[backup.projectId]?.length)&&
+                <p>No saved versions are available.</p>}
+              {(cloudVersions[backup.projectId]??[]).map(version=>
+                <div key={version.serverRevision}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2">
+                  <span>Backup #{version.serverRevision} · Project revision {version.projectRevision}</span>
+                  <button type="button" className={buttonClass} disabled={cloudBusy}
+                    onClick={()=>{void downloadAccountBackupVersion(
+                      backup.projectId,version.serverRevision);}}>
+                    Download snapshot
+                  </button>
+                </div>)}
+            </div>}
         </div>)}
       </section>}
       {remoteJobsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
