@@ -122,6 +122,9 @@ fun NativeWorldLabForm() {
     var savedMenuOpen by remember { mutableStateOf(false) }
     var confirmingSavedDelete by remember { mutableStateOf(false) }
     var digitalNewGateName by remember { mutableStateOf("Invented device") }
+    var digitalAssumption by remember { mutableStateOf("User-assumed Boolean behavior") }
+    var digitalSourceA by remember { mutableStateOf("input_a") }
+    var digitalSourceB by remember { mutableStateOf("") }
     var snapMeters by remember { mutableStateOf(0.5) }
     var measurementTargetIndex by remember { mutableIntStateOf(0) }
     val model=when(kind) {
@@ -526,24 +529,43 @@ fun NativeWorldLabForm() {
                         }
                     }
                 }
-                OutlinedTextField(value=digitalNewGateName,
-                    onValueChange={digitalNewGateName=it.take(120)},
-                    label={Text("Name your next invented digital gate")},
-                    singleLine=true)
-                OutlinedButton(
-                    onClick={applyProjectEdit{json->
-                        NativeWorldLabEditor.addDigitalGate(
-                            json,digital.id,digitalNewGateName,
-                            "User-assumed one-input truth table",
-                            listOf(digital.gates.last().id))
-                    }},
-                    enabled=digital.gates.size<32&&digitalNewGateName.isNotBlank()
-                ){Text("Connect a new invented gate")}
-                Text("Each new gate reads the preceding gate. Toggle its truth-table bits,"+
-                    " then wire an indicator to inspect it.",
-                    style=MaterialTheme.typography.bodySmall)
                 val signalNodes=digital.inputs.map{it.id to it.label}+
                     digital.gates.map{it.id to it.name}
+                OutlinedTextField(value=digitalNewGateName,
+                    onValueChange={digitalNewGateName=it.take(120)},
+                    label={Text("Name your invented digital gate")},singleLine=true)
+                OutlinedTextField(value=digitalAssumption,
+                    onValueChange={digitalAssumption=it.take(500)},
+                    label={Text("Assumed Boolean behavior")},singleLine=true)
+                val firstIndex=signalNodes.indexOfFirst{it.first==digitalSourceA}
+                OutlinedButton(onClick={
+                    digitalSourceA=signalNodes[(firstIndex+1).mod(signalNodes.size)].first
+                }){
+                    Text("First input: "+
+                        (signalNodes.getOrNull(firstIndex)?.second?:"choose a switch or gate"))
+                }
+                val secondNodes=listOf("" to "No second input")+signalNodes
+                val secondIndex=secondNodes.indexOfFirst{it.first==digitalSourceB}
+                OutlinedButton(onClick={
+                    digitalSourceB=secondNodes[(secondIndex+1).mod(secondNodes.size)].first
+                }){
+                    Text("Optional second input: "+
+                        (secondNodes.getOrNull(secondIndex)?.second?:"None"))
+                }
+                val ports=listOf(digitalSourceA)+
+                    listOfNotNull(digitalSourceB.takeIf{it.isNotEmpty()})
+                OutlinedButton(onClick={applyProjectEdit{json->
+                    NativeWorldLabEditor.addDigitalGate(json,digital.id,
+                        digitalNewGateName,digitalAssumption,ports)
+                }},enabled=digital.gates.size<32&&digitalNewGateName.isNotBlank()&&
+                    digitalAssumption.isNotBlank()&&
+                    ports.all{port->signalNodes.any{it.first==port}}&&
+                    ports.distinct().size==ports.size){
+                    Text("Connect a new invented gate")
+                }
+                Text("Choose source switches or earlier gates. Define the new truth-table rows,"+
+                    " then wire an output indicator.",
+                    style=MaterialTheme.typography.bodySmall)
                 digital.outputs.forEach{output->
                     val current=signalNodes.indexOfFirst{it.first==output.sourceNodeId}
                     OutlinedButton(onClick={
