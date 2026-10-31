@@ -157,4 +157,28 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.addHypotheticalMaterial(initial,"Other",Double.NaN)
         }
     }
+    @Test fun revisedInventedMaterialChangesAssumptionsWithoutChangingSolidReference(){
+        var json=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="solid")
+        json=NativeWorldLabEditor.addHypotheticalMaterial(
+            json,"Invented material",null,null,id="invented")
+        json=NativeWorldLabEditor.assignMaterial(json,"solid","invented")
+        val old=NativeWorldLabProjectCodec.decode(json)
+        val next=NativeWorldLabEditor.reviseHypotheticalMaterial(
+            json,"invented","Revised hypothesis",45.0,2e11)
+        val new=NativeWorldLabProjectCodec.decode(next)
+        assertEquals(old.revision+1,new.revision)
+        assertEquals(old.entities.first().materialId,new.entities.first().materialId)
+        assertEquals("invented",new.materials.first().id)
+        assertEquals("hypothetical-user-assumed",new.materials.first().evidence)
+        assertEquals(2e11,new.materials.first().youngModulusPa!!,0.0)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.reviseHypotheticalMaterial(
+                next,"invented","Invalid",Double.NaN,2e11)
+        }
+        assertThrows(IllegalStateException::class.java){
+            NativeWorldLabEditor.reviseHypotheticalMaterial(
+                next,"not-real","Unknown",1.0,2e11)
+        }
+    }
+
 }
