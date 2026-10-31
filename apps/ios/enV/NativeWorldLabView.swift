@@ -39,6 +39,7 @@ struct NativeWorldLabView:View {
     @State private var inventedName=""
     @State private var inventedDensity=""
     @State private var inventedModulus=""
+    @State private var editingMaterialId:String?
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
     @State private var deviceName=""
@@ -607,13 +608,22 @@ struct NativeWorldLabView:View {
                         Button("Redo"){travelEdit(true)}.disabled(!editHistory.canRedo)
                     }.buttonStyle(.bordered)
                     if let solid { solidContent(project:project,solid:solid) }
+                    if let solid,
+                       let attached=project.materials.first(where:{$0.id==solid.materialId}){
+                        Button("Revise this material's assumptions"){
+                            editingMaterialId=attached.id
+                            inventedName=attached.name
+                            inventedDensity=attached.densityKgM3.map(String.init) ?? ""
+                            inventedModulus=attached.youngModulusPa.map(String.init) ?? ""
+                        }.buttonStyle(.bordered)
+                    }
                     TextField("Invented material name",text:$inventedName)
                         .textFieldStyle(.roundedBorder)
                     TextField("Assumed density in kg/m³ (optional)",text:$inventedDensity)
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
                     TextField("Assumed Young's modulus in Pa (optional)",text:$inventedModulus)
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
-                    Button("Save invented material") {
+                    Button(editingMaterialId==nil ? "Save invented material" : "Save revised material") {
                         do {
                             guard !inventedName.trimmingCharacters(in:.whitespaces).isEmpty else{
                                 throw NativeWorldLabError.invalid("Name your invented material.")
@@ -630,6 +640,11 @@ struct NativeWorldLabView:View {
                             else {throw NativeWorldLabError.invalid("Young's modulus must be numeric")}
                             let id=UUID().uuidString
                             applyProject {old in
+                                if let editingMaterialId {
+                                    return try NativeWorldLabEditor.reviseHypotheticalMaterial(
+                                        old,id:editingMaterialId,name:inventedName,
+                                        densityKgM3:density,youngModulusPa:modulus)
+                                }
                                 let first=try NativeWorldLabEditor.addHypotheticalMaterial(
                                     old,name:inventedName,densityKgM3:density,
                                     youngModulusPa:modulus,id:id)
@@ -641,9 +656,16 @@ struct NativeWorldLabView:View {
                             }
                             if problem.isEmpty {
                                 inventedName="";inventedDensity="";inventedModulus=""
+                                editingMaterialId=nil;beamRun=nil
                             }
                         }catch{problem=error.localizedDescription}
                     }.buttonStyle(.borderedProminent)
+                    if editingMaterialId != nil {
+                        Button("Cancel material revision"){
+                            editingMaterialId=nil
+                            inventedName="";inventedDensity="";inventedModulus=""
+                        }.buttonStyle(.bordered)
+                    }
                     Text("An invented Young's modulus can power a bounded analytical beam model. Unknown strength, fractures and chemical behavior remain unverified.")
                         .font(.caption).foregroundStyle(.secondary)
                 
