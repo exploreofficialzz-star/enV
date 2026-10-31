@@ -296,3 +296,8 @@ release-candidate evidence bundle are unfinished.
 ## iOS native multi-node circuit authoring (2026-10-31)
 
 - Added Swift native editor methods to create/remove bounded junctions, connect arbitrary resistors, and rewire actual component terminal IDs without dangling, same-node, ground-deletion, or resource-limit violations. SwiftUI exposes progressive connection controls and terminal pickers using the portable graph; source-based XCTest covers the 9V series divider/Kirchhoff power result and rejected invalid rewiring. All changes remain on draft PR #59 pending full native build and simulator verification.
+
+## Time-dependent buoyant motion and 3D fluid layer (2026-10-31)
+
+- Added a Web fluid motion experiment that advances an invented solid's vertical position using immersed primitive geometry at each timestep, Archimedes force, gravity, assumed linear viscous drag, and an inelastic ground constraint. Sampled results report submergence, velocity, buoyancy, external fluid work, damping loss and a mechanical energy residual, with pause/step/slow/fast/seek and evidence JSON. In the existing Babylon scene, the selected mesh follows actual computed height and an explicitly illustrative blue flat-water plane follows user-assumed liquid level.
+- The model is 1D and bounded; it does not simulate Navier–Stokes flow, hydrodynamic stability, waves, turbulence, structural failure, measured density, or certify a real invention. Numeric regression cases are registered but broad release CI was explicitly deferred. Native parity is not claimed.

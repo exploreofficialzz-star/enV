@@ -18,6 +18,8 @@ import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
   snapSolidPosition,measureSolidCenters} from "@/lib/world-lab/edit-history";
 import { runNetworkMotorExperiment,type NetworkMotorRun } from "@/lib/world-lab/network-motor";
 import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hydrostatics";
+import {runFluidMotion,sampleFluidMotion,type FluidMotionRun}
+  from "@/lib/world-lab/fluid-motion";
 import { WorldLabFluidCutaway } from "./fluid-cutaway";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
@@ -128,6 +130,12 @@ export default function WorldLab() {
   const [fluidRun,setFluidRun]=useState<HydrostaticResult|null>(null);
   const [fluidDensity,setFluidDensity]=useState(1000);
   const [fluidDepth,setFluidDepth]=useState(0.5);
+  const [fluidMotionRun,setFluidMotionRun]=useState<FluidMotionRun|null>(null);
+  const [fluidMotionTime,setFluidMotionTime]=useState(0);
+  const [fluidMotionPlaying,setFluidMotionPlaying]=useState(false);
+  const [fluidMotionRate,setFluidMotionRate]=useState(1);
+  const [fluidSurfaceHeight,setFluidSurfaceHeight]=useState(1);
+  const [fluidDrag,setFluidDrag]=useState(200);
   const [dropRun, setDropRun] = useState<DropRun | null>(null);
   const [dropTime, setDropTime] = useState(0);
   const [dropPlaying, setDropPlaying] = useState(false);
@@ -172,6 +180,12 @@ export default function WorldLab() {
     && project?.id === dropRun.source.projectId
     && project?.revision === dropRun.source.projectRevision ? dropRun : null;
   const dropSample = selectedDrop ? sampleDrop(selectedDrop, Math.min(dropTime, selectedDrop.input.durationSeconds)) : null;
+  const selectedFluidMotion=fluidMotionRun &&
+    fluidMotionRun.source.projectId===project?.id &&
+    fluidMotionRun.source.projectRevision===project?.revision &&
+    fluidMotionRun.source.entityId===selectedEntity?.id ?fluidMotionRun:null;
+  const fluidMotionSample=selectedFluidMotion
+    ?sampleFluidMotion(selectedFluidMotion,fluidMotionTime):null;
   const selectedActuator = actuatorRun && selectedEntity?.id === actuatorRun.source.entityId
     && project?.id === actuatorRun.source.projectId
     && project?.revision === actuatorRun.source.projectRevision ? actuatorRun : null;
@@ -505,6 +519,46 @@ export default function WorldLab() {
     }
   },[selectedActuator,actuatorSample,project]);
 
+  useEffect(()=>{
+    if(!fluidMotionPlaying||!fluidMotionRun)return;
+    let frame=0,previous=0;
+    const tick=(now:number)=>{
+      if(previous){
+        const elapsed=Math.min(0.05,(now-previous)/1000);
+        setFluidMotionTime(t=>Math.min(fluidMotionRun.input.durationSeconds,
+          t+elapsed*fluidMotionRate));
+      }
+      previous=now;frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(frame);
+  },[fluidMotionPlaying,fluidMotionRun,fluidMotionRate]);
+  useEffect(()=>{
+    if(fluidMotionRun && fluidMotionTime>=fluidMotionRun.input.durationSeconds)
+      setFluidMotionPlaying(false);
+  },[fluidMotionRun,fluidMotionTime]);
+  useEffect(()=>{
+    const scene=sceneRef.current;
+    if(!scene||!selectedFluidMotion||!fluidMotionSample)return;
+    const mesh=scene.addedShapes.get(selectedFluidMotion.source.entityId);
+    const entity=project?.entities.find(x=>x.id===selectedFluidMotion.source.entityId);
+    if(mesh&&entity)
+      mesh.position.y=fluidMotionSample.bottomHeightM+entity.dimensionsMeters[1]/2;
+  },[selectedFluidMotion,fluidMotionSample,project]);
+  useEffect(()=>{
+    const scene=sceneRef.current?.scene;
+    if(!scene||!selectedFluidMotion)return;
+    const water=B.MeshBuilder.CreateGround("fluid-motion-assumed-surface",
+      {width:12,height:12},scene);
+    water.position.y=selectedFluidMotion.input.waterSurfaceHeightM;
+    const color=new B.StandardMaterial("fluid-motion-assumed-water",scene);
+    color.diffuseColor=new B.Color3(0.05,0.55,0.9);
+    color.alpha=0.25;
+    color.backFaceCulling=false;
+    water.material=color;
+    water.isPickable=false;
+    return ()=>{water.dispose();color.dispose();};
+  },[selectedFluidMotion]);
   useEffect(() => {
     if (!dropPlaying || !dropRun) return;
     let frame = 0;
@@ -715,6 +769,7 @@ export default function WorldLab() {
   }
   function invalidateWorldLabResults(){
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
+    setFluidMotionPlaying(false);setFluidMotionRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
     setWiredMotorRun(null);setDcRun(null);setRemoteJob(null);
   }
@@ -815,6 +870,26 @@ export default function WorldLab() {
     void poll();
     return ()=>{disposed=true;if(pending)clearTimeout(pending);};
   },[remoteJob?.id]);
+  function simulateFluidMotion(){
+    if(!project||!selectedEntity)return;
+    setError("");
+    try {
+      const result=runFluidMotion(project,selectedEntity.id,{
+        fluidDensityKgM3:fluidDensity,
+        waterSurfaceHeightM:fluidSurfaceHeight,
+        startingBottomHeightM:Math.max(0,selectedEntity.positionMeters[1]-
+          selectedEntity.dimensionsMeters[1]/2),
+        linearDragNsPerM:fluidDrag,
+        gravityMps2:9.80665,durationSeconds:4,
+      });
+      setDropPlaying(false);setActuatorPlaying(false);
+      setFluidMotionRun(result);setFluidMotionTime(0);setFluidMotionPlaying(true);
+      setMessage("Calculated real time-dependent buoyancy and vertical motion for the assumed material; this is a bounded static-water model.");
+    }catch(cause){
+      setFluidMotionPlaying(false);setFluidMotionRun(null);
+      setError(cause instanceof Error?cause.message:"Fluid trajectory exceeds this solver's limits.");
+    }
+  }
   function runFluidTest(){
     if(!project||!selectedEntity)return;
     setError("");
@@ -1431,6 +1506,62 @@ export default function WorldLab() {
                         value={fluidDepth} onChange={e=>{setFluidDepth(Number(e.target.value));setFluidRun(null);}} />
                     </label>
                   </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="text-xs">Level of liquid above ground (m)
+                      <input className={inputLabel} type="number" min={0} max={20} step={0.1}
+                        aria-label="Fluid surface height" value={fluidSurfaceHeight}
+                        onChange={e=>{setFluidSurfaceHeight(Number(e.target.value));setFluidMotionPlaying(false);setFluidMotionRun(null);}}/>
+                    </label>
+                    <label className="text-xs">Assumed drag (N·s/m)
+                      <input className={inputLabel} type="number" min={0} max={10000} step={10}
+                        aria-label="Fluid linear drag" value={fluidDrag}
+                        onChange={e=>{setFluidDrag(Number(e.target.value));setFluidMotionPlaying(false);setFluidMotionRun(null);}}/>
+                    </label>
+                  </div>
+                  <button type="button" className={buttonClass+" mt-2"} onClick={simulateFluidMotion}>
+                    Simulate floating or sinking over time
+                  </button>
+                  {selectedFluidMotion&&fluidMotionSample&&
+                    <div className="mt-2 rounded-lg border border-border p-2 text-xs"
+                      aria-label="Time-dependent fluid mechanics results">
+                      <p>Simulated time: {fluidMotionSample.timeSeconds.toFixed(3)} seconds</p>
+                      <p>Bottom height: {fluidMotionSample.bottomHeightM.toFixed(4)} m</p>
+                      <p>Vertical velocity: {fluidMotionSample.velocityMps.toFixed(4)} m/s</p>
+                      <p>Submerged depth: {fluidMotionSample.immersionDepthM.toFixed(4)} m</p>
+                      <p>Calculated buoyancy: {fluidMotionSample.buoyancyForceN.toFixed(3)} N</p>
+                      <p>Assumed viscous drag: {fluidMotionSample.dragForceN.toFixed(3)} N</p>
+                      <p>Energy residual: {fluidMotionSample.energyResidualJ.toExponential(3)} J</p>
+                      <label className="block">Explore fluid time
+                        <input className="w-full" type="range" aria-label="Explore fluid motion time"
+                          min={0} max={selectedFluidMotion.input.durationSeconds}
+                          step={selectedFluidMotion.stepSeconds} value={fluidMotionTime}
+                          onChange={e=>{setFluidMotionPlaying(false);setFluidMotionTime(Number(e.target.value));}}/>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={buttonClass}
+                          onClick={()=>setFluidMotionPlaying(v=>!v)}>
+                          {fluidMotionPlaying?"Pause fluid":"Play fluid"}
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setFluidMotionPlaying(false);setFluidMotionTime(0);}}>Reset fluid</button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setFluidMotionPlaying(false);setFluidMotionTime(t=>
+                            Math.min(selectedFluidMotion.input.durationSeconds,
+                              t+selectedFluidMotion.stepSeconds));}}>Step fluid</button>
+                        <select className={inputLabel} aria-label="Fluid playback speed"
+                          value={fluidMotionRate} onChange={e=>setFluidMotionRate(Number(e.target.value))}>
+                          <option value={0.1}>0.1× slow</option>
+                          <option value={1}>1× normal</option>
+                          <option value={4}>4× fast</option>
+                        </select>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>downloadJson("world-lab-fluid-motion-evidence.json",selectedFluidMotion)}>
+                          Export fluid trajectory evidence
+                        </button>
+                      </div>
+                      <p className="mt-2 text-muted-foreground">{selectedFluidMotion.validity}</p>
+                      <p className="text-muted-foreground">The blue 3D plane is an illustrative assumed fluid surface; vertical position follows the calculated trajectory.</p>
+                    </div>}
                   <button type="button" className={buttonClass+" mt-2"} onClick={runFluidTest}>
                     Calculate buoyancy
                   </button>
