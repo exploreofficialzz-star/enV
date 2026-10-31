@@ -14,6 +14,7 @@ import { starterDcNetwork, solveDcNetwork, type DcNetworkResult } from "@/lib/wo
 import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitNode}
   from "@/lib/world-lab/network-graph";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
+import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
   summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
@@ -1387,6 +1388,7 @@ export default function WorldLab() {
           <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
         </div>}
       </section>
+      <WorldLabDigitalLogicPanel project={project} mutateProject={mutateProject}/>
       <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
         <h3 className="text-sm font-semibold">Connect electricity</h3>
         <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>

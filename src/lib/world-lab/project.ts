@@ -78,6 +78,54 @@ const circuitNetworkSchema=z.object({
 export type WorldLabCircuitNetwork=z.infer<typeof circuitNetworkSchema>;
 export type WorldLabCircuitComponent=WorldLabCircuitNetwork["components"][number];
 
+
+/**
+ * A digital invention is a bounded combinational Boolean graph, not an
+ * emulator of a CPU, chip, transistor, clock or physical semiconductor.
+ * Inventors supply each gate's truth table and assumptions explicitly.
+ */
+const digitalInputSchema=z.object({
+  id:uid,label:z.string().trim().min(1).max(80),value:z.boolean(),
+}).strict();
+const digitalGateSchema=z.object({
+  id:uid,name:z.string().trim().min(1).max(120),
+  assumption:z.string().trim().min(1).max(500),
+  inputNodeIds:z.array(uid).min(1).max(4),
+  truthTable:z.array(z.union([z.literal(0),z.literal(1)])).min(2).max(16),
+  evidence:z.literal("hypothetical-user-assumed"),
+}).strict().superRefine((g,ctx)=>{
+  if(g.truthTable.length!==2**g.inputNodeIds.length)
+    ctx.addIssue({code:"custom",message:"Truth table must cover every input combination."});
+  if(new Set(g.inputNodeIds).size!==g.inputNodeIds.length)
+    ctx.addIssue({code:"custom",message:"Repeated gate input wiring is not supported."});
+});
+const digitalOutputSchema=z.object({
+  id:uid,label:z.string().trim().min(1).max(80),sourceNodeId:uid,
+}).strict();
+const digitalNetworkSchema=z.object({
+  id:uid,name:z.string().trim().min(1).max(120),
+  inputs:z.array(digitalInputSchema).min(1).max(12),
+  gates:z.array(digitalGateSchema).min(1).max(32),
+  outputs:z.array(digitalOutputSchema).min(1).max(16),
+}).strict().superRefine((n,ctx)=>{
+  const ids=new Set<string>();
+  for(const item of [...n.inputs,...n.gates,...n.outputs]){
+    if(ids.has(item.id))ctx.addIssue({code:"custom",message:"Duplicate digital node identity."});
+    ids.add(item.id);
+  }
+  const preceding=new Set(n.inputs.map(x=>x.id));
+  for(const gate of n.gates){
+    for(const id of gate.inputNodeIds)
+      if(!preceding.has(id))
+        ctx.addIssue({code:"custom",message:"Digital gates must connect only to preceding nodes; cycles are unsupported."});
+    preceding.add(gate.id);
+  }
+  for(const output of n.outputs)
+    if(!preceding.has(output.sourceNodeId))
+      ctx.addIssue({code:"custom",message:"Digital output has a missing or unsupported source."});
+});
+export type WorldLabDigitalNetwork=z.infer<typeof digitalNetworkSchema>;
+
 const assemblySchema=z.object({
   id:uid,
   name:z.string().trim().min(1).max(120),
@@ -108,6 +156,7 @@ export const worldLabProjectSchema = z.object({
   materials: z.array(materialSchema).max(100),
   networks: z.array(circuitNetworkSchema).max(12).optional(),
   assemblies:z.array(assemblySchema).max(50).optional(),
+  digitalNetworks:z.array(digitalNetworkSchema).max(8).optional(),
 }).strict().superRefine((p, ctx) => {
   if (new Set(p.entities.map(x => x.id)).size !== p.entities.length) {
     ctx.addIssue({ code: "custom", message: "Duplicate entity IDs." });
@@ -117,6 +166,8 @@ export const worldLabProjectSchema = z.object({
   }
   if(new Set((p.networks??[]).map(x=>x.id)).size!==(p.networks??[]).length)
     ctx.addIssue({code:"custom",message:"Duplicate circuit network IDs."});
+  if(new Set((p.digitalNetworks??[]).map(n=>n.id)).size!==(p.digitalNetworks??[]).length)
+    ctx.addIssue({code:"custom",message:"Duplicate digital network IDs."});
   const entityIds=new Set(p.entities.map(x=>x.id));
   const groupIds=new Set<string>();
   const assigned=new Set<string>();
@@ -177,7 +228,7 @@ export function blankWorldLabProject(id: string, now: string): WorldLabProject {
     world: { frame: "LOCAL_ENU", origin: [0, 0, 0],
       representation: "representative-not-measured", terrainSource: null },
     camera: { positionMeters: [0, 1.65, -8], lookingAtMeters: [0, 1.2, 0] },
-    entities: [], materials: [], networks: [], assemblies: [],
+    entities: [], materials: [], networks: [], assemblies: [], digitalNetworks: [],
   });
 }
 export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number): WorldLabEntity {
