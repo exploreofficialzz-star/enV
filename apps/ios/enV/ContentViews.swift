@@ -268,14 +268,15 @@ enum NativeAnalyticsClient {
 
     static func start() async {
         startNetworkMonitor()
-        guard isEnabled else { return }
-        if choice == "granted" { record("app_opened") }
-        // A pending opt-out revocation must retry even while consent is now denied.
+        if isEnabled && choice == "granted" { record("app_opened") }
+        // Consent withdrawal retries even when this app build has collection disabled.
         try? await flush()
     }
 
     static func chooseConsent(granted: Bool) async throws {
-        guard isEnabled else { throw NSError(domain: "enVAnalytics", code: 503, userInfo: [NSLocalizedDescriptionKey: "Analytics is not enabled in this app build."]) }
+        if granted && !isEnabled {
+            throw NSError(domain: "enVAnalytics", code: 503, userInfo: [NSLocalizedDescriptionKey: "Analytics is not enabled in this app build."])
+        }
         let oldSubject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount)
         let subject = oldSubject ?? UUID().uuidString.lowercased()
         if granted {
@@ -330,7 +331,8 @@ enum NativeAnalyticsClient {
     }
 
     static func flush() async throws {
-        guard isEnabled else { return }
+        // A previously accepted consent decision can always be withdrawn,
+        // regardless of whether analytics collection is enabled in this build.
         if let pending = readPendingRevocation() {
             do {
                 try await postConsent(pending, granted: false)
