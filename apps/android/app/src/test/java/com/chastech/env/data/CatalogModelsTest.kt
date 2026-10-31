@@ -70,6 +70,24 @@ class CatalogModelsTest {
         assertEquals("Estimates based on your inputs — not financial advice.", catalog.tools.single().nativeDisclaimerText())
     }
 
+    @Test fun webAndCommerceNativeCategoriesBecomeAvailableWhenParsed() {
+        val catalog = Catalog.fromJson("""
+            {"schemaVersion":1,"catalogVersion":"test","counts":{"total":3,"active":0,"planned":3,"categories":3},
+             "categories":[],
+             "tools":[
+               {"id":"qr-payload-inspector","name":"QR & Barcode Reader","slug":"qr-payload-inspector","description":"Scan codes","category":"qr","keywords":[],"tags":[],"icon":"QrCode","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"planned","related":[],"engine":{"type":"qr","id":"inspect","preset":"inspect"}},
+               {"id":"product-generator","name":"Product Generator","slug":"product-generator","description":"Create product records","category":"ecommerce","keywords":[],"tags":[],"icon":"ShoppingCart","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"planned","related":[],"engine":{"type":"custom","id":"product-generator"}},
+               {"id":"other-tool","name":"Other Tool","slug":"other-tool","description":"Not part of this implementation","category":"marketing","keywords":[],"tags":[],"icon":"Megaphone","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"planned","related":[],"engine":{"type":"custom","id":"other-tool"}}
+             ]}
+        """.trimIndent())
+        assertEquals("active", catalog.tools.first { it.id == "qr-payload-inspector" }.status)
+        assertEquals("QR & Barcode Reader", catalog.tools.first { it.id == "qr-payload-inspector" }.name)
+        assertEquals("active", catalog.tools.first { it.id == "product-generator" }.status)
+        assertEquals("planned", catalog.tools.first { it.id == "other-tool" }.status)
+        assertEquals(2, catalog.counts.active)
+        assertEquals(1, catalog.counts.planned)
+    }
+
     @Test fun searchesNameDescriptionKeywordsTagsAndRanksRelevanceBeforePopularity() {
         val catalog = Catalog.fromJson("""
             {"counts":{},"categories":[],"tools":[

@@ -40,7 +40,7 @@
     "audit:developer:browser:ci": "node scripts/run-developer-browser-audit.mjs",
     "benchmark:developer": "node --experimental-strip-types scripts/developer-tool-benchmark.mjs",
     "check:production": "node scripts/check-production.mjs",
-    "verify": "npm run export:native-catalog && npm run check:design && npm run check:ux-ui-studio && npm run check:production && npm run check:production-gating && npm run check:audio-studios && npm run check:audio-studio-interfaces && npm run check:audio-studio-usability && npm run check:audio-session-handoff && npm run check:music-live-video-studio && npm run check:audio-studio-round9 && npm run check:execution-policy && npm run check:catalog && npm run check:tool-icons && npm run check:native-ai && npm run check:native-related && npm run check:native-backend-forms && npm run check:native-ui-parity && npm run check:accessibility-parity && npm run check:ai && npm run check:modal-moss && npm run check:billing && npm run check:support-center && npm run check:offline-wallet && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:calculators:registry && npm run audit:calculators:browser && npm run check:converters && npm run check:developer && npm run check:developer-routes && npm run check:screenshots && npm run export:native-execution-matrix && npm run check:native-calculators && npm run check:native-math-exercises && npm run check:native-coverage && npm run check:native-backend-dispatch && npm run check:native-executability && npm run check:native-no-web && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",
+    "verify": "npm run export:native-catalog && npm run check:design && npm run check:ux-ui-studio && npm run check:production && npm run check:production-gating && npm run check:qr-barcode && npm run audit:qr-barcode:browser && npm run check:audio-studios && npm run check:audio-studio-interfaces && npm run check:audio-studio-usability && npm run check:audio-session-handoff && npm run check:music-live-video-studio && npm run check:audio-studio-round9 && npm run check:execution-policy && npm run check:catalog && npm run check:tool-icons && npm run check:native-ai && npm run check:native-related && npm run check:native-backend-forms && npm run check:native-ui-parity && npm run check:accessibility-parity && npm run check:ai && npm run check:modal-moss && npm run check:billing && npm run check:support-center && npm run check:offline-wallet && npm run check:coming-soon && npm run audit:coming-soon:deep && npm run check:calculators && npm run check:calculators:registry && npm run audit:calculators:browser && npm run check:converters && npm run check:developer && npm run check:developer-routes && npm run check:screenshots && npm run export:native-execution-matrix && npm run check:native-calculators && npm run check:native-math-exercises && npm run check:native-coverage && npm run check:native-backend-dispatch && npm run check:native-executability && npm run check:native-no-web && npm run check:text && npm run check:datetime && npm test && npm run build && npm run typecheck && npm run lint",
     "check:coming-soon": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/coming-soon-audit.mjs",
     "audit:coming-soon:deep": "node scripts/coming-soon-deep-audit.mjs",
     "audit:video": "node scripts/video-137-audit.mjs",
@@ -100,6 +100,8 @@
     "check:modal-moss": "node scripts/check-modal-moss-music.mjs",
     "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts src/lib/media/song-backend.test.ts src/lib/media/song-intelligence.test.ts src/lib/media/song-stem-separation.test.ts src/lib/media/spleeter-audio.test.ts src/lib/engines/music-dataset-analysis.test.ts src/lib/engines/music-sandbox.test.ts src/lib/engines/music-sandbox-analysis.test.ts",
     "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs",
+    "check:qr-barcode": "node scripts/check-qr-barcode.mjs",
+    "audit:qr-barcode:browser": "node scripts/browser-qr-barcode-reader-audit.mjs",
     "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/design-contrast.test.ts && node scripts/check-design.mjs"
   },
   "dependencies": {
@@ -133,10 +135,13 @@
     "@tanstack/react-table": "^8.21.0",
     "@tanstack/router-plugin": "^1.168.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@zxing/browser": "0.1.5",
+    "@zxing/library": "0.21.3",
     "axe-core": "^4.14.0",
     "babylonjs": "9.32.1",
     "babylonjs-loaders": "9.32.1",
-    "better-auth": "~1.6.30",
+    "babylonjs-serializers": "9.32.1",
+    "better-auth": "~1.7.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -171,8 +176,7 @@
     "vaul": "^1.1.2",
     "vite": "^8.3.3",
     "zod": "^4.4.0",
-    "zustand": "^5.0.0",
-    "babylonjs-serializers": "9.32.1"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
