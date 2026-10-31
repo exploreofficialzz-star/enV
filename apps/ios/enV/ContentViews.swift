@@ -271,8 +271,9 @@ enum NativeAnalyticsClient {
         let oldSubject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount)
         let subject = oldSubject ?? UUID().uuidString.lowercased()
         if granted {
-            try await postConsent(subject, granted: true)
+            // Keep the local revocation identifier before the server records consent.
             NativeAnalyticsKeychain.write(subject, account: NativeAnalyticsKeychain.subjectAccount)
+            try await postConsent(subject, granted: true)
             defaults.set("granted", forKey: choiceKey)
             clearPendingRevocation()
             record("app_opened")
