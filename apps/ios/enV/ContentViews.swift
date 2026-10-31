@@ -193,7 +193,6 @@ enum NativeAnalyticsClient {
         }
         if let legacy = defaults.array(forKey: queueKey) as? [[String: Any]] {
             writeQueue(legacy)
-            writeQueue([])
             defaults.removeObject(forKey: queueKey)
             return legacy
         }
@@ -255,11 +254,12 @@ enum NativeAnalyticsClient {
             try await flush()
         } else {
             defaults.set("denied", forKey: choiceKey)
+            writeQueue([])
             defaults.removeObject(forKey: queueKey)
             if oldSubject != nil {
                 do {
                     try await postConsent(subject, granted: false)
-                    defaults.removeObject(forKey: revokeKey)
+                    clearPendingRevocation()
                 } catch {
                     storePendingRevocation(subject)
                 }
@@ -297,7 +297,7 @@ enum NativeAnalyticsClient {
         if let pending = readPendingRevocation() {
             do {
                 try await postConsent(pending, granted: false)
-                defaults.removeObject(forKey: revokeKey)
+                clearPendingRevocation()
             } catch { /* Retry the revocation next time the app becomes active. */ }
         }
         guard isEnabled, choice == "granted", let subject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) else { return }
