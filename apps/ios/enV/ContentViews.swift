@@ -130,9 +130,11 @@ struct NativeProductUpdatesBanner: View {
 
 private enum NativeAnalyticsKeychain {
     private static let service = "com.chastech.env.analytics"
-    private static let account = "installation-subject"
+    static let subjectAccount = "installation-subject"
+    static let queueAccount = "pending-events"
+    static let revokeAccount = "pending-revocation"
 
-    static func read() -> String? {
+    static func read(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -146,14 +148,17 @@ private enum NativeAnalyticsKeychain {
         return String(data: data, encoding: .utf8)
     }
 
-    static func write(_ value: String) {
+    static func write(_ value: String, account: String) {
         let data = Data(value.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        let attributes: [String: Any] = [kSecValueData as String: data]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
         if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
             var added = query
             attributes.forEach { added[$0.key] = $0.value }
@@ -161,7 +166,7 @@ private enum NativeAnalyticsKeychain {
         }
     }
 
-    static func remove() {
+    static func remove(account: String) {
         SecItemDelete([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -179,6 +184,45 @@ enum NativeAnalyticsClient {
     private static let revokeKey = "env.analytics.revoke.v1"
     private static let maxQueue = 25
     private static let sessionID = UUID().uuidString.lowercased()
+
+    private static func readQueue() -> [[String: Any]] {
+        if let raw = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.queueAccount),
+           let data = raw.data(using: .utf8),
+           let queue = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            return queue
+        }
+        if let legacy = defaults.array(forKey: queueKey) as? [[String: Any]] {
+            writeQueue(legacy)
+            writeQueue([])
+            defaults.removeObject(forKey: queueKey)
+            return legacy
+        }
+        return []
+    }
+
+    private static func writeQueue(_ queue: [[String: Any]]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: queue),
+              let value = String(data: data, encoding: .utf8) else {
+            NativeAnalyticsKeychain.remove(account: NativeAnalyticsKeychain.queueAccount)
+            return
+        }
+        NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.queueAccount)
+    }
+
+    private static func readPendingRevocation() -> String? {
+        NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.revokeAccount)
+            ?? defaults.string(forKey: revokeKey)
+    }
+
+    private static func storePendingRevocation(_ value: String) {
+        NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.revokeAccount)
+        defaults.removeObject(forKey: revokeKey)
+    }
+
+    private static func clearPendingRevocation() {
+        NativeAnalyticsKeychain.remove(account: NativeAnalyticsKeychain.revokeAccount)
+        defaults.removeObject(forKey: revokeKey)
+    }
 
     static var isEnabled: Bool {
         (Bundle.main.object(forInfoDictionaryKey: "ENV_ANALYTICS_ENABLED") as? Bool) == true
@@ -200,13 +244,13 @@ enum NativeAnalyticsClient {
 
     static func chooseConsent(granted: Bool) async throws {
         guard isEnabled else { throw NSError(domain: "enVAnalytics", code: 503, userInfo: [NSLocalizedDescriptionKey: "Analytics is not enabled in this app build."]) }
-        let oldSubject = NativeAnalyticsKeychain.read()
+        let oldSubject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount)
         let subject = oldSubject ?? UUID().uuidString.lowercased()
         if granted {
             try await postConsent(subject, granted: true)
-            NativeAnalyticsKeychain.write(subject)
+            NativeAnalyticsKeychain.write(subject, account: NativeAnalyticsKeychain.subjectAccount)
             defaults.set("granted", forKey: choiceKey)
-            defaults.removeObject(forKey: revokeKey)
+            clearPendingRevocation()
             record("app_opened")
             try await flush()
         } else {
@@ -217,15 +261,15 @@ enum NativeAnalyticsClient {
                     try await postConsent(subject, granted: false)
                     defaults.removeObject(forKey: revokeKey)
                 } catch {
-                    defaults.set(subject, forKey: revokeKey)
+                    storePendingRevocation(subject)
                 }
             }
-            NativeAnalyticsKeychain.remove()
+            NativeAnalyticsKeychain.remove(account: NativeAnalyticsKeychain.subjectAccount)
         }
     }
 
     static func record(_ name: String, toolID: String? = nil, outcome: String = "unknown", durationMs: Int? = nil, errorCode: String? = nil) {
-        guard isEnabled, choice == "granted", NativeAnalyticsKeychain.read() != nil else { return }
+        guard isEnabled, choice == "granted", NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) != nil else { return }
         let allowed = Set(["app_opened", "tool_viewed", "tool_started", "tool_completed", "tool_failed", "tool_cancelled", "tool_abandoned", "feedback_submitted", "update_viewed", "offline_sync_succeeded", "offline_sync_failed"])
         guard allowed.contains(name) else { return }
         var event: [String: Any] = [
@@ -243,21 +287,21 @@ enum NativeAnalyticsClient {
         if let toolID { event["toolId"] = toolID }
         if let durationMs, (0...3_600_000).contains(durationMs) { event["durationMs"] = durationMs }
         if let errorCode, errorCode.range(of: "^[A-Z0-9_]{1,64}$", options: .regularExpression) != nil { event["errorCode"] = errorCode }
-        var queue = defaults.array(forKey: queueKey) as? [[String: Any]] ?? []
+        var queue = readQueue()
         queue.append(event)
-        defaults.set(Array(queue.suffix(maxQueue)), forKey: queueKey)
+        writeQueue(Array(queue.suffix(maxQueue)))
     }
 
     static func flush() async throws {
         guard isEnabled else { return }
-        if let pending = defaults.string(forKey: revokeKey) {
+        if let pending = readPendingRevocation() {
             do {
                 try await postConsent(pending, granted: false)
                 defaults.removeObject(forKey: revokeKey)
             } catch { /* Retry the revocation next time the app becomes active. */ }
         }
-        guard isEnabled, choice == "granted", let subject = NativeAnalyticsKeychain.read() else { return }
-        let queue = defaults.array(forKey: queueKey) as? [[String: Any]] ?? []
+        guard isEnabled, choice == "granted", let subject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) else { return }
+        let queue = readQueue()
         guard !queue.isEmpty else { return }
         let batch = Array(queue.prefix(maxQueue))
         guard let baseURL else { throw URLError(.badURL) }
@@ -277,7 +321,7 @@ enum NativeAnalyticsClient {
         guard (200...299).contains(http.statusCode), envelope?["ok"] as? Bool == true else {
             throw NSError(domain: "enVAnalytics", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: envelope?["message"] as? String ?? "Analytics events were not accepted."])
         }
-        defaults.set(Array(queue.dropFirst(batch.count)), forKey: queueKey)
+        writeQueue(Array(queue.dropFirst(batch.count)))
     }
 
     private static func postConsent(_ subject: String, granted: Bool) async throws {
