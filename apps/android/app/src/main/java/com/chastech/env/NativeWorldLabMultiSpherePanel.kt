@@ -136,7 +136,7 @@ fun NativeWorldLabMultiSpherePanel(
             for((index,ball)in sample.objects.withIndex()){
                 val point=Offset(size.width*0.05f+(ball.positionM.x-minX).toFloat()*sx,
                     size.height*0.9f-(ball.positionM.y-minY).toFloat()*sy)
-                val radius=(active.initial[index].radiusM*minOf(sx,sy))
+                val radius=(active.initial[index].radiusM.toFloat()*minOf(sx,sy))
                     .coerceAtLeast(4f)
                 drawCircle(if(index%2==0)Color(0xFF69C3C3) else Color(0xFFF2B877),
                     radius,point)
