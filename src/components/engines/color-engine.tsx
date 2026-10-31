@@ -150,7 +150,10 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
         const safeRoles: Partial<SemanticPaletteColors> = {};
         for (const role of allowedRoles) {
           const value = parsed[role];
-          if (typeof value === "string" && parseDesignColor(value)) safeRoles[role] = value;
+          if (typeof value === "string") {
+            const parsedColor = parseDesignColor(value);
+            if (parsedColor) safeRoles[role] = toHex(parsedColor).slice(0, 7);
+          }
         }
         setRoleOverrides(safeRoles);
       } catch {
@@ -571,11 +574,12 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   <p className="text-[10px] text-muted">{semanticContrast.body !== null && semanticContrast.body >= 4.5 ? "Meets normal-text AA" : "Below normal-text AA target"}</p>
                 </div>
                 <div className="rounded-lg border border-border p-2">
-                  <p className="text-[11px] text-muted">Primary color on background</p>
+                  <p className="text-[11px] text-muted">Primary / background pair (3:1 reference)</p>
                   <p className="mt-1 text-sm font-semibold tabular-nums">{semanticContrast.primary === null ? "Unavailable" : semanticContrast.primary.toFixed(2) + ":1"}</p>
-                  <p className="text-[10px] text-muted">{semanticContrast.primary !== null && semanticContrast.primary >= 3 ? "Meets non-text AA target" : "Below non-text AA target"}</p>
+                  <p className="text-[10px] text-muted">{semanticContrast.primary !== null && semanticContrast.primary >= 3 ? "Reaches the 3:1 non-text reference" : "Below the 3:1 non-text reference"}</p>
                 </div>
               </div>
+              <p className="text-[10px] leading-4 text-muted">These pair checks are colour-contrast references only. They do not certify all text, component states, imagery or a complete page against WCAG.</p>
               <div className="overflow-hidden rounded-xl border" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }}>
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
                   <span className="text-sm font-bold">Acme workspace</span>

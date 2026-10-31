@@ -56,6 +56,7 @@ const checks = [
   ["Perceptual OKLCH shade scale with gamut mapping", palette.includes("linearRgbToOklab") && palette.includes("fromOklchInSrgb") && palette.includes("upwardRoom")],
   ["Palette semantic roles and token exports", palette.includes("buildDesignPaletteExport") && ["css", "scss", "tailwind", "json", "tokens"].every((format) => palette.includes(`format === "${format}"`))],
   ["Palette locking, sharing and image extraction", ["Lock color", "Copy share link", "Extract colors from an image", "Light preview", "Dark preview", "Try a smaller image", "context.drawImage(image, offsetX"].every((label) => colorEngine.includes(label))],
+  ["Palette harmony counts avoid duplicate swatches", palette.includes("const anchors:") && paletteTests.includes("must not contain duplicate swatches")],
   ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports") && paletteTests.includes("selectable counts from three to eight")],
   ["Strict HSV / HSB / CMYK parser and tested converters", designColor.includes("parsePercentOrUnit") && designColor.includes("hs[VB]") && designColorTests.includes("HSV and HSB accept percentages") && designColorTests.includes("CMYK accepts percentage")],
   ["Independent multi-layer shadow editor", cssEngine.includes("Independent shadow layers") && cssEngine.includes("setShadowLayers") && cssEngine.includes("buildBoxShadow") && cssEngine.includes("Add layer")],

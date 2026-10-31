@@ -51,25 +51,35 @@ function fromHsl(h: number, s: number, l: number): RgbaColor {
 export function createHarmonyPalette(color: RgbaColor, harmony: PaletteHarmony, count = 5): RgbaColor[] {
   const safeCount = Math.min(8, Math.max(3, Math.round(Number.isFinite(count) ? count : 5)));
   const hsl = rgbToHsl(color);
-  if (safeCount === 5) {
-    if (harmony === "monochromatic") {
-      return [-0.32, -0.16, 0, 0.16, 0.3].map((offset) => fromHsl(hsl.h, hsl.s, hsl.l + offset));
-    }
-    return HARMONY_OFFSETS[harmony].map((offset) => fromHsl(hsl.h + offset, hsl.s, hsl.l));
-  }
   if (harmony === "monochromatic") {
     return Array.from({ length: safeCount }, (_, index) => {
       const progress = index / (safeCount - 1);
       return fromHsl(hsl.h, hsl.s, 0.12 + progress * 0.76);
     });
   }
-  const offsets = harmony === "analogous"
-    ? Array.from({ length: safeCount }, (_, index) => -40 + (80 * index) / (safeCount - 1))
-    : HARMONY_OFFSETS[harmony];
+
+  if (harmony === "analogous") {
+    return Array.from({ length: safeCount }, (_, index) =>
+      fromHsl(hsl.h - 40 + (80 * index) / (safeCount - 1), hsl.s, hsl.l));
+  }
+
+  // Use the canonical anchor hues first; add restrained off-anchor variations
+  // for larger palettes rather than repeating the same swatches.
+  const anchors: Record<Exclude<PaletteHarmony, "analogous" | "monochromatic">, number[]> = {
+    complementary: [0, 180],
+    triadic: [0, 120, 240],
+    split: [0, 150, 210],
+    tetradic: [0, 90, 180, 270],
+  };
+  const baseHues = anchors[harmony];
   return Array.from({ length: safeCount }, (_, index) => {
-    const cycle = Math.floor(index / offsets.length);
-    const lightnessShift = cycle === 0 ? 0 : (cycle % 2 ? 1 : -1) * Math.min(0.12, cycle * 0.04);
-    return fromHsl(hsl.h + offsets[index % offsets.length], hsl.s, hsl.l + lightnessShift);
+    const cycle = Math.floor(index / baseHues.length);
+    const anchor = baseHues[index % baseHues.length];
+    const direction = cycle % 2 === 1 ? 1 : -1;
+    const variation = cycle === 0 ? 0 : direction * (8 + Math.floor((cycle - 1) / 2) * 7);
+    const lightnessShift = cycle === 0 ? 0 : (cycle % 2 ? 0.045 : -0.045) * Math.ceil(cycle / 2);
+    const saturation = Math.min(1, hsl.s + cycle * 0.035);
+    return fromHsl(hsl.h + anchor + variation, saturation, hsl.l + lightnessShift);
   });
 }
 

@@ -63,6 +63,7 @@ test("harmony palette generator respects selectable counts from three to eight",
       const palette = createHarmonyPalette(source, harmony, count);
       assert.equal(palette.length, count, `${harmony} count ${count}`);
       assert.ok(palette.every((color) => color.r >= 0 && color.r <= 255 && color.g >= 0 && color.g <= 255 && color.b >= 0 && color.b <= 255));
+      assert.equal(new Set(palette.map(toHex)).size, count, `${harmony} count ${count} must not contain duplicate swatches`);
     }
   }
   assert.equal(new Set(createHarmonyPalette(source, "triadic", 3).map(toHex)).size, 3);
