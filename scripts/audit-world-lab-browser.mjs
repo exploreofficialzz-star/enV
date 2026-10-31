@@ -15,6 +15,25 @@ try{
   await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
   await page.getByRole("button",{name:"Add cube"}).click();
   await page.getByRole("button",{name:"Add sphere"}).click();
+
+  // End-to-end authored digital device: connect a new hypothetical gate to an
+  // indicator, modify its truth table, and verify the live calculated output.
+  await page.getByRole("button",{name:"Start an invented logic circuit"}).click();
+  await page.getByText("Create another invented gate").click();
+  await page.getByRole("textbox",{name:"Device name"}).fill("Invented child gate");
+  await page.getByRole("combobox",{name:"Input 2"}).selectOption("invented_gate");
+  await page.getByRole("button",{name:"Connect invented gate"}).click();
+  await page.locator("summary").filter({hasText:"Invented child gate"}).click();
+  await page.getByRole("combobox",{
+    name:"Output for Invented child gate input row 1",
+  }).selectOption("1");
+  const indicator=page.getByRole("combobox",{name:"Wire Indicator Q to digital node"});
+  await indicator.selectOption({label:"Invented child gate"});
+  assert.match(await indicator.locator("..").innerText(),/\\b1\\b/,
+    "The indicator must show the computed invented-gate output");
+  await page.getByRole("button",{name:"Test every switch combination"}).click();
+  await page.getByText(/Verified 4 mathematical input combinations/).waitFor();
+
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Cube"});
   await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
   await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("1");
