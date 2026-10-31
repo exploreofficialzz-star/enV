@@ -1,3 +1,5 @@
+import { useContext, useEffect } from "react";
+import { ToolExecutionTelemetryContext } from "@/components/tools/tool-execution-context";
 import { CopyButton } from "@/components/tools/copy-button";
 import { downloadText } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,10 @@ export function ResultPanel({
   extraText?: string;
   filename?: string;
 }) {
+  const telemetry = useContext(ToolExecutionTelemetryContext);
+  useEffect(() => {
+    if (items.length > 0 || extraText) telemetry?.finish("success");
+  }, [items, extraText, telemetry]);
   if (items.length === 0 && !extraText) return null;
   const blob = extraText ?? items.map((i) => `${i.label}: ${i.value}`).join("\n");
   return (
@@ -57,6 +63,10 @@ export function CodeResult({
   code: string;
   filename?: string;
 }) {
+  const telemetry = useContext(ToolExecutionTelemetryContext);
+  useEffect(() => {
+    if (code) telemetry?.finish("success");
+  }, [code, telemetry]);
   if (!code) return null;
   return (
     <div className="mt-6 space-y-3">
