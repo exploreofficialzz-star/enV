@@ -1299,3 +1299,65 @@ enum NativeWorldLabHeatTransfer {
                 "radiation, safety certification or measured matter.")
     }
 }
+
+
+// Portable interchange must include computed evidence properties explicitly:
+// synthesized Encodable implementations omit Swift computed properties.
+extension NativeGravityRun {
+    private enum EvidenceKeys:String,CodingKey {
+        case format,modelVersion,evidence,materialEvidence
+        case gravitationalConstantM3KgS2,projectId,projectRevision
+        case bodies,durationSeconds,integrationSteps,frames
+        case initialEnergyJ,finalEnergyJ,energyDriftFraction
+        case initialMomentumKgMps,finalMomentumKgMps,validity
+    }
+    func encode(to encoder:Encoder)throws {
+        var c=encoder.container(keyedBy:EvidenceKeys.self)
+        try c.encode(format,forKey:.format)
+        try c.encode(modelVersion,forKey:.modelVersion)
+        try c.encode(evidence,forKey:.evidence)
+        try c.encode(materialEvidence,forKey:.materialEvidence)
+        try c.encode(gravitationalConstantM3KgS2,forKey:.gravitationalConstantM3KgS2)
+        try c.encode(projectId,forKey:.projectId)
+        try c.encode(projectRevision,forKey:.projectRevision)
+        try c.encode(bodies,forKey:.bodies)
+        try c.encode(durationSeconds,forKey:.durationSeconds)
+        try c.encode(integrationSteps,forKey:.integrationSteps)
+        try c.encode(frames,forKey:.frames)
+        try c.encode(initialEnergyJ,forKey:.initialEnergyJ)
+        try c.encode(finalEnergyJ,forKey:.finalEnergyJ)
+        try c.encode(energyDriftFraction,forKey:.energyDriftFraction)
+        try c.encode(initialMomentumKgMps,forKey:.initialMomentumKgMps)
+        try c.encode(finalMomentumKgMps,forKey:.finalMomentumKgMps)
+        try c.encode(validity,forKey:.validity)
+    }
+}
+extension NativeMaterialHeatRun {
+    private enum EvidenceKeys:String,CodingKey {
+        case format,modelVersion,evidence,materialEvidence
+        case projectId,projectRevision,firstEntityId,secondEntityId
+        case firstMaterialId,secondMaterialId,firstThermalCapacityJPerK
+        case secondThermalCapacityJPerK,conductanceWPerK
+        case equilibriumTemperatureK,input,samples,validity
+    }
+    func encode(to encoder:Encoder)throws {
+        var c=encoder.container(keyedBy:EvidenceKeys.self)
+        try c.encode(format,forKey:.format)
+        try c.encode(modelVersion,forKey:.modelVersion)
+        try c.encode(evidence,forKey:.evidence)
+        try c.encode(materialEvidence,forKey:.materialEvidence)
+        try c.encode(projectId,forKey:.projectId)
+        try c.encode(projectRevision,forKey:.projectRevision)
+        try c.encode(firstEntityId,forKey:.firstEntityId)
+        try c.encode(secondEntityId,forKey:.secondEntityId)
+        try c.encode(firstMaterialId,forKey:.firstMaterialId)
+        try c.encode(secondMaterialId,forKey:.secondMaterialId)
+        try c.encode(firstThermalCapacityJPerK,forKey:.firstThermalCapacityJPerK)
+        try c.encode(secondThermalCapacityJPerK,forKey:.secondThermalCapacityJPerK)
+        try c.encode(conductanceWPerK,forKey:.conductanceWPerK)
+        try c.encode(equilibriumTemperatureK,forKey:.equilibriumTemperatureK)
+        try c.encode(input,forKey:.input)
+        try c.encode(samples,forKey:.samples)
+        try c.encode(validity,forKey:.validity)
+    }
+}
