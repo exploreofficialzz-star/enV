@@ -307,6 +307,7 @@ function countWorkingDays(
     if (cursor.getTime() === end.getTime() && !includeEnd) return count;
     if (direction > 0 ? cursor > end : cursor < end) return count;
     if (isWorkingDate(cursor, weekends, excluded)) count += direction;
+    if (cursor.getTime() === end.getTime()) return count;
   }
   throw new Error("That working-day range is too large.");
 }

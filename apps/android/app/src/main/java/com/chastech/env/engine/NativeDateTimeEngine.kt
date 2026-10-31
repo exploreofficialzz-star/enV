@@ -351,6 +351,7 @@ object NativeDateTimeEngine {
             if (cursor == to && !includeEnd) return count
             if (if (direction > 0) cursor > to else cursor < to) return count
             if (isWorkingDate(cursor, weekends, excluded)) count += direction
+            if (cursor == to) return count
         }
         throw IllegalArgumentException("That working-day range is too large.")
     }
@@ -368,6 +369,7 @@ object NativeDateTimeEngine {
             if (remaining <= 0) return cursor
             cursor = cursor.plusDays(direction)
             if (isWorkingDate(cursor, weekends, excluded)) remaining--
+            if (remaining <= 0) return cursor
         }
         throw IllegalArgumentException("That workday range is too large.")
     }

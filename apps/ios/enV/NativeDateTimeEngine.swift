@@ -517,6 +517,7 @@ public enum NativeDateTimeEngine {
             if cursor == end && !includeEnd { return count }
             if direction > 0 ? cursor > end : cursor < end { return count }
             if isWorkingDay(cursor, weekends: weekends, excluded: excluded) { count += direction }
+            if cursor == end { return count }
         }
         throw NativeDateTimeError.invalidOperation("That working-day range is too large.")
     }
@@ -535,6 +536,7 @@ public enum NativeDateTimeEngine {
             if remaining <= 0 { return date }
             date = cal.date(byAdding: .day, value: direction, to: date)!
             if isWorkingDay(date, weekends: weekends, excluded: excluded) { remaining -= 1 }
+            if remaining <= 0 { return date }
         }
         throw NativeDateTimeError.invalidOperation("That workday range is too large.")
     }

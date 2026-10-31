@@ -73,6 +73,10 @@ assert.throws(() => runDateTime("world-clock", { zones: "A city that is not real
 assert.equal(runDateTime("weekday", { value: "0001-01-01" })[0].value, "Monday");
 assert.throws(() => runDateTime("workday", { start: "2024-01-08", days: "1.5" }), /whole number/);
 assert.throws(() => runDateTime("business-days", { from: "2000-01-01", to: "3003-01-01" }), /range is too large/);
+const maximumRangeEnd = new Date(Date.UTC(2000, 0, 1) + 366_000 * 86_400_000).toISOString().slice(0, 10);
+assert.doesNotThrow(() => runDateTime("business-days", {
+  from: "2000-01-01", to: maximumRangeEnd, includeEnd: "true",
+}));
 assert.throws(() => runDateTime("date-add", { start: "2024-01-01", days: "1", direction: "ad" }), /Direction must be add or subtract/);
 assert.equal(runDateTime("meeting-planner", {
   date: "2024-01-13", zones: "Lagos, London", sourceTz: "Lagos"
