@@ -23,7 +23,7 @@ data class NativeLabCollisionResult(
     val energyBeforeJ:Double,val energyAfterJ:Double,val dissipatedEnergyJ:Double,
     val evidence:String="physics-model-computed",
     val inputEvidence:String="hypothetical-user-assumed",
-    val validity:String="Ideal rigid rectangular box pair with aligned Y/Z centres, "+
+    val validity:String="Ideal rigid primitive pair with aligned Y/Z centres, "+
         "single instantaneous frictionless X impact, no spin, gravity-driven horizontal "+
         "acceleration, secondary contacts, deformation or failure. Assumed densities "+
         "give inertial masses; restitution is a user assumption, not measured."
@@ -50,8 +50,8 @@ object NativeWorldLabCollision {
         val a=project.entities.firstOrNull{it.id==firstId}
         val b=project.entities.firstOrNull{it.id==secondId}
         require(a!=null&&b!=null){"Both collision solids must exist"}
-        require(a.shape=="box"&&b.shape=="box"){
-            "Current central-impact model supports two rectangular box solids"
+        require(a.shape in setOf("box","sphere","cylinder")&&b.shape in setOf("box","sphere","cylinder")){
+            "Current central-impact model supports box, sphere or cylinder primitives"
         }
         val left=if(a.positionMeters.x<b.positionMeters.x)a else b
         val right=if(left.id==a.id)b else a
@@ -82,7 +82,7 @@ object NativeWorldLabCollision {
         val mr=rightMaterial?.densityKgM3?.times(right.volumeMetersCubed())
         require(ml!=null&&mr!=null&&ml.isFinite()&&mr.isFinite()&&
             ml in 0.001..10000.0&&mr in 0.001..10000.0){
-            "Both boxes need assigned finite inventor-assumed mass from density"
+            "Both solids need assigned finite inventor-assumed mass from density"
         }
         val impulse=(1+restitution)*relative/(1/ml+1/mr)
         val vl=velocityLeftMps-impulse/ml
