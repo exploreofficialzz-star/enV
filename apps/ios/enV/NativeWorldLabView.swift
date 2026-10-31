@@ -889,8 +889,7 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
         let chosen=project.materials.first(where:{$0.id==solid.materialId})
         Text("Test hypothetical elastic beam bending").font(.headline)
-        Text("Assume a rectangular cantilever: X length, Y vertical depth, Z width, "+
-             "fixed at one end, with a static downward force at the free end.")
+        Text("Assume a rectangular cantilever: X length, Y vertical depth, Z width, fixed at one end, with a static downward force at the free end.")
             .font(.caption).foregroundStyle(.secondary)
         value("Assumed Young's modulus",chosen?.youngModulusPa,"Pa")
         TextField("Downward beam tip load in newtons",text:$beamForce)
