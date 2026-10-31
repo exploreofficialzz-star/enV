@@ -34,6 +34,7 @@ import com.chastech.env.engine.NativeWorldLabDigitalLogic
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
+import com.chastech.env.engine.WorldLabSavedLocal
 import com.chastech.env.engine.NativeWorldLabScience
 import com.chastech.env.engine.NativeDropInput
 import com.chastech.env.engine.NativeDropResult
@@ -116,6 +117,10 @@ fun NativeWorldLabForm() {
     var secondAssemblyIndex by remember { mutableIntStateOf(0) }
     var assemblyMoveStep by remember { mutableStateOf(0.5) }
     var digitalShowCases by remember { mutableStateOf(false) }
+    var savedProjects by remember { mutableStateOf<List<WorldLabSavedLocal>>(emptyList()) }
+    var selectedSavedId by remember { mutableStateOf("") }
+    var savedMenuOpen by remember { mutableStateOf(false) }
+    var confirmingSavedDelete by remember { mutableStateOf(false) }
     var digitalNewGateName by remember { mutableStateOf("Invented device") }
     var snapMeters by remember { mutableStateOf(0.5) }
     var measurementTargetIndex by remember { mutableIntStateOf(0) }
@@ -174,17 +179,60 @@ fun NativeWorldLabForm() {
                     if(stored==null) warning="There is no saved World Lab project on this device."
                     else {
                         projectJson=stored.json;project=NativeWorldLabProjectCodec.decode(stored.json)
-                        savedSnapshot=stored.json;selected=0;warning=""
+                        savedSnapshot=stored.json;selectedSavedId=stored.id;selected=0;warning=""
                         editHistory.clear()
                     }
                 }.onFailure{warning=it.message?:"The saved project could not be recovered safely."}
         }
+    }
+    fun refreshSavedProjects(){
+        scope.launch {
+            runCatching {withContext(Dispatchers.IO){localProjects.listProjects()}}
+                .onSuccess { items->
+                    savedProjects=items
+                    if(items.none{it.id==selectedSavedId})selectedSavedId=items.firstOrNull()?.id?:""
+                }.onFailure {warning=it.message?:"Cannot list saved projects safely."}
+        }
+    }
+    fun loadSelectedProject(){
+        val id=selectedSavedId
+        if(id.isEmpty()){warning="Choose a saved World Lab project.";return}
+        scope.launch {
+            runCatching {withContext(Dispatchers.IO){localProjects.read(id)}}
+                .onSuccess { stored->
+                    projectJson=stored.json;project=NativeWorldLabProjectCodec.decode(stored.json)
+                    savedSnapshot=stored.json;selected=0;warning="";editHistory.clear()
+                }.onFailure{warning=it.message?:"Could not open this saved project."}
+        }
+    }
+    fun deleteSelectedProject(){
+        val id=selectedSavedId
+        if(id.isEmpty())return
+        scope.launch {
+            runCatching {withContext(Dispatchers.IO) {
+                localProjects.delete(id)
+                localProjects.listProjects()
+            }}.onSuccess { remaining->
+                savedProjects=remaining
+                selectedSavedId=remaining.firstOrNull()?.id?:""
+                if(project?.id==id)savedSnapshot=null
+                warning=""
+            }.onFailure {warning=it.message?:"Unable to safely delete the selected project."}
+        }
+    }
+    LaunchedEffect(Unit){
+        runCatching{withContext(Dispatchers.IO){localProjects.listProjects()}}
+            .onSuccess{items->
+                savedProjects=items
+                selectedSavedId=items.firstOrNull()?.id?:""
+            }.onFailure{warning=it.message?:"Could not load saved World Lab project index."}
     }
     fun askReplace(action:String){
         if(projectJson!=null && savedSnapshot!=projectJson) confirmation=action
         else when(action){
             "new"->newProject()
             "open"->loadSavedProject()
+            "open-selected"->loadSelectedProject()
             "import"->requestImport=true
         }
     }
@@ -223,7 +271,7 @@ fun NativeWorldLabForm() {
                 }?:error("File could not be opened.")
                 val json=out.toString(Charsets.UTF_8.name())
                 Pair(json,NativeWorldLabProjectCodec.decode(json))
-            } }.onSuccess { projectJson=it.first;project=it.second;selected=0;warning="";editHistory.clear() }
+            } }.onSuccess { projectJson=it.first;project=it.second;savedSnapshot=null;selected=0;warning="";editHistory.clear() }
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
     }
@@ -290,10 +338,21 @@ fun NativeWorldLabForm() {
             when(choice){
                 "new"->newProject()
                 "open"->loadSavedProject()
+                "open-selected"->loadSelectedProject()
                 "import"->requestImport=true
             }
         }){Text("Discard and continue")}},
         dismissButton={TextButton(onClick={confirmation=null}){Text("Keep editing")}}
+    )
+    if(confirmingSavedDelete) AlertDialog(
+        onDismissRequest={confirmingSavedDelete=false},
+        title={Text("Delete this saved World Lab project?")},
+        text={Text("Only this local-device saved copy will be removed. Export JSON before deleting if you need a backup.")},
+        confirmButton={TextButton(onClick={
+            confirmingSavedDelete=false
+            deleteSelectedProject()
+        }){Text("Delete saved copy")}},
+        dismissButton={TextButton(onClick={confirmingSavedDelete=false}){Text("Cancel")}}
     )
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("The World Lab",style=MaterialTheme.typography.titleLarge)
@@ -393,12 +452,43 @@ fun NativeWorldLabForm() {
             Button(onClick={
                 val json=projectJson
                 if(json!=null)scope.launch{
-                    runCatching { withContext(Dispatchers.IO){localProjects.save(json)} }
-                        .onSuccess{savedSnapshot=json;warning="";editHistory.clear()}
+                    val prior=savedSnapshot
+                    runCatching { withContext(Dispatchers.IO){
+                        val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
+                        val current=NativeWorldLabProjectCodec.decode(json)
+                        val expected=if(savedBaseline?.id==current.id)savedBaseline.revision else null
+                        localProjects.save(json,expectedSavedRevision=expected)
+                        localProjects.listProjects()
+                    } }.onSuccess{items->
+                        savedSnapshot=json;savedProjects=items
+                        selectedSavedId=project?.id?:""
+                        warning="";editHistory.clear()
+                    }
                         .onFailure{warning=it.message?:"Could not save the project locally."}
                 }
             },enabled=projectJson!=null){Text("Save locally")}
             OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
+        }
+        if(savedProjects.isNotEmpty()){
+            Box {
+                OutlinedButton(onClick={savedMenuOpen=true}){
+                    Text("Saved projects: "+
+                        (savedProjects.firstOrNull{it.id==selectedSavedId}?.title?:"Choose"))
+                }
+                DropdownMenu(expanded=savedMenuOpen,onDismissRequest={savedMenuOpen=false}){
+                    savedProjects.forEach{item->
+                        DropdownMenuItem(
+                            text={Text(item.title+" · revision "+item.revision)},
+                            onClick={selectedSavedId=item.id;savedMenuOpen=false})
+                    }
+                }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={askReplace("open-selected")},
+                    enabled=selectedSavedId.isNotEmpty()){Text("Open selected")}
+                OutlinedButton(onClick={confirmingSavedDelete=true},
+                    enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
+            }
         }
         if(projectJson!=null && savedSnapshot!=projectJson)
             Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
