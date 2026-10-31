@@ -127,7 +127,7 @@ export default function WorldLab() {
     setEditEpoch(x=>x+1);
   }
   const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
-  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor">("hydrostatics");
+  const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteError,setRemoteError]=useState("");
   const [remoteBusy,setRemoteBusy]=useState(false);
@@ -839,9 +839,10 @@ export default function WorldLab() {
     if(!remoteJobsEnabled||!project||remoteBusy)return;
     setRemoteBusy(true);setRemoteError("");
     try{
-      if(remoteKind!=="dc-network"&&!selectedEntityId)
+      if(remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&!selectedEntityId)
         throw new Error("Select an invented solid before submitting this experiment.");
       const body=remoteKind==="dc-network"?{kind:remoteKind,project}:
+        remoteKind==="chemical-thermal"?{kind:remoteKind,project,chemicalInput}:
         remoteKind==="hydrostatics"?{
           kind:remoteKind,project,entityId:selectedEntityId,
           fluidDensityKgM3:fluidDensity,
@@ -1176,9 +1177,10 @@ export default function WorldLab() {
             <option value="hydrostatics">Floating and buoyancy</option>
             <option value="dc-network">Connected DC circuit</option>
             <option value="wired-motor">Circuit-powered lifting machine</option>
+            <option value="chemical-thermal">Hypothetical chemical heating</option>
           </select>
           <button type="button" className={buttonClass} disabled={remoteBusy||!project||
-              (remoteKind!=="dc-network"&&!selectedEntity)||
+              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&!selectedEntity)||
               (remoteKind!=="hydrostatics"&&!project?.networks?.[0])}
             onClick={()=>{void submitRemoteJob();}}>
             {remoteBusy?"Submitting calculation…":"Submit authenticated job"}

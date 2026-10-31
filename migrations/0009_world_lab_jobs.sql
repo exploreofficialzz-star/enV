@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS public.world_lab_jobs (
   user_id text NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
   idempotency_key text NOT NULL,
   input_sha256 char(64) NOT NULL,
-  kind text NOT NULL CHECK (kind IN ('hydrostatics','dc-network','wired-motor')),
+  kind text NOT NULL CHECK (kind IN ('hydrostatics','dc-network','wired-motor','chemical-thermal')),
   project_id text NOT NULL,
   project_revision integer NOT NULL CHECK (project_revision >= 0),
   status text NOT NULL DEFAULT 'queued'

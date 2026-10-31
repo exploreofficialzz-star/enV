@@ -24,3 +24,9 @@ Still required: independently verify SQL migration and RLS, real sessions, paral
 enqueues, cancellation during execution, retries/lease expiry, worker hosting,
 cost and quota calibration, retention, streaming and solver scientific validation.
 Do not enable this code in production solely because compilation succeeds.
+
+Supported hypothetical `chemical-thermal` operations include a fully specified
+`chemicalInput` record of bounded Arrhenius reaction-rate, enthalpy, initial
+reactant, thermal capacity, ambient cooling and external heating fields.
+No chemical name, measured reactivity, complex mechanism or user-executable
+code is inferred. This migration/worker expansion remains disabled and unverified.

@@ -345,3 +345,7 @@ release-candidate evidence bundle are unfinished.
 ## iOS native chemical–thermal feedback source parity (2026-10-31)
 
 - Added independent native Swift zero-dimensional Arrhenius conversion coupled to bulk temperature, reaction enthalpy, ambient cooling and external heating, with RK4, conservation residual, and strict numerical/stiffness limits. SwiftUI presents explicit hypothetical rate, heat and heater inputs with play/pause/seek/step, and results link to computed conversion, temperature, power and energy. Native XCTest source checks exothermic conservation and invalid heat capacity. Full iOS simulator build still pending user-requested consolidated acceptance audit.
+
+## Owner-scoped chemical job integration (2026-10-31)
+
+- Extended the existing guarded server compute dispatcher, durable job kind constraint, owner-scoped submission input budget and disabled Web remote lifecycle to accept one explicitly bounded hypothetical chemical–thermal experiment. Unknown, missing, executable or cross-model inputs are rejected. Migration 0009 SQL has been updated **before its first deployment**; no live database operation has been performed. Tests written for permissible chemistry and invalid assumptions; feature flag remains off pending security/workers/production checks.

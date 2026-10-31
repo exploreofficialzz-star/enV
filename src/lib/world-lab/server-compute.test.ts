@@ -40,3 +40,22 @@ test("bounded dispatcher rejects unauthorised input fields and extreme workloads
  assert.throws(()=>runBoundedWorldLabOperation({kind:"dc-network",project,
    entityId:"solid"}),/Unrelated/);
 });
+
+
+test("authenticated dispatcher accepts bounded hypothetical reaction data, rejects extra fields",()=>{
+ const project=fixture();
+ const input={
+  initialReactantMol:1,initialTemperatureK:300,ambientTemperatureK:300,
+  preExponentialPerS:0.5,activationEnergyJPerMol:0,
+  reactionHeatReleasedJPerMol:50000,heatCapacityJPerK:500,
+  coolingConductanceWPerK:0,externalHeatingW:0,durationSeconds:2,
+ };
+ const result=runBoundedWorldLabOperation({kind:"chemical-thermal",project,chemicalInput:input});
+ assert.equal(result.kind,"chemical-thermal");
+ assert.equal(result.projectId,project.id);
+ assert.equal(result.outcome.evidence,"physics-model-computed");
+ assert.throws(()=>runBoundedWorldLabOperation({kind:"chemical-thermal",
+  project,chemicalInput:{...input,arbitraryScript:"console.log('unsafe')"}}),/Unknown or missing/);
+ assert.throws(()=>runBoundedWorldLabOperation({kind:"chemical-thermal",
+  project,chemicalInput:{...input,initialTemperatureK:Infinity}}),/Initial temperature/);
+});
