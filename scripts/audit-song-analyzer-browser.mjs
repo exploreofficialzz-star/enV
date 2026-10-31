@@ -221,7 +221,9 @@ try {
   assert.equal(tracks[0].lyrics, lyrics);
   assert.equal(tracks[0].custom.custom_note, tags.custom_note);
   await scope.locator(".ms-record-row button").first().click();
-  assert.equal(await scope.locator("audio").count(), 1, "Audio remains on screen while tagging");
+  const audioPreview = scope.locator("audio");
+  await audioPreview.waitFor({ state: "visible", timeout: 5000 });
+  assert.equal(await audioPreview.count(), 1, "Audio remains on screen while tagging");
   await scope.locator("audio").evaluate((audio) => audio.play());
   await page.waitForFunction(() => document.querySelector(".music-sandbox audio")?.currentTime > 0.1);
   await scope.locator(".ms-data-tabs").getByRole("button", { name: "tags.json" }).click();
