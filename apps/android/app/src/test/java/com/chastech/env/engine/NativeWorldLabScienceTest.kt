@@ -239,4 +239,45 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun spatialSphereContactTransfersImpulseAndConservesAngularMomentum(){
+        var json=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"sphere",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="b")
+        json=NativeWorldLabEditor.positionSolid(json,"a",listOf(0.0,0.5,0.0))
+        json=NativeWorldLabEditor.positionSolid(json,"b",listOf(3.0,1.0,0.0))
+        json=NativeWorldLabEditor.addHypotheticalMaterial(
+            json,"Hypothetical matter",6.0/Math.PI,id="invented")
+        json=NativeWorldLabEditor.assignMaterial(json,"a","invented")
+        json=NativeWorldLabEditor.assignMaterial(json,"b","invented")
+        val p=NativeWorldLabProjectCodec.decode(json)
+        val first=NativeLabVector(2.0,0.0,0.0)
+        val zero=NativeLabVector(0.0,0.0,0.0)
+        val run=NativeWorldLabSphereImpact.evaluate(p,"a","b",first,zero,0.65)
+        assertEquals((3.0-Math.sqrt(0.75))/2.0,run.impactTimeSeconds,1e-10)
+        assertEquals(1.0,run.firstMassKg,1e-10)
+        assertEquals(1.0,run.secondMassKg,1e-10)
+        assertEquals(run.momentumBeforeKgMps.x,run.momentumAfterKgMps.x,1e-10)
+        assertEquals(run.momentumBeforeKgMps.y,run.momentumAfterKgMps.y,1e-10)
+        assertEquals(run.angularMomentumBeforeKgM2PerS.z,
+            run.angularMomentumAfterKgM2PerS.z,1e-10)
+        assertEquals(run.energyBeforeJ,run.energyAfterJ+run.dissipatedEnergyJ,1e-10)
+        val at=run.sample(run.impactTimeSeconds)
+        val dx=at.firstCentreM.x-at.secondCentreM.x
+        val dy=at.firstCentreM.y-at.secondCentreM.y
+        assertEquals(1.0,Math.hypot(dx,dy),1e-10)
+        val evidence=org.json.JSONObject(run.toEvidenceJson())
+        assertEquals("env-world-lab-sphere-impact-3d",evidence.getString("format"))
+        assertEquals("hypothetical-user-assumed",evidence.getString("assumptionEvidence"))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabSphereImpact.evaluate(p,"a","b",zero,zero,0.5)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabSphereImpact.evaluate(p,"a","b",first,zero,1.5)
+        }
+        val unknown=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.assignMaterial(json,"b",null))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabSphereImpact.evaluate(unknown,"a","b",first,zero,0.5)
+        }
+    }
+
 }
