@@ -421,3 +421,8 @@ release-candidate evidence bundle are unfinished.
   grid over invented stiffness and load, returning actual deflection, stress
   and strain only within the accepted small-deformation domain (migration
   0015). No failure strengths are invented.
+
+- Added an isolated, optional deployment blueprint and Docker package for a
+  private World Lab science worker, with a database schema preflight requiring
+  migration 0015. Root media-service Render configuration is unchanged;
+  no paid worker or production flag is activated by this source change.

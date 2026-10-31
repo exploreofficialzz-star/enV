@@ -91,3 +91,14 @@ assumed stiffness and applied force by 0.5× to 1.5×. Unsupported strains,
 deflections or stiffness values yield `outside-domain` and null results,
 never invented fracture conclusions. This is a deterministic sensitivity
 study of ideal static mechanics, NOT certification of invented material.
+
+## Private worker packaging and schema preflight
+
+An optional dedicated Render Docker worker template lives in
+`infra/world-lab-worker/`, separate from the deployed media processor and
+the repository's root Render blueprint. It is **not provisioned or enabled**
+merely by committing code. It requires operator approval for a potentially
+paid private worker, PostgreSQL URL, Better Auth enablement and migrations
+through 0015. The worker fails startup if the migration ledger lacks 0015.
+Native Android/iOS cloud job upload is deliberately not enabled without a
+real mobile Better Auth session bridge.

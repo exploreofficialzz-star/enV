@@ -144,6 +144,20 @@ export async function claimNextWorldLabJob():Promise<{job:WorldLabJobRow;token:s
  * oldest rows per batch to avoid unbounded transactions. The worker invokes
  * this on startup and periodically; an inactive worker cannot enforce TTL.
  */
+/** Fail closed before polling when Postgres schema is behind worker code.
+ * The explicit migration gate prevents a partially deployed queue from
+ * advertising new scientific operation kinds it cannot persist.
+ */
+export async function assertWorldLabWorkerReady():Promise<void>{
+  requireEnabled();
+  const sql=await getSql();
+  const rows=await sql.query<{applied:boolean}>(
+    "SELECT EXISTS (SELECT 1 FROM public._migrations "+
+    "WHERE name='0015_world_lab_structural_sweep_jobs.sql') AS applied");
+  if(rows[0]?.applied!==true)
+    throw new WorldLabJobError("JOB_SCHEMA_OUTDATED",
+      "World Lab worker requires database migrations through 0015.");
+}
 export async function purgeExpiredWorldLabJobs():Promise<number>{
   requireEnabled();
   const sql=await getSql();

@@ -4,9 +4,16 @@ if(!process.env.DATABASE_URL||process.env.WORLD_LAB_JOBS_ENABLED!=="true"){
   console.error("[world-lab-worker] Durable job service is disabled.");
   process.exitCode=1;
 }else{
-  const {processOneWorldLabJob,purgeExpiredWorldLabJobs}=
+  const {processOneWorldLabJob,purgeExpiredWorldLabJobs,assertWorldLabWorkerReady}=
     await import("../src/lib/world-lab/jobs.server.ts");
   const once=process.argv.includes("--once");
+  try{
+    await assertWorldLabWorkerReady();
+  }catch(error){
+    console.error("[world-lab-worker] Deployment is not ready:",
+      error instanceof Error?error.message:"Unknown startup error");
+    process.exit(1);
+  }
   let running=true;
   const stop=()=>{running=false;};
   process.on("SIGTERM",stop);process.on("SIGINT",stop);
