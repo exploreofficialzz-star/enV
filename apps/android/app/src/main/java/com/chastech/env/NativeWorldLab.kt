@@ -31,6 +31,8 @@ import com.chastech.env.engine.NativeLabFluidMotionRun
 import com.chastech.env.engine.NativeLabHydroResult
 import com.chastech.env.engine.NativeWorldLabSpatial
 import com.chastech.env.engine.NativeWorldLabDigitalLogic
+import com.chastech.env.engine.NativeWorldLabStructural
+import com.chastech.env.engine.NativeLabBeamBendingResult
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
 import com.chastech.env.engine.NativeWorldLabProjectStore
@@ -80,6 +82,9 @@ fun NativeWorldLabForm() {
     var requestImport by remember { mutableStateOf(false) }
     var proposedName by remember { mutableStateOf("") }
     var proposedDensity by remember { mutableStateOf("") }
+    var proposedModulus by remember { mutableStateOf("") }
+    var beamForce by remember { mutableStateOf("1000") }
+    var beamRun by remember { mutableStateOf<NativeLabBeamBendingResult?>(null) }
     var deviceName by remember { mutableStateOf("") }
     var deviceAssumption by remember { mutableStateOf("") }
     var deviceResistance by remember { mutableStateOf("") }
@@ -151,7 +156,7 @@ fun NativeWorldLabForm() {
             editHistory.record(previous,next)
             projectJson=next
             project=parsed
-            dcRun=null;wiredMotor=null;digitalMotor=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
+            dcRun=null;wiredMotor=null;digitalMotor=null;beamRun=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
             selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
             warning=""
         }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
@@ -896,6 +901,35 @@ fun NativeWorldLabForm() {
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
+                Text("Assumed Young's modulus: "+labNumber(material?.youngModulusPa)+" Pa")
+                Text("Calculate how an invented elastic beam bends",
+                    style=MaterialTheme.typography.titleSmall)
+                Text("Rectangular beam: X = clamped length, Y = vertical depth, Z = width. "+
+                    "Downward tip load and linear elasticity are assumed, not observed.",
+                    style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value=beamForce,onValueChange={beamForce=it;beamRun=null},
+                    label={Text("Downward cantilever end load (newtons)")},
+                    singleLine=true,modifier=Modifier.fillMaxWidth())
+                OutlinedButton(onClick={
+                    runCatching {
+                        val force=beamForce.toDouble()
+                        beamRun=NativeWorldLabStructural.bending(project!!,solid.id,force)
+                        warning=""
+                    }.onFailure{
+                        beamRun=null
+                        warning=it.message?:"Unsupported elastic beam assumptions."
+                    }
+                },enabled=solid.shape=="box"&&(material?.youngModulusPa?:0.0)>0.0){
+                    Text("Calculate elastic bending")
+                }
+                beamRun?.takeIf{it.projectId==project!!.id&&
+                    it.projectRevision==project!!.revision&&it.entityId==solid.id&&
+                    it.forceN==beamForce.toDoubleOrNull()}?.let{run->
+                    Text("Free-end deflection: "+labNumber(run.tipDeflectionM)+" m")
+                    Text("Maximum bending stress: "+labNumber(run.maximumStressPa)+" Pa")
+                    Text("Maximum surface strain: "+labNumber(run.surfaceStrain))
+                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                }
                 Text("Try floating your invention",style=MaterialTheme.typography.titleSmall)
                 Text("Fluid surface above ground: "+labNumber(waterSurfaceHeight.toDouble())+" m")
                 Slider(value=waterSurfaceHeight,onValueChange={
@@ -1134,20 +1168,24 @@ fun NativeWorldLabForm() {
             OutlinedTextField(value=proposedDensity,onValueChange={proposedDensity=it},
                 label={Text("Hypothetical density (kg/m³), or blank")},singleLine=true,
                 modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedModulus,onValueChange={proposedModulus=it},
+                label={Text("Hypothetical Young's modulus (Pa), or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
             Button(onClick={
                 runCatching {
                     require(proposedName.isNotBlank()){"Name your invented material first."}
                     val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val id=java.util.UUID.randomUUID().toString()
                     val edited=NativeWorldLabEditor.addHypotheticalMaterial(
-                        requireNotNull(projectJson),proposedName,density,id=id)
+                        requireNotNull(projectJson),proposedName,density,youngModulusPa=modulus,id=id)
                     val linked=solid?.let{NativeWorldLabEditor.assignMaterial(edited,it.id,id)}?:edited
                     projectJson=linked
                     project=NativeWorldLabProjectCodec.decode(linked)
-                    proposedName="";proposedDensity="";warning=""
+                    proposedName="";proposedDensity="";proposedModulus="";beamRun=null;warning=""
                 }.onFailure{warning=it.message?:"Hypothetical material was not saved."}
             }){Text("Save invented material")}
-            Text("Objects are inspected numerically. Collisions, deformation, and unknown material properties are not simulated.",
+            Text("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.",
                 style=MaterialTheme.typography.bodySmall)
         }
         if(warning.isNotBlank()) Text(warning,color=MaterialTheme.colorScheme.error)
