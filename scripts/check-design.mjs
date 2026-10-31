@@ -28,6 +28,8 @@ const cssGradient = read("src/lib/engines/css-gradient.ts");
 const cssGradientTests = read("src/lib/engines/css-gradient.test.ts");
 const palette = read("src/lib/engines/design-palette.ts");
 const paletteTests = read("src/lib/engines/design-palette.test.ts");
+const palette = read("src/lib/engines/design-palette.ts");
+const paletteTests = read("src/lib/engines/design-palette.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const accessibilityEngine = read("src/components/engines/accessibility-engine.tsx");
@@ -48,7 +50,7 @@ const checks = [
   ["Palette locking, sharing and image extraction", ["Lock color", "Copy share link", "Extract colors from an image", "Light preview", "Dark preview"].every((label) => colorEngine.includes(label))],
   ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports")],
   ["Layered shadow presets and opacity control", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from") && cssEngine.includes("Shadow opacity")],
-  ["Button hover and input focus preview states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible")],
+  ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
 ];
