@@ -224,7 +224,7 @@ assert.match(android, /LaunchedEffect\(selected\?\.id\)[\s\S]*?favorites\.record
 assert.match(androidStore, /private val recentKey = "recent_tool_ids"/);
 assert.match(androidStore, /fun recordRecent\(toolId: String\): List<String>/);
 assert.match(androidStore, /\.filterNot \{ it == toolId \}.*\.take\(24\)/s);
-assert.match(iosTools, /\.onAppear \{ store\.recordRecent\(tool\.id\) \}/);
+assert.match(iosTools, /\.onAppear\s*\{\s*store\.recordRecent\(tool\.id\)\s*\}/);
 assert.match(iosCatalog, /@Published private\(set\) var recentIDs: \[String\]/);
 assert.match(iosCatalog, /func recordRecent\(_ toolID: String\)/);
 assert.match(iosCatalog, /\.prefix\(24\)/);
