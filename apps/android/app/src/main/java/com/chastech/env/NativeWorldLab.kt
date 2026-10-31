@@ -1093,6 +1093,7 @@ fun NativeWorldLabForm() {
                     }){Text("Export 3D impact evidence")}
                     Text(run.validity,style=MaterialTheme.typography.bodySmall)
                 }
+                NativeWorldLabMultiSpherePanel(project!!){ warning=it }
                 Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
                 Text("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.",
                     style=MaterialTheme.typography.bodySmall)
