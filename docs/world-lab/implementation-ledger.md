@@ -612,3 +612,8 @@ release-candidate evidence bundle are unfinished.
   follow the same non-executable evidence envelope as Web/iOS; Android's
   existing composite project archive does not yet merge these optical
   records into one bundle, so explicit export remains necessary.
+
+- Follow-up source integration corrected the Web optical material-selector
+  optional chaining and ensured the Android optical evidence quota predicate
+  evaluates a numeric count before its 20-record comparison. No test or
+  build execution is claimed for these edits.

@@ -87,7 +87,7 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         validate(bytes,run.projectId,recordId)
         val dir=dir(run.projectId)
         require(dir.isDirectory||dir.mkdirs()){"Cannot create private optics history."}
-        require(dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0<20){
+        require((dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0)<20){
             "Optical evidence history is full (20 records)."
         }
         val target=file(run.projectId,recordId)

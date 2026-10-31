@@ -56,8 +56,8 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence,onVisu
         <select className={field+" block"} value={editMaterial}
           onChange={e=>{
             setEditMaterial(e.target.value);
-            setAssumedIndex(project?.materials.find(m=>m.id===e.target.value)?
-              .refractiveIndex?.toString()??"":"");
+            setAssumedIndex(project?.materials.find(m=>m.id===e.target.value)
+              ?.refractiveIndex?.toString()??"");
           }}>
           <option value="">Choose material</option>
           {materials.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
