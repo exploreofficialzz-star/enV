@@ -55,12 +55,17 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   border: [
     { name: "style", label: "Border style", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }, { value: "double", label: "Double" }] },
     { name: "width", label: "Width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
-    { name: "radius", label: "Corner radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
+    { name: "radius", label: "All corners (fallback)", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
+    { name: "topLeft", label: "Top left radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
+    { name: "topRight", label: "Top right radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
+    { name: "bottomRight", label: "Bottom right radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
+    { name: "bottomLeft", label: "Bottom left radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "color", label: "Border color", type: "color", defaultValue: "#b9c5d5" },
   ],
   button: [
     { name: "bg", label: "Background", type: "color", defaultValue: "#0d9f8a" },
     { name: "hover", label: "Hover background", type: "color", defaultValue: "#087f70" },
+    { name: "focus", label: "Focus ring color", type: "color", defaultValue: "#7c4dff" },
     { name: "text", label: "Text color", type: "color", defaultValue: "#ffffff" },
     { name: "radius", label: "Corner radius", type: "number", defaultValue: 10, min: 0, max: 48, suffix: "px" },
     { name: "px", label: "Horizontal padding", type: "number", defaultValue: 16, min: 0, max: 64, suffix: "px" },
@@ -269,18 +274,20 @@ function cssFor(
   if (family === "border") {
     const width = numberValue(values, "width", 1, 0, 24);
     const radius = numberValue(values, "radius", 16, 0, 120);
+    const radii = ["topLeft", "topRight", "bottomRight", "bottomLeft"].map((key) => numberValue(values, key, radius, 0, 120));
     const style = values.style ?? "solid";
     const color = values.color ?? "#b9c5d5";
+    const borderRadius = radii.map((value) => `${value}px`).join(" ");
     return {
-      css: `border: ${width}px ${style} ${color};\nborder-radius: ${radius}px;`,
-      style: { border: `${width}px ${style} ${color}`, borderRadius: `${radius}px` },
+      css: `border: ${width}px ${style} ${color};\nborder-radius: ${borderRadius};`,
+      style: { border: `${width}px ${style} ${color}`, borderRadius },
     };
   }
   if (family === "button") {
     const radius = numberValue(values, "radius", 10, 0, 48);
     const px = numberValue(values, "px", 16, 0, 64);
     const py = numberValue(values, "py", 10, 0, 40);
-    const css = `.env-button {\n  background: ${values.bg};\n  color: ${values.text};\n  border: 0;\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n}\n.env-button:hover { background: ${values.hover}; }\n.env-button:focus-visible { outline: 3px solid ${values.hover}; outline-offset: 3px; }`;
+    const css = `.env-button {\n  background: ${values.bg};\n  color: ${values.text};\n  border: 0;\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n  transition: background-color 160ms ease, transform 160ms ease;\n}\n.env-button:hover { background: ${values.hover}; }\n.env-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }\n@media (prefers-reduced-motion: reduce) { .env-button { transition: none; } }`;
     return { css, style: { background: values.bg, color: values.text, borderRadius: `${radius}px`, padding: `${py}px ${px}px` } };
   }
   if (family === "card") {
@@ -557,7 +564,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
         </div>
 
         <div className="min-w-0 space-y-3 lg:sticky lg:top-4">
-          {family === "button" ? <style>{`.env-live-button:hover { background: ${values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.hover ?? values.bg}; outline-offset: 3px; }`}</style> : null}
+          {family === "button" ? <style>{`.env-live-button:hover { background: ${values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
           {family === "input" ? <style>{`.env-live-input:focus-visible { outline: 3px solid ${values.focus ?? "#0d9f8a"}; outline-offset: 2px; }`}</style> : null}
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-fg">Live preview</p>
