@@ -1,5 +1,5 @@
-export type SvgColorOptions = { color: string };
-export type BlobSvgOptions = { seed: number; points: number; color: string };
+export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal";
+export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number };
 export type WaveSvgOptions = {
   amplitude: number;
   layers: number;
@@ -25,20 +25,33 @@ function safeHex(value: string, fallback: string): string {
   return fallback;
 }
 
-export function buildPatternSvg(size: number, opacity: number, color: string): string {
+export function buildPatternSvg(size: number, opacity: number, color: string, pattern: PatternStyle = "diagonal"): string {
   const safeSize = Math.round(clamp(size, 6, 160));
   const safeOpacity = clamp(opacity, 0, 1);
   const safeColor = safeHex(color, "#0d9f8a");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}"><path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}" stroke="${safeColor}" stroke-opacity="${safeOpacity}" stroke-width="1"/></svg>`;
+  const stroke = `stroke="${safeColor}" stroke-opacity="${safeOpacity}" stroke-width="1"`;
+  const center = safeSize / 2;
+  const patternShapes: Record<PatternStyle, string> = {
+    dots: `<circle cx="${center}" cy="${center}" r="${Math.max(1, safeSize / 16)}" fill="${safeColor}" fill-opacity="${safeOpacity}"/>`,
+    grid: `<path d="M0 0H0V${safeSize}M0 0H${safeSize}" ${stroke}/>`,
+    diagonal: `<path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}" ${stroke}/>`,
+    cross: `<path d="M${center} 0V${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
+    horizontal: `<path d="M0 ${center}H${safeSize}" ${stroke}/>`,
+  };
+  const safePattern = Object.prototype.hasOwnProperty.call(patternShapes, pattern) ? pattern : "diagonal";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}">${patternShapes[safePattern]}</svg>`;
 }
 
-export function buildBlobSvg({ seed, points, color }: BlobSvgOptions): string {
+export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#ffffff", strokeWidth = 0 }: BlobSvgOptions): string {
   const safeSeed = Math.round(clamp(seed, 1, 999));
   const count = Math.round(clamp(points, 8, 18));
   const safeColor = safeHex(color, "#0d9f8a");
+  const safeStroke = safeHex(stroke, "#ffffff");
+  const safeRotation = clamp(rotation, 0, 360);
+  const safeStrokeWidth = clamp(strokeWidth, 0, 8);
   const coordinates = Array.from({ length: count }, (_, index) => {
     const angle = (index / count) * Math.PI * 2;
-    const radius = 34 + ((safeSeed * (index + 3) * 13) % 20);
+    const radius = 28 + ((safeSeed * (index + 3) * 13) % 18);
     return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
   });
   const middle = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
@@ -49,7 +62,8 @@ export function buildBlobSvg({ seed, points, color }: BlobSvgOptions): string {
     return `Q ${point.x.toFixed(2)} ${point.y.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
   }).join(" ");
   const path = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} ${curve} Z`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100"><path fill="${safeColor}" d="${path}"/></svg>`;
+  const strokeAttributes = safeStrokeWidth > 0 ? ` stroke="${safeStroke}" stroke-width="${safeStrokeWidth}" vector-effect="non-scaling-stroke"` : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100"><path fill="${safeColor}"${strokeAttributes} transform="rotate(${safeRotation} 50 50)" d="${path}"/></svg>`;
 }
 
 export function buildWaveSvg(options: WaveSvgOptions): string {
