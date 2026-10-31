@@ -103,6 +103,29 @@ enum NativeWorldLabEditor {
             root["digitalNetworks"]=networks
         }
     }
+    /// Rewire a Boolean indicator to an existing input or computed invented gate.
+    static func digitalOutputSource(_ data:Data,networkId:String,outputId:String,
+        sourceNodeId:String)throws->Data {
+        try mutate(data){root in
+            guard var networks=root["digitalNetworks"] as? [[String:Any]],
+                  let index=networks.firstIndex(where:{$0["id"] as? String==networkId}),
+                  var outputs=networks[index]["outputs"] as? [[String:Any]],
+                  let outputIndex=outputs.firstIndex(where:{$0["id"] as? String==outputId}),
+                  let inputs=networks[index]["inputs"] as? [[String:Any]],
+                  let gates=networks[index]["gates"] as? [[String:Any]] else {
+                throw NativeWorldLabError.invalid("Unknown digital indicator")
+            }
+            let known=inputs.compactMap{$0["id"] as? String}+
+                gates.compactMap{$0["id"] as? String}
+            guard known.contains(sourceNodeId) else {
+                throw NativeWorldLabError.invalid(
+                    "Digital indicator must read an existing switch or gate")
+            }
+            outputs[outputIndex]["sourceNodeId"]=sourceNodeId
+            networks[index]["outputs"]=outputs
+            root["digitalNetworks"]=networks
+        }
+    }
     static func starterCircuit(_ data:Data,id:String=UUID().uuidString) throws -> Data {
         try mutate(data){root in
             var networks=(root["networks"] as? [[String:Any]]) ?? []
