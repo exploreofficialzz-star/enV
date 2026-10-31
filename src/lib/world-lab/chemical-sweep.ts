@@ -27,9 +27,13 @@ export function runChemicalAssumptionSweep(input:ReactionThermalInput){
       try{
         const experiment=runChemicalThermal(scenario,1/120);
         const last=experiment.samples[experiment.samples.length-1];
-        const maximumTemperatureK=Math.max(...experiment.samples.map(s=>s.temperatureK));
-        const maximumAbsoluteEnergyResidualJ=Math.max(...experiment.samples.map(
-          s=>Math.abs(s.energyResidualJ)));
+        let maximumTemperatureK=-Infinity;
+        let maximumAbsoluteEnergyResidualJ=0;
+        for(const sample of experiment.samples){
+          maximumTemperatureK=Math.max(maximumTemperatureK,sample.temperatureK);
+          maximumAbsoluteEnergyResidualJ=Math.max(
+            maximumAbsoluteEnergyResidualJ,Math.abs(sample.energyResidualJ));
+        }
         scenarios.push({frequencyFactorScale:kinetic,heatReleaseScale:enthalpy,
           attemptedPreExponentialPerS,attemptedReactionHeatReleasedJPerMol,
           status:"computed",finalReactantMol:last.reactantRemainingMol,

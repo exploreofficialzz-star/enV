@@ -127,13 +127,13 @@ test("remote structural parameter sweep retains computed and out-of-domain cases
  p.materials[0].youngModulusPa=2e11;
  p.entities[0].dimensionsMeters=[2,0.1,0.05];
  const r=runBoundedWorldLabOperation({kind:"structural-sweep",project:p,
-   entityId:"solid",tipForceN:9000});
+   entityId:"solid",tipForceN:25000});
  assert.equal(r.kind,"structural-sweep");
  if(!("scenarios" in r.outcome))throw new Error("Missing stress sensitivity evidence.");
  assert.equal(r.outcome.scenarioCount,25);
  assert.ok(r.outcome.successfulCount<25);
  assert.throws(()=>runBoundedWorldLabOperation({
-   kind:"structural-sweep",project:p,entityId:"solid",tipForceN:9000,
+   kind:"structural-sweep",project:p,entityId:"solid",tipForceN:25000,
    injectedFunction:"run",
  }),/Structural sensitivity only accepts/);
 });

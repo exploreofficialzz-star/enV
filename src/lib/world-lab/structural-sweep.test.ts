@@ -19,7 +19,7 @@ test("25 parameter studies preserve original project and known beam result",()=>
  assert.equal(JSON.stringify(p),prior);
 });
 test("large-strain variants are flagged outside-domain not extrapolated",()=>{
- const run=runStructuralAssumptionSweep(beam(),"solid",9000);
+ const run=runStructuralAssumptionSweep(beam(),"solid",25000);
  assert.ok(run.scenarios.some(s=>s.status==="outside-domain"));
  assert.ok(run.scenarios.some(s=>s.status==="outside-domain"&&s.tipDeflectionM===null));
 });
