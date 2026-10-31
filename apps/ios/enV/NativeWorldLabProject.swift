@@ -71,6 +71,46 @@ struct NativeLabAssembly:Decodable {
     let name:String
     let entityIds:[String]
 }
+struct NativeLabDigitalInput:Decodable {let id:String;let label:String;let value:Bool}
+struct NativeLabDigitalGate:Decodable {
+    let id:String;let name:String;let assumption:String
+    let inputNodeIds:[String];let truthTable:[Int];let evidence:String
+}
+struct NativeLabDigitalOutput:Decodable {
+    let id:String;let label:String;let sourceNodeId:String
+}
+struct NativeLabDigitalNetwork:Decodable {
+    let id:String;let name:String;let inputs:[NativeLabDigitalInput]
+    let gates:[NativeLabDigitalGate];let outputs:[NativeLabDigitalOutput]
+}
+enum NativeWorldLabDigitalLogic {
+    static func evaluate(_ n:NativeLabDigitalNetwork)throws->[String:Int] {
+        var values:[String:Int]=[:]
+        for input in n.inputs {values[input.id]=input.value ? 1 : 0}
+        for gate in n.gates {
+            var row=0
+            for upstream in gate.inputNodeIds {
+                guard let bit=values[upstream] else {
+                    throw NativeWorldLabError.invalid("Unsupported digital connection")
+                }
+                row=row*2+bit
+            }
+            guard row<gate.truthTable.count else {
+                throw NativeWorldLabError.invalid("Missing digital truth-table row")
+            }
+            values[gate.id]=gate.truthTable[row]
+        }
+        var outputs:[String:Int]=[:]
+        for output in n.outputs {
+            guard let bit=values[output.sourceNodeId] else {
+                throw NativeWorldLabError.invalid("Missing digital output source")
+            }
+            outputs[output.id]=bit
+        }
+        return outputs
+    }
+}
+
 struct NativeWorldLabProject: Decodable {
     struct World: Decodable {
         let frame: String
@@ -95,6 +135,7 @@ struct NativeWorldLabProject: Decodable {
     let materials: [NativeLabMaterial]
     let networks: [NativeLabCircuitNetwork]?
     let assemblies:[NativeLabAssembly]?
+    let digitalNetworks:[NativeLabDigitalNetwork]?
 
     static let maxBytes = 1_048_576
     static func decode(_ data: Data) throws -> NativeWorldLabProject {
@@ -106,8 +147,8 @@ struct NativeWorldLabProject: Decodable {
         let essential:Set<String>=["format","schemaVersion","id","title","revision",
             "createdAt","updatedAt","world","camera","entities","materials"]
         let keys=Set(root.keys)
-        guard keys.subtracting(["networks","assemblies"])==essential &&
-              keys.count<=essential.count+2 else {
+        guard keys.subtracting(["networks","assemblies","digitalNetworks"])==essential &&
+              keys.count<=essential.count+3 else {
             throw NativeWorldLabError.invalid("Unexpected or missing World Lab JSON keys")
         }
         guard let world = root["world"] as? [String: Any],
@@ -235,6 +276,76 @@ struct NativeWorldLabProject: Decodable {
                 try validateId(member)
                 guard solidIds.contains(member),includedSolidIds.insert(member).inserted else {
                     throw NativeWorldLabError.invalid("Assembly has missing or overlapping solid")
+                }
+            }
+        }
+        if root.keys.contains("digitalNetworks") &&
+            !(root["digitalNetworks"] is [[String:Any]]) {
+            throw NativeWorldLabError.invalid("Digital networks must be objects")
+        }
+        let digital=(root["digitalNetworks"] as? [[String:Any]]) ?? []
+        guard digital.count<=8 else {throw NativeWorldLabError.invalid("Digital network limit reached")}
+        var digitalIds:Set<String>=[]
+        for network in digital {
+            try requireKeys(network,["id","name","inputs","gates","outputs"])
+            guard let networkId=network["id"] as? String,
+                  let name=network["name"] as? String,
+                  let inputs=network["inputs"] as? [[String:Any]],
+                  let gates=network["gates"] as? [[String:Any]],
+                  let outputs=network["outputs"] as? [[String:Any]],
+                  (1...12).contains(inputs.count),(1...32).contains(gates.count),
+                  (1...16).contains(outputs.count) else {
+                throw NativeWorldLabError.invalid("Invalid digital network capacity")
+            }
+            try validateId(networkId);try validateName(name)
+            guard digitalIds.insert(networkId).inserted else {
+                throw NativeWorldLabError.invalid("Duplicate digital networks")
+            }
+            var allIds:Set<String>=[];var known:Set<String>=[]
+            for input in inputs {
+                try requireKeys(input,["id","label","value"])
+                guard let key=input["id"] as? String,
+                      let label=input["label"] as? String,
+                      input["value"] is Bool else {
+                    throw NativeWorldLabError.invalid("Invalid digital Boolean input")
+                }
+                try validateId(key);try validateName(label)
+                guard label.count<=80,allIds.insert(key).inserted else {
+                    throw NativeWorldLabError.invalid("Duplicate digital input")
+                }
+                known.insert(key)
+            }
+            for gate in gates {
+                try requireKeys(gate,["id","name","assumption","inputNodeIds","truthTable","evidence"])
+                guard let key=gate["id"] as? String,
+                      let name=gate["name"] as? String,
+                      let assumption=gate["assumption"] as? String,
+                      let wires=gate["inputNodeIds"] as? [String],
+                      let bits=gate["truthTable"] as? [Int],
+                      let evidence=gate["evidence"] as? String,
+                      evidence=="hypothetical-user-assumed",
+                      (1...4).contains(wires.count),bits.count==(1<<wires.count),
+                      bits.allSatisfy({$0==0 || $0==1}),assumption.count<=500 else {
+                    throw NativeWorldLabError.invalid("Invalid assumed digital truth table")
+                }
+                try validateId(key);try validateName(name);try validateName(assumption)
+                guard allIds.insert(key).inserted,Set(wires).count==wires.count,
+                      wires.allSatisfy({known.contains($0)}) else {
+                    throw NativeWorldLabError.invalid("Cyclic or missing digital input port")
+                }
+                known.insert(key)
+            }
+            for output in outputs {
+                try requireKeys(output,["id","label","sourceNodeId"])
+                guard let key=output["id"] as? String,
+                      let name=output["label"] as? String,
+                      let source=output["sourceNodeId"] as? String else {
+                    throw NativeWorldLabError.invalid("Invalid digital output")
+                }
+                try validateId(key);try validateId(source);try validateName(name)
+                guard name.count<=80,allIds.insert(key).inserted,
+                      known.contains(source) else {
+                    throw NativeWorldLabError.invalid("Missing digital output source")
                 }
             }
         }

@@ -47,6 +47,7 @@ enum NativeWorldLabEditor {
                      "origin":[0,0,0],"terrainSource":NSNull()],
             "camera":["positionMeters":[0,1.65,-8],"lookingAtMeters":[0,1.2,0]],
             "entities":[],"materials":[],"networks":[],"assemblies":[],
+            "digitalNetworks":[],
         ])
     }
     static func starterCircuit(_ data:Data,id:String=UUID().uuidString) throws -> Data {

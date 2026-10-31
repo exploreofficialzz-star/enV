@@ -45,6 +45,7 @@ object NativeWorldLabEditor {
             .put("materials",JSONArray())
             .put("networks",JSONArray())
             .put("assemblies",JSONArray())
+            .put("digitalNetworks",JSONArray())
         val json=project.toString()
         NativeWorldLabProjectCodec.decode(json)
         return json

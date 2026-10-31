@@ -41,6 +41,26 @@ data class NativeLabCircuitNetwork(
 data class NativeLabAssembly(
     val id:String,val name:String,val entityIds:List<String>
 )
+data class NativeLabDigitalInput(val id:String,val label:String,val value:Boolean)
+data class NativeLabDigitalGate(val id:String,val name:String,val assumption:String,
+    val inputNodeIds:List<String>,val truthTable:List<Int>,val evidence:String)
+data class NativeLabDigitalOutput(val id:String,val label:String,val sourceNodeId:String)
+data class NativeLabDigitalNetwork(val id:String,val name:String,
+    val inputs:List<NativeLabDigitalInput>,val gates:List<NativeLabDigitalGate>,
+    val outputs:List<NativeLabDigitalOutput>)
+/** Deterministic Boolean truth-table evaluation; no real chip physics. */
+object NativeWorldLabDigitalLogic {
+    fun evaluate(n:NativeLabDigitalNetwork):Map<String,Int> {
+        val state=n.inputs.associate{it.id to if(it.value)1 else 0}.toMutableMap()
+        for(g in n.gates){
+            var row=0
+            for(id in g.inputNodeIds)row=row*2+requireNotNull(state[id])
+            state[g.id]=g.truthTable[row]
+        }
+        return n.outputs.associate{it.id to requireNotNull(state[it.sourceNodeId])}
+    }
+}
+
 data class NativeWorldLabProject(
     val id: String, val title: String, val revision: Int, val createdAt: String,
     val updatedAt: String, val cameraPositionMeters: NativeLabVector,
@@ -48,6 +68,7 @@ data class NativeWorldLabProject(
     val materials: List<NativeLabMaterial>,
     val networks: List<NativeLabCircuitNetwork> = emptyList(),
     val assemblies:List<NativeLabAssembly> = emptyList(),
+    val digitalNetworks:List<NativeLabDigitalNetwork> = emptyList(),
 )
 object NativeWorldLabProjectCodec {
     const val MAX_BYTES=1024*1024
@@ -88,8 +109,8 @@ object NativeWorldLabProjectCodec {
         val essential=setOf("format","schemaVersion","id","title","revision","createdAt","updatedAt",
             "world","camera","entities","materials")
         val supplied=p.keys().asSequence().toSet()
-        require(supplied.subtract(setOf("networks","assemblies"))==essential &&
-            supplied.size<=essential.size+2) {
+        require(supplied.subtract(setOf("networks","assemblies","digitalNetworks"))==essential &&
+            supplied.size<=essential.size+3) {
             "Unexpected World Lab project keys"
         }
         require(p.getString("format")=="env-world-lab" && p.getInt("schemaVersion")==1)
@@ -213,9 +234,69 @@ object NativeWorldLabProjectCodec {
             }
             NativeLabAssembly(groupId,title,ids)
         }
+        val digitalArray=if(p.has("digitalNetworks"))p.getJSONArray("digitalNetworks") else JSONArray()
+        require(digitalArray.length()<=8){"Too many digital networks"}
+        val digitalNetworkIds=mutableSetOf<String>()
+        val digital=(0 until digitalArray.length()).map{i->
+            val n=digitalArray.getJSONObject(i)
+            keys(n,setOf("id","name","inputs","gates","outputs"))
+            val digitalId=id(n,"id")
+            require(digitalNetworkIds.add(digitalId)){"Duplicate digital network"}
+            val ins=n.getJSONArray("inputs");val gates=n.getJSONArray("gates")
+            val outs=n.getJSONArray("outputs")
+            require(ins.length() in 1..12 && gates.length() in 1..32 &&
+                outs.length() in 1..16){"Invalid digital network capacity"}
+            val used=mutableSetOf<String>();val known=mutableSetOf<String>()
+            val inputs=(0 until ins.length()).map{j->
+                val x=ins.getJSONObject(j)
+                keys(x,setOf("id","label","value"))
+                val key=id(x,"id")
+                require(used.add(key)){"Duplicate digital input"}
+                require(x.get("value") is Boolean){"Digital switch must be Boolean"}
+                known.add(key)
+                NativeLabDigitalInput(key,name(x,"label",80),x.getBoolean("value"))
+            }
+            val parts=(0 until gates.length()).map{j->
+                val g=gates.getJSONObject(j)
+                keys(g,setOf("id","name","assumption","inputNodeIds","truthTable","evidence"))
+                val key=id(g,"id")
+                require(used.add(key)){"Duplicate digital gate"}
+                val origin=g.getJSONArray("inputNodeIds")
+                require(origin.length() in 1..4){"Digital gate requires 1–4 inputs"}
+                val wires=(0 until origin.length()).map{k->
+                    val port=origin.getString(k)
+                    require(port in known){"Missing or cyclic digital port"}
+                    port
+                }
+                require(wires.toSet().size==wires.size){"Repeated digital gate port"}
+                val truth=g.getJSONArray("truthTable")
+                require(truth.length()==(1 shl wires.size)){"Incomplete digital truth table"}
+                val table=(0 until truth.length()).map{k->
+                    val b=truth.get(k)
+                    require(b is Number && b.toDouble() in listOf(0.0,1.0)){
+                        "Digital truth table permits only 0 and 1"
+                    }
+                    b.toInt()
+                }
+                require(g.getString("evidence")=="hypothetical-user-assumed")
+                known.add(key)
+                NativeLabDigitalGate(key,name(g,"name"),name(g,"assumption",500),
+                    wires,table,"hypothetical-user-assumed")
+            }
+            val outputs=(0 until outs.length()).map{j->
+                val o=outs.getJSONObject(j)
+                keys(o,setOf("id","label","sourceNodeId"))
+                val key=id(o,"id")
+                require(used.add(key)){"Duplicate digital output"}
+                val upstream=id(o,"sourceNodeId")
+                require(upstream in known){"Digital output source is missing"}
+                NativeLabDigitalOutput(key,name(o,"label",80),upstream)
+            }
+            NativeLabDigitalNetwork(digitalId,name(n,"name"),inputs,parts,outputs)
+        }
         return NativeWorldLabProject(projectId,title,revision.toInt(),created,updated,
             vector(camera.getJSONArray("positionMeters")),
-            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks,assemblies)
+            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks,assemblies,digital)
     }
 }
 
