@@ -599,3 +599,10 @@ release-candidate evidence bundle are unfinished.
   before moving any scene object; cross-revision results remain export-only.
 - Changing a refractive material, incident angle or optical target clears
   stale illustrative 3D ray overlays rather than leaving outdated rays.
+
+- iOS native optical records now encode the same full Fresnel schema as Web
+  (s/p/unpolarized reflection, refraction, critical angle, energy balance,
+  project ownership, inventor assumptions) and can be saved in the private
+  native scientific evidence store. Saved records are eligible for the
+  existing native complete-archive interchange. The private store rejects
+  malformed optical record bounds rather than trusting imported payloads.

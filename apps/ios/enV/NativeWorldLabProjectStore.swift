@@ -242,6 +242,26 @@ struct NativeWorldLabScientificEvidenceStore {
                   samples.count==121 else {
                 throw NativeWorldLabError.invalid("Unsupported material heat record")
             }
+        }else if kind=="interface-optics" {
+            guard result["format"] as? String=="env-world-lab-interface-optics",
+                  result["modelVersion"] as? String=="1.0.0",
+                  let firstId=result["firstMaterialId"] as? String,
+                  let secondId=result["secondMaterialId"] as? String,
+                  firstId != secondId,
+                  let first=result["firstIndex"] as? Double,
+                  let second=result["secondIndex"] as? Double,
+                  first.isFinite,second.isFinite,
+                  (1...5).contains(first),(1...5).contains(second),
+                  let angle=result["incidentAngleDegrees"] as? Double,
+                  angle.isFinite,(0...89.9).contains(angle),
+                  result["reflectedAngleDegrees"] as? Double==angle,
+                  let reflected=result["unpolarizedReflectance"] as? Double,
+                  let transmitted=result["unpolarizedTransmittance"] as? Double,
+                  reflected.isFinite,transmitted.isFinite,
+                  (0...1).contains(reflected),(0...1).contains(transmitted),
+                  abs(1-reflected-transmitted)<=1e-10 else {
+                throw NativeWorldLabError.invalid("Unsupported invented optical evidence")
+            }
         }else{
             throw NativeWorldLabError.invalid("Unknown scientific evidence kind")
         }
@@ -320,6 +340,10 @@ struct NativeWorldLabScientificEvidenceStore {
     @discardableResult func saveHeat(_ run:NativeMaterialHeatRun,
         project:NativeWorldLabProject)throws->String {
         try store(run,kind:"material-heat",project:project)
+    }
+    @discardableResult func saveOptics(_ run:NativeOpticalInterfaceRun,
+        project:NativeWorldLabProject)throws->String {
+        try store(run,kind:"interface-optics",project:project)
     }
     func read(_ projectId:String,_ recordId:String)throws->Data {
         let url=try file(projectId,recordId)

@@ -1458,6 +1458,13 @@ Text("Invent chemical heat").font(.headline)
                 if run.totalInternalReflection {
                     Text("Total internal reflection (no transmitted ray).")
                 }else{value("Transmitted angle",run.transmittedDegrees,"degrees")}
+                Button("Keep optical evidence with invention"){
+                    do{
+                        _ = try savedScience.saveOptics(run,project:project)
+                        refreshScientificEvidence()
+                        problem="Saved portable optical evidence with this device's invention."
+                    }catch{problem=error.localizedDescription}
+                }.buttonStyle(.bordered)
                 Text(run.validity).font(.caption).foregroundStyle(.secondary)
             }
         }else{
