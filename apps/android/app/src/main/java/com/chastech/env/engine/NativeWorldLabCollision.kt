@@ -1,5 +1,6 @@
 package com.chastech.env.engine
 
+import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -28,6 +29,29 @@ data class NativeLabCollisionResult(
         "acceleration, secondary contacts, deformation or failure. Assumed densities "+
         "give inertial masses; restitution is a user assumption, not measured."
 ) {
+    /** Portable numeric evidence, with no executable content or invented measurements. */
+    fun toEvidenceJson():String=JSONObject()
+        .put("format","env-world-lab-object-collision")
+        .put("modelVersion","1.0.0")
+        .put("evidence",evidence).put("inputEvidence",inputEvidence)
+        .put("projectId",projectId).put("projectRevision",projectRevision)
+        .put("leftEntityId",leftEntityId).put("rightEntityId",rightEntityId)
+        .put("leftMaterialId",leftMaterialId).put("rightMaterialId",rightMaterialId)
+        .put("leftMassKg",leftMassKg).put("rightMassKg",rightMassKg)
+        .put("leftStartXM",leftStartXM).put("rightStartXM",rightStartXM)
+        .put("leftHalfWidthM",leftHalfWidthM).put("rightHalfWidthM",rightHalfWidthM)
+        .put("leftInitialVelocityMps",leftInitialVelocityMps)
+        .put("rightInitialVelocityMps",rightInitialVelocityMps)
+        .put("restitution",restitution).put("durationSeconds",durationSeconds)
+        .put("impactTimeSeconds",impactTimeSeconds).put("contactXM",contactXM)
+        .put("leftFinalVelocityMps",leftFinalVelocityMps)
+        .put("rightFinalVelocityMps",rightFinalVelocityMps)
+        .put("impulseNs",impulseNs).put("momentumBeforeKgMps",momentumBeforeKgMps)
+        .put("momentumAfterKgMps",momentumAfterKgMps)
+        .put("energyBeforeJ",energyBeforeJ).put("energyAfterJ",energyAfterJ)
+        .put("dissipatedEnergyJ",dissipatedEnergyJ)
+        .put("validity",validity).toString(2)
+
     fun sample(timeSeconds:Double):NativeLabCollisionSample{
         require(timeSeconds.isFinite()&&timeSeconds>=0&&timeSeconds<=durationSeconds){
             "Impact playback time is outside the simulated interval"
