@@ -166,4 +166,34 @@ class NativeWorldLabScienceTest {
         assertEquals(reference,atOne.currentA,1e-7)
         assertEquals(0.0,atOne.heightM,0.0)
     }
+    @Test fun inventedMaterialModulusProducesAnalyticalBeamDeflectionWithoutInventingStrength() {
+        var json=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),
+            "box",id="beam")
+        json=NativeWorldLabEditor.resizeSolid(json,"beam",listOf(2.0,0.1,0.05))
+        json=NativeWorldLabEditor.addHypotheticalMaterial(
+            json,"Invented elastic material",null,2e11,id="invented-matter")
+        json=NativeWorldLabEditor.assignMaterial(json,"beam","invented-matter")
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val r=NativeWorldLabStructural.bending(project,"beam",1000.0)
+        assertEquals(0.0032,r.tipDeflectionM,1e-12)
+        assertEquals(24e6,r.maximumStressPa,1e-4)
+        assertEquals(0.00012,r.surfaceStrain,1e-12)
+        assertEquals("hypothetical-user-assumed",r.materialEvidence)
+        assertEquals(project.revision,r.projectRevision)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabStructural.bending(project,"beam",1e8)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabStructural.bending(project,"beam",Double.NaN)
+        }
+        val unknown=NativeWorldLabEditor.addHypotheticalMaterial(json,
+            "Unproven matter",null,null,id="unknown-matter")
+        val changed=NativeWorldLabEditor.assignMaterial(
+            unknown,"beam","unknown-matter")
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabStructural.bending(
+                NativeWorldLabProjectCodec.decode(changed),"beam",1000.0)
+        }
+    }
+
 }
