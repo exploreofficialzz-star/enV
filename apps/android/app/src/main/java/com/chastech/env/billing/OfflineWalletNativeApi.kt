@@ -1,5 +1,7 @@
 package com.chastech.env.billing
 
+import com.chastech.env.NativeAnalytics
+
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -335,6 +337,7 @@ object OfflineWalletNativeApi {
                 "Finalization is available only in the isolated local-test environment. Server-signed attestation is required before production can release unused reservations."
             }
         }
+        val syncStartedAt = System.currentTimeMillis()
         val bearer = sessionToken(context) ?: throw IllegalStateException("This device is not paired. Local records have not been removed.")
         val (_, unresolved) = journal.repairFinishingOperations(context, allowanceId)
         require(unresolved == 0) { "An offline calculator operation has an unfinished journal record. Finish or recover it before synchronizing." }
@@ -345,6 +348,7 @@ object OfflineWalletNativeApi {
         if (response.status in 200..299 && response.body.optBoolean("ok", false) && data != null) {
             val status = data.optString("status")
             journal.acknowledgeSyncBatch(allowanceId, batch.batchId, status)
+            NativeAnalytics.record(context, "offline_sync_succeeded", outcome = "success", durationMs = (System.currentTimeMillis() - syncStartedAt).coerceIn(0, 3_600_000))
             if (status == "reconciled") Result(true, "Local-test allowance finalized. Accepted usage: ${data.optLong("acceptedSubunits") / 1000.0} tokens; unused test reservation returned: ${data.optLong("releasedSubunits") / 1000.0} tokens.")
             else if (finalize) Result(true, "The next bounded sync batch was accepted. Review the remaining records and finalize again to close this local-test allowance.")
             else Result(true, "Offline records synchronized. Reserved funds remain protected until verified finalization.")
@@ -352,6 +356,7 @@ object OfflineWalletNativeApi {
             val code = response.body.optString("error")
             if (response.status == 409 && code in setOf("SEQUENCE_GAP", "CHECKPOINT_SEQUENCE_MISMATCH")) {
                 journal.prepareRetryAfterRecoverableRejection(allowanceId, batch.batchId, code)
+                NativeAnalytics.record(context, "offline_sync_failed", outcome = "failure", durationMs = (System.currentTimeMillis() - syncStartedAt).coerceIn(0, 3_600_000), errorCode = "OFFLINE_RETRY_REQUIRED")
                 Result(false, "The server requested a safe batch retry. Local transaction rows and spending counters were preserved.", code)
             } else {
                 if (response.status == 409 && data?.optString("status") == "needs_recovery" || code in setOf("INVALID_DEVICE_SIGNATURE", "DEVICE_BINDING_MISMATCH", "INVALID_ALLOWANCE_TOKEN", "IDEMPOTENCY_CONFLICT", "OFFLINE_NEEDS_RECOVERY")) {
@@ -359,6 +364,7 @@ object OfflineWalletNativeApi {
                 }
                 val message = response.body.optString("message").takeIf { it.isNotBlank() }
                     ?: "Synchronization failed (${response.status}). The journal has been kept for safe retry or recovery."
+                NativeAnalytics.record(context, "offline_sync_failed", outcome = "failure", durationMs = (System.currentTimeMillis() - syncStartedAt).coerceIn(0, 3_600_000), errorCode = code.takeIf { it.matches(Regex("[A-Z0-9_]{1,64}")) } ?: "OFFLINE_SYNC_FAILED")
                 Result(false, message, code.takeIf { it.isNotBlank() })
             }
         }
