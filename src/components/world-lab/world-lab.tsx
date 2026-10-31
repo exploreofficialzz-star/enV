@@ -1980,8 +1980,8 @@ export default function WorldLab() {
                     Give every sphere an X/Y/Z starting velocity. A bounded event-driven
                     3D solver checks each future impact, transfers the calculated impulse,
                     and continues to the next contact. For 2–12 non-overlapping spheres
-                    with invented density; simultaneous or crowded contacts are rejected,
-                    not approximated as established physics.
+                    with invented density. Independent simultaneous pairs are calculated;
+                    contacts sharing a sphere are rejected, not guessed.
                   </p>
                   {groupSpheres.length<2||groupSpheres.length>12
                     ?<p className="mt-2 text-xs">Add 2–12 spheres and assign an invented material density to each.</p>
