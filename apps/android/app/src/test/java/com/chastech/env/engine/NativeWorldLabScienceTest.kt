@@ -280,4 +280,41 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun multiSphereCradleTransfersMomentumAcrossConsecutiveThreeDimensionalContacts(){
+        var json=NativeWorldLabEditor.blank()
+        for(i in 0..2)json=NativeWorldLabEditor.addSolid(json,"sphere",id="s-$i")
+        json=NativeWorldLabEditor.addHypotheticalMaterial(json,"Invented gel",12/Math.PI,id="gel")
+        for(i in 0..2){
+            json=NativeWorldLabEditor.positionSolid(json,"s-$i",
+                listOf(-4.0+3*i,0.5,0.0))
+            json=NativeWorldLabEditor.assignMaterial(json,"s-$i","gel")
+        }
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val initial=mapOf("s-0" to NativeLabVector(2.0,0.0,0.0))
+        val run=NativeWorldLabMultiSphere.evaluate(project,initial,1.0,4.0)
+        assertEquals(2,run.events.size)
+        assertEquals(1.0,run.events[0].atSeconds,1e-10)
+        assertEquals(2.0,run.events[1].atSeconds,1e-10)
+        assertEquals(run.initialEnergyJ,run.finalEnergyJ,1e-9)
+        assertEquals(0.0,run.dissipationJ,1e-9)
+        assertEquals(run.initialMomentum.x,run.finalMomentum.x,1e-9)
+        assertEquals(run.initialAngular.z,run.finalAngular.z,1e-9)
+        val final=run.sample(3.0)
+        assertEquals(2,final.completedEvents)
+        assertEquals(2.0,final.objects[2].velocityMps.x,1e-9)
+        assertEquals(0.0,final.objects[0].velocityMps.x,1e-9)
+        val evidence=org.json.JSONObject(run.toEvidenceJson())
+        assertEquals("env-world-lab-multi-sphere-impact",evidence.getString("format"))
+        assertEquals("hypothetical-user-assumed",evidence.getString("materialEvidence"))
+        assertEquals(2,evidence.getJSONArray("events").length())
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabMultiSphere.evaluate(project,initial,-1.0)
+        }
+        val unknown=NativeWorldLabProjectCodec.decode(
+            NativeWorldLabEditor.assignMaterial(json,"s-1",null))
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabMultiSphere.evaluate(unknown,initial,1.0)
+        }
+    }
+
 }
