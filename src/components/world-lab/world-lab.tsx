@@ -16,6 +16,7 @@ import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitN
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
+import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
 import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
   summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
@@ -202,6 +203,8 @@ export default function WorldLab() {
   const [materialName, setMaterialName] = useState("");
   const [density, setDensity] = useState("");
   const [youngModulus, setYoungModulus] = useState("");
+  const [beamLoadN,setBeamLoadN]=useState(1000);
+  const [beamRun,setBeamRun]=useState<StructuralBendingEvidence|null>(null);
   const materials = project?.materials ?? [];
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
@@ -853,7 +856,7 @@ export default function WorldLab() {
     setDropPlaying(false);setDropRun(null);setFluidRun(null);
     setFluidMotionPlaying(false);setFluidMotionRun(null);
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
-    setWiredMotorRun(null);setDigitalMotorRun(null);setDcRun(null);setRemoteJob(null);
+    setWiredMotorRun(null);setDigitalMotorRun(null);setBeamRun(null);setDcRun(null);setRemoteJob(null);
   }
   function mutateProject(transform:(current:WorldLabProject)=>WorldLabProject){
     const current=projectForEdits.current;
@@ -1214,7 +1217,7 @@ export default function WorldLab() {
         evidence:proposed.provenance,
       }]}));
       setMaterialName(""); setDensity(""); setYoungModulus("");
-      setMessage("Hypothetical material saved in the project. Its density can supply an assumed mass to the spring model; other physical behavior is not simulated.");
+      setMessage("Hypothetical material saved. Density can supply mass and Young\'s modulus can drive a bounded ideal cantilever experiment; unknown properties remain unknown.");
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Invalid material proposal.");
@@ -1835,6 +1838,60 @@ export default function WorldLab() {
                   {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
                     "Computed from geometry × user-assumed density. Not measured or structurally validated."}
                 </p>
+                <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                  aria-label="Invented material bending experiment">
+                  <h3 className="text-sm font-semibold">Test invented material stiffness</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Treat a rectangular box as a cantilever: length along X, vertical depth along Y,
+                    width along Z, clamped at its left end and loaded at its free end.
+                    This uses your assumed Young's modulus, not a known strength or failure limit.
+                  </p>
+                  <label className="mt-2 block text-xs">
+                    Downward end load (newtons)
+                    <input type="number" className={inputLabel}
+                      aria-label="Cantilever end load" min={0} max={100000000} step="any"
+                      value={beamLoadN} onChange={event=>{
+                        setBeamLoadN(Number(event.target.value));setBeamRun(null);
+                      }}/>
+                  </label>
+                  <button className={buttonClass+" mt-2"} type="button"
+                    disabled={selectedEntity.shape!=="box"||
+                      selectedMaterial?.youngModulusPa==null||
+                      selectedMaterial.youngModulusPa<=0}
+                    onClick={()=>{
+                      if(!project||!selectedEntity)return;
+                      try{
+                        const computed=calculateStructuralBending(project,selectedEntity.id,beamLoadN);
+                        setBeamRun(computed);setError("");
+                        setMessage("Calculated an ideal small-deflection beam from explicitly assumed material stiffness.");
+                      }catch(cause){
+                        setBeamRun(null);
+                        setError(cause instanceof Error?cause.message:"Unsupported structural assumptions.");
+                      }
+                    }}>Calculate elastic bending</button>
+                  {selectedEntity.shape!=="box"&&<p className="text-xs text-muted-foreground">
+                    Only rectangular box beams are supported by this equation.
+                  </p>}
+                  {selectedMaterial?.youngModulusPa==null&&<p className="text-xs text-muted-foreground">
+                    Assign invented matter with a positive Young's modulus before testing stiffness.
+                  </p>}
+                  {beamRun&&beamRun.entityId===selectedEntity.id&&
+                    beamRun.projectId===project?.id&&beamRun.projectRevision===project.revision&&
+                    beamRun.appliedForceN===beamLoadN&&(
+                    <div className="mt-2 space-y-1 text-xs"
+                      aria-label="Calculated hypothetical bending results">
+                      <p>Free-end deflection: {metric(beamRun.maximumTipDeflectionM,"m")}</p>
+                      <p>Maximum bending stress: {metric(beamRun.maximumBendingStressPa,"Pa")}</p>
+                      <p>Maximum surface strain: {beamRun.maximumSurfaceStrain.toExponential(4)} (dimensionless)</p>
+                      <p>Geometric bending stiffness EI: {metric(beamRun.bendingStiffnessNm2,"N·m²")}</p>
+                      <p className="text-muted-foreground">{beamRun.validity}</p>
+                      <button type="button" className={buttonClass} onClick={()=>
+                        downloadJson("world-lab-structural-bending-evidence.json",beamRun)}>
+                        Export assumed bending evidence
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Fluid displacement and buoyancy experiment">
                   <h3 className="text-sm font-semibold">Try floating an invention</h3>
                   <p className="text-xs text-muted-foreground">
