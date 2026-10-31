@@ -9,7 +9,7 @@ export const Route = createFileRoute("/developer")({ component: DeveloperWorkspa
 type Ticket = {
   id: string; platform: string; category: string; title: string; description: string;
   toolId: string | null; appVersion: string | null; status: string; priority: string;
-  developerNote: string | null; createdAt: string; fromSignedInUser: boolean;
+  developerNote: string | null; createdAt: string; updatedAt: string; fromSignedInUser: boolean;
 };
 type CommunityReport = {
   reportId: string; reason: string; details: string | null; status: string; createdAt: string;
