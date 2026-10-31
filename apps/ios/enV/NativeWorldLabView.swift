@@ -356,7 +356,8 @@ struct NativeWorldLabView:View {
             }
             ForEach(network.gates,id:\.id){gate in
                 Text(gate.name+" · "+gate.assumption).font(.caption)
-                ForEach(Array(gate.truthTable.enumerated()),id:\.offset){index,bit in
+                ForEach(gate.truthTable.indices,id:\.self){index in
+                    let bit=gate.truthTable[index]
                     HStack{
                         Text(String(repeating:"0",count:max(0,gate.inputNodeIds.count - String(index,radix:2).count)) + String(index,radix:2))
                         Spacer()
