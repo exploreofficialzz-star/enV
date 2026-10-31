@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, AlertTriangle, BarChart3, Monitor, LogOut, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Download, Monitor, LogOut, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/userbehavior")({ component: UserBehaviorDashboard });
@@ -70,6 +70,59 @@ function BreakdownList({ title, rows }: { title: string; rows: Breakdown[] }) {
       ) : <p className="mt-4 text-xs text-muted">No consented records yet.</p>}
     </section>
   );
+}
+
+function csvCell(value: string | number) {
+  const text = String(value);
+  return /[",\\r\\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadAnalyticsReport(summary: Summary) {
+  const rows: Array<Array<string | number>> = [
+    ["enV product analytics report"],
+    ["Generated at", summary.generatedAt],
+    ["Overview window (days)", summary.windowDays],
+    ["Aggregate history (days)", summary.historyDays],
+    [],
+    ["Overview metric", "Value"],
+    ["Events received", summary.overview.totalEvents],
+    ["Opted-in installations", summary.overview.optedInInstallations],
+    ["Verified signed-in users", summary.overview.signedInUsers],
+    ["Sessions", summary.overview.sessions],
+    ["Tools used", summary.overview.toolsUsed],
+    ["Failures", summary.overview.failures],
+    [],
+    ["Daily activity", "Events", "Failures"],
+    ...summary.daily.map(row => [row.day, row.events, row.failures]),
+    [],
+    ["Tool activity", "Views", "Completed", "Failures"],
+    ...summary.tools.map(row => [row.toolId, row.views, row.completed, row.failures]),
+    [],
+    ["Platform breakdown", "Events"],
+    ...summary.platforms.map(row => [row.name, row.events]),
+    [],
+    ["Device breakdown", "Events"],
+    ...summary.devices.map(row => [row.name, row.events]),
+    [],
+    ["Browser breakdown", "Events"],
+    ...summary.browsers.map(row => [row.name, row.events]),
+    [],
+    ["Network breakdown", "Events"],
+    ...summary.networks.map(row => [row.name, row.events]),
+    [],
+    ["Search/referrer sources", "Events"],
+    ...summary.searchSources.map(row => [row.name, row.events]),
+    [],
+    ["Failure codes", "Tool ID", "Count"],
+    ...summary.failureCodes.map(row => [row.code, row.toolId, row.count]),
+  ];
+  const csv = "\uFEFF" + rows.map(row => row.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `env-user-behavior-${new Date(summary.generatedAt).toISOString().slice(0, 10)}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function UserBehaviorDashboard() {
@@ -164,7 +217,8 @@ function UserBehaviorDashboard() {
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-fg">User behavior</h1>
           <p className="mt-2 text-sm text-muted">Consent-based product activity across Web, Android and iOS · Last {summary.windowDays} days for overview · {summary.historyDays}-day aggregate history</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => downloadAnalyticsReport(summary)}><Download className="mr-2 size-4" /> Download CSV</Button>
           <Button variant="outline" size="sm" onClick={() => void loadSummary()} disabled={loading}><RefreshCw className="mr-2 size-4" /> Refresh</Button>
           <Button variant="outline" size="sm" onClick={() => void signOut()}><LogOut className="mr-2 size-4" /> Sign out</Button>
         </div>
