@@ -393,7 +393,7 @@ public enum NativeDateTimeEngine {
         "berlin": "Europe/Berlin", "cairo": "Africa/Cairo", "chicago": "America/Chicago",
         "delhi": "Asia/Kolkata", "dubai": "Asia/Dubai", "dublin": "Europe/Dublin",
         "hong kong": "Asia/Hong_Kong", "istanbul": "Europe/Istanbul", "jakarta": "Asia/Jakarta",
-        "johannesburg": "Africa/Johannesburg", "lagos": "Africa/Lagos", "lisbon": "Europe/Lisbon",
+        "kathmandu": "Asia/Katmandu", "johannesburg": "Africa/Johannesburg", "lagos": "Africa/Lagos", "lisbon": "Europe/Lisbon",
         "london": "Europe/London", "los angeles": "America/Los_Angeles", "madrid": "Europe/Madrid",
         "manila": "Asia/Manila", "melbourne": "Australia/Melbourne", "mumbai": "Asia/Kolkata",
         "nairobi": "Africa/Nairobi", "new delhi": "Asia/Kolkata", "new york": "America/New_York",
