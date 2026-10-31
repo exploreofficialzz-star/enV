@@ -1102,8 +1102,6 @@ Text("Invent chemical heat").font(.headline)
                                 }.buttonStyle(.bordered)
                             }
 
-    }
-
                             if let logic=project.digitalNetworks?.first {
                                 ForEach(logic.outputs,id:\.id){output in
                                     Button("Drive with invented logic: "+output.label){
@@ -1123,6 +1121,9 @@ Text("Invent chemical heat").font(.headline)
                                     }.buttonStyle(.bordered)
                                 }
                             }
+
+
+    }
 
     @ViewBuilder private func solidMotorReadoutContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                             if let run=motorRun,motorEntityId==solid.id {
