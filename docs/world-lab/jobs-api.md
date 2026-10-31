@@ -47,3 +47,13 @@ This is a real exhaustive mathematical computation, NOT real electronics or an
 unbounded binary processor emulator. It has no external calls or user code.
 Accounts, job limits, cloud workers and migration 0013 must be deployed before
 it is available to end users.
+
+## Reopening cloud calculations after refresh
+
+GET /api/world-lab/jobs returns at most the last 30 owner-scoped job summaries
+(newest first). It never exposes stored project input_json and never transmits
+large result_json in the list. The Web studio can inspect the list and explicitly
+fetch one prior job's full evidence with the existing owner-gated GET /jobs/:id.
+This is durable account-job retrieval, not implicit project synchronization;
+inventions never silently replace local documents. A previous calculation
+remains only as long as the backing database retains it.

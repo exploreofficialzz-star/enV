@@ -83,6 +83,19 @@ export async function enqueueWorldLabJob(userId:string,
     return inserted[0];
   });
 }
+/** Small owner-scoped job index. Never return stored project inputs or large
+ * result documents in a list request; retrieve a single job explicitly.
+ */
+export async function listOwnedWorldLabJobs(userId:string):Promise<WorldLabJobRow[]>{
+  requireEnabled();
+  if(!safeId(userId))throw new WorldLabJobError("AUTH_REQUIRED","Account not available.");
+  const sql=await getSql();
+  return sql.query<WorldLabJobRow>(
+    "SELECT id,user_id,kind,project_id,project_revision,status,attempts,"+
+    "NULL::jsonb AS result_json,error_code,created_at,started_at,completed_at "+
+    "FROM public.world_lab_jobs WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30",
+    [userId]);
+}
 export async function getOwnedWorldLabJob(userId:string,id:string):Promise<WorldLabJobRow|null>{
   requireEnabled();
   if(!safeId(userId)||!safeId(id))return null;

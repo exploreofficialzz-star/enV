@@ -51,6 +51,7 @@ type RemoteWorldLabJob=Readonly<{
 }>;
 type RemoteJobReply=Readonly<{
   ok?:boolean;code?:string;error?:string;job?:RemoteWorldLabJob;
+  jobs?:RemoteWorldLabJob[];
 }>;
 const remoteJobsEnabled=import.meta.env.VITE_WORLD_LAB_JOBS_ENABLED==="true";
 const cloudBackupsEnabled=import.meta.env.VITE_WORLD_LAB_PROJECT_SYNC_ENABLED==="true";
@@ -162,6 +163,8 @@ export default function WorldLab() {
   const [cloudError,setCloudError]=useState("");
   const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
+  const [remoteHistory,setRemoteHistory]=useState<RemoteWorldLabJob[]>([]);
+  const [remoteHistoryBusy,setRemoteHistoryBusy]=useState(false);
   const [remoteError,setRemoteError]=useState("");
   const [remoteBusy,setRemoteBusy]=useState(false);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
@@ -1199,10 +1202,39 @@ export default function WorldLab() {
       if(!response.ok||!data.job)
         throw new Error(data.error||data.code||"Server calculation is unavailable.");
       setRemoteJob(data.job);
+      setRemoteHistory(previous=>[{
+        ...data.job!,result:null,
+      },...previous.filter(job=>job.id!==data.job!.id)].slice(0,30));
     }catch(cause){
       setRemoteJob(null);
       setRemoteError(cause instanceof Error?cause.message:"Could not submit server calculation.");
     }finally{setRemoteBusy(false);}
+  }
+  async function loadRemoteHistory(){
+    if(!remoteJobsEnabled||remoteHistoryBusy)return;
+    setRemoteHistoryBusy(true);setRemoteError("");
+    try{
+      const response=await fetch("/api/world-lab/jobs",{
+        credentials:"same-origin",cache:"no-store"});
+      const data=await response.json() as RemoteJobReply;
+      if(!response.ok||!Array.isArray(data.jobs))
+        throw new Error(data.error||data.code||"Cannot access your cloud calculations.");
+      setRemoteHistory(data.jobs);
+    }catch(error){setRemoteError(error instanceof Error?error.message:
+      "Cloud job history is not available.");}
+    finally{setRemoteHistoryBusy(false);}
+  }
+  async function openRemoteHistoryJob(job:RemoteWorldLabJob){
+    setRemoteError("");
+    try{
+      const response=await fetch("/api/world-lab/jobs/"+encodeURIComponent(job.id),{
+        credentials:"same-origin",cache:"no-store"});
+      const data=await response.json() as RemoteJobReply;
+      if(!response.ok||!data.job)
+        throw new Error(data.error||data.code||"Cloud evidence is unavailable.");
+      setRemoteJob(data.job);
+    }catch(error){setRemoteError(error instanceof Error?error.message:
+      "Could not retrieve the selected calculation.");}
   }
   async function cancelRemoteJob(){
     if(!remoteJob||!remoteJobsEnabled)return;
@@ -1676,6 +1708,24 @@ export default function WorldLab() {
           {remoteJob&&(remoteJob.status==="queued"||remoteJob.status==="running")&&
             <button type="button" className={buttonClass}
               onClick={()=>{void cancelRemoteJob();}}>Cancel job</button>}
+        </div>
+        <div className="mt-2">
+          <button type="button" className={buttonClass} disabled={remoteHistoryBusy}
+            onClick={()=>{void loadRemoteHistory();}}>
+            {remoteHistoryBusy?"Loading jobs…":"My recent cloud calculations"}
+          </button>
+          {remoteHistory.length>0&&
+            <div className="mt-2 max-h-52 space-y-2 overflow-y-auto"
+              aria-label="Previous authenticated scientific calculations">
+              {remoteHistory.map(job=>
+                <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span>{job.kind} · {job.status} · project revision {job.projectRevision}</span>
+                  <button type="button" className={buttonClass}
+                    onClick={()=>{void openRemoteHistoryJob(job);}}>
+                    Open evidence
+                  </button>
+                </div>)}
+            </div>}
         </div>
         {remoteError&&<p role="alert" className="mt-2 text-xs">{remoteError}</p>}
         {remoteJob&&remoteJob.projectId===project?.id&&
