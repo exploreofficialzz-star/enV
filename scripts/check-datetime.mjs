@@ -30,6 +30,8 @@ for (const platform of ["android", "ios"]) {
 const fixedNow = new Date("2025-01-15T12:00:00Z");
 const age = runDateTime("age", { birth: "1990-02-01" }, fixedNow);
 assert.match(age.find((row) => row.label === "Age")?.value ?? "", /^\d+ years, \d+ months, \d+ days$/);
+const leapDayAge = runDateTime("age", { birth: "2000-02-29" }, new Date("2025-02-28T12:00:00Z"));
+assert.equal(leapDayAge.find((row) => row.label === "Age")?.value, "25 years, 0 months, 0 days");
 
 const birthdayDefault = runDateTime("birthday", { birth: "2000-02-29" }, fixedNow);
 assert.equal(birthdayDefault[0].value, "44");
@@ -42,6 +44,8 @@ assert.equal(countdown.find((row) => row.label === "Total seconds")?.value, "360
 const dateDifference = runDateTime("date-diff", { from: "2024-01-01", to: "2024-01-05" });
 assert.equal(dateDifference.find((row) => row.label === "Total days")?.value, "4");
 assert.match(dateDifference.find((row) => row.label === "Calendar span")?.value ?? "", /0 years, 0 months, 4 days/);
+assert.equal(runDateTime("date-diff", { from: "2024-01-31", to: "2024-02-29" })
+  .find((row) => row.label === "Calendar span")?.value, "0 years, 1 months, 0 days");
 
 const monthEnd = runDateTime("date-add", { start: "2024-01-31", months: "1" });
 assert.match(monthEnd[0].value, /2024-02-29/);

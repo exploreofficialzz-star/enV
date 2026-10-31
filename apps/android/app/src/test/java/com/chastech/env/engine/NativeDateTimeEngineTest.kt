@@ -29,6 +29,13 @@ class NativeDateTimeEngineTest {
 
     @Test fun businessDayDateDiffDurationAndBirthdayAreOffline() {
         assertEquals("Calendar span: 0 years, 0 months, 4 days\nTotal days: 4\nWeeks: 0.57\nCalendar hours (24-hour days): 96", NativeDateTimeEngine.run("date-difference", options = mapOf("from" to "2024-01-01", "to" to "2024-01-05"), now = fixedNow).output)
+        assertTrue(NativeDateTimeEngine.run("date-difference", options = mapOf(
+            "from" to "2024-01-31", "to" to "2024-02-29"
+        ), now = fixedNow).output.contains("Calendar span: 0 years, 1 months, 0 days"))
+        assertEquals("Age: 25 years, 0 months, 0 days", NativeDateTimeEngine.run(
+            "age-calculator", options = mapOf("birth" to "2000-02-29"),
+            now = Instant.parse("2025-02-28T12:00:00Z"), localTimeZone = java.time.ZoneId.of("UTC")
+        ).output.substringBefore("\n"))
         assertEquals("Working days: 1\nRange rule: Start date excluded; end date included.\nCustom excluded dates: None supplied", NativeDateTimeEngine.run("business-day-calculator", options = mapOf("from" to "2024-01-05", "to" to "2024-01-08"), now = fixedNow).output)
         assertEquals("Result: 2024-01-08 Monday", NativeDateTimeEngine.run("workday-calculator", options = mapOf("start" to "2024-01-05", "days" to "1"), now = fixedNow).output)
         assertEquals("Days until birthday: 17", NativeDateTimeEngine.run("birthday-countdown", input = "1990-02-01", now = fixedNow).output)

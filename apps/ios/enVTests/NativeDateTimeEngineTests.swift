@@ -24,6 +24,13 @@ final class NativeDateTimeEngineTests: XCTestCase {
 
     func testBusinessDateDiffDurationAndBirthdayAreOffline() throws {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "date-difference", options: ["from": "2024-01-01", "to": "2024-01-05"], now: fixedNow).output, "Calendar span: 0 years, 0 months, 4 days\nTotal days: 4\nWeeks: 0.57\nCalendar hours (24-hour days): 96")
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "date-difference", options: [
+            "from": "2024-01-31", "to": "2024-02-29"
+        ], now: fixedNow).output.contains("Calendar span: 0 years, 1 months, 0 days"))
+        let leapDayNow = ISO8601DateFormatter().date(from: "2025-02-28T12:00:00Z")!
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "age-calculator", options: [
+            "birth": "2000-02-29"
+        ], now: leapDayNow, localTimeZone: TimeZone(secondsFromGMT: 0)!).output.contains("Age: 25 years, 0 months, 0 days"))
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "business-day-calculator", options: ["from": "2024-01-05", "to": "2024-01-08"], now: fixedNow).output, "Working days: 1\nRange rule: Start date excluded; end date included.\nCustom excluded dates: None supplied")
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-05", "days": "1"], now: fixedNow).output, "Result: 2024-01-08 Monday")
         XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "date-difference", options: ["from": "2024-01-01", "to": "2024-01-02"], now: fixedNow).output.contains("Total days: 1"))

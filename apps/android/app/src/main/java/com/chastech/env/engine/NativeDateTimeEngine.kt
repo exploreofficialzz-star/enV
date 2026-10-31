@@ -228,23 +228,28 @@ object NativeDateTimeEngine {
     private fun calendarSpan(from: LocalDate, to: LocalDate): CalendarSpan {
         val start = if (from <= to) from else to
         val end = if (from <= to) to else from
-        val years = ChronoUnit.YEARS.between(start, end)
-        val afterYears = start.plusYears(years)
-        val months = ChronoUnit.MONTHS.between(afterYears, end)
-        val afterMonths = afterYears.plusMonths(months)
+        var years = end.year - start.year
+        var afterYears = start.plusYears(years.toLong())
+        if (afterYears > end) {
+            years -= 1
+            afterYears = start.plusYears(years.toLong())
+        }
+        var months = (end.year - afterYears.year) * 12 + end.monthValue - afterYears.monthValue
+        var afterMonths = afterYears.plusMonths(months.toLong())
+        if (afterMonths > end) {
+            months -= 1
+            afterMonths = afterYears.plusMonths(months.toLong())
+        }
         val days = ChronoUnit.DAYS.between(afterMonths, end)
-        return CalendarSpan(years, months, days, ChronoUnit.DAYS.between(from, to))
+        return CalendarSpan(years.toLong(), months.toLong(), days, ChronoUnit.DAYS.between(from, to))
     }
 
     private fun age(value: String, now: Instant, localTimeZone: ZoneId): Result {
         val birth = parseDate(value, "birth date")
         val today = now.atZone(localTimeZone).toLocalDate()
         if (birth > today) throw IllegalArgumentException("Birth date cannot be in the future.")
-        val years = ChronoUnit.YEARS.between(birth, today)
-        val afterYears = birth.plusYears(years)
-        val months = ChronoUnit.MONTHS.between(afterYears, today)
-        val days = ChronoUnit.DAYS.between(afterYears.plusMonths(months), today)
-        return rows("Age" to "$years years, $months months, $days days", "Days lived" to ChronoUnit.DAYS.between(birth, today).toString())
+        val span = calendarSpan(birth, today)
+        return rows("Age" to "${span.years} years, ${span.months} months, ${span.days} days", "Days lived" to span.totalDays.toString())
     }
 
     private fun birthday(value: String, now: Instant, options: Map<String, String>, localTimeZone: ZoneId): Result {

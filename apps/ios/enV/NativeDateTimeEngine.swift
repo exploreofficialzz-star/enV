@@ -49,13 +49,9 @@ public enum NativeDateTimeEngine {
             let cal = calendar(.gregorian)
             let today = deviceToday(now, in: localTimeZone)
             guard birth <= today else { throw NativeDateTimeError.invalidOperation("Birth date cannot be in the future.") }
-            let years = cal.dateComponents([.year], from: birth, to: today).year ?? 0
-            let afterYears = cal.date(byAdding: .year, value: years, to: birth)!
-            let months = cal.dateComponents([.month], from: afterYears, to: today).month ?? 0
-            let afterMonths = cal.date(byAdding: .month, value: months, to: afterYears)!
-            let days = cal.dateComponents([.day], from: afterMonths, to: today).day ?? 0
+            let span = calendarSpan(birth, today)
             let lived = cal.dateComponents([.day], from: birth, to: today).day ?? 0
-            return result(("Age", "\(years) years, \(months) months, \(days) days"), ("Days lived", String(lived)))
+            return result(("Age", "\(span.years) years, \(span.months) months, \(span.days) days"), ("Days lived", String(lived)))
         case "date-diff":
             let from = try dateOnly(options["from"] ?? "", label: "start date")
             let to = try dateOnly(options["to"] ?? "", label: "end date")
@@ -465,10 +461,21 @@ public enum NativeDateTimeEngine {
         let cal = calendar(.gregorian)
         let start = min(from, to)
         let end = max(from, to)
-        let years = cal.dateComponents([.year], from: start, to: end).year ?? 0
-        let afterYears = cal.date(byAdding: .year, value: years, to: start)!
-        let months = cal.dateComponents([.month], from: afterYears, to: end).month ?? 0
-        let afterMonths = cal.date(byAdding: .month, value: months, to: afterYears)!
+        var years = cal.component(.year, from: end) - cal.component(.year, from: start)
+        var afterYears = cal.date(byAdding: .year, value: years, to: start)!
+        if afterYears > end {
+            years -= 1
+            afterYears = cal.date(byAdding: .year, value: years, to: start)!
+        }
+        let afterYearComponents = cal.dateComponents([.year, .month], from: afterYears)
+        let endComponents = cal.dateComponents([.year, .month], from: end)
+        var months = ((endComponents.year ?? 0) - (afterYearComponents.year ?? 0)) * 12 +
+            (endComponents.month ?? 1) - (afterYearComponents.month ?? 1)
+        var afterMonths = cal.date(byAdding: .month, value: months, to: afterYears)!
+        if afterMonths > end {
+            months -= 1
+            afterMonths = cal.date(byAdding: .month, value: months, to: afterYears)!
+        }
         let days = cal.dateComponents([.day], from: afterMonths, to: end).day ?? 0
         let total = cal.dateComponents([.day], from: from, to: to).day ?? 0
         return (years, months, days, total)

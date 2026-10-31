@@ -4,8 +4,6 @@ import {
   addWeeks,
   addYears,
   differenceInCalendarDays,
-  differenceInMonths,
-  differenceInYears,
   format,
   getISOWeek,
   getISOWeekYear,
@@ -334,10 +332,19 @@ function calendarSpan(from: Date, to: Date) {
   const direction = from <= to ? 1 : -1;
   const start = direction > 0 ? from : to;
   const end = direction > 0 ? to : from;
-  const years = differenceInYears(end, start);
-  const afterYears = addYears(start, years);
-  const months = differenceInMonths(end, afterYears);
-  const afterMonths = addMonths(afterYears, months);
+  let years = end.getFullYear() - start.getFullYear();
+  let afterYears = addYears(start, years);
+  if (afterYears > end) {
+    years -= 1;
+    afterYears = addYears(start, years);
+  }
+  let months = (end.getFullYear() - afterYears.getFullYear()) * 12 +
+    end.getMonth() - afterYears.getMonth();
+  let afterMonths = addMonths(afterYears, months);
+  if (afterMonths > end) {
+    months -= 1;
+    afterMonths = addMonths(afterYears, months);
+  }
   const days = differenceInCalendarDays(end, afterMonths);
   return { direction, years, months, days, totalDays: differenceInCalendarDays(to, from) };
 }
@@ -479,9 +486,8 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
       const birth = parseDate(opts.birth || opts.value, "birth date");
       const today = now;
       if (birth > today) throw new Error("Birth date cannot be in the future.");
-      const years = differenceInYears(today, birth);
-      const months = differenceInMonths(today, addYears(birth, years));
-      const days = differenceInCalendarDays(today, addMonths(addYears(birth, years), months));
+      const span = calendarSpan(birth, today);
+      const { years, months, days } = span;
       return [
         { label: "Age", value: `${years} years, ${months} months, ${days} days` },
         { label: "Days lived", value: String(differenceInCalendarDays(today, birth)) },
