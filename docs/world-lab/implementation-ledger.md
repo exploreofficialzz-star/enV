@@ -349,3 +349,7 @@ release-candidate evidence bundle are unfinished.
 ## Owner-scoped chemical job integration (2026-10-31)
 
 - Extended the existing guarded server compute dispatcher, durable job kind constraint, owner-scoped submission input budget and disabled Web remote lifecycle to accept one explicitly bounded hypothetical chemical–thermal experiment. Unknown, missing, executable or cross-model inputs are rejected. Migration 0009 SQL has been updated **before its first deployment**; no live database operation has been performed. Tests written for permissible chemistry and invalid assumptions; feature flag remains off pending security/workers/production checks.
+
+## Web owner-scoped project backup controls (2026-10-31)
+
+- Added a separately gated account backup panel with authenticated owner list, conditional optimistic-revision save, and download-only recovery to JSON. Cloud `serverRevision` stays independent from local project revision, and a stale expected revision receives a conflict rather than losing remote changes. Existing local IndexedDB autosave/import/export is unchanged; no automatic remote restoration or local overwrite. Both build-time VITE_WORLD_LAB_PROJECT_SYNC_ENABLED and runtime WORLD_LAB_PROJECT_SYNC_ENABLED must be explicitly activated only after migration 0010/ownership/security/deployment acceptance.

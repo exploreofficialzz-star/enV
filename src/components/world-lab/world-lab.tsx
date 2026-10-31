@@ -42,6 +42,16 @@ type RemoteJobReply=Readonly<{
   ok?:boolean;code?:string;error?:string;job?:RemoteWorldLabJob;
 }>;
 const remoteJobsEnabled=import.meta.env.VITE_WORLD_LAB_JOBS_ENABLED==="true";
+const cloudBackupsEnabled=import.meta.env.VITE_WORLD_LAB_PROJECT_SYNC_ENABLED==="true";
+type WorldLabCloudSummary=Readonly<{
+  projectId:string;title:string;projectRevision:number;
+  serverRevision:number;updatedAt:string;
+}>;
+type WorldLabCloudReply=Readonly<{
+  ok?:boolean;code?:string;error?:string;
+  backup?:WorldLabCloudSummary;backups?:WorldLabCloudSummary[];
+  project?:unknown;
+}>;
 type SceneHandles = {
   engine: B.Engine;
   scene: B.Scene;
@@ -127,6 +137,11 @@ export default function WorldLab() {
     setEditEpoch(x=>x+1);
   }
   const [savedProjects, setSavedProjects] = useState<WorldLabProject[]>([]);
+  const [cloudBackups,setCloudBackups]=useState<WorldLabCloudSummary[]>([]);
+  const [cloudRevisionTokens,setCloudRevisionTokens]=useState<Record<string,number>>({});
+  const [cloudBusy,setCloudBusy]=useState(false);
+  const [cloudStatus,setCloudStatus]=useState("");
+  const [cloudError,setCloudError]=useState("");
   const [remoteKind,setRemoteKind]=useState<"hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal">("hydrostatics");
   const [remoteJob,setRemoteJob]=useState<RemoteWorldLabJob|null>(null);
   const [remoteError,setRemoteError]=useState("");
@@ -835,6 +850,62 @@ export default function WorldLab() {
       setError("");
     }catch(err){setError(err instanceof Error?err.message:"Cannot restore edit.");}
   }
+  async function loadAccountBackups(){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects",{
+        credentials:"same-origin",cache:"no-store",
+      });
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.backups)
+        throw new Error(body.error||body.code||"Account backups are unavailable.");
+      setCloudBackups(body.backups);
+      setCloudStatus("Account backup list refreshed without changing local files.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:"Unable to inspect account backups.");
+    }finally{setCloudBusy(false);}
+  }
+  async function saveAccountBackup(){
+    if(!cloudBackupsEnabled||cloudBusy||!project)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const token=cloudRevisionTokens[project.id]??null;
+      const response=await fetch("/api/world-lab/projects",{
+        method:"POST",credentials:"same-origin",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({project,expectedServerRevision:token}),
+      });
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.backup)
+        throw new Error(body.error||body.code||"Could not save project backup.");
+      const saved=body.backup;
+      setCloudRevisionTokens(previous=>({...previous,
+        [saved.projectId]:saved.serverRevision}));
+      setCloudBackups(previous=>[saved,...previous.filter(x=>x.projectId!==saved.projectId)]);
+      setCloudStatus("Cloud backup saved with an independent revision token. Your local project was not replaced.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:
+        "Cloud backup could not be saved. Local project is unchanged.");
+    }finally{setCloudBusy(false);}
+  }
+  async function downloadAccountBackup(id:string){
+    if(!cloudBackupsEnabled||cloudBusy)return;
+    setCloudBusy(true);setCloudError("");
+    try{
+      const response=await fetch("/api/world-lab/projects/"+encodeURIComponent(id),{
+        credentials:"same-origin",cache:"no-store",
+      });
+      const body=await response.json() as WorldLabCloudReply;
+      if(!response.ok||!body.project)
+        throw new Error(body.error||body.code||"This project backup cannot be opened.");
+      const archived=parseWorldLabProject(body.project);
+      downloadJson("world-lab-account-backup-"+archived.id+".json",archived);
+      setCloudStatus("Downloaded an account backup. The open local design was not modified.");
+    }catch(error){
+      setCloudError(error instanceof Error?error.message:"Backup download failed.");
+    }finally{setCloudBusy(false);}
+  }
   async function submitRemoteJob(){
     if(!remoteJobsEnabled||!project||remoteBusy)return;
     setRemoteBusy(true);setRemoteError("");
@@ -1163,6 +1234,45 @@ export default function WorldLab() {
           </details>}
         </div>
       )}
+      {cloudBackupsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
+        aria-label="Authenticated project backups">
+        <h3 className="text-sm font-semibold">Back up your inventions to your account</h3>
+        <p className="text-xs text-muted-foreground">
+          Cloud backup is separate from local saving. Updates require a matching
+          cloud revision; downloads never silently overwrite your workspace.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className={buttonClass} type="button" disabled={cloudBusy}
+            onClick={()=>{void loadAccountBackups();}}>Show my backups</button>
+          <button className={buttonClass} type="button" disabled={cloudBusy||!project}
+            onClick={()=>{void saveAccountBackup();}}>
+            {cloudBusy?"Working…":"Back up open project"}
+          </button>
+        </div>
+        {cloudError&&<p role="alert" className="mt-2 text-xs">{cloudError}</p>}
+        {cloudStatus&&<p role="status" className="mt-2 text-xs">{cloudStatus}</p>}
+        {cloudBackups.map(backup=><div key={backup.projectId}
+          className="mt-2 rounded-lg border border-border p-2 text-xs">
+          <p className="font-medium">{backup.title}</p>
+          <p>Project version {backup.projectRevision} · Backup version {backup.serverRevision}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className={buttonClass}
+              disabled={cloudBusy}
+              onClick={()=>{void downloadAccountBackup(backup.projectId);}}>
+              Download JSON safely
+            </button>
+            {project?.id===backup.projectId&&
+              <button type="button" className={buttonClass} disabled={cloudBusy}
+                onClick={()=>{
+                  setCloudRevisionTokens(x=>({...x,
+                    [backup.projectId]:backup.serverRevision}));
+                  setCloudStatus("Prepared a conditional update from this open local design. Saving will still reject changes made on another device.");
+                }}>
+                Prepare update to this version
+              </button>}
+          </div>
+        </div>)}
+      </section>}
       {remoteJobsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
         aria-label="Authenticated remote World Lab calculations">
         <h3 className="text-sm font-semibold">Run on your account's science worker</h3>
