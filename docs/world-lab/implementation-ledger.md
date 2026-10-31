@@ -460,3 +460,17 @@ release-candidate evidence bundle are unfinished.
   This is code committed only: no successful CI, real device acceptance,
   paid worker deployment, measured planetary inputs, or merged production
   release is claimed.
+
+
+- The material invention form and portable schema now retain explicitly
+  hypothetical density, Young's modulus, thermal conductivity and specific heat.
+  Old files without the latter properties remain accepted by native Android,
+  native iOS and Web decoders; unknown is never substituted with an invented
+  default. Editing a material preserves its identity and updated assumptions.
+- A real energy-conserving, two-node contact heat-transfer reference now connects
+  two face-touching invented box solids, with assumed conductivity controlling
+  interface resistance and density/specific heat controlling thermal capacity.
+  The Web editor provides editable starting Kelvin temperatures, local playback,
+  numeric heat flow, a colored 3D visualization and complete JSON evidence.
+  This is exact only for the stated insulated lumped interface; it is not a
+  spatial PDE solver, radiation, convection or thermal hazard certification.

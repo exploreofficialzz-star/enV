@@ -20,6 +20,8 @@ import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitN
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {WorldLabGravityPanel} from "./gravity-panel";
+import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
+import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
 import type {GravityConfig,GravityFrame,GravityBody} from "@/lib/world-lab/gravity";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
@@ -1897,6 +1899,21 @@ export default function WorldLab() {
           <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
         </div>}
       </section>
+      <WorldLabMaterialHeatPanel project={project}
+        onSample={(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>{
+          const scene=sceneRef.current;
+          if(!scene||!sample||!run)return;
+          const items=[[run.firstEntityId,sample.firstTemperatureK],
+            [run.secondEntityId,sample.secondTemperatureK]] as const;
+          for(const [id,temperature] of items){
+            const material=scene.addedShapes.get(id)?.material;
+            if(material instanceof B.StandardMaterial){
+              const hot=Math.max(0,Math.min(1,(temperature-200)/1800));
+              material.diffuseColor=new B.Color3(0.2+0.75*hot,0.4+0.35*hot,
+                0.85-0.65*hot);
+            }
+          }
+        }}/>
       <WorldLabGravityPanel project={project} cloudEnabled={remoteJobsEnabled}
         cloudBusy={remoteBusy}
         remoteJobStatus={remoteJob?.kind==="newton-gravity"&&
