@@ -282,7 +282,7 @@ enum NativeAnalyticsClient {
         if granted {
             // Keep the local revocation identifier before the server records consent.
             guard NativeAnalyticsKeychain.write(subject, account: NativeAnalyticsKeychain.subjectAccount) else {
-                throw NSError(domain: "enVAnalytics", code: errSecNotAvailable, userInfo: [NSLocalizedDescriptionKey: "Secure device storage is unavailable. Analytics consent was not enabled."])
+                throw NSError(domain: "enVAnalytics", code: Int(errSecNotAvailable), userInfo: [NSLocalizedDescriptionKey: "Secure device storage is unavailable. Analytics consent was not enabled."])
             }
             try await postConsent(subject, granted: true)
             defaults.set("granted", forKey: choiceKey)
@@ -291,7 +291,7 @@ enum NativeAnalyticsClient {
             try await flush()
         } else {
             defaults.set("denied", forKey: choiceKey)
-            writeQueue([])
+            _ = writeQueue([])
             defaults.removeObject(forKey: queueKey)
             if oldSubject != nil {
                 do {
