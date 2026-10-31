@@ -379,7 +379,7 @@ struct NativeWorldLabView:View {
                         .font(.caption)
                     ForEach(0..<min(16,cases.count),id:\.self){index in
                         let label=String(repeating:"0",
-                            count:max(0,network.inputs.count-String(index,radix:2).count))+
+                            count:max(0,network.inputs.count-String(index,radix:2).count)) +
                             String(index,radix:2)
                         let bits=network.outputs.map{String(cases[index][$0.id] ?? 0)}
                             .joined()
