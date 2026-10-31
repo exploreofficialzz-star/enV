@@ -1,7 +1,7 @@
 name: World Lab reference-model checks
 on:
   push:
-    branches: [main]
+    branches: [main, feat/world-lab-foundation-20261030]
     paths:
       - "src/lib/world-lab/**"
       - "src/components/world-lab/**"
