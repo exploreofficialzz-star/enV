@@ -339,3 +339,56 @@ enum NativeWorldLabEditor {
         try editSolid(data,id:solidId){$0["materialId"]=materialId.map{$0 as Any} ?? NSNull()}
     }
 }
+
+/// Pure in-memory history; restored edits advance the authoritative revision.
+struct NativeWorldLabEditHistory {
+    private(set) var past:[Data]=[]
+    private(set) var future:[Data]=[]
+    var canUndo:Bool {!past.isEmpty}
+    var canRedo:Bool {!future.isEmpty}
+    mutating func clear(){past.removeAll();future.removeAll()}
+    mutating func record(before:Data,after:Data)throws {
+        let old=try NativeWorldLabProject.decode(before)
+        let next=try NativeWorldLabProject.decode(after)
+        guard old.id==next.id,next.revision>old.revision else {
+            throw NativeWorldLabError.invalid("Edit history requires one advancing project")
+        }
+        past.append(before)
+        if past.count>50 {past.removeFirst(past.count-50)}
+        future.removeAll()
+    }
+    private func restore(_ snapshot:Data,current:Data)throws->Data {
+        let before=try NativeWorldLabProject.decode(snapshot)
+        let active=try NativeWorldLabProject.decode(current)
+        guard before.id==active.id,active.revision<1_000_000_000 else {
+            throw NativeWorldLabError.invalid("History cannot replace a project or overflow revision")
+        }
+        guard var root=try JSONSerialization.jsonObject(with:snapshot) as? [String:Any] else {
+            throw NativeWorldLabError.invalid("Historical project cannot be reconstructed")
+        }
+        root["revision"]=active.revision+1
+        root["updatedAt"]=ISO8601DateFormatter().string(from:Date())
+        guard JSONSerialization.isValidJSONObject(root) else {
+            throw NativeWorldLabError.invalid("Historical state is not valid JSON")
+        }
+        let data=try JSONSerialization.data(withJSONObject:root,options:[.sortedKeys])
+        _ = try NativeWorldLabProject.decode(data)
+        return data
+    }
+    mutating func undo(current:Data)throws->Data? {
+        guard let last=past.last else {return nil}
+        let restored=try restore(last,current:current)
+        past.removeLast()
+        future.insert(current,at:0)
+        if future.count>50 {future.removeLast(future.count-50)}
+        return restored
+    }
+    mutating func redo(current:Data)throws->Data? {
+        guard let next=future.first else {return nil}
+        let restored=try restore(next,current:current)
+        future.removeFirst()
+        past.append(current)
+        if past.count>50 {past.removeFirst(past.count-50)}
+        return restored
+    }
+}

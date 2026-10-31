@@ -60,6 +60,22 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.rewireCircuitPart(
             data,id:"load",positive:"middle",negative:"middle"))
     }
+    func testNativeUndoRedoPreservesMonotonicProjectRevisions() throws {
+        var history=NativeWorldLabEditHistory()
+        let original=try NativeWorldLabEditor.blank()
+        let edited=try NativeWorldLabEditor.addSolid(original,shape:"box",id:"invented")
+        try history.record(before:original,after:edited)
+        XCTAssertTrue(history.canUndo)
+        let undone=try XCTUnwrap(history.undo(current:edited))
+        XCTAssertTrue(try NativeWorldLabProject.decode(undone).entities.isEmpty)
+        XCTAssertEqual(try NativeWorldLabProject.decode(undone).revision,2)
+        let redone=try XCTUnwrap(history.redo(current:undone))
+        XCTAssertEqual(try NativeWorldLabProject.decode(redone).entities.count,1)
+        XCTAssertEqual(try NativeWorldLabProject.decode(redone).revision,3)
+        history.clear()
+        XCTAssertFalse(history.canUndo)
+        XCTAssertFalse(history.canRedo)
+    }
     func testSchemaEnforcedForEveryMutation() throws {
         let data=try NativeWorldLabEditor.blank()
         XCTAssertThrowsError(try NativeWorldLabEditor.addSolid(data,shape:"freeform"))

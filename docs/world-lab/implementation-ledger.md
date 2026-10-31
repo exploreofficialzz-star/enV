@@ -313,3 +313,7 @@ release-candidate evidence bundle are unfinished.
 ## Android revision-safe invention history (2026-10-31)
 
 - Added native 50-step bounded undo/redo for complete validated portable World Lab JSON state. An undo restores a historical design **with a new monotonic revision** and updated timestamp, so persisted owner/project revisions are never rolled backward; redo is cleared by new edits. Compose exposes touch-friendly Undo/Redo and invalidates computed fluid/electrical results after travel. Tests authored for roundtrip and monotonic revisions; comprehensive CI remains deferred.
+
+## iOS native revision-safe undo/redo (2026-10-31)
+
+- Added 50-step Swift source-history storage for v1 portable JSON, requiring strict pre/post-decoding and monotonic revision advancement. Each undo/redo restores a previous component/solid/material arrangement as **a new revision**, preserving auditability; a new edit clears redo, and new/open/save/import clear in-memory history. SwiftUI exposes native Undo/Redo, invalidates science outputs after state travel and restores the native SceneKit geometry. Tests authored; simulator validation remains pending final acceptance.

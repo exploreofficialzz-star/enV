@@ -31,6 +31,7 @@ struct NativeWorldLabView:View {
     @State private var seeInside=false
     @State private var importing=false
     @State private var exporting=false
+    @State private var editHistory=NativeWorldLabEditHistory()
     @State private var projectData:Data?
     @State private var savedSnapshot:Data?
     @State private var confirmation=false
@@ -79,7 +80,7 @@ struct NativeWorldLabView:View {
         do {
             let data=try NativeWorldLabEditor.blank()
             project=try NativeWorldLabProject.decode(data)
-            projectData=data;savedSnapshot=nil;selected=0;problem="";redraw()
+            projectData=data;savedSnapshot=nil;selected=0;editHistory.clear();problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
     private func loadSavedProject(){
@@ -88,7 +89,7 @@ struct NativeWorldLabView:View {
                 problem="There is no saved World Lab project on this device."
                 return
             }
-            projectData=saved.0;project=saved.1;savedSnapshot=saved.0
+            projectData=saved.0;project=saved.1;savedSnapshot=saved.0;editHistory.clear()
             selected=0;problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -104,7 +105,7 @@ struct NativeWorldLabView:View {
                 throw NativeWorldLabError.invalid("Create or import a project before saving.")
             }
             _ = try localProjects.save(data)
-            savedSnapshot=data;problem=""
+            savedSnapshot=data;editHistory.clear();problem=""
         }catch{problem=error.localizedDescription}
     }
     private var input:NativeLabInput {
@@ -133,8 +134,26 @@ struct NativeWorldLabView:View {
                 throw NativeWorldLabError.invalid("Create or import a project first.")
             }
             let data=try work(old)
-            project=try NativeWorldLabProject.decode(data)
+            let validated=try NativeWorldLabProject.decode(data)
+            try editHistory.record(before:old,after:data)
+            project=validated
             projectData=data;dcRun=nil;wiredMotor=nil;hydroRun=nil;fluidPlaying=false;fluidMotion=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            problem="";redraw()
+        }catch{problem=error.localizedDescription}
+    }
+    private func travelEdit(_ redo:Bool){
+        do {
+            guard let old=projectData else {
+                throw NativeWorldLabError.invalid("Open a World Lab project first")
+            }
+            let next=try redo ? editHistory.redo(current:old) : editHistory.undo(current:old)
+            guard let updated=next else {return}
+            let restored=try NativeWorldLabProject.decode(updated)
+            project=restored;projectData=updated
+            dcRun=nil;wiredMotor=nil;hydroRun=nil
+            fluidPlaying=false;fluidMotion=nil
+            dropPlaying=false;dropRun=nil;motorPlaying=false;motorRun=nil
+            selected=min(selected,max(0,restored.entities.count-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -394,6 +413,10 @@ struct NativeWorldLabView:View {
                         Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}
                         Button("Add cylinder"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"cylinder")}}
                     }.buttonStyle(.bordered).disabled(project.entities.count>=200)
+                    HStack {
+                        Button("Undo"){travelEdit(false)}.disabled(!editHistory.canUndo)
+                        Button("Redo"){travelEdit(true)}.disabled(!editHistory.canRedo)
+                    }.buttonStyle(.bordered)
                     if let solid {
                         HStack {
                             Button("Previous"){selected=max(0,selected-1)}.disabled(selected==0)
@@ -762,6 +785,7 @@ struct NativeWorldLabView:View {
                 project=try NativeWorldLabProject.decode(data)
                 projectData=data
                 savedSnapshot=nil
+                editHistory.clear()
                 selected=0;problem="";redraw()
             }catch{problem=error.localizedDescription}
         }
