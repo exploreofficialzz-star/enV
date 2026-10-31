@@ -481,9 +481,11 @@ struct NativeWorldLabPortableArchiveStore {
     func importArchive(_ data:Data)throws->NativeWorldLabPortableArchiveContent {
         let imported=try decode(data)
         let local=NativeWorldLabProjectStore(directory:root)
-        if (try? local.read(imported.project.id)) != nil {
+        let target=root.appendingPathComponent(imported.project.id+".json")
+        if FileManager.default.fileExists(atPath:target.path) {
             throw NativeWorldLabError.invalid(
-                "An invention with this identifier already exists on this device")
+                "An invention with this ID already exists, including unreadable copies; "+
+                "portable import may not overwrite it.")
         }
         let manager=FileManager.default
         // Keep an original source backup first, so any interrupted multi-file

@@ -89,8 +89,10 @@ class NativeWorldLabPortableArchiveStore(private val root:File){
      * The original legacy runs remain byte-preserved in private app storage. */
     @Synchronized fun import(json:String):NativeWorldLabPortableContent{
         val content=decode(json)
-        require(runCatching{NativeWorldLabProjectStore(root).read(content.project.id)}
-            .isFailure){"An invention with this identifier already exists locally."}
+        require(!File(File(root,"world-lab-v1"),content.project.id+".json").exists()){
+            "An invention with this identifier already exists locally; even an "+
+            "unreadable saved file cannot be silently replaced."
+        }
         val dir=opaque
         require(dir.isDirectory||dir.mkdirs()){"Cannot create portable archive directory"}
         // Preserve the original legacy payload first, before importing any edits.

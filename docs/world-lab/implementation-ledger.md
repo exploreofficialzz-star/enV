@@ -561,3 +561,8 @@ release-candidate evidence bundle are unfinished.
   identity and revision. The same 2 MB/evidence parser rejects unknown,
   malformed and foreign results. This closes the device→worker→device
   cycle without silently overwriting local geometry.
+
+- Native archive conflict checks now guard the actual target file's existence,
+  including unreadable or corrupted local project files, instead of treating
+  failed parsing as proof that an invention ID is available. This preserves
+  no-overwrite semantics even in damaged local storage.
