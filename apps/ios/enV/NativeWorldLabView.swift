@@ -733,7 +733,19 @@ Text("Invent chemical heat").font(.headline)
     }
     @ViewBuilder private func solidContent(project:NativeWorldLabProject,
         solid:NativeLabSolid)->some View {
+        solidPlacementContent(project:project,solid:solid)
+        Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
+                                value("Assumed mass",assumedMass,"kg")
+        solidFluidContent(project:project,solid:solid)
+        solidHydroContent(project:project,solid:solid)
+        if let derived=assumedMass,derived>=0.001,derived<=10000 {
+            solidEnergyControlsContent(project:project,solid:solid,derived:derived)
+            solidMotorReadoutContent(project:project,solid:solid)
+            solidDropReadoutContent(project:project,solid:solid)
+        }
+    }
 
+    @ViewBuilder private func solidPlacementContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                         HStack {
                             Button("Previous"){selected=max(0,selected-1)}.disabled(selected==0)
                             Spacer()
@@ -792,18 +804,20 @@ Text("Invent chemical heat").font(.headline)
                                     Text("Bounds: "+clearance.status.replacingOccurrences(
                                         of:"-",with:" "))
                                     if clearance.status=="box-intersection" {
-                                        Text("Box overlap X/Y/Z: "+
-                                            clearance.overlapDepthMeters
-                                                .map{String(format:"%.4f",$0)}
-                                                .joined(separator:" / ")+" m")
+                                        let overlapText=clearance.overlapDepthMeters
+                                            .map { String(format:"%.4f",$0) }
+                                            .joined(separator:" / ")
+                                        Text("Box overlap X/Y/Z: \(overlapText) m")
                                     }
                                     Text(clearance.validity)
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                             }
                         }
-                        Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
-                        value("Assumed mass",assumedMass,"kg")
+
+    }
+
+    @ViewBuilder private func solidFluidContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                         Text("Try floating your invention").font(.headline)
                         value("Liquid surface height",fluidSurfaceHeight,"m")
                         Slider(value:$fluidSurfaceHeight,in:0...5) { editing in
@@ -873,6 +887,10 @@ Text("Invent chemical heat").font(.headline)
                             Text("Blue 3D plane is an assumed flat fluid surface, not measured water.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
+
+    }
+
+    @ViewBuilder private func solidHydroContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                         value("Assumed fluid density",fluidDensity,"kg/m³")
                         Slider(value:$fluidDensity,in:100...2500) { editing in
                             if editing {hydroRun=nil}
@@ -900,7 +918,10 @@ Text("Invent chemical heat").font(.headline)
                             value("Equilibrium draft",liquid.equilibriumDraftM,"m")
                             Text(liquid.validity).font(.caption).foregroundStyle(.secondary)
                         }
-                        if let derived=assumedMass,derived>=0.001,derived<=10000 {
+
+    }
+
+    @ViewBuilder private func solidEnergyControlsContent(project:NativeWorldLabProject,solid:NativeLabSolid,derived:Double)->some View {
                             Button("Test assumed mass in spring model"){
                                 mass=derived;mode=0;seconds=0;playing=false
                             }.buttonStyle(.borderedProminent)
@@ -955,6 +976,10 @@ Text("Invent chemical heat").font(.headline)
                                     }catch{problem=error.localizedDescription}
                                 }.buttonStyle(.bordered)
                             }
+
+    }
+
+    @ViewBuilder private func solidMotorReadoutContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                             if let run=motorRun,motorEntityId==solid.id {
                                 let index=max(0,min(run.samples.count-1,
                                     Int((motorTime/run.stepSeconds).rounded())))
@@ -993,6 +1018,10 @@ Text("Invent chemical heat").font(.headline)
                                 Text("Electricity and physical motion are coupled in one 1D solver. Material and actuator parameters are hypothetical, not measurements.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
+
+    }
+
+    @ViewBuilder private func solidDropReadoutContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                             if let run=dropRun,dropEntityId==solid.id {
                                 let index=max(0,min(run.samples.count-1,Int((dropTime/run.stepSeconds).rounded())))
                                 let sample=run.samples[index]
@@ -1008,8 +1037,7 @@ Text("Invent chemical heat").font(.headline)
                                 Text("Gravity, drag and contact are simplified. Invented material density is an assumption, not verified strength.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
-                        }
-                    
+
     }
 
     private func applyMotorPosition(){
