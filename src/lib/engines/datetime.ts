@@ -86,12 +86,39 @@ const CITY_ZONES: Record<string, string> = {
   utc: "UTC",
 };
 
+function localCalendarDate(year: number, monthIndex: number, day: number): Date {
+  const date = new Date(0);
+  date.setFullYear(year, monthIndex, day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function utcDateTimeMilliseconds(year: number, monthIndex: number, day: number, hour = 0, minute = 0, second = 0): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, monthIndex, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return date.getTime();
+}
+
+function localDayStart(date: Date): Date {
+  return localCalendarDate(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function boundedInteger(raw: string | undefined, label: string, fallback: number, minimum: number, maximum: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(label + " must be a whole number from " + minimum + " to " + maximum + ".");
+  }
+  return value;
+}
+
 function parseDate(value: string, label = "date"): Date {
   const raw = value?.trim() ?? "";
   if (!raw) throw new Error(`Enter a ${label}.`);
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   if (dateOnly) {
-    const result = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+    const result = localCalendarDate(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
     if (
       result.getFullYear() === Number(dateOnly[1]) &&
       result.getMonth() === Number(dateOnly[2]) - 1 &&
@@ -130,11 +157,11 @@ function resolveZone(raw: string): ZoneChoice {
 function parseZoneList(value: string, limit = 20): ZoneChoice[] {
   const raw = (value || "").split(/[\r\n,;]+/).map((part) => part.trim()).filter(Boolean);
   if (!raw.length) throw new Error("Enter at least one city or IANA time zone.");
+  if (raw.length > limit) throw new Error("Enter no more than " + limit + " cities or time zones.");
   const unique = new Map<string, ZoneChoice>();
   for (const item of raw) {
     const zone = resolveZone(item);
     unique.set(zone.zone, zone);
-    if (unique.size >= limit) break;
   }
   return [...unique.values()];
 }
@@ -163,9 +190,7 @@ function zonedParts(instant: Date, zone: string) {
 
 function zoneOffsetMilliseconds(instant: Date, zone: string): number {
   const parts = zonedParts(instant, zone);
-  const representedAsUtc = Date.UTC(
-    parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second,
-  );
+  const representedAsUtc = utcDateTimeMilliseconds(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
   return representedAsUtc - Math.floor(instant.getTime() / 1000) * 1000;
 }
 
@@ -202,7 +227,7 @@ function parseWallTimeInZone(rawValue: string, zone: string): { instant: Date; o
     year: Number(yearText), month: Number(monthText), day: Number(dayText),
     hour: Number(hourText), minute: Number(minuteText), second: Number(secondText),
   };
-  const naiveUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const naiveUtc = utcDateTimeMilliseconds(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
   const validCalendarDate = new Date(naiveUtc);
   if (
     validCalendarDate.getUTCFullYear() !== parts.year ||
@@ -274,25 +299,28 @@ function countWorkingDays(
   const weekends = parseWeekendDays(options.weekendDays);
   const excluded = parseExcludedDates(options.excludedDates);
   const direction = from <= to ? 1 : -1;
-  let cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  let cursor = localDayStart(from);
+  const end = localDayStart(to);
   let count = 0;
   for (let iterations = 0; iterations < 366_000; iterations++) {
     cursor = addDays(cursor, direction);
-    if (cursor.getTime() === end.getTime() && !includeEnd) break;
-    if (direction > 0 ? cursor > end : cursor < end) break;
+    if (cursor.getTime() === end.getTime() && !includeEnd) return count;
+    if (direction > 0 ? cursor > end : cursor < end) return count;
     if (isWorkingDate(cursor, weekends, excluded)) count += direction;
   }
-  return count;
+  throw new Error("That working-day range is too large.");
 }
 
 function addWorkingDays(start: Date, amount: number, options: Record<string, string>): Date {
-  if (!Number.isFinite(amount)) throw new Error("Enter how many business days to add.");
+  if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
+    throw new Error("Business days must be a whole number; use a negative number to subtract.");
+  }
+  if (Math.abs(amount) > 366_000) throw new Error("That workday range is too large.");
   const weekends = parseWeekendDays(options.weekendDays);
   const excluded = parseExcludedDates(options.excludedDates);
   const direction = amount < 0 ? -1 : 1;
-  let remaining = Math.floor(Math.abs(amount));
-  let cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  let remaining = Math.abs(amount);
+  let cursor = localDayStart(start);
   for (let iterations = 0; remaining > 0 && iterations < 366_000; iterations++) {
     cursor = addDays(cursor, direction);
     if (isWorkingDate(cursor, weekends, excluded)) remaining--;
@@ -378,13 +406,16 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
   const date = parseDate(options.date, "meeting date");
   const workStart = options.workStart || "09:00";
   const workEnd = options.workEnd || "17:00";
-  const duration = Math.max(5, Math.min(480, Math.trunc(Number(options.durationMinutes) || 30)));
-  const interval = Math.max(5, Math.min(120, Math.trunc(Number(options.intervalMinutes) || 30)));
-  const startLocal = parseWallTimeInZone(`${dateKey(date)}T${workStart}`, anchor.zone).instant;
-  let endLocal = parseWallTimeInZone(`${dateKey(date)}T${workEnd}`, anchor.zone).instant;
-  if (endLocal <= startLocal) endLocal = new Date(endLocal.getTime() + 86_400_000);
   const workStartMinutes = clockMinutes(workStart);
   const workEndMinutes = clockMinutes(workEnd);
+  if (workEndMinutes <= workStartMinutes) {
+    throw new Error("The meeting planner requires a daytime work window: end time must be later than start time.");
+  }
+  const duration = boundedInteger(options.durationMinutes, "Meeting length", 30, 5, 480);
+  const interval = boundedInteger(options.intervalMinutes, "Slot interval", 30, 5, 120);
+  const startLocal = parseWallTimeInZone(`${dateKey(date)}T${workStart}`, anchor.zone).instant;
+  const endLocal = parseWallTimeInZone(`${dateKey(date)}T${workEnd}`, anchor.zone).instant;
+  if (endLocal <= startLocal) throw new Error("The reference city's work window is not valid on that date.");
   const slots: Array<{ instant: Date; value: string }> = [];
   for (let cursor = startLocal.getTime(); cursor + duration * 60_000 <= endLocal.getTime(); cursor += interval * 60_000) {
     const instant = new Date(cursor);
@@ -463,7 +494,7 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
     }
     case "date-add": {
       const start = parseDate(opts.start || opts.value, "start date");
-      const repeat = Math.max(1, Math.min(100, Math.trunc(Number(opts.repeatCount) || 1)));
+      const repeat = boundedInteger(opts.repeatCount, "Repeat count", 1, 1, 100);
       const units = ["years", "months", "weeks", "days"].map((key) => Number(opts[key] || 0));
       if (units.some((value) => !Number.isFinite(value) || !Number.isInteger(value))) {
         throw new Error("Years, months, weeks and days must be whole numbers.");
@@ -547,8 +578,8 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
       const destination = formatInZone(source, to.zone);
       const sourceDate = zonedParts(source, from.zone);
       const destinationDate = zonedParts(source, to.zone);
-      const dateChange = Date.UTC(destinationDate.year, destinationDate.month - 1, destinationDate.day) -
-        Date.UTC(sourceDate.year, sourceDate.month - 1, sourceDate.day);
+      const dateChange = utcDateTimeMilliseconds(destinationDate.year, destinationDate.month - 1, destinationDate.day) -
+        utcDateTimeMilliseconds(sourceDate.year, sourceDate.month - 1, sourceDate.day);
       const dayShift = Math.round(dateChange / 86_400_000);
       const rows: DateTimeRow[] = [
         { label: `In ${from.label}`, value: `${formatInZone(source, from.zone)} · ${offsetLabel(source, from.zone)}` },
@@ -588,26 +619,27 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
     case "leap": {
       const year = Number(opts.year);
       if (!Number.isInteger(year) || year < 1 || year > 9999) throw new Error("Enter a year from 1 to 9999.");
-      return [{ label: String(year), value: isLeapYear(new Date(year, 5, 1)) ? "Leap year" : "Not a leap year" }];
+      return [{ label: String(year), value: isLeapYear(localCalendarDate(year, 5, 1)) ? "Leap year" : "Not a leap year" }];
     }
     case "birthday": {
       const birth = parseDate(opts.birth || opts.value, "birth date");
       
-      const thisYear = now.getFullYear();
+      const today = localDayStart(now);
+      const thisYear = today.getFullYear();
       let month = birth.getMonth();
       let day = birth.getDate();
-      if (month === 1 && day === 29 && !isLeapYear(new Date(thisYear, 5, 1))) {
+      if (month === 1 && day === 29 && !isLeapYear(localCalendarDate(thisYear, 5, 1))) {
         if (opts.leapBirthday === "mar-1") { month = 2; day = 1; }
         else day = 28;
       }
-      const next = new Date(thisYear, month, day);
-      if (next < new Date(now.getFullYear(), now.getMonth(), now.getDate())) next.setFullYear(thisYear + 1);
-      return [{ label: "Days until birthday", value: String(differenceInCalendarDays(next, new Date(now.getFullYear(), now.getMonth(), now.getDate()))) }];
+      let next = localCalendarDate(thisYear, month, day);
+      if (next < today) next = localCalendarDate(thisYear + 1, month, day);
+      return [{ label: "Days until birthday", value: String(differenceInCalendarDays(next, today)) }];
     }
     case "time-until": {
       const target = parseDate(opts.target || opts.value, "target date");
-      const today = now;
-      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const today = localDayStart(now);
+      const start = today;
       const span = calendarSpan(start, target);
       const sign = span.direction < 0 ? "-" : "";
       return [
@@ -617,8 +649,8 @@ export function runDateTime(op: string, opts: Record<string, string>, now = new 
     }
     case "deadline": {
       const target = parseDate(opts.target || opts.value, "deadline");
-      const today = now;
-      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const today = localDayStart(now);
+      const start = today;
       const includeEnd = opts.includeEnd === "true";
       return [
         { label: "Calendar days remaining", value: String(differenceInCalendarDays(target, start)) },
