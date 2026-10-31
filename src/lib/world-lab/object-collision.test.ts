@@ -72,7 +72,8 @@ test("material, geometry, alignment, time and velocity violations fail closed",(
   assert.throws(()=>calculateObjectCollision(p,"left","right",2,0,0.5),/touching or overlapping/);
   p.entities[1].positionMeters[0]=3;
   p.entities[1].shape="sphere";
-  assert.throws(()=>calculateObjectCollision(p,"left","right",2,0,0.5),/box/);
+  const sphere=calculateObjectCollision(p,"left","right",2,0,0.5);
+  assert.ok(sphere.rightMassKg<2);
   p.entities[1].shape="box";
   p.entities[1].materialId=null;
   assert.throws(()=>calculateObjectCollision(p,"left","right",2,0,0.5),/assumed mass/);
