@@ -977,6 +977,39 @@ fun NativeWorldLabForm() {
                 }?.let{run->
                     val state=run.sample(collisionTime.toDouble()
                         .coerceIn(0.0,run.durationSeconds))
+                    Canvas(Modifier.fillMaxWidth().height(105.dp)
+                        .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                        .semantics{
+                            contentDescription="Calculated one-dimensional two-object impact scene; exact mass and motion are displayed below"
+                        }){
+                        val boundary=listOf(
+                            run.sample(0.0),
+                            run.sample(run.impactTimeSeconds),
+                            run.sample(run.durationSeconds))
+                        val minX=boundary.minOf{
+                            minOf(it.leftCenterXM-run.leftHalfWidthM,
+                                it.rightCenterXM-run.rightHalfWidthM)
+                        }
+                        val maxX=boundary.maxOf{
+                            maxOf(it.leftCenterXM+run.leftHalfWidthM,
+                                it.rightCenterXM+run.rightHalfWidthM)
+                        }
+                        val scale=size.width*0.86f/(maxX-minX).toFloat()
+                        val origin=size.width*0.07f
+                        fun screenX(x:Double):Float=
+                            origin+((x-minX).toFloat()*scale)
+                        val leftWidth=(run.leftHalfWidthM*2*scale).toFloat()
+                        val rightWidth=(run.rightHalfWidthM*2*scale).toFloat()
+                        val baseline=size.height*0.7f
+                        drawLine(Color.LightGray,Offset(0f,baseline+15f),
+                            Offset(size.width,baseline+15f),strokeWidth=2f)
+                        drawRect(Color(0xFF69C3C3),
+                            Offset(screenX(state.leftCenterXM)-leftWidth/2,baseline-22f),
+                            Size(leftWidth,43f))
+                        drawRect(Color(0xFFF2B877),
+                            Offset(screenX(state.rightCenterXM)-rightWidth/2,baseline-22f),
+                            Size(rightWidth,43f))
+                    }
                     Text("Impact at "+labNumber(run.impactTimeSeconds)+" s")
                     Text("Impulse: "+labNumber(run.impulseNs)+" N·s")
                     Text("Post-impact left/right speed: "+
