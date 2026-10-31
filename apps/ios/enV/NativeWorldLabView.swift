@@ -67,6 +67,16 @@ struct NativeWorldLabView:View {
     @State private var spherePlaying=false
     @State private var sphereSpeed=1.0
     @State private var exportingSphereImpact=false
+    @State private var heatFirstId=""
+    @State private var heatSecondId=""
+    @State private var heatFirstTemperature="400"
+    @State private var heatSecondTemperature="300"
+    @State private var heatDuration="100"
+    @State private var heatTransferRun:NativeMaterialHeatRun?
+    @State private var heatTransferTime=0.0
+    @State private var heatTransferPlaying=false
+    @State private var heatTransferSpeed=1.0
+    @State private var exportingHeatTransfer=false
     @State private var gravitySpeeds:[String:String]=[:]
     @State private var gravitySelectionTouched=false
     @State private var gravitySelectedIds:Set<String>=[]
@@ -139,6 +149,12 @@ struct NativeWorldLabView:View {
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
+    private var materialHeatEvidenceDocument:NativeWorldLabJsonFile? {
+        guard let run=heatTransferRun,let bytes=try? JSONEncoder().encode(run) else {
+            return nil
+        }
+        return NativeWorldLabJsonFile(content:bytes)
+    }
     private var gravityEvidenceDocument:NativeWorldLabJsonFile? {
         guard let run=gravityRun,let bytes=try? JSONEncoder().encode(run) else{return nil}
         return NativeWorldLabJsonFile(content:bytes)
@@ -463,6 +479,7 @@ struct NativeWorldLabView:View {
         .onChange(of:projectData){_ in
             scheduleRecoveryDraft()
             gravityRun=nil;gravityPlaying=false;gravityTime=0
+            heatTransferRun=nil;heatTransferPlaying=false;heatTransferTime=0
             // Never reuse a prior computed trajectory after geometry/material edits.
             fluidPlaying=false;fluidMotion=nil;fluidTime=0
             beamRun=nil
@@ -505,6 +522,12 @@ struct NativeWorldLabView:View {
                 if fluidTime >= (run.samples.last?.timeSeconds ?? 4) {
                     fluidPlaying=false
                 }
+            }
+            if heatTransferPlaying,let run=heatTransferRun {
+                heatTransferTime=min(run.durationSeconds,
+                    heatTransferTime+dt*heatTransferSpeed)
+                updateHeatTransferScene()
+                if heatTransferTime>=run.durationSeconds {heatTransferPlaying=false}
             }
             if gravityPlaying,let run=gravityRun {
                 gravityTime=min(run.durationSeconds,gravityTime+dt*gravityRate)
@@ -551,6 +574,11 @@ struct NativeWorldLabView:View {
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
+                if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingHeatTransfer,
+            document:materialHeatEvidenceDocument,contentType:.json,
+            defaultFilename:"world-lab-material-heat-evidence"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
         .fileExporter(isPresented:$exportingGravityEvidence,
@@ -1114,6 +1142,7 @@ Text("Invent chemical heat").font(.headline)
         solidPlacementContent(project:project,solid:solid)
         solidGroupSphereContent(project:project)
         solidGravityContent(project:project)
+        solidHeatTransferContent(project:project)
         solidSphereImpactContent(project:project,solid:solid)
         solidCollisionContent(project:project,solid:solid)
         solidBeamContent(project:project,solid:solid)
@@ -1128,6 +1157,116 @@ Text("Invent chemical heat").font(.headline)
         }
     }
 
+    private func updateHeatTransferScene(){
+        guard let run=heatTransferRun,
+              let snapshot=try? run.sample(heatTransferTime) else{return}
+        let materials:[(String,Double)]=[
+            (run.firstEntityId,snapshot.firstTemperatureK),
+            (run.secondEntityId,snapshot.secondTemperatureK)]
+        for (id,kelvin) in materials {
+            guard let node=scene.rootNode.childNode(withName:"lab-solid-"+id,
+                recursively:false),
+                  let material=node.geometry?.firstMaterial else{continue}
+            let fraction=CGFloat(max(0,min(1,(kelvin-200)/1800)))
+            material.diffuse.contents=UIColor(
+                red:0.2+0.75*fraction,green:0.4+0.35*fraction,
+                blue:0.85-0.65*fraction,alpha:1)
+        }
+    }
+    @ViewBuilder private func solidHeatTransferContent(
+        project:NativeWorldLabProject)->some View {
+        let boxes=project.entities.filter{$0.shape=="box"}
+        Text("Transfer heat between invented materials").font(.headline)
+        Text("Two face-touching boxes exchange thermal energy according to "+
+            "their assumed density, specific heat and conductivity. Native "+
+            "calculations only; no actual material identity or safety claim.")
+            .font(.caption).foregroundStyle(.secondary)
+        if boxes.count<2 {
+            Text("Create two box solids and invent their thermal properties.")
+                .font(.caption)
+        }else {
+            let first=boxes.first(where:{$0.id==heatFirstId}) ?? boxes[0]
+            let second=boxes.first(where:{$0.id==heatSecondId &&
+                $0.id != first.id}) ?? boxes.first(where:{$0.id != first.id})!
+            HStack {
+                Picker("First material body",selection:Binding(
+                    get:{first.id},set:{heatFirstId=$0;heatTransferRun=nil})){
+                    ForEach(boxes,id:\.id){body in
+                        Text(body.name).tag(body.id)
+                    }
+                }
+                Picker("Second material body",selection:Binding(
+                    get:{second.id},set:{heatSecondId=$0;heatTransferRun=nil})){
+                    ForEach(boxes.filter{$0.id != first.id},id:\.id){body in
+                        Text(body.name).tag(body.id)
+                    }
+                }
+            }.pickerStyle(.menu)
+            HStack {
+                TextField("First K",text:$heatFirstTemperature)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("First material temperature Kelvin")
+                TextField("Second K",text:$heatSecondTemperature)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Second material temperature Kelvin")
+                TextField("Seconds",text:$heatDuration)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Thermal simulation duration")
+            }
+            Button("Calculate local material heat transfer"){
+                do {
+                    guard let t1=Double(heatFirstTemperature),
+                          let t2=Double(heatSecondTemperature),
+                          let duration=Double(heatDuration) else {
+                        throw NativeWorldLabError.invalid(
+                            "Enter numerical temperatures and simulated duration")
+                    }
+                    let solved=try NativeWorldLabHeatTransfer.evaluate(
+                        project,firstId:first.id,secondId:second.id,
+                        firstTemperatureK:t1,secondTemperatureK:t2,
+                        durationSeconds:duration)
+                    heatTransferRun=solved;heatTransferTime=0;heatTransferPlaying=false
+                    problem="";redraw();updateHeatTransferScene()
+                }catch{
+                    heatTransferRun=nil;heatTransferPlaying=false
+                    problem=error.localizedDescription
+                }
+            }.buttonStyle(.bordered)
+        }
+        if let run=heatTransferRun,run.projectId==project.id,
+           run.projectRevision==project.revision,
+           let sample=try? run.sample(heatTransferTime) {
+            value("First invented material temperature",
+                sample.firstTemperatureK,"K")
+            value("Second invented material temperature",
+                sample.secondTemperatureK,"K")
+            value("Contact heat flow",sample.interfaceHeatFlowW,"W")
+            value("Thermal energy residual",sample.energyResidualJ,"J")
+            Slider(value:$heatTransferTime,in:0...run.durationSeconds,
+                onEditingChanged:{editing in
+                    if editing {heatTransferPlaying=false}
+                    updateHeatTransferScene()
+                })
+                .accessibilityLabel("Material heat exchange timeline")
+                .onChange(of:heatTransferTime){_ in updateHeatTransferScene()}
+            HStack {
+                Button(heatTransferPlaying ? "Pause heat":"Play heat"){
+                    heatTransferPlaying.toggle()
+                }
+                Button("Reset heat"){
+                    heatTransferPlaying=false;heatTransferTime=0
+                    updateHeatTransferScene()
+                }
+                Button("Export heat evidence"){exportingHeatTransfer=true}
+            }.buttonStyle(.bordered)
+            Picker("Thermal playback speed",selection:$heatTransferSpeed){
+                ForEach([0.1,1.0,5.0,10.0],id:\.self){rate in
+                    Text(String(format:"%.1f×",rate)).tag(rate)
+                }
+            }.pickerStyle(.segmented)
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+        }
+    }
     private func updateGravityScene(){
         guard let run=gravityRun,let frame=try? run.sample(gravityTime) else{return}
         for (index,body) in run.bodies.enumerated() {
