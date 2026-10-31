@@ -419,14 +419,17 @@ enum NativeWorldLabEditor {
                                         youngModulusPa:Double?=nil,
                                         id:String=UUID().uuidString,
                                         thermalConductivityWPerMK:Double?=nil,
-                                        specificHeatJPerKgK:Double?=nil) throws -> Data {
+                                        specificHeatJPerKgK:Double?=nil,
+                                        refractiveIndex:Double?=nil) throws -> Data {
         try mutate(data){root in
             guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   name.count <= 120,
                   (densityKgM3.map { $0.isFinite && $0 >= 0.001 && $0 <= 1e9 } ?? true),
                   (youngModulusPa.map { $0.isFinite && $0 >= 0 && $0 <= 1e15 } ?? true),
                   (thermalConductivityWPerMK.map{$0.isFinite && $0>=1e-6 && $0<=1e6} ?? true),
-                  (specificHeatJPerKgK.map{$0.isFinite && $0>=0.01 && $0<=1e7} ?? true) else {
+                  (specificHeatJPerKgK.map{$0.isFinite && $0>=0.01 && $0<=1e7} ?? true),
+                  (refractiveIndex.map{$0.isFinite && $0>=1 && $0<=5} ?? true),
+                  (refractiveIndex.map{$0.isFinite && $0>=1 && $0<=5} ?? true) else {
                 throw NativeWorldLabError.invalid("Hypothetical properties must be finite values inside their documented SI limits")
             }
             guard var materials=root["materials"] as? [[String:Any]],
@@ -439,6 +442,7 @@ enum NativeWorldLabEditor {
                 "youngModulusPa":youngModulusPa.map{$0 as Any} ?? NSNull(),
                 "thermalConductivityWPerMK":thermalConductivityWPerMK.map{$0 as Any} ?? NSNull(),
                 "specificHeatJPerKgK":specificHeatJPerKgK.map{$0 as Any} ?? NSNull(),
+                "refractiveIndex":refractiveIndex.map{$0 as Any} ?? NSNull(),
                 "evidence":"hypothetical-user-assumed",
             ])
             root["materials"]=materials
@@ -448,7 +452,8 @@ enum NativeWorldLabEditor {
     static func reviseHypotheticalMaterial(_ data:Data,id:String,name:String,
         densityKgM3:Double?,youngModulusPa:Double?,
         thermalConductivityWPerMK:Double?=nil,
-        specificHeatJPerKgK:Double?=nil)throws->Data {
+        specificHeatJPerKgK:Double?=nil,
+        refractiveIndex:Double?=nil)throws->Data {
         try mutate(data){root in
             guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
                   name.count<=120,
@@ -466,6 +471,7 @@ enum NativeWorldLabEditor {
             materials[index]["thermalConductivityWPerMK"]=
                 thermalConductivityWPerMK.map{$0 as Any} ?? NSNull()
             materials[index]["specificHeatJPerKgK"]=specificHeatJPerKgK.map{$0 as Any} ?? NSNull()
+            materials[index]["refractiveIndex"]=refractiveIndex.map{$0 as Any} ?? NSNull()
             materials[index]["evidence"]="hypothetical-user-assumed"
             root["materials"]=materials
         }

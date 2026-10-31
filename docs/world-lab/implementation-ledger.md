@@ -581,3 +581,9 @@ release-candidate evidence bundle are unfinished.
 - Fixed account queue validation to accept Newtonian multi-body gravity
   projects without an unrelated selected solid ID; remote solvers still
   perform full input-domain checks and require explicit user consent.
+
+- Implemented native Kotlin and Swift authored optical property editing,
+  including strict bounded 1–5 indices and material revision preservation.
+  Each native editor includes its own local Fresnel/Snell calculation UI,
+  without WebView or automatic network transfer. Cross-platform archive
+  persistence of native optical result records remains unfinished.

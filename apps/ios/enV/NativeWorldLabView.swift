@@ -48,6 +48,11 @@ struct NativeWorldLabView:View {
     @State private var inventedModulus=""
     @State private var inventedConductivity=""
     @State private var inventedSpecificHeat=""
+    @State private var inventedRefraction=""
+    @State private var opticalFirstId=""
+    @State private var opticalSecondId=""
+    @State private var opticalAngle="30"
+    @State private var opticalRun:NativeOpticalInterfaceRun?
     @State private var editingMaterialId:String?
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
@@ -965,6 +970,7 @@ struct NativeWorldLabView:View {
                                 String($0)} ?? ""
                             inventedSpecificHeat=attached.specificHeatJPerKgK.map{
                                 String($0)} ?? ""
+                            inventedRefraction=attached.refractiveIndex.map{String($0)} ?? ""
                         }.buttonStyle(.bordered)
                     }
                     TextField("Invented material name",text:$inventedName)
@@ -978,6 +984,8 @@ struct NativeWorldLabView:View {
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
                     TextField("Assumed specific heat J/(kg K) (optional)",
                               text:$inventedSpecificHeat)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    TextField("Assumed optical index 1–5 (optional)",text:$inventedRefraction)
                         .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
                     Button(editingMaterialId==nil ? "Save invented material" : "Save revised material") {
                         do {
@@ -998,6 +1006,12 @@ struct NativeWorldLabView:View {
                                 in:.whitespaces).isEmpty ? nil : Double(inventedConductivity)
                             let heatCapacity=inventedSpecificHeat.trimmingCharacters(
                                 in:.whitespaces).isEmpty ? nil : Double(inventedSpecificHeat)
+                            let refraction=inventedRefraction.trimmingCharacters(
+                                in:.whitespaces).isEmpty ? nil : Double(inventedRefraction)
+                            if !inventedRefraction.trimmingCharacters(in:.whitespaces).isEmpty &&
+                                refraction==nil {
+                                throw NativeWorldLabError.invalid("Optical index must be numeric")
+                            }
                             if !inventedConductivity.trimmingCharacters(in:.whitespaces).isEmpty &&
                                conductivity==nil {
                                 throw NativeWorldLabError.invalid("Conductivity must be numeric")
@@ -1013,13 +1027,15 @@ struct NativeWorldLabView:View {
                                         old,id:editingMaterialId,name:inventedName,
                                         densityKgM3:density,youngModulusPa:modulus,
                                         thermalConductivityWPerMK:conductivity,
-                                        specificHeatJPerKgK:heatCapacity)
+                                        specificHeatJPerKgK:heatCapacity,
+                                        refractiveIndex:refraction)
                                 }
                                 let first=try NativeWorldLabEditor.addHypotheticalMaterial(
                                     old,name:inventedName,densityKgM3:density,
                                     youngModulusPa:modulus,id:id,
                                     thermalConductivityWPerMK:conductivity,
-                                    specificHeatJPerKgK:heatCapacity)
+                                    specificHeatJPerKgK:heatCapacity,
+                                        refractiveIndex:refraction)
                                 if let solid {
                                     return try NativeWorldLabEditor.assignMaterial(
                                         first,solidId:solid.id,materialId:id)
@@ -1028,7 +1044,7 @@ struct NativeWorldLabView:View {
                             }
                             if problem.isEmpty {
                                 inventedName="";inventedDensity="";inventedModulus=""
-                                inventedConductivity="";inventedSpecificHeat=""
+                                inventedConductivity="";inventedSpecificHeat="";inventedRefraction=""
                                 editingMaterialId=nil;beamRun=nil
                             }
                         }catch{problem=error.localizedDescription}
@@ -1270,6 +1286,7 @@ Text("Invent chemical heat").font(.headline)
         solidPlacementContent(project:project,solid:solid)
         solidGroupSphereContent(project:project)
         solidGravityContent(project:project)
+        solidOpticsContent(project:project)
         solidHeatTransferContent(project:project)
         scientificEvidenceLibrary(project:project)
         solidSphereImpactContent(project:project,solid:solid)
@@ -1395,6 +1412,57 @@ Text("Invent chemical heat").font(.headline)
                 }
             }.pickerStyle(.segmented)
             Text(run.validity).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    @ViewBuilder private func solidOpticsContent(
+        project:NativeWorldLabProject)->some View {
+        let materials=project.materials
+        Text("Invented light and material behavior").font(.headline)
+        Text("Local planar Fresnel reflection and Snell refraction from invented, "+
+            "explicitly assumed indices. No measured optical material or "+
+            "spectral properties are implied.")
+            .font(.caption).foregroundStyle(.secondary)
+        if materials.count>=2 {
+            let first=materials.first(where:{$0.id==opticalFirstId}) ?? materials[0]
+            let second=materials.first(where:{$0.id==opticalSecondId &&
+                $0.id != first.id}) ?? materials.first(where:{$0.id != first.id})!
+            Picker("Light begins in",selection:Binding(
+                get:{first.id},set:{opticalFirstId=$0;opticalRun=nil})){
+                ForEach(materials,id:\.id){m in
+                    Text(m.name+" (n="+(m.refractiveIndex.map{String($0)} ?? "?")+")").tag(m.id)
+                }
+            }.pickerStyle(.menu)
+            Picker("Light enters",selection:Binding(
+                get:{second.id},set:{opticalSecondId=$0;opticalRun=nil})){
+                ForEach(materials.filter{$0.id != first.id},id:\.id){m in
+                    Text(m.name+" (n="+(m.refractiveIndex.map{String($0)} ?? "?")+")").tag(m.id)
+                }
+            }.pickerStyle(.menu)
+            TextField("Incidence angle 0–89.9 degrees",text:$opticalAngle)
+                .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+            Button("Calculate ideal light interface on device"){
+                do {
+                    guard let angle=Double(opticalAngle) else {
+                        throw NativeWorldLabError.invalid("Enter a finite incidence angle.")
+                    }
+                    opticalRun=try NativeWorldLabOptics.calculate(
+                        project,firstId:first.id,secondId:second.id,angleDegrees:angle)
+                    problem=""
+                }catch{opticalRun=nil;problem=error.localizedDescription}
+            }.buttonStyle(.bordered)
+            if let run=opticalRun,run.projectId==project.id &&
+                run.projectRevision==project.revision,
+                run.firstMaterialId==first.id,run.secondMaterialId==second.id {
+                value("Ideal reflection",run.reflectance*100,"%")
+                value("Ideal transmission",run.transmittance*100,"%")
+                if run.totalInternalReflection {
+                    Text("Total internal reflection (no transmitted ray).")
+                }else{value("Transmitted angle",run.transmittedDegrees,"degrees")}
+                Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            }
+        }else{
+            Text("Invent at least two materials and add their assumed refractive indices.")
+                .font(.caption)
         }
     }
     private func updateGravityScene(){

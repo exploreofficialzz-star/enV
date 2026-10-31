@@ -352,7 +352,8 @@ object NativeWorldLabEditor {
     fun addHypotheticalMaterial(
         source:String,name:String,densityKgM3:Double?,youngModulusPa:Double?=null,
         id:String=UUID.randomUUID().toString(),
-        thermalConductivityWPerMK:Double?=null,specificHeatJPerKgK:Double?=null
+        thermalConductivityWPerMK:Double?=null,specificHeatJPerKgK:Double?=null,
+        refractiveIndex:Double?=null
     ):String = edit(source){project->
         require(name.isNotBlank() && name.length<=120){"Hypothetical material needs a name."}
         require(densityKgM3==null || densityKgM3.isFinite() && densityKgM3 in 0.001..1e9){
@@ -367,6 +368,9 @@ object NativeWorldLabEditor {
         require(specificHeatJPerKgK==null||
             specificHeatJPerKgK.isFinite()&&specificHeatJPerKgK in 0.01..1e7){
             "Invented specific heat must be finite in 0.01..1e7 J/(kg K)"}
+        require(refractiveIndex==null||
+            refractiveIndex.isFinite()&&refractiveIndex in 1.0..5.0){
+            "Invented refractive index must be 1–5"}
         val array=project.getJSONArray("materials")
         require(array.length()<100){"Only 100 materials can be stored."}
         require((0 until array.length()).none {array.getJSONObject(it).getString("id")==id}){"Duplicate material ID"}
@@ -375,13 +379,15 @@ object NativeWorldLabEditor {
             .put("youngModulusPa",youngModulusPa?:JSONObject.NULL)
             .put("thermalConductivityWPerMK",thermalConductivityWPerMK?:JSONObject.NULL)
             .put("specificHeatJPerKgK",specificHeatJPerKgK?:JSONObject.NULL)
+            .put("refractiveIndex",refractiveIndex?:JSONObject.NULL)
             .put("evidence","hypothetical-user-assumed"))
     }
     /** Modify only hypothetical properties; retain material and solid identities. */
     fun reviseHypotheticalMaterial(source:String,id:String,name:String,
         densityKgM3:Double?,youngModulusPa:Double?,
         thermalConductivityWPerMK:Double?=null,
-        specificHeatJPerKgK:Double?=null):String=edit(source){project->
+        specificHeatJPerKgK:Double?=null,
+        refractiveIndex:Double?=null):String=edit(source){project->
         require(name.isNotBlank()&&name.length<=120){"Material name is required"}
         require(densityKgM3==null ||
             densityKgM3.isFinite()&&densityKgM3 in 0.001..1e9){
@@ -397,6 +403,9 @@ object NativeWorldLabEditor {
         require(specificHeatJPerKgK==null||
             specificHeatJPerKgK.isFinite()&&specificHeatJPerKgK in 0.01..1e7){
             "Invented specific heat must be finite and positive"}
+        require(refractiveIndex==null||
+            refractiveIndex.isFinite()&&refractiveIndex in 1.0..5.0){
+            "Invented refractive index must be 1–5"}
         val materials=project.getJSONArray("materials")
         val selected=(0 until materials.length()).map{materials.getJSONObject(it)}
             .firstOrNull{it.getString("id")==id}
@@ -406,6 +415,7 @@ object NativeWorldLabEditor {
             .put("youngModulusPa",youngModulusPa?:JSONObject.NULL)
             .put("thermalConductivityWPerMK",thermalConductivityWPerMK?:JSONObject.NULL)
             .put("specificHeatJPerKgK",specificHeatJPerKgK?:JSONObject.NULL)
+            .put("refractiveIndex",refractiveIndex?:JSONObject.NULL)
             .put("evidence","hypothetical-user-assumed")
     }
 

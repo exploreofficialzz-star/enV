@@ -93,6 +93,7 @@ fun NativeWorldLabForm() {
     var proposedModulus by remember { mutableStateOf("") }
     var proposedConductivity by remember { mutableStateOf("") }
     var proposedSpecificHeat by remember { mutableStateOf("") }
+    var proposedRefraction by remember { mutableStateOf("") }
     var editingMaterialId by remember { mutableStateOf<String?>(null) }
     var beamForce by remember { mutableStateOf("1000") }
     var beamRun by remember { mutableStateOf<NativeLabBeamBendingResult?>(null) }
@@ -1218,6 +1219,7 @@ fun NativeWorldLabForm() {
                 }
                 NativeWorldLabMultiSpherePanel(project!!){ warning=it }
                 NativeWorldLabGravityPanel(project!!){ warning=it }
+                NativeWorldLabOpticsPanel(project!!){ warning=it }
                 NativeWorldLabHeatPanel(project!!){ warning=it }
                 NativeWorldLabEvidencePanel(project!!){ warning=it }
                 Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
@@ -1333,6 +1335,7 @@ fun NativeWorldLabForm() {
                     proposedModulus=material.youngModulusPa?.toString()?:""
                     proposedConductivity=material.thermalConductivityWPerMK?.toString()?:""
                     proposedSpecificHeat=material.specificHeatJPerKgK?.toString()?:""
+                    proposedRefraction=material.refractiveIndex?.toString()?:""
                 }){Text("Revise this material's assumptions")}
                 Text("Assumed mass: "+labNumber(derivedMass)+" kg")
                 Text("Assumed Young's modulus: "+labNumber(material?.youngModulusPa)+" Pa")
@@ -1613,6 +1616,10 @@ fun NativeWorldLabForm() {
                 onValueChange={proposedSpecificHeat=it},
                 label={Text("Assumed specific heat (J/kg K), or blank")},
                 singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedRefraction,
+                onValueChange={proposedRefraction=it},
+                label={Text("Assumed optical refractive index 1–5, or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
             Button(onClick={
                 runCatching {
                     require(proposedName.isNotBlank()){"Name your invented material first."}
@@ -1620,6 +1627,7 @@ fun NativeWorldLabForm() {
                     val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val conductivity=proposedConductivity.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val heatCapacity=proposedSpecificHeat.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val refraction=proposedRefraction.trim().takeIf{it.isNotEmpty()}?.toDouble()
                     val materialId=editingMaterialId
                     val freshId=java.util.UUID.randomUUID().toString()
                     val previous=projectJson
@@ -1628,26 +1636,28 @@ fun NativeWorldLabForm() {
                             NativeWorldLabEditor.reviseHypotheticalMaterial(
                                 json,materialId,proposedName,density,modulus,
                                 thermalConductivityWPerMK=conductivity,
-                                specificHeatJPerKgK=heatCapacity)
+                                specificHeatJPerKgK=heatCapacity,
+                                refractiveIndex=refraction)
                         }else{
                             val proposed=NativeWorldLabEditor.addHypotheticalMaterial(
                                 json,proposedName,density,youngModulusPa=modulus,id=freshId,
                                 thermalConductivityWPerMK=conductivity,
-                                specificHeatJPerKgK=heatCapacity)
+                                specificHeatJPerKgK=heatCapacity,
+                                refractiveIndex=refraction)
                             solid?.let{NativeWorldLabEditor.assignMaterial(
                                 proposed,it.id,freshId)}?:proposed
                         }
                     }
                     if(projectJson!=previous){
                         proposedName="";proposedDensity="";proposedModulus=""
-                        proposedConductivity="";proposedSpecificHeat=""
+                        proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
                         editingMaterialId=null;beamRun=null
                     }
                 }.onFailure{warning=it.message?:"Material edit was not saved."}
             }){Text(if(editingMaterialId==null)"Save invented material" else "Save revised material")}
             if(editingMaterialId!=null)OutlinedButton(onClick={
                 editingMaterialId=null;proposedName="";proposedDensity="";proposedModulus=""
-                proposedConductivity="";proposedSpecificHeat=""
+                proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
             }){Text("Cancel material revision")}
             Text("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.",
                 style=MaterialTheme.typography.bodySmall)
