@@ -75,6 +75,26 @@ class NativeWorldLabEvidenceStore(private val root:File){
             }
         }finally{temp.delete()}
     }
+    fun validateEnvelope(raw:String,projectId:String):JSONObject=
+        validated(raw,projectId)
+    @Synchronized fun importRecord(projectId:String,record:JSONObject){
+        val savedProject=NativeWorldLabProjectStore(root).read(projectId)
+        val json=record.toString()
+        val checked=validated(json,projectId)
+        require(checked.getInt("projectRevision")<=savedProject.revision){
+            "Scientific evidence is newer than the local invention"}
+        val dest=file(projectId,checked.getString("id"))
+        if(dest.isFile){
+            val existing=read(projectId,checked.getString("id"))
+            require(existing.similar(record)){
+                "Immutable scientific evidence cannot replace a different record"}
+            return
+        }
+        val dir=folder(projectId)
+        val count=dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0
+        require(count<20){"Scientific device history is full"}
+        atomic(dest,json.toByteArray(StandardCharsets.UTF_8))
+    }
     @Synchronized fun save(project:NativeWorldLabProject,
         result:JSONObject):String{
         // A local saved project must exist before scientific evidence is committed.
