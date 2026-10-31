@@ -23,6 +23,7 @@ on:
       - "scripts/export-native-execution-matrix.mjs"
       - "scripts/generate-billing-profiles.mjs"
       - "scripts/check-billing.mjs"
+      - "apps/android/gradle.properties"
       - "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"
       - "apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"
       - "apps/android/app/src/main/java/com/chastech/env/engine/NativeDateTimeEngine.kt"
@@ -107,7 +108,7 @@ jobs:
       - name: Run Date & Time Kotlin tests
         run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests "com.chastech.env.engine.NativeDateTimeEngineTest"
       - name: Lint and assemble Android app
-        run: ./gradlew --no-daemon --max-workers=2 :app:lintDebug :app:assembleDebug
+        run: ./gradlew --no-daemon --max-workers=2 --stacktrace :app:lintDebug :app:assembleDebug
 
   ios-datetime:
     name: iOS Date & Time XCTest and build
