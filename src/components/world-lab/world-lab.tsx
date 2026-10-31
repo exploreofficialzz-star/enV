@@ -18,6 +18,7 @@ import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
 import {calculateObjectCollision,sampleObjectCollision,type ObjectCollisionRun} from "@/lib/world-lab/object-collision";
+import {solveSphereImpact3d,sampleSphereImpact3d,type SphereImpactEvidence,type Vec3} from "@/lib/world-lab/sphere-collision-3d";
 import {createWorldLabAssembly,moveWorldLabAssembly,ungroupWorldLabAssembly,
   summarizeWorldLabAssembly} from "@/lib/world-lab/assemblies";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
@@ -215,10 +216,25 @@ export default function WorldLab() {
   const [collisionTime,setCollisionTime]=useState(0);
   const [collisionPlaying,setCollisionPlaying]=useState(false);
   const [collisionPlaybackRate,setCollisionPlaybackRate]=useState(1);
+  const [sphereOtherId,setSphereOtherId]=useState("");
+  const [sphereFirstVelocity,setSphereFirstVelocity]=useState<Vec3>([2,0,0]);
+  const [sphereSecondVelocity,setSphereSecondVelocity]=useState<Vec3>([0,0,0]);
+  const [sphereRestitution,setSphereRestitution]=useState(0.65);
+  const [sphereRun,setSphereRun]=useState<SphereImpactEvidence|null>(null);
+  const [sphereTime,setSphereTime]=useState(0);
+  const [spherePlaying,setSpherePlaying]=useState(false);
+  const [spherePlaybackRate,setSpherePlaybackRate]=useState(1);
   const materials = project?.materials ?? [];
   const selectedEntity = project?.entities.find(entity => entity.id === selectedEntityId) ?? null;
   const selectedMaterial = materials.find(material => material.id === selectedEntity?.materialId);
   const collisionPartner=project?.entities.find(e=>e.id===collisionOtherId);
+  const sphereOther=project?.entities.find(e=>e.id===sphereOtherId);
+  const selectedSphereRun=sphereRun&&project?.id===sphereRun.projectId&&
+    project.revision===sphereRun.projectRevision&&
+    project.entities.some(e=>e.id===sphereRun.firstEntityId)&&
+    project.entities.some(e=>e.id===sphereRun.secondEntityId)?sphereRun:null;
+  const sphereSample=selectedSphereRun?
+    sampleSphereImpact3d(selectedSphereRun,Math.min(sphereTime,selectedSphereRun.durationSeconds)):null;
   const selectedCollision=collisionRun &&project?.id===collisionRun.projectId &&
     project?.revision===collisionRun.projectRevision &&
     project.entities.some(e=>e.id===collisionRun.leftEntityId) &&
@@ -578,6 +594,31 @@ export default function WorldLab() {
           ?collisionSample.rightCenterXM:entity.positionMeters[0];
     }
   },[collisionSample,selectedCollision,project]);
+  useEffect(()=>{
+    if(!spherePlaying||!selectedSphereRun)return;
+    let frame=0,previous=0;
+    const tick=(now:number)=>{
+      if(previous){
+        const dt=Math.min(0.05,(now-previous)/1000);
+        setSphereTime(t=>Math.min(selectedSphereRun.durationSeconds,t+dt*spherePlaybackRate));
+      }
+      previous=now;frame=requestAnimationFrame(tick);
+    };
+    frame=requestAnimationFrame(tick);
+    return ()=>cancelAnimationFrame(frame);
+  },[spherePlaying,selectedSphereRun,spherePlaybackRate]);
+  useEffect(()=>{
+    if(selectedSphereRun&&sphereTime>=selectedSphereRun.durationSeconds)
+      setSpherePlaying(false);
+  },[selectedSphereRun,sphereTime]);
+  useEffect(()=>{
+    const scene=sceneRef.current;
+    if(!scene||!sphereSample||!selectedSphereRun)return;
+    const first=scene.addedShapes.get(selectedSphereRun.firstEntityId);
+    const second=scene.addedShapes.get(selectedSphereRun.secondEntityId);
+    if(first)first.position.copyFromFloats(...sphereSample.firstCentreM);
+    if(second)second.position.copyFromFloats(...sphereSample.secondCentreM);
+  },[sphereSample,selectedSphereRun,project]);
   useEffect(() => {
     if (!actuatorPlaying || !actuatorRun) return;
     let frame=0;
@@ -904,6 +945,7 @@ export default function WorldLab() {
     setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
     setWiredMotorRun(null);setDigitalMotorRun(null);setBeamRun(null);setDcRun(null);setRemoteJob(null);
     setCollisionPlaying(false);setCollisionRun(null);setCollisionTime(0);
+    setSpherePlaying(false);setSphereRun(null);setSphereTime(0);
   }
   function mutateProject(transform:(current:WorldLabProject)=>WorldLabProject){
     const current=projectForEdits.current;
