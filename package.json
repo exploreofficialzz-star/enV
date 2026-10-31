@@ -141,7 +141,7 @@
     "babylonjs": "9.32.1",
     "babylonjs-loaders": "9.32.1",
     "babylonjs-serializers": "9.32.1",
-    "better-auth": "~1.6.30",
+    "better-auth": "~1.7.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
