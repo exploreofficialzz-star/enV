@@ -227,7 +227,7 @@ function cssFor(
       : "";
     const fallbackImage = [glow, fallbackGradient].filter(Boolean).join(", ");
     const enhancedImage = [glow, enhanced].filter(Boolean).join(", ");
-    const css = `background: ${fallback};\nbackground-image: ${fallbackImage};${enhanced === fallbackGradient ? "" : `\nbackground-image: ${enhancedImage}; /* Modern browsers: perceptual color interpolation */`}`;
+    const css = `background: ${fallback};\nbackground-image: ${fallbackImage};${enhanced === fallbackGradient ? "" : `\n@supports (background-image: ${enhanced}) {\n  background-image: ${enhancedImage};\n}`}`;
     return { css, style: { background: fallback, backgroundImage: enhancedImage } };
   }
   if (family === "shadow") {
