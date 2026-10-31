@@ -21,6 +21,9 @@ import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabEditHistory
 import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabChemicalThermal
+import com.chastech.env.engine.NativeChemicalThermalInput
+import com.chastech.env.engine.NativeChemicalThermalResult
 import com.chastech.env.engine.NativeWorldLabHydrostatics
 import com.chastech.env.engine.NativeWorldLabFluidMotion
 import com.chastech.env.engine.NativeLabFluidMotionInput
@@ -79,6 +82,12 @@ fun NativeWorldLabForm() {
     var positiveWire by remember { mutableStateOf("supply") }
     var negativeWire by remember { mutableStateOf("ground") }
     var selected by remember { mutableIntStateOf(0) }
+    var reactionResult by remember { mutableStateOf<NativeChemicalThermalResult?>(null) }
+    var reactionFrame by remember { mutableIntStateOf(0) }
+    var reactionPlaying by remember { mutableStateOf(false) }
+    var reactionHeat by remember { mutableFloatStateOf(50000f) }
+    var reactionFactor by remember { mutableFloatStateOf(0.5f) }
+    var reactionHeating by remember { mutableFloatStateOf(0f) }
     var hydroRun by remember { mutableStateOf<NativeLabHydroResult?>(null) }
     var fluidMotion by remember { mutableStateOf<NativeLabFluidMotionRun?>(null) }
     var fluidFrame by remember { mutableIntStateOf(0) }
@@ -223,6 +232,15 @@ fun NativeWorldLabForm() {
         if(requestImport){
             requestImport=false
             picker.launch(arrayOf("application/json","text/plain","*/*"))
+        }
+    }
+    LaunchedEffect(reactionPlaying,reactionResult) {
+        while(reactionPlaying){
+            delay(40)
+            val result=reactionResult?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04/result.stepSeconds).toInt())
+            reactionFrame=(reactionFrame+stride).coerceAtMost(result.samples.lastIndex)
+            if(reactionFrame>=result.samples.lastIndex)reactionPlaying=false
         }
     }
     LaunchedEffect(fluidPlaying,fluidMotion) {
@@ -383,6 +401,53 @@ fun NativeWorldLabForm() {
                 style=MaterialTheme.typography.bodySmall)
         if(project!=null){
             Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            Text("Invent chemical heat",style=MaterialTheme.typography.titleSmall)
+            Text("Hypothetical chemistry only. Reaction rate and heat feedback use your assumptions.",
+                style=MaterialTheme.typography.bodySmall)
+            Text("Assumed heat released: "+labNumber(reactionHeat.toDouble())+" J/mol")
+            Slider(value=reactionHeat,onValueChange={reactionHeat=it;reactionPlaying=false;
+                reactionResult=null},valueRange=-50000f..100000f,
+                modifier=Modifier.semantics {contentDescription="Hypothetical reaction heat"})
+            Text("Assumed reaction factor: "+labNumber(reactionFactor.toDouble())+" 1/s")
+            Slider(value=reactionFactor,onValueChange={reactionFactor=it;reactionPlaying=false;
+                reactionResult=null},valueRange=0f..5f,
+                modifier=Modifier.semantics {contentDescription="Hypothetical reaction factor"})
+            Text("External heater: "+labNumber(reactionHeating.toDouble())+" W")
+            Slider(value=reactionHeating,onValueChange={reactionHeating=it;reactionPlaying=false;
+                reactionResult=null},valueRange=-200f..200f,
+                modifier=Modifier.semantics {contentDescription="External thermal heater power"})
+            OutlinedButton(onClick={
+                runCatching{
+                    reactionResult=NativeWorldLabChemicalThermal.evaluate(
+                        NativeChemicalThermalInput(
+                            reactionHeatReleasedJPerMol=reactionHeat.toDouble(),
+                            preExponentialPerS=reactionFactor.toDouble(),
+                            externalHeatingW=reactionHeating.toDouble()))
+                    reactionFrame=0;reactionPlaying=true;warning=""
+                }.onFailure{reactionPlaying=false;reactionResult=null
+                    warning=it.message?:"Invalid hypothetical reaction parameters"}
+            }){Text("Calculate reaction temperature")}
+            reactionResult?.let{run->
+                val sample=run.samples[reactionFrame.coerceIn(0,run.samples.lastIndex)]
+                Text("Time: "+labNumber(sample.timeSeconds)+" s")
+                Text("Reactant converted: "+labNumber(sample.productFormedMol)+" mol")
+                Text("Temperature: "+labNumber(sample.temperatureK)+" K")
+                Text("Chemical heat: "+labNumber(sample.reactionPowerW)+" W")
+                Text("Energy residual: "+labNumber(sample.energyResidualJ)+" J")
+                Slider(value=reactionFrame.toFloat()/run.samples.lastIndex,
+                    onValueChange={reactionPlaying=false
+                        reactionFrame=(it*run.samples.lastIndex).toInt()},
+                    modifier=Modifier.semantics {contentDescription="Explore reaction time"})
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={reactionPlaying=!reactionPlaying}){
+                        Text(if(reactionPlaying)"Pause reaction" else "Play reaction")
+                    }
+                    OutlinedButton(onClick={reactionPlaying=false;reactionFrame=0}){
+                        Text("Reset reaction")
+                    }
+                }
+                Text(run.validity,style=MaterialTheme.typography.bodySmall)
+            }
             Text("Connected DC circuits",style=MaterialTheme.typography.titleSmall)
             if(project!!.networks.isEmpty()){
                 OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.addStarterCircuit(it)}}){

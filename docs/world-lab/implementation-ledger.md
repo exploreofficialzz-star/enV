@@ -337,3 +337,7 @@ release-candidate evidence bundle are unfinished.
 ## Chemical–thermal inventor experiment (2026-10-31)
 
 - Added bounded well-mixed hypothetical first-order Arrhenius chemical reaction with temperature-dependent rate, reaction enthalpy feeding an assumed lumped thermal mass, external heater/cooler, Newton cooling, and integrated heat conservation/residual. Local RK4 solver rejects unsafe numerical settings, nonfinite heat/quantity, and stiff resource budgets. The Web studio now exposes child-friendly progressive reaction parameter fields, pause/step/seek, computed conversion/temperature/reaction power/energy records and JSON evidence. All invented chemical properties are explicitly *hypothetical*: no compound identity, physical reaction confirmation or chemical safety is claimed. Numeric tests authored and registered for later CI; native parity and true spatial chemistry remain undone.
+
+## Android native chemical–thermal coupling (2026-10-31)
+
+- Implemented native Kotlin independent bounded 0D first-order Arrhenius conversion with reaction heat, bulk thermal capacity, Newton cooling and optional external heat input. Each time sample reports reactant/product, temperature, rate, heat flows and conservation residual. Compose offers assumed kinetics/enthalpy/heater controls and time playback, with explicit hypothetical/unknown-chemistry labels. Numerical regression source checks reaction conversion, heating, energy and invalid heat capacity; the full CI/device audit remains pending.

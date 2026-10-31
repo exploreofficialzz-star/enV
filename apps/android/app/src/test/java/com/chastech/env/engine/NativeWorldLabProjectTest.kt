@@ -124,6 +124,20 @@ class NativeWorldLabProjectTest {
             NativeWorldLabProjectCodec.decode(root.toString())
         }
     }
+    @Test fun nativeHypotheticalReactionCouplesTemperatureAndConservesHeat(){
+        val input=NativeChemicalThermalInput(
+            preExponentialPerS=0.5,activationEnergyJPerMol=0.0,
+            reactionHeatReleasedJPerMol=50000.0,
+            coolingConductanceWPerK=0.0,durationSeconds=4.0)
+        val run=NativeWorldLabChemicalThermal.evaluate(input)
+        assertTrue(run.samples.last().productFormedMol>0.5)
+        assertTrue(run.samples.last().temperatureK>input.initialTemperatureK)
+        assertTrue(kotlin.math.abs(run.samples.last().energyResidualJ)<1e-4)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabChemicalThermal.evaluate(input.copy(
+                heatCapacityJPerK=0.0))
+        }
+    }
     @Test fun rejectsUntrustedAttributesAndInvalidGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             NativeWorldLabProjectCodec.decode(fixture().replace(
