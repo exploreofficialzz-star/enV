@@ -29,7 +29,26 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
             outer.getString("id")==id&&outer.getString("projectId")==projectId&&
             outer.getString("kind")=="interface-optics"&&
             outer.getInt("projectRevision")>=0){"Optical evidence identity was changed."}
+        require(outer.getString("createdAt").let{
+            runCatching{OffsetDateTime.parse(it)}.isSuccess
+        }){"Optical evidence date is invalid."}
         val result=outer.getJSONObject("result")
+        val required=setOf("format","modelVersion","evidence","materialEvidence",
+            "projectId","projectRevision","firstMaterialId","secondMaterialId",
+            "firstIndex","secondIndex","incidentAngleDegrees","reflectedAngleDegrees",
+            "transmittedAngleDegrees","criticalAngleDegrees",
+            "totalInternalReflection","sReflectance","pReflectance",
+            "unpolarizedReflectance","unpolarizedTransmittance","energyResidual",
+            "validity")
+        require(result.keys().asSequence().toSet()==required){
+            "Optical evidence fields are incomplete or unrecognized."
+        }
+        require(result.getString("firstMaterialId")!=result.getString("secondMaterialId")&&
+            result.getDouble("incidentAngleDegrees") in 0.0..89.9&&
+            result.getDouble("reflectedAngleDegrees")==result.getDouble("incidentAngleDegrees")&&
+            result.getString("validity").length in 30..2000){
+            "Optical evidence assumptions are invalid."
+        }
         require(result.getString("format")=="env-world-lab-interface-optics"&&
             result.getString("modelVersion")=="1.0.0"&&
             result.getString("evidence")=="physics-model-computed"&&
@@ -42,6 +61,16 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         val second=result.getDouble("secondIndex")
         val refl=result.getDouble("unpolarizedReflectance")
         val trans=result.getDouble("unpolarizedTransmittance")
+        val s=result.getDouble("sReflectance")
+        val p=result.getDouble("pReflectance")
+        val residual=result.getDouble("energyResidual")
+        val total=result.getBoolean("totalInternalReflection")
+        require(s.isFinite()&&p.isFinite()&&s in 0.0..1.0&&p in 0.0..1.0&&
+            residual.isFinite()&&residual in 0.0..1e-8&&
+            kotlin.math.abs(refl-(s+p)/2)<1e-9&&
+            (!total||(result.isNull("transmittedAngleDegrees")&&trans==0.0))){
+            "Optical evidence polarizations or power balance are invalid."
+        }
         require(first.isFinite()&&first in 1.0..5.0&&
             second.isFinite()&&second in 1.0..5.0&&
             refl.isFinite()&&refl in 0.0..1.0&&
@@ -102,6 +131,40 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
             }
         }finally{temp.delete()}
         return recordId
+    }
+    /** Import only an already-saved, project-bound, immutable optical result. */
+    @Synchronized fun importRecord(json:String,projectId:String):String {
+        val bytes=json.toByteArray(StandardCharsets.UTF_8)
+        require(bytes.size<=2*1024*1024){"Imported scientific record exceeds 2 MB."}
+        val header=JSONObject(json)
+        val id=safeId(header.getString("id"))
+        val record=validate(bytes,projectId,id)
+        val saved=NativeWorldLabProjectStore(root).read(projectId)
+        require(record.getInt("projectRevision")<=saved.revision){
+            "Scientific evidence belongs to a later invention revision."
+        }
+        val destination=file(projectId,id)
+        if(destination.exists()){
+            require(read(projectId,id)==json){
+                "A different immutable optical result already uses this ID."
+            }
+            return id
+        }
+        val dir=dir(projectId)
+        require(dir.isDirectory||dir.mkdirs()){"Cannot create optical evidence history."}
+        require((dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0)<20){
+            "Optical evidence quota is full."
+        }
+        val temp=File.createTempFile("optic-import-",".tmp",dir)
+        try{
+            temp.writeBytes(bytes)
+            try{
+                Files.move(temp.toPath(),destination.toPath(),StandardCopyOption.ATOMIC_MOVE)
+            }catch(_:java.nio.file.AtomicMoveNotSupportedException){
+                Files.move(temp.toPath(),destination.toPath())
+            }
+        }finally{temp.delete()}
+        return id
     }
     @Synchronized fun list(projectId:String):List<String> {
         val folder=dir(projectId)

@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import java.io.ByteArrayOutputStream
 import com.chastech.env.engine.NativeWorldLabOpticsEvidenceStore
 import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.NativeWorldLabProject
@@ -28,6 +29,31 @@ fun NativeWorldLabOpticsPanel(project:NativeWorldLabProject,onMessage:(String)->
         mutableStateOf(runCatching{store.list(project.id)}.getOrDefault(emptyList()))
     }
     var chosenEvidence by remember { mutableStateOf("") }
+    val importer=rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null){
+            runCatching{
+                val stream=context.contentResolver.openInputStream(uri)
+                    ?:error("Cannot open the optical JSON file.")
+                val output=ByteArrayOutputStream()
+                stream.use{input->
+                    val chunk=ByteArray(8192)
+                    while(true){
+                        val count=input.read(chunk)
+                        if(count<0)break
+                        require(output.size()+count<=2*1024*1024){
+                            "Optical scientific record exceeds 2 MB."
+                        }
+                        output.write(chunk,0,count)
+                    }
+                }
+                store.importRecord(output.toString("UTF-8"),project.id)
+            }.onSuccess{
+                records=store.list(project.id)
+                onMessage("Imported optical evidence for this invention.")
+            }.onFailure{onMessage(it.message?:"Optical import was rejected.")}
+        }
+    }
     val export=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null&&chosenEvidence.isNotEmpty()){
@@ -80,6 +106,9 @@ fun NativeWorldLabOpticsPanel(project:NativeWorldLabProject,onMessage:(String)->
                 }.onFailure{onMessage(it.message?:"Optical record could not be saved.")}
             }){Text("Keep optical evidence on device")}
             Text(run.validity,style=MaterialTheme.typography.bodySmall)
+        }
+        OutlinedButton(onClick={importer.launch(arrayOf("application/json","text/plain"))}){
+            Text("Import portable optical evidence")
         }
         if(records.isNotEmpty()){
             Text("Saved optical experiments: "+records.size,

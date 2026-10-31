@@ -617,3 +617,9 @@ release-candidate evidence bundle are unfinished.
   optional chaining and ensured the Android optical evidence quota predicate
   evaluates a numeric count before its 20-record comparison. No test or
   build execution is claimed for these edits.
+
+- Android now accepts optical scientific evidence JSON exported by Web/iOS
+  through the Android document picker. It validates project ownership,
+  saved revision bounds, index/angle/power domains, non-executable exact
+  fields and an immutable 20-record quota; a conflicting record ID fails
+  closed. This is user-triggered import/export, not automatic cloud sync.
