@@ -1,4 +1,4 @@
-import { parseCssColor, toHex, type RgbaColor } from "./accessibility-color";
+import { parseCssColor, type RgbaColor } from "./accessibility-color";
 
 type HsvColor = { h: number; s: number; v: number };
 const NUMBER = "[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)";
