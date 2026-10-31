@@ -3,8 +3,8 @@ import type {Vec3} from "./sphere-collision-3d.ts";
 
 /**
  * Exact event-driven, free-flight hard-sphere contact for 2–12 invented spheres.
- * Isolated, frictionless binary impacts only. If impacts share a simultaneous
- * time, there is no unique binary impulse answer: reject rather than invent.
+ * Frictionless binary impacts. Disjoint simultaneous pairs are independent;
+ * contacts sharing a sphere are ambiguous and rejected, never guessed.
  */
 const add=(a:Vec3,b:Vec3):Vec3=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
 const sub=(a:Vec3,b:Vec3):Vec3=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -114,35 +114,42 @@ export function runMultiSphereCollisions(raw:WorldLabProject,
       else if(Math.abs(interval-shortest)<=TIME_TOL)equalPairs.push([i,j]);
     }
     if(!Number.isFinite(shortest))break;
-    if(equalPairs.length!==1)
-      throw new Error("Simultaneous multi-contact is unresolved; choose separated impact times.");
-    if(events.length>=MAX_EVENTS)
+    // Events at the same time are solvable as independent binary impulses
+    // ONLY when no sphere participates in more than one contact.
+    const participants=new Set<number>();
+    for(const [i,j] of equalPairs){
+      if(participants.has(i)||participants.has(j))
+        throw new Error("Simultaneous shared-sphere multi-contact is unresolved.");
+      participants.add(i);participants.add(j);
+    }
+    if(events.length+equalPairs.length>MAX_EVENTS)
       throw new Error("Event limit reached; this dense multi-contact experiment is unsupported.");
-    const [i,j]=equalPairs[0];
     for(const o of objects)o.position=add(o.position,mul(o.velocity,shortest));
     time+=shortest;
-    const a=objects[i],b=objects[j];
-    const distance=len(sub(b.position,a.position));
-    if(Math.abs(distance-a.radius-b.radius)>1e-6)
-      throw new Error("Event contact position failed its geometric audit.");
-    const normal=mul(sub(b.position,a.position),1/distance);
-    const closing=dot(sub(b.velocity,a.velocity),normal);
-    if(closing>=-1e-10)throw new Error("Collision event did not have a closing normal speed.");
-    const impulse=mul(normal,-(1+restitution)*closing/(1/a.mass+1/b.mass));
-    const beforeEnergy=energy(objects),beforeP=momentum(objects),beforeL=angular(objects);
-    a.velocity=sub(a.velocity,mul(impulse,1/a.mass));
-    b.velocity=add(b.velocity,mul(impulse,1/b.mass));
-    const afterEnergy=energy(objects),afterP=momentum(objects),afterL=angular(objects);
-    const lost=0.5*a.mass*b.mass/(a.mass+b.mass)*(1-restitution*restitution)*closing*closing;
-    if(![...afterP,...afterL,afterEnergy,lost].every(Number.isFinite)||
-      len(sub(beforeP,afterP))>1e-8*Math.max(1,len(beforeP))||
-      len(sub(beforeL,afterL))>1e-8*Math.max(1,len(beforeL))||
-      Math.abs(beforeEnergy-afterEnergy-lost)>1e-8*Math.max(1,beforeEnergy))
-      throw new Error("Event violates finite momentum, angular momentum or kinetic energy conservation.");
-    lossTotal+=lost;
-    events.push({atSeconds:time,firstEntityId:a.id,secondEntityId:b.id,
-      contactNormal:normal,impulseNs:impulse,energyLostJ:lost,
-      totalEnergyAfterJ:afterEnergy,totalMomentumAfterKgMps:afterP});
+    for(const [i,j] of equalPairs){
+      const a=objects[i],b=objects[j];
+      const distance=len(sub(b.position,a.position));
+      if(Math.abs(distance-a.radius-b.radius)>1e-6)
+        throw new Error("Event contact position failed its geometric audit.");
+      const normal=mul(sub(b.position,a.position),1/distance);
+      const closing=dot(sub(b.velocity,a.velocity),normal);
+      if(closing>=-1e-10)throw new Error("Collision event did not have a closing normal speed.");
+      const impulse=mul(normal,-(1+restitution)*closing/(1/a.mass+1/b.mass));
+      const beforeEnergy=energy(objects),beforeP=momentum(objects),beforeL=angular(objects);
+      a.velocity=sub(a.velocity,mul(impulse,1/a.mass));
+      b.velocity=add(b.velocity,mul(impulse,1/b.mass));
+      const afterEnergy=energy(objects),afterP=momentum(objects),afterL=angular(objects);
+      const lost=0.5*a.mass*b.mass/(a.mass+b.mass)*(1-restitution*restitution)*closing*closing;
+      if(![...afterP,...afterL,afterEnergy,lost].every(Number.isFinite)||
+        len(sub(beforeP,afterP))>1e-8*Math.max(1,len(beforeP))||
+        len(sub(beforeL,afterL))>1e-8*Math.max(1,len(beforeL))||
+        Math.abs(beforeEnergy-afterEnergy-lost)>1e-8*Math.max(1,beforeEnergy))
+        throw new Error("Event violates finite momentum, angular momentum or kinetic energy conservation.");
+      lossTotal+=lost;
+      events.push({atSeconds:time,firstEntityId:a.id,secondEntityId:b.id,
+        contactNormal:normal,impulseNs:impulse,energyLostJ:lost,
+        totalEnergyAfterJ:afterEnergy,totalMomentumAfterKgMps:afterP});
+    }
   }
   const finalP=momentum(objects),finalL=angular(objects);
   const finalEnergy=energy(objects);
@@ -163,9 +170,9 @@ export function runMultiSphereCollisions(raw:WorldLabProject,
     initialAngularMomentumKgM2PerS:initialL,
     finalAngularMomentumKgM2PerS:finalL,
     validity:"Exact event-driven free flight of 2–12 ideal rigid smooth spheres "+
-      "with isolated binary contacts, assumed mass and restitution. No gravity, "+
+      "with isolated or independent simultaneous binary contacts, assumed mass and restitution. No gravity, "+
       "friction, spin, soft-body deformation, joint constraint, terrain, "+
-      "simultaneous contacts, fracture or thermal constitutive model. "+
+      "shared-sphere simultaneous multi-contacts, fracture or thermal constitutive model. "+
       "Contact dissipation is kinetic energy loss, not predicted temperature. "+
       "A run with zero events is valid free flight, not evidence of contact.",
   });
