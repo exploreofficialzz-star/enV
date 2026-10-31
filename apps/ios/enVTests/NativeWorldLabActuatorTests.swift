@@ -284,4 +284,57 @@ final class NativeWorldLabActuatorTests:XCTestCase {
             velocities:["s-0":[2,0,0]],restitution:1))
     }
 
+    func testDisjointSimultaneousSphereContactsAreCalculatedWithoutOrderingBias() throws {
+        var json=try NativeWorldLabEditor.blank()
+        for i in 0..<4 {
+            json=try NativeWorldLabEditor.addSolid(json,shape:"sphere",id:"s-\(i)")
+        }
+        json=try NativeWorldLabEditor.addHypotheticalMaterial(
+            json,name:"Invented gel",densityKgM3:12/Double.pi,id:"gel")
+        let positions:[Double]=[-4,-1,4,10]
+        for i in 0..<4 {
+            json=try NativeWorldLabEditor.positionSolid(
+                json,id:"s-\(i)",positionMeters:[positions[i],0.5,0])
+            json=try NativeWorldLabEditor.assignMaterial(
+                json,solidId:"s-\(i)",materialId:"gel")
+        }
+        let project=try NativeWorldLabProject.decode(json)
+        for restitution in [1.0,0.5] {
+            let run=try NativeWorldLabMultiSphere.evaluate(project,velocities:[
+                "s-0":[2,0,0],"s-2":[5,0,0]
+            ],restitution:restitution,durationSeconds:1.5)
+            XCTAssertEqual(run.events.count,2)
+            XCTAssertEqual(run.events[0].atSeconds,1,accuracy:1e-10)
+            XCTAssertEqual(run.events[1].atSeconds,1,accuracy:1e-10)
+            XCTAssertEqual(try run.sample(0.99).completedEvents,0)
+            let atContact=try run.sample(1)
+            XCTAssertEqual(atContact.completedEvents,2)
+            XCTAssertEqual(atContact.objects[1].velocityMps[0],1+restitution,accuracy:1e-9)
+            XCTAssertEqual(atContact.objects[3].velocityMps[0],2.5*(1+restitution),accuracy:1e-9)
+            XCTAssertEqual(run.totalInitialEnergyJ-run.totalFinalEnergyJ,
+                run.totalDissipatedEnergyJ,accuracy:1e-9)
+            XCTAssertEqual(run.initialMomentumKgMps[0],run.finalMomentumKgMps[0],
+                accuracy:1e-9)
+        }
+    }
+
+    func testSharedSphereSimultaneousImpactsRemainUnsupported() throws {
+        var json=try NativeWorldLabEditor.blank()
+        for i in 0..<3 {
+            json=try NativeWorldLabEditor.addSolid(json,shape:"sphere",id:"s-\(i)")
+        }
+        json=try NativeWorldLabEditor.addHypotheticalMaterial(
+            json,name:"Invented gel",densityKgM3:12/Double.pi,id:"gel")
+        for i in 0..<3 {
+            json=try NativeWorldLabEditor.positionSolid(
+                json,id:"s-\(i)",positionMeters:[-4+Double(3*i),0.5,0])
+            json=try NativeWorldLabEditor.assignMaterial(
+                json,solidId:"s-\(i)",materialId:"gel")
+        }
+        let project=try NativeWorldLabProject.decode(json)
+        XCTAssertThrowsError(try NativeWorldLabMultiSphere.evaluate(project,velocities:[
+            "s-0":[2,0,0],"s-2":[-2,0,0]
+        ],restitution:1,durationSeconds:2))
+    }
+
 }
