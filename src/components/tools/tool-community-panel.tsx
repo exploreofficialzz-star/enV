@@ -51,7 +51,8 @@ function newIdempotencyKey() {
   return window.crypto.randomUUID();
 }
 
-export function ToolCommunityPanel({ toolId }: { toolId: string }) {\n  const featureEnabled = import.meta.env.VITE_COMMUNITY_ENABLED === "true";
+export function ToolCommunityPanel({ toolId }: { toolId: string }) {
+  const featureEnabled = import.meta.env.VITE_COMMUNITY_ENABLED === "true";
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [feed, setFeed] = useState<CommunityFeed | null>(null);
   const [loading, setLoading] = useState(true);
@@ -220,7 +221,9 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {\n  const fe
     );
   }
 
-  if (!featureEnabled) return null;\n\n  return (
+  if (!featureEnabled) return null;
+
+  return (
     <section className="mt-10 border-t border-border pt-7" aria-labelledby="tool-community-heading">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
