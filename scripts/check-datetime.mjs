@@ -49,6 +49,7 @@ assert.equal(runDateTime("date-diff", { from: "2024-01-31", to: "2024-02-29" })
 
 const monthEnd = runDateTime("date-add", { start: "2024-01-31", months: "1" });
 assert.match(monthEnd[0].value, /2024-02-29/);
+assert.throws(() => runDateTime("date-add", { start: "2024-01-01", days: "1.5" }), /whole number/);
 
 const converted = runDateTime("timezone", {
   time: "2024-01-01T09:00", fromTz: "UTC", toTz: "America/New_York",

@@ -359,7 +359,8 @@ function addDateSpan(start: Date, options: Record<string, string>, multiplier = 
   const amount = (key: string) => {
     const parsed = Number(options[key] || 0);
     if (!Number.isFinite(parsed)) throw new Error(`Enter a valid number for ${key}.`);
-    return Math.trunc(parsed) * direction * multiplier;
+    if (!Number.isInteger(parsed)) throw new Error(`${key} must be a whole number.`);
+    return parsed * direction * multiplier;
   };
   let result = addYears(start, amount("years"));
   result = addMonths(result, amount("months"));
