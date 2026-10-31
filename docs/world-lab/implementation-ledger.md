@@ -329,3 +329,7 @@ release-candidate evidence bundle are unfinished.
 ## Android native movable visual assemblies (2026-10-31)
 
 - Kotlin validated editors now create named groups of 2–30 existing solids, move all member centers by a consistent SI vector and remove group records without destroying member geometry. Compose offers group creation, touch movement on X/Y/Z, and ungroup controls; saved snapshot clears transient revision-aware undo history. The strict shared project parser prevents overlapping membership or dangling references. Native regression source covers group transform, immutable non-members and data preservation; broad CI remains deferred.
+
+## iOS native visual assembly UI (2026-10-31)
+
+- The existing native SwiftUI World Lab now exposes named visual grouping of two existing invented solids, movable group offsets in three axes, and non-destructive ungroup operations, all through the validated iOS project editor and monotonic revision history. Overlapping/missing memberships are rejected rather than silently created. These groups do not imply rigid physics or structural joints; native simulator and accessibility audits remain pending.

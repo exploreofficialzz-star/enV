@@ -46,6 +46,8 @@ struct NativeWorldLabView:View {
     @State private var negativeWire="ground"
     @State private var gridSpacing=0.5
     @State private var measureTargetId=""
+    @State private var assemblyName="My invention"
+    @State private var assemblySecondId=""
     @State private var problem=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
@@ -413,6 +415,57 @@ struct NativeWorldLabView:View {
                         Button("Add sphere"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"sphere")}}
                         Button("Add cylinder"){applyProject{try NativeWorldLabEditor.addSolid($0,shape:"cylinder")}}
                     }.buttonStyle(.bordered).disabled(project.entities.count>=200)
+                    Text("Build from visual parts").font(.headline)
+                    Text("Connect solid shapes for coordinated movement, not a calculated mechanical joint.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let chosen=solid {
+                        let available=project.entities.filter{candidate in
+                            candidate.id != chosen.id &&
+                            !(project.assemblies ?? []).contains(where:{
+                                $0.entityIds.contains(candidate.id)
+                            })
+                        }
+                        TextField("Assembly name",text:$assemblyName)
+                            .textFieldStyle(.roundedBorder)
+                        Picker("Second part",selection:$assemblySecondId){
+                            Text("Choose a second solid").tag("")
+                            ForEach(available,id:\.id){candidate in
+                                Text(candidate.name).tag(candidate.id)
+                            }
+                        }.pickerStyle(.menu)
+                        Button("Group these parts"){
+                            applyProject{try NativeWorldLabEditor.createVisualAssembly(
+                                $0,name:assemblyName,
+                                entityIds:[chosen.id,assemblySecondId])}
+                        }.buttonStyle(.bordered)
+                            .disabled(assemblySecondId.isEmpty ||
+                                !available.contains(where:{$0.id==assemblySecondId}) ||
+                                assemblyName.isEmpty ||
+                                (project.assemblies?.count ?? 0)>=50 ||
+                                (project.assemblies ?? []).contains(where:{
+                                    $0.entityIds.contains(chosen.id)
+                                }))
+                    }
+                    ForEach(project.assemblies ?? [],id:\.id){group in
+                        VStack(alignment:.leading,spacing:6){
+                            Text(group.name+" · "+String(group.entityIds.count)+" parts")
+                                .font(.subheadline)
+                            HStack {
+                                ForEach(0..<3,id:\.self){axis in
+                                    Button("Move +"+["X","Y","Z"][axis]){
+                                        var delta=[0.0,0.0,0.0]
+                                        delta[axis]=0.5
+                                        applyProject{try NativeWorldLabEditor.moveVisualAssembly(
+                                            $0,id:group.id,deltaMeters:delta)}
+                                    }
+                                }
+                            }.buttonStyle(.bordered)
+                            Button("Ungroup safely"){
+                                applyProject{try NativeWorldLabEditor.ungroupVisualAssembly(
+                                    $0,id:group.id)}
+                            }.buttonStyle(.bordered)
+                        }
+                    }
                     HStack {
                         Button("Undo"){travelEdit(false)}.disabled(!editHistory.canUndo)
                         Button("Redo"){travelEdit(true)}.disabled(!editHistory.canRedo)
