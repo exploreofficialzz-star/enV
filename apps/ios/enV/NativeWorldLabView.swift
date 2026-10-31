@@ -1064,18 +1064,13 @@ Text("Invent chemical heat").font(.headline)
             value("Initial kinetic energy",run.totalInitialEnergyJ,"J")
             value("Remaining kinetic energy",run.totalFinalEnergyJ,"J")
             value("Dissipated kinetic energy",run.totalDissipatedEnergyJ,"J")
-            Text("Momentum before (kg·m/s): "+
-                run.initialMomentumKgMps.map{String(format:"%.4g",$0)}
-                    .joined(separator:" / "))
+            Text("Momentum before (kg·m/s): "+run.initialMomentumKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
-            Text("Momentum after (kg·m/s): "+
-                run.finalMomentumKgMps.map{String(format:"%.4g",$0)}
-                    .joined(separator:" / "))
+            Text("Momentum after (kg·m/s): "+run.finalMomentumKgMps.map{String(format:"%.4g",$0)}.joined(separator:" / "))
                 .font(.caption)
             ForEach(run.events.indices,id:\.self){i in
                 let event=run.events[i]
-                Text("Impact \(i+1) at "+String(format:"%.4f",event.atSeconds)+
-                    " s: "+event.firstEntityId+" → "+event.secondEntityId)
+                Text("Impact \(i+1) at "+String(format:"%.4f",event.atSeconds)+" s: "+event.firstEntityId+" → "+event.secondEntityId)
                     .font(.caption)
             }
             Text("Group simulated time: "+String(format:"%.2f",groupTime)+" s")
