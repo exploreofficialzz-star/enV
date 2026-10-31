@@ -9,7 +9,6 @@ import {
   contrastRatio,
   evaluateContrast,
   getContrastTargets,
-  parseCssColor,
   resolveRenderedPair,
   rgbToHsl,
   suggestContrastCorrections,
