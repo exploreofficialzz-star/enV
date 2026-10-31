@@ -748,6 +748,7 @@ struct ToolCommunityPanel: View {
     private func react(_ reaction: String) async {
         do {
             try await NativeCommunityClient.post("api/community/reactions", payload: ["toolId": toolID, "visitorId": visitorID, "reaction": reaction])
+            NativeAnalyticsClient.record("reaction_created", toolID: toolID, outcome: "success")
             await refresh()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -769,6 +770,7 @@ struct ToolCommunityPanel: View {
         ]
         do {
             try await NativeCommunityClient.post("api/community/comments", payload: payload)
+            NativeAnalyticsClient.record("comment_created", toolID: toolID, outcome: "success")
             commentText = ""
             replyTo = nil
             notice = "Your comment was posted."
