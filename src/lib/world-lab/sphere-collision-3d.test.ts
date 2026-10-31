@@ -29,7 +29,7 @@ test("3D straight elastic spheres swap velocities and remain exactly separated",
   assert.deepEqual(p,before);
 });
 test("3D off-axis impact preserves tangential movement, full momentum and angular momentum",()=>{
-  const p=project();p.entities[1].positionMeters=[3,1.5,0];
+  const p=project();p.entities[1].positionMeters=[3,1,0];
   const run=solveSphereImpact3d(p,"a","b",[2,0,0],[0,0,0],0.65);
   near(run.impactTimeSeconds,(3-Math.sqrt(1-0.5**2))/2);
   assert.ok(Math.abs(run.impactNormal[1])>0.1);
@@ -45,7 +45,7 @@ test("3D off-axis impact preserves tangential movement, full momentum and angula
   assert.ok(run.dissipatedEnergyJ>0);
 });
 test("fully plastic 3D sphere contact dissipates normal kinetic energy only",()=>{
-  const p=project();p.entities[1].positionMeters=[3,1.5,0];
+  const p=project();p.entities[1].positionMeters=[3,1,0];
   const run=solveSphereImpact3d(p,"a","b",[2,0,0],[0,0,0],0);
   const before=sampleSphereImpact3d(run,0);
   const after=sampleSphereImpact3d(run,run.durationSeconds);
