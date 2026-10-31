@@ -193,9 +193,19 @@ assert.ok(webClient.includes("Atomically reserve a stable batch ID") && webClien
 assert.ok(webClient.includes("ALLOWANCE_REPLAY_CONFLICT") && webClient.includes("A replayed server issue response must never reset a local spent balance") &&
   webClient.includes("OFFLINE_ACKNOWLEDGEMENT_FAILED") && webClient.includes('current.status !== "finishing"'),
   "Web allowance replay, signature persistence, and server acknowledgements must preserve the durable journal state.");
-const webSyncMethod = webClient.slice(webClient.indexOf("export async function synchronizeWebOfflineAllowance"), webClient.indexOf("export async function reportWebOfflineAllowanceLost"));
-assert.ok(webSyncMethod.includes("safe idempotent retry") && !webSyncMethod.includes("objectStore(\"transactions\").delete"),
-  "Web repairable rejections must keep transaction rows intact while rotating only the saved batch envelope.");
+const webSyncStart = webClient.indexOf("async function synchronizeWebOfflineAllowanceInternal");
+const webSyncEnd = webClient.indexOf("/** Observe only the server-confirmed sync result", webSyncStart);
+const webSyncMethod = webClient.slice(webSyncStart, webSyncEnd);
+const webAcknowledgementStart = webClient.indexOf("export async function acknowledgeOfflineSyncBatch");
+const webAcknowledgementEnd = webClient.indexOf("/** Request a server reservation", webAcknowledgementStart);
+const webAcknowledgementMethod = webClient.slice(webAcknowledgementStart, webAcknowledgementEnd);
+assert.ok(webSyncStart >= 0 && webSyncEnd > webSyncStart &&
+  webSyncMethod.includes("safe idempotent retry") &&
+  webSyncMethod.includes("allowance.pendingBatch = undefined") &&
+  !webSyncMethod.includes('objectStore("transactions").delete') &&
+  webAcknowledgementMethod.includes('resultStatus !== "syncing" && resultStatus !== "reconciled"') &&
+  webAcknowledgementMethod.includes('tx.objectStore("transactions").delete'),
+  "Web repairable rejections must preserve transaction rows; row deletion is allowed only after durable server acknowledgement.");
 assert.ok(!webClient.includes("allowance.spentSubunits += row.reservedSubunits;\n          if (input.outcome === \"succeeded\")"), "Failed-operation outcome must not refund its reservation.");
 
 const syncRoute = read("server/routes/api/billing/offline/sync.post.ts");
