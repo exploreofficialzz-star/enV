@@ -268,7 +268,7 @@ assert.ok(rewardsMigration.includes("billing_reward_events") && rewardsServer.in
   paystackServer.includes("verifyAndCreditPaystackReference"),
   "Reward attribution and deposits must use server-side verification, signed video attribution and idempotent event records.");
 const webIssueFunction = webClient.slice(webClient.indexOf("export async function requestWebOfflineAllowance"), webClient.indexOf("/** Send the persisted, retry-safe batch"));
-const webSyncFunction = webClient.slice(webClient.indexOf("export async function synchronizeWebOfflineAllowance"), webClient.indexOf("/** Retry selected local records"));
+const webSyncFunction = webSyncMethod;
 assert.ok(webIssueFunction.includes("/api/billing/offline/allowances") && webIssueFunction.includes("requestedSubunits: input.requestedSubunits") &&
   webIssueFunction.includes("idempotencyKey: input.idempotencyKey") && webIssueFunction.includes("publicKeyJwk: key.publicKeyJwk"),
   "The Web client must send the server's complete, idempotent allowance-issuance contract.");
