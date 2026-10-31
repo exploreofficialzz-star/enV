@@ -39,7 +39,7 @@ export function recordToolExecutionResult(
  });
 }
 export function recordAnalyticsEvent(event:Omit<AnalyticsEventInput,"eventId"|"occurredAt">){
- if(typeof window==="undefined"||getAnalyticsConsent()!=="granted")return;
+ if(typeof window==="undefined"||import.meta.env.VITE_ANALYTICS_ENABLED!=="true"||getAnalyticsConsent()!=="granted")return;
  const subjectId=subject(),sessionId=session(),eventId=id();if(!subjectId||!sessionId||!eventId)return;
  const nav=navigator as Navigator&{connection?:{type?:string;effectiveType?:string}};
  const width=innerWidth,connection=nav.connection;
