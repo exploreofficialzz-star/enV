@@ -608,6 +608,20 @@ public enum NativeDateTimeEngine {
         }
         let duration = try meetingLimit("durationMinutes", label: "Meeting length", fallback: 30, minimum: 5, maximum: 480)
         let interval = try meetingLimit("intervalMinutes", label: "Slot interval", fallback: 30, minimum: 5, maximum: 120)
+        let workDaysRaw = (options["workDays"] ?? "1,2,3,4,5").trimmingCharacters(in: .whitespacesAndNewlines)
+        let workDayParts = workDaysRaw.split(whereSeparator: { $0 == "," || $0.isWhitespace })
+        guard !workDayParts.isEmpty else {
+            throw NativeDateTimeError.invalidOperation("Select at least one working weekday (0=Sunday through 6=Saturday).")
+        }
+        var workDays = Set<Int>()
+        for part in workDayParts {
+            guard let day = Int(part), (0...6).contains(day) else {
+                throw NativeDateTimeError.invalidOperation("Working weekdays must be numbers from 0 (Sunday) to 6 (Saturday).")
+            }
+            workDays.insert(day)
+        }
+        let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        let workDayLabel = workDays.sorted().map { dayNames[$0] }.joined(separator: ", ")
         let dayText = format(date, pattern: "yyyy-MM-dd")
         let localFormatter = DateFormatter()
         localFormatter.locale = Locale(identifier: "en_US_POSIX")
@@ -638,8 +652,8 @@ public enum NativeDateTimeEngine {
                 let sameDay = a.year == b.year && a.month == b.month && a.day == b.day
                 let localStart = (a.hour ?? 0) * 60 + (a.minute ?? 0)
                 let localEnd = (b.hour ?? 0) * 60 + (b.minute ?? 0)
-                let weekday = cal.component(.weekday, from: cursor)
-                if !sameDay || !(2...6).contains(weekday) || localStart < startMinutes || localEnd > endMinutes {
+                let weekday = cal.component(.weekday, from: cursor) - 1
+                if !sameDay || !workDays.contains(weekday) || localStart < startMinutes || localEnd > endMinutes {
                     suitable = false
                     break
                 }
@@ -652,11 +666,11 @@ public enum NativeDateTimeEngine {
             cursor = cursor.addingTimeInterval(Double(interval * 60))
         }
         guard !slots.isEmpty else {
-            return result(("Available slots", "No shared Monday-Friday working-hours slots found. This checks working hours, not personal calendar free/busy."))
+            return result(("Available slots", "No shared working-hours slots found on the selected weekdays (\(workDayLabel)). This checks working hours, not personal calendar free/busy."))
         }
         let shown = Array(slots.prefix(8))
         var output: [(String, String)] = [
-            ("Available slots", "\(slots.count) matching Monday-Friday slots; showing the first \(shown.count). This checks working hours, not personal calendar free/busy.")
+            ("Available slots", "\(slots.count) matching slots on \(workDayLabel); showing the first \(shown.count). The same weekday rule is applied to every listed city. This checks working hours, not personal calendar free/busy.")
         ]
         for (index, slot) in shown.enumerated() { output.append(("Option \(index + 1)", slot.1)) }
         let first = shown[0].0

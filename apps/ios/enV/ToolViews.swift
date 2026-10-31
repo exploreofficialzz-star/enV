@@ -5758,7 +5758,7 @@ struct NativeDateTimeToolView: View {
         case "countdown": return ["target"]
         case "world-clock": return ["zones"]
         case "timezone-converter": return ["time", "fromTz", "toTz"]
-        case "meeting-time-planner": return ["date", "zones", "sourceTz", "workStart", "workEnd", "durationMinutes", "intervalMinutes"]
+        case "meeting-time-planner": return ["date", "zones", "sourceTz", "workStart", "workEnd", "workDays", "durationMinutes", "intervalMinutes"]
         case "unix-timestamp-converter": return ["value"]
         case "date-formatter": return ["value", "pattern"]
         case "weekday-calculator", "week-number-calculator": return ["value"]
@@ -5816,6 +5816,7 @@ struct NativeDateTimeToolView: View {
             "years": "Years", "months": "Months", "weeks": "Weeks", "direction": "Direction (add/subtract)",
             "repeatCount": "Repeat count", "date": "Meeting date (reference city)", "sourceTz": "Reference city / time zone",
             "workStart": "Working day starts (HH:mm)", "workEnd": "Working day ends (HH:mm)",
+            "workDays": "Working weekdays (0=Sun…6=Sat)",
             "durationMinutes": "Meeting length in minutes", "intervalMinutes": "Slot interval in minutes"
         ][key] ?? key.capitalized
     }
@@ -5841,6 +5842,7 @@ struct NativeDateTimeToolView: View {
             return formatter.string(from: Date())
         case "workStart": return "09:00"
         case "workEnd": return "17:00"
+        case "workDays": return "1,2,3,4,5"
         case "durationMinutes": return "30"
         case "intervalMinutes": return "30"
         case "time":

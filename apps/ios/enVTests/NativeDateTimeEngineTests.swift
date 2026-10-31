@@ -138,6 +138,24 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow).output, "Result: 2024-01-05 Friday")
     }
 
+    func testMeetingPlannerSupportsSundayToThursdayWorkweeks() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos",
+            "workStart": "09:00", "workEnd": "17:00", "workDays": "0,1,2,3,4"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("Option 1:"))
+        XCTAssertTrue(result.output.contains("Sunday, Monday, Tuesday, Wednesday, Thursday"))
+    }
+
+    func testMeetingPlannerRejectsInvalidWeekdayInput() throws {
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos", "workDays": "0,7"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos", "workDays": ""
+        ], now: fixedNow))
+    }
+
     func testNegativeSubsecondUnixValuesUseFloorSemantics() throws {
         let result = try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
             "value": "-00000000000000001"
