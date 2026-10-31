@@ -25,6 +25,16 @@ const android = extractDefinitions(kotlinSource, /NativeDeveloperStudioSpec\("([
 const ios = extractDefinitions(swiftSource, /\.init\(id:\s*"([a-z0-9-]+-studio)"/g, /\.init\("([a-z0-9-]+)"\s*,/g, 'iOS Swift');
 
 assert.equal(web.size, 14, 'Web must define all fourteen Developer Studios');
+const worldLabWeb = readFileSync('src/lib/developer-studios-catalog.ts', 'utf8');
+const worldLabAndroid = readFileSync('apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', 'utf8');
+const worldLabIos = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
+const nativeKotlin = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeWorldLab.kt', 'utf8');
+const nativeSwift = readFileSync('apps/ios/enV/NativeWorldLabView.swift', 'utf8');
+assert.ok(worldLabWeb.includes('id: "the-world-lab"'), 'World Lab must be a separate discoverable workspace');
+assert.ok(worldLabAndroid.includes('"the-world-lab" -> NativeWorldLabForm()'), 'Android must launch the World Lab native workspace');
+assert.ok(worldLabIos.includes('tool.id == "the-world-lab"') && worldLabIos.includes('NativeWorldLabView()'), 'iOS must launch World Lab as a native editor');
+assert.ok(nativeKotlin.includes('NativeWorldLabScience.evaluate('), 'Android science UI must call a real solver');
+assert.ok(nativeSwift.includes('NativeWorldLabScience.evaluate('), 'iOS science UI must call a real solver');
 assert.deepEqual([...android.keys()].sort(), [...web.keys()].sort(), 'Android Studio IDs must match Web');
 assert.deepEqual([...ios.keys()].sort(), [...web.keys()].sort(), 'iOS Studio IDs must match Web');
 for (const [id, modes] of web) {

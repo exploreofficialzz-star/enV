@@ -1,0 +1,60 @@
+name: World Lab reference-model checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/lib/world-lab/**"
+      - "src/components/world-lab/**"
+      - "src/routes/tools/**"
+      - "scripts/check-world-lab.mjs"
+      - "scripts/audit-world-lab-browser.mjs"
+      - ".github/workflows/world-lab-validation.yml"
+  pull_request:
+    paths:
+      - "src/lib/world-lab/**"
+      - "src/components/world-lab/**"
+      - "src/routes/tools/**"
+      - "scripts/check-world-lab.mjs"
+      - "scripts/audit-world-lab-browser.mjs"
+      - ".github/workflows/world-lab-validation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  world-lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Verified numerical reference cases
+        run: node scripts/check-world-lab.mjs
+      - name: Generate route types and production bundle
+        run: npm run build
+      - name: TypeScript contract
+        run: npm run typecheck
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Rendered World Lab browser acceptance
+        shell: bash
+        run: |
+          npm run dev > /tmp/world-lab-dev.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/tools/developer/the-world-lab > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != 1 ]; then
+            cat /tmp/world-lab-dev.log
+            exit 1
+          fi
+          node scripts/audit-world-lab-browser.mjs

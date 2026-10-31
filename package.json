@@ -99,7 +99,9 @@
     "audit:ux-ui-studio:browser": "node scripts/audit-ux-ui-studio-browser.mjs",
     "check:modal-moss": "node scripts/check-modal-moss-music.mjs",
     "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts src/lib/media/song-backend.test.ts src/lib/media/song-intelligence.test.ts src/lib/media/song-stem-separation.test.ts src/lib/media/spleeter-audio.test.ts src/lib/engines/music-dataset-analysis.test.ts src/lib/engines/music-sandbox.test.ts src/lib/engines/music-sandbox-analysis.test.ts",
-    "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs"
+    "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs",
+    "world-lab:worker": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/world-lab-worker.mjs",
+    "world-lab:worker:once": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/world-lab-worker.mjs --once"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -135,7 +137,8 @@
     "axe-core": "^4.14.0",
     "babylonjs": "9.32.1",
     "babylonjs-loaders": "9.32.1",
-    "better-auth": "~1.6.30",
+    "babylonjs-serializers": "9.32.1",
+    "better-auth": "1.7.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -170,8 +173,7 @@
     "vaul": "^1.1.2",
     "vite": "^8.3.3",
     "zod": "^4.4.0",
-    "zustand": "^5.0.0",
-    "babylonjs-serializers": "9.32.1"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

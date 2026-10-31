@@ -58,6 +58,12 @@ jobs:
           profile: pixel_2
           disable-linux-hw-accel: false
           emulator-boot-timeout: 900
+          # SwiftShader GLES rejected Godot 4.6.3 material and canvas shaders:
+          # "Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)"
+          # (run 41117521516). The host backend previously rendered the real
+          # game and passed the test, but Gradle teardown lost ADB; execute
+          # instrumented assertions directly to avoid that post-pass disconnect.
+          # NEVER disable pixel or touch-movement assertions to make CI green.
           emulator-options: -no-window -gpu host -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
           script: bash scripts/test-android-game-preview.sh
       - name: Upload test evidence

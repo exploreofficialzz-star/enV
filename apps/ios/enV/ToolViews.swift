@@ -429,7 +429,9 @@ struct ToolDestinationView: View {
     let tool: Tool
 
     @ViewBuilder var body: some View {
-        if tool.id == "artboard-studio" {
+        if tool.id == "the-world-lab" {
+            NativeWorldLabView()
+        } else if tool.id == "artboard-studio" {
             NativeGamePreview()
         } else if tool.id == "ux-ui-studio" {
             NativeUxUiStudioView()

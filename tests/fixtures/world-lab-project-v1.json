@@ -1,0 +1,80 @@
+{
+  "format": "env-world-lab",
+  "schemaVersion": 1,
+  "id": "worldlab-fixture-1",
+  "title": "Cross-platform solid fixture",
+  "revision": 0,
+  "createdAt": "2026-10-30T12:00:00Z",
+  "updatedAt": "2026-10-30T12:00:00Z",
+  "world": {
+    "frame": "LOCAL_ENU",
+    "representation": "representative-not-measured",
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "terrainSource": null
+  },
+  "camera": {
+    "positionMeters": [
+      0,
+      1.65,
+      -8
+    ],
+    "lookingAtMeters": [
+      0,
+      1.2,
+      0
+    ]
+  },
+  "entities": [
+    {
+      "id": "cube-1",
+      "name": "Cube",
+      "shape": "box",
+      "positionMeters": [
+        1,
+        0.5,
+        1
+      ],
+      "dimensionsMeters": [
+        2,
+        3,
+        4
+      ],
+      "color": "#CFD7D6",
+      "materialId": "mat-1",
+      "scientificRole": "visual-only",
+      "opacity": 1
+    },
+    {
+      "id": "sphere-1",
+      "name": "Sphere",
+      "shape": "sphere",
+      "positionMeters": [
+        0,
+        0.5,
+        0
+      ],
+      "dimensionsMeters": [
+        1,
+        1,
+        1
+      ],
+      "color": "#AAAAAA",
+      "materialId": null,
+      "scientificRole": "visual-only",
+      "opacity": 0.5
+    }
+  ],
+  "materials": [
+    {
+      "id": "mat-1",
+      "name": "User invented",
+      "densityKgM3": 300,
+      "youngModulusPa": null,
+      "evidence": "hypothetical-user-assumed"
+    }
+  ]
+}

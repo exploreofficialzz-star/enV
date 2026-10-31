@@ -541,6 +541,11 @@ struct NativeDeveloperStudioSpec: Identifiable, Hashable {
 }
 
 let nativeDeveloperStudioSpecs: [NativeDeveloperStudioSpec] = [
+    .init(id:"the-world-lab",sourceID:"javascript-formatter",slug:"the-world-lab",
+          name:"The World Lab",
+          description:"Native 3D inspection and bounded offline scientific reference experiments.",
+          icon:"Orbit",keywords:["world lab","science","materials","physics","3d"],
+          modes:[.init("workspace","Workspace","the-world-lab")]),
     .init(id: "json-studio", sourceID: "json-formatter", slug: "json-studio", name: "JSON Studio", description: "Format, validate, compare, inspect, and query JSON locally while preserving large integer tokens and explaining parser caveats.", icon: "Braces", keywords: ["json", "format", "minify", "validate", "diff", "path", "tree", "large integer", "privacy"], modes: [.init("format", "Format", "json-formatter"), .init("minify", "Minify", "json-minifier"), .init("validate", "Validate", "json-validator"), .init("diff", "Diff", "json-diff"), .init("path", "Path / Search", "json-path-query"), .init("tree", "Tree / Inspect", "json-inspector"), .init("schema", "Schema", "developer-json-schema-generator"), .init("convert", "Convert to CSV", "json-to-csv"), .init("csv", "CSV tools", "csv-formatter")]),
     .init(id: "jwt-studio", sourceID: "jwt-decoder", slug: "jwt-studio", name: "JWT Studio", description: "Decode tokens and inspect registered claims locally. Decoding never proves trust or signature validity.", icon: "ShieldCheck", keywords: ["jwt", "token", "claims", "expiration", "privacy"], modes: [.init("decode", "Decode", "jwt-decoder"), .init("expiration", "Expiration", "jwt-expiration-checker"), .init("claims", "Claims inspector", "jwt-inspector"), .init("payload", "Payload builder", "developer-jwt-payload-generator")]),
     .init(id: "regex-studio", sourceID: "regex-tester", slug: "regex-studio", name: "Regex Studio", description: "Test and replace regular expressions, review captures and portability, and see engine-specific limitations.", icon: "Regex", keywords: ["regex", "match", "replace", "capture", "flags"], modes: [.init("match", "Match / Test", "regex-tester"), .init("replace", "Replace", "regex-replace"), .init("explain", "Explain", "developer-regex-explainer")]),
