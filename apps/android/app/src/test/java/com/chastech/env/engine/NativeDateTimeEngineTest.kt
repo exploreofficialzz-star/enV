@@ -145,6 +145,21 @@ class NativeDateTimeEngineTest {
         assertTrue(meeting.contains("DTSTAMP:"))
     }
 
+    @Test fun unixTimestampBatchConvertsLocallyAndEnforcesLimit() {
+        val result = NativeDateTimeEngine.run("unix-timestamp-converter", options = mapOf(
+            "value" to "1704067200, 1704153600000"
+        ), now = fixedNow)
+        assertEquals(2, result.rows.size)
+        assertTrue(result.output.contains("Timestamp 1:"))
+        assertTrue(result.output.contains("Timestamp 2:"))
+        try {
+            NativeDateTimeEngine.run("unix-timestamp-converter", options = mapOf(
+                "value" to (1..101).joinToString(",") { "1704067200" }
+            ), now = fixedNow)
+            throw AssertionError("more than 100 timestamps accepted")
+        } catch (_: IllegalArgumentException) { }
+    }
+
     @Test fun repeatedDaylightSavingTimeSelectsEarlierOccurrenceAndExplainsIt() {
         val result = NativeDateTimeEngine.run("timezone-converter", options = mapOf(
             "time" to "2024-11-03T01:30", "fromTz" to "America/New_York", "toTz" to "UTC"

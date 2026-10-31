@@ -87,6 +87,13 @@ assert.throws(() => runDateTime("meeting-planner", {
 const micros = runDateTime("unix", { value: "1704067200000000" });
 assert.equal(micros.find((row) => row.label === "Detected precision")?.value, "microseconds");
 assert.equal(micros.find((row) => row.label === "Unix seconds")?.value, "1704067200");
+const unixBatch = runDateTime("unix", { value: "1704067200, 1704153600000" });
+assert.equal(unixBatch.length, 2);
+assert.equal(unixBatch[0].label, "Timestamp 1");
+assert.equal(unixBatch[1].label, "Timestamp 2");
+assert.throws(() => runDateTime("unix", {
+  value: Array.from({ length: 101 }, () => "1704067200").join(",")
+}), /100 timestamps/);
 
 const meeting = runDateTime("meeting-planner", {
   date: "2024-01-15", zones: "Lagos\nLondon\nNew York", sourceTz: "Lagos",
