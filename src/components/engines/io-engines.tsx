@@ -396,6 +396,7 @@ const DATE_FIELDS: Record<string, UiField[]> = {
     { name: "sourceTz", label: "Reference city / time zone", type: "text", placeholder: "Auto: your device time zone" },
     { name: "workStart", label: "Working day starts (HH:mm)", type: "text", defaultValue: "09:00" },
     { name: "workEnd", label: "Working day ends (HH:mm)", type: "text", defaultValue: "17:00" },
+    { name: "workDays", label: "Working weekdays (0=Sun … 6=Sat)", type: "text", defaultValue: "1,2,3,4,5" },
     { name: "durationMinutes", label: "Meeting length in minutes", type: "number", defaultValue: 30 },
     { name: "intervalMinutes", label: "Slot interval in minutes", type: "number", defaultValue: 30 },
   ],

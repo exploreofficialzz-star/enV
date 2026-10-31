@@ -85,6 +85,18 @@ assert.throws(() => runDateTime("date-add", { start: "2024-01-01", days: "1", di
 assert.equal(runDateTime("meeting-planner", {
   date: "2024-01-13", zones: "Lagos, London", sourceTz: "Lagos"
 }).some((row) => row.label === "Option 1"), false);
+const sundayMeeting = runDateTime("meeting-planner", {
+  date: "2024-01-14", zones: "Lagos, Berlin", sourceTz: "Lagos",
+  workStart: "09:00", workEnd: "17:00", workDays: "0,1,2,3,4"
+});
+assert.ok(sundayMeeting.some((row) => row.label === "Option 1"));
+assert.match(sundayMeeting[0].value, /Sunday, Monday, Tuesday, Wednesday, Thursday/);
+assert.throws(() => runDateTime("meeting-planner", {
+  date: "2024-01-14", zones: "Lagos, Berlin", sourceTz: "Lagos", workDays: "0,7"
+}), /Working weekdays/);
+assert.throws(() => runDateTime("meeting-planner", {
+  date: "2024-01-14", zones: "Lagos, Berlin", sourceTz: "Lagos", workDays: ""
+}), /at least one working weekday/);
 assert.throws(() => runDateTime("meeting-planner", {
   date: "2024-01-15", zones: "Lagos, London", sourceTz: "Lagos", durationMinutes: "abc"
 }), /Meeting length/);

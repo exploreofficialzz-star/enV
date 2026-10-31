@@ -426,6 +426,21 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
   }
   const duration = boundedInteger(options.durationMinutes, "Meeting length", 30, 5, 480);
   const interval = boundedInteger(options.intervalMinutes, "Slot interval", 30, 5, 120);
+  const workDaysRaw = options.workDays === undefined ? "1,2,3,4,5" : options.workDays.trim();
+  const workDayParts = workDaysRaw.split(/[\\s,]+/).filter(Boolean);
+  const workDays = new Set<number>();
+  for (const part of workDayParts) {
+    const day = Number(part);
+    if (!Number.isInteger(day) || day < 0 || day > 6) {
+      throw new Error("Working weekdays must be numbers from 0 (Sunday) to 6 (Saturday).");
+    }
+    workDays.add(day);
+  }
+  if (!workDayParts.length || !workDays.size) {
+    throw new Error("Select at least one working weekday (0=Sunday through 6=Saturday).");
+  }
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const workDayLabel = [...workDays].sort((a, b) => a - b).map((day) => dayNames[day]).join(", ");
   const startLocal = parseWallTimeInZone(`${dateKey(date)}T${workStart}`, anchor.zone).instant;
   const endLocal = parseWallTimeInZone(`${dateKey(date)}T${workEnd}`, anchor.zone).instant;
   if (endLocal <= startLocal) throw new Error("The reference city's work window is not valid on that date.");
@@ -440,7 +455,7 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
       const endMinutes = b.hour * 60 + b.minute;
       const sameLocalDay = a.year === b.year && a.month === b.month && a.day === b.day;
       const localWeekday = new Date(utcDateTimeMilliseconds(a.year, a.month - 1, a.day)).getUTCDay();
-      const weekday = localWeekday >= 1 && localWeekday <= 5;
+      const weekday = workDays.has(localWeekday);
       return { choice, a, startMinutes, endMinutes, sameLocalDay, weekday };
     });
     const suitable = localTimes.every(({ startMinutes, endMinutes, sameLocalDay, weekday }) =>
@@ -455,10 +470,10 @@ function meetingSlots(options: Record<string, string>, now: Date): DateTimeRow[]
       });
     }
   }
-  if (!slots.length) return [{ label: "Available slots", value: "No shared Monday-Friday working-hours slots found for that date and these working-hour settings." }];
+  if (!slots.length) return [{ label: "Available slots", value: "No shared working-hours slots found on the selected weekdays (" + workDayLabel + ") for that date and these working-hour settings." }];
   const shown = slots.slice(0, 8);
   const rows: DateTimeRow[] = [
-    { label: "Available slots", value: `${slots.length} matching Monday-Friday slots; showing the first ${shown.length}. This checks working hours, not personal calendar free/busy.` },
+    { label: "Available slots", value: `${slots.length} matching slots on ${workDayLabel}; showing the first ${shown.length}. The same weekday rule is applied to every listed city. This checks working hours, not personal calendar free/busy.` },
     ...shown.map((slot, index) => ({ label: `Option ${index + 1}`, value: slot.value })),
   ];
   const first = shown[0].instant;
