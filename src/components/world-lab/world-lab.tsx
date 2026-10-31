@@ -2466,7 +2466,7 @@ export default function WorldLab() {
           {editingMaterialId&&<button type="button" className={buttonClass+" mt-3 ml-2"}
             onClick={()=>{
               setEditingMaterialId(null);setMaterialName("");setDensity("");setYoungModulus("");
-            }}>Cancel material edit</button>
+            }}>Cancel material edit</button>}
           {materials.length > 0 && (
             <ul className="mt-3 list-inside list-disc text-sm">
               {materials.map((material) => <li key={material.id}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
