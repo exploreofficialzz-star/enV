@@ -412,3 +412,139 @@ enum NativeWorldLabStructural {
             surfaceStrain:strain)
     }
 }
+
+
+/// Pure one-dimensional impact event. Never claims arbitrary 3D rigid-body contact.
+struct NativeLabCollisionSample {
+    let timeSeconds:Double
+    let leftCenterXM:Double
+    let rightCenterXM:Double
+    let leftVelocityMps:Double
+    let rightVelocityMps:Double
+    let collided:Bool
+}
+struct NativeLabCollisionResult {
+    let projectId:String
+    let projectRevision:Int
+    let leftEntityId:String
+    let rightEntityId:String
+    let leftMaterialId:String
+    let rightMaterialId:String
+    let leftMassKg:Double
+    let rightMassKg:Double
+    let leftStartXM:Double
+    let rightStartXM:Double
+    let leftHalfWidthM:Double
+    let rightHalfWidthM:Double
+    let leftInitialVelocityMps:Double
+    let rightInitialVelocityMps:Double
+    let restitution:Double
+    let durationSeconds:Double
+    let impactTimeSeconds:Double
+    let contactXM:Double
+    let leftFinalVelocityMps:Double
+    let rightFinalVelocityMps:Double
+    let impulseNs:Double
+    let momentumBeforeKgMps:Double
+    let momentumAfterKgMps:Double
+    let energyBeforeJ:Double
+    let energyAfterJ:Double
+    let dissipatedEnergyJ:Double
+    let evidence="physics-model-computed"
+    let inputEvidence="hypothetical-user-assumed"
+    let validity="Single instantaneous, frictionless central impact of ideal rigid boxes sharing Y/Z centres. No rotations, ground friction, 3D joint constraints, deformable contact, breakage, fatigue or secondary impacts. Both inertial masses come from invented user-assumed densities; restitution is not measured."
+    func sample(_ time:Double)throws->NativeLabCollisionSample {
+        guard time.isFinite,time>=0,time<=durationSeconds else {
+            throw NativeWorldLabError.invalid("Collision playback time is outside simulation")
+        }
+        let before=min(time,impactTimeSeconds)
+        let after=max(0,time-impactTimeSeconds)
+        return NativeLabCollisionSample(timeSeconds:time,
+            leftCenterXM:leftStartXM+leftInitialVelocityMps*before+leftFinalVelocityMps*after,
+            rightCenterXM:rightStartXM+rightInitialVelocityMps*before+rightFinalVelocityMps*after,
+            leftVelocityMps:time<impactTimeSeconds ? leftInitialVelocityMps:leftFinalVelocityMps,
+            rightVelocityMps:time<impactTimeSeconds ? rightInitialVelocityMps:rightFinalVelocityMps,
+            collided:time>=impactTimeSeconds)
+    }
+}
+enum NativeWorldLabCollision {
+    static func evaluate(_ project:NativeWorldLabProject,firstId:String,secondId:String,
+        velocityLeftMps:Double,velocityRightMps:Double,
+        restitution:Double,durationSeconds:Double=4)throws->NativeLabCollisionResult {
+        guard firstId != secondId,
+              let a=project.entities.first(where:{$0.id==firstId}),
+              let b=project.entities.first(where:{$0.id==secondId}) else {
+            throw NativeWorldLabError.invalid("Choose two different existing physical solids")
+        }
+        guard a.shape=="box",b.shape=="box" else {
+            throw NativeWorldLabError.invalid("Central impact supports two rectangular boxes only")
+        }
+        let left=a.positionMeters[0]<b.positionMeters[0] ? a:b
+        let right=left.id==a.id ? b:a
+        guard left.positionMeters[0]<right.positionMeters[0],
+              abs(left.positionMeters[1]-right.positionMeters[1])<=1e-8,
+              abs(left.positionMeters[2]-right.positionMeters[2])<=1e-8 else {
+            throw NativeWorldLabError.invalid("Boxes need distinct X positions and aligned Y/Z centres")
+        }
+        let hl=left.dimensionsMeters[0]/2
+        let hr=right.dimensionsMeters[0]/2
+        let gap=right.positionMeters[0]-hr-(left.positionMeters[0]+hl)
+        guard gap>1e-9 else {
+            throw NativeWorldLabError.invalid("Collision solids must begin separated without overlap")
+        }
+        guard [velocityLeftMps,velocityRightMps,restitution,durationSeconds].allSatisfy({$0.isFinite}),
+              abs(velocityLeftMps)<=100,abs(velocityRightMps)<=100,
+              restitution>=0,restitution<=1,durationSeconds>0,durationSeconds<=30 else {
+            throw NativeWorldLabError.invalid("Finite velocities ±100 m/s, restitution 0 to 1 and duration (0,30] s required")
+        }
+        let relative=velocityLeftMps-velocityRightMps
+        guard relative>0 else {
+            throw NativeWorldLabError.invalid("The left solid must approach the right solid")
+        }
+        let hitTime=gap/relative
+        guard hitTime<=durationSeconds else {
+            throw NativeWorldLabError.invalid("No contact within selected simulation duration")
+        }
+        guard let leftMaterial=project.materials.first(where:{$0.id==left.materialId}),
+              let rightMaterial=project.materials.first(where:{$0.id==right.materialId}),
+              let dl=leftMaterial.densityKgM3,let dr=rightMaterial.densityKgM3 else {
+            throw NativeWorldLabError.invalid("Both objects require invented assumed densities")
+        }
+        let ml=dl*left.volumeMetersCubed
+        let mr=dr*right.volumeMetersCubed
+        guard ml.isFinite,mr.isFinite,ml>=0.001,mr>=0.001,ml<=10000,mr<=10000 else {
+            throw NativeWorldLabError.invalid("Inertial mass must be finite between 0.001 and 10000 kg")
+        }
+        let impulse=(1+restitution)*relative/(1/ml+1/mr)
+        let vl=velocityLeftMps-impulse/ml
+        let vr=velocityRightMps+impulse/mr
+        let momentumBefore=ml*velocityLeftMps+mr*velocityRightMps
+        let momentumAfter=ml*vl+mr*vr
+        let energyBefore=0.5*(ml*velocityLeftMps*velocityLeftMps+
+            mr*velocityRightMps*velocityRightMps)
+        let energyAfter=0.5*(ml*vl*vl+mr*vr*vr)
+        let lost=0.5*(ml*mr/(ml+mr))*(1-restitution*restitution)*relative*relative
+        let contact=left.positionMeters[0]+hl+velocityLeftMps*hitTime
+        guard [impulse,vl,vr,momentumBefore,momentumAfter,energyBefore,
+               energyAfter,lost,contact].allSatisfy({$0.isFinite}),
+              abs(momentumBefore-momentumAfter)<=1e-8*max(1,abs(momentumBefore)),
+              abs(energyBefore-energyAfter-lost)<=1e-8*max(1,energyBefore),
+              energyAfter<=energyBefore+1e-8*max(1,energyBefore) else {
+            throw NativeWorldLabError.invalid("Collision conservation check exceeds numerical tolerance")
+        }
+        return NativeLabCollisionResult(projectId:project.id,
+            projectRevision:project.revision,leftEntityId:left.id,
+            rightEntityId:right.id,leftMaterialId:leftMaterial.id,
+            rightMaterialId:rightMaterial.id,leftMassKg:ml,rightMassKg:mr,
+            leftStartXM:left.positionMeters[0],rightStartXM:right.positionMeters[0],
+            leftHalfWidthM:hl,rightHalfWidthM:hr,
+            leftInitialVelocityMps:velocityLeftMps,
+            rightInitialVelocityMps:velocityRightMps,
+            restitution:restitution,durationSeconds:durationSeconds,
+            impactTimeSeconds:hitTime,contactXM:contact,
+            leftFinalVelocityMps:vl,rightFinalVelocityMps:vr,
+            impulseNs:impulse,momentumBeforeKgMps:momentumBefore,
+            momentumAfterKgMps:momentumAfter,energyBeforeJ:energyBefore,
+            energyAfterJ:energyAfter,dissipatedEnergyJ:lost)
+    }
+}
