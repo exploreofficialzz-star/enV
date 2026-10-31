@@ -30,6 +30,8 @@ const palette = read("src/lib/engines/design-palette.ts");
 const paletteTests = read("src/lib/engines/design-palette.test.ts");
 const designColor = read("src/lib/engines/design-color.ts");
 const designColorTests = read("src/lib/engines/design-color.test.ts");
+const svgGenerators = read("src/lib/engines/svg-generators.ts");
+const svgGeneratorTests = read("src/lib/engines/svg-generators.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -55,7 +57,9 @@ const checks = [
   ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background)") && colorEngine.includes("previewPair.background")],
   ["Independent border corner radii", cssEngine.includes("Top left radius") && cssEngine.includes("bottomLeft")],
   ["Dedicated button focus and reduced-motion states", cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
-  ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
+  ["SVG noise filter and bounded export utility", svgGenerators.includes("feTurbulence") && svgGenerators.includes("safeHex") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
+  ["Blob, pattern and wave generator regression tests", svgGenerators.includes("buildWaveSvg") && svgGenerators.includes("buildBlobSvg") && svgGeneratorTests.includes("wave geometry responds to frequency") && svgGeneratorTests.includes("pattern generator clamps settings")],
+  ["Wave customization and transparent background UI", cssEngine.includes("Wave frequency") && cssEngine.includes("Wave phase") && cssEngine.includes("Canvas background") && cssEngine.includes("buildWaveSvg")],
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
