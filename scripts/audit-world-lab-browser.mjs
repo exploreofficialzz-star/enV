@@ -327,6 +327,42 @@ try{
   const laterSphereCoords=await page.getByText(/Computed world coordinates, first/).innerText();
   assert.notEqual(earlySphereCoords,laterSphereCoords);
   await page.getByRole("button",{name:"Reset 3D impact"}).click();
+  // A full three-sphere chain now uses THREE real movable scene objects.
+  // The event solver must find two distinct sequential contacts, not fake a
+  // single two-sphere trajectory as multi-body physics.
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:1});
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("-4");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:2});
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("-1");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
+  await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("2");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("button",{name:"Calculate all sphere contacts"}).click();
+  await page.getByText("Actual computed contacts: 2").waitFor({timeout:10000});
+  const groupDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export group impact evidence"}).click();
+  let groupJson="";
+  for await(const segment of await (await groupDownload).createReadStream())
+    groupJson+=segment.toString();
+  const groupRun=JSON.parse(groupJson);
+  assert.equal(groupRun.format,"env-world-lab-multi-sphere-impact");
+  assert.equal(groupRun.initial.length,3);
+  assert.equal(groupRun.events.length,2);
+  assert.equal(groupRun.materialEvidence,"hypothetical-user-assumed");
+  assert.ok(Math.abs(groupRun.events[0].atSeconds-1)<1e-8);
+  assert.ok(Math.abs(groupRun.events[1].atSeconds-2)<1e-8);
+  assert.ok(Math.abs(groupRun.totalInitialEnergyJ-groupRun.totalFinalEnergyJ)<1e-8);
+  assert.ok(Math.abs(groupRun.totalDissipatedEnergyJ)<1e-10);
+  await page.getByRole("slider",{name:"Explore group collision time"}).fill("2.5");
+  await page.getByText("Impacts completed at this moment: 2").waitFor();
+  await page.getByRole("button",{name:"Reset group impact"}).click();
   // Persist newly authored spheres before requesting a destructive legacy import.
   await page.getByRole("button",{name:"Save on device"}).click();
   await page.getByText(/scientific runs saved on this device/).waitFor();
