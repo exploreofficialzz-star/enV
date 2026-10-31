@@ -145,6 +145,11 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [paletteError, setPaletteError] = useState("");
 
   useEffect(() => {
+    const initialConverterValue = CONVERTER_DEFAULTS[toolId ?? ""];
+    if (initialConverterValue) setConverterValue(initialConverterValue);
+  }, [toolId]);
+
+  useEffect(() => {
     if (op !== "palette" || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const sharedBase = params.get("base");
