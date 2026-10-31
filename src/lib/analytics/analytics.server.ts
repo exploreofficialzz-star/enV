@@ -224,20 +224,21 @@ export async function runAnalyticsRetention(request: Request) {
   const configured=Number(process.env.ANALYTICS_RETENTION_DAYS??90);
   const days=Number.isSafeInteger(configured)&&configured>=30&&configured<=365?configured:90;
   const sql=await getSql();
-  // Capture yesterday before raw events are eligible for deletion. The snapshot contains
-  // aggregates only: no installation, user, session, network or raw event identifiers.
+  // Backfill every still-present historical event day before raw events are pruned.
+  // Re-running is safe: each day/platform/tool/event aggregate is upserted atomically.
+  // Snapshots contain no installation, user, session, network or raw event identifiers.
   const snapshots=await sql.query(
     `insert into product_analytics_daily_snapshots(
       snapshot_day,platform,tool_id,event_name,event_count,failure_count,unique_installations,
       sessions,duration_total_ms,duration_sample_count,captured_at
     )
-    select current_date-1,platform,coalesce(tool_id,''),event_name,count(*)::bigint,
+    select received_at::date,platform,coalesce(tool_id,''),event_name,count(*)::bigint,
       count(*) filter(where outcome='failure')::bigint,
       count(distinct anonymous_subject_digest)::bigint,count(distinct session_digest)::bigint,
       coalesce(sum(duration_ms),0)::bigint,count(duration_ms)::bigint,now()
     from product_analytics_events
-    where received_at>=current_date-1 and received_at<current_date
-    group by platform,coalesce(tool_id,''),event_name
+    where received_at<current_date
+    group by received_at::date,platform,coalesce(tool_id,''),event_name
     on conflict(snapshot_day,platform,tool_id,event_name) do update set
       event_count=excluded.event_count,failure_count=excluded.failure_count,
       unique_installations=excluded.unique_installations,sessions=excluded.sessions,
