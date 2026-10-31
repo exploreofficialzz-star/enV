@@ -307,3 +307,45 @@ enum NativeWorldLabNetworkMotor {
             networkId:network.id,entityId:entityId,dc:dc,motor:motor,samples:samples)
     }
 }
+
+
+/// A static assumed Boolean signal switches a bounded native physical motor.
+struct NativeDigitalMotorResult {
+    let projectId:String
+    let projectRevision:Int
+    let networkId:String
+    let outputId:String
+    let entityId:String
+    let logicBit:Int
+    let input:NativeActuatorInput
+    let motor:NativeActuatorResult
+    let validity="An assumed static Boolean output controls an ideal motor voltage "+
+        "for a one-dimensional reference experiment; no real processor, switching "+
+        "electronics, signal timing, verified material or device certification."
+}
+enum NativeWorldLabDigitalMotor {
+    static func evaluate(_ project:NativeWorldLabProject,networkId:String,
+        outputId:String,entityId:String,massKg:Double,
+        energizedVoltageV:Double=24,thermal:Bool=false)throws->NativeDigitalMotorResult {
+        guard energizedVoltageV.isFinite,energizedVoltageV>=0,
+              energizedVoltageV<=1000 else {
+            throw NativeWorldLabError.invalid("Assumed logic-controlled voltage outside bounds")
+        }
+        guard project.entities.contains(where:{$0.id==entityId}),
+              let network=project.digitalNetworks?.first(where:{$0.id==networkId}),
+              network.outputs.contains(where:{$0.id==outputId}) else {
+            throw NativeWorldLabError.invalid("Digital output or selected physical solid is missing")
+        }
+        let computed=try NativeWorldLabDigitalLogic.evaluate(network)
+        guard let bit=computed[outputId],bit==0 || bit==1 else {
+            throw NativeWorldLabError.invalid("Digital output has no Boolean result")
+        }
+        var input=NativeActuatorInput(massKg:massKg)
+        input.supplyVoltageV=energizedVoltageV*Double(bit)
+        if thermal {input.thermal=NativeActuatorThermalInput()}
+        let motor=try NativeWorldLabActuator.evaluate(input)
+        return NativeDigitalMotorResult(projectId:project.id,
+            projectRevision:project.revision,networkId:networkId,
+            outputId:outputId,entityId:entityId,logicBit:bit,input:input,motor:motor)
+    }
+}
