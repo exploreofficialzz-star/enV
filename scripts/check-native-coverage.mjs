@@ -19,6 +19,16 @@ const platformRuntimeExtensions = [
 for (const tool of platformRuntimeExtensions) {
   if (!catalog.some((item) => item.id === tool.id)) catalog.push(tool);
 }
+
+const dateTimeRuntimeExtensions = [
+  { id: "age-calculator", status: "active", category: "datetime", engine: { type: "datetime" } },
+  { id: "date-calculator", status: "active", category: "datetime", engine: { type: "datetime" } },
+  { id: "duration-calculator", status: "active", category: "datetime", engine: { type: "datetime" } },
+  { id: "meeting-time-planner", status: "active", category: "datetime", engine: { type: "datetime" } },
+];
+for (const tool of dateTimeRuntimeExtensions) {
+  if (!catalog.some((item) => item.id === tool.id)) catalog.push(tool);
+}
 const nativeAnalyzerRoute = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', import.meta.url), 'utf8');
 const nativeAnalyzerEngine = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt', import.meta.url), 'utf8');
 const iosAnalyzerRoutes = fs.readFileSync(new URL('../apps/ios/enV/ToolViews.swift', import.meta.url), 'utf8');

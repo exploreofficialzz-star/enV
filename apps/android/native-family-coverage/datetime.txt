@@ -1,10 +1,14 @@
+age-calculator
 birthday-countdown
 business-day-calculator
 countdown
+date-calculator
 date-difference
 date-formatter
 deadline-calculator
+duration-calculator
 leap-year-checker
+meeting-time-planner
 time-until-calculator
 timezone-converter
 unix-timestamp-converter
