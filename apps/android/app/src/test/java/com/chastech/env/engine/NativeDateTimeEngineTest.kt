@@ -118,6 +118,13 @@ class NativeDateTimeEngineTest {
         } catch (_: IllegalArgumentException) { }
     }
 
+    @Test fun defaultWeekendSetTreatsSundayAndSaturdayAsWeekend() {
+        val result = NativeDateTimeEngine.run("workday-calculator", options = mapOf(
+            "start" to "2024-01-08", "days" to "-1"
+        ), now = fixedNow)
+        assertTrue(result.output.contains("2024-01-05"))
+    }
+
     @Test fun meetingPlannerDoesNotOfferWeekendSlotsByDefault() {
         val result = NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
             "date" to "2024-01-13", "zones" to "Lagos, London", "sourceTz" to "Lagos"

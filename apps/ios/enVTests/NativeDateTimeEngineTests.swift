@@ -160,6 +160,13 @@ final class NativeDateTimeEngineTests: XCTestCase {
         XCTAssertTrue(afterMarchFirst.output.contains("Days until birthday: 364"))
     }
 
+    func testDefaultWeekendSetTreatsSundayAndSaturdayAsWeekend() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "workday-calculator", options: [
+            "start": "2024-01-08", "days": "-1"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("2024-01-05"))
+    }
+
     func testMeetingPlannerSupportsSundayToThursdayWorkweeks() throws {
         let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
             "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos",
