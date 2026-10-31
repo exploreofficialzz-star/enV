@@ -2224,6 +2224,10 @@ export default function WorldLab() {
       <WorldLabOpticsPanel project={project} mutateProject={mutateProject}
         onKeepEvidence={keepScientificEvidence} onVisualize={drawOpticalReference}/>
       <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
+        remoteComputed={remoteJob?.status==="succeeded"&&
+          remoteJob.kind==="newton-gravity"&&remoteJob.result&&
+          typeof remoteJob.result==="object"&&"outcome" in remoteJob.result?
+          (remoteJob.result as {outcome:GravityRun}).outcome:null}
         cloudEnabled={remoteJobsEnabled}
         cloudBusy={remoteBusy}
         remoteJobStatus={remoteJob?.kind==="newton-gravity"&&

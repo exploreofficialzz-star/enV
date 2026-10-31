@@ -592,3 +592,10 @@ release-candidate evidence bundle are unfinished.
   target explicitly, and connected the Web optical result to an illustrative
   Babylon.js incident/reflected/refracted ray overlay. Each scene edit disposes
   prior rays; the overlay does not imply tracing against invented solid geometry.
+
+- Completed account-owned gravity jobs are now connected to Web local 3D
+  playback, simulation timeline and scientific evidence preservation. The
+  response must pass the existing strict portable scientific-evidence decoder
+  before moving any scene object; cross-revision results remain export-only.
+- Changing a refractive material, incident angle or optical target clears
+  stale illustrative 3D ray overlays rather than leaving outdated rays.

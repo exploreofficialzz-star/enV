@@ -4,6 +4,7 @@ import {runNewtonianGravity,sampleNewtonianGravity,
   type GravityRun,type GravityConfig,type GravityFrame,
   type GravityBody} from "@/lib/world-lab/gravity";
 import type {Vec3} from "@/lib/world-lab/sphere-collision-3d";
+import {parseScientificEvidenceRecord} from "@/lib/world-lab/scientific-evidence";
 
 const field="w-full rounded border border-border bg-bg px-2 py-1 text-sm";
 const button="rounded border border-border px-3 py-2 text-sm";
@@ -13,6 +14,7 @@ type Props={
   onRemote:(config:GravityConfig)=>void;
   onFrame:(frame:GravityFrame|null,bodies:readonly GravityBody[])=>void;
   onKeepEvidence:(run:GravityRun)=>void;
+  remoteComputed:GravityRun|null;
 };
 function download(run:GravityRun){
   const blob=new Blob([JSON.stringify(run,null,2)],{type:"application/json"});
@@ -25,6 +27,7 @@ function download(run:GravityRun){
 }
 export function WorldLabGravityPanel({
   project,cloudEnabled,cloudBusy,remoteJobStatus,onRemote,onFrame,onKeepEvidence,
+  remoteComputed,
 }:Props){
   const [selection,setSelection]=useState<string[]>([]);
   const [velocities,setVelocities]=useState<Record<string,Vec3>>({});
@@ -39,9 +42,24 @@ export function WorldLabGravityPanel({
   const available=new Set(spheres.map(s=>s.id));
   const selected=selection.length?selection.filter(id=>available.has(id)):
     spheres.slice(0,2).map(s=>s.id);
-  const active=run&&project&&project.id===run.projectId&&
-    project.revision===run.projectRevision&&
-    run.bodies.every(b=>available.has(b.entityId))?run:null;
+  const validatedCloud=useMemo(()=>{
+    if(!project||!remoteComputed||project.id!==remoteComputed.projectId||
+      project.revision!==remoteComputed.projectRevision)return null;
+    try{
+      // Treat returned cloud JSON as untrusted before any scene mutation.
+      const record=parseScientificEvidenceRecord({
+        id:"cloud_gravity_preview",projectId:project.id,
+        projectRevision:project.revision,createdAt:new Date().toISOString(),
+        kind:"newton-gravity",result:remoteComputed,
+      });
+      return record.result.format==="env-world-lab-newton-gravity"?
+        record.result:null;
+    }catch{return null;}
+  },[project,remoteComputed]);
+  const candidate=validatedCloud??run;
+  const active=candidate&&project&&project.id===candidate.projectId&&
+    project.revision===candidate.projectRevision&&
+    candidate.bodies.every(b=>available.has(b.entityId))?candidate:null;
   const current=active?sampleNewtonianGravity(active,time):null;
   const offload=selected.length>8||steps>1200;
   const config=():GravityConfig=>({
@@ -160,6 +178,9 @@ export function WorldLabGravityPanel({
       </div>
       {offload&&!cloudEnabled&&<p className="mt-1 text-xs">
         Account worker is unavailable. Reduce to 8 bodies and 1200 steps to run offline.
+      </p>}
+      {validatedCloud&&<p className="mt-1 text-xs" role="status">
+        Completed cloud gravity trajectory is loaded for local visualization and archiving.
       </p>}
       {remoteJobStatus&&<p className="mt-1 text-xs" role="status">
         Account gravity calculation: {remoteJobStatus}. Open the cloud result in

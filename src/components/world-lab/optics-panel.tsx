@@ -74,7 +74,7 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence,onVisu
       <div className="flex flex-wrap gap-2">
         <label className="text-xs">Light starts in
           <select className={field+" block"} value={first}
-            onChange={e=>{setSource(e.target.value);setResult(null);}}>
+            onChange={e=>{setSource(e.target.value);setResult(null);onVisualize(null);}}>
             {materials.map(m=><option key={m.id} value={m.id}>
               {m.name} (n = {m.refractiveIndex??"unknown"})
             </option>)}
@@ -82,7 +82,7 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence,onVisu
         </label>
         <label className="text-xs">Light enters
           <select className={field+" block"} value={second}
-            onChange={e=>{setDestination(e.target.value);setResult(null);}}>
+            onChange={e=>{setDestination(e.target.value);setResult(null);onVisualize(null);}}>
             {materials.filter(m=>m.id!==first).map(m=><option key={m.id} value={m.id}>
               {m.name} (n = {m.refractiveIndex??"unknown"})
             </option>)}
@@ -91,7 +91,7 @@ export function WorldLabOpticsPanel({project,mutateProject,onKeepEvidence,onVisu
         <label className="text-xs">Incidence angle from normal (°)
           <input className={field+" block"} type="number" min={0} max={89.9}
             step={0.1} value={angle} onChange={e=>{
-              setAngle(Number(e.target.value));setResult(null);
+              setAngle(Number(e.target.value));setResult(null);onVisualize(null);
             }}/>
         </label>
       </div>
