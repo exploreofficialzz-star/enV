@@ -332,7 +332,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                 <div className="divide-y divide-border">
                   {contrastChecks.map((item) => (
                     <div key={item.value} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
-                      <div><p className="text-sm font-medium text-fg">{item.label}</p><p className="mt-0.5 text-xs text-muted">Success criterion 1.{item.result.criterion}</p></div>
+                      <div><p className="text-sm font-medium text-fg">{item.label}</p><p className="mt-0.5 text-xs text-muted">Success criterion {item.result.criterion}</p></div>
                       <span className="text-xs tabular-nums text-muted">Required {item.result.threshold.toFixed(1)}:1</span>
                       <span className="text-xs tabular-nums text-fg">Actual {item.result.ratio.toFixed(2)}:1</span>
                       <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.result.passes ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>{item.result.passes ? "PASS" : "FAIL"}</span>
