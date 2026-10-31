@@ -24,6 +24,8 @@ const explorer = read("src/components/tools/design-category-explorer.tsx");
 const colorEngine = read("src/components/engines/color-engine.tsx");
 const cssEngine = read("src/components/engines/cssgen-engine.tsx");
 const colorVision = read("src/lib/engines/color-vision.ts");
+const cssGradient = read("src/lib/engines/css-gradient.ts");
+const cssGradientTests = read("src/lib/engines/css-gradient.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const accessibilityEngine = read("src/components/engines/accessibility-engine.tsx");
@@ -38,7 +40,8 @@ const checks = [
   ["Published CVD simulation utility", colorVision.includes("simulateColorVision") && colorVision.includes("protanopia") && colorVision.includes("tritanopia")],
   ["CVD regression tests", tests.includes("color vision simulations preserve neutral black and white")],
   ["Accessibility Studio uses shared CVD model", accessibilityEngine.includes('from "@/lib/engines/color-vision"') && accessibilityEngine.includes("return simulateColorVision(hex, type);")],
-  ["Gradient modes and three stops", cssEngine.includes("radial-gradient") && cssEngine.includes("conic-gradient") && cssEngine.includes("values.via")],
+  ["Gradient modes and editable stops", cssEngine.includes("Add stop (") && cssEngine.includes("Distribute evenly") && cssEngine.includes("Reverse") && cssEngine.includes("GRADIENT_PRESETS.map")],
+  ["Gradient stop engine and regression tests", cssGradient.includes("normalizeGradientStops") && cssGradient.includes("repeating-linear-gradient") && cssGradientTests.includes("radial and conic gradients emit their selected geometry")],
   ["Layered shadow presets", cssEngine.includes("const presets:") && cssEngine.includes("const layers = Array.from")],
   ["Working SVG noise asset", cssEngine.includes("feTurbulence") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
   ["SVG shape color controls", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??")],

@@ -83,7 +83,7 @@ The upgrade direction is to preserve the compact nature of enV while making ever
 - Contrast UI uses separate WCAG text and non-text requirements plus alpha-aware calculation and adjustment suggestions.
 - Color-vision simulation is separated into a reusable local utility and has regression tests for neutral endpoints, valid outputs and distinct modes.
 - The active Accessibility Studio's multi-surface and side-by-side color-vision previews also use that same shared simulation utility, so legacy simulator routes and the newer studio cannot silently diverge.
-- Gradient generator gains linear/radial/conic modes and three stops.
+- Gradient generator gains linear/radial/conic and repeating modes, a live 2–8 stop editor with independently editable colors/positions, presets, reverse/even distribution actions, shape/center controls, fallback CSS and copy/export output.
 - Box shadow generator gains presets, inset treatment and multiple coordinated layers.
 - Button/card/border/glass/neumorphic generators gain more real-world controls; button output includes hover/focus rules.
 - Blob/wave generators expose fill and variation settings; the CSS noise overlay uses generated SVG turbulence instead of a placeholder URL.
@@ -99,7 +99,7 @@ The upgrade direction is to preserve the compact nature of enV while making ever
 
 **Next priority — professional color and gradients**
 - OKLCH/OKLab support, perceptual interpolation and optional Display-P3 where browser support allows.
-- Gradient stop editor with add/remove/reorder, explicit stop positions, layered gradients and downloadable CSS/SVG.
+- Drag-to-reorder stops, editable radial size/center offsets, multi-layer gradients and PNG/SVG export.
 - Better palette shade scales and APCA as a clearly separate advanced preview metric.
 
 **Next priority — SVG asset studio**

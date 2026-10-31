@@ -3,17 +3,32 @@ import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
+import { buildCssGradient, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const DEFAULT_GRADIENT_STOPS: GradientStop[] = [
+  { id: "start", color: "#0d9f8a", position: 0 },
+  { id: "middle", color: "#5a9ee8", position: 50 },
+  { id: "end", color: "#7c4dff", position: 100 },
+];
+
+const GRADIENT_PRESETS: Array<{ name: string; stops: GradientStop[]; angle: number }> = [
+  { name: "Aurora", angle: 135, stops: [{ id: "a", color: "#0f766e", position: 0 }, { id: "b", color: "#38bdf8", position: 48 }, { id: "c", color: "#8b5cf6", position: 100 }] },
+  { name: "Sunset", angle: 120, stops: [{ id: "a", color: "#f97316", position: 0 }, { id: "b", color: "#ec4899", position: 52 }, { id: "c", color: "#7c3aed", position: 100 }] },
+  { name: "Ocean", angle: 135, stops: [{ id: "a", color: "#0f172a", position: 0 }, { id: "b", color: "#0369a1", position: 52 }, { id: "c", color: "#67e8f9", position: 100 }] },
+  { name: "Candy", angle: 135, stops: [{ id: "a", color: "#f9a8d4", position: 0 }, { id: "b", color: "#c4b5fd", position: 50 }, { id: "c", color: "#93c5fd", position: 100 }] },
+  { name: "Midnight", angle: 145, stops: [{ id: "a", color: "#020617", position: 0 }, { id: "b", color: "#312e81", position: 55 }, { id: "c", color: "#0f766e", position: 100 }] },
+];
+
 const BASE_FIELDS: Record<string, UiField[]> = {
   gradient: [
     { name: "kind", label: "Gradient type", type: "select", defaultValue: "linear", options: [{ value: "linear", label: "Linear" }, { value: "radial", label: "Radial" }, { value: "conic", label: "Conic" }] },
-    { name: "from", label: "Start color", type: "color", defaultValue: "#0d9f8a" },
-    { name: "via", label: "Middle color", type: "color", defaultValue: "#5a9ee8" },
-    { name: "to", label: "End color", type: "color", defaultValue: "#7c4dff" },
     { name: "angle", label: "Angle", type: "number", defaultValue: 135, min: 0, max: 360, suffix: "deg" },
+    { name: "shape", label: "Radial shape", type: "select", defaultValue: "circle", options: [{ value: "circle", label: "Circle" }, { value: "ellipse", label: "Ellipse" }] },
+    { name: "position", label: "Gradient center", type: "select", defaultValue: "center", options: [{ value: "center", label: "Center" }, { value: "top", label: "Top" }, { value: "top right", label: "Top right" }, { value: "right", label: "Right" }, { value: "bottom right", label: "Bottom right" }, { value: "bottom", label: "Bottom" }, { value: "bottom left", label: "Bottom left" }, { value: "left", label: "Left" }, { value: "top left", label: "Top left" }] },
+    { name: "repeating", label: "Repeat gradient", type: "select", defaultValue: "no", options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
   ],
   shadow: [
     { name: "preset", label: "Shadow preset", type: "select", defaultValue: "soft", options: [{ value: "subtle", label: "Subtle" }, { value: "soft", label: "Soft elevation" }, { value: "medium", label: "Medium" }, { value: "hard", label: "Hard" }, { value: "glow", label: "Glow" }, { value: "inset", label: "Inset" }, { value: "custom", label: "Custom" }] },
@@ -128,17 +143,21 @@ function makeNoiseDataUrl(color: string, density: number): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
-function cssFor(family: string, values: Record<string, string>) {
+function cssFor(family: string, values: Record<string, string>, gradientStops: GradientStop[] = []) {
   if (family === "gradient") {
-    const kind = values.kind ?? "linear";
+    const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
     const angle = numberValue(values, "angle", 135, 0, 360);
-    const stops = `${values.from ?? "#0d9f8a"} 0%, ${values.via ?? "#5a9ee8"} 50%, ${values.to ?? "#7c4dff"} 100%`;
-    const background = kind === "radial"
-      ? `radial-gradient(circle at center, ${stops})`
-      : kind === "conic"
-        ? `conic-gradient(from ${angle}deg, ${stops})`
-        : `linear-gradient(${angle}deg, ${stops})`;
-    return { css: `background: ${background};`, style: { background } };
+    const normalized = normalizeGradientStops(gradientStops);
+    const background = buildCssGradient({
+      kind,
+      angle,
+      shape: values.shape === "ellipse" ? "ellipse" : "circle",
+      position: values.position ?? "center",
+      repeating: values.repeating === "yes",
+      stops: normalized,
+    });
+    const fallback = normalized[0]?.color ?? "#0d9f8a";
+    return { css: `background: ${fallback};\\nbackground: ${background};`, style: { background } };
   }
   if (family === "shadow") {
     const preset = values.preset ?? "soft";
@@ -295,16 +314,67 @@ function cssFor(family: string, values: Record<string, string>) {
 
 export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   const { family } = familyAndWorkflow(op, toolId);
-  const fields = BASE_FIELDS[family] ?? BASE_FIELDS.gradient;
-  const [values, setValues] = useState(() => initialValues(fields));
+  const allFields = BASE_FIELDS[family] ?? BASE_FIELDS.gradient;
+  const [values, setValues] = useState(() => initialValues(allFields));
+  const fields = useMemo(() => family !== "gradient" ? allFields : allFields.filter((field) => {
+    if (field.name === "angle" && values.kind === "radial") return false;
+    if (field.name === "shape" && values.kind !== "radial") return false;
+    if (field.name === "position" && values.kind === "linear") return false;
+    return true;
+  }), [allFields, family, values.kind]);
+  const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
   const [sampleText, setSampleText] = useState("A little detail makes a big difference.");
-  const output = useMemo(() => cssFor(family, values), [family, values]);
+  const output = useMemo(() => cssFor(family, values, gradientStops), [family, gradientStops, values]);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "input" || family === "text-shadow";
 
   function randomizeShape() {
     setValues((previous) => ({ ...previous, seed: String(Math.floor(Math.random() * 999) + 1) }));
+  }
+  const sortedGradientStops = useMemo(() => normalizeGradientStops(gradientStops), [gradientStops]);
+
+  function addGradientStop() {
+    if (gradientStops.length >= 8) return;
+    let bestStart = 0;
+    let bestEnd = 100;
+    let largestGap = -1;
+    for (let index = 0; index < sortedGradientStops.length - 1; index += 1) {
+      const start = sortedGradientStops[index].position;
+      const end = sortedGradientStops[index + 1].position;
+      if (end - start > largestGap) {
+        largestGap = end - start;
+        bestStart = start;
+        bestEnd = end;
+      }
+    }
+    const position = Math.round((bestStart + bestEnd) / 2);
+    const colors = ["#f59e0b", "#22c55e", "#ec4899", "#38bdf8"];
+    setGradientStops((previous) => [...previous, {
+      id: `stop-${Date.now()}-${previous.length}`,
+      color: colors[previous.length % colors.length],
+      position,
+    }]);
+  }
+
+  function loadGradientPreset(name: string) {
+    const preset = GRADIENT_PRESETS.find((item) => item.name === name);
+    if (!preset) return;
+    setGradientStops(preset.stops.map((stop) => ({ ...stop })));
+    setValues((previous) => ({ ...previous, kind: "linear", angle: String(preset.angle), repeating: "no" }));
+  }
+
+  function distributeGradientStops() {
+    setGradientStops((previous) => normalizeGradientStops(previous).map((stop, index, list) => ({
+      ...stop,
+      position: list.length < 2 ? 0 : Math.round((index / (list.length - 1)) * 100),
+    })));
+  }
+
+  function reverseGradientStops() {
+    setGradientStops((previous) => normalizeGradientStops(previous)
+      .map((stop) => ({ ...stop, position: 100 - stop.position }))
+      .sort((a, b) => a.position - b.position));
   }
 
   return (
@@ -315,10 +385,51 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
           <p className="mt-1 text-xs leading-5 text-muted">Change a setting to update the preview and export automatically. Processing stays in your browser.</p>
         </div>
         {family === "blob" ? <Button type="button" size="sm" variant="outline" onClick={randomizeShape}>Randomize shape</Button> : null}
+        {family === "gradient" ? <Button type="button" size="sm" variant="outline" onClick={() => { setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop }))); setValues((previous) => ({ ...previous, kind: "linear", angle: "135", shape: "circle", position: "center", repeating: "no" })); }}>Reset gradient</Button> : null}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
         <div className="min-w-0 space-y-4">
+          {family === "gradient" ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="gradient-stops-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="gradient-stops-heading" className="text-sm font-semibold text-fg">Color stops</h3>
+                  <p className="mt-1 text-xs text-muted">Add, recolor and position each stop. The preview updates instantly.</p>
+                </div>
+                <Button type="button" size="sm" onClick={addGradientStop} disabled={gradientStops.length >= 8}>Add stop ({gradientStops.length}/8)</Button>
+              </div>
+              <div className="h-4 rounded-full border border-border" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${sortedGradientStops.map((stop) => `${stop.color} ${stop.position}%`).join(", ")})` }} />
+              <div className="space-y-2">
+                {sortedGradientStops.map((stop, index) => (
+                  <div key={stop.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_5.5rem_auto] sm:items-center">
+                    <label className="flex min-w-0 items-center gap-2">
+                      <Input type="color" value={stop.color} onChange={(event) => setGradientStops((previous) => previous.map((item) => item.id === stop.id ? { ...item, color: event.target.value } : item))} className="h-10 w-12 shrink-0 p-1" aria-label={`Color for stop ${index + 1}`} />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold text-fg">Stop {index + 1}</span>
+                        <span className="block truncate font-mono text-[10px] text-muted">{stop.color.toUpperCase()}</span>
+                      </span>
+                    </label>
+                    <label className="col-span-2 flex min-w-0 items-center gap-2 sm:col-span-1">
+                      <span className="w-14 shrink-0 text-[11px] text-muted">Position</span>
+                      <input type="range" min="0" max="100" step="1" value={stop.position} onChange={(event) => setGradientStops((previous) => previous.map((item) => item.id === stop.id ? { ...item, position: Number(event.target.value) } : item))} className="min-w-0 flex-1 accent-accent" aria-label={`Position for stop ${index + 1}`} />
+                    </label>
+                    <Input type="number" min={0} max={100} value={stop.position} onChange={(event) => setGradientStops((previous) => previous.map((item) => item.id === stop.id ? { ...item, position: clamp(Number(event.target.value) || 0, 0, 100) } : item))} className="h-10 font-mono text-xs" aria-label={`Stop ${index + 1} position percentage`} />
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setGradientStops((previous) => previous.filter((item) => item.id !== stop.id))} disabled={gradientStops.length <= 2} aria-label={`Remove stop ${index + 1}`}>Remove</Button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={distributeGradientStops}>Distribute evenly</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={reverseGradientStops}>Reverse</Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {GRADIENT_PRESETS.map((preset) => <Button key={preset.name} type="button" size="sm" variant="ghost" onClick={() => loadGradientPreset(preset.name)}>{preset.name}</Button>)}
+                </div>
+              </div>
+            </section>
+          ) : null}
           <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((previous) => {
             const next = { ...previous, [name]: value };
             if (name === "preset") {
