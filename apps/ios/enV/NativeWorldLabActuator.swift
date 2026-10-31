@@ -1169,3 +1169,114 @@ enum NativeWorldLabGravity {
                 "and conservation audit. No measurements, relativistic dynamics, impacts or tides.")
     }
 }
+
+
+// Invented-material heat exchange, calculated locally in Swift without browser engines.
+struct NativeMaterialHeatSample:Encodable {
+    let timeSeconds:Double
+    let firstTemperatureK:Double
+    let secondTemperatureK:Double
+    let interfaceHeatFlowW:Double
+    let energyResidualJ:Double
+}
+struct NativeMaterialHeatRun:Encodable {
+    let format="env-world-lab-material-heat-transfer"
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let materialEvidence="hypothetical-user-assumed"
+    let projectId:String
+    let projectRevision:Int
+    let firstEntityId:String
+    let secondEntityId:String
+    let firstMaterialId:String
+    let secondMaterialId:String
+    let firstCapacityJPerK:Double
+    let secondCapacityJPerK:Double
+    let conductanceWPerK:Double
+    let equilibriumTemperatureK:Double
+    let durationSeconds:Double
+    let samples:[NativeMaterialHeatSample]
+    let validity:String
+    func sample(_ time:Double)throws->NativeMaterialHeatSample {
+        guard time.isFinite else {
+            throw NativeWorldLabError.invalid("Heat simulation time must be finite")
+        }
+        let index=max(0,min(samples.count-1,
+            Int((max(0,min(durationSeconds,time))/durationSeconds*120).rounded())))
+        return samples[index]
+    }
+}
+enum NativeWorldLabHeatTransfer {
+    static func evaluate(_ project:NativeWorldLabProject,
+        firstId:String,secondId:String,firstTemperatureK:Double,
+        secondTemperatureK:Double,durationSeconds:Double=100)throws->NativeMaterialHeatRun {
+        guard firstId != secondId,
+              let a=project.entities.first(where:{$0.id==firstId}),
+              let b=project.entities.first(where:{$0.id==secondId}),
+              a.shape=="box",b.shape=="box" else {
+            throw NativeWorldLabError.invalid("Choose two distinct box solids")
+        }
+        guard let am=project.materials.first(where:{$0.id==a.materialId}),
+              let bm=project.materials.first(where:{$0.id==b.materialId}),
+              let rho1=am.densityKgM3,let rho2=bm.densityKgM3,
+              let c1=am.specificHeatJPerKgK,let c2=bm.specificHeatJPerKgK,
+              let k1=am.thermalConductivityWPerMK,
+              let k2=bm.thermalConductivityWPerMK else {
+            throw NativeWorldLabError.invalid(
+                "Invented matter requires density, conductivity and specific heat")
+        }
+        let pa=a.positionMeters,pb=b.positionMeters
+        let da=a.dimensionsMeters,db=b.dimensionsMeters
+        guard abs(pa[1]-pb[1])<=1e-7,abs(pa[2]-pb[2])<=1e-7,
+              abs(da[1]-db[1])<=1e-7,abs(da[2]-db[2])<=1e-7,
+              abs(abs(pa[0]-pb[0])-(da[0]+db[0])/2)<=1e-7 else {
+            throw NativeWorldLabError.invalid(
+                "Thermal exchange requires face-touching X-aligned slabs")
+        }
+        guard firstTemperatureK.isFinite,secondTemperatureK.isFinite,
+              (200...2000).contains(firstTemperatureK),
+              (200...2000).contains(secondTemperatureK),
+              durationSeconds.isFinite,(0.1...3600).contains(durationSeconds) else {
+            throw NativeWorldLabError.invalid(
+                "Thermal time or temperatures outside the supported domain")
+        }
+        let ca=a.volumeMetersCubed*rho1*c1,cb=b.volumeMetersCubed*rho2*c2
+        let area=da[1]*da[2]
+        let g=1/(da[0]/(2*k1*area)+db[0]/(2*k2*area))
+        let total=ca+cb
+        let equilibrium=ca/total*firstTemperatureK+cb/total*secondTemperatureK
+        let decay=g*(1/ca+1/cb)
+        guard [ca,cb,g,equilibrium,decay].allSatisfy({$0.isFinite}),
+              ca>0,cb>0,g>0 else {
+            throw NativeWorldLabError.invalid(
+                "Heat capacity or conductance exceeded finite model bounds")
+        }
+        let samples=try (0...120).map{ i -> NativeMaterialHeatSample in
+            let t=Double(i)/120*durationSeconds
+            let difference=(firstTemperatureK-secondTemperatureK)*exp(-decay*t)
+            let t1=equilibrium+cb/total*difference
+            let t2=equilibrium-ca/total*difference
+            let flow=g*(t1-t2)
+            let residual=ca*(t1-firstTemperatureK)+cb*(t2-secondTemperatureK)
+            let tolerance=1e-7*max(1,abs(ca*(firstTemperatureK-secondTemperatureK)),
+                abs(cb*(firstTemperatureK-secondTemperatureK)))
+            guard [t1,t2,flow,residual].allSatisfy({$0.isFinite}),
+                  abs(residual)<=tolerance else {
+                throw NativeWorldLabError.invalid(
+                    "Thermal energy conservation residual exceeded tolerance")
+            }
+            return NativeMaterialHeatSample(timeSeconds:t,firstTemperatureK:t1,
+                secondTemperatureK:t2,interfaceHeatFlowW:flow,
+                energyResidualJ:residual)
+        }
+        return NativeMaterialHeatRun(projectId:project.id,
+            projectRevision:project.revision,firstEntityId:a.id,
+            secondEntityId:b.id,firstMaterialId:am.id,secondMaterialId:bm.id,
+            firstCapacityJPerK:ca,secondCapacityJPerK:cb,conductanceWPerK:g,
+            equilibriumTemperatureK:equilibrium,durationSeconds:durationSeconds,
+            samples:samples,
+            validity:"Insulated two-slab, invented homogeneous thermal property "+
+                "reference only. No spatial gradients, phase change, convection, "+
+                "radiation, safety certification or measured matter.")
+    }
+}
