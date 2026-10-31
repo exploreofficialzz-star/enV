@@ -58,7 +58,8 @@ const checks = [
   ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background)") && colorEngine.includes("previewPair.background")],
   ["Independent border corner radii", cssEngine.includes("Top left radius") && cssEngine.includes("bottomLeft")],
   ["SVG noise filter and bounded export utility", svgGenerators.includes("feTurbulence") && svgGenerators.includes("safeHex") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
-  ["Blob, pattern and wave generator regression tests", svgGenerators.includes("buildWaveSvg") && svgGenerators.includes("buildBlobSvg") && svgGeneratorTests.includes("wave geometry responds to frequency") && svgGeneratorTests.includes("pattern generator clamps settings")],
+  ["Blob, pattern and wave generator regression tests", svgGenerators.includes("buildWaveSvg") && svgGenerators.includes("buildBlobSvg") && svgGenerators.includes("PatternStyle") && svgGeneratorTests.includes("wave geometry responds to frequency") && svgGeneratorTests.includes("pattern generator clamps settings") && svgGeneratorTests.includes("outlined")],
+  ["Multi-style pattern and outlined rotated blob controls", cssEngine.includes("Pattern style") && cssEngine.includes("Outline width") && cssEngine.includes("Rotation")],
   ["Wave customization and transparent background UI", cssEngine.includes("Wave frequency") && cssEngine.includes("Wave phase") && cssEngine.includes("Canvas background") && cssEngine.includes("buildWaveSvg")],
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
 ];

@@ -10,6 +10,9 @@ test("blob generator is deterministic, bounded and safely colors its output", ()
   assert.notEqual(first, changed);
   assert.match(first, /viewBox="0 0 100 100"/);
   assert.match(first, /fill="#0d9f8a"/);
+  const outlined = buildBlobSvg({ seed: 17, points: 12, color: "#0d9f8a", rotation: 45, stroke: "#112233", strokeWidth: 2 });
+  assert.match(outlined, /rotate\(45 50 50\)/);
+  assert.match(outlined, /stroke="#112233" stroke-width="2"/);
   assert.doesNotMatch(buildBlobSvg({ seed: 17, points: 12, color: '"><script>' }), /<script>/);
 });
 
@@ -19,6 +22,8 @@ test("pattern generator clamps settings and rejects unsafe color values", () => 
   assert.match(svg, /stroke="#0d9f8a"/);
   assert.match(svg, /stroke-opacity="1"/);
   assert.doesNotMatch(svg, /<script>/);
+  const variants = (["dots", "grid", "diagonal", "cross", "horizontal"] as const).map((kind) => buildPatternSvg(28, 0.5, "#123456", kind));
+  assert.equal(new Set(variants).size, 5);
 });
 
 test("wave geometry responds to frequency, phase, layers and transparent canvas", () => {

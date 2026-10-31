@@ -115,6 +115,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "dist", label: "Shadow distance", type: "number", defaultValue: 10, min: 1, max: 40, suffix: "px" },
   ],
   pattern: [
+    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }] },
     { name: "color", label: "Pattern color", type: "color", defaultValue: "#0d9f8a" },
     { name: "size", label: "Pattern size", type: "number", defaultValue: 24, min: 6, max: 160, suffix: "px" },
     { name: "opacity", label: "Opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
@@ -122,7 +123,10 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   blob: [
     { name: "seed", label: "Shape variation", type: "number", defaultValue: 7, min: 1, max: 999, step: 1 },
     { name: "points", label: "Shape detail", type: "select", defaultValue: "12", options: [{ value: "8", label: "Simple" }, { value: "12", label: "Balanced" }, { value: "18", label: "Detailed" }] },
+    { name: "rotation", label: "Rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Fill color", type: "color", defaultValue: "#0d9f8a" },
+    { name: "stroke", label: "Outline color", type: "color", defaultValue: "#ffffff" },
+    { name: "strokeWidth", label: "Outline width", type: "number", defaultValue: 0, min: 0, max: 8, suffix: "px" },
   ],
   wave: [
     { name: "amp", label: "Wave height", type: "number", defaultValue: 24, min: 0, max: 58, suffix: "px" },
@@ -336,7 +340,7 @@ function cssFor(
   if (family === "pattern") {
     const size = numberValue(values, "size", 24, 6, 160);
     const opacity = numberValue(values, "opacity", 0.14, 0, 1);
-    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a");
+    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a", (values.pattern ?? "diagonal") as import("@/lib/engines/svg-generators").PatternStyle);
     const backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
     return { css: `background-image: ${backgroundImage};\nbackground-size: ${size}px ${size}px;`, style: { backgroundImage, backgroundSize: `${size}px ${size}px` }, svg };
   }
@@ -345,6 +349,9 @@ function cssFor(
       seed: numberValue(values, "seed", 7, 1, 999),
       points: Number(values.points ?? 12),
       color: values.color ?? "#0d9f8a",
+      rotation: numberValue(values, "rotation", 0, 0, 360),
+      stroke: values.stroke ?? "#ffffff",
+      strokeWidth: numberValue(values, "strokeWidth", 0, 0, 8),
     });
     return { css: svg, style: {}, svg };
   }
