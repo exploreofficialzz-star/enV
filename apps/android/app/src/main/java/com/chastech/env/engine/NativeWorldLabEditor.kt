@@ -66,7 +66,7 @@ object NativeWorldLabEditor {
                 .put("truthTable",JSONArray(listOf(1,1,1,0)))))
             .put("outputs",JSONArray().put(JSONObject()
                 .put("id","output_q").put("label","Indicator")
-                .put("sourceNodeId","invented_gate")))
+                .put("sourceNodeId","invented_gate"))))
     }
     fun digitalSwitch(source:String,networkId:String,inputId:String,value:Boolean):String=
         edit(source){p->
