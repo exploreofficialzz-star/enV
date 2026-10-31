@@ -319,9 +319,7 @@ struct NativeDigitalMotorResult {
     let logicBit:Int
     let input:NativeActuatorInput
     let motor:NativeActuatorResult
-    let validity="An assumed static Boolean output controls an ideal motor voltage "+
-        "for a one-dimensional reference experiment; no real processor, switching "+
-        "electronics, signal timing, verified material or device certification."
+    let validity="A hypothetical static Boolean output controls an ideal voltage in a one-dimensional motor experiment; not a real processor, switching electronic circuit, measured material, timing model or device certification."
 }
 enum NativeWorldLabDigitalMotor {
     static func evaluate(_ project:NativeWorldLabProject,networkId:String,
