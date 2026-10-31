@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { MessageCircle, ThumbsDown, ThumbsUp, Ban, Trash2, Send, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { recordAnalyticsEvent } from "@/lib/analytics/client";
 
 type CommunityComment = {
   id: string;
@@ -115,6 +116,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
     setProblem(""); setNotice("");
     try {
       await post("/api/community/reactions", { toolId, visitorId, reaction });
+      recordAnalyticsEvent({ name: "reaction_created", toolId, outcome: "success", properties: { action: reaction } });
       await refresh(visitorId);
     } catch (error) {
       setProblem(error instanceof Error ? error.message : "Your reaction could not be saved.");
@@ -132,6 +134,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
         displayName: identityMode === "public" ? displayName.trim() : null,
         parentId: replyTarget,
       });
+      recordAnalyticsEvent({ name: "comment_created", toolId, outcome: "success", properties: { action: replyTarget ? "reply" : "comment" } });
       setBody(""); setReplyTarget(null);
       setNotice("Your comment was posted.");
       await refresh(visitorId);
