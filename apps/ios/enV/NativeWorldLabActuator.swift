@@ -521,8 +521,7 @@ enum NativeWorldLabCollision {
         let vr=velocityRightMps+impulse/mr
         let momentumBefore=ml*velocityLeftMps+mr*velocityRightMps
         let momentumAfter=ml*vl+mr*vr
-        let energyBefore=0.5*(ml*velocityLeftMps*velocityLeftMps+
-            mr*velocityRightMps*velocityRightMps)
+        let energyBefore=0.5*(ml*velocityLeftMps*velocityLeftMps+mr*velocityRightMps*velocityRightMps)
         let energyAfter=0.5*(ml*vl*vl+mr*vr*vr)
         let lost=0.5*(ml*mr/(ml+mr))*(1-restitution*restitution)*relative*relative
         let contact=left.positionMeters[0]+hl+velocityLeftMps*hitTime
