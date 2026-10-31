@@ -1554,6 +1554,36 @@ export default function WorldLab() {
     mutateProject(current=>({...current, entities:current.entities.map(e=>
       e.id===selectedEntity.id?{...e,...patch}:e)}));
   }
+  function keepRemoteGravityEvidence(){
+    const job=remoteJob;
+    const current=projectForEdits.current;
+    if(!job||job.status!=="succeeded"||!current||
+      job.projectId!==current.id||job.projectRevision!==current.revision){
+      setRemoteError("The previous cloud calculation is not for the open invention revision.");
+      return;
+    }
+    try{
+      const value=job.result;
+      if(!value||typeof value!=="object"||Array.isArray(value)||
+        !("kind" in value)||value.kind!=="newton-gravity"||
+        !("outcome" in value)||!value.outcome||
+        typeof value.outcome!=="object"||Array.isArray(value.outcome))
+        throw new Error("This cloud job did not return a Newtonian trajectory.");
+      // Parse as untrusted computation evidence before accepting a remote
+      // record. Malformed or foreign project results cannot enter history.
+      const record=newScientificEvidenceRecord(
+        value.outcome as ScientificEvidenceResult,crypto.randomUUID(),
+        new Date().toISOString());
+      if(record.kind!=="newton-gravity"||record.projectId!==current.id||
+        record.projectRevision!==current.revision)
+        throw new Error("Cloud trajectory identity or model does not match.");
+      keepScientificEvidence(record.result);
+      setRemoteError("");
+    }catch(cause){
+      setRemoteError(cause instanceof Error?cause.message:
+        "The cloud result cannot be imported as trusted local model evidence.");
+    }
+  }
   function keepScientificEvidence(result:ScientificEvidenceResult){
     const current=projectForEdits.current;
     if(!current||current.id!==result.projectId||
@@ -2023,10 +2053,19 @@ export default function WorldLab() {
               </p>}
             {remoteJob.errorCode&&<p>Solver status: {remoteJob.errorCode}</p>}
             {remoteJob.status==="succeeded"&&remoteJob.result!==null&&
-              <button type="button" className={buttonClass} onClick={()=>
-                downloadJson("world-lab-owned-computation-evidence.json",remoteJob.result)}>
-                Export authenticated calculation evidence
-              </button>}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={buttonClass} onClick={()=>
+                  downloadJson("world-lab-owned-computation-evidence.json",remoteJob.result)}>
+                  Export authenticated calculation evidence
+                </button>
+                {remoteJob.kind==="newton-gravity"&&
+                  remoteJob.projectId===project?.id&&
+                  remoteJob.projectRevision===project?.revision&&
+                  <button type="button" className={buttonClass}
+                    onClick={keepRemoteGravityEvidence}>
+                    Keep remote gravity trajectory with invention
+                  </button>}
+              </div>}
           </div>}
       </section>}
       <section className="mb-3 rounded-xl border border-border p-3"

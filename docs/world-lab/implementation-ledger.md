@@ -554,3 +554,10 @@ release-candidate evidence bundle are unfinished.
 - Native archive source regression cases cover an invention's original
   assumed-mass gravity evidence and no-overwrite reimport. Builds, devices,
   provider login and CI have not yet been verified or released.
+
+- The authenticated Newtonian gravity job can now feed its validated
+  trajectory back into the local immutable science history through an
+  explicit button, only when the open invention matches both project
+  identity and revision. The same 2 MB/evidence parser rejects unknown,
+  malformed and foreign results. This closes the device→worker→device
+  cycle without silently overwriting local geometry.
