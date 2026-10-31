@@ -50,6 +50,17 @@ data class NativeLabDigitalNetwork(val id:String,val name:String,
     val outputs:List<NativeLabDigitalOutput>)
 /** Deterministic Boolean truth-table evaluation; no real chip physics. */
 object NativeWorldLabDigitalLogic {
+
+    /** Entire assumed Boolean input space, never a chip timing or power model. */
+    fun truthTable(n:NativeLabDigitalNetwork):List<Map<String,Int>> {
+        require(n.inputs.size<=8){"Exhaustive check supports at most eight switches"}
+        return (0 until (1 shl n.inputs.size)).map{case->
+            val updated=n.copy(inputs=n.inputs.mapIndexed{i,port->
+                port.copy(value=(case and (1 shl (n.inputs.size-i-1)))!=0)
+            })
+            evaluate(updated)
+        }
+    }
     fun evaluate(n:NativeLabDigitalNetwork):Map<String,Int> {
         val state=n.inputs.associate{it.id to if(it.value)1 else 0}.toMutableMap()
         for(g in n.gates){

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {blankWorldLabProject,parseWorldLabProject,serializeWorldLabProject} from "./project.ts";
 import {appendDigitalGate,setDigitalInput,setDigitalTruthBit,
-  solveDigitalLogic,starterDigitalNetwork} from "./digital-logic.ts";
+  solveDigitalLogic,starterDigitalNetwork,verifyDigitalTruthTable} from "./digital-logic.ts";
 const base=()=>{
  const p=blankWorldLabProject("digital","2026-10-31T00:00:00Z");
  p.digitalNetworks=[starterDigitalNetwork("logic")];
@@ -47,4 +47,25 @@ test("rejects cycles, dangling nodes, duplicate IDs, executable input and incomp
   gates:[{...n.gates[0],sourceCode:"eval(x)"}]}]}),/Unrecognized key/);
  assert.throws(()=>appendDigitalGate(p,"logic","missing","Part","Assumption",["nobody"]),
   /missing upstream/);
+});
+
+test("exhaustive mathematical checks enumerate NAND without modifying switch state",()=>{
+ const p=base();const original=serializeWorldLabProject(p);
+ const verified=verifyDigitalTruthTable(p,"logic");
+ assert.equal(verified.cases.length,4);
+ assert.deepEqual(verified.cases.map(c=>c.outputBits.output_q),[1,1,1,0]);
+ assert.deepEqual(verified.cases.map(c=>[
+   c.inputBits.input_a,c.inputBits.input_b]),[[0,0],[0,1],[1,0],[1,1]]);
+ assert.equal(serializeWorldLabProject(p),original);
+ assert.match(verified.validity,/not a physical circuit test/);
+});
+test("resource limits prevent exponential exhaustion on broad designs",()=>{
+ const p=base();
+ const net=p.digitalNetworks![0];
+ const inputs=Array.from({length:9},(_,i)=>({
+  id:"switch"+i,label:"Signal "+i,value:false,
+ }));
+ const expanded=parseWorldLabProject({...p,digitalNetworks:[{...net,
+  inputs, gates:[{...net.gates[0],inputNodeIds:["switch0","switch1"]}]}]});
+ assert.throws(()=>verifyDigitalTruthTable(expanded,"logic"),/at most eight/);
 });

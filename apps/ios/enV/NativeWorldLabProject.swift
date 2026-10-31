@@ -84,6 +84,22 @@ struct NativeLabDigitalNetwork:Decodable {
     let gates:[NativeLabDigitalGate];let outputs:[NativeLabDigitalOutput]
 }
 enum NativeWorldLabDigitalLogic {
+
+    /// Exhaust the Boolean input space; this does not verify real semiconductor behavior.
+    static func truthTable(_ n:NativeLabDigitalNetwork)throws->[[String:Int]] {
+        guard n.inputs.count<=8 else {
+            throw NativeWorldLabError.invalid("Only eight switches can be exhaustively checked")
+        }
+        return try (0..<(1<<n.inputs.count)).map{sample in
+            let switches=n.inputs.enumerated().map{index,input in
+                NativeLabDigitalInput(id:input.id,label:input.label,
+                    value:(sample & (1<<(n.inputs.count-index-1))) != 0)
+            }
+            let test=NativeLabDigitalNetwork(id:n.id,name:n.name,
+                inputs:switches,gates:n.gates,outputs:n.outputs)
+            return try evaluate(test)
+        }
+    }
     static func evaluate(_ n:NativeLabDigitalNetwork)throws->[String:Int] {
         var values:[String:Int]=[:]
         for input in n.inputs {values[input.id]=input.value ? 1 : 0}

@@ -83,3 +83,35 @@ export function appendDigitalGate(p:WorldLabProject,netId:string,
     n.id===netId?{...n,gates:[...n.gates,{id:newId,name,assumption,
       inputNodeIds:inputIds,truthTable:table,evidence:"hypothetical-user-assumed" as const}]}:n)});
 }
+
+
+/**
+ * Exhaust every input vector without mutating the stored invention.
+ * At most eight switches (256 cases); output bits are model evidence only.
+ */
+export function verifyDigitalTruthTable(p:WorldLabProject,networkId:string){
+  const safe=parseWorldLabProject(p);
+  const network=safe.digitalNetworks?.find(n=>n.id===networkId);
+  if(!network)throw new Error("Digital network does not exist.");
+  if(network.inputs.length>8)throw new Error("Exhaustive check supports at most eight digital inputs.");
+  const cases:Array<{inputBits:Record<string,0|1>;outputBits:Readonly<Record<string,0|1>>}>=[];
+  for(let index=0;index<2**network.inputs.length;index++){
+    const inputBits:Record<string,0|1>={};
+    const inputs=network.inputs.map((input,i)=>{
+      const value=((index >> (network.inputs.length-i-1))&1)===1;
+      inputBits[input.id]=value?1:0;
+      return {...input,value};
+    });
+    const derived={...safe,digitalNetworks:safe.digitalNetworks!.map(n=>
+      n.id===networkId?{...n,inputs}:n)};
+    const evidence=solveDigitalLogic(derived,networkId);
+    cases.push({inputBits,outputBits:evidence.outputs});
+  }
+  return {format:"env-world-lab-digital-truth-table" as const,
+    modelVersion:"1.0.0" as const,
+    projectId:safe.id,projectRevision:safe.revision,networkId,
+    evidence:"mathematical-model-computed" as const,
+    inputEvidence:"hypothetical-user-assumed" as const,
+    cases,
+    validity:"An exhaustive mathematical check of assumed combinational truth tables only; not a physical circuit test, processor emulation or hardware certification."};
+}

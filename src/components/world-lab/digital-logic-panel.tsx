@@ -1,7 +1,7 @@
 import {useMemo,useState} from "react";
 import type {WorldLabProject} from "@/lib/world-lab/project";
 import {appendDigitalGate,setDigitalInput,setDigitalTruthBit,
-  solveDigitalLogic,starterDigitalNetwork} from "@/lib/world-lab/digital-logic";
+  solveDigitalLogic,starterDigitalNetwork,verifyDigitalTruthTable} from "@/lib/world-lab/digital-logic";
 type Props={
   project:WorldLabProject|null;
   mutateProject:(fn:(p:WorldLabProject)=>WorldLabProject)=>void;
@@ -13,12 +13,17 @@ export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
   const [sourceA,setSourceA]=useState("input_a");
   const [sourceB,setSourceB]=useState("input_b");
   const [error,setError]=useState("");
+  const [showCases,setShowCases]=useState(false);
   const net=project?.digitalNetworks?.[0];
   const result=useMemo(()=>{
     if(!project||!net)return null;
     try{return solveDigitalLogic(project,net.id);}
     catch{return null;}
   },[project,net]);
+  const sweep=useMemo(()=>{
+    if(!showCases||!project||!net)return null;
+    try{return verifyDigitalTruthTable(project,net.id);}catch{return null;}
+  },[showCases,project,net]);
   function addGate(){
     if(!net)return;
     try{
@@ -100,6 +105,31 @@ export function WorldLabDigitalLogicPanel({project,mutateProject}:Props){
           Connect invented gate
         </button>
       </details>
+      <button type="button" className={button} onClick={()=>setShowCases(x=>!x)}>
+        {showCases?"Hide complete logic test":"Test every switch combination"}
+      </button>
+      {showCases&&sweep&&<div className="rounded border border-border p-2"
+        aria-label="Exhaustive digital truth-table evidence">
+        <p>Verified {sweep.cases.length} mathematical input combinations
+          against the assumed truth tables; not real hardware.</p>
+        <div className="mt-2 max-h-64 overflow-y-auto">
+          <table className="w-full text-left">
+            <thead><tr><th>Switch bits</th><th>Output bits</th></tr></thead>
+            <tbody>{sweep.cases.slice(0,16).map((entry,i)=><tr key={i}>
+              <td>{Object.values(entry.inputBits).join("")}</td>
+              <td>{Object.values(entry.outputBits).join("")}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {sweep.cases.length>16&&<p>First 16 shown; export all cases.</p>}
+        <button type="button" className={button+" mt-2"} onClick={()=>{
+          const blob=new Blob([JSON.stringify(sweep,null,2)],{type:"application/json"});
+          const url=URL.createObjectURL(blob);
+          const link=document.createElement("a");link.href=url;
+          link.download="world-lab-invented-logic-evidence.json";link.click();
+          URL.revokeObjectURL(url);
+        }}>Export complete truth-table evidence</button>
+      </div>}
       {error&&<p role="alert" className="text-red-600">{error}</p>}
       <p className="text-muted-foreground">{result?.validity}</p>
     </div>}
