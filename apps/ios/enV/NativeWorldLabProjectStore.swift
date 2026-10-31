@@ -176,3 +176,153 @@ struct NativeWorldLabProjectStore {
         return try read(id)
     }
 }
+
+
+/// Private evidence library for native Swift gravity and material-heat models.
+/// The exact native JSON payload is retained; it is not a measured reading or
+/// a substitute for saving the inventor's own material assumptions.
+struct NativeWorldLabScientificEvidenceStore {
+    static let maxRecords=20
+    static let maxRecordBytes=2*1024*1024
+    let root:URL
+    init(directory:URL?=nil){
+        root=directory ?? NativeWorldLabProjectStore().directory
+    }
+    private func validateID(_ id:String)throws {
+        guard id.range(of:"^[A-Za-z0-9_-]{1,120}$",
+            options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("Scientific record ID is invalid")
+        }
+    }
+    private func folder(_ projectId:String)throws->URL {
+        try validateID(projectId)
+        return root.appendingPathComponent("ScientificEvidence",isDirectory:true)
+            .appendingPathComponent(projectId,isDirectory:true)
+    }
+    private func file(_ projectId:String,_ id:String)throws->URL {
+        try validateID(id)
+        return try folder(projectId).appendingPathComponent(id+".json")
+    }
+    private func inspect(_ bytes:Data,expectedId:String?,
+        expectedProject:String)throws->[String:Any] {
+        guard bytes.count<=Self.maxRecordBytes,
+              let record=try JSONSerialization.jsonObject(with:bytes) as? [String:Any],
+              Set(record.keys)==Set(["id","projectId","projectRevision",
+                "createdAt","kind","result"]),
+              let id=record["id"] as? String,
+              let projectId=record["projectId"] as? String,
+              projectId==expectedProject,
+              let revision=record["projectRevision"] as? Int,revision>=0,
+              let createdAt=record["createdAt"] as? String,
+              ISO8601DateFormatter().date(from:createdAt) != nil,
+              let kind=record["kind"] as? String,
+              let result=record["result"] as? [String:Any],
+              let innerId=result["projectId"] as? String,innerId==projectId,
+              let innerRevision=result["projectRevision"] as? Int,
+              innerRevision==revision,
+              result["evidence"] as? String=="physics-model-computed",
+              result["materialEvidence"] as? String=="hypothetical-user-assumed",
+              let validity=result["validity"] as? String,
+              validity.count>=30,validity.count<=2000,
+              (expectedId == nil || expectedId == id) else {
+            throw NativeWorldLabError.invalid("Scientific evidence metadata is inconsistent")
+        }
+        try validateID(id)
+        if kind=="newton-gravity" {
+            guard result["format"] as? String=="env-world-lab-newton-gravity",
+                  let bodies=result["bodies"] as? [[String:Any]],
+                  (2...8).contains(bodies.count),
+                  let frames=result["frames"] as? [[String:Any]],
+                  (2...241).contains(frames.count) else {
+                throw NativeWorldLabError.invalid("Unsupported gravitational record")
+            }
+        }else if kind=="material-heat" {
+            guard result["format"] as? String=="env-world-lab-material-heat-transfer",
+                  let samples=result["samples"] as? [[String:Any]],
+                  samples.count==121 else {
+                throw NativeWorldLabError.invalid("Unsupported material heat record")
+            }
+        }else{
+            throw NativeWorldLabError.invalid("Unknown scientific evidence kind")
+        }
+        return record
+    }
+    @discardableResult private func store<T:Encodable>(
+        _ result:T,kind:String,project:NativeWorldLabProject)throws->String {
+        let current=try NativeWorldLabProjectStore(directory:root).read(project.id).1
+        guard current.revision>=project.revision else {
+            throw NativeWorldLabError.invalid(
+                "Save the matching invention before retaining its scientific result")
+        }
+        let data=try JSONEncoder().encode(result)
+        let value=try JSONSerialization.jsonObject(with:data) as? [String:Any]
+        guard let value,
+              value["projectId"] as? String==project.id,
+              value["projectRevision"] as? Int==project.revision else {
+            throw NativeWorldLabError.invalid(
+                "Scientific evidence belongs to another invention or revision")
+        }
+        let id=UUID().uuidString
+        let envelope:[String:Any]=[
+            "id":id,"projectId":project.id,"projectRevision":project.revision,
+            "createdAt":ISO8601DateFormatter().string(from:Date()),
+            "kind":kind,"result":value
+        ]
+        let bytes=try JSONSerialization.data(withJSONObject:envelope,
+            options:[.sortedKeys])
+        _ = try inspect(bytes,expectedId:id,expectedProject:project.id)
+        let directory=try folder(project.id)
+        let manager=FileManager.default
+        try manager.createDirectory(at:directory,withIntermediateDirectories:true)
+        let count=try manager.contentsOfDirectory(at:directory,
+            includingPropertiesForKeys:nil).filter{$0.pathExtension=="json"}.count
+        guard count<Self.maxRecords else {
+            throw NativeWorldLabError.invalid(
+                "This invention already holds 20 scientific evidence records")
+        }
+        try bytes.write(to:try file(project.id,id),options:.atomic)
+        return id
+    }
+    @discardableResult func saveGravity(_ run:NativeGravityRun,
+        project:NativeWorldLabProject)throws->String {
+        try store(run,kind:"newton-gravity",project:project)
+    }
+    @discardableResult func saveHeat(_ run:NativeMaterialHeatRun,
+        project:NativeWorldLabProject)throws->String {
+        try store(run,kind:"material-heat",project:project)
+    }
+    func read(_ projectId:String,_ recordId:String)throws->Data {
+        let url=try file(projectId,recordId)
+        let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+        guard let size=(attributes[.size] as? NSNumber)?.intValue,
+              size<=Self.maxRecordBytes else {
+            throw NativeWorldLabError.invalid(
+                "Scientific evidence file is missing or exceeds 2 MB")
+        }
+        let bytes=try Data(contentsOf:url)
+        _ = try inspect(bytes,expectedId:recordId,expectedProject:projectId)
+        return bytes
+    }
+    func list(_ projectId:String)throws->[(id:String,kind:String,createdAt:String)] {
+        let dir=try folder(projectId)
+        let manager=FileManager.default
+        guard manager.fileExists(atPath:dir.path) else{return []}
+        let urls=try manager.contentsOfDirectory(at:dir,
+            includingPropertiesForKeys:[.contentModificationDateKey])
+            .filter{$0.pathExtension=="json"}
+        guard urls.count<=Self.maxRecords else {
+            throw NativeWorldLabError.invalid("Scientific evidence storage quota is inconsistent")
+        }
+        return try urls.map{ url in
+            let id=url.deletingPathExtension().lastPathComponent
+            let record=try inspect(Data(contentsOf:url),
+                expectedId:id,expectedProject:projectId)
+            return (id:id,kind:record["kind"] as! String,
+                createdAt:record["createdAt"] as! String)
+        }.sorted{$0.createdAt>$1.createdAt}
+    }
+    func delete(_ projectId:String,_ recordId:String)throws {
+        _ = try read(projectId,recordId)
+        try FileManager.default.removeItem(at:try file(projectId,recordId))
+    }
+}
