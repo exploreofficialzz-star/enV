@@ -146,6 +146,88 @@ export async function putLocalWorldLabProject(
 }
 
 
+
+/**
+ * Commit a project and its immutable scientific runs in ONE IndexedDB
+ * transaction. Failure of any run, revision conflict or quota aborts all writes.
+ * This is used for complete portable archive import and ordinary save alike.
+ */
+export async function putLocalWorldLabArchive(source:WorldLabProject,
+  expectedRevision:number|null,runs:readonly LabRun[]):Promise<WorldLabProject>{
+  const project=parseWorldLabProject(source);
+  if(expectedRevision!==null&&
+    (!Number.isSafeInteger(expectedRevision)||expectedRevision<0))
+    throw new Error("Invalid expected project revision.");
+  if(runs.length>MAX_STORED_RUNS_PER_PROJECT)
+    throw new Error("An archive can contain at most 20 scientific runs.");
+  const unique=new Set<string>();
+  const prepared=runs.map(candidate=>{
+    const run=parseStoredWorldLabRun(candidate);
+    const serialized=serializeStoredWorldLabRun(run);
+    if(unique.has(run.id))throw new Error("Duplicate scientific run ID in archive.");
+    unique.add(run.id);
+    if(run.assumedMassSource&&run.assumedMassSource.projectId!==project.id)
+      throw new Error("Scientific run provenance identifies another project.");
+    return {run,serialized};
+  });
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction([STORE,RUNS],"readwrite");
+    const projects=tx.objectStore(STORE);
+    const history=tx.objectStore(RUNS);
+    let saved:WorldLabProject|null=null;
+    let error:Error|null=null;
+    const abort=(cause:unknown)=>{
+      error=cause instanceof Error?cause:new Error("Project and science archive save failed.");
+      tx.abort();
+    };
+    const old=projects.get(project.id);
+    old.onsuccess=()=>{
+      try{
+        const previous=old.result?parseWorldLabProject(old.result):null;
+        if((previous?.revision??null)!==expectedRevision)
+          throw new Error("Project revision changed on this device. Neither project nor runs were overwritten.");
+        saved=parseWorldLabProject({...project,
+          revision:(previous?.revision??-1)+1,updatedAt:new Date().toISOString()});
+        const existing=history.index("projectId").getAll(project.id);
+        existing.onsuccess=()=>{
+          try{
+            const rows=existing.result as {id:string;projectId:string;run:LabRun}[];
+            if(rows.length>MAX_STORED_RUNS_PER_PROJECT)
+              throw new Error("Existing scientific history exceeds its quota.");
+            const byId=new Map(rows.map(row=>[row.id,row]));
+            let newCount=0;
+            for(const item of prepared){
+              const stored=byId.get(item.run.id);
+              if(stored){
+                if(stored.projectId!==project.id ||
+                  serializeStoredWorldLabRun(stored.run)!==item.serialized)
+                  throw new Error("An immutable recorded experiment cannot be replaced.");
+              }else newCount++;
+            }
+            if(rows.length+newCount>MAX_STORED_RUNS_PER_PROJECT)
+              throw new Error("The combined experiment history exceeds 20 runs.");
+            // Global run IDs must also be unique across all projects. An
+            // IndexedDB constraint failure aborts this entire transaction.
+            projects.put(saved!);
+            for(const item of prepared)if(!byId.has(item.run.id))
+              history.add({id:item.run.id,projectId:project.id,run:item.run});
+          }catch(cause){abort(cause);}
+        };
+      }catch(cause){abort(cause);}
+    };
+    tx.oncomplete=()=>{
+      db.close();
+      if(saved)resolve(saved);
+      else reject(new Error("No project was saved."));
+    };
+    tx.onabort=()=>{db.close();reject(error??new Error(
+      "Atomic project-and-run save failed. Existing data is unchanged."));};
+    tx.onerror=()=>{db.close();reject(error??new Error(
+      "Atomic project-and-run save was interrupted."));};
+  });
+}
+
 /** Persist a verified scientific result without overwriting a recorded run ID.
  * Duplicate insertion for the same project/run is safe and idempotent.
  * The run's scientific inputs are never inferred from mutable project state.

@@ -6,7 +6,7 @@ import {
   type WorldLabEntity, type WorldLabProject,
 } from "@/lib/world-lab/project";
 import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRuns,
-  putLocalWorldLabProject, saveLocalWorldLabRun,
+  putLocalWorldLabArchive, saveLocalWorldLabRun,
   listLocalWorldLabDrafts, saveLocalWorldLabDraft, deleteLocalWorldLabDraft,
   type WorldLabDraft } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
@@ -1333,7 +1333,7 @@ export default function WorldLab() {
     if (!project) return;
     setError("");
     try {
-      const saved=await putLocalWorldLabProject(project,savedRevision);
+      const saved=await putLocalWorldLabArchive(project,savedRevision,runs);
       setProject(saved);
       clearEditHistory();
       setSavedRevision(saved.revision);
@@ -1353,17 +1353,8 @@ export default function WorldLab() {
       } catch {
         // Project and scientific histories are in IndexedDB even if preferences storage is unavailable.
       }
-      const archival=await Promise.allSettled(runs.map(run=>saveLocalWorldLabRun(saved.id,run)));
-      const rejected=archival.filter(item=>item.status==="rejected");
-      if(rejected.length) {
-        setMessage("The project was saved locally, but some experiment history could not be archived.");
-        setError("Export any missing run JSON before closing this tab. "+
-          rejected.map(item=>item.status==="rejected" && item.reason instanceof Error
-            ? item.reason.message : "Local storage failed.").join(" "));
-      }else{
-        setMessage("Project and "+archival.length+
-          " scientific runs saved on this device. Cloud synchronization is not yet available.");
-      }
+      setMessage("Project and "+runs.length+
+        " scientific runs saved together in one atomic device transaction.");
     } catch(cause) {
       setError(cause instanceof Error?cause.message:"Could not save this project. Export a JSON backup.");
     }
