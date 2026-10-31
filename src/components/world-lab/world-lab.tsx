@@ -6,7 +6,9 @@ import {
   type WorldLabEntity, type WorldLabProject,
 } from "@/lib/world-lab/project";
 import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRuns,
-  putLocalWorldLabProject, saveLocalWorldLabRun } from "@/lib/world-lab/local-storage";
+  putLocalWorldLabProject, saveLocalWorldLabRun,
+  listLocalWorldLabDrafts, saveLocalWorldLabDraft, deleteLocalWorldLabDraft,
+  type WorldLabDraft } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
 import { deriveDropInput, runDropExperiment, sampleDrop, type DropRun } from "@/lib/world-lab/physical-motion";
 import { deriveActuatorInput, runActuatorExperiment, sampleActuator, type ActuatorRun } from "@/lib/world-lab/electromechanical";
@@ -162,6 +164,8 @@ export default function WorldLab() {
   const [remoteBusy,setRemoteBusy]=useState(false);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
+  const [recoveryDrafts,setRecoveryDrafts]=useState<WorldLabDraft[]>([]);
+  const [recoveryStatus,setRecoveryStatus]=useState("");
   const [selectedEntityId, setSelectedEntityId] = useState("");
   const [fluidRun,setFluidRun]=useState<HydrostaticResult|null>(null);
   const [chemicalInput,setChemicalInput]=useState<ReactionThermalInput>({
@@ -336,6 +340,30 @@ export default function WorldLab() {
       setMessage("The old local workspace was unreadable; a fresh workspace opened without overwriting it.");
     }
   }, []);
+
+  useEffect(() => {
+    let active=true;
+    void listLocalWorldLabDrafts().then(items=>{
+      if(active)setRecoveryDrafts(items);
+    }).catch(()=>{
+      if(active)setRecoveryStatus("Recovery history is unavailable; export your project regularly.");
+    });
+    return ()=>{active=false;};
+  }, []);
+
+  useEffect(()=>{
+    if(!project||!workspaceDirty)return;
+    const snapshot=project;
+    const timeout=window.setTimeout(()=>{
+      void saveLocalWorldLabDraft(snapshot,savedRevision).then(record=>{
+        setRecoveryDrafts(items=>[record,...items.filter(x=>x.id!==record.id)]
+          .sort((a,b)=>b.savedAt.localeCompare(a.savedAt)));
+        setRecoveryStatus("Uncommitted invention cached on this device.");
+      }).catch(error=>setRecoveryStatus(error instanceof Error?error.message:
+        "Recovery cache unavailable; export your invention before closing."));
+    },700);
+    return ()=>window.clearTimeout(timeout);
+  },[project,workspaceDirty,savedRevision]);
 
   useEffect(() => {
     let active = true;
@@ -1309,6 +1337,13 @@ export default function WorldLab() {
       setSavedRevision(saved.revision);
       setWorkspaceDirty(false);
       setSavedProjects(await listLocalWorldLabProjects());
+      try{
+        await deleteLocalWorldLabDraft(saved.id);
+        setRecoveryDrafts(items=>items.filter(item=>item.id!==saved.id));
+        setRecoveryStatus("Project saved; temporary recovery draft cleared.");
+      }catch{
+        setRecoveryStatus("Project saved, but an older recovery draft could not be cleared.");
+      }
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
           format:"env-world-lab-local", version:1,modelKind,mechanical,circuit,heat,
@@ -1386,6 +1421,30 @@ export default function WorldLab() {
     setSavedRevision(null);setWorkspaceDirty(false);setSelectedEntityId("");
     setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
     setMessage("New local World Lab project created.");
+  }
+  function restoreRecoveryDraft(draft:WorldLabDraft){
+    if(workspaceDirty&&!window.confirm(
+      "Replace current unsaved edits with this cached draft? Export them first if needed."))return;
+    try{
+      const restored=parseWorldLabProject(draft.project);
+      if(restored.id!==draft.id)throw new Error("Recovery draft project identity mismatch.");
+      restoreRunsEpoch.current++;
+      setProject(restored);clearEditHistory();
+      setSavedRevision(draft.baseSavedRevision);
+      setWorkspaceDirty(true);setSelectedEntityId("");
+      setRuns([]);setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+      if(draft.baseSavedRevision!==null)restoreRunsForProject(restored.id);
+      setMessage("Recovered a cached, unsaved invention. Save or export to preserve it.");
+    }catch(error){setError(error instanceof Error?error.message:"Recovery draft is invalid.");}
+  }
+  async function discardRecoveryDraft(draft:WorldLabDraft){
+    if(!window.confirm("Permanently discard this cached draft? Saved projects will not be deleted."))return;
+    try{
+      await deleteLocalWorldLabDraft(draft.id);
+      setRecoveryDrafts(items=>items.filter(item=>item.id!==draft.id));
+      setRecoveryStatus("Selected temporary recovery draft discarded.");
+    }catch(error){setRecoveryStatus(error instanceof Error?error.message:
+      "Could not remove the recovery draft.");}
   }
   async function deleteSelectedRun() {
     if(!project || !currentRun)return;
@@ -1473,6 +1532,26 @@ export default function WorldLab() {
           </details>}
         </div>
       )}
+      {recoveryDrafts.length>0&&
+        <section className="mb-3 rounded-xl border border-border p-3"
+          aria-label="Unsaved invention recovery">
+          <h3 className="text-sm font-semibold">Recover unfinished inventions</h3>
+          <p className="text-xs text-muted-foreground">
+            Browser-cached drafts are separate from saved projects.
+            Recovery only happens when you choose it; saving commits the recovered project.
+          </p>
+          {recoveryDrafts.map(draft=>
+            <div key={draft.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span>{draft.project.title} · cached {new Date(draft.savedAt).toLocaleString()}</span>
+              <div className="flex gap-2">
+                <button className={buttonClass} type="button"
+                  onClick={()=>restoreRecoveryDraft(draft)}>Restore draft</button>
+                <button className={buttonClass} type="button"
+                  onClick={()=>{void discardRecoveryDraft(draft);}}>Discard cache</button>
+              </div>
+            </div>)}
+        </section>}
+      {recoveryStatus&&<p role="status" className="mb-2 text-xs">{recoveryStatus}</p>}
       {cloudBackupsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
         aria-label="Authenticated project backups">
         <h3 className="text-sm font-semibold">Back up your inventions to your account</h3>

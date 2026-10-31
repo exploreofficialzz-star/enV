@@ -74,6 +74,7 @@ test("remote group collision reuses computed 3D event history and rejects unsafe
     velocities:{"ball-0":[2,0,0]},restitution:1,durationSeconds:4});
   assert.equal(run.kind,"multi-sphere");
   if(run.kind!=="multi-sphere")throw new Error("Wrong operation");
+  if(!("events" in run.outcome))throw new Error("Missing collision evidence");
   assert.equal(run.outcome.events.length,2);
   assert.equal(run.outcome.totalDissipatedEnergyJ,0);
   assert.throws(()=>runBoundedWorldLabOperation({kind:"multi-sphere",project,

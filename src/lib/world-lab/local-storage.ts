@@ -8,13 +8,19 @@ import type { LabRun } from "./model.ts";
 const DB_NAME="env-world-lab-v1";
 const STORE="projects";
 const RUNS="runs";
+const DRAFTS="drafts";
 const validProjectId=(value:string)=>/^[A-Za-z0-9_-]{1,120}$/.test(value);
+export type WorldLabDraft=Readonly<{
+  id:string;project:WorldLabProject;baseSavedRevision:number|null;savedAt:string;
+}>;
 function connect():Promise<IDBDatabase>{
   if(typeof indexedDB==="undefined") return Promise.reject(new Error("Browser project storage is unavailable."));
   return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB_NAME,2);
+    const req=indexedDB.open(DB_NAME,3);
     req.onupgradeneeded=()=>{
       if(!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE,{keyPath:"id"});
+      if(!req.result.objectStoreNames.contains(DRAFTS))
+        req.result.createObjectStore(DRAFTS,{keyPath:"id"});
       if(!req.result.objectStoreNames.contains(RUNS)) {
         const runs=req.result.createObjectStore(RUNS,{keyPath:"id"});
         runs.createIndex("projectId","projectId",{unique:false});
@@ -22,6 +28,71 @@ function connect():Promise<IDBDatabase>{
     };
     req.onerror=()=>reject(new Error("Browser project storage could not open."));
     req.onsuccess=()=>resolve(req.result);
+  });
+}
+/** Session recovery is separate from committed projects and never restores automatically. */
+export async function listLocalWorldLabDrafts():Promise<WorldLabDraft[]>{
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(DRAFTS,"readonly");
+    const req=tx.objectStore(DRAFTS).getAll();
+    tx.oncomplete=()=>{
+      db.close();
+      try{
+        const rows=req.result as WorldLabDraft[];
+        if(rows.length>50)throw new Error("Recovery cache exceeds its project limit.");
+        resolve(rows.map(row=>{
+          if(!validProjectId(row.id)||row.project?.id!==row.id||
+            (row.baseSavedRevision!==null&&
+              (!Number.isSafeInteger(row.baseSavedRevision)||row.baseSavedRevision<0))||
+            !Number.isFinite(Date.parse(row.savedAt)))
+            throw new Error("A recovery draft has inconsistent metadata.");
+          return {...row,project:parseWorldLabProject(row.project)};
+        }).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)));
+      }catch(error){reject(error);}
+    };
+    tx.onerror=()=>{db.close();reject(new Error("Recovery history could not be read."));};
+  });
+}
+export async function saveLocalWorldLabDraft(projectInput:WorldLabProject,
+  baseSavedRevision:number|null):Promise<WorldLabDraft>{
+  const project=parseWorldLabProject(projectInput);
+  if(baseSavedRevision!==null&&
+    (!Number.isSafeInteger(baseSavedRevision)||baseSavedRevision<0))
+    throw new Error("Invalid base project revision for recovery.");
+  const record:WorldLabDraft={
+    id:project.id,project,baseSavedRevision,savedAt:new Date().toISOString(),
+  };
+  if(new TextEncoder().encode(JSON.stringify(record)).byteLength>1048576)
+    throw new Error("Recovery draft exceeds the 1 MB bound; export the invention as JSON.");
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(DRAFTS,"readwrite");
+    const store=tx.objectStore(DRAFTS);
+    let failure:Error|null=null;
+    const request=store.get(record.id);
+    request.onsuccess=()=>{
+      const count=store.count();
+      count.onsuccess=()=>{
+        if(!request.result&&count.result>=50){
+          failure=new Error("Recovery storage contains 50 projects. Discard older drafts first.");
+          tx.abort();
+        }else store.put(record);
+      };
+    };
+    tx.oncomplete=()=>{db.close();resolve(record);};
+    tx.onerror=()=>{db.close();reject(failure??new Error("Could not save recovery draft."));};
+    tx.onabort=()=>{db.close();reject(failure??new Error("Recovery draft storage was interrupted."));};
+  });
+}
+export async function deleteLocalWorldLabDraft(id:string):Promise<void>{
+  if(!validProjectId(id))throw new Error("Invalid recovery project ID.");
+  const db=await connect();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(DRAFTS,"readwrite");
+    tx.objectStore(DRAFTS).delete(id);
+    tx.oncomplete=()=>{db.close();resolve();};
+    tx.onerror=()=>{db.close();reject(new Error("Cannot delete the recovery draft."));};
   });
 }
 export async function getLocalWorldLabProject(id:string):Promise<WorldLabProject|null>{
