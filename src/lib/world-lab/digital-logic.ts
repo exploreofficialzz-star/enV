@@ -85,6 +85,21 @@ export function appendDigitalGate(p:WorldLabProject,netId:string,
 }
 
 
+/** Rewire an indicator to an existing switch or gate. The authored project stays portable. */
+export function setDigitalOutputSource(p:WorldLabProject,netId:string,
+  outputId:string,sourceNodeId:string):WorldLabProject {
+  const safe=parseWorldLabProject(p);
+  const net=safe.digitalNetworks?.find(n=>n.id===netId);
+  if(!net)throw new Error("Digital network does not exist.");
+  if(!net.outputs.some(o=>o.id===outputId))
+    throw new Error("Digital output does not exist.");
+  if(![...net.inputs,...net.gates].some(node=>node.id===sourceNodeId))
+    throw new Error("Digital output must connect to an existing switch or gate.");
+  return parseWorldLabProject({...safe,digitalNetworks:safe.digitalNetworks!.map(n=>
+    n.id===netId?{...n,outputs:n.outputs.map(o=>
+      o.id===outputId?{...o,sourceNodeId}:o)}:n)});
+}
+
 /**
  * Exhaust every input vector without mutating the stored invention.
  * At most eight switches (256 cases); output bits are model evidence only.
