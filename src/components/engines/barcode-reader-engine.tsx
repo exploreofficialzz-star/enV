@@ -77,11 +77,13 @@ function payloadLabel(value: string): string {
   return "Text or structured data";
 }
 
-function decodeMultipleImageCodes(image: HTMLImageElement | HTMLVideoElement) {
+function decodeMultipleImageCodes(
+  image: HTMLImageElement | HTMLVideoElement,
+  maxDimension = 2800,
+) {
   const sourceWidth = "videoWidth" in image ? image.videoWidth : image.naturalWidth;
   const sourceHeight = "videoHeight" in image ? image.videoHeight : image.naturalHeight;
   if (!sourceWidth || !sourceHeight) return [];
-  const maxDimension = 1800;
   const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
@@ -102,83 +104,57 @@ function decodeMultipleImageCodes(image: HTMLImageElement | HTMLVideoElement) {
 
   const bitmap = new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(luminance, width, height)));
   const hints = new Map([[DecodeHintType.TRY_HARDER, true]]);
-  const pendingRegions: Array<{ left: number; top: number; width: number; height: number }> = [
-    { left: 0, top: 0, width, height },
+  const pendingRegions: Array<{ left: number; top: number; width: number; height: number; depth: number }> = [
+    { left: 0, top: 0, width, height, depth: 0 },
   ];
   const visitedRegions = new Set<string>();
   const decoded = new Map<string, ReturnType<MultiFormatReader["decodeWithState"]>>();
   let attempts = 0;
 
-  // Repeatedly decode the current crop, then search the four areas outside the
-  // detected symbol. This keeps the implementation inside ZXing's public API.
-  while (pendingRegions.length && attempts < 80 && decoded.size < 50) {
+  // Decode the whole frame first, then overlapping quadrants. A single ZXing
+  // reader only returns one result per frame; overlapping tiles let separate
+  // labels/codes be found without slicing through a symbol on a hard midline.
+  while (pendingRegions.length && attempts < 24 && decoded.size < 50) {
     const region = pendingRegions.shift();
-    if (!region || region.width < 16 || region.height < 16) continue;
+    if (!region || region.width < 64 || region.height < 64) continue;
     const regionKey = `${region.left}:${region.top}:${region.width}:${region.height}`;
     if (visitedRegions.has(regionKey)) continue;
     visitedRegions.add(regionKey);
     attempts += 1;
 
-    let result: ReturnType<MultiFormatReader["decodeWithState"]>;
     try {
       const reader = new MultiFormatReader();
       reader.setHints(hints);
-      result = reader.decodeWithState(bitmap.crop(region.left, region.top, region.width, region.height));
+      const cropped = bitmap.crop(region.left, region.top, region.width, region.height);
+      const result = reader.decodeWithState(cropped);
+      const signature = `${result.getBarcodeFormat()}\\u0000${result.getText()}`;
+      if (!decoded.has(signature)) decoded.set(signature, result);
     } catch {
-      continue;
+      // A tile without a code is normal; other tiles still get decoded.
     }
 
-    const signature = `${result.getBarcodeFormat()}\u0000${result.getText()}`;
-    if (!decoded.has(signature)) decoded.set(signature, result);
+    if (region.depth >= 2 || region.width < 180 || region.height < 180) continue;
+    const middleX = Math.floor(region.width / 2);
+    const middleY = Math.floor(region.height / 2);
+    const overlapX = Math.max(8, Math.round(region.width * 0.08));
+    const overlapY = Math.max(8, Math.round(region.height * 0.08));
+    const leftWidth = Math.min(region.width, middleX + overlapX);
+    const rightOffset = Math.max(0, middleX - overlapX);
+    const topHeight = Math.min(region.height, middleY + overlapY);
+    const bottomOffset = Math.max(0, middleY - overlapY);
+    const rightWidth = region.width - rightOffset;
+    const bottomHeight = region.height - bottomOffset;
 
-    const points = result.getResultPoints() ?? [];
-    if (!points.length) continue;
-    const minX = Math.min(...points.map((point) => point.getX()));
-    const maxX = Math.max(...points.map((point) => point.getX()));
-    const minY = Math.min(...points.map((point) => point.getY()));
-    const maxY = Math.max(...points.map((point) => point.getY()));
-    const marginX = Math.max(12, Math.round(region.width * 0.02));
-    const marginY = Math.max(12, Math.round(region.height * 0.05));
-    const left = Math.max(0, Math.floor(minX - marginX));
-    const top = Math.max(0, Math.floor(minY - marginY));
-    const right = Math.min(region.width, Math.ceil(maxX + marginX));
-    const bottom = Math.min(region.height, Math.ceil(maxY + marginY));
-    if (right <= left || bottom <= top) continue;
-
-    const middleHeight = bottom - top;
-    const remainingBottom = region.height - bottom;
-    if (top > 0) {
-      pendingRegions.push({ left: region.left, top: region.top, width: region.width, height: top });
-    }
-    if (remainingBottom > 0) {
-      pendingRegions.push({
-        left: region.left,
-        top: region.top + bottom,
-        width: region.width,
-        height: remainingBottom,
-      });
-    }
-    if (left > 0 && middleHeight > 0) {
-      pendingRegions.push({
-        left: region.left,
-        top: region.top + top,
-        width: left,
-        height: middleHeight,
-      });
-    }
-    if (right < region.width && middleHeight > 0) {
-      pendingRegions.push({
-        left: region.left + right,
-        top: region.top + top,
-        width: region.width - right,
-        height: middleHeight,
-      });
-    }
+    pendingRegions.push(
+      { left: region.left, top: region.top, width: leftWidth, height: topHeight, depth: region.depth + 1 },
+      { left: region.left + rightOffset, top: region.top, width: rightWidth, height: topHeight, depth: region.depth + 1 },
+      { left: region.left, top: region.top + bottomOffset, width: leftWidth, height: bottomHeight, depth: region.depth + 1 },
+      { left: region.left + rightOffset, top: region.top + bottomOffset, width: rightWidth, height: bottomHeight, depth: region.depth + 1 },
+    );
   }
 
   return [...decoded.values()];
 }
-
 export function BarcodeReaderEngine() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
@@ -308,7 +284,7 @@ export function BarcodeReaderEngine() {
           ) {
             lastCameraMultiScanAtRef.current = now;
             try {
-              const frameResults = decodeMultipleImageCodes(video);
+              const frameResults = decodeMultipleImageCodes(video, 1440);
               if (frameResults.length > 1) {
                 frameResults.forEach((item) => addResult(item.getText(), item.getBarcodeFormat()));
                 setNotice(`Detected ${frameResults.length} codes in the camera frame.`);
