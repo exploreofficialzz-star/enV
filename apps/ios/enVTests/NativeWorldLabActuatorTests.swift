@@ -2,6 +2,33 @@ import XCTest
 @testable import enV
 
 final class NativeWorldLabActuatorTests:XCTestCase {
+    func testInventedBooleanIndicatorSwitchesNativeMotorPower() throws {
+        let blank=try NativeWorldLabEditor.blank()
+        let withSolid=try NativeWorldLabEditor.addSolid(blank,shape:"box",id:"solid")
+        let withLogic=try NativeWorldLabEditor.startDigitalInvention(withSolid,id:"logic")
+        let initial=try NativeWorldLabProject.decode(withLogic)
+        let powered=try NativeWorldLabDigitalMotor.evaluate(
+            initial,networkId:"logic",outputId:"output_q",entityId:"solid",massKg:1)
+        XCTAssertEqual(powered.logicBit,1)
+        XCTAssertEqual(powered.input.supplyVoltageV,24)
+        XCTAssertTrue(powered.motor.samples.contains(where:{$0.currentA>0 && $0.heightM>0}))
+        let first=try NativeWorldLabEditor.digitalSwitch(
+            withLogic,networkId:"logic",inputId:"input_a",value:true)
+        let second=try NativeWorldLabEditor.digitalSwitch(
+            first,networkId:"logic",inputId:"input_b",value:true)
+        let changed=try NativeWorldLabProject.decode(second)
+        let off=try NativeWorldLabDigitalMotor.evaluate(
+            changed,networkId:"logic",outputId:"output_q",entityId:"solid",massKg:1)
+        XCTAssertEqual(off.logicBit,0)
+        XCTAssertEqual(off.input.supplyVoltageV,0)
+        XCTAssertTrue(off.motor.samples.allSatisfy({$0.currentA==0 && $0.heightM==0}))
+        XCTAssertEqual(off.projectRevision,changed.revision)
+        XCTAssertThrowsError(try NativeWorldLabDigitalMotor.evaluate(
+            changed,networkId:"logic",outputId:"missing",entityId:"solid",massKg:1))
+        XCTAssertThrowsError(try NativeWorldLabDigitalMotor.evaluate(
+            changed,networkId:"logic",outputId:"output_q",entityId:"solid",
+            massKg:1,energizedVoltageV:Double.nan))
+    }
     func testElectricityActuallyLiftsAConstructedReferenceSolid() throws {
         let result=try NativeWorldLabActuator.evaluate(NativeActuatorInput(massKg:1))
         XCTAssertEqual(result.inputEvidence,"hypothetical-user-assumed")
