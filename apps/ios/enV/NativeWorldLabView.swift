@@ -251,7 +251,8 @@ struct NativeWorldLabView:View {
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
-    var body:some View {
+    var body:some View { importExportView }
+    private var coreView:some View {
         ScrollView{
             VStack(alignment:.leading,spacing:12) {
                 Text("The World Lab").font(.title2.bold())
@@ -350,6 +351,9 @@ struct NativeWorldLabView:View {
                     .font(.caption2).foregroundStyle(.secondary)
             }.padding(14)
         }
+    }
+    private var sceneSettingsView:some View {
+        coreView
         .onAppear{redraw();lastTick=Date();refreshSavedProjects()}
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
@@ -360,6 +364,9 @@ struct NativeWorldLabView:View {
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
+    }
+    private var interactionView:some View {
+        sceneSettingsView
         .onChange(of:reactionHeat){_ in
             chemicalPlaying=false;chemicalRun=nil;chemicalTime=0
         }
@@ -449,6 +456,9 @@ struct NativeWorldLabView:View {
         } message: {
             Text("Save locally or export JSON first if you want to keep the current changes.")
         }
+    }
+    private var importExportView:some View {
+        interactionView
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
