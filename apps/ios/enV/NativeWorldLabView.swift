@@ -50,6 +50,11 @@ struct NativeWorldLabView:View {
     @State private var dcRun:NativeLabDcResult?
     @State private var selected=0
     @State private var hydroRun:NativeLabHydroResult?
+    @State private var fluidMotion:NativeLabFluidMotionRun?
+    @State private var fluidTime=0.0
+    @State private var fluidPlaying=false
+    @State private var fluidSurfaceHeight=1.0
+    @State private var fluidDrag=200.0
     @State private var fluidDensity=1000.0
     @State private var fluidFraction=0.5
     @State private var dropRun:NativeDropResult?
@@ -129,7 +134,7 @@ struct NativeWorldLabView:View {
             }
             let data=try work(old)
             project=try NativeWorldLabProject.decode(data)
-            projectData=data;dcRun=nil;wiredMotor=nil;hydroRun=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
+            projectData=data;dcRun=nil;wiredMotor=nil;hydroRun=nil;fluidPlaying=false;fluidMotion=nil;selected=min(selected,max(0,(project?.entities.count ?? 1)-1))
             problem="";redraw()
         }catch{problem=error.localizedDescription}
     }
@@ -449,6 +454,74 @@ struct NativeWorldLabView:View {
                         Text("Material: "+(material?.name ?? "Unknown")+" (hypothetical)")
                         value("Assumed mass",assumedMass,"kg")
                         Text("Try floating your invention").font(.headline)
+                        value("Liquid surface height",fluidSurfaceHeight,"m")
+                        Slider(value:$fluidSurfaceHeight,in:0...5) { editing in
+                            if editing {fluidPlaying=false;fluidMotion=nil}
+                        }.accessibilityLabel("Liquid surface above ground")
+                        value("Assumed fluid drag",fluidDrag,"N·s/m")
+                        Slider(value:$fluidDrag,in:0...1000) { editing in
+                            if editing {fluidPlaying=false;fluidMotion=nil}
+                        }.accessibilityLabel("Assumed viscous damping")
+                        Button("Simulate floating or sinking"){
+                            do {
+                                let startingHeight=max(0,
+                                    solid.positionMeters[1]-solid.dimensionsMeters[1]/2)
+                                let input=NativeLabFluidMotionInput(
+                                    fluidDensityKgM3:fluidDensity,
+                                    waterSurfaceHeightM:fluidSurfaceHeight,
+                                    startingBottomHeightM:startingHeight,
+                                    linearDragNsPerM:fluidDrag)
+                                fluidMotion=try NativeWorldLabFluidMotion.evaluate(
+                                    project,entityId:solid.id,input:input)
+                                fluidTime=0;fluidPlaying=true;problem=""
+                                scene.rootNode.childNode(withName:"world-lab-fluid-plane",
+                                    recursively:false)?.removeFromParentNode()
+                                let plane=SCNPlane(width:12,height:12)
+                                plane.firstMaterial?.diffuse.contents=UIColor.systemBlue
+                                plane.firstMaterial?.transparency=0.25
+                                plane.firstMaterial?.isDoubleSided=true
+                                let water=SCNNode(geometry:plane)
+                                water.name="world-lab-fluid-plane"
+                                water.eulerAngles.x = -Float.pi/2
+                                water.position.y=Float(fluidSurfaceHeight)
+                                scene.rootNode.addChildNode(water)
+                                applyFluidPosition()
+                            }catch{
+                                fluidPlaying=false;fluidMotion=nil
+                                problem=error.localizedDescription
+                            }
+                        }.buttonStyle(.bordered)
+                        if let run=fluidMotion,run.projectId==project.id,
+                           run.projectRevision==project.revision,run.entityId==solid.id,
+                           !run.samples.isEmpty {
+                            let index=max(0,min(run.samples.count-1,
+                                Int((fluidTime/run.stepSeconds).rounded())))
+                            let observation=run.samples[index]
+                            value("Simulated fluid time",observation.timeSeconds,"s")
+                            value("Bottom height",observation.bottomHeightM,"m")
+                            value("Vertical velocity",observation.velocityMps,"m/s")
+                            value("Submerged depth",observation.immersionDepthM,"m")
+                            value("Calculated buoyancy",observation.buoyancyForceN,"N")
+                            value("Energy residual",observation.energyResidualJ,"J")
+                            Slider(value:$fluidTime,
+                                in:0...(run.samples.last?.timeSeconds ?? 4)) { editing in
+                                if editing {fluidPlaying=false}
+                            }.accessibilityLabel("Explore fluid motion time")
+                            HStack {
+                                Button(fluidPlaying ? "Pause fluid":"Play fluid"){
+                                    fluidPlaying.toggle()
+                                }
+                                Button("Reset fluid"){fluidPlaying=false;fluidTime=0}
+                                Button("Step fluid"){
+                                    fluidPlaying=false
+                                    fluidTime=min(run.samples.last?.timeSeconds ?? 4,
+                                        fluidTime+run.stepSeconds)
+                                }
+                            }.buttonStyle(.bordered)
+                            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+                            Text("Blue 3D plane is an assumed flat fluid surface, not measured water.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         value("Assumed fluid density",fluidDensity,"kg/m³")
                         Slider(value:$fluidDensity,in:100...2500) { editing in
                             if editing {hydroRun=nil}
@@ -625,6 +698,7 @@ struct NativeWorldLabView:View {
         .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
         .onChange(of:seconds){_ in redraw()}
         .onChange(of:dropTime){_ in applyDropPosition()}
+        .onChange(of:fluidTime){_ in applyFluidPosition()}
         .onChange(of:motorTime){_ in applyMotorPosition()}
         .onChange(of:seeInside){_ in redraw()}
         .onChange(of:mass){_ in redraw()}
@@ -632,6 +706,7 @@ struct NativeWorldLabView:View {
         .onChange(of:diffusivity){_ in redraw()}
         .onChange(of:projectData){_ in
             // Never reuse a prior computed trajectory after geometry/material edits.
+            fluidPlaying=false;fluidMotion=nil;fluidTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
             motorPlaying=false;motorRun=nil;motorEntityId=nil;motorTime=0;redraw()
         }
@@ -642,6 +717,12 @@ struct NativeWorldLabView:View {
             if motorPlaying,let run=motorRun {
                 motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
                 if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
+            }
+            if fluidPlaying,let run=fluidMotion {
+                fluidTime=min(run.samples.last?.timeSeconds ?? 4,fluidTime+dt)
+                if fluidTime >= (run.samples.last?.timeSeconds ?? 4) {
+                    fluidPlaying=false
+                }
             }
             if dropPlaying,let run=dropRun {
                 dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
@@ -702,6 +783,16 @@ struct NativeWorldLabView:View {
               !run.samples.isEmpty else{return}
         let index=max(0,min(run.samples.count-1,Int((motorTime/run.stepSeconds).rounded())))
         node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightM)
+    }
+    private func applyFluidPosition() {
+        guard let run=fluidMotion,
+              let solid=project?.entities.first(where:{$0.id==run.entityId}),
+              let node=scene.rootNode.childNode(withName:"lab-solid-"+run.entityId,
+                recursively:false),!run.samples.isEmpty else {return}
+        let index=max(0,min(run.samples.count-1,
+            Int((fluidTime/run.stepSeconds).rounded())))
+        node.position.y=Float(solid.dimensionsMeters[1]/2+
+            run.samples[index].bottomHeightM)
     }
     private func applyDropPosition() {
         guard let run=dropRun,let id=dropEntityId,

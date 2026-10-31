@@ -500,3 +500,152 @@ enum NativeWorldLabHydrostatics {
             equilibriumDraftM:draft,status:status)
     }
 }
+
+/// Independent bounded Swift 1D buoyancy, gravity and viscous damping.
+struct NativeLabFluidMotionInput {
+    var fluidDensityKgM3:Double
+    var waterSurfaceHeightM:Double
+    var startingBottomHeightM:Double
+    var linearDragNsPerM:Double
+    var gravityMps2:Double=9.80665
+    var durationSeconds:Double=4
+}
+struct NativeLabFluidMotionSample {
+    let timeSeconds:Double
+    let bottomHeightM:Double
+    let velocityMps:Double
+    let immersionDepthM:Double
+    let displacedVolumeM3:Double
+    let buoyancyForceN:Double
+    let dragForceN:Double
+    let weightForceN:Double
+    let kineticEnergyJ:Double
+    let gravitationalEnergyJ:Double
+    let cumulativeBuoyancyWorkJ:Double
+    let dissipatedEnergyJ:Double
+    let energyResidualJ:Double
+    let grounded:Bool
+}
+struct NativeLabFluidMotionRun {
+    let projectId:String
+    let projectRevision:Int
+    let entityId:String
+    let materialId:String
+    let massKg:Double
+    let input:NativeLabFluidMotionInput
+    let samples:[NativeLabFluidMotionSample]
+    let stepSeconds:Double
+    let evidence="physics-model-computed"
+    let validity="One-dimensional Archimedes displacement with an assumed fixed fluid plane, "+
+        "viscous drag and bottom contact; no real fluid flow, waves or verified material."
+}
+enum NativeWorldLabFluidMotion {
+    static func evaluate(_ p:NativeWorldLabProject,entityId:String,
+                         input:NativeLabFluidMotionInput,
+                         requestedStepSeconds:Double=1.0/240)throws->NativeLabFluidMotionRun {
+        func bounded(_ v:Double,_ lower:Double,_ upper:Double,_ name:String)throws {
+            guard v.isFinite,v>=lower,v<=upper else {
+                throw NativeWorldLabError.invalid("\(name) outside the supported fluid range")
+            }
+        }
+        try bounded(input.fluidDensityKgM3,0.01,25000,"Fluid density")
+        try bounded(input.waterSurfaceHeightM,0,20,"Fluid surface")
+        try bounded(input.startingBottomHeightM,0,20,"Initial height")
+        try bounded(input.linearDragNsPerM,0,10000,"Linear damping")
+        try bounded(input.gravityMps2,0,100,"Gravity")
+        try bounded(input.durationSeconds,0.1,12,"Duration")
+        try bounded(requestedStepSeconds,0.0001,0.05,"Solver step")
+        guard let solid=p.entities.first(where:{$0.id==entityId}),
+              let material=p.materials.first(where:{$0.id==solid.materialId}),
+              let density=material.densityKgM3 else {
+            throw NativeWorldLabError.invalid("Floating motion requires an assumed solid density")
+        }
+        let mass=solid.volumeMetersCubed*density
+        try bounded(mass,0.001,10000,"Invented mass")
+        let rate=max(1.0,input.linearDragNsPerM/mass)
+        let stepCount=Int(ceil(input.durationSeconds/min(
+            requestedStepSeconds,0.05/rate)))
+        guard stepCount<=50000 else {
+            throw NativeWorldLabError.invalid("A stiff fluid solver is required")
+        }
+        let dt=input.durationSeconds/Double(stepCount)
+        struct Force {
+            let depth:Double
+            let displaced:Double
+            let buoyancy:Double
+            let drag:Double
+            let weight:Double
+            let acceleration:Double
+        }
+        func forces(_ h:Double,_ v:Double)throws->Force {
+            let depth=max(0,min(solid.dimensionsMeters[1],
+                input.waterSurfaceHeightM-max(0,h)))
+            let displaced=try NativeWorldLabHydrostatics.displacedVolume(solid,depth:depth)
+            let buoyancy=input.fluidDensityKgM3*input.gravityMps2*displaced
+            let drag = -input.linearDragNsPerM*v
+            let weight=mass*input.gravityMps2
+            return Force(depth:depth,displaced:displaced,buoyancy:buoyancy,
+                drag:drag,weight:weight,acceleration:(buoyancy+drag-weight)/mass)
+        }
+        func derivative(_ s:[Double])throws->[Double] {
+            let f=try forces(s[0],s[1])
+            if s[0]<=0 && s[1]<=0 && f.buoyancy<=f.weight {return [0,0]}
+            return [s[1],f.acceleration]
+        }
+        func advance(_ s:[Double])throws->[Double] {
+            let k1=try derivative(s)
+            func shifted(_ k:[Double],_ multiple:Double)->[Double] {
+                return [s[0]+dt*k[0]*multiple,s[1]+dt*k[1]*multiple]
+            }
+            let k2=try derivative(shifted(k1,0.5))
+            let k3=try derivative(shifted(k2,0.5))
+            let k4=try derivative(shifted(k3,1))
+            return [
+                s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
+                s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6
+            ]
+        }
+        var state:[Double]=[input.startingBottomHeightM,0]
+        var buoyancyWork=0.0
+        var dissipation=0.0
+        let initial=mass*input.gravityMps2*state[0]
+        var samples:[NativeLabFluidMotionSample]=[]
+        samples.reserveCapacity(stepCount+1)
+        for j in 0...stepCount {
+            let h=state[0],v=state[1]
+            let f=try forces(h,v)
+            let kinetic=0.5*mass*v*v
+            let potential=mass*input.gravityMps2*h
+            let residual=initial+buoyancyWork-kinetic-potential-dissipation
+            guard [h,v,kinetic,potential,residual,buoyancyWork,
+                   dissipation,f.buoyancy].allSatisfy({$0.isFinite}),
+                  h<=1000,abs(v)<=10000 else {
+                throw NativeWorldLabError.invalid("Fluid motion left its finite numerical domain")
+            }
+            samples.append(NativeLabFluidMotionSample(
+                timeSeconds:Double(j)*dt,bottomHeightM:h,velocityMps:v,
+                immersionDepthM:f.depth,displacedVolumeM3:f.displaced,
+                buoyancyForceN:f.buoyancy,dragForceN:f.drag,weightForceN:f.weight,
+                kineticEnergyJ:kinetic,gravitationalEnergyJ:potential,
+                cumulativeBuoyancyWorkJ:buoyancyWork,
+                dissipatedEnergyJ:dissipation,energyResidualJ:residual,
+                grounded:h==0 && v==0))
+            if j==stepCount {break}
+            let raw=try advance(state)
+            let next=(raw[0]<0 || (raw[0]==0 && raw[1]<0))
+                ? [0.0,0.0] : raw
+            let after=try forces(next[0],next[1])
+            buoyancyWork+=0.5*(f.buoyancy+after.buoyancy)*(next[0]-h)
+            dissipation+=0.5*dt*input.linearDragNsPerM*(v*v+next[1]*next[1])
+            if next[0]==0 && next[1]==0 && (h>0 || v<0) && raw[1]<0 {
+                dissipation+=0.5*mass*raw[1]*raw[1]
+            }
+            state=next
+        }
+        return NativeLabFluidMotionRun(
+            projectId:p.id,projectRevision:p.revision,entityId:entityId,
+            materialId:material.id,massKg:mass,input:input,
+            samples:samples,stepSeconds:dt)
+    }
+}
+

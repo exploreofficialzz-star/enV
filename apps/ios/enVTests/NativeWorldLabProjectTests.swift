@@ -87,6 +87,29 @@ final class NativeWorldLabProjectTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(run.branchCurrentsA[component.id]),0.45,accuracy:1e-10)
         XCTAssertEqual(run.powerResidualW,0,accuracy:1e-8)
     }
+    func testNativeFloatingDynamicsChangesSubmergedVolumeAndAccountsForEnergy() throws {
+        var data=try NativeWorldLabEditor.blank()
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"float")
+        data=try NativeWorldLabEditor.addHypotheticalMaterial(data,
+            name:"Assumed lightweight matter",densityKgM3:500,id:"foam")
+        data=try NativeWorldLabEditor.assignMaterial(
+            data,solidId:"float",materialId:"foam")
+        let project=try NativeWorldLabProject.decode(data)
+        let input=NativeLabFluidMotionInput(fluidDensityKgM3:1000,
+            waterSurfaceHeightM:1,startingBottomHeightM:0,
+            linearDragNsPerM:200,durationSeconds:3)
+        let run=try NativeWorldLabFluidMotion.evaluate(
+            project,entityId:"float",input:input)
+        XCTAssertGreaterThan(run.samples.count,500)
+        XCTAssertEqual(run.samples[0].displacedVolumeM3,1,accuracy:1e-12)
+        XCTAssertGreaterThan(run.samples[150].bottomHeightM,0)
+        XCTAssertLessThan(run.samples[150].immersionDepthM,1)
+        XCTAssertTrue(run.samples.allSatisfy({$0.energyResidualJ.isFinite}))
+        var impossible=input
+        impossible.linearDragNsPerM = .nan
+        XCTAssertThrowsError(try NativeWorldLabFluidMotion.evaluate(
+            project,entityId:"float",input:impossible))
+    }
     func testRejectsUnsupportedInputAndWrongMaterialReference() throws {
         var data=try sharedFixture()
         let original=try XCTUnwrap(String(data:data,encoding:.utf8))

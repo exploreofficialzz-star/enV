@@ -305,3 +305,7 @@ release-candidate evidence bundle are unfinished.
 ## Android coupled buoyancy and motion source parity (2026-10-31)
 
 - Added a standalone native Kotlin 1D floating/sinking solver using upright box/cylinder/sphere immersed volume per step, assumed fluid density, gravity, bounded linear drag, RK4 state evolution, floor contact, cumulative fluid work, dissipation and mechanical energy residual. Compose has native start/play/pause/seek and numeric force/time readouts with result invalidation. Kotlin reference cases are authored. Full Android device rendering and numerical CI acceptance remain pending the consolidated audit.
+
+## iOS time-dependent fluid/mechanics and SceneKit presentation (2026-10-31)
+
+- Swift now evolves an upright invented solid across the assumed level liquid using 1D RK4, actual primitive displaced volume, gravity, hypothetical linear damping, ground collision, external buoyancy work and numerical mechanical energy balance. SwiftUI controls include solver start, time seek/step/pause/play and force readouts; SceneKit shows a translucent flat assumed-water plane and drives the solid's Y position from recorded solver samples. XCTest cases authored for an assumed light solid and invalid drag. This is bounded reference science with native source integration, not tested device physics; final CI deferred per user request.
