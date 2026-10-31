@@ -547,127 +547,143 @@ struct ToolCommunityPanel: View {
         (feed?.comments ?? []).filter { $0.parentId == nil }
     }
 
+    private var communityHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                enVCharacterSpacedText("Community")
+                    .font(.envScaled(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.envInk)
+                enVCharacterSpacedText("Discuss this tool with other users.")
+                    .font(.envScaled(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+            }
+            Spacer()
+            Button("Refresh") { Task { await refresh() } }
+                .font(.envScaled(size: 12, weight: .semibold))
+                .disabled(loading)
+        }
+    }
+
+    private var reactionBar: some View {
+        HStack(spacing: 8) {
+            Button { Task { await react("like") } } label: {
+                Label("\(feed?.counts.likes ?? 0)", systemImage: "hand.thumbsup")
+                    .font(.envScaled(size: 13, weight: .medium))
+                    .foregroundStyle(feed?.myReaction == "like" ? Color.envAccent : Color.envInk)
+                    .padding(.horizontal, 11).padding(.vertical, 8)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+            }.buttonStyle(.plain)
+            Button { Task { await react("dislike") } } label: {
+                Label("\(feed?.counts.dislikes ?? 0)", systemImage: "hand.thumbsdown")
+                    .font(.envScaled(size: 13, weight: .medium))
+                    .foregroundStyle(feed?.myReaction == "dislike" ? Color.envAccent : Color.envInk)
+                    .padding(.horizontal, 11).padding(.vertical, 8)
+                    .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
+            }.buttonStyle(.plain)
+            enVCharacterSpacedText("\(feed?.counts.views ?? 0) views")
+                .font(.envScaled(size: 11, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+        }
+    }
+
+    private var commentComposer: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            enVCharacterSpacedText(replyTo == nil ? "Join the discussion" : "Write a reply")
+                .font(.envScaled(size: 14, weight: .semibold))
+                .foregroundStyle(Color.envInk)
+            if replyTo != nil {
+                HStack {
+                    enVCharacterSpacedText("Replying to a comment")
+                        .font(.envScaled(size: 12, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                    Spacer()
+                    Button("Cancel") { replyTo = nil }
+                        .font(.envScaled(size: 12, weight: .medium))
+                }
+            }
+            TextEditor(text: $commentText)
+                .font(.envScaled(size: 14, weight: .regular))
+                .frame(minHeight: 90, maxHeight: 150)
+                .padding(7)
+                .scrollContentBackground(.hidden)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                .onChange(of: commentText) { _, value in
+                    if value.count > 2000 { commentText = String(value.prefix(2000)) }
+                }
+            HStack(spacing: 8) {
+                Button { publicIdentity.toggle() } label: {
+                    Label(publicIdentity ? "Display name" : "Anonymous", systemImage: publicIdentity ? "person" : "person.crop.circle")
+                        .font(.envScaled(size: 12, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                Spacer()
+                enVCharacterSpacedText("\(commentText.count)/2000")
+                    .font(.envScaled(size: 10, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+                Button { Task { await submitComment() } } label: {
+                    Label(isSending ? "Posting…" : "Post", systemImage: "paperplane")
+                        .font(.envScaled(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                        .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 9))
+                }
+                .buttonStyle(.plain)
+                .disabled(isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
+            }
+            if publicIdentity {
+                TextField("Choose a public display name", text: $displayName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.envScaled(size: 14, weight: .regular))
+                    .onChange(of: displayName) { _, value in
+                        if value.count > 32 { displayName = String(value.prefix(32)) }
+                    }
+            }
+            enVCharacterSpacedText("Anonymous hides your display name, not the private abuse-prevention record. Never post passwords or payment details.")
+                .font(.envScaled(size: 10, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+        }
+        .padding(12)
+        .background(Color.envSurface2.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var commentFeed: some View {
+        if loading && feed == nil {
+            ProgressView().frame(maxWidth: .infinity).padding(.vertical, 14)
+        } else if rootComments.isEmpty {
+            enVCharacterSpacedText("No comments yet. Start the discussion.")
+                .font(.envScaled(size: 13, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .frame(maxWidth: .infinity).padding(.vertical, 18)
+        } else {
+            ForEach(rootComments) { comment in
+                commentCard(comment)
+                ForEach((feed?.comments ?? []).filter { $0.parentId == comment.id }) { reply in
+                    commentCard(reply, nested: true)
+                }
+            }
+        }
+    }
+
     var body: some View {
         Group {
             if enabled {
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            enVCharacterSpacedText("Community")
-                                .font(.envScaled(size: 18, weight: .semibold))
-                                .foregroundStyle(Color.envInk)
-                            enVCharacterSpacedText("Discuss this tool with other users.")
-                                .font(.envScaled(size: 12, weight: .regular))
-                                .foregroundStyle(Color.envMuted)
-                        }
-                        Spacer()
-                        Button("Refresh") { Task { await refresh() } }
-                            .font(.envScaled(size: 12, weight: .semibold))
-                            .disabled(loading)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button { Task { await react("like") } } label: {
-                            Label("\(feed?.counts.likes ?? 0)", systemImage: "hand.thumbsup")
-                                .font(.envScaled(size: 13, weight: .medium))
-                                .foregroundStyle(feed?.myReaction == "like" ? Color.envAccent : Color.envInk)
-                                .padding(.horizontal, 11).padding(.vertical, 8)
-                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
-                        }.buttonStyle(.plain)
-                        Button { Task { await react("dislike") } } label: {
-                            Label("\(feed?.counts.dislikes ?? 0)", systemImage: "hand.thumbsdown")
-                                .font(.envScaled(size: 13, weight: .medium))
-                                .foregroundStyle(feed?.myReaction == "dislike" ? Color.envAccent : Color.envInk)
-                                .padding(.horizontal, 11).padding(.vertical, 8)
-                                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 8))
-                        }.buttonStyle(.plain)
-                        enVCharacterSpacedText("\(feed?.counts.views ?? 0) views")
-                            .font(.envScaled(size: 11, weight: .regular))
-                            .foregroundStyle(Color.envMuted)
-                    }
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        enVCharacterSpacedText(replyTo == nil ? "Join the discussion" : "Write a reply")
-                            .font(.envScaled(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.envInk)
-                        if replyTo != nil {
-                            HStack {
-                                enVCharacterSpacedText("Replying to a comment")
-                                    .font(.envScaled(size: 12, weight: .regular))
-                                    .foregroundStyle(Color.envMuted)
-                                Spacer()
-                                Button("Cancel") { replyTo = nil }
-                                    .font(.envScaled(size: 12, weight: .medium))
-                            }
-                        }
-                        TextEditor(text: $commentText)
-                            .font(.envScaled(size: 14, weight: .regular))
-                            .frame(minHeight: 90, maxHeight: 150)
-                            .padding(7)
-                            .scrollContentBackground(.hidden)
-                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                            .onChange(of: commentText) { _, value in
-                                if value.count > 2000 { commentText = String(value.prefix(2000)) }
-                            }
-                        HStack(spacing: 8) {
-                            Button {
-                                publicIdentity.toggle()
-                            } label: {
-                                Label(publicIdentity ? "Display name" : "Anonymous", systemImage: publicIdentity ? "person" : "person.crop.circle")
-                                    .font(.envScaled(size: 12, weight: .medium))
-                            }
-                            .buttonStyle(.bordered)
-                            Spacer()
-                            enVCharacterSpacedText("\(commentText.count)/2000")
-                                .font(.envScaled(size: 10, weight: .regular))
-                                .foregroundStyle(Color.envMuted)
-                            Button { Task { await submitComment() } } label: {
-                                Label(isSending ? "Posting…" : "Post", systemImage: "paperplane")
-                                    .font(.envScaled(size: 13, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 14).padding(.vertical, 10)
-                                    .background(Color.envAccent, in: RoundedRectangle(cornerRadius: 9))
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
-                        }
-                        if publicIdentity {
-                            TextField("Choose a public display name", text: $displayName)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.envScaled(size: 14, weight: .regular))
-                                .onChange(of: displayName) { _, value in
-                                    if value.count > 32 { displayName = String(value.prefix(32)) }
-                                }
-                        }
-                        enVCharacterSpacedText("Anonymous hides your display name, not the private abuse-prevention record. Never post passwords or payment details.")
-                            .font(.envScaled(size: 10, weight: .regular))
-                            .foregroundStyle(Color.envMuted)
-                    }
-                    .padding(12)
-                    .background(Color.envSurface2.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
-
+                    communityHeader
+                    reactionBar
+                    commentComposer
                     if let notice {
-                        enVCharacterSpacedText(notice).font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envAccent)
+                        enVCharacterSpacedText(notice)
+                            .font(.envScaled(size: 12, weight: .medium))
+                            .foregroundStyle(Color.envAccent)
                     }
                     if let errorMessage {
-                        enVCharacterSpacedText(errorMessage).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.red)
+                        enVCharacterSpacedText(errorMessage)
+                            .font(.envScaled(size: 12, weight: .regular))
+                            .foregroundStyle(Color.red)
                     }
-                    if loading && feed == nil {
-                        ProgressView().frame(maxWidth: .infinity).padding(.vertical, 14)
-                    } else if rootComments.isEmpty {
-                        enVCharacterSpacedText("No comments yet. Start the discussion.")
-                            .font(.envScaled(size: 13, weight: .regular))
-                            .foregroundStyle(Color.envMuted)
-                            .frame(maxWidth: .infinity).padding(.vertical, 18)
-                    } else {
-                        ForEach(rootComments) { comment in
-                            commentCard(comment)
-                            ForEach((feed?.comments ?? []).filter { $0.parentId == comment.id }) { reply in
-                                commentCard(reply, nested: true)
-                            }
-                        }
-                    }
+                    commentFeed
                 }
                 .padding(16)
                 .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
