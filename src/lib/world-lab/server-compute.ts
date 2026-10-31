@@ -5,13 +5,14 @@ import {runNetworkMotorExperiment} from "./network-motor.ts";
 import {runChemicalThermal,type ReactionThermalInput} from "./chemical-thermal.ts";
 import {runMultiSphereCollisions} from "./multi-sphere-collision.ts";
 import type {Vec3} from "./sphere-collision-3d.ts";
+import {verifyDigitalTruthTablePacked} from "./digital-logic.ts";
 
 /**
  * The authenticated HTTP layer controls access. This dispatcher only accepts
  * bounded scientific methods and user-supplied local projects. It never reads
  * or mutates other tenants' projects and executes no uploaded scripts/assets.
  */
-export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere";
+export type WorldLabRemoteOperation="hydrostatics"|"dc-network"|"wired-motor"|"chemical-thermal"|"multi-sphere"|"exhaustive-logic";
 const finiteBound=(n:unknown,min:number,max:number,name:string)=>{
   if(typeof n!=="number"||!Number.isFinite(n)||n<min||n>max)
     throw new Error(name+" is outside the supported finite scientific domain.");
@@ -32,23 +33,35 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   projectRevision:number;
   outcome:ReturnType<typeof calculateHydrostatics>|
     ReturnType<typeof solveDcNetwork>|ReturnType<typeof runNetworkMotorExperiment>|
-    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>;
+    ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>|ReturnType<typeof verifyDigitalTruthTablePacked>;
 }> {
   if(!input||typeof input!=="object"||Array.isArray(input))
     throw new Error("Scientific request must be a JSON object.");
   const data=input as Record<string,unknown>;
   const kind=data.kind;
-  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere"].includes(String(kind)))
+  if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere","exhaustive-logic"].includes(String(kind)))
     throw new Error("Requested scientific model is not available.");
   exactKeys(data,["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
-    "velocities","restitution","durationSeconds"]);
+    "velocities","restitution","durationSeconds","networkId"]);
   if(kind!=="multi-sphere"&&
     ["velocities","restitution","durationSeconds"].some(key=>data[key]!==undefined))
     throw new Error("Sphere settings cannot be supplied to unrelated calculations.");
+  if(kind!=="exhaustive-logic"&&data.networkId!==undefined)
+    throw new Error("Digital network identifier is only accepted for digital verification.");
   const project:WorldLabProject=parseWorldLabProject(data.project);
   let outcome;
-  if(kind==="multi-sphere"){
+  if(kind==="exhaustive-logic"){
+    if(Object.keys(data).some(key=>!["kind","project","networkId"].includes(key)))
+      throw new Error("Exhaustive digital logic only accepts an invented network identifier.");
+    const id=identifier(data.networkId);
+    const count=project.digitalNetworks?.find(n=>n.id===id)?.inputs.length??0;
+    // Full sweeps at 1–8 inputs are already supported on the device.
+    // Queue compute is reserved for large authored circuits.
+    if(count<9||count>12)
+      throw new Error("Remote exhaustive logic requires 9–12 authored switches.");
+    outcome=verifyDigitalTruthTablePacked(project,id);
+  }else if(kind==="multi-sphere"){
     if(Object.keys(data).some(key=>!["kind","project","velocities","restitution",
       "durationSeconds"].includes(key)))
       throw new Error("Group collisions accept only velocities, restitution and duration.");

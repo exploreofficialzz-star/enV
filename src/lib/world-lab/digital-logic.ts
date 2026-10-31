@@ -58,6 +58,93 @@ export function solveDigitalLogic(project:WorldLabProject,
     evidence:"mathematical-model-computed",inputEvidence:"hypothetical-user-assumed",
     inputs:inputRecord,gates:gateRecord,outputs:outputRecord,validity:VALIDITY};
 }
+/** Add an independent, explicitly authored switch. No electrical semantics implied. */
+export function appendDigitalInput(p:WorldLabProject,networkId:string,
+  id:string,label:string):WorldLabProject{
+  const safe=parseWorldLabProject(p);
+  const net=safe.digitalNetworks?.find(n=>n.id===networkId);
+  if(!net)throw new Error("Digital invention does not exist.");
+  if(net.inputs.length>=12)throw new Error("This digital invention supports at most twelve switches.");
+  if([...net.inputs,...net.gates,...net.outputs].some(n=>n.id===id))
+    throw new Error("Switch identifier is already in use.");
+  return parseWorldLabProject({...safe,digitalNetworks:safe.digitalNetworks!.map(n=>
+    n.id===networkId?{...n,inputs:[...n.inputs,{id,label,value:false}]}:n)});
+}
+
+/** Exhaustively evaluate up to 12 Boolean switches into a bounded, fully
+ * reconstructible bit-plane record. Output hex is big-endian per input index,
+ * padded on the right; bit i is the corresponding lexicographic input vector.
+ * Neither combinatorial enumeration nor bit packing is hardware measurement.
+ */
+export function verifyDigitalTruthTablePacked(p:WorldLabProject,networkId:string){
+  const safe=parseWorldLabProject(p);
+  const network=safe.digitalNetworks?.find(n=>n.id===networkId);
+  if(!network)throw new Error("Digital invention does not exist.");
+  if(network.inputs.length<1||network.inputs.length>12)
+    throw new Error("Packed exhaustive verification supports 1–12 inputs.");
+  const total=2**network.inputs.length;
+  const nodeIndices=new Map<string,number>();
+  const inputCount=network.inputs.length;
+  network.inputs.forEach((x,i)=>nodeIndices.set(x.id,i));
+  const gates=network.gates.map((gate,i)=>{
+    const ports=gate.inputNodeIds.map(id=>{
+      const idx=nodeIndices.get(id);
+      if(idx===undefined)throw new Error("Digital network contains a missing source.");
+      return idx;
+    });
+    nodeIndices.set(gate.id,inputCount+i);
+    return {ports,table:gate.truthTable};
+  });
+  const outputNodes=network.outputs.map(output=>{
+    const idx=nodeIndices.get(output.sourceNodeId);
+    if(idx===undefined)throw new Error("Digital output references a missing source.");
+    return idx;
+  });
+  const bitsByOutput=network.outputs.map(()=>new Uint8Array(Math.ceil(total/8)));
+  const highCounts=network.outputs.map(()=>0);
+  const state=new Uint8Array(inputCount+gates.length);
+  for(let vector=0;vector<total;vector++){
+    for(let i=0;i<inputCount;i++)
+      state[i]=(vector>>(inputCount-i-1))&1;
+    for(let i=0;i<gates.length;i++){
+      const gate=gates[i];
+      let key=0;
+      for(const port of gate.ports)key=(key<<1)|state[port];
+      state[inputCount+i]=gate.table[key];
+    }
+    for(let i=0;i<outputNodes.length;i++){
+      const high=state[outputNodes[i]];
+      if(high){
+        bitsByOutput[i][vector>>3]|=1<<(7-(vector&7));
+        highCounts[i]++;
+      }
+    }
+  }
+  const packedHexByOutput:Record<string,string>={};
+  const highCasesByOutput:Record<string,number>={};
+  for(let i=0;i<network.outputs.length;i++){
+    const id=network.outputs[i].id;
+    packedHexByOutput[id]=Array.from(bitsByOutput[i],b=>
+      b.toString(16).padStart(2,"0")).join("");
+    highCasesByOutput[id]=highCounts[i];
+  }
+  return Object.freeze({
+    format:"env-world-lab-digital-packed-sweep" as const,
+    modelVersion:"1.0.0" as const,
+    projectId:safe.id,projectRevision:safe.revision,networkId,
+    evidence:"mathematical-model-computed" as const,
+    inputEvidence:"hypothetical-user-assumed" as const,
+    inputOrder:network.inputs.map(x=>x.id),
+    outputOrder:network.outputs.map(x=>x.id),
+    caseCount:total,bitOrder:"input-binary-index-msb-first" as const,
+    packedHexByOutput,highCasesByOutput,
+    validity:"Complete enumerated mathematical truth-table outcomes of declared invented "+
+      "combinational logic. Each hex byte describes eight successive input vectors, "+
+      "most significant bit first, zero padded after the last vector. "+
+      "This is not a powered circuit simulation, timing model, chip measurement, "+
+      "hardware validation or executable code.",
+  });
+}
 export function setDigitalInput(p:WorldLabProject,netId:string,inputId:string,
   value:boolean):WorldLabProject {
   return parseWorldLabProject({...p,digitalNetworks:(p.digitalNetworks??[]).map(n=>

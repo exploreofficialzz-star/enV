@@ -380,3 +380,15 @@ release-candidate evidence bundle are unfinished.
 - Web can explicitly export/import this combined archive. Existing local IDs are rejected instead of silently replacing projects, and opening a different archive still prompts before discarding unsaved work. Saving after import commits the project's runs via the existing IndexedDB history. Native Android/iOS do not yet import these composite archives; their canonical project-only interchange remains unchanged. This does not constitute complete export of all heterogeneous experiments (collisions, chemical runs, etc.), which still have separate evidence exports.
 
 - Atomic Web IndexedDB archive save now commits a portable project and its immutable numerical run records in one revision-checked transaction. A conflicting project version, run-ID collision, quota, malformed evidence or transaction failure aborts the entire operation; no partial imported project is accepted as a successful save. This does not imply an atomic multi-device or cross-platform transaction.
+
+
+## 2026-10-31 local-first capacity routing, first scientific offload
+- An independent packed 1–12 switch combinational verifier now computes each
+  possible input combination using only the authored acyclic truth tables.
+  Small (1–8 switch) exhaustive verification remains strictly local; larger
+  (9–12 switch) verification is an explicitly submitted authenticated job via
+  the same owner-scoped backend queue, never an automatic upload.
+- The compact network-order/MSB-first output bitsets are fully reconstructible
+  mathematical evidence with retained hypothetical validity labeling; no
+  silicon or experimental measurement is claimed. Database migration 0013
+  extends the server job kind constraint.

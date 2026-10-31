@@ -34,3 +34,16 @@ code is inferred. This migration/worker expansion remains disabled and unverifie
 ## 3D multiple hard-sphere job (migration 0012)
 
 The authenticated queue also accepts `kind="multi-sphere"`, a strictly parsed portable project containing 2–12 non-overlapping spheres with assumed densities, a map of entity IDs to finite X/Y/Z velocities no faster than 100 m/s, restitution 0–1, and simulation duration 0.01–5 s. The worker executes the same bounded event-driven Web reference solver and returns the complete impulse, conservation, evidence, and time-of-contact record. Disjoint simultaneous impacts are supported; shared-sphere simultaneous contacts remain unsupported rather than guessed. The Web queue surface can submit the open group assumptions, poll, cancel, and export resulting immutable evidence. This is not a generic remote physics service or an FMI plugin. Migration 0012 extends the database job-kind constraint, and workers plus feature flags must remain disabled until authenticated deployment is audited.
+
+## Off-device exhaustive digital invention checks (migration 0013)
+
+Local Boolean evaluation and exhaustive checks through 8 inputs remain available
+offline. Larger 9–12 input combinational networks have up to 4096 possible input
+vectors; the worker now runs a deterministic, prevalidated graph evaluation
+without re-parsing the project for each vector. Instead of storing 4096 verbose
+JSON rows it returns losslessly recoverable, MSB-first output bit-plane hex plus
+high-count totals, the declared input/output order, assumption and model labels.
+This is a real exhaustive mathematical computation, NOT real electronics or an
+unbounded binary processor emulator. It has no external calls or user code.
+Accounts, job limits, cloud workers and migration 0013 must be deployed before
+it is available to end users.

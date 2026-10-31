@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {blankWorldLabProject,parseWorldLabProject,serializeWorldLabProject} from "./project.ts";
 import {appendDigitalGate,setDigitalInput,setDigitalOutputSource,setDigitalTruthBit,
-  solveDigitalLogic,starterDigitalNetwork,verifyDigitalTruthTable} from "./digital-logic.ts";
+  solveDigitalLogic,starterDigitalNetwork,verifyDigitalTruthTable,
+  appendDigitalInput,verifyDigitalTruthTablePacked} from "./digital-logic.ts";
 const base=()=>{
  const p=blankWorldLabProject("digital","2026-10-31T00:00:00Z");
  p.digitalNetworks=[starterDigitalNetwork("logic")];
@@ -85,4 +86,26 @@ test("resource limits prevent exponential exhaustion on broad designs",()=>{
  const expanded=parseWorldLabProject({...p,digitalNetworks:[{...net,
   inputs, gates:[{...net.gates[0],inputNodeIds:["switch0","switch1"]}]}]});
  assert.throws(()=>verifyDigitalTruthTable(expanded,"logic"),/at most eight/);
+});
+
+test("packed enumeration exactly reproduces local NAND row order and high count",()=>{
+ const p=base();
+ const record=verifyDigitalTruthTablePacked(p,"logic");
+ assert.equal(record.caseCount,4);
+ assert.equal(record.packedHexByOutput.output_q,"e0");
+ assert.equal(record.highCasesByOutput.output_q,3);
+ assert.deepEqual(record.inputOrder,["input_a","input_b"]);
+});
+test("twelve authored switches enumerate exactly 4096 cases without changing source",()=>{
+ let p=base();
+ for(let i=2;i<12;i++)p=appendDigitalInput(p,"logic","input_"+i,"Switch "+i);
+ const original=serializeWorldLabProject(p);
+ const packed=verifyDigitalTruthTablePacked(p,"logic");
+ assert.equal(packed.caseCount,4096);
+ assert.equal(packed.packedHexByOutput.output_q.length,1024);
+ assert.equal(packed.highCasesByOutput.output_q,3072);
+ assert.equal(serializeWorldLabProject(p),original);
+ assert.throws(()=>verifyDigitalTruthTable(p,"logic"),/at most eight/);
+ assert.throws(()=>appendDigitalInput(p,"logic","too-many","Overflow"),/twelve/);
+ assert.throws(()=>appendDigitalInput(base(),"logic","input_a","Duplicate"),/already in use/);
 });

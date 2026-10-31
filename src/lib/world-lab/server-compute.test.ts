@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {blankWorldLabProject,newSolid} from "./project.ts";
 import {starterDcNetwork} from "./network.ts";
+import {starterDigitalNetwork,appendDigitalInput} from "./digital-logic.ts";
 import {runBoundedWorldLabOperation} from "./server-compute.ts";
 const fixture=()=>{
   const project=blankWorldLabProject("owner-project","2026-10-30T00:00:00Z");
@@ -84,4 +85,21 @@ test("remote group collision reuses computed 3D event history and rejects unsafe
   assert.throws(()=>runBoundedWorldLabOperation({kind:"multi-sphere",project,
     velocities:{"ball-0":[2,0,0]},restitution:1,durationSeconds:4,
     arbitraryCode:"unsafe"}),/Group collisions accept only/);
+});
+
+test("authenticated backend exhaustively evaluates all 12 digital switches in packed evidence",()=>{
+ let project=fixture();
+ project.digitalNetworks=[starterDigitalNetwork("logic")];
+ for(let i=2;i<12;i++)project=appendDigitalInput(project,"logic","input_"+i,"Signal "+i);
+ const result=runBoundedWorldLabOperation({
+   kind:"exhaustive-logic",project,networkId:"logic"});
+ assert.equal(result.kind,"exhaustive-logic");
+ if(!("packedHexByOutput" in result.outcome))
+   throw new Error("Expected packed digital evidence");
+ assert.equal(result.outcome.caseCount,4096);
+ assert.equal(result.outcome.highCasesByOutput.output_q,3072);
+ assert.throws(()=>runBoundedWorldLabOperation({
+   kind:"exhaustive-logic",project:fixture(),networkId:"logic"}),/requires 9–12/);
+ assert.throws(()=>runBoundedWorldLabOperation({
+   kind:"exhaustive-logic",project,networkId:"logic",executable:"evil"}),/only accepts/);
 });
