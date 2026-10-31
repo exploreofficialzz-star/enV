@@ -74,6 +74,7 @@ test("Overlaps, absent masses, invalid speed and unknown inputs fail closed",()=
   p.entities[1].positionMeters=[-3.5,0.5,0];
   assert.throws(()=>runMultiSphereCollisions(p,{},1),/separated/);
   p.entities[1].positionMeters=[-1,0.5,0];
+  p.entities[1].shape="box";
   p.entities[2].shape="box";
   assert.throws(()=>runMultiSphereCollisions(p,{},1),/2–12/);
 });
