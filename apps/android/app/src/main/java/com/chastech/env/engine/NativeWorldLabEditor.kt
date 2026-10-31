@@ -91,6 +91,37 @@ object NativeWorldLabEditor {
         require(row in 0 until table.length()){"Digital row is outside truth table"}
         table.put(row,bit)
     }
+    /** Add a user-defined Boolean gate after its input nodes, preserving an acyclic graph. */
+    fun addDigitalGate(source:String,networkId:String,name:String,assumption:String,
+        inputNodeIds:List<String>,id:String=UUID.randomUUID().toString()):String=
+        edit(source){p->
+            require(name.isNotBlank()&&name.length<=120&&
+                assumption.isNotBlank()&&assumption.length<=500){
+                "Digital invention requires a bounded name and assumption"
+            }
+            require(inputNodeIds.size in 1..4&&inputNodeIds.distinct().size==inputNodeIds.size){
+                "Digital invention requires one to four distinct upstream nodes"
+            }
+            val nets=p.getJSONArray("digitalNetworks")
+            val n=(0 until nets.length()).map{nets.getJSONObject(it)}
+                .firstOrNull{it.getString("id")==networkId}?:error("Unknown digital network")
+            val inputs=n.getJSONArray("inputs")
+            val gates=n.getJSONArray("gates")
+            val outputs=n.getJSONArray("outputs")
+            require(gates.length()<32){"Digital gate limit reached"}
+            val preceding=(0 until inputs.length()).map{inputs.getJSONObject(it).getString("id")}+
+                (0 until gates.length()).map{gates.getJSONObject(it).getString("id")}
+            require(inputNodeIds.all{it in preceding}){"Digital ports must connect upstream"}
+            val allIds=preceding+
+                (0 until outputs.length()).map{outputs.getJSONObject(it).getString("id")}
+            require(id !in allIds){"Duplicate digital node"}
+            val truth=JSONArray()
+            repeat(1 shl inputNodeIds.size){truth.put(0)}
+            gates.put(JSONObject().put("id",id).put("name",name.trim())
+                .put("assumption",assumption.trim())
+                .put("evidence","hypothetical-user-assumed")
+                .put("inputNodeIds",JSONArray(inputNodeIds)).put("truthTable",truth))
+        }
     /** Attach the indicator to a valid upstream node without altering any gate assumption. */
     fun digitalOutputSource(source:String,networkId:String,outputId:String,
         sourceNodeId:String):String=edit(source){p->
