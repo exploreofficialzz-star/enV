@@ -70,6 +70,12 @@ function normalizeEvent(value) {
     tool_failed: "failure",
     tool_cancelled: "cancelled",
     tool_abandoned: "abandoned",
+    offline_sync_succeeded: "success",
+    offline_sync_failed: "failure",
+    comment_created: "success",
+    reaction_created: "success",
+    feedback_submitted: "success",
+    update_viewed: "success",
   }[value.name];
   const outcome = inferredOutcome ?? (outcomes.has(value.outcome) ? value.outcome : "unknown");
   const errorCode = value.errorCode == null ? null : value.errorCode;
