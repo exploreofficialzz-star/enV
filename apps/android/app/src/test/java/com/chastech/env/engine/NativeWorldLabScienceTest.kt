@@ -62,6 +62,34 @@ class NativeWorldLabScienceTest {
         }
     }
 
+    @Test fun inventedDigitalLogicCanSwitchRealCalculatedMotorMotion(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="solid")
+        json=NativeWorldLabEditor.startDigitalInvention(json,id="logic")
+        val original=NativeWorldLabProjectCodec.decode(json)
+        val powered=NativeWorldLabDigitalMotor.evaluate(
+            original,"logic","output_q","solid",1.0)
+        assertEquals(1,powered.logicBit)
+        assertEquals(24.0,powered.input.supplyVoltageV,0.0)
+        assertTrue(powered.motor.samples.any{it.heightM>0.0 && it.currentA>0.0})
+        json=NativeWorldLabEditor.digitalSwitch(json,"logic","input_a",true)
+        json=NativeWorldLabEditor.digitalSwitch(json,"logic","input_b",true)
+        val changed=NativeWorldLabProjectCodec.decode(json)
+        val off=NativeWorldLabDigitalMotor.evaluate(
+            changed,"logic","output_q","solid",1.0)
+        assertEquals(0,off.logicBit)
+        assertEquals(0.0,off.input.supplyVoltageV,0.0)
+        assertTrue(off.motor.samples.all{it.currentA==0.0&&it.heightM==0.0})
+        assertEquals(changed.revision,off.projectRevision)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabDigitalMotor.evaluate(
+                changed,"logic","output_q","solid",1.0,Double.NaN)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabDigitalMotor.evaluate(
+                changed,"logic","missing","solid",1.0)
+        }
+    }
     @Test fun nativeActuatorCouplesCurrentForceAndMotion() {
         val input=NativeActuatorInput(massKg=1.0)
         val run=NativeWorldLabActuator.evaluate(input)
