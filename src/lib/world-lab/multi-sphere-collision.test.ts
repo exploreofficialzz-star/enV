@@ -78,15 +78,34 @@ test("Overlaps, absent masses, invalid speed and unknown inputs fail closed",()=
   p.entities[2].shape="box";
   assert.throws(()=>runMultiSphereCollisions(p,{},1),/2–12/);
 });
-test("Simultaneous contacts remain disabled instead of silently ordering incompatible impulses",()=>{
+test("Disjoint simultaneous impacts compute independent impulses and replay at one timestamp",()=>{
   const p=cradle();
-  const d=newSolid("sphere-3","sphere",3);
-  d.positionMeters=[10,0.5,0];d.materialId="invented";
-  p.entities.push(d);
   p.entities[2].positionMeters=[4,0.5,0];
-  // Distinct pairs: first 0->1 at 1s, then 2->3 at 1s. Even disjoint
-  // simultaneity is conservatively refused by this initial engine.
+  const d=newSolid("sphere-3","sphere",3);
+  d.positionMeters=[10,0.5,0];d.materialId="invented";p.entities.push(d);
+  for(const restitution of [1,0.5]){
+    const run=runMultiSphereCollisions(p,{
+      "sphere-0":[2,0,0],"sphere-2":[5,0,0],
+    },restitution,1.5);
+    assert.equal(run.events.length,2);
+    assert.deepEqual(run.events.map(e=>[e.firstEntityId,e.secondEntityId]),[
+      ["sphere-0","sphere-1"],["sphere-2","sphere-3"],
+    ]);
+    close(run.events[0].atSeconds,1);
+    close(run.events[1].atSeconds,1);
+    assert.equal(sampleMultiSphereCollisions(run,0.99).completedEvents,0);
+    const atContact=sampleMultiSphereCollisions(run,1);
+    assert.equal(atContact.completedEvents,2);
+    close(atContact.objects[1].velocityMps[0],(1+restitution));
+    close(atContact.objects[3].velocityMps[0],(1+restitution)*2.5);
+    close(run.totalInitialEnergyJ-run.totalFinalEnergyJ,run.totalDissipatedEnergyJ);
+    close(run.initialMomentumKgMps[0],run.finalMomentumKgMps[0]);
+    assert.deepEqual(run.events.map(e=>e.atSeconds),[1,1]);
+  }
+});
+test("Shared-sphere simultaneous impacts still fail closed",()=>{
+  const p=cradle();
   assert.throws(()=>runMultiSphereCollisions(p,{
-    "sphere-0":[2,0,0],"sphere-2":[5,0,0],
-  },1,4),/Simultaneous/);
+    "sphere-0":[2,0,0],"sphere-2":[-2,0,0],
+  },1,2),/Simultaneous shared-sphere/);
 });
