@@ -5,6 +5,7 @@ import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
 import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,18 +154,6 @@ function numberValue(values: Record<string, string>, key: string, fallback: numb
 }
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function makeNoiseDataUrl(color: string, density: number, strength = 1): string {
-  const parsed = parseCssColor(color);
-  const red = (parsed?.r ?? 17) / 255;
-  const green = (parsed?.g ?? 24) / 255;
-  const blue = (parsed?.b ?? 39) / 255;
-  const matrix = `${red} 0 0 0 0 0 ${green} 0 0 0 0 0 ${blue} 0 0 0 0 0 1 0`;
-  const safeDensity = clamp(density, 0.1, 3);
-  const safeStrength = clamp(strength, 0, 1);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="${safeDensity}" numOctaves="2" stitchTiles="stitch" result="noise"/><feColorMatrix in="noise" type="matrix" values="${matrix}"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="${safeStrength}"/></svg>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
 function downloadSvgAsPng(svg: string, filename: string): void {
@@ -347,75 +336,36 @@ function cssFor(
   if (family === "pattern") {
     const size = numberValue(values, "size", 24, 6, 160);
     const opacity = numberValue(values, "opacity", 0.14, 0, 1);
-    const color = values.color ?? "#0d9f8a";
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><path d="M0 0L${size} ${size}M${size} 0L0 ${size}" stroke="${color}" stroke-opacity="${opacity}" stroke-width="1"/></svg>`;
+    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a");
     const backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
     return { css: `background-image: ${backgroundImage};\nbackground-size: ${size}px ${size}px;`, style: { backgroundImage, backgroundSize: `${size}px ${size}px` }, svg };
   }
   if (family === "blob") {
-    const seed = numberValue(values, "seed", 7, 1, 999);
-    const count = Number(values.points ?? 12);
-    const coordinates = Array.from({ length: clamp(count, 8, 18) }, (_, index) => {
-      const angle = (index / count) * Math.PI * 2;
-      const radius = 34 + ((seed * (index + 3) * 13) % 20);
-      return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
+    const svg = buildBlobSvg({
+      seed: numberValue(values, "seed", 7, 1, 999),
+      points: Number(values.points ?? 12),
+      color: values.color ?? "#0d9f8a",
     });
-    const middle = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-    const start = middle(coordinates[coordinates.length - 1], coordinates[0]);
-    const curve = coordinates.map((point, index) => {
-      const next = coordinates[(index + 1) % coordinates.length];
-      const end = middle(point, next);
-      return `Q ${point.x.toFixed(2)} ${point.y.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
-    }).join(" ");
-    const path = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} ${curve} Z`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100"><path fill="${values.color ?? "#0d9f8a"}" d="${path}"/></svg>`;
     return { css: svg, style: {}, svg };
   }
   if (family === "wave") {
-    const amplitude = numberValue(values, "amp", 24, 0, 58);
-    const layerCount = numberValue(values, "layers", 2, 1, 3);
-    const frequency = numberValue(values, "frequency", 2, 1, 5);
-    const phase = numberValue(values, "phase", 0, 0, 360) * Math.PI / 180;
-    const baseline = numberValue(values, "baseline", 76, 30, 140);
-    const fill = values.fill ?? "#0d9f8a";
-    const secondary = values.secondary ?? "#7c4dff";
-    const background = values.background ?? "#ffffff";
-    const transparent = values.backgroundMode === "transparent";
-    const paths = Array.from({ length: layerCount }, (_, index) => {
-      const offset = (layerCount - index - 1) * amplitude * 0.32;
-      const height = Math.max(0, amplitude * (1 - index * 0.16));
-      const segmentCount = frequency * 4;
-      const layerPhase = phase + index * 0.42;
-      const points = Array.from({ length: segmentCount + 1 }, (_, pointIndex) => {
-        const progress = pointIndex / segmentCount;
-        const angle = progress * frequency * Math.PI * 2 + layerPhase;
-        return {
-          x: progress * 1440,
-          y: baseline + offset - Math.sin(angle) * height,
-          derivative: -Math.cos(angle) * height * frequency * Math.PI * 2 / segmentCount,
-        };
-      });
-      let d = `M 0 ${points[0].y.toFixed(2)}`;
-      for (let pointIndex = 0; pointIndex < segmentCount; pointIndex += 1) {
-        const start = points[pointIndex];
-        const end = points[pointIndex + 1];
-        const dx = end.x - start.x;
-        const controlOneY = start.y + start.derivative / 3;
-        const controlTwoY = end.y - end.derivative / 3;
-        d += ` C ${(start.x + dx / 3).toFixed(2)} ${controlOneY.toFixed(2)} ${(end.x - dx / 3).toFixed(2)} ${controlTwoY.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
-      }
-      d += " L1440 160 L0 160 Z";
-      const color = index % 2 === 0 ? fill : secondary;
-      return `<path fill="${color}" opacity="${1 - index * 0.12}" d="${d}"/>`;
-    }).join("");
-    const canvas = transparent ? "" : `<rect width="1440" height="160" fill="${background}"/>`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 160" preserveAspectRatio="none">${canvas}${paths}</svg>`;
+    const svg = buildWaveSvg({
+      amplitude: numberValue(values, "amp", 24, 0, 58),
+      layers: numberValue(values, "layers", 2, 1, 3),
+      frequency: numberValue(values, "frequency", 2, 1, 5),
+      phase: numberValue(values, "phase", 0, 0, 360),
+      baseline: numberValue(values, "baseline", 76, 30, 140),
+      fill: values.fill ?? "#0d9f8a",
+      secondary: values.secondary ?? "#7c4dff",
+      background: values.background ?? "#ffffff",
+      transparent: values.backgroundMode === "transparent",
+    });
     return { css: svg, style: {}, svg };
   }
   const opacity = numberValue(values, "opacity", 0.08, 0, 1);
   const density = numberValue(values, "density", 1.1, 0.1, 3);
-  const dataUrl = makeNoiseDataUrl(values.color ?? "#111827", density);
-  const previewDataUrl = makeNoiseDataUrl(values.color ?? "#111827", density, opacity);
+  const dataUrl = buildNoiseDataUrl(values.color ?? "#111827", density);
+  const previewDataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, opacity);
   const css = `.env-noise {\n  position: relative;\n  isolation: isolate;\n}\n.env-noise::after {\n  content: "";\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n  opacity: ${opacity};\n  background-image: ${dataUrl};\n}`;
   return { css, style: { backgroundColor: "#e2e8f0", backgroundImage: previewDataUrl, backgroundSize: "160px 160px" } };
 }
