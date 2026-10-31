@@ -116,7 +116,7 @@ class NativeDateTimeEngineTest {
             "date" to "2024-01-13", "zones" to "Lagos, London", "sourceTz" to "Lagos"
         ), now = fixedNow)
         assertTrue(result.output.contains("No shared Monday-Friday working-hours slots"))
-        assertFalse(result.output.contains("Option 1:"))
+        assertTrue(!result.output.contains("Option 1:"))
     }
 
     @Test fun worldClockAcceptsUnambiguousIanaCityAliases() {
