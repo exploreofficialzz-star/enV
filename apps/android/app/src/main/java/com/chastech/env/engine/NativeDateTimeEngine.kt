@@ -401,6 +401,15 @@ object NativeDateTimeEngine {
         }
         val duration = meetingLimit("durationMinutes", "Meeting length", 30, 5, 480)
         val interval = meetingLimit("intervalMinutes", "Slot interval", 30, 5, 120)
+        val workDayRaw = options["workDays"]?.trim() ?: "1,2,3,4,5"
+        val workDayParts = workDayRaw.split(Regex("[,\\s]+")).filter { it.isNotBlank() }
+        val workDays = workDayParts.map { part ->
+            part.toIntOrNull()?.takeIf { it in 0..6 }
+                ?: throw IllegalArgumentException("Working weekdays must be numbers from 0 (Sunday) to 6 (Saturday).")
+        }.toSet()
+        if (workDays.isEmpty()) throw IllegalArgumentException("Select at least one working weekday (0=Sunday through 6=Saturday).")
+        val dayNames = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+        val workDayLabel = workDays.sorted().joinToString(", ") { dayNames[it] }
         val start = parseWallTimeInZone("${date}T$workStart", anchor.zone).instant
         val end = parseWallTimeInZone("${date}T$workEnd", anchor.zone).instant
         if (end <= start) throw IllegalArgumentException("The reference city's work window is not valid on that date.")
@@ -414,7 +423,7 @@ object NativeDateTimeEngine {
                 val aMinutes = a.hour * 60 + a.minute
                 val bMinutes = b.hour * 60 + b.minute
                 val sameDay = a.toLocalDate() == b.toLocalDate()
-                Triple(choice, a, sameDay && a.dayOfWeek.value in 1..5 && aMinutes >= startMinutes && bMinutes <= endMinutes)
+                Triple(choice, a, sameDay && (a.dayOfWeek.value % 7) in workDays && aMinutes >= startMinutes && bMinutes <= endMinutes)
             }
             if (local.all { it.third }) {
                 val label = local.joinToString(" | ") { (choice, time, _) ->
@@ -424,9 +433,9 @@ object NativeDateTimeEngine {
             }
             cursor = cursor.plusSeconds(interval * 60L)
         }
-        if (slots.isEmpty()) return rows("Available slots" to "No shared Monday-Friday working-hours slots found. This checks working hours, not personal calendar free/busy.")
+        if (slots.isEmpty()) return rows("Available slots" to "No shared working-hours slots found on the selected weekdays ($workDayLabel). This checks working hours, not personal calendar free/busy.")
         val shown = slots.take(8)
-        val rows = mutableListOf(Row("Available slots", "${slots.size} matching Monday-Friday slots; showing the first ${shown.size}. This checks working hours, not personal calendar free/busy."))
+        val rows = mutableListOf(Row("Available slots", "${slots.size} matching slots on $workDayLabel; showing the first ${shown.size}. The same weekday rule is applied to every listed city. This checks working hours, not personal calendar free/busy."))
         shown.forEachIndexed { index, slot -> rows += Row("Option ${index + 1}", slot.second) }
         val first = shown.first().first
         val finish = first.plusSeconds(duration * 60L)

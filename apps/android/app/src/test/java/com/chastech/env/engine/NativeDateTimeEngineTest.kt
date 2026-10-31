@@ -118,12 +118,30 @@ class NativeDateTimeEngineTest {
         } catch (_: IllegalArgumentException) { }
     }
 
-    @Test fun meetingPlannerDoesNotOfferWeekendSlots() {
+    @Test fun meetingPlannerDoesNotOfferWeekendSlotsByDefault() {
         val result = NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
             "date" to "2024-01-13", "zones" to "Lagos, London", "sourceTz" to "Lagos"
         ), now = fixedNow)
-        assertTrue(result.output.contains("No shared Monday-Friday working-hours slots"))
+        assertTrue(result.output.contains("No shared working-hours slots"))
         assertTrue(!result.output.contains("Option 1:"))
+    }
+
+    @Test fun meetingPlannerSupportsSundayToThursdayWorkweeks() {
+        val result = NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
+            "date" to "2024-01-14", "zones" to "Lagos, Berlin", "sourceTz" to "Lagos",
+            "workStart" to "09:00", "workEnd" to "17:00", "workDays" to "0,1,2,3,4"
+        ), now = fixedNow)
+        assertTrue(result.output.contains("Option 1:"))
+        assertTrue(result.output.contains("Sunday, Monday, Tuesday, Wednesday, Thursday"))
+    }
+
+    @Test fun meetingPlannerRejectsInvalidWeekdayInput() {
+        try {
+            NativeDateTimeEngine.run("meeting-time-planner", options = mapOf(
+                "date" to "2024-01-14", "zones" to "Lagos, Berlin", "sourceTz" to "Lagos", "workDays" to "0,7"
+            ), now = fixedNow)
+            throw AssertionError("invalid weekday accepted")
+        } catch (_: IllegalArgumentException) { }
     }
 
     @Test fun worldClockAcceptsUnambiguousIanaCityAliases() {

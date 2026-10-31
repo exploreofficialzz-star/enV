@@ -2350,6 +2350,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
     var toTz by rememberSaveable(toolId) { mutableStateOf("America/New_York") }
     var workStart by rememberSaveable(toolId) { mutableStateOf("09:00") }
     var workEnd by rememberSaveable(toolId) { mutableStateOf("17:00") }
+    var workDays by rememberSaveable(toolId) { mutableStateOf("1,2,3,4,5") }
     var meetingDuration by rememberSaveable(toolId) { mutableStateOf("30") }
     var intervalMinutes by rememberSaveable(toolId) { mutableStateOf("30") }
     var value by rememberSaveable(toolId) { mutableStateOf(if (op == "unix") now.epochSecond.toString() else today) }
@@ -2409,6 +2410,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
                 InputField(fromTz, { fromTz = it }, "Reference city / time zone", placeholder = "Africa/Lagos")
                 InputField(workStart, { workStart = it }, "Working day starts (HH:mm)", singleLine = true)
                 InputField(workEnd, { workEnd = it }, "Working day ends (HH:mm)", singleLine = true)
+                InputField(workDays, { workDays = it }, "Working weekdays (0=Sun … 6=Sat)", singleLine = true)
                 InputField(meetingDuration, { meetingDuration = it }, "Meeting length in minutes", singleLine = true)
                 InputField(intervalMinutes, { intervalMinutes = it }, "Slot interval in minutes", singleLine = true)
             }
@@ -2437,7 +2439,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
                     "deadline" -> mapOf("target" to target, "includeEnd" to includeEnd, "weekendDays" to weekendDays, "excludedDates" to excludedDates)
                     "world-clock" -> mapOf("zones" to zones)
                     "timezone" -> mapOf("time" to time, "fromTz" to fromTz, "toTz" to toTz)
-                    "meeting-planner" -> mapOf("date" to start, "zones" to zones, "sourceTz" to fromTz, "workStart" to workStart, "workEnd" to workEnd, "durationMinutes" to meetingDuration, "intervalMinutes" to intervalMinutes)
+                    "meeting-planner" -> mapOf("date" to start, "zones" to zones, "sourceTz" to fromTz, "workStart" to workStart, "workEnd" to workEnd, "workDays" to workDays, "durationMinutes" to meetingDuration, "intervalMinutes" to intervalMinutes)
                     "unix", "weekday", "week-number", "format" -> if (op == "format") mapOf("value" to value, "pattern" to pattern) else mapOf("value" to value)
                     "leap" -> mapOf("year" to year)
                     else -> emptyMap()
@@ -2452,7 +2454,7 @@ private fun NativeDateTimeToolForm(toolId: String) {
                 target = if (op == "countdown") now.plusSeconds(3600).toString() else ""
                 zones = "Lagos\nLondon\nNew York\nTokyo"; time = java.time.LocalDateTime.now().withSecond(0).withNano(0).toString()
                 fromTz = java.time.ZoneId.systemDefault().id; toTz = "America/New_York"; workStart = "09:00"; workEnd = "17:00"
-                meetingDuration = "30"; intervalMinutes = "30"; value = if (op == "unix") now.epochSecond.toString() else today
+                meetingDuration = "30"; intervalMinutes = "30"; workDays = "1,2,3,4,5"; value = if (op == "unix") now.epochSecond.toString() else today
                 pattern = "yyyy-MM-dd"; year = LocalDate.now().year.toString(); birth = ""; output = ""; error = ""
             }
         )
