@@ -55,7 +55,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   border: [
     { name: "style", label: "Border style", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }, { value: "double", label: "Double" }] },
     { name: "width", label: "Width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
-    { name: "radius", label: "All corners (fallback)", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
+    { name: "radius", label: "Uniform radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "topLeft", label: "Top left radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "topRight", label: "Top right radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "bottomRight", label: "Bottom right radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
@@ -533,6 +533,12 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
           ) : null}
           <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((previous) => {
             const next = { ...previous, [name]: value };
+            if (family === "border" && name === "radius") {
+              next.topLeft = value;
+              next.topRight = value;
+              next.bottomRight = value;
+              next.bottomLeft = value;
+            }
             if (name === "preset") {
               const presets: Record<string, { x: number; y: number; blur: number; spread: number; alpha: number }> = {
                 subtle: { x: 0, y: 1, blur: 3, spread: 0, alpha: 0.12 },
@@ -578,14 +584,14 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
               <div className="w-full max-w-xl [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: generatedSvg }} />
             ) : family === "card" ? (
               <div className="w-full max-w-xs" style={output.style}>
-                <p className="text-base font-semibold text-slate-900">A card preview</p>
+                <p className="text-base font-semibold" style={{ color: values.text ?? "#111827" }}>A card preview</p>
                 <p className="env-card__description mt-2 text-sm" style={{ color: values.muted ?? "#475569" }}>See how spacing, surface and depth work together in a real component.</p>
                 <span className="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Learn more</span>
               </div>
             ) : family === "input" ? (
               <input readOnly value="Input field preview" className="env-live-input w-full max-w-xs px-3 py-2 text-sm text-slate-800" style={output.style} />
             ) : family === "button" ? (
-              <button type="button" className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors" style={output.style}>{sampleText}</button>
+              <button type="button" className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors motion-reduce:transition-none" style={output.style}>{sampleText}</button>
             ) : family === "badge" ? (
               <span style={output.style}>{sampleText.length > 18 ? "New feature" : sampleText}</span>
             ) : family === "text-shadow" ? (
