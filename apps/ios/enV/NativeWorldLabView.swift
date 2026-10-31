@@ -996,6 +996,116 @@ Text("Invent chemical heat").font(.headline)
         }
     }
 
+    private func updateGroupSphereScene() {
+        guard let run=groupRun,let frame=try? run.sample(groupTime) else{return}
+        for object in frame.objects {
+            if let node=scene.rootNode.childNode(withName:"lab-solid-"+object.entityId,
+                recursively:false) {
+                node.position=SCNVector3(Float(object.positionM[0]),
+                    Float(object.positionM[1]),Float(object.positionM[2]))
+            }
+        }
+    }
+
+    @ViewBuilder private func solidGroupSphereContent(
+        project:NativeWorldLabProject)->some View {
+        let spheres=project.entities.filter{$0.shape=="sphere"}
+        Text("Collide a group of spheres").font(.headline)
+        Text("An event-driven free-flight calculation: each sphere has an invented density and X/Y/Z velocity. Successive isolated impacts transfer momentum. Concurrent contacts, spin, gravity and breakage are not modeled.")
+            .font(.caption).foregroundStyle(.secondary)
+        if spheres.count<2 || spheres.count>12 {
+            Text("Create 2–12 spheres and assign an invented density to each.")
+                .font(.caption)
+        }else{
+            ScrollView(.vertical) {
+                VStack(alignment:.leading,spacing:6) {
+                    ForEach(spheres.indices,id:\.self){i in
+                        let item=spheres[i]
+                        Text(item.name+" · "+String(item.id.prefix(8)))
+                            .font(.subheadline)
+                        TextField("X,Y,Z speed (m/s) for "+item.name,
+                            text:Binding(
+                                get:{groupSpeeds[item.id] ?? (i==0 ? "2,0,0":"0,0,0")},
+                                set:{newValue in
+                                    groupSpeeds[item.id]=newValue
+                                    groupRun=nil;groupPlaying=false;redraw()
+                                }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                            .accessibilityLabel("Sphere group velocity "+item.id)
+                    }
+                }
+            }.frame(maxHeight:230)
+            value("Invented group restitution",groupRestitution,"")
+            Slider(value:$groupRestitution,in:0...1)
+                .accessibilityLabel("Group sphere restitution")
+                .onChange(of:groupRestitution){_ in
+                    groupRun=nil;groupPlaying=false;redraw()
+                }
+            Button("Calculate all sphere contacts"){
+                do {
+                    var velocityMap=[String:[Double]]()
+                    for (i,item) in spheres.enumerated(){
+                        velocityMap[item.id]=try nativeSphereVelocity(
+                            groupSpeeds[item.id] ?? (i==0 ? "2,0,0":"0,0,0"))
+                    }
+                    let result=try NativeWorldLabMultiSphere.evaluate(
+                        project,velocities:velocityMap,restitution:groupRestitution)
+                    groupRun=result;groupTime=0;groupPlaying=false
+                    collisionRun=nil;collisionPlaying=false
+                    sphereRun=nil;spherePlaying=false
+                    problem="";redraw();updateGroupSphereScene()
+                }catch{groupRun=nil;groupPlaying=false;problem=error.localizedDescription}
+            }.buttonStyle(.bordered)
+        }
+        if let run=groupRun,run.projectId==project.id,
+           run.projectRevision==project.revision {
+            value("Calculated successive impacts",Double(run.events.count),"")
+            value("Initial kinetic energy",run.totalInitialEnergyJ,"J")
+            value("Remaining kinetic energy",run.totalFinalEnergyJ,"J")
+            value("Dissipated kinetic energy",run.totalDissipatedEnergyJ,"J")
+            Text("Momentum before (kg·m/s): "+
+                run.initialMomentumKgMps.map{String(format:"%.4g",$0)}
+                    .joined(separator:" / "))
+                .font(.caption)
+            Text("Momentum after (kg·m/s): "+
+                run.finalMomentumKgMps.map{String(format:"%.4g",$0)}
+                    .joined(separator:" / "))
+                .font(.caption)
+            ForEach(run.events.indices,id:\.self){i in
+                let event=run.events[i]
+                Text("Impact \(i+1) at "+String(format:"%.4f",event.atSeconds)+
+                    " s: "+event.firstEntityId+" → "+event.secondEntityId)
+                    .font(.caption)
+            }
+            Text("Group simulated time: "+String(format:"%.2f",groupTime)+" s")
+            Slider(value:$groupTime,in:0...run.durationSeconds,
+                onEditingChanged:{editing in
+                    if editing {groupPlaying=false}
+                    updateGroupSphereScene()
+                })
+                .accessibilityLabel("Explore group collision time")
+                .onChange(of:groupTime){_ in updateGroupSphereScene()}
+            if let frame=try? run.sample(groupTime) {
+                value("Contacts completed",Double(frame.completedEvents),"")
+            }
+            HStack {
+                Button(groupPlaying ? "Pause group":"Play group"){
+                    groupPlaying.toggle()
+                }
+                Button("Reset group"){
+                    groupPlaying=false;groupTime=0;updateGroupSphereScene()
+                }
+            }.buttonStyle(.bordered)
+            Picker("Group impact playback speed",selection:$groupPlaybackRate) {
+                Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
+            }.pickerStyle(.segmented)
+            Button("Export group collision evidence"){exportingGroupEvidence=true}
+                .buttonStyle(.bordered)
+            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
     private func nativeSphereVelocity(_ input:String)throws->[Double] {
         let values=input.split(separator:",",omittingEmptySubsequences:false).compactMap {
             Double($0.trimmingCharacters(in:.whitespacesAndNewlines))
