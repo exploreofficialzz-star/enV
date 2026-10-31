@@ -438,6 +438,26 @@ enum NativeWorldLabEditor {
             root["materials"]=materials
         }
     }
+    /// Revise a hypothetical material; attached solids keep their original material ID.
+    static func reviseHypotheticalMaterial(_ data:Data,id:String,name:String,
+        densityKgM3:Double?,youngModulusPa:Double?)throws->Data {
+        try mutate(data){root in
+            guard !name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+                  name.count<=120,
+                  (densityKgM3.map{$0.isFinite && $0 >= 0.001 && $0<=1e9} ?? true),
+                  (youngModulusPa.map{$0.isFinite && $0 >= 0 && $0<=1e15} ?? true),
+                  var materials=root["materials"] as? [[String:Any]],
+                  let index=materials.firstIndex(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Invented material or its proposed properties are invalid")
+            }
+            materials[index]["name"]=name.trimmingCharacters(in:.whitespacesAndNewlines)
+            materials[index]["densityKgM3"]=densityKgM3.map{$0 as Any} ?? NSNull()
+            materials[index]["youngModulusPa"]=youngModulusPa.map{$0 as Any} ?? NSNull()
+            materials[index]["evidence"]="hypothetical-user-assumed"
+            root["materials"]=materials
+        }
+    }
+
     private static func editSolid(_ data:Data,id:String,
                                   _ edit:(inout [String:Any])->Void) throws -> Data {
         try mutate(data){root in
