@@ -24,6 +24,7 @@ import {addCircuitNode,addCircuitResistor,rewireCircuitPart,removeUnusedCircuitN
   from "@/lib/world-lab/network-graph";
 import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
+import {WorldLabOpticsPanel} from "./optics-panel";
 import {WorldLabGravityPanel} from "./gravity-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
@@ -2156,7 +2157,7 @@ export default function WorldLab() {
         {scientificEvidence.map(record=>
           <div key={record.id}
             className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span>{record.kind==="newton-gravity"?"Gravity":"Material heat"} ·
+            <span>{record.kind==="newton-gravity"?"Gravity":record.kind==="interface-optics"?"Optics":"Material heat"} ·
               revision {record.projectRevision} ·
               {new Date(record.createdAt).toLocaleString()}</span>
             <div className="flex flex-wrap gap-2">
@@ -2186,6 +2187,8 @@ export default function WorldLab() {
             }
           }
         }}/>
+      <WorldLabOpticsPanel project={project} mutateProject={mutateProject}
+        onKeepEvidence={keepScientificEvidence}/>
       <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
         cloudEnabled={remoteJobsEnabled}
         cloudBusy={remoteBusy}

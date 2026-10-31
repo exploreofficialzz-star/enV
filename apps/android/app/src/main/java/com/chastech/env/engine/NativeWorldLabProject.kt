@@ -54,6 +54,7 @@ data class NativeLabMaterial(
     val youngModulusPa: Double?, val evidence: String,
     val thermalConductivityWPerMK:Double?=null,
     val specificHeatJPerKgK:Double?=null,
+    val refractiveIndex:Double?=null,
 )
 data class NativeLabSolid(
     val id: String, val name: String, val shape: String, val positionMeters: NativeLabVector,
@@ -185,12 +186,13 @@ object NativeWorldLabProjectCodec {
         val materials=(0 until materialsArray.length()).map { i ->
             val o=materialsArray.getJSONObject(i)
             keys(o,setOf("id","name","densityKgM3","youngModulusPa",
-                "thermalConductivityWPerMK","specificHeatJPerKgK","evidence"))
+                "thermalConductivityWPerMK","specificHeatJPerKgK","refractiveIndex","evidence"))
             require(o.getString("evidence")=="hypothetical-user-assumed")
             NativeLabMaterial(id(o,"id"),name(o,"name"),optionalNumber(o,"densityKgM3",0.001,1e9),
                 optionalNumber(o,"youngModulusPa",0.0,1e15),o.getString("evidence"),
                 optionalNumber(o,"thermalConductivityWPerMK",1e-6,1e6),
-                optionalNumber(o,"specificHeatJPerKgK",0.01,1e7))
+                optionalNumber(o,"specificHeatJPerKgK",0.01,1e7),
+                optionalNumber(o,"refractiveIndex",1.0,5.0))
         }
         require(materials.map { it.id }.toSet().size==materials.size)
         val entities=(0 until solidArray.length()).map { i ->

@@ -20,6 +20,7 @@ const materialSchema = z.object({
   youngModulusPa: scalar.min(0).max(1e15).nullable(),
   thermalConductivityWPerMK: scalar.min(1e-6).max(1e6).nullable().optional(),
   specificHeatJPerKgK: scalar.min(0.01).max(1e7).nullable().optional(),
+  refractiveIndex: scalar.min(1).max(5).nullable().optional(),
   evidence: z.literal("hypothetical-user-assumed"),
 }).strict();
 const entitySchema = z.object({
@@ -247,7 +248,7 @@ export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number)
 export function reviseWorldLabMaterial(
   raw:WorldLabProject,id:string,
   assumptions:Pick<WorldLabMaterial,"name"|"densityKgM3"|"youngModulusPa"> &
-    Partial<Pick<WorldLabMaterial,"thermalConductivityWPerMK"|"specificHeatJPerKgK">>,
+    Partial<Pick<WorldLabMaterial,"thermalConductivityWPerMK"|"specificHeatJPerKgK"|"refractiveIndex">>,
 ):WorldLabProject {
   const project=parseWorldLabProject(raw);
   if(!project.materials.some(material=>material.id===id))
@@ -260,6 +261,8 @@ export function reviseWorldLabMaterial(
       previous.thermalConductivityWPerMK:assumptions.thermalConductivityWPerMK,
     specificHeatJPerKgK:assumptions.specificHeatJPerKgK===undefined?
       previous.specificHeatJPerKgK:assumptions.specificHeatJPerKgK,
+    refractiveIndex:assumptions.refractiveIndex===undefined?
+      previous.refractiveIndex:assumptions.refractiveIndex,
     evidence:"hypothetical-user-assumed",
   });
   return parseWorldLabProject({...project,

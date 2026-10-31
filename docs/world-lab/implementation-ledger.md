@@ -566,3 +566,18 @@ release-candidate evidence bundle are unfinished.
   including unreadable or corrupted local project files, instead of treating
   failed parsing as proof that an invention ID is available. This preserves
   no-overwrite semantics even in damaged local storage.
+
+
+## Invented optical interface (Web + portable native material contract)
+- Added optional 1–5 assumed refractive index to invented materials in
+  canonical Web/Kotlin/Swift project parsing; old project files remain valid.
+- Web editor can author and revise optical material assumptions and compute
+  single-boundary nonabsorbing Fresnel/Snell reflection, transmission and total
+  internal reflection on device. The typed result is persisted/exported with
+  versioned scientific evidence and portable archives; the model does NOT
+  infer wavelength effects, microstructure, spectral absorption or real-world
+  optical performance. Native project interchange preserves the assumption,
+  but native optics authoring/playback is not yet built.
+- Fixed account queue validation to accept Newtonian multi-body gravity
+  projects without an unrelated selected solid ID; remote solvers still
+  perform full input-domain checks and require explicit user consent.

@@ -1,14 +1,15 @@
 import type {GravityRun} from "./gravity.ts";
 import type {MaterialHeatRun} from "./material-heat-transfer.ts";
+import type {OpticalInterfaceRun} from "./optics.ts";
 
 /** Untrusted heterogenous scientific evidence interchange, never executable
  * source or proof of real measurement. Project and model revision are immutable. */
 export const MAX_SCIENCE_EVIDENCE_BYTES=2*1024*1024;
 export const MAX_SCIENCE_EVIDENCE_PER_PROJECT=20;
-export type ScientificEvidenceResult=GravityRun|MaterialHeatRun;
+export type ScientificEvidenceResult=GravityRun|MaterialHeatRun|OpticalInterfaceRun;
 export type ScientificEvidenceRecord=Readonly<{
   id:string;projectId:string;projectRevision:number;
-  createdAt:string;kind:"newton-gravity"|"material-heat";
+  createdAt:string;kind:"newton-gravity"|"material-heat"|"interface-optics";
   result:ScientificEvidenceResult;
 }>;
 const uid=(s:unknown):s is string=>typeof s==="string"&&
@@ -95,6 +96,35 @@ function heat(value:Record<string,unknown>){
     value.secondEntityId!==value.input.secondEntityId)
     throw new Error("Thermal evidence does not match its declared material bodies.");
 }
+function optics(value:Record<string,unknown>){
+  const numbers=["firstIndex","secondIndex","incidentAngleDegrees",
+    "reflectedAngleDegrees","sReflectance","pReflectance",
+    "unpolarizedReflectance","unpolarizedTransmittance","energyResidual"];
+  if(value.format!=="env-world-lab-interface-optics"||
+    value.modelVersion!=="1.0.0"||
+    value.evidence!=="physics-model-computed"||
+    value.materialEvidence!=="hypothetical-user-assumed"||
+    !label(value.validity)||
+    !uid(value.firstMaterialId)||!uid(value.secondMaterialId)||
+    value.firstMaterialId===value.secondMaterialId||
+    numbers.some(n=>!finite(value[n]))||
+    Number(value.firstIndex)<1||Number(value.firstIndex)>5||
+    Number(value.secondIndex)<1||Number(value.secondIndex)>5||
+    Number(value.incidentAngleDegrees)<0||Number(value.incidentAngleDegrees)>89.9||
+    value.reflectedAngleDegrees!==value.incidentAngleDegrees||
+    typeof value.totalInternalReflection!=="boolean"||
+    (value.transmittedAngleDegrees!==null&&!finite(value.transmittedAngleDegrees))||
+    (value.criticalAngleDegrees!==null&&!finite(value.criticalAngleDegrees))||
+    ["sReflectance","pReflectance","unpolarizedReflectance",
+      "unpolarizedTransmittance"].some(n=>Number(value[n])<0||Number(value[n])>1)||
+    Math.abs(Number(value.unpolarizedReflectance)+
+      Number(value.unpolarizedTransmittance)-1)>1e-10||
+    Number(value.energyResidual)>1e-8||
+    (value.totalInternalReflection&&
+      (value.transmittedAngleDegrees!==null||
+        value.unpolarizedTransmittance!==0)))
+    throw new Error("Stored optical interface evidence is invalid.");
+}
 export function parseScientificEvidenceRecord(data:unknown):ScientificEvidenceRecord{
   if(!obj(data)||!keys(data,["id","projectId","projectRevision","createdAt","kind","result"])||
     Object.keys(data).length!==6||!uid(data.id)||!uid(data.projectId)||
@@ -111,13 +141,15 @@ export function parseScientificEvidenceRecord(data:unknown):ScientificEvidenceRe
     throw new Error("Scientific evidence belongs to another project or revision.");
   if(data.kind==="newton-gravity")gravity(result);
   else if(data.kind==="material-heat")heat(result);
+  else if(data.kind==="interface-optics")optics(result);
   else throw new Error("This scientific evidence format is not yet supported.");
   return data as unknown as ScientificEvidenceRecord;
 }
 export function newScientificEvidenceRecord(result:ScientificEvidenceResult,
   id:string,createdAt:string):ScientificEvidenceRecord{
   const kind=result.format==="env-world-lab-newton-gravity"?
-    "newton-gravity":"material-heat";
+    "newton-gravity":result.format==="env-world-lab-material-heat-transfer"?
+      "material-heat":"interface-optics";
   return parseScientificEvidenceRecord({id,createdAt,
     projectId:result.projectId,projectRevision:result.projectRevision,
     kind,result});
