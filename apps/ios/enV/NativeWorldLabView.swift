@@ -949,10 +949,14 @@ Text("Invent chemical heat").font(.headline)
     private func updateCollisionScene() {
         guard let run=collisionRun,
               let state=try? run.sample(collisionTime) else {return}
-        scene.rootNode.childNode(withName:"lab-solid-"+run.leftEntityId,
-            recursively:false)?.position.x=Float(state.leftCenterXM)
-        scene.rootNode.childNode(withName:"lab-solid-"+run.rightEntityId,
-            recursively:false)?.position.x=Float(state.rightCenterXM)
+        if let left=scene.rootNode.childNode(withName:"lab-solid-"+run.leftEntityId,
+            recursively:false) {
+            left.position=SCNVector3(Float(state.leftCenterXM),left.position.y,left.position.z)
+        }
+        if let right=scene.rootNode.childNode(withName:"lab-solid-"+run.rightEntityId,
+            recursively:false) {
+            right.position=SCNVector3(Float(state.rightCenterXM),right.position.y,right.position.z)
+        }
     }
 
     @ViewBuilder private func solidCollisionContent(
