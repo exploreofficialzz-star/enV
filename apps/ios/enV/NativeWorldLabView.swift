@@ -8,8 +8,8 @@ private struct NativeWorldLabJsonFile: FileDocument {
     init(content: Data){self.content=content}
     init(configuration: ReadConfiguration) throws {
         let bytes=configuration.file.regularFileContents ?? Data()
-        guard bytes.count <= NativeWorldLabProject.maxBytes else {
-            throw NativeWorldLabError.invalid("World Lab JSON must be 1 MB or smaller")
+        guard bytes.count <= NativeWorldLabPortableArchiveStore.maxBytes else {
+            throw NativeWorldLabError.invalid("World Lab archive must be 24 MB or smaller")
         }
         content=bytes
     }
@@ -31,6 +31,8 @@ struct NativeWorldLabView:View {
     @State private var seeInside=false
     @State private var importing=false
     @State private var exporting=false
+    @State private var exportingCompleteArchive=false
+    @State private var completeArchiveFile:NativeWorldLabJsonFile?
     @State private var editHistory=NativeWorldLabEditHistory()
     @State private var projectData:Data?
     @State private var savedSnapshot:Data?
@@ -155,6 +157,7 @@ struct NativeWorldLabView:View {
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
     private let savedScience=NativeWorldLabScientificEvidenceStore()
+    private let portableArchives=NativeWorldLabPortableArchiveStore()
     private var hasUnsavedWork:Bool { projectData != nil && savedSnapshot != projectData }
     private func refreshScientificEvidence(){
         guard let project else{
@@ -240,6 +243,14 @@ struct NativeWorldLabView:View {
         guard let run=collisionRun,
               let data=try? JSONEncoder().encode(run) else {return nil}
         return NativeWorldLabJsonFile(content:data)
+    }
+    private func prepareCompleteArchiveExport(){
+        guard let data=projectData else{return}
+        do{
+            let archived=try portableArchives.export(data)
+            completeArchiveFile=NativeWorldLabJsonFile(content:archived)
+            exportingCompleteArchive=true
+        }catch{problem=error.localizedDescription}
     }
     private func newProject(){
         do {
@@ -461,8 +472,11 @@ struct NativeWorldLabView:View {
                     Button("New project"){askToReplace("new")}.buttonStyle(.borderedProminent)
                     Button("Export JSON"){exporting=true}
                         .buttonStyle(.bordered).disabled(projectData==nil)
+                    Button("Export complete archive"){prepareCompleteArchiveExport()}
+                        .buttonStyle(.bordered).disabled(projectData==nil)
                 }
-                Button("Import World Lab project JSON"){askToReplace("import")}.buttonStyle(.bordered)
+                Button("Import project or complete archive"){askToReplace("import")}
+                    .buttonStyle(.bordered)
                 HStack {
                     Button("Save locally"){saveLocally()}
                         .buttonStyle(.borderedProminent).disabled(projectData==nil)
@@ -661,6 +675,12 @@ struct NativeWorldLabView:View {
             contentType:.json,defaultFilename:"world-lab-project"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
+        .fileExporter(isPresented:$exportingCompleteArchive,
+            document:completeArchiveFile,contentType:.json,
+            defaultFilename:"world-lab-complete-archive"){result in
+                if case .failure(let error)=result{problem=error.localizedDescription}
+                completeArchiveFile=nil
+            }
         .fileExporter(isPresented:$exportingStoredScientificEvidence,
             document:storedEvidenceFile,contentType:.json,
             defaultFilename:"world-lab-scientific-evidence"){result in
@@ -701,15 +721,32 @@ struct NativeWorldLabView:View {
                 // allocating memory for untrusted imported project contents.
                 let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
                 guard let length=(attributes[.size] as? NSNumber)?.intValue,
-                      length<=NativeWorldLabProject.maxBytes else {
-                    throw NativeWorldLabError.invalid("Project files must be 1 MB or smaller.")
+                      length<=NativeWorldLabPortableArchiveStore.maxBytes else {
+                    throw NativeWorldLabError.invalid(
+                        "Imported project or archive must be 24 MB or smaller.")
                 }
                 let data=try Data(contentsOf:url)
-                project=try NativeWorldLabProject.decode(data)
-                projectData=data
-                savedSnapshot=nil
+                let raw=try JSONSerialization.jsonObject(with:data) as? [String:Any]
+                if raw?["format"] as? String=="env-world-lab-archive" {
+                    let archive=try portableArchives.importArchive(data)
+                    project=archive.project
+                    projectData=archive.projectData
+                    savedSnapshot=archive.projectData
+                    problem="Imported and saved complete invention archive. "+
+                        "Older numerical experiments were preserved for re-export."
+                    refreshSavedProjects();refreshScientificEvidence()
+                }else{
+                    guard data.count<=NativeWorldLabProject.maxBytes else {
+                        throw NativeWorldLabError.invalid(
+                            "Standalone projects must be 1 MB or smaller")
+                    }
+                    project=try NativeWorldLabProject.decode(data)
+                    projectData=data
+                    savedSnapshot=nil
+                    problem=""
+                }
                 editHistory.clear()
-                selected=0;problem="";redraw()
+                selected=0;redraw()
             }catch{problem=error.localizedDescription}
         }
     }
