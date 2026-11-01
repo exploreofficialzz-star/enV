@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -140,11 +140,22 @@ for (const [browserName, browserType] of browserEntries) {
     page.getByRole("button", { name: "Download PNG", exact: true }).click(),
   ]);
   assert.match(pngDownload.suggestedFilename(), /\\.png$/i, "Palette PNG export should produce a PNG file");
+  const pngPath = resolve(outputDir, `palette-swatches-${browserName}.png`);
+  await pngDownload.saveAs(pngPath);
+  const pngBytes = await readFile(pngPath);
+  assert.deepEqual([...pngBytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], "Palette download must contain a real PNG signature");
+  assert.ok(pngBytes.length > 1000, "Palette PNG should contain the rendered swatch sheet, not an empty file");
+
   const [svgDownload] = await Promise.all([
     page.waitForEvent("download", { timeout: 15000 }),
     swatchExport.getByRole("button", { name: "Download", exact: true }).click(),
   ]);
   assert.equal(svgDownload.suggestedFilename(), "env-palette-swatches.svg", "Palette SVG export should retain its SVG filename");
+  const svgPath = resolve(outputDir, `palette-swatches-${browserName}.svg`);
+  await svgDownload.saveAs(svgPath);
+  const svgContent = await readFile(svgPath, "utf8");
+  assert.match(svgContent, /<svg[^>]+xmlns="http:\/\/www\\.w3\\.org\/2000\/svg"/, "Palette SVG export should be a valid standalone SVG document");
+  assert.match(svgContent, /enV color palette/, "Palette SVG export should contain its accessible title");
 
   const layoutSelect = page.getByLabel("Page preview layout");
   await layoutSelect.waitFor({ state: "visible" });
