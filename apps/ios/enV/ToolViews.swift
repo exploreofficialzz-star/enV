@@ -14822,6 +14822,30 @@ private final class ABookLocalStore {
             }
             try perform { context in
                 do {
+                    let noteCountRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookNoteEntity")
+                    let revisionCountRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookRevisionEntity")
+                    let attachmentCountRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookAttachmentEntity")
+                    let existingNoteCount = try context.count(for: noteCountRequest)
+                    let existingRevisionCount = try context.count(for: revisionCountRequest)
+                    let existingAttachmentCount = try context.count(for: attachmentCountRequest)
+                    let attachmentRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+                    let existingAttachments = try context.fetch(attachmentRequest)
+                    let existingAttachmentBytes = existingAttachments.reduce(Int64(0)) { total, item in
+                        total + max(0, item.size)
+                    }
+                    guard existingNoteCount + importedNotes.count <= 10_000 else {
+                        throw NSError(domain: "ABookArchive", code: 36, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local notes. Export or remove older notes before importing this backup."])
+                    }
+                    guard existingRevisionCount + importedRevisions.count <= 100_000 else {
+                        throw NSError(domain: "ABookArchive", code: 37, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 100,000 local revisions. Export or remove older notes before importing this backup."])
+                    }
+                    guard existingAttachmentCount + importedAttachments.count <= 10_000 else {
+                        throw NSError(domain: "ABookArchive", code: 38, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing this backup."])
+                    }
+                    guard existingAttachmentBytes >= 0,
+                          existingAttachmentBytes + Int64(totalBytes) <= 150 * 1024 * 1024 else {
+                        throw NSError(domain: "ABookArchive", code: 39, userInfo: [NSLocalizedDescriptionKey: "The complete local library attachment limit is 150 MB. Export and remove older files before importing this backup."])
+                    }
                     for note in importedNotes {
                         let entity = ABookNoteEntity(context: context)
                         entity.id = note.id; entity.title = note.title; entity.body = note.body
