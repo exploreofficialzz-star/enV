@@ -52,3 +52,10 @@ test("invalid epochs zones and oversized inputs fail closed",()=>{
  assert.throws(()=>createReplayManifest(inputs[0],{worldEpochUTC:epoch,timezoneDisplay:"Mars/Olympus",sampleTimesSeconds:times}));
  assert.throws(()=>decodeAndReplayManifest(new Uint8Array(REPLAY_MANIFEST_MAX_BYTES+1)));
 });
+
+test("portable replay fingerprint matches the Android and Swift golden fixture",()=>{
+ const input:ModelInput={kind:"damped-oscillator",massKg:2,springNPerM:8,dampingNsPerM:0.5,
+  initialDisplacementM:0.25,initialVelocityMPerS:-0.1};
+ const manifest=createReplayManifest(input,{worldEpochUTC:"2026-11-01T00:00:00.000Z",timezoneDisplay:"UTC",sampleTimesSeconds:times});
+ assert.equal(manifest.inputFingerprint,"627da37ad5c8bfe2");
+});
