@@ -323,7 +323,7 @@ fun NativeWorldLabViewport(
                     val projected=clip(vertices,solid.id).map{projection(it,size.width,size.height,focalLength)}
                     if(projected.size>=3&&projected.all{it.visible}){
                         val path=Path().apply{projected.forEachIndexed{i,point->if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)};close()}
-                        drawPath(path,fill.copy(alpha=if(inspection.mode==NativeInspectionMode.XRAY)minOf(0.2f,inspection.opacity) else fill.alpha))
+                        drawPath(path,fill.copy(alpha=if(inspection.mode==NativeInspectionMode.XRAY)minOf(0.2f,inspection.opacity) else fill.alpha*alpha()))
                         if(selected&&outline||inspection.mode==NativeInspectionMode.XRAY)drawPath(path,Color.White.copy(alpha=0.85f),style=Stroke(2f))
                     }
                 }
@@ -334,8 +334,8 @@ fun NativeWorldLabViewport(
                 sideFaces.forEachIndexed{index,face->
                     drawCylinderPolygon(face,color.copy(alpha=0.66f+(index%3)*0.07f),true)
                 }
-                drawCylinderPolygon(bottomRing,color.copy(alpha=alpha()),selected)
-                drawCylinderPolygon(topRing,color.copy(alpha=alpha()),selected)
+                drawCylinderPolygon(bottomRing,color,selected)
+                drawCylinderPolygon(topRing,color,selected)
             }else{
                 val hx=dimensions.x/2;val hy=dimensions.y/2;val hz=dimensions.z/2
                 val raw=listOf(
