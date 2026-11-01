@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { computeABookPdfBackingScale, A_BOOK_PDF_VIEWER_LIMITS } from "./pdf-viewer-utils.ts";
 import { extractPdfTextLocally, extractSelectedPdfTextLocally } from "./pdf-reader.ts";
 import { extractPdfPagesInWorker, extractSelectedPdfsInWorker, inspectPdfInWorker, mergePdfsInWorker, rotateSelectedPdfsInWorker, splitPdfIntoZipInWorker, splitSelectedPdfsIntoZipInWorker } from "./pdf-worker-client.ts";
 import test from "node:test";
@@ -299,4 +300,22 @@ test("batch PDF text extraction validates selection and file limits before proce
     () => extractPdfTextLocally(new Blob([])),
     /selected PDF is empty/,
   );
+});
+
+
+test("PDF viewer canvas scaling enforces pixel and dimension budgets", () => {
+  const regular = computeABookPdfBackingScale(612, 792, 1.5, 2);
+  assert.equal(regular, 2);
+
+  const oversizedWide = computeABookPdfBackingScale(50_000, 1_000, 2, 2);
+  assert.ok(50_000 * oversizedWide <= A_BOOK_PDF_VIEWER_LIMITS.maxDimension);
+  assert.ok(1_000 * oversizedWide <= A_BOOK_PDF_VIEWER_LIMITS.maxDimension);
+  assert.ok(50_000 * 1_000 * oversizedWide * oversizedWide <= A_BOOK_PDF_VIEWER_LIMITS.maxBackingPixels);
+
+  const largeSquare = computeABookPdfBackingScale(4_000, 4_000, 2, 2);
+  assert.ok(4_000 * largeSquare <= A_BOOK_PDF_VIEWER_LIMITS.maxDimension);
+  assert.ok(16_000_000 * largeSquare * largeSquare <= A_BOOK_PDF_VIEWER_LIMITS.maxBackingPixels);
+
+  assert.throws(() => computeABookPdfBackingScale(0, 400, 1, 1), /invalid dimensions/);
+  assert.throws(() => computeABookPdfBackingScale(400, 400, Number.NaN, 1), /invalid dimensions/);
 });
