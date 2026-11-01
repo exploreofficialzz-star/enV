@@ -73,12 +73,24 @@ const explorerGroupIds = [...explorer.matchAll(/ids:\s*\[([^\]]+)\]/g)]
 const missingExplorerIds = expectedIds.filter((id) => !explorerGroupIds.includes(id));
 const duplicateExplorerIds = explorerGroupIds.filter((id, index) => explorerGroupIds.indexOf(id) !== index);
 const unexpectedExplorerIds = explorerGroupIds.filter((id) => !expectedIds.includes(id));
+const generatedFamilyGroups = {
+  gradient: "effects", shadow: "effects", border: "effects", glass: "effects", neomorph: "effects", noise: "effects",
+  button: "components", card: "components", badge: "components", input: "components", avatar: "components",
+  pattern: "shapes", blob: "shapes", wave: "shapes",
+};
+const generatedDesignTools = design.filter((tool) => !explorerGroupIds.includes(tool.id));
+const unmappedGeneratedDesignTools = generatedDesignTools.filter((tool) => {
+  if (tool.engine?.type === "color") return false;
+  if (tool.engine?.type !== "cssgen") return true;
+  return !generatedFamilyGroups[String(tool.engine?.op ?? "").split(":")[0]];
+});
 const checks = [
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
   ["Every core Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedIds.length],
   ["Generated Design workflow families are mapped into visible groups", designCatalogGenerator.includes('addCross("design"') && ["gradient", "shadow", "border", "glass", "neomorph", "noise", "button", "card", "badge", "input", "avatar", "pattern", "blob", "wave"].every((family) => explorerUtils.includes(family + ":")) && explorerUtils.includes('engine.type === "color"') && explorerUtilsTests.includes("every generated Design CSS family maps to one visible explorer group")],
   ["Generated tools participate in explorer filtering and result counts", explorer.includes("getGeneratedDesignTools(tools, CORE_TOOL_IDS, group.id)") && explorerUtils.includes("getGeneratedDesignTools") && explorerUtilsTests.includes("generated utilities are grouped once") && explorer.includes("uniqueTools.filter((tool) => !normalizedQuery")],
+  ["Every generated Design catalog entry maps into a visible explorer group", generatedDesignTools.length === design.length - explorerGroupIds.length && unmappedGeneratedDesignTools.length === 0],
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
   ["Color picker alpha control and extended CSS Color 4 outputs", colorEngine.includes("design-color-alpha") && colorEngine.includes("Opacity / alpha") && colorEngine.includes('["HWB", formatHwb(color)]') && colorEngine.includes('["OKLCH", formatOklch(color)]')],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],
@@ -129,8 +141,8 @@ const checks = [
   ["SVG artwork family selector and conditional controls", cssEngine.includes("Artwork family") && cssEngine.includes('if (family === "blob")') && cssEngine.includes("values.artStyle") && cssEngine.includes("buildTextureSvg")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
-if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length || missingExplorerIds.length || duplicateExplorerIds.length || unexpectedExplorerIds.length) {
-  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), missingExplorerIds, duplicateExplorerIds, unexpectedExplorerIds, failedChecks });
+if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length || missingExplorerIds.length || duplicateExplorerIds.length || unexpectedExplorerIds.length || unmappedGeneratedDesignTools.length) {
+  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), missingExplorerIds, duplicateExplorerIds, unexpectedExplorerIds, unmappedGeneratedDesignTools: unmappedGeneratedDesignTools.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), failedChecks });
   process.exit(1);
 }
 console.log(`Design audit passed: ${design.length} active catalogue entries, ${expectedIds.length} core tool IDs present, every engine operation supported, ${checks.length} implementation checks passed.`);
