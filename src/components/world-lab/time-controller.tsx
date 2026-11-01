@@ -1,11 +1,12 @@
-import {useState} from "react";
-import type {LabRun} from "@/lib/world-lab/model";
+import {useEffect,useState} from "react";
+import type {LabRun,ModelInput} from "@/lib/world-lab/model";
 import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepRecordedTime} from "@/lib/world-lab/timeline";
 import {createTimeEngineCheckpoint,createTimeEngineState,restoreTimeEngineCheckpoint,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
 type Props={run:LabRun|null;timeSeconds:number;playing:boolean;rate:number;direction:TimeEngineDirection;
  onDirectionChange:(v:TimeEngineDirection)=>void;timezoneDisplay:string;onTimezoneDisplayChange:(v:string)=>void;
  wallTimeUTC:string;onTimeChange:(t:number)=>void;onPlayingChange:(v:boolean)=>void;
- onRateChange:(v:number)=>void;onCheckpoint:(value:unknown)=>void};
+ onRateChange:(v:number)=>void;onCheckpoint:(value:unknown)=>void;
+ onCreateBranch:(input:ModelInput)=>void};
 const button="rounded border border-border px-3 py-2 text-sm disabled:opacity-50";
 function displayTime(value:string,timezone:string){
  try{return new Intl.DateTimeFormat(undefined,{timeZone:timezone,dateStyle:"medium",timeStyle:"medium"}).format(new Date(value));}
@@ -13,7 +14,13 @@ function displayTime(value:string,timezone:string){
 }
 export function WorldLabTimeController(p:Props){
  const [restoreStatus,setRestoreStatus]=useState("");
+ const [branchDraft,setBranchDraft]=useState<ModelInput|null>(p.run?.inputs??null);
+ useEffect(()=>setBranchDraft(p.run?.inputs??null),[p.run?.id]);
  const run=p.run,duration=run?.time.simulatedDurationSeconds??0;
+ const branchChanged=!!run&&!!branchDraft&&JSON.stringify(branchDraft)!==JSON.stringify(run.inputs);
+ const updateBranchDraft=(patch:Partial<ModelInput>)=>{
+  setBranchDraft(current=>current?({...current,...patch} as ModelInput):current);
+ };
  const sample=run?Math.round(p.timeSeconds/run.time.solverStepSeconds):0;
  const clock=run?createTimeEngineState(run,{wallTimeUTC:p.wallTimeUTC,
   simulationTimeSeconds:p.timeSeconds,playbackRate:p.rate,direction:p.direction,
@@ -70,6 +77,45 @@ export function WorldLabTimeController(p:Props){
     <ul className="mt-1 list-disc pl-4">{branch.inputDiff.map(change=>
      <li key={change.field}>{change.field}: {String(change.previous??"unset")} → {String(change.next??"unset")}</li>)}</ul>}
   </div>}
+  <details className="mt-3 rounded border border-border p-2">
+   <summary className="cursor-pointer text-sm font-medium">Branch this experiment</summary>
+   <p className="mt-2 text-xs text-muted-foreground">
+    Change one or more assumptions and calculate a new child run. The source run and its recorded samples remain unchanged.
+    This local reference workspace supports only the three models listed below.
+   </p>
+   {branchDraft?.kind==="damped-oscillator"&&<>
+    <div className="mt-2 grid grid-cols-2 gap-2">
+     <label className="text-xs">Mass (kg)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0.001" max="10000" step="any" value={branchDraft.massKg} onChange={e=>updateBranchDraft({massKg:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Spring stiffness (N/m)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0.001" max="1000000" step="any" value={branchDraft.springNPerM} onChange={e=>updateBranchDraft({springNPerM:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Damping (N·s/m)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0" max="100000" step="any" value={branchDraft.dampingNsPerM} onChange={e=>updateBranchDraft({dampingNsPerM:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Initial displacement (m)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="-10" max="10" step="any" value={branchDraft.initialDisplacementM} onChange={e=>updateBranchDraft({initialDisplacementM:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs col-span-2">Initial velocity (m/s)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="-100" max="100" step="any" value={branchDraft.initialVelocityMPerS} onChange={e=>updateBranchDraft({initialVelocityMPerS:Number(e.currentTarget.value)})}/></label>
+    </div>
+   </>}
+   {branchDraft?.kind==="rc-circuit"&&<>
+    <div className="mt-2 grid grid-cols-2 gap-2">
+     <label className="text-xs">Resistance (Ω)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0.001" max="1000000000" step="any" value={branchDraft.resistanceOhm} onChange={e=>updateBranchDraft({resistanceOhm:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Capacitance (F)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0.000000001" max="1000" step="any" value={branchDraft.capacitanceF} onChange={e=>updateBranchDraft({capacitanceF:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Supply voltage (V)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="-1000" max="1000" step="any" value={branchDraft.supplyVoltageV} onChange={e=>updateBranchDraft({supplyVoltageV:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Initial voltage (V)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="-1000" max="1000" step="any" value={branchDraft.initialVoltageV} onChange={e=>updateBranchDraft({initialVoltageV:Number(e.currentTarget.value)})}/></label>
+    </div>
+   </>}
+   {branchDraft?.kind==="heat-rod"&&<>
+    <div className="mt-2 grid grid-cols-2 gap-2">
+     <label className="text-xs">Thermal diffusivity (m²/s)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0.0000001" max="100" step="any" value={branchDraft.thermalDiffusivityM2PerS} onChange={e=>updateBranchDraft({thermalDiffusivityM2PerS:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Rod length (m)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0.1" max="100" step="any" value={branchDraft.lengthMeters} onChange={e=>updateBranchDraft({lengthMeters:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Ambient temperature (K)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0" max="2000" step="any" value={branchDraft.ambientTemperatureK} onChange={e=>updateBranchDraft({ambientTemperatureK:Number(e.currentTarget.value)})}/></label>
+     <label className="text-xs">Center temperature (K)<input className="mt-1 w-full rounded border border-border bg-bg p-2" type="number" min="0" max="2000" step="any" value={branchDraft.centerTemperatureK} onChange={e=>updateBranchDraft({centerTemperatureK:Number(e.currentTarget.value)})}/></label>
+    </div>
+   </>}
+   <div className="mt-2 flex flex-wrap gap-2">
+    <button type="button" className={button} disabled={!run} onClick={()=>setBranchDraft(run?.inputs??null)}>Reset to source assumptions</button>
+    <button type="button" className={button} disabled={!branchChanged} onClick={()=>{
+     if(branchDraft&&branchChanged){p.onPlayingChange(false);p.onCreateBranch(branchDraft);}
+    }}>Calculate new branch</button>
+   </div>
+   {run&&<p className="mt-1 text-[11px] text-muted-foreground">Source run: {run.id} · {run.modelId} v{run.modelVersion}</p>}
+  </details>
   <label htmlFor="worldlab-checkpoint-restore" className="mt-2 inline-block text-sm">Restore saved time-engine checkpoint</label>
   <input id="worldlab-checkpoint-restore" className="mt-1 block w-full text-sm" type="file"
    accept=".json,application/json" disabled={!run} onChange={event=>{
