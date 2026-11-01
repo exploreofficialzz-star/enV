@@ -46,21 +46,8 @@ enum NativeWorldLabScience {
             try domain(r,0.001,1e9,"Resistance")
             try domain(c,1e-9,1000,"Capacitance")
             try domain(v,-1000,1000,"Supply")
-            let voltage = try NativeWorldLabSI.declare(v,unit:"V")
-            _ = try NativeWorldLabSI.convert(voltage,to:"V")
-            try NativeWorldLabGraph.validate(.init(
-                projectId:"native-rc-reference",projectRevision:0,
-                components:[
-                    .init(id:"source",modelId:"ideal-dc-source",ports:[
-                        .init(id:"voltage",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical")]),
-                    .init(id:"capacitor",modelId:"ideal-rc",ports:[
-                        .init(id:"input",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical")])
-                ],
-                connections:[
-                    .init(fromComponentId:"source",fromPortId:"voltage",
-                          toComponentId:"capacitor",toPortId:"input",delayed:false)
-                ]))
             try domain(v0,-1000,1000,"Initial voltage")
+            try NativeWorldLabGraph.validate(NativeWorldLabExecution.idealRCGraph())
         case let .heat(alpha,length,ambient,center):
             try domain(alpha,1e-7,100,"Diffusivity")
             try domain(length,0.1,100,"Length")
@@ -94,8 +81,24 @@ enum NativeWorldLabScience {
             result.xMeters=x;result.velocityMPerS=v
             result.mechanicalEnergyJ=(m*v*v+k*x*x)/2
         case let .rc(r,c,supply,initial):
-            let voltage=supply+(initial-supply)*exp(-t/(r*c))
-            let current=(supply-voltage)/r
+            let voltage:Double
+            let current:Double
+            if t<0.001 {
+                voltage=initial
+                current=(supply-voltage)/r
+            } else {
+                let adapters=try NativeWorldLabExecution.idealRCAdapters(
+                    sourceVoltageV:supply,resistanceOhm:r,capacitanceF:c,initialVoltageV:initial)
+                let run=try NativeWorldLabExecution.execute(
+                    NativeWorldLabExecution.idealRCGraph(),adapters:adapters,
+                    durationSeconds:t,stepSeconds:min(1.0/240.0,stable))
+                guard let last=run.samples.last,
+                      let solvedVoltage=last.values["load:Vc"]?.valueSI,
+                      let solvedCurrent=last.values["load:I"]?.valueSI else {
+                    throw NativeWorldLabError.invalid("RC graph scheduler omitted its voltage or current output")
+                }
+                voltage=solvedVoltage;current=solvedCurrent
+            }
             result.voltageV=voltage;result.currentA=current
             result.resistorHeatW=current*current*r
             result.storedEnergyJ=c*voltage*voltage/2
@@ -179,7 +182,7 @@ enum NativeWorldLabDropScience {
         try valid(i.durationSeconds,0.01,20,"Duration")
         try valid(stepSeconds,0.001,1.0/30,"Step")
         let steps=Int(ceil(i.durationSeconds/stepSeconds))
-        guard steps<=20000 else { throw NativeWorldLabError.invalid("Drop exceeds local solver budget") }
+        guard steps<=50000 else { throw NativeWorldLabError.invalid("Drop exceeds local solver budget") }
         let dt=i.durationSeconds/Double(steps)
         let k=0.5*i.airDensityKgM3*i.dragCoefficient*i.projectedAreaM2/i.massKg
         var height=i.dropHeightM
@@ -440,7 +443,7 @@ enum NativeWorldLabExecution {
         try NativeWorldLabGraph.validate(graph)
         guard durationSeconds.isFinite,(0.001...60).contains(durationSeconds),
               stepSeconds.isFinite,(0.00001...1).contains(stepSeconds),
-              ceil(durationSeconds/stepSeconds)<=20000,
+              ceil(durationSeconds/stepSeconds)<=50000,
               powerToleranceW.isFinite,(0...1e6).contains(powerToleranceW) else {
             throw NativeWorldLabError.invalid("Scientific timeline or tolerance exceeds the bounded budget")
         }
@@ -484,7 +487,7 @@ enum NativeWorldLabExecution {
         var now=0.0
         var scheduled:Double?
         var previous:[String:NativeScienceQuantity]=[:]
-        while now<durationSeconds-1e-12 && samples.count<20000 {
+        while now<durationSeconds-1e-12 && samples.count<50000 {
             let end=min(durationSeconds,min(now+stepSeconds,scheduled ?? durationSeconds))
             guard end>now+1e-12 else {
                 throw NativeWorldLabError.invalid("Scientific solver failed to advance")
@@ -543,6 +546,18 @@ enum NativeWorldLabExecution {
             throw NativeWorldLabError.invalid("Scientific simulation failed to reach its duration")
         }
         return NativeScientificRun(graph:graph,samples:samples)
+    }
+    static func idealRCGraph(projectId:String="native-rc-reference",
+        projectRevision:Int=0)->NativeScientificGraph {
+        NativeScientificGraph(projectId:projectId,projectRevision:projectRevision,components:[
+            NativeScienceComponent(id:"source",modelId:"ideal-dc-source",ports:[
+                NativeSciencePort(id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical")]),
+            NativeScienceComponent(id:"load",modelId:"series-rc-load",ports:[
+                NativeSciencePort(id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"),
+                NativeSciencePort(id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+                NativeSciencePort(id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical")])
+        ],connections:[NativeScienceEdge(fromComponentId:"source",fromPortId:"V",
+            toComponentId:"load",toPortId:"Vin",delayed:false)])
     }
     static func idealRCAdapters(sourceVoltageV:Double,resistanceOhm:Double,
         capacitanceF:Double,initialVoltageV:Double=0)throws->[NativeScientificAdapter] {
