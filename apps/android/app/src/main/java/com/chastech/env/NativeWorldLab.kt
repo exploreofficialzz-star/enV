@@ -85,6 +85,8 @@ fun NativeWorldLabForm() {
     var resistance by remember { mutableFloatStateOf(1000f) }
     var diffusivity by remember { mutableFloatStateOf(0.02f) }
     var inside by remember { mutableStateOf(false) }
+    var timelineStatus by remember { mutableStateOf("") }
+    var pendingTimelineJson by remember { mutableStateOf<String?>(null) }
     var inspection by remember { mutableStateOf(com.chastech.env.engine.NativeInspectionSettings()) }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
     var projectJson by remember { mutableStateOf<String?>(null) }
@@ -393,6 +395,35 @@ fun NativeWorldLabForm() {
             }
         }
     }
+    val timelineExportPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null){
+            val json=pendingTimelineJson
+            if(json!=null)scope.launch{runCatching{withContext(Dispatchers.IO){
+                context.contentResolver.openOutputStream(uri,"wt")?.use{it.write(json.toByteArray(Charsets.UTF_8));it.flush()}
+                    ?:error("Cannot write timeline checkpoint")
+            }}.onSuccess{timelineStatus="Reference experiment checkpoint saved."}
+                .onFailure{timelineStatus=it.message?:"Timeline checkpoint export failed."}}
+        }
+    }
+    val timelineImportPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                    val out=ByteArrayOutputStream();val buffer=ByteArray(4096)
+                    while(true){val n=input.read(buffer);if(n<0)break
+                        require(out.size()+n<=16*1024){"Timeline checkpoint exceeds 16 KB"}
+                        out.write(buffer,0,n)}
+                    out.toByteArray()
+                }?:error("Cannot read timeline checkpoint")
+                NativeWorldLabDemoCheckpointCodec.decode(bytes.toString(Charsets.UTF_8))
+            }}.onSuccess{checkpoint->
+                kind=checkpoint.modelId;time=checkpoint.timeSeconds.toFloat()
+                mass=checkpoint.massKg.toFloat();spring=checkpoint.springNPerM.toFloat()
+                resistance=checkpoint.resistanceOhm.toFloat();diffusivity=checkpoint.diffusivityM2PerS.toFloat()
+                playing=false;timelineStatus="Matching reference experiment and inputs restored."
+            }.onFailure{timelineStatus=it.message?:"Timeline checkpoint restore failed."}
+        }
+    }
     val collisionEvidencePicker=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null){
@@ -514,8 +545,8 @@ fun NativeWorldLabForm() {
         while(spherePlaying){
             delay(40)
             val run=sphereRun?:break
-            sphereTime=(sphereTime+0.04f*sphereSpeed)
-                .coerceAtMost(run.durationSeconds.toFloat())
+            sphereTime=nextWorldLabEventTime(sphereTime.toDouble(),0.04,sphereSpeed.toDouble(),
+                run.durationSeconds,listOf(run.impactTimeSeconds)).toFloat()
             if(sphereTime>=run.durationSeconds.toFloat())spherePlaying=false
         }
     }
@@ -1503,7 +1534,21 @@ fun NativeWorldLabForm() {
         Canvas(Modifier.fillMaxWidth().height(170.dp)
             .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
             .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
-            if(kind=="spring") {
+            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+            OutlinedButton(onClick={
+                runCatching{
+                    pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
+                        NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
+                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble()))
+                    timelineExportPicker.launch("world-lab-time-checkpoint.json")
+                }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
+            }){Text("Save checkpoint")}
+            OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
+                Text("Restore checkpoint")
+            }
+        }
+        if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
+        if(kind=="spring") {
                 drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
                     Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
                 val x=((observation?.xMeters?:0.0).coerceIn(-1.0,1.0)*size.width*0.3).toFloat()
