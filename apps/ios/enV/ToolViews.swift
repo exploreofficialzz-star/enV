@@ -14470,6 +14470,7 @@ private final class ABookLocalStore {
     }
 
     func permanentlyDeleteNote(noteID: UUID) throws {
+        var filesToRemove: [URL] = []
         try perform { context in
             let attachmentsRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
             attachmentsRequest.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
@@ -14478,7 +14479,7 @@ private final class ABookLocalStore {
                 .appendingPathComponent("Abook", isDirectory: true).standardizedFileURL
             for attachment in attachments {
                 let fileURL = root.appendingPathComponent(attachment.relativePath).standardizedFileURL
-                if fileURL.path.hasPrefix(root.path + "/") { try? fileManager.removeItem(at: fileURL) }
+                if fileURL.path.hasPrefix(root.path + "/") { filesToRemove.append(fileURL) }
                 context.delete(attachment)
             }
             let revisionsRequest = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
@@ -14489,6 +14490,9 @@ private final class ABookLocalStore {
             try context.fetch(noteRequest).forEach(context.delete)
             try context.save()
         }
+        // Physical cleanup follows the durable database commit. A failed save never
+        // leaves a surviving note with attachment rows whose files were already removed.
+        filesToRemove.forEach { try? fileManager.removeItem(at: $0) }
     }
 
     func revisions(noteID: UUID) throws -> [ABookNativeRevision] {
