@@ -265,6 +265,7 @@ export default function WorldLab() {
   const [actuatorHeatEnabled,setActuatorHeatEnabled] = useState(false);
   const [coilHeatCapacity,setCoilHeatCapacity] = useState(80);
   const [coilCooling,setCoilCooling] = useState(0.3);
+  const [actuatorPowerOffAt,setActuatorPowerOffAt] = useState<number|null>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const cadImportInput=useRef<HTMLInputElement>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
@@ -1051,11 +1052,12 @@ export default function WorldLab() {
         initialTemperatureK:293.15,ambientTemperatureK:293.15,
         heatCapacityJPerK:coilHeatCapacity,coolingWPerK:coilCooling,
         resistanceTemperatureCoefficientPerK:0.004}}:{};
+      const powerEvent=actuatorPowerOffAt===null?{}:{powerOffAtSeconds:actuatorPowerOffAt};
       const wiredRun=wired?runNetworkMotorExperiment(project,selectedEntity.id,{
-        forceConstantNPerA:actuatorConstant,...thermal,
+        forceConstantNPerA:actuatorConstant,...thermal,...powerEvent,
       }):null;
       const derived=wiredRun?null:deriveActuatorInput(project,selectedEntity.id,{
-        supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,
+        supplyVoltageV:actuatorVoltage,forceConstantNPerA:actuatorConstant,...thermal,...powerEvent,
       });
       const result=wiredRun?.motor??runActuatorExperiment(
         derived!.input,derived!.source);
@@ -1084,9 +1086,10 @@ export default function WorldLab() {
         initialTemperatureK:293.15,ambientTemperatureK:293.15,
         heatCapacityJPerK:coilHeatCapacity,coolingWPerK:coilCooling,
         resistanceTemperatureCoefficientPerK:0.004}}:{};
+      const powerEvent=actuatorPowerOffAt===null?{}:{powerOffAtSeconds:actuatorPowerOffAt};
       const result=runDigitalMotorExperiment(project,project.digitalNetworks[0].id,
         outputId,selectedEntity.id,actuatorVoltage,{
-          forceConstantNPerA:actuatorConstant,...thermal,
+          forceConstantNPerA:actuatorConstant,...thermal,...powerEvent,
         });
       setPlaying(false);setDropPlaying(false);setDropRun(null);
       setWiredMotorRun(null);setDigitalMotorRun(result);
@@ -3471,6 +3474,29 @@ export default function WorldLab() {
                       </label>
                     </div>
                   </details>
+                  <label className="mt-2 flex items-center gap-2 text-xs">
+                    <input type="checkbox" aria-label="Open motor supply switch during experiment"
+                      checked={actuatorPowerOffAt!==null}
+                      onChange={e=>{
+                        setActuatorPowerOffAt(e.target.checked?2:null);
+                        setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
+                      }}/>
+                    Open the motor supply switch during the run
+                  </label>
+                  {actuatorPowerOffAt!==null&&<div className="mt-1 rounded border border-border p-2">
+                    <label className="block text-xs" htmlFor="worldlab-motor-power-off">
+                      Switch opens at {actuatorPowerOffAt.toFixed(3)} s
+                    </label>
+                    <input id="worldlab-motor-power-off" className="w-full" type="range"
+                      min="0" max="4" step={1/240} value={actuatorPowerOffAt}
+                      onChange={e=>{
+                        setActuatorPowerOffAt(Number(e.target.value));
+                        setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
+                      }}/>
+                    <p className="text-[11px] text-muted-foreground">
+                      Supply voltage becomes zero at this exact event. The modeled coil current decays continuously through its R–L path; arcing, fuse damage and contact bounce are outside this model.
+                    </p>
+                  </div>}
                   <button type="button" className={buttonClass+" mt-2"}
                     disabled={selectedQuantities.massKg===null} onClick={()=>startActuatorWithSelectedSolid(false)}>
                     Power this solid
