@@ -36,6 +36,8 @@ const paletteImage = read("src/lib/engines/palette-image.ts");
 const paletteImageTests = read("src/lib/engines/palette-image.test.ts");
 const textShadow = read("src/lib/engines/css-text-shadow.ts");
 const textShadowTests = read("src/lib/engines/css-text-shadow.test.ts");
+const componentA11y = read("src/lib/engines/design-component-a11y.ts");
+const componentA11yTests = read("src/lib/engines/design-component-a11y.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -67,6 +69,7 @@ const checks = [
   ["Button variants and disabled interaction preview", cssEngine.includes("Button style") && cssEngine.includes("env-button:disabled") && cssEngine.includes("disabled={values.disabled === \"yes\"}")],
   ["Five structured card preview layouts", cssEngine.includes("Card layout") && ["product", "profile", "article", "metric"].every((layout) => cssEngine.includes(`values.layout === "${layout}"`))],
   ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
+  ["Live contrast feedback for generated buttons, cards, badges and inputs", componentA11y.includes("inspectDesignComponentContrast") && componentA11y.includes("non-text") && componentA11yTests.includes("cards check title") && cssEngine.includes("Component contrast check") && cssEngine.includes("inspectDesignComponentContrast(family, values)")],
   ["Editable color-vision palette", colorEngine.includes("Test your own interface colors") && colorEngine.includes("Reset sample colors")],
   ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background, canvas)") && colorEngine.includes("previewPair.background")],
   ["Independent border corner radii", cssEngine.includes("Top left radius") && cssEngine.includes("bottomLeft")],

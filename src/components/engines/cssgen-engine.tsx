@@ -9,6 +9,7 @@ import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "
 import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
 import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
 import { toHex } from "@/lib/engines/accessibility-color";
+import { inspectDesignComponentContrast } from "@/lib/engines/design-component-a11y";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -408,6 +409,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   }, [family, allFields]);
   const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
   const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay, shadowLayers, textShadowLayers), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, shadowLayers, textShadowLayers, values]);
+  const componentContrast = inspectDesignComponentContrast(family, values);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "text-shadow";
@@ -687,6 +689,28 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             )}
           </div>
           {family === "neomorph" ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5 text-muted">Neumorphic effects can make controls and boundaries difficult to distinguish. Keep labels visible, retain clear focus indicators and verify text and control contrast before using this treatment in an interface.</p> : null}
+          {componentContrast.length > 0 ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="component-contrast-heading">
+              <div>
+                <h4 id="component-contrast-heading" className="text-sm font-semibold text-fg">Component contrast check</h4>
+                <p className="mt-1 text-xs leading-5 text-muted">Checks the selected text and essential UI pairs against WCAG contrast reference thresholds.</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {componentContrast.map((item) => (
+                  <div key={item.label} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border p-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-fg">{item.label}</p>
+                      <p className="mt-1 text-[10px] text-muted">{item.criterion === "text" ? "Text ·" : "Non-text ·"} {item.threshold.toFixed(1)}:1 target</p>
+                    </div>
+                    <span className={`shrink-0 font-mono text-xs font-semibold ${item.passes ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                      {item.ratio.toFixed(2)}:1 · {item.passes ? "Pass" : "Review"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] leading-4 text-muted">These checks cover the listed color pairs only. They do not certify every component state, focus context or the complete interface.</p>
+            </section>
+          ) : null}
           <p className="text-xs leading-5 text-muted">The preview shows the main visual treatment. Check the exported code in your target browser and project before shipping.</p>
         </div>
       </div>

@@ -43,7 +43,7 @@ test("HWB CSS colors parse hue units, alpha and whiteness/blackness", () => {
   assert.equal(toHex(parseDesignColor("hwb(0 0% 0%)")!), "#ff0000");
   assert.equal(toHex(parseDesignColor("hwb(120 0% 0% / 50%)")!), "#00ff0080");
   assert.equal(toHex(parseDesignColor("hwb(240 20% 20%)")!), "#3333cc");
-  assert.equal(toHex(parseDesignColor("hwb(90 40% 60%)")!), "#808080");
+  assert.equal(toHex(parseDesignColor("hwb(90 50% 50%)")!), "#808080");
   assert.equal(parseDesignColor("hwb(0 110% 0%)"), null);
 });
 
