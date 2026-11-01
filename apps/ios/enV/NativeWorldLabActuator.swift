@@ -20,6 +20,7 @@ struct NativeActuatorInput {
     var dampingNsPerM:Double=0.5
     var durationSeconds:Double=4
     var thermal:NativeActuatorThermalInput?=nil
+    var powerOffAtSeconds:Double?=nil
 }
 struct NativeActuatorSample {
     let timeSeconds:Double
@@ -30,6 +31,7 @@ struct NativeActuatorSample {
     let backEmfV:Double
     let resistiveHeatW:Double
     let sourcePowerW:Double
+    let sourceVoltageV:Double
     let kineticEnergyJ:Double
     let gravityEnergyJ:Double
     let magneticEnergyJ:Double
@@ -106,6 +108,47 @@ enum NativeWorldLabActuator {
         }
         return n
     }
+    private struct Segment {
+        let before:[Double]
+        let after:[Double]
+        let stepSeconds:Double
+        let sourceVoltageV:Double
+        let impactLossJ:Double
+    }
+    private struct Integrated {
+        let state:[Double]
+        let segments:[Segment]
+    }
+    private static func oneSegment(_ state:[Double],_ input:NativeActuatorInput,
+                                   _ dt:Double)->Segment {
+        let raw=step(state,input,dt,clamp:false)
+        let impacted=raw[0]<0 || (raw[0]==0 && raw[1]<0)
+        var after=raw
+        if impacted {after[0]=0;after[1]=0}
+        let loss=impacted && raw[1]<0 ? 0.5*input.massKg*raw[1]*raw[1] : 0
+        return Segment(before:state,after:after,stepSeconds:dt,
+            sourceVoltageV:input.supplyVoltageV,impactLossJ:loss)
+    }
+    /// Split integration at the switch instant; no RK stage spans the discontinuity.
+    private static func advance(_ state:[Double],_ input:NativeActuatorInput,
+                                _ dt:Double,_ startSeconds:Double)->Integrated {
+        if let cutoff=input.powerOffAtSeconds,
+           cutoff>startSeconds+1e-12,cutoff<=startSeconds+dt+1e-12 {
+            var before=input;before.powerOffAtSeconds=nil
+            var after=input;after.supplyVoltageV=0;after.powerOffAtSeconds=nil
+            let first=oneSegment(state,before,cutoff-startSeconds)
+            let remaining=startSeconds+dt-cutoff
+            if remaining<=1e-12{return Integrated(state:first.after,segments:[first])}
+            let second=oneSegment(first.after,after,remaining)
+            return Integrated(state:second.after,segments:[first,second])
+        }
+        var effective=input
+        if let cutoff=input.powerOffAtSeconds,cutoff<=startSeconds+1e-12 {
+            effective.supplyVoltageV=0;effective.powerOffAtSeconds=nil
+        }
+        let segment=oneSegment(state,effective,dt)
+        return Integrated(state:segment.after,segments:[segment])
+    }
     static func evaluate(_ i:NativeActuatorInput,
                          requestedStepSeconds:Double=1.0/240)throws->NativeActuatorResult {
         try bounded(i.massKg,0.001,10000,"Mass")
@@ -117,6 +160,7 @@ enum NativeWorldLabActuator {
         try bounded(i.forceConstantNPerA,0,10000,"Motor constant")
         try bounded(i.dampingNsPerM,0,100000,"Damping")
         try bounded(i.durationSeconds,0.1,12,"Duration")
+        if let powerOff=i.powerOffAtSeconds {try bounded(powerOff,0,i.durationSeconds,"Power-off event time")}
         try bounded(requestedStepSeconds,0.0001,0.05,"Step")
         if let thermal=i.thermal {
             try bounded(thermal.initialTemperatureK,1,1500,"Initial temperature")
