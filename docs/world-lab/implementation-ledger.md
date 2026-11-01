@@ -789,3 +789,8 @@ release-candidate evidence bundle are unfinished.
 - Marked the multi-part snapping coordinate map as throwing so invalid/out-of-world coordinates propagate through Swift's error boundary.
 - Extracted the SwiftUI snap and two-part measurement controls from the main CAD VStack into typed subviews, and replaced fragile multi-line string concatenation with bounded formatted measurement rows.
 - These edits address the Swift compiler errors identified in NativeWorldLabEditor.swift and NativeWorldLabView.swift. The iOS build and simulator/accessibility reruns are still required.
+
+## Android Compose compiler method-size correction — 2026-11-01
+- The authoritative Android CI run exposed a Kotlin backend bytecode failure: the accumulated native feature UI made NativeWorldLabForm exceed the JVM method-size limit. This was not a solver or CAD numerical failure; compilation stopped before unit tests and rendered-preview assertions could execute.
+- Split the largest digital/circuit panel and selected-solid workspace (including CAD, collision, material, fluid and motion controls) into independent Compose lambdas. The existing state, callbacks, view order, features and native screen remain intact; no controls or test assertions were removed.
+- The next authoritative Android run must confirm both debug/release compilation and Kotlin tests/lint. The Android preview must then repeat its real rendered/touch assertions; this source correction is not itself a CI pass.
