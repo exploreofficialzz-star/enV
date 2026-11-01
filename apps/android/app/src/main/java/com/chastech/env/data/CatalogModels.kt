@@ -79,6 +79,39 @@ fun JSONObject.toToolRecord(): ToolRecord {
     )
 }
 
+private val retiredDesignBuildCalculatorIds = setOf(
+    "math-exp-sum-math-design-build-delivery-effort-a",
+    "math-exp-sum-math-design-build-delivery-effort-b",
+    "math-exp-sum-math-design-build-delivery-effort-c",
+    "math-exp-sum-engineering-design-build-delivery-effort-a",
+    "math-exp-sum-engineering-design-build-delivery-effort-b",
+    "math-exp-sum-engineering-design-build-delivery-effort-c",
+    "math-exp-sum-business-design-build-delivery-effort-a",
+    "math-exp-sum-business-design-build-delivery-effort-b",
+    "math-exp-sum-business-design-build-delivery-effort-c",
+    "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-a",
+    "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-b",
+    "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-c",
+    "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-a",
+    "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-b",
+    "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-c",
+    "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-a",
+    "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-b",
+    "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-c",
+    "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-a",
+    "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-b",
+    "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-c",
+    "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-a",
+    "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-b",
+    "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-c",
+    "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-a",
+    "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-b",
+    "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-c",
+    "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-a",
+    "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-b",
+    "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-c",
+)
+
 fun Catalog.Companion.fromJson(raw: String): Catalog {
     val root = JSONObject(raw)
     val categoriesJson = root.optJSONArray("categories") ?: JSONArray()
@@ -88,8 +121,11 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
         val tool = toolsJson.getJSONObject(i).toToolRecord()
         add(tool)
     } }
-    val tools = allTools.filterNot { NativeCopy.isWebRuntimeOnly(it.id) }
-    val relatedReferenceTools = allTools.filter { NativeCopy.isWebRuntimeOnly(it.id) }
+    // These formula exercises were incorrectly generated from Design/Build terminology.
+    // Exclude them from both direct browsing and related/search references, including stale bundles.
+    val availableTools = allTools.filterNot { it.id in retiredDesignBuildCalculatorIds }
+    val tools = availableTools.filterNot { NativeCopy.isWebRuntimeOnly(it.id) }
+    val relatedReferenceTools = availableTools.filter { NativeCopy.isWebRuntimeOnly(it.id) }
     val planned = tools.count { it.status.equals("planned", ignoreCase = true) }
     val active = tools.count { it.status.equals("active", ignoreCase = true) }
     return Catalog(
