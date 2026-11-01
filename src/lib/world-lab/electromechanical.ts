@@ -60,7 +60,7 @@ export type ActuatorSample = Readonly<{
 export type ActuatorRun = Readonly<{
   format: "env-world-lab-actuator-run";
   schemaVersion: 1;
-  modelVersion: "1.0.0" | "1.1.0";
+  modelVersion: "1.0.0" | "1.1.0" | "1.2.0";
   evidence: "physics-model-computed";
   validity: string;
   source: ActuatorSource;
@@ -170,9 +170,13 @@ function oneSegment(s:State,i:ActuatorInput,dt:number,startSeconds:number):Integ
 /** Split a solver interval at an opening event so the discontinuity is integrated at its actual time. */
 function advance(s:State,i:ActuatorInput,dt:number,startSeconds:number):Readonly<{state:State;segments:readonly IntegratedSegment[]}> {
   const cutoff=i.powerOffAtSeconds;
-  if(cutoff!==undefined&&cutoff!==null&&cutoff>startSeconds+1e-12&&cutoff<startSeconds+dt-1e-12){
-    const first=oneSegment(s,i,cutoff-startSeconds,startSeconds);
-    const second=oneSegment(first.after,i,startSeconds+dt-cutoff,cutoff);
+  if(cutoff!==undefined&&cutoff!==null&&cutoff>startSeconds+1e-12&&cutoff<=startSeconds+dt+1e-12){
+    const beforeSwitch=Object.freeze({...i,powerOffAtSeconds:null});
+    const afterSwitch=Object.freeze({...i,supplyVoltageV:0,powerOffAtSeconds:null});
+    const first=oneSegment(s,beforeSwitch,cutoff-startSeconds,startSeconds);
+    const remaining=startSeconds+dt-cutoff;
+    if(remaining<=1e-12)return Object.freeze({state:first.after,segments:Object.freeze([first])});
+    const second=oneSegment(first.after,afterSwitch,remaining,cutoff);
     return Object.freeze({state:second.after,segments:Object.freeze([first,second])});
   }
   const segment=oneSegment(s,i,dt,startSeconds);
@@ -205,7 +209,8 @@ export function runActuatorExperiment(
   for(let j=0;j<=n;j++){
     const [h,v,c,t]=state;
     const r=resistanceAt(input,t);
-    const sourcePower=input.supplyVoltageV*c;
+    const sourceVoltage=supplyVoltageAt(input,j*dt);
+    const sourcePower=sourceVoltage*c;
     const heat=r*c*c;
     const cooling=input.thermal?input.thermal.coolingWPerK*(t-input.thermal.ambientTemperatureK):0;
     const ke=0.5*input.massKg*v*v,pe=input.massKg*input.gravityMps2*h;
@@ -219,7 +224,7 @@ export function runActuatorExperiment(
     samples.push(Object.freeze({
       timeSeconds:j*dt,heightM:h,velocityMps:v,coilCurrentA:c,
       backEmfV:input.forceConstantNPerA*v,motorForceN:input.forceConstantNPerA*c,
-      sourcePowerW:sourcePower,sourceVoltageV:supplyVoltageAt(input,t),resistiveHeatW:heat,
+      sourcePowerW:sourcePower,sourceVoltageV:sourceVoltage,resistiveHeatW:heat,
       ...(input.thermal?{coilResistanceOhm:r,coilTemperatureK:t,
         thermalEnergyJ:thermalEnergy,coolingPowerW:cooling}:{}),
       kineticEnergyJ:ke,gravitationalEnergyJ:pe,magneticEnergyJ:magnetic,
