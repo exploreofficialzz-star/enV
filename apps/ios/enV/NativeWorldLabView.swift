@@ -898,7 +898,8 @@ struct NativeWorldLabView:View {
                 worldEpochUTC:ISO8601DateFormatter().string(from:worldEpochUTC),
                 solverInternalTimeSeconds:seconds,displaySampleTimeSeconds:seconds,
                 playbackRate:speed,playbackDirection:reversePlayback ? "reverse-recording":"forward",
-                timezoneDisplay:TimeZone.current.identifier)
+                timezoneDisplay:TimeZone.current.identifier,
+                solverStepSeconds:values?.solverStepSeconds ?? 1.0/240.0)
             timelineCheckpointFile=NativeWorldLabJsonFile(content:try checkpoint.encodeBounded())
             exportingTimelineCheckpoint=true;timelineStatus=""
         }catch{problem=error.localizedDescription;timelineStatus=""}

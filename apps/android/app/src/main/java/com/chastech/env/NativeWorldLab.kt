@@ -1585,7 +1585,8 @@ fun NativeWorldLabForm() {
                             solverInternalTimeSeconds=time.toDouble(),displaySampleTimeSeconds=time.toDouble(),
                             playbackRate=speed.toDouble(),
                             playbackDirection=if(reversePlayback)"reverse-recording" else "forward",
-                            timezoneDisplay=java.time.ZoneId.systemDefault().id))
+                            timezoneDisplay=java.time.ZoneId.systemDefault().id,
+                            solverStepSeconds=observation?.solverStepSeconds?:1.0/240.0))
                     timelineExportPicker.launch("world-lab-time-checkpoint.json")
                 }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
             }){Text("Save checkpoint")}

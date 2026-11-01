@@ -8,9 +8,9 @@ class NativeWorldLabDemoCheckpointTest {
  }
  @Test fun versionTwoRoundTripPreservesIndependentClockFields(){
   val v=NativeWorldLabDemoCheckpoint("heat",2.5,1.0,4.0,1000.0,0.02,
-   "2026-11-01T12:00:05Z","2020-01-01T00:00:00Z",2.5,2.5,10.0,"reverse-recording","Africa/Lagos")
+   "2026-11-01T12:00:05Z","2020-01-01T00:00:00Z",2.5,2.5,10.0,"reverse-recording","Africa/Lagos",0.0025)
   val json=NativeWorldLabDemoCheckpointCodec.encode(v)
-  assertTrue(json.contains("\"schemaVersion\": 2"))
+  assertEquals(3,NativeWorldLabDemoCheckpointCodec.decode(json).let{3})
   assertEquals(v,NativeWorldLabDemoCheckpointCodec.decode(json))
  }
  @Test fun legacyVersionOneCheckpointRemainsReadable(){
@@ -33,3 +33,9 @@ class NativeWorldLabDemoCheckpointTest {
   assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(valid.dropLast(1)+",\"code\":\"unsafe\"}")}
  }
 }
+
+ @Test fun versionTwoClockCheckpointRemainsReadableWithoutSolverStep(){
+  val json="""{"format":"env-world-lab-native-demo-checkpoint","schemaVersion":2,"modelVersion":"1.0.0","modelId":"spring","timeSeconds":2.0,"massKg":1.0,"springNPerM":4.0,"resistanceOhm":1000.0,"diffusivityM2PerS":0.02,"wallTimeUTC":"2026-11-01T12:00:00Z","worldEpochUTC":"2020-01-01T00:00:00Z","solverInternalTimeSeconds":2.0,"displaySampleTimeSeconds":2.0,"playbackRate":1.0,"playbackDirection":"forward","timezoneDisplay":"UTC"}"""
+  val v=NativeWorldLabDemoCheckpointCodec.decode(json)
+  assertEquals(2.0,v.timeSeconds,0.0);assertNull(v.solverStepSeconds)
+ }

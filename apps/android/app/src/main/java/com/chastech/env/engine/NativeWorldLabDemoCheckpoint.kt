@@ -8,30 +8,33 @@ data class NativeWorldLabDemoCheckpoint(
  val springNPerM:Double,val resistanceOhm:Double,val diffusivityM2PerS:Double,
  val wallTimeUTC:String?=null,val worldEpochUTC:String?=null,
  val solverInternalTimeSeconds:Double?=null,val displaySampleTimeSeconds:Double?=null,
- val playbackRate:Double?=null,val playbackDirection:String?=null,val timezoneDisplay:String?=null
+ val playbackRate:Double?=null,val playbackDirection:String?=null,val timezoneDisplay:String?=null,
+ val solverStepSeconds:Double?=null
 )
 object NativeWorldLabDemoCheckpointCodec {
  const val FORMAT="env-world-lab-native-demo-checkpoint"
  const val MODEL_VERSION="1.0.0"
  private val baseKeys=setOf("format","schemaVersion","modelVersion","modelId","timeSeconds","massKg","springNPerM","resistanceOhm","diffusivityM2PerS")
  private val clockKeys=setOf("wallTimeUTC","worldEpochUTC","solverInternalTimeSeconds","displaySampleTimeSeconds","playbackRate","playbackDirection","timezoneDisplay")
+ private val versionThreeClockKeys=clockKeys+"solverStepSeconds"
  fun encode(v:NativeWorldLabDemoCheckpoint):String {
   validate(v)
   val fields=listOf(v.wallTimeUTC,v.worldEpochUTC,v.solverInternalTimeSeconds,v.displaySampleTimeSeconds,v.playbackRate,v.playbackDirection,v.timezoneDisplay)
   require(fields.all{it==null}||fields.all{it!=null}){"Clock checkpoint fields must be all present or all absent"}
-  val version=if(fields.all{it!=null})2 else 1
+  val version=if(fields.all{it!=null}){if(v.solverStepSeconds!=null)3 else 2}else 1
   val o=JSONObject().put("format",FORMAT).put("schemaVersion",version).put("modelVersion",MODEL_VERSION)
    .put("modelId",v.modelId).put("timeSeconds",v.timeSeconds).put("massKg",v.massKg)
    .put("springNPerM",v.springNPerM).put("resistanceOhm",v.resistanceOhm).put("diffusivityM2PerS",v.diffusivityM2PerS)
   if(version==2)o.put("wallTimeUTC",v.wallTimeUTC).put("worldEpochUTC",v.worldEpochUTC)
    .put("solverInternalTimeSeconds",v.solverInternalTimeSeconds).put("displaySampleTimeSeconds",v.displaySampleTimeSeconds)
    .put("playbackRate",v.playbackRate).put("playbackDirection",v.playbackDirection).put("timezoneDisplay",v.timezoneDisplay)
+  if(version==3)o.put("solverStepSeconds",v.solverStepSeconds)
   return o.toString(2)
  }
  fun decode(json:String):NativeWorldLabDemoCheckpoint {
   require(json.toByteArray(Charsets.UTF_8).size<=16*1024){"Timeline checkpoint exceeds 16 KB"}
   val o=JSONObject(json);val version=o.getInt("schemaVersion")
-  val expected=when(version){1->baseKeys;2->baseKeys+clockKeys;else->throw IllegalArgumentException("Unsupported timeline checkpoint version")}
+  val expected=when(version){1->baseKeys;2->baseKeys+clockKeys;3->baseKeys+versionThreeClockKeys;else->throw IllegalArgumentException("Unsupported timeline checkpoint version")}
   require(o.keys().asSequence().toSet()==expected){"Unexpected or missing timeline checkpoint fields"}
   require(o.getString("format")==FORMAT&&o.getString("modelVersion")==MODEL_VERSION){"Unsupported timeline checkpoint format"}
   val v=NativeWorldLabDemoCheckpoint(o.getString("modelId"),number(o,"timeSeconds"),number(o,"massKg"),
@@ -42,7 +45,8 @@ object NativeWorldLabDemoCheckpointCodec {
    if(version==2)number(o,"displaySampleTimeSeconds") else null,
    if(version==2)number(o,"playbackRate") else null,
    if(version==2)o.getString("playbackDirection") else null,
-   if(version==2)o.getString("timezoneDisplay") else null)
+   if(version>=2)o.getString("timezoneDisplay") else null,
+   if(version>=3)number(o,"solverStepSeconds") else null)
   validate(v);return v
  }
  private fun number(o:JSONObject,key:String):Double {
@@ -65,6 +69,7 @@ object NativeWorldLabDemoCheckpointCodec {
    require(v.displaySampleTimeSeconds!!.isFinite()&&v.displaySampleTimeSeconds in 0.0..12.0)
    require(v.playbackRate!!.isFinite()&&v.playbackRate in 0.01..100.0)
    require(v.playbackDirection in setOf("forward","reverse-recording"))
+   if(v.solverStepSeconds!=null)require(v.solverStepSeconds.isFinite()&&v.solverStepSeconds in 1e-9..12.0)
    require(!v.timezoneDisplay.isNullOrBlank()&&v.timezoneDisplay.length<=120)
    ZoneId.of(v.timezoneDisplay)
   }
