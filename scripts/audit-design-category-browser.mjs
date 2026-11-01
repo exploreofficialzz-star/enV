@@ -34,6 +34,8 @@ try {
   const response = await page.goto(baseUrl + "/tools/design", { waitUntil: "domcontentloaded", timeout: 60000 });
   assert.ok(response && response.ok(), "Design category route should respond successfully");
   await page.getByText("enV Design workspace", { exact: true }).waitFor({ state: "visible" });
+  // Wait for the client-side explorer to hydrate before exercising controlled React inputs.
+  await page.waitForLoadState("networkidle", { timeout: 30000 });
 
   const cards = page.locator('a[href^="/tools/design/"]');
   const cardCount = await cards.count();
@@ -46,7 +48,13 @@ try {
   assert.equal(new Set(hrefs).size, hrefs.length, "Every Design tool card should have a unique route");
 
   const search = page.getByRole("textbox", { name: "Search design tools" });
+  await search.click();
   await search.fill("Gradient Token Generator");
+  await page.waitForFunction(() => {
+    const status = [...document.querySelectorAll('[aria-live="polite"]')]
+      .find((element) => /tools? found/.test(element.textContent ?? ""));
+    return status && status.textContent?.trim() !== "122 tools found";
+  }, { timeout: 10000 });
   const generatedGradientToken = page.locator('a[href="/tools/design/gradient-token-generator"]');
   await generatedGradientToken.waitFor({ state: "visible" });
   assert.equal(await cards.count(), 1, "Search should find the generated Gradient Token Generator alone");
