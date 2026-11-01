@@ -8,25 +8,27 @@ const run=()=>runExperiment({kind:"damped-oscillator",massKg:1,springNPerM:4,dam
 test("wall, world, simulation, solver, display and playback clocks remain separate",()=>{
  const r=run(),state=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00.000Z",simulationTimeSeconds:0.203,playbackRate:10});
  assert.equal(state.wallTimeUTC,"2026-11-01T12:00:00.000Z");
- assert.equal(state.simulationTimeSeconds,0.2);
+ assert.equal(state.simulationTimeSeconds,0.203);
  assert.equal(state.solverInternalTimeSeconds,0.2);
  assert.equal(state.displaySampleTimeSeconds,0.2);
- assert.equal(state.worldDateUTC,"2000-01-01T00:00:00.200Z");
+ assert.equal(state.worldDateUTC,"2000-01-01T00:00:00.203Z");
  assert.equal(state.playbackRate,10);
 });
 test("pause advances wall time without advancing world or simulation clocks",()=>{
  const r=run(),state=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.2,paused:true});
  const next=advanceTimeEngine(r,state,5);
  assert.equal(next.wallTimeUTC,"2026-11-01T12:00:05.000Z");
- assert.equal(next.simulationTimeSeconds,0.2);assert.equal(next.worldDateUTC,state.worldDateUTC);
+ assert.equal(next.simulationTimeSeconds,0.203);assert.equal(next.worldDateUTC,state.worldDateUTC);
 });
 test("forward and reverse replay traverse actual stored samples only",()=>{
  const r=run(),start=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",paused:false});
  const forward=advanceTimeEngine(r,start,0.025);
- assert.equal(forward.simulationTimeSeconds,0.02);
+ assert.equal(forward.simulationTimeSeconds,0.025);
+ assert.equal(forward.displaySampleTimeSeconds,0.02);
  const reverseState=withTimeEngineDirection(forward,"reverse-recording");
  const reverse=advanceTimeEngine(r,reverseState,0.011);
- assert.equal(reverse.simulationTimeSeconds,0.01);
+ assert.equal(reverse.simulationTimeSeconds,0.014);
+ assert.equal(reverse.displaySampleTimeSeconds,0.01);
  assert.equal(reverse.fidelity,"cached-recording-reverse");
  assert.equal(reverse.direction,"reverse-recording");
  assert.equal(stepTimeEngine(r,reverse,1).simulationTimeSeconds,0.02);
@@ -45,4 +47,10 @@ test("invalid clock speeds and timezones are rejected",()=>{
  const r=run();
  assert.throws(()=>createTimeEngineState(r,{playbackRate:0}),/Playback rate/);
  assert.throws(()=>createTimeEngineState(r,{timezoneDisplay:"Nowhere/Unknown"}),/timezone/);
+});
+test("slow playback accumulates wall-time fractions instead of sticking on one frame",()=>{
+ const r=run();let clock=createTimeEngineState(r,{playbackRate:0.1,paused:false});
+ for(let i=0;i<100;i++)clock=advanceTimeEngine(r,clock,0.016);
+ assert.ok(clock.simulationTimeSeconds>0.1);
+ assert.equal(clock.displaySampleTimeSeconds,0.1);
 });

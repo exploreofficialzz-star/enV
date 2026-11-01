@@ -35,6 +35,7 @@ import {WorldLabRadiationPanel} from "./radiation-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
 import {advanceEventSafeTime,nextEventTime,previousEventTime} from "@/lib/world-lab/timeline";
+import {advanceTimeEngine,createTimeEngineState,withTimeEngineDirection,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
 import type {GravityConfig,GravityFrame,GravityBody,GravityRun} from "@/lib/world-lab/gravity";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
@@ -162,6 +163,8 @@ export default function WorldLab() {
   const [dirty, setDirty] = useState(false);
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [playbackDirection,setPlaybackDirection]=useState<TimeEngineDirection>("forward");
+  const [timezoneDisplay,setTimezoneDisplay]=useState("Africa/Lagos");
   const [playing, setPlaying] = useState(false);
   const [seeInside, setSeeInside] = useState(false);
   const [fieldLayerId,setFieldLayerId]=useState("");
@@ -906,14 +909,17 @@ export default function WorldLab() {
     const tick = (now: number) => {
       if (lastFrame.current !== null) {
         const elapsed = Math.max(0, Math.min(0.25, (now - lastFrame.current) / 1000));
-        setTimeSeconds((value) => advancePlayback(value, elapsed, playbackRate, currentRun.time.simulatedDurationSeconds));
+        setTimeSeconds((value) => advanceTimeEngine(currentRun,
+          createTimeEngineState(currentRun,{wallTimeUTC:new Date().toISOString(),
+            simulationTimeSeconds:value,playbackRate,direction:playbackDirection,
+            paused:false,timezoneDisplay}),elapsed).simulationTimeSeconds);
       }
       lastFrame.current = now;
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(frame); lastFrame.current = null; };
-  }, [playing, currentRun, playbackRate]);
+  }, [playing, currentRun, playbackRate,playbackDirection,timezoneDisplay]);
   useEffect(() => {
     if (currentRun && timeSeconds >= currentRun.time.simulatedDurationSeconds) setPlaying(false);
   }, [currentRun, timeSeconds]);
@@ -958,9 +964,11 @@ export default function WorldLab() {
     setActuatorPlaying(false);
     setError("");
     try {
+      const startedAtUTC=new Date().toISOString();
       const next = runExperiment(input, {
         id: window.crypto.randomUUID(), parentRunId: currentRun?.id ?? null,
-        worldDateUTC: new Date().toISOString(), assumedMassSource: source,
+        sourceRun:currentRun,startedAtUTC,
+        worldDateUTC: startedAtUTC, assumedMassSource: source,
       });
       setRuns((previous) => [...previous.slice(-19), next]);
       setWorkspaceDirty(true);
@@ -972,6 +980,7 @@ export default function WorldLab() {
       setRunId(next.id);
       setComparisonRunId("");
       setTimeSeconds(0);
+      setPlaybackDirection("forward");
       setDirty(false);
       setPlaying(true);
       setMessage(source
@@ -3675,7 +3684,10 @@ export default function WorldLab() {
           </div>
           <button type="button" className={buttonClass+" bg-foreground text-background"} onClick={start}>Start / Recalculate</button>
           <WorldLabTimeController run={currentRun} timeSeconds={timeSeconds} playing={playing}
-            rate={playbackRate} onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
+            rate={playbackRate} direction={playbackDirection} onDirectionChange={setPlaybackDirection}
+            timezoneDisplay={timezoneDisplay} onTimezoneDisplayChange={setTimezoneDisplay}
+            wallTimeUTC={new Date().toISOString()}
+            onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
             onRateChange={setPlaybackRate}
             onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}/>
           {runs.length > 0 && (

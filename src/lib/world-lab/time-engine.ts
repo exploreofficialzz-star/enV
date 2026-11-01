@@ -54,8 +54,8 @@ export function createTimeEngineState(run:LabRun,options:Partial<{
  if(!["forward","reverse-recording"].includes(direction)||!timezoneIsValid(timezone))
   throw new Error("Playback direction or display timezone is unsupported.");
  return Object.freeze({
-  wallTimeUTC:wall,worldDateUTC:worldDateAt(run,sample.simulatedSeconds),
-  simulationTimeSeconds:sample.simulatedSeconds,
+  wallTimeUTC:wall,worldDateUTC:worldDateAt(run,requested),
+  simulationTimeSeconds:requested,
   solverInternalTimeSeconds:sample.simulatedSeconds,
   displaySampleTimeSeconds:sample.simulatedSeconds,
   playbackRate:rate,direction,paused:options.paused??true,timezoneDisplay:timezone,
@@ -64,9 +64,9 @@ export function createTimeEngineState(run:LabRun,options:Partial<{
 }
 export function seekTimeEngine(run:LabRun,state:TimeEngineState,targetSeconds:number):TimeEngineState{
  const {sample}=nearestSample(run,targetSeconds);
- return Object.freeze({...state,simulationTimeSeconds:sample.simulatedSeconds,
+ return Object.freeze({...state,simulationTimeSeconds:targetSeconds,
   solverInternalTimeSeconds:sample.simulatedSeconds,displaySampleTimeSeconds:sample.simulatedSeconds,
-  worldDateUTC:worldDateAt(run,sample.simulatedSeconds),paused:true});
+  worldDateUTC:worldDateAt(run,targetSeconds),paused:true});
 }
 export function stepTimeEngine(run:LabRun,state:TimeEngineState,direction:-1|1):TimeEngineState{
  const next=stepRecordedTime(run,state.simulationTimeSeconds,direction);
@@ -87,8 +87,8 @@ export function advanceTimeEngine(run:LabRun,state:TimeEngineState,elapsedWallSe
  }
  const {sample}=nearestSample(run,next);
  return Object.freeze({...state,wallTimeUTC,
-  simulationTimeSeconds:sample.simulatedSeconds,solverInternalTimeSeconds:sample.simulatedSeconds,
-  displaySampleTimeSeconds:sample.simulatedSeconds,worldDateUTC:worldDateAt(run,sample.simulatedSeconds),
+  simulationTimeSeconds:next,solverInternalTimeSeconds:sample.simulatedSeconds,
+  displaySampleTimeSeconds:sample.simulatedSeconds,worldDateUTC:worldDateAt(run,next),
   fidelity:state.direction==="reverse-recording"?"cached-recording-reverse":"recorded-solver-samples"});
 }
 export function withTimeEngineDirection(state:TimeEngineState,direction:TimeEngineDirection):TimeEngineState{
@@ -100,7 +100,7 @@ export function createTimeEngineCheckpoint(run:LabRun,state:TimeEngineState):Tim
  const {index,sample}=nearestSample(run,state.simulationTimeSeconds);
  if(state.displaySampleTimeSeconds!==sample.simulatedSeconds||
     state.solverInternalTimeSeconds!==sample.simulatedSeconds||
-    state.worldDateUTC!==worldDateAt(run,sample.simulatedSeconds))
+    state.worldDateUTC!==worldDateAt(run,state.simulationTimeSeconds))
   throw new Error("Clock state does not match the selected recorded solver sample.");
  return Object.freeze({format:"env-world-lab-time-engine-checkpoint",schemaVersion:1,
   runId:run.id,modelId:run.modelId,modelVersion:run.modelVersion,
