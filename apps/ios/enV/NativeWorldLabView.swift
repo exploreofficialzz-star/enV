@@ -1868,16 +1868,23 @@ Text("Invent chemical heat").font(.headline)
                             value("Power residual",run.powerResidualW,"W")
                             ForEach(circuit.components,id:\.id){part in
                                 if let signed=run.branchCurrentsA[part.id] {
-                                    let forward=signed>1e-12
-                                    let reverse=signed < -1e-12
-                                    let fromId=forward ? part.positiveNodeId:part.negativeNodeId
-                                    let toId=forward ? part.negativeNodeId:part.positiveNodeId
-                                    let from=circuit.nodes.first(where:{$0.id==fromId})?.label ?? fromId
-                                    let to=circuit.nodes.first(where:{$0.id==toId})?.label ?? toId
-                                    Text(abs(signed)<=1e-12
-                                        ? part.id+": 0 A · no net branch current"
-                                        : part.id+": "+String(format:"%.6g",abs(signed))+" A · "+from+" → "+to)
-                                        .font(.caption)
+                                    if let flow=try? NativeWorldLabBranchCurrent.resolve(
+                                        positiveNodeId:part.positiveNodeId,
+                                        negativeNodeId:part.negativeNodeId,signedCurrentA:signed) {
+                                        if flow.direction == .zero {
+                                            Text(part.id+": 0 A · no net branch current").font(.caption)
+                                        } else {
+                                            let fromId=flow.fromNodeId ?? ""
+                                            let toId=flow.toNodeId ?? ""
+                                            let from=circuit.nodes.first(where:{$0.id==fromId})?.label ?? fromId
+                                            let to=circuit.nodes.first(where:{$0.id==toId})?.label ?? toId
+                                            Text(part.id+": "+String(format:"%.6g",flow.magnitudeA)+" A · "+from+" → "+to)
+                                                .font(.caption)
+                                        }
+                                    } else {
+                                        Text(part.id+": signed current outside supported display bounds")
+                                            .font(.caption)
+                                    }
                                 }
                             }
                             Text("Direction follows the calculated signed conventional branch current; these are circuit-topology indicators, not a measured 3D electromagnetic field.")
