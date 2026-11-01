@@ -28,6 +28,9 @@ import com.chastech.env.engine.NativeWorldLabDemoCheckpoint
 import com.chastech.env.engine.NativeWorldLabDemoCheckpointCodec
 import com.chastech.env.engine.nextWorldLabEventTime
 import com.chastech.env.engine.advanceWorldLabEventTime
+import com.chastech.env.engine.NativeWorldLabRecordedRun
+import com.chastech.env.engine.NativeWorldLabRecordedClock
+import com.chastech.env.engine.NativeWorldLabRecordedTime
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
 import com.chastech.env.engine.NativeChemicalThermalResult
@@ -191,9 +194,25 @@ fun NativeWorldLabForm() {
     var motorEntityId by remember { mutableStateOf<String?>(null) }
     var motorFrame by remember { mutableIntStateOf(0) }
     var motorPlaying by remember { mutableStateOf(false) }
+    var motorReversePlayback by remember { mutableStateOf(false) }
+    var motorRunIdentity by remember { mutableStateOf("") }
+    var motorClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
     var motorThermalEnabled by remember { mutableStateOf(false) }
     var motorPowerOffAtSeconds by remember { mutableStateOf<Double?>(null) }
     var motorSpeed by remember { mutableFloatStateOf(1f) }
+    val motorRecordedRun=remember(motorResult,motorRunIdentity,worldEpochUTC,motorPowerOffAtSeconds) {
+        motorResult?.let { result->
+            runCatching {
+                NativeWorldLabRecordedRun(
+                    runId=motorRunIdentity,modelId="native-actuator",modelVersion=result.modelVersion,
+                    worldEpochUTC=worldEpochUTC,
+                    sampleTimesSeconds=result.samples.map { it.timeSeconds },
+                    mandatoryEventTimesSeconds=if(result.modelVersion=="1.2.0")
+                        listOfNotNull(motorPowerOffAtSeconds) else emptyList()
+                ).also { it.validate() }
+            }.getOrNull()
+        }
+    }
     var warning by remember { mutableStateOf("") }
     var assemblyName by remember { mutableStateOf("My invention") }
     var secondAssemblyIndex by remember { mutableIntStateOf(0) }
@@ -567,6 +586,7 @@ fun NativeWorldLabForm() {
         // Edited/imported geometry and materials invalidate earlier hypothetical drop results.
         dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
         motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0;digitalMotor=null
+        motorRunIdentity="";motorClock=null;motorReversePlayback=false
         collisionPlaying=false;collisionRun=null;collisionTime=0f
         spherePlaying=false;sphereRun=null;sphereTime=0f
     }
@@ -621,13 +641,46 @@ fun NativeWorldLabForm() {
             if((collisionReversePlayback&&collisionTime<=0f)||(!collisionReversePlayback&&collisionTime>=run.durationSeconds.toFloat()))collisionPlaying=false
         }
     }
-    LaunchedEffect(motorPlaying,motorSpeed,motorResult) {
-        while(motorPlaying) {
+    LaunchedEffect(motorRecordedRun) {
+        val recording=motorRecordedRun
+        if(recording==null) {
+            motorClock=null;motorFrame=0;motorPlaying=false
+        } else {
+            motorClock=NativeWorldLabRecordedTime.start(recording,
+                java.time.Instant.now().toString(),java.time.ZoneId.systemDefault().id,
+                playbackRate=motorSpeed.toDouble(),
+                direction=if(motorReversePlayback)"reverse-recording" else "forward")
+            motorFrame=0
+        }
+    }
+    LaunchedEffect(motorRecordedRun,motorPlaying,motorSpeed,motorReversePlayback) {
+        val recording=motorRecordedRun?:return@LaunchedEffect
+        var previousNanos=System.nanoTime()
+        while(motorRecordedRun==recording) {
             delay(40)
-            val result=motorResult?:break
-            val stride=kotlin.math.max(1,kotlin.math.round(0.04f*motorSpeed/result.stepSeconds).toInt())
-            motorFrame=(motorFrame+stride).coerceAtMost(result.samples.lastIndex)
-            if(motorFrame==result.samples.lastIndex)motorPlaying=false
+            val now=System.nanoTime()
+            val elapsed=((now-previousNanos).coerceAtLeast(0L)/1_000_000_000.0).coerceIn(0.0,0.25)
+            previousNanos=now
+            val current=motorClock?:continue
+            val before=current.simulationTimeSeconds
+            val state=current.copy(playbackRate=motorSpeed.toDouble(),
+                direction=if(motorReversePlayback)"reverse-recording" else "forward",
+                paused=!motorPlaying)
+            val next=runCatching {
+                NativeWorldLabRecordedTime.advance(recording,state,elapsed,paused=!motorPlaying)
+            }.getOrElse { warning=it.message?: "Recorded motor clock rejected an invalid transition.";motorPlaying=false;continue }
+            motorClock=next
+            if(motorPlaying) {
+                motorFrame=next.sampleIndex
+                val hitEvent=recording.mandatoryEventTimesSeconds.any {
+                    kotlin.math.abs(it-next.simulationTimeSeconds)<=1e-9 &&
+                        kotlin.math.abs(it-before)>1e-9
+                }
+                val atEnd=next.simulationTimeSeconds>=recording.durationSeconds-1e-9
+                val atBeginning=next.simulationTimeSeconds<=1e-9
+                if(hitEvent || (motorReversePlayback&&atBeginning) || (!motorReversePlayback&&atEnd))
+                    motorPlaying=false
+            }
         }
     }
     LaunchedEffect(playing,speed,reversePlayback) {
@@ -1484,7 +1537,9 @@ fun NativeWorldLabForm() {
                                 thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
                             val result=NativeWorldLabActuator.evaluate(input)
                             motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
-                            motorResult=result;wiredMotor=null;digitalMotor=null;motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                            motorResult=result;wiredMotor=null;digitalMotor=null;motorEntityId=solid.id
+                            motorRunIdentity=java.util.UUID.randomUUID().toString()
+                            motorFrame=0;motorReversePlayback=false;motorPlaying=true
                             dropPlaying=false;playing=false;warning=""
                         }.onFailure{warning=it.message?:"This powered mechanism is outside the local solver limits."}
                     }) { Text("Power this solid") }
@@ -1501,7 +1556,8 @@ fun NativeWorldLabForm() {
                                     thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
                                 wiredMotor=connected;digitalMotor=null;motorResult=connected.motor
                                 motorAudit=NativeWorldLabActuator.numericalAudit(input,connected.motor)
-                                motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                                motorEntityId=solid.id;motorRunIdentity=java.util.UUID.randomUUID().toString()
+                                motorFrame=0;motorReversePlayback=false;motorPlaying=true
                                 dropPlaying=false;playing=false;warning=""
                             }.onFailure{warning=it.message?:"Connected motor cannot be calculated."}
                         }){Text("Wire motor to circuit")}
@@ -1517,7 +1573,8 @@ fun NativeWorldLabForm() {
                                         run.input,run.motor)
                                     digitalMotor=run;wiredMotor=null
                                     motorResult=run.motor;motorAudit=selfCheck
-                                    motorEntityId=solid.id;motorFrame=0;motorPlaying=true
+                                    motorEntityId=solid.id;motorRunIdentity=java.util.UUID.randomUUID().toString()
+                                    motorFrame=0;motorReversePlayback=false;motorPlaying=true
                                     dropPlaying=false;playing=false;warning=""
                                 }.onFailure{cause->
                                     digitalMotor=null
@@ -1578,15 +1635,68 @@ fun NativeWorldLabForm() {
                         motorAudit?.let { audit ->
                             Text("Numerical self-check: "+audit.status+". "+audit.explanation)
                         }
-                        Slider(value=motorFrame.toFloat(),onValueChange={
-                            motorPlaying=false;motorFrame=it.toInt().coerceIn(0,run.samples.lastIndex)
+                        Slider(value=motorFrame.toFloat(),onValueChange={value->
+                            motorPlaying=false
+                            val index=value.toInt().coerceIn(0,run.samples.lastIndex)
+                            motorRecordedRun?.let { recording->
+                                motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.seek(recording,clock,
+                                        recording.sampleTimesSeconds[index])
+                                    motorFrame=motorClock!!.sampleIndex
+                                } ?: run { motorFrame=index }
+                            } ?: run { motorFrame=index }
                         },valueRange=0f..run.samples.lastIndex.toFloat(),
-                            modifier=Modifier.semantics { contentDescription="Motor simulated time" })
-                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick={motorPlaying=!motorPlaying}) {
-                                Text(if(motorPlaying)"Pause motor" else "Play motor")
-                            }
-                            OutlinedButton(onClick={motorPlaying=false;motorFrame=0}){Text("Reset motor")}
+                            modifier=Modifier.semantics { contentDescription="Motor recorded sample position" })
+                        Text("Playback rate: "+labNumber(motorSpeed.toDouble())+"×")
+                        Slider(value=motorSpeed,onValueChange={motorSpeed=it},
+                            valueRange=0.01f..100f,modifier=Modifier.semantics {
+                                contentDescription="Motor recorded playback speed"
+                            })
+                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(onClick={
+                                motorPlaying=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.step(recording,clock,-1)
+                                    motorFrame=motorClock!!.sampleIndex
+                                }}
+                            }){Text("Prev")}
+                            OutlinedButton(onClick={
+                                motorPlaying=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.step(recording,clock,1)
+                                    motorFrame=motorClock!!.sampleIndex
+                                }}
+                            }){Text("Next")}
+                            OutlinedButton(onClick={
+                                motorReversePlayback=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    if(clock.simulationTimeSeconds>=recording.durationSeconds-1e-9){
+                                        motorClock=NativeWorldLabRecordedTime.seek(recording,clock,0.0);motorFrame=0
+                                    }
+                                }}
+                                motorPlaying=!motorPlaying
+                            }){Text(if(motorPlaying&&!motorReversePlayback)"Pause":"Play")}
+                            OutlinedButton(onClick={
+                                motorReversePlayback=true
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    if(clock.simulationTimeSeconds<=1e-9){
+                                        motorClock=NativeWorldLabRecordedTime.seek(recording,clock,recording.durationSeconds)
+                                        motorFrame=motorClock!!.sampleIndex
+                                    }
+                                }}
+                                motorPlaying=true
+                            }){Text("Rewind")}
+                            OutlinedButton(onClick={
+                                motorPlaying=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.seek(recording,clock,0.0);motorFrame=0
+                                }}
+                            }){Text("Beginning")}
+                        }
+                        motorClock?.let { clock->
+                            Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
+                                (clock.sampleIndex+1)+"/"+run.samples.size+" · world UTC "+clock.worldDateUTC,
+                                style=MaterialTheme.typography.bodySmall)
                         }
                         Text("Hypothetical values, coupled 1D coil and lift calculation. Not measured or certified.",
                             style=MaterialTheme.typography.bodySmall)
