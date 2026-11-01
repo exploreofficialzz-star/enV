@@ -22,7 +22,7 @@ This section records code that exists in the current implementation branch. It i
 
 **Important implementation details:**
 - Web PDF inspection, extraction, batch extraction, splitting, batch splitting, rotation and merging execute in a dedicated same-origin module Web Worker. Worker requests have a bounded execution deadline, explicit error handling, cancellation and termination. Node tests use the same operation functions through a direct local fallback; a browser without Web Workers fails closed rather than blocking the UI thread.
-- Web local PDF text extraction uses pinned `pdfjs-dist` 6.4.299 and its same-origin PDF.js worker. Each PDF is bounded to 200 MB, 250 pages and 150,000 extracted characters; text batches are bounded to 25 files, 300 MB and 5,000 source pages and are processed sequentially. Scanned image-only pages return no selectable text; Web OCR is not enabled.
+- Web local PDF text extraction uses pinned `pdfjs-dist` 6.4.299 and its same-origin PDF.js worker. Each PDF is bounded to 200 MB, 250 pages, 150,000 extracted characters and a two-minute processing deadline; text batches are bounded to 25 files, 300 MB and 5,000 source pages (counting full source page counts) and are processed sequentially. Blank or scanned image-only pages return no fabricated selectable text; Web OCR is not enabled.
 - The Web local database currently uses IndexedDB. OPFS is a planned enhancement, not a claimed dependency.
 - Android currently uses a SQLiteOpenHelper-backed store. Do not describe it as Room until the migration is implemented and tested.
 - The shared env.abook.archive.v1 ZIP format is used for portable local backup/restore. Import paths validate archive limits and remap imported IDs to avoid collisions.
