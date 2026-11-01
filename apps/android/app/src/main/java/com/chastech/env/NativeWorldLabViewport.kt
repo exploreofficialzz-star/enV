@@ -9,8 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusable
-import androidx.compose.ui.input.key.Key
+import androidx.compose.foundation.focusable
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +28,7 @@ import com.chastech.env.engine.NativeEnu
 import com.chastech.env.engine.NativeWorldLabGeodesy
 import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabProject
+import com.chastech.env.engine.NativeWorldLabCamera
 import kotlin.math.*
 
 private data class LabScreenPoint(val x:Float,val y:Float,val scale:Float,val depth:Double,val visible:Boolean)
@@ -124,13 +125,13 @@ fun NativeWorldLabViewport(
             .onPreviewKeyEvent{event->
                 if(event.type!=KeyEventType.KeyDown)return@onPreviewKeyEvent false
                 val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
-                when(event.key){
-                    Key.DirectionLeft->{yaw+=0.12f;true}
-                    Key.DirectionRight->{yaw-=0.12f;true}
-                    Key.DirectionUp->{elevation=(elevation+4f).coerceAtMost(80f);true}
-                    Key.DirectionDown->{elevation=(elevation-4f).coerceAtLeast(5f);true}
-                    Key.PageDown->{observerDepthMeters=(observerDepthMeters-step).coerceAtLeast(-20000f);true}
-                    Key.PageUp->{observerDepthMeters=(observerDepthMeters+step).coerceAtMost(20000f);true}
+                when(event.nativeKeyEvent.keyCode){
+                    AndroidKeyEvent.KEYCODE_DPAD_LEFT->{yaw+=0.12f;true}
+                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT->{yaw-=0.12f;true}
+                    AndroidKeyEvent.KEYCODE_DPAD_UP->{elevation=(elevation+4f).coerceAtMost(85f);true}
+                    AndroidKeyEvent.KEYCODE_DPAD_DOWN->{elevation=(elevation-4f).coerceAtLeast(-85f);true}
+                    AndroidKeyEvent.KEYCODE_PAGE_DOWN->{observerDepthMeters=(observerDepthMeters-step).coerceAtLeast(-20000f);true}
+                    AndroidKeyEvent.KEYCODE_PAGE_UP->{observerDepthMeters=(observerDepthMeters+step).coerceAtMost(20000f);true}
                     else->false
                 }
             }
