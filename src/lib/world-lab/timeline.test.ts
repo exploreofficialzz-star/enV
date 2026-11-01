@@ -7,3 +7,13 @@ test("mandatory event times are visited before high-speed playback continues",()
 test("recorded checkpoints preserve run identity and exact immutable sample state",()=>{const r=makeRun(),c=createRecordedTimelineCheckpoint(r,0.5);assert.equal(restoreRecordedTimelineCheckpoint(r,JSON.parse(JSON.stringify(c))),0.5);assert.throws(()=>restoreRecordedTimelineCheckpoint({...r,id:"other"},c),/different run/);const bad=JSON.parse(JSON.stringify(c));bad.state.positionM=999;assert.throws(()=>restoreRecordedTimelineCheckpoint(r,bad),/differs/);});
 
 test("checkpoint snaps a between-frame pause to its nearest stored solver sample",()=>{const r=makeRun();const c=createRecordedTimelineCheckpoint(r,0.503);assert.equal(c.simulatedSeconds,0.5);assert.equal(restoreRecordedTimelineCheckpoint(r,c),0.5);});
+
+test("contact navigation moves to the nearest previous or next recorded event",()=>{
+ const events=[2,0.5,1,1,Number.NaN,-1,99];
+ assert.equal(previousEventTime(0,5,events),0);
+ assert.equal(previousEventTime(1.8,5,events),1);
+ assert.equal(previousEventTime(4,5,events),2);
+ assert.equal(nextEventTime(0,5,events),0.5);
+ assert.equal(nextEventTime(1,5,events),2);
+ assert.equal(nextEventTime(2,5,events),5);
+});

@@ -34,7 +34,7 @@ import {WorldLabReferenceLayersPanel} from "./world-layers-panel";
 import {WorldLabRadiationPanel} from "./radiation-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
-import {advanceEventSafeTime} from "@/lib/world-lab/timeline";
+import {advanceEventSafeTime,nextEventTime,previousEventTime} from "@/lib/world-lab/timeline";
 import type {GravityConfig,GravityFrame,GravityBody,GravityRun} from "@/lib/world-lab/gravity";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
@@ -2946,15 +2946,27 @@ export default function WorldLab() {
                       {groupSample&&<p>Impacts completed at this moment: {groupSample.completedEvents}</p>}
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={buttonClass}
-                          onClick={()=>setGroupPlaying(v=>!v)}>
-                          {groupPlaying?"Pause group impact":"Play group impact"}
+                          onClick={()=>{setGroupPlaying(false);setGroupTime(0);}}>Beginning</button>
+                        <button type="button" className={buttonClass}
+                          disabled={!activeGroupRun.events.some(event=>event.atSeconds<groupTime-1e-9)}
+                          onClick={()=>{setGroupPlaying(false);setGroupTime(previousEventTime(groupTime,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));}}>
+                          Previous contact
                         </button>
                         <button type="button" className={buttonClass}
-                          onClick={()=>{setGroupPlaying(false);setGroupTime(0);}}>Reset group impact</button>
+                          onClick={()=>setGroupPlaying(v=>!v)}>
+                          {groupPlaying?"Pause":"Play"}
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setGroupPlaying(false);setGroupTime(nextEventTime(groupTime,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));}}>
+                          Next contact
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setGroupPlaying(false);setGroupTime(activeGroupRun.durationSeconds);}}>End</button>
                         <select className={inputLabel} aria-label="Group impact playback rate"
                           value={groupRate} onChange={e=>setGroupRate(Number(e.target.value))}>
-                          <option value={0.1}>0.1×</option><option value={1}>1×</option>
-                          <option value={4}>4×</option>
+                          <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
+                          <option value={1}>1×</option><option value={10}>10×</option>
+                          <option value={100}>100×</option>
                         </select>
                         <button type="button" className={buttonClass}
                           onClick={()=>downloadJson("world-lab-multi-sphere-evidence.json",activeGroupRun)}>
@@ -3074,18 +3086,27 @@ export default function WorldLab() {
                       </p>}
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={buttonClass}
-                          onClick={()=>setSpherePlaying(v=>!v)}>
-                          {spherePlaying?"Pause 3D impact":"Play 3D impact"}
+                          onClick={()=>{setSpherePlaying(false);setSphereTime(0);}}>Beginning</button>
+                        <button type="button" className={buttonClass}
+                          disabled={sphereTime<=1e-9}
+                          onClick={()=>{setSpherePlaying(false);setSphereTime(previousEventTime(sphereTime,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));}}>
+                          Previous contact
                         </button>
                         <button type="button" className={buttonClass}
-                          onClick={()=>{setSpherePlaying(false);setSphereTime(0);}}>
-                          Reset 3D impact
+                          onClick={()=>setSpherePlaying(v=>!v)}>
+                          {spherePlaying?"Pause":"Play"}
                         </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setSpherePlaying(false);setSphereTime(nextEventTime(sphereTime,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));}}>
+                          Next contact
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setSpherePlaying(false);setSphereTime(selectedSphereRun.durationSeconds);}}>End</button>
                         <select className={inputLabel} aria-label="Three-dimensional collision playback rate"
                           value={spherePlaybackRate} onChange={e=>setSpherePlaybackRate(Number(e.target.value))}>
-                          <option value={0.1}>0.1× slow</option>
-                          <option value={1}>1×</option>
-                          <option value={4}>4×</option>
+                          <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
+                          <option value={1}>1×</option><option value={10}>10×</option>
+                          <option value={100}>100×</option>
                         </select>
                         <button type="button" className={buttonClass}
                           onClick={()=>downloadJson("world-lab-spatial-sphere-impact.json",selectedSphereRun)}>
@@ -3179,18 +3200,27 @@ export default function WorldLab() {
                       </>}
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={buttonClass}
-                          onClick={()=>setCollisionPlaying(v=>!v)}>
-                          {collisionPlaying?"Pause collision":"Play collision"}
+                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(0);}}>Beginning</button>
+                        <button type="button" className={buttonClass}
+                          disabled={collisionTime<=1e-9}
+                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(previousEventTime(collisionTime,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));}}>
+                          Previous contact
                         </button>
                         <button type="button" className={buttonClass}
-                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(0);}}>
-                          Reset collision
+                          onClick={()=>setCollisionPlaying(v=>!v)}>
+                          {collisionPlaying?"Pause":"Play"}
                         </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(nextEventTime(collisionTime,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));}}>
+                          Next contact
+                        </button>
+                        <button type="button" className={buttonClass}
+                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(selectedCollision.durationSeconds);}}>End</button>
                         <select className={inputLabel} aria-label="Collision playback speed"
                           value={collisionPlaybackRate} onChange={e=>setCollisionPlaybackRate(Number(e.target.value))}>
-                          <option value={0.1}>0.1× slow</option>
-                          <option value={1}>1× normal</option>
-                          <option value={4}>4× fast</option>
+                          <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
+                          <option value={1}>1×</option><option value={10}>10×</option>
+                          <option value={100}>100×</option>
                         </select>
                         <button type="button" className={buttonClass}
                           onClick={()=>downloadJson("world-lab-two-body-collision-evidence.json",selectedCollision)}>
