@@ -9,7 +9,8 @@ import { describeExpansion } from "../src/lib/calc/expansion-rows.mjs";
 
 // Preserve the additive Audio Studio records that intentionally sit outside the generated base catalogue.
 const currentCatalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const audioStudioSupplement = currentCatalogSource.match(/\nconst audioStudioTools: ToolMeta\\[\\] = \\[([\\s\\S]*)$/)?.[0];
+const audioStudioSupplementStart = currentCatalogSource.indexOf("\\nconst audioStudioTools: ToolMeta[] = [");
+const audioStudioSupplement = audioStudioSupplementStart >= 0 ? currentCatalogSource.slice(audioStudioSupplementStart) : "";
 if (!audioStudioSupplement) throw new Error("Cannot regenerate the catalogue without preserving its Audio Studio supplement.");
 
 /** @typedef {[string, string, string, string, string, string, string, number, number, string?]} Tuple */
