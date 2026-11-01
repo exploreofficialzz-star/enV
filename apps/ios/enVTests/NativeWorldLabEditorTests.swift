@@ -380,7 +380,6 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.scaleGroupAroundCentroid(data,ids:["a","b"],factor:0))
     }
 
-}
 
     func testSketchExtrusionsHonorBasePlacementAndOrientation() throws {
         let data=try NativeWorldLabEditor.extrudeRectangle(NativeWorldLabEditor.blank(),
@@ -457,3 +456,39 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.importCADExchange(source,
             cadData:JSONSerialization.data(withJSONObject:wrong)))
     }
+
+
+    func testMultiSelectionSnapIsAtomicAndMatchesWebNegativeHalfGridRule() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"b")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"outside")
+        data=try NativeWorldLabEditor.positionSolid(data,id:"a",positionMeters:[0.25,-0.25,2.49])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"b",positionMeters:[3,4,12])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"outside",positionMeters:[8.25,0,0])
+        let before=try NativeWorldLabProject.decode(data)
+        let result=try NativeWorldLabEditor.snapSolids(data,ids:["a","b"],gridMeters:0.5)
+        let after=try NativeWorldLabProject.decode(result)
+        XCTAssertEqual(after.revision,before.revision+1)
+        XCTAssertEqual(after.entities.first(where:{$0.id=="a"})?.positionMeters,[0.5,0,2.5])
+        XCTAssertEqual(after.entities.first(where:{$0.id=="outside"})?.positionMeters,
+                       before.entities.first(where:{$0.id=="outside"})?.positionMeters)
+        XCTAssertThrowsError(try NativeWorldLabEditor.snapSolids(data,ids:["a","missing"],gridMeters:0.5))
+        XCTAssertThrowsError(try NativeWorldLabEditor.snapSolids(data,ids:["a","a"],gridMeters:0.5))
+        XCTAssertThrowsError(try NativeWorldLabEditor.snapSolids(data,ids:["a"],gridMeters:0))
+    }
+
+    func testSelectedGeometryMeasurementReportsThreeDimensionalAndHorizontalOffsets() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"b")
+        data=try NativeWorldLabEditor.positionSolid(data,id:"a",positionMeters:[0,0,0])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"b",positionMeters:[3,4,12])
+        let project=try NativeWorldLabProject.decode(data)
+        let measured=try NativeWorldLabEditor.measureCenters(project,fromId:"a",toId:"b")
+        XCTAssertEqual(measured.centerDistanceM,13,accuracy:1e-12)
+        XCTAssertEqual(measured.horizontalDistanceM,hypot(3,12),accuracy:1e-12)
+        XCTAssertEqual(measured.offsetXM,3,accuracy:1e-12)
+        XCTAssertEqual(measured.offsetYM,4,accuracy:1e-12)
+        XCTAssertEqual(measured.offsetZM,12,accuracy:1e-12)
+        XCTAssertThrowsError(try NativeWorldLabEditor.measureCenters(project,fromId:"a",toId:"a"))
+    }
+}
