@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10031,
-    "active": 10031,
+    "total": 10002,
+    "active": 10002,
     "planned": 0,
-    "offlineNative": 7788,
+    "offlineNative": 7758,
     "backendNative": 1614,
-    "webOnly": 629,
-    "missingActive": 629,
+    "webOnly": 630,
+    "missingActive": 630,
     "divergentActive": 0,
-    "fullyExecutable": 9402
+    "fullyExecutable": 9372
   },
   "tools": [
     {
@@ -1297,6 +1297,15 @@
       "status": "active",
       "category": "audio",
       "engine": "calculator",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "song-metadata-analyzer",
+      "name": "Song Metadata Analyzer",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
       "android": "offline-native",
       "ios": "offline-native"
     },
@@ -6768,7 +6777,7 @@
       "name": "Break-Even Calculator",
       "status": "active",
       "category": "calculators",
-      "engine": "business",
+      "engine": "calculator",
       "android": "offline-native",
       "ios": "offline-native"
     },
@@ -13876,276 +13885,6 @@
     {
       "id": "math-exercise-derivative-sine-D",
       "name": "Derivative Sine — Solve for D",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-business-design-build-delivery-effort-a",
-      "name": "Design / Build — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-engineering-design-build-delivery-effort-a",
-      "name": "Design / Build — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-math-design-build-delivery-effort-a",
-      "name": "Design / Build — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-business-design-build-delivery-effort-b",
-      "name": "Design / Build — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-engineering-design-build-delivery-effort-b",
-      "name": "Design / Build — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-math-design-build-delivery-effort-b",
-      "name": "Design / Build — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-business-design-build-delivery-effort-c",
-      "name": "Design / Build — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-engineering-design-build-delivery-effort-c",
-      "name": "Design / Build — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-math-design-build-delivery-effort-c",
-      "name": "Design / Build — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-a",
-      "name": "Design-Effort / Build-Effort — Solve for a",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-b",
-      "name": "Design-Effort / Build-Effort — Solve for b",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
-      "status": "active",
-      "category": "calculators",
-      "engine": "calculator",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-c",
-      "name": "Design-Effort / Build-Effort — Solve for c",
       "status": "active",
       "category": "calculators",
       "engine": "calculator",
@@ -64202,6 +63941,15 @@
       "ios": "backend-native"
     },
     {
+      "id": "age-calculator",
+      "name": "Age Calculator",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
       "id": "birthday-countdown",
       "name": "Birthday Countdown",
       "status": "active",
@@ -64222,6 +63970,15 @@
     {
       "id": "countdown",
       "name": "Countdown",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "date-calculator",
+      "name": "Date Calculator",
       "status": "active",
       "category": "datetime",
       "engine": "datetime",
@@ -64256,8 +64013,26 @@
       "ios": "offline-native"
     },
     {
+      "id": "duration-calculator",
+      "name": "Duration Calculator",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
       "id": "leap-year-checker",
       "name": "Leap Year Checker",
+      "status": "active",
+      "category": "datetime",
+      "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "meeting-time-planner",
+      "name": "Meeting Time Planner",
       "status": "active",
       "category": "datetime",
       "engine": "datetime",
@@ -64983,6 +64758,15 @@
       "engine": "cssgen",
       "android": "offline-native",
       "ios": "offline-native"
+    },
+    {
+      "id": "hex-color-converter",
+      "name": "HEX Color Converter",
+      "status": "active",
+      "category": "design",
+      "engine": "color",
+      "android": "web-only",
+      "ios": "web-only"
     },
     {
       "id": "hsl-converter",
@@ -90232,50 +90016,6 @@
     {
       "id": "audio-joiner-local",
       "name": "Local Audio Joiner",
-      "status": "active",
-      "category": "audio",
-      "engine": "audio",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "age-calculator",
-      "name": "Age Calculator",
-      "status": "active",
-      "category": "datetime",
-      "engine": "datetime",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "date-calculator",
-      "name": "Date Calculator",
-      "status": "active",
-      "category": "datetime",
-      "engine": "datetime",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "duration-calculator",
-      "name": "Duration Calculator",
-      "status": "active",
-      "category": "datetime",
-      "engine": "datetime",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "meeting-time-planner",
-      "name": "Meeting Time Planner",
-      "status": "active",
-      "category": "datetime",
-      "engine": "datetime",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "song-metadata-analyzer",
       "status": "active",
       "category": "audio",
       "engine": "audio",
