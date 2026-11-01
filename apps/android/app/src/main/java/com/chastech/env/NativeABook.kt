@@ -463,6 +463,21 @@ fun NativeABookScreen(){
     var pdfText by remember{mutableStateOf("")}
     var pendingPdf by remember{mutableStateOf<File?>(null)}
 
+    val exportZip=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
+        val source=pendingZip
+        if(uri!=null&&source!=null)runCatching{
+            context.contentResolver.openOutputStream(uri)?.use{out->source.inputStream().use{it.copyTo(out)}}?:throw IllegalStateException("Cannot write ZIP export")
+        }.onFailure{error=it.message?:"ZIP export failed"}
+        source?.delete();pendingZip=null
+    }
+    val exportPdf=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
+        val source=pendingPdf
+        if(uri!=null&&source!=null)runCatching{
+            context.contentResolver.openOutputStream(uri)?.use{out->source.inputStream().use{it.copyTo(out)}}?:throw IllegalStateException("Cannot write PDF")
+        }.onFailure{error=it.message?:"PDF export failed"}
+        source?.delete();pendingPdf=null
+    }
+
     fun reload(id:String?=selected,trashOnly:Boolean=showTrash){
         notes=db.notes(archived,trashOnly)
         val n=notes.firstOrNull{it.id==id}?:notes.firstOrNull()
@@ -672,20 +687,6 @@ fun NativeABookScreen(){
             context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(text)}?:throw IllegalStateException("Cannot write export")
         }.onFailure{error=it.message?:"Markdown export failed"}
     }
-    val exportZip=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
-        val source=pendingZip
-        if(uri!=null&&source!=null)runCatching{
-            context.contentResolver.openOutputStream(uri)?.use{out->source.inputStream().use{it.copyTo(out)}}?:throw IllegalStateException("Cannot write ZIP export")
-        }.onFailure{error=it.message?:"ZIP export failed"}
-        source?.delete();pendingZip=null
-    }
-    val exportPdf=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
-        val source=pendingPdf
-        if(uri!=null&&source!=null)runCatching{
-            context.contentResolver.openOutputStream(uri)?.use{out->source.inputStream().use{it.copyTo(out)}}?:throw IllegalStateException("Cannot write PDF")
-        }.onFailure{error=it.message?:"PDF export failed"}
-        source?.delete();pendingPdf=null
-    }
     LaunchedEffect(selected,title,body,notebook,tags,archived,showTrash){
         val id=selected?:return@LaunchedEffect
         delay(500);status="Saving on this device…"
@@ -706,7 +707,7 @@ fun NativeABookScreen(){
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
             Button(onClick={showTrash=false;archived=false;selectedPdfIds=emptySet();val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id,false)}){Text("New note")}
             OutlinedButton(onClick={exportMarkdown.launch("${title.ifBlank{"note"}}.md")},enabled=selected!=null){Text("Export .md")}
-            OutlinedButton(onClick={startLocalBackup}){Text("Export backup")}
+            OutlinedButton(onClick={startLocalBackup()}){Text("Export backup")}
             OutlinedButton(onClick={importArchivePicker.launch(arrayOf("*/*"))}){Text("Import backup")}
             OutlinedButton(onClick={showTrash=!showTrash;archived=false;notes=db.notes(false,showTrash);selected=null;title="";body="";files=emptyList();revisions=emptyList()}){Text(if(showTrash)"All notes" else "Trash")}
             if(!showTrash)OutlinedButton(onClick={archived=!archived;notes=db.notes(archived,false)}){Text(if(archived)"Hide archived" else "Archived")}
