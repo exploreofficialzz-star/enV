@@ -799,3 +799,10 @@ release-candidate evidence bundle are unfinished.
 - The observer camera regression file contained two pose tests after its class-closing brace; they are now members of NativeWorldLabCameraTest so JUnit discovers them instead of reporting an InvalidTestClassError.
 - Corrected the CAD merge test's revision expectation to assert the target revision plus one. Importing geometry is one edit on top of the target invention's existing revision, not a reset to revision one.
 - The Compose panels compiled in the latest run; the Kotlin test suite then reported these two test-source failures. Both are corrected and require a fresh exact-head Android rerun.
+
+## C/D CAD alignment and browser acceptance continuation — 2026-11-01
+- Android's native multi-part CAD panel now exposes Minimum, Center and Maximum alignment choices, matching the existing Kotlin engine, iOS SwiftUI menu and Web CAD controls. Each applies the selected rotated primitive bounds in one validated project revision; distribution remains a separate explicit action.
+- Android JUnit coverage exercises all three alignment modes with non-axis-aligned rotated bounds and rejects unsupported alignment values.
+- The Web CAD panel's grid and sketch fields now have explicit accessible names. The rendered Chromium acceptance has been extended to select two actual parts, snap them to a 0.5 m grid, verify the computed 3D/horizontal centre measurements, then export and inspect rectangle/circle extrusions using non-origin base centres and non-zero orientations.
+- The sketch browser cases validate the actual portable project coordinates/rotation arrays, not only the displayed labels. They do not imply a general B-rep CAD kernel or physical assembly joints.
+- These edits are source integration and require fresh exact-head World Lab browser, Web typecheck/build, Android unit/lint, Android game-preview, iOS simulator and native accessibility results before any acceptance status is upgraded.
