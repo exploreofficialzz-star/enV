@@ -86,6 +86,8 @@ test("palette swatch SVG export is self-contained, accessible and escapes labels
   assert.match(svg, /&lt;script&gt;/);
   assert.doesNotMatch(svg, /<script>/);
   assert.equal((svg.match(/<rect /g) ?? []).length, 4); // one canvas plus three valid swatches
+  const alphaSvg = buildPaletteSwatchesSvg(["rgba(0, 0, 0, 0.5)"]);
+  assert.match(alphaSvg, /fill="#808080"/, "transparent swatches should match their appearance on the white export canvas");
 });
 
 test("palette swatch SVG export rejects an empty or invalid palette", () => {
