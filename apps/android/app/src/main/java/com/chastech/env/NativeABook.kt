@@ -835,7 +835,7 @@ fun NativeABookScreen(){
         Text("Private notes and PDFs stored on this device.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Text(status,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(error.isNotBlank())Text(error,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
             Button(onClick={showTrash=false;archived=false;selectedPdfIds=emptySet();val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id,false)}){Text("New note")}
             OutlinedButton(onClick={exportMarkdown.launch("${title.ifBlank{"note"}}.md")},enabled=selected!=null){Text("Export .md")}
             OutlinedButton(onClick={startLocalBackup()}){Text("Export backup")}
@@ -857,7 +857,7 @@ fun NativeABookScreen(){
             OutlinedTextField(notebook,{notebook=it},label={Text("Notebook")},modifier=Modifier.fillMaxWidth(),singleLine=true,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
             OutlinedTextField(tags,{tags=it},label={Text("Tags · comma separated")},modifier=Modifier.fillMaxWidth(),singleLine=true,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
             OutlinedTextField(body,{body=it},label={Text("Write a note")},modifier=Modifier.fillMaxWidth().heightIn(min=180.dp),minLines=7,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                 val selectedNote=notes.firstOrNull{it.id==selected}
                 if(selectedNote?.deletedAt!=null){
                     OutlinedButton(onClick={db.restore(selectedNote.id);showTrash=false;reload(selectedNote.id,false)}){Text("Restore")}
@@ -885,7 +885,7 @@ fun NativeABookScreen(){
             }
             val selectedCount=selectedPdfFiles().size
             OutlinedTextField(splitPageGroups,{splitPageGroups=it},label={Text("PDF split groups · e.g. 1-3;4-6")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                 OutlinedButton(onClick={mergeSelectedPdfs()},enabled=selectedCount>=2){Text("Merge selected")}
                 OutlinedButton(onClick={rotateSelectedPdfs()},enabled=selectedCount>=1){Text("Rotate batch")}
                 OutlinedButton(onClick={splitActivePdf()},enabled=selectedCount>=1){Text("Split selected PDFs")}
@@ -895,7 +895,7 @@ fun NativeABookScreen(){
                 Text(f.name,style=MaterialTheme.typography.titleSmall)
                 OutlinedTextField(extractPageRange,{extractPageRange=it},label={Text("Extract pages · e.g. 1-3,5")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                 OutlinedButton(onClick={extractSelectedPdfPages()}){Text("Extract selected pages")}
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedButton(onClick={launchPdfProcessing{
                         status="Extracting PDF text locally…";error=""
                         val result=withContext(Dispatchers.IO){runCatching{PDFBoxResourceLoader.init(context);PDDocument.load(local).use{doc->"Pages: ${doc.numberOfPages}\n\n"+PDFTextStripper().getText(doc).take(150000)}}}
