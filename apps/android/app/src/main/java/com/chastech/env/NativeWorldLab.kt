@@ -1219,6 +1219,7 @@ fun NativeWorldLabForm() {
                 }
                 NativeWorldLabMultiSpherePanel(project!!){ warning=it }
                 NativeWorldLabGravityPanel(project!!){ warning=it }
+                NativeWorldLabWavePanel(project!!){ warning=it }
                 NativeWorldLabOpticsPanel(project!!){ warning=it }
                 NativeWorldLabRayPanel(project!!){ warning=it }
                 NativeWorldLabHeatPanel(project!!){ warning=it }
