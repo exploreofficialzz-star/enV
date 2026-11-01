@@ -1260,6 +1260,7 @@ struct NativeWorldLabView:View {
                 Text(iersImportStatus).font(.caption).foregroundStyle(.secondary)
                     .accessibilityAddTraits(.updatesFrequently)
             }
+            NativeWorldLabFieldImportPanel(timeSeconds:demoClock?.simulationTimeSeconds ?? seconds)
             Text("UTC is the civil reference. TAI/TT use the bounded IERS leap table; UT1 requires dated IERS Earth-orientation data. No value is extrapolated beyond published coverage.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
@@ -4460,3 +4461,147 @@ private struct NativeWorldLabVehiclePanel:View {
     }
 }
 
+
+
+private struct NativeWorldLabFieldImportPanel:View {
+    let timeSeconds:Double
+    @State private var layer:NativeWorldLabFieldLayer?
+    @State private var importing=false
+    @State private var status="Only public field layers are available until the native app has an authenticated dataset permission context."
+    @State private var plane:NativeWorldLabFieldPlane = .xy
+    @State private var sliceIndex=0
+    @State private var tensorComponent=0
+
+    private var sliceFrame:NativeWorldLabFieldSliceFrame? {
+        guard let layer else{return nil}
+        switch layer.kind {
+        case .scalar:return try? layer.scalarSlice(timeSeconds,plane:plane,sliceIndex:sliceIndex)
+        case .vector:
+            guard layer.rendererKind=="glyphs" else{return nil}
+            return try? layer.vectorGlyphs(timeSeconds,plane:plane,sliceIndex:sliceIndex)
+        case .tensor:return try? layer.tensorSlice(timeSeconds,component:tensorComponent,plane:plane,sliceIndex:sliceIndex)
+        }
+    }
+    private var streamlines:NativeWorldLabFieldStreamlineFrame? {
+        guard let layer,layer.kind == .vector,layer.rendererKind=="streamlines" else{return nil}
+        return try? layer.vectorStreamlines(timeSeconds,plane:plane,sliceIndex:sliceIndex)
+    }
+    private var maxSlice:Int {
+        guard let layer else{return 0}
+        return max(0,layer.dimensions[plane.axes.normal]-1)
+    }
+    var body:some View {
+        VStack(alignment:.leading,spacing:8) {
+            Text("Recorded scientific field").font(.headline)
+            Button("Import field-layer JSON"){importing=true}.buttonStyle(.bordered)
+            Text(status).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+            if let layer {
+                Text(layer.legendTitle).font(.subheadline.weight(.semibold))
+                Text("\(layer.kind.rawValue) · \(layer.rendererKind) · \(layer.crs) · \(layer.displayUnits)")
+                    .font(.caption.monospaced())
+                HStack(spacing:6) {
+                    ForEach(NativeWorldLabFieldPlane.allCases) { candidate in
+                        Button(candidate.rawValue.uppercased()) {
+                            plane=candidate
+                            sliceIndex=(layer.dimensions[candidate.axes.normal]-1)/2
+                        }.buttonStyle(.bordered)
+                    }
+                }
+                Text("Slice \(sliceIndex+1)/\(maxSlice+1)").font(.caption)
+                if maxSlice>0 {
+                    Slider(value:Binding(get:{Double(sliceIndex)},set:{sliceIndex=Int($0.rounded())}),
+                        in:0...Double(maxSlice))
+                }
+                if layer.kind == .tensor {
+                    Picker("Tensor component",selection:$tensorComponent) {
+                        ForEach(0..<9,id:\.self){index in
+                            Text(["Txx","Txy","Txz","Tyx","Tyy","Tyz","Tzx","Tzy","Tzz"][index]).tag(index)
+                        }
+                    }.pickerStyle(.menu)
+                }
+                Canvas { context,size in
+                    let width=layer.dimensions[plane.axes.u],height=layer.dimensions[plane.axes.v]
+                    guard width>0,height>0 else{return}
+                    let cellW=size.width/CGFloat(width),cellH=size.height/CGFloat(height)
+                    if let frame=sliceFrame {
+                        for cell in frame.cells {
+                            let rect=CGRect(x:CGFloat(cell.uIndex)*cellW,
+                                y:size.height-CGFloat(cell.vIndex+1)*cellH,width:cellW,height:cellH)
+                            if layer.kind == .scalar || layer.kind == .tensor {
+                                let component=layer.kind == .tensor ? tensorComponent:0
+                                let value=cell.components[component]
+                                let fill:Color
+                                if let value {
+                                    let range=max(1e-12,layer.maximumSI-layer.minimumSI)
+                                    let t=min(1,max(0,(value-layer.minimumSI)/range))
+                                    fill=Color(red:t,green:0.18+0.36*(1-t),blue:1-t)
+                                } else {fill=Color.gray.opacity(0.42)}
+                                context.fill(Path(rect),with:.color(fill))
+                                context.stroke(Path(rect),with:.color(.primary.opacity(0.22)),lineWidth:0.5)
+                            } else if let u=cell.components[plane.axes.u],
+                                      let v=cell.components[plane.axes.v] {
+                                let magnitude=hypot(u,v)
+                                if magnitude>1e-12,magnitude.isFinite {
+                                    let start=CGPoint(x:(CGFloat(cell.uIndex)+0.5)*cellW,
+                                        y:size.height-(CGFloat(cell.vIndex)+0.5)*cellH)
+                                    let factor=0.33*min(cellW,cellH)/magnitude
+                                    let end=CGPoint(x:start.x+CGFloat(u*factor),
+                                        y:start.y-CGFloat(v*factor))
+                                    var path=Path();path.move(to:start);path.addLine(to:end)
+                                    context.stroke(path,with:.color(.blue),lineWidth:2)
+                                    let dot=CGRect(x:end.x-2,y:end.y-2,width:4,height:4)
+                                    context.fill(Path(ellipseIn:dot),with:.color(.blue))
+                                }
+                            }
+                        }
+                    }
+                    if let streamlines {
+                        for points in streamlines.paths where points.count>=2 {
+                            var path=Path()
+                            for (index,point) in points.enumerated() {
+                                let position=CGPoint(x:point.u*size.width,y:size.height-point.v*size.height)
+                                if index==0 {path.move(to:position)} else {path.addLine(to:position)}
+                            }
+                            context.stroke(path,with:.color(.blue),lineWidth:2)
+                        }
+                    }
+                }
+                .frame(height:210)
+                .accessibilityLabel(layer.accessibleDescription+" · "+plane.rawValue.uppercased()+" slice")
+                Text("Source: \(layer.sourceDescription) · calibration: \(layer.calibrationStatus) (\(layer.calibrationMethod))")
+                    .font(.caption)
+                Text(layer.validity).font(.caption2).foregroundStyle(.secondary)
+                if let frame=sliceFrame {
+                    Text("Recorded sample \(frame.sampleIndex+1)/\(layer.sampleTimesSeconds.count) · \(frame.sampleTimeSeconds) s")
+                        .font(.caption.monospaced())
+                }
+                if layer.kind == .vector,layer.rendererKind=="streamlines",streamlines?.paths.isEmpty != false {
+                    Text("No complete streamline crosses this slice at the selected time; missing data terminates a path.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .fileImporter(isPresented:$importing,allowedContentTypes:[.json]) { result in
+            switch result {
+            case .success(let url):
+                let access=url.startAccessingSecurityScopedResource()
+                defer {if access {url.stopAccessingSecurityScopedResource()}}
+                do {
+                    let handle=try FileHandle(forReadingFrom:url)
+                    defer {try? handle.close()}
+                    let data=try handle.read(upToCount:NativeWorldLabFieldLayerCodec.maxBytes+1) ?? Data()
+                    guard data.count<=NativeWorldLabFieldLayerCodec.maxBytes else {
+                        throw NativeWorldLabError.invalid("Field layer import exceeds 16 MB.")
+                    }
+                    let decoded=try NativeWorldLabFieldLayerCodec.decode(data,principalRoles:[])
+                    layer=decoded
+                    plane = .xy
+                    sliceIndex=(decoded.dimensions[2]-1)/2
+                    tensorComponent=0
+                    status="Loaded \(decoded.label) · \(decoded.sourceDescription) · \(decoded.sampleTimesSeconds.count) recorded times."
+                } catch {status=error.localizedDescription}
+            case .failure(let error):status=error.localizedDescription
+            }
+        }
+    }
+}
