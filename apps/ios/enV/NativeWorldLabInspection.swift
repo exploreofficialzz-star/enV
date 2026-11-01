@@ -1,5 +1,6 @@
 import Foundation
 import SceneKit
+import CoreFoundation
 
 struct NativeWorldLabInspectionPlane {
     let normal:[Double]
