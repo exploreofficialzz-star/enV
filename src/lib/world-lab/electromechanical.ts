@@ -232,7 +232,7 @@ export function runActuatorExperiment(
       energyResidualJ:residual,grounded:h===0&&v===0,
     }));
     if(j===n)break;
-    const integrated=advance(state,input,dt,t);
+    const integrated=advance(state,input,dt,j*dt);
     for(const segment of integrated.segments){
       const [h0,v0,c0,temp0]=segment.before;
       const [h1,v1,c1,temp1]=segment.after;
