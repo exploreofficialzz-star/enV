@@ -402,9 +402,9 @@ export const MATH_EXERCISE_CATALOG = specs.map((spec) => ({
   key: spec.key,
   name: spec.name,
   targetLabels: Object.fromEntries(
-    Object.keys(spec.solve).map((target) => [
-      target,
-      spec.labels[target] ?? spec.fields.find((field) => field.name === target)?.label ?? target,
+    spec.fields.map((field) => [
+      field.name,
+      spec.labels[field.name] ?? field.label,
     ]),
   ),
 }));
