@@ -236,7 +236,7 @@ enum NativeWorldLabActuator {
                 "Ideal supply switch opens at the exact recorded time. Coil current remains continuous and decays through the modeled R-L path; no arc, fuse damage or contact bounce is predicted." :
                 (i.thermal == nil ?
                 "Bounded 1D R-L actuator with hypothetical parameters; not certified." :
-                "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, " + "cooling and resistance; not measured or certified.")
+                "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, " + "cooling and resistance; not measured or certified."))
     }
 
     /// Internal 1D numerical consistency only. Does not verify motor parameters.
