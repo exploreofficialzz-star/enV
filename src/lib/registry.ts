@@ -4,6 +4,9 @@ import type { CategoryId, ToolMeta } from "@/types/tool";
 import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessibility-studios";
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
+import mathExpansion from "@/data/math-expansion.json";
+import { EXPANSION_FAMILIES, describeExpansion } from "@/lib/calc/expansion-rows.mjs";
+import { MATH_EXERCISE_CATALOG } from "@/lib/engines/math-exercise-calculators";
 
 const musicDownloaderTool: ToolMeta = {
   id: "music-downloader",
@@ -68,6 +71,42 @@ const designHexColorConverterTool: ToolMeta = {
   related: ["color-picker", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter", "palette-generator"],
   engine: { type: "color", op: "picker" },
 };
+
+type ExpansionFamily = (typeof EXPANSION_FAMILIES)[number];
+const expansionRows = mathExpansion as Record<ExpansionFamily, string[][]>;
+const generatedCalculatorPresentation = new Map<string, { name: string; description: string }>();
+
+// Human-readable labels are generated from the same field metadata the calculator
+// engine uses. This also repairs existing checked-in catalog records immediately,
+// without waiting for a full catalog regeneration.
+for (const spec of MATH_EXERCISE_CATALOG) {
+  for (const [target, targetLabel] of Object.entries(spec.targetLabels)) {
+    generatedCalculatorPresentation.set(`exercise-${spec.key}-${target}`, {
+      name: `${spec.name} — Solve for ${targetLabel}`,
+      description: `Formula exercise calculator for ${spec.name}, solving for ${targetLabel}. Enter the other known values to calculate the missing value.`,
+    });
+  }
+}
+
+for (const family of EXPANSION_FAMILIES) {
+  for (const row of expansionRows[family]) {
+    const info = describeExpansion(family, row);
+    for (const target of ["a", "b", "c"] as const) {
+      const targetLabel = info.labels[target];
+      const equationTitle = `${info.relation} — Solve for ${targetLabel}`;
+      generatedCalculatorPresentation.set(`exp-${family}-${info.key}-${target}`, {
+        name: info.title ? `${info.title}: ${equationTitle}` : equationTitle,
+        description: `Formula exercise calculator: ${info.relation}. Solve for ${targetLabel}. Enter the other two values to calculate the missing value.`,
+      });
+    }
+  }
+}
+
+function presentGeneratedCalculator(tool: ToolMeta): ToolMeta {
+  if (tool.engine.type !== "calculator") return tool;
+  const presentation = generatedCalculatorPresentation.get(tool.engine.formula);
+  return presentation ? { ...tool, ...presentation } : tool;
+}
 
 const allTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
