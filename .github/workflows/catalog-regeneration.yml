@@ -8,6 +8,7 @@ on:
       - "src/data/math-expansion.json"
       - "scripts/gen-catalog.mjs"
       - "scripts/check-design.mjs"
+      - "scripts/check-billing.mjs"
       - "scripts/export-native-engine-data.mjs"
       - "scripts/export-native-catalog.mjs"
       - "scripts/export-native-execution-matrix.mjs"
