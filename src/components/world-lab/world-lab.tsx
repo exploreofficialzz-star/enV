@@ -30,7 +30,7 @@ import {WorldLabElasticWavePanel} from "./elastic-wave-panel";
 import {WorldLabRadiationPanel} from "./radiation-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
-import type {GravityConfig,GravityFrame,GravityBody} from "@/lib/world-lab/gravity";
+import type {GravityConfig,GravityFrame,GravityBody,GravityRun} from "@/lib/world-lab/gravity";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
 import {calculateObjectCollision,sampleObjectCollision,type ObjectCollisionRun} from "@/lib/world-lab/object-collision";
@@ -1811,7 +1811,7 @@ export default function WorldLab() {
       setProject(restored);clearEditHistory();
       setSavedRevision(draft.baseSavedRevision);
       setWorkspaceDirty(true);setSelectedEntityId("");
-      setRuns(draft.runs??[]);setScientificEvidence(draft.scientificEvidence??[]);
+      setRuns([...(draft.runs??[])]);setScientificEvidence([...(draft.scientificEvidence??[])]);
       setRunId(draft.runs?.at(-1)?.id??"");
       setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
       if(draft.runs===undefined&&draft.scientificEvidence===undefined&&

@@ -36,7 +36,7 @@ function intersect(o:Vec3,d:Vec3,b:OpticBody):Hit|null{
     return {t,normal};
   }
   let enter=-Infinity,leave=Infinity;
-  let entryNormal:Vec3=[0,0,0],exitNormal:Vec3=[0,0,0];
+  let entryNormal:[number,number,number]=[0,0,0],exitNormal:[number,number,number]=[0,0,0];
   for(let axis=0;axis<3;axis++){
     const min=b.center[axis]-b.half[axis],max=b.center[axis]+b.half[axis];
     if(Math.abs(d[axis])<1e-12){

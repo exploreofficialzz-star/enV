@@ -129,7 +129,7 @@ export function WorldLabGravityPanel({
                 <input className={field} type="number" step="any"
                   aria-label={name+" velocity "+axis}
                   value={velocity[i]} onChange={e=>{
-                    const next=[...velocity] as Vec3;next[i]=Number(e.target.value);
+                    const next:[number,number,number]=[...velocity];next[i]=Number(e.target.value);
                     setVelocities(old=>({...old,[id]:next}));
                     setRun(null);setPlaying(false);
                   }}/>

@@ -36,7 +36,7 @@ const norm=(v:readonly number[])=>Math.hypot(v[0],v[1],v[2]);
 const validVelocity=(v:unknown):v is Vec3=>Array.isArray(v)&&v.length===3&&
   v.every(x=>typeof x==="number"&&Number.isFinite(x))&&norm(v)<=1e6;
 function forces(pos:readonly Vec3[],masses:readonly number[],radii:readonly number[]){
-  const accelerations:Vec3[]=masses.map(()=>[0,0,0]);
+  const accelerations:[number,number,number][]=masses.map(()=>[0,0,0]);
   let potential=0;
   for(let i=0;i<masses.length;i++)for(let j=i+1;j<masses.length;j++){
     const dx=pos[j][0]-pos[i][0],dy=pos[j][1]-pos[i][1],dz=pos[j][2]-pos[i][2];
@@ -59,7 +59,7 @@ function forces(pos:readonly Vec3[],masses:readonly number[],radii:readonly numb
 function diagnostics(pos:readonly Vec3[],vel:readonly Vec3[],
   mass:readonly number[],radii:readonly number[]){
   const {accelerations,potential}=forces(pos,mass,radii);
-  let kinetic=0;const momentum:Vec3=[0,0,0];
+  let kinetic=0;const momentum:[number,number,number]=[0,0,0];
   for(let i=0;i<mass.length;i++){
     kinetic+=0.5*mass[i]*(vel[i][0]**2+vel[i][1]**2+vel[i][2]**2);
     for(let a=0;a<3;a++)momentum[a]+=mass[i]*vel[i][a];
