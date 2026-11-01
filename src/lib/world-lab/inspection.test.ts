@@ -9,3 +9,40 @@ test("explode view is derived only for assembly members and never mutates projec
 test("cutaway plane clips geometry at the selected object axis",()=>{const p=fixture(),plane=inspectionPlane(p,settings({mode:"cutaway",axis:"x"}));assert.ok(plane);assert.deepEqual(plane.normal,[1,0,0]);assert.equal(plane.offset,-1);const polygon:[number,number,number][]=[[-2,0,0],[0,0,0],[0,1,0],[-2,1,0]];const clipped=clipInspectionPolygon(polygon,plane!);assert.equal(clipped.length,4);assert.ok(clipped.every(v=>v[0]>=plane!.offset-1e-9));assert.equal(clipInspectionPolygon([[-2,0,0],[-3,0,0],[-2,1,0]],plane!).length,0);});
 test("isolation remains fail-open until the user selects a valid object",()=>{const p=fixture();assert.equal(inspectionEntityVisible(p,settings({mode:"isolate",selectedEntityId:"missing"}),"a"),true);});
 test("invalid inspection settings fail closed",()=>{assert.throws(()=>validateInspectionSettings(settings({opacity:101})),/bounds/);assert.throws(()=>validateInspectionSettings(settings({cutawayFraction:2})),/bounds/);assert.throws(()=>validateInspectionSettings(settings({explosionDistanceM:11})),/bounds/);});
+
+
+import {
+ createInspectionViewHistory,commitInspectionViewHistory,travelInspectionViewHistory,
+ type InspectionViewHistory,type InspectionViewState,
+} from "./inspection.ts";
+const initialInspectionView:InspectionViewState={
+ mode:"normal",opacity:55,axis:"x",cutawayFraction:0,explosionDistanceM:1,
+};
+test("inspection view undo and redo restore cutaway and x-ray settings without project mutation",()=>{
+ const original=createInspectionViewHistory(initialInspectionView);
+ const cutaway=commitInspectionViewHistory(original,{...original.present,
+  mode:"cutaway",axis:"z",cutawayFraction:0.4});
+ const xray=commitInspectionViewHistory(cutaway,{...cutaway.present,
+  mode:"xray",opacity:25});
+ assert.equal(xray.present.mode,"xray");
+ const undoXray=travelInspectionViewHistory(xray,"undo");
+ assert.equal(undoXray.present.mode,"cutaway");
+ assert.equal(undoXray.present.axis,"z");
+ assert.equal(undoXray.present.cutawayFraction,0.4);
+ const undoCutaway=travelInspectionViewHistory(undoXray,"undo");
+ assert.deepEqual(undoCutaway.present,initialInspectionView);
+ const redo=travelInspectionViewHistory(undoCutaway,"redo");
+ assert.equal(redo.present.mode,"cutaway");
+ assert.equal(travelInspectionViewHistory(original,"undo"),original);
+});
+test("inspection view history validates settings, caps memory and clears redo after a new edit",()=>{
+ let history=createInspectionViewHistory(initialInspectionView);
+ for(let i=1;i<=65;i++)history=commitInspectionViewHistory(history,{
+  ...history.present,opacity:i%2?50:60,cutawayFraction:(i%20)/20,
+ });
+ assert.equal(history.past.length,50);
+ const undone=travelInspectionViewHistory(history,"undo");
+ const edited=commitInspectionViewHistory(undone,{...undone.present,mode:"transparent"});
+ assert.equal(edited.future.length,0);
+ assert.throws(()=>commitInspectionViewHistory(edited,{...edited.present,opacity:101}),/bounds/);
+});
