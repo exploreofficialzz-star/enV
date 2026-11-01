@@ -163,10 +163,19 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
         }finally{db.endTransaction()}
     }
 
-    fun addFile(noteId:String,name:String,mime:String,path:String,size:Long){
-        writableDatabase.insertOrThrow("attachments",null,ContentValues().apply{
-            put("id",UUID.randomUUID().toString());put("note_id",noteId);put("name",name);put("mime",mime);put("path",path);put("size",size);put("created_at",System.currentTimeMillis())
-        })
+    fun addFiles(records:List<ABookFileRecord>){
+        if(records.isEmpty())return
+        val db=writableDatabase
+        db.beginTransaction()
+        try{
+            records.forEach{record->
+                db.insertOrThrow("attachments",null,ContentValues().apply{
+                    put("id",record.id);put("note_id",record.noteId);put("name",record.name);put("mime",record.mime)
+                    put("path",record.relativePath);put("size",record.size);put("created_at",record.createdAt)
+                })
+            }
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
     }
 }
 
@@ -460,15 +469,42 @@ fun NativeABookScreen(){
             status="Saving files on this device…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
                 val folder=File(context.filesDir,"a-book/attachments/$id").apply{mkdirs()}
-                uris.forEach{uri->
-                    val name=context.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{c->if(c.moveToFirst())c.getString(0)else null}?: "attachment"
-                    val ext=name.substringAfterLast('.',"").filter{it.isLetterOrDigit()}.take(10)
-                    val destination=File(folder,UUID.randomUUID().toString()+if(ext.isNotEmpty())".$ext" else "")
-                    context.contentResolver.openInputStream(uri)?.use{input->destination.outputStream().use{output->input.copyTo(output)}}?:throw IllegalStateException("Could not read $name")
-                    val path="a-book/attachments/"+id+"/"+destination.name
-                    db.addFile(id,name.take(200),context.contentResolver.getType(uri)?:"application/octet-stream",path,destination.length())
+                val copiedFiles=mutableListOf<File>()
+                val records=mutableListOf<ABookFileRecord>()
+                var totalBytes=0L
+                var committed=false
+                try{
+                    uris.forEach{uri->
+                        val name=context.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{c->if(c.moveToFirst())c.getString(0)else null}?.takeIf{it.isNotBlank()}?: "attachment"
+                        val ext=name.substringAfterLast('.',"").filter{it.isLetterOrDigit()}.take(10)
+                        val fileId=UUID.randomUUID().toString()
+                        val destination=File(folder,fileId+(if(ext.isNotEmpty())".$ext" else ""))
+                        copiedFiles.add(destination)
+                        var fileBytes=0L
+                        context.contentResolver.openInputStream(uri)?.use{input->
+                            FileOutputStream(destination).use{output->
+                                val buffer=ByteArray(8192)
+                                while(true){
+                                    val count=input.read(buffer)
+                                    if(count<0)break
+                                    fileBytes+=count.toLong();totalBytes+=count.toLong()
+                                    require(fileBytes<=100L*1024*1024){"Each attachment must be 100 MB or smaller so it can be included in a local A book backup."}
+                                    require(totalBytes<=150L*1024*1024){"Choose a smaller attachment batch (150 MB maximum per import)."}
+                                    output.write(buffer,0,count)
+                                }
+                            }
+                        }?:throw IllegalStateException("Could not read $name")
+                        require(fileBytes>0){"$name is empty."}
+                        val path="a-book/attachments/"+id+"/"+destination.name
+                        records.add(ABookFileRecord(fileId,id,name.take(200),(context.contentResolver.getType(uri)?:"application/octet-stream").take(200),path,fileBytes,System.currentTimeMillis()))
+                    }
+                    db.addFiles(records)
+                    committed=true
+                    db.attachments(id)
+                }catch(error:Throwable){
+                    if(!committed)copiedFiles.forEach{it.delete()}
+                    throw error
                 }
-                db.attachments(id)
             }}
             result.fold({files=it;status="Files saved on this device"},{error=it.message?:"Import failed";status="Not saved"})
         }
