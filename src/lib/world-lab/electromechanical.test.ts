@@ -132,7 +132,8 @@ test("an opened motor supply is an exact-time event; inductive current decays in
   const at=sampleActuator(run,1);
   const later=sampleActuator(run,2);
   const final=sampleActuator(run,4);
-  assert.ok(before.sourceVoltageV>0&&before.sourcePowerW>0);
+  assert.ok(before.sourceVoltageV>0&&before.coilCurrentA>0,
+    "the source remains energized and the recorded coil current is positive before isolation");
   assert.equal(at.sourceVoltageV,0);
   assert.equal(at.sourcePowerW,0);
   assert.ok(at.coilCurrentA>0,"coil current must remain continuous at switch opening");
