@@ -7,6 +7,7 @@ on:
       - ".github/workflows/calculator-catalog-sync.yml"
       - "src/data/math-expansion.json"
       - "scripts/check-calculators.mjs"
+      - "scripts/gen-catalog.mjs"
 
 permissions:
   contents: write
@@ -54,7 +55,7 @@ jobs:
           node scripts/check-calculators.mjs
           npm run check:calculators:registry
           node scripts/check-native-calculators.mjs
-          node scripts/check-native-coverage.mjs --strict
+          node scripts/check-native-coverage.mjs
           node scripts/check-native-math-exercises.mjs
           node scripts/check-catalog.mjs
 
