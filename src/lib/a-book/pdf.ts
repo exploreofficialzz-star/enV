@@ -35,7 +35,7 @@ async function openPdf(file: Blob): Promise<PDFDocument> {
 
 function safeArchiveName(value: string): string {
   const name = value.replace(/\.pdf$/i, "").trim().replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
-  return name.slice(0, 100).toLowerCase() || "document";
+  return name.slice(0, 100) || "document";
 }
 
 function assertBatch(files: ABookPdfInput[]): void {
@@ -163,7 +163,7 @@ export async function extractSelectedPdfs(files: ABookPdfInput[], pageRange: str
   }
 
   const output: Record<string, Uint8Array> = {};
-  const names = new Set<string>();
+  const names = new Map<string, string>();
   for (const item of prepared) {
     const source = await openPdf(item.blob);
     const base = safeArchiveName(item.name);
@@ -201,7 +201,7 @@ export async function splitSelectedPdfsIntoZip(files: ABookPdfInput[], pageGroup
   }
 
   const output: Record<string, Uint8Array> = {};
-  const names = new Set<string>();
+  const names = new Map<string, string>();
   for (const item of prepared) {
     const source = await openPdf(item.blob);
     const base = safeArchiveName(item.name);
@@ -218,16 +218,27 @@ export async function splitSelectedPdfsIntoZip(files: ABookPdfInput[], pageGroup
   return zipSync(output, { level: 6 });
 }
 
-function uniqueArchiveEntryName(requestedName: string, used: Set<string>): string {
+function uniqueArchiveEntryName(requestedName: string, used: Map<string, string>): string {
   const dot = requestedName.lastIndexOf(".");
-  const stem = dot > 0 ? requestedName.slice(0, dot) : requestedName;
+  const requestedStem = dot > 0 ? requestedName.slice(0, dot) : requestedName;
   const extension = dot > 0 ? requestedName.slice(dot) : "";
-  let candidate = requestedName;
-  let suffix = 2;
-  while (used.has(candidate.toLowerCase())) {
-    candidate = `${stem}-${suffix++}${extension}`;
+  const key = requestedName.toLowerCase();
+  const existing = used.get(key);
+  if (!existing) {
+    used.set(key, requestedName);
+    return requestedName;
   }
-  used.add(candidate.toLowerCase());
+
+  // Keep the first file's spelling/case for subsequent duplicate suffixes so
+  // an archive never contains case-only variants of the same source name.
+  const existingDot = existing.lastIndexOf(".");
+  const canonicalStem = existingDot > 0 ? existing.slice(0, existingDot) : existing;
+  let suffix = 2;
+  let candidate = `${canonicalStem}-${suffix++}${extension}`;
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${canonicalStem}-${suffix++}${extension}`;
+  }
+  used.set(candidate.toLowerCase(), candidate);
   return candidate;
 }
 
