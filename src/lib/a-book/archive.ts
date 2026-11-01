@@ -134,7 +134,7 @@ export async function createABookArchive(
     const attachment = attachments[index];
     if (!noteIds.has(attachment.noteId) || !attachment.id || attachment.id.length > 180 || attachment.name.length > 500
       || attachment.type.length > 200 || attachment.size !== attachment.blob.size
-      || attachment.size > MAX_ATTACHMENT_BYTES) {
+      || attachment.size <= 0 || attachment.size > MAX_ATTACHMENT_BYTES) {
       fail("An attachment is invalid or exceeds the 100 MB per-file backup limit.");
     }
     totalBytes += attachment.size;
@@ -213,7 +213,7 @@ export async function readABookArchive(file: Blob): Promise<ABookArchiveData> {
     }
     expectedPaths.add(raw.path);
     const data = files[raw.path];
-    if (!data || data.byteLength !== raw.size || data.byteLength > MAX_ATTACHMENT_BYTES) {
+    if (!data || data.byteLength <= 0 || data.byteLength !== raw.size || data.byteLength > MAX_ATTACHMENT_BYTES) {
       fail("An attachment is missing, damaged, or larger than the supported limit.");
     }
     totalBytes += data.byteLength;
