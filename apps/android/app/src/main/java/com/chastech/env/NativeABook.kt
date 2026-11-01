@@ -161,9 +161,23 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
         readableDatabase.query("notes",null,when { includeDeleted && includeArchived -> null; includeDeleted -> "deleted_at IS NOT NULL"; includeArchived -> "deleted_at IS NULL"; else -> "deleted_at IS NULL AND archived=0" },null,null,null,"pinned DESC,updated_at DESC")
             .use{c->buildList{while(c.moveToNext())add(read(c))}}
     fun save(note:ABookNoteRecord):ABookNoteRecord{
+        require(note.id.isNotBlank()&&note.id.length<=180&&note.title.length<=10_000&&note.body.length<=5_000_000&&note.notebook.length<=500){
+            "This note exceeds A book's local storage limits."
+        }
+        require(note.revision>=0&&note.createdAt>=0&&note.updatedAt>=0&&(note.deletedAt==null||note.deletedAt>=0)){
+            "This note contains invalid local metadata."
+        }
+        val noteTags=runCatching{JSONArray(note.tags)}.getOrElse{throw IllegalArgumentException("This note contains invalid tags.")}
+        require(noteTags.length()<=50&& (0 until noteTags.length()).all{noteTags.opt(it) is String && noteTags.getString(it).length<=200}){
+            "A note supports up to 50 tags, with 200 characters per tag."
+        }
         val db=writableDatabase;db.beginTransaction()
         try{
             val old=db.query("notes",null,"id=?",arrayOf(note.id),null,null,null).use{if(it.moveToFirst())read(it)else null}
+            if(old==null){
+                val count=db.rawQuery("SELECT COUNT(*) FROM notes",null).use{cursor->if(cursor.moveToFirst())cursor.getLong(0)else 0L}
+                require(count<10_000L){"A book supports up to 10,000 local notes. Export or remove older notes before creating another."}
+            }
             val changed=old!=null&&(old.title!=note.title||old.body!=note.body||old.notebook!=note.notebook||old.tags!=note.tags)
             var rev=old?.revision?:0
             if(changed&&old!=null){
