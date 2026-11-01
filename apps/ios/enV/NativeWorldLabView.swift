@@ -34,6 +34,8 @@ struct NativeWorldLabView:View {
     @State private var inspectionAxis:NativeWorldLabInspectionAxis = .x
     @State private var inspectionCutawayFraction=0.0
     @State private var inspectionExplodeDistance=1.0
+    @State private var showInspectionLabels=true
+    @State private var showInspectionOverlays=true
     @State private var exportingTimelineCheckpoint=false
     @State private var importingTimelineCheckpoint=false
     @State private var timelineCheckpointFile:NativeWorldLabJsonFile?
@@ -546,9 +548,9 @@ struct NativeWorldLabView:View {
                 Picker("Inspection view",selection:$inspectionMode){
                     ForEach(NativeWorldLabInspectionMode.allCases){item in Text(item.title).tag(item)}
                 }.pickerStyle(.menu)
-                if inspectionMode == .transparent || inspectionMode == .xray {
-                    Text("Inspection opacity \(Int(inspectionOpacity*100))%").font(.caption)
-                    Slider(value:$inspectionOpacity,in:0.05...1).accessibilityLabel("See Inside opacity")
+                if inspectionMode == .transparent || inspectionMode == .xray || inspectionMode == .cutaway {
+                    Text("Selected target opacity \(Int(inspectionOpacity*100))%").font(.caption)
+                    Slider(value:$inspectionOpacity,in:0...1).accessibilityLabel("See Inside selected target opacity")
                 }
                 if inspectionMode == .cutaway {
                     Picker("Cutaway axis",selection:$inspectionAxis){
@@ -561,6 +563,32 @@ struct NativeWorldLabView:View {
                 if inspectionMode == .exploded {
                     Text("Assembly separation \(String(format:"%.1f",inspectionExplodeDistance)) m").font(.caption)
                     Slider(value:$inspectionExplodeDistance,in:0...10).accessibilityLabel("Exploded assembly separation")
+                }
+                HStack(spacing:6){
+                    Button("Zoom to selected"){zoomToSelected()}.disabled(project?.entities.indices.contains(selected) != true)
+                    Button(showInspectionLabels ? "Hide labels":"Show labels"){
+                        showInspectionLabels.toggle()
+                    }.accessibilityLabel(showInspectionLabels ? "Hide selected object labels":"Show selected object labels")
+                    Button(showInspectionOverlays ? "Hide overlays":"Show overlays"){
+                        showInspectionOverlays.toggle()
+                    }
+                    Button("Reset inspection"){
+                        inspectionMode = .normal;seeInside=false;inspectionOpacity=0.32
+                        inspectionAxis = .x;inspectionCutawayFraction=0
+                        inspectionExplodeDistance=1;showInspectionLabels=true;showInspectionOverlays=true
+                        redraw()
+                    }
+                }.buttonStyle(.bordered)
+                if showInspectionOverlays,showInspectionLabels,
+                   let project,project.entities.indices.contains(selected) {
+                    Text("Selected: \(project.entities[selected].name) · \(project.entities[selected].shape)")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .accessibilityElement(children:.combine)
+                }
+                if showInspectionOverlays,inspectionMode == .isolate,
+                   project?.entities.indices.contains(selected) != true {
+                    Text("Select a part first; the full scene remains visible until a valid selection exists.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 HStack{
                     Button(playing ? "Pause":"Play"){playing.toggle()}.buttonStyle(.borderedProminent)
@@ -2776,6 +2804,19 @@ Text("Invent chemical heat").font(.headline)
         sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
         updateObserverCameraClip()
     }
+    private func zoomToSelected(){
+        guard let project,project.entities.indices.contains(selected) else{return}
+        let target=project.entities[selected].positionMeters
+        let position=sceneCameraNode.position
+        let dx=Double(position.x)-target[0],dy=Double(position.y)-target[1],dz=Double(position.z)-target[2]
+        let old=max(0.25,hypot(hypot(dx,dy),dz))
+        let next=max(0.5,min(100000,old*0.35))
+        let ratio=next/old
+        sceneCameraNode.position=SCNVector3(
+            Float(target[0]+dx*ratio),Float(target[1]+dy*ratio),Float(target[2]+dz*ratio))
+        sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        updateObserverCameraClip()
+    }
     private func zoomObserverView(factor:Double){
         guard factor.isFinite,factor>0 else{return}
         let target=currentObserverTarget(),position=sceneCameraNode.position
@@ -2868,9 +2909,13 @@ Text("Invent chemical heat").font(.headline)
                     geometry.firstMaterial?.diffuse.contents=UIColor(
                         red:CGFloat((hex>>16)&255)/255,green:CGFloat((hex>>8)&255)/255,blue:CGFloat(hex&255)/255,alpha:1)
                 }
-                geometry.firstMaterial?.transparency=CGFloat((inspectionMode == .transparent || seeInside) ? inspectionOpacity : 1)*CGFloat(item.opacity)
-                geometry.firstMaterial?.fillMode=inspectionMode == .xray ? .lines : .fill
-                geometry.firstMaterial?.isDoubleSided=inspectionMode == .xray || cut
+                let inspectionTarget=targets.contains(item.id)
+                let transparentTarget=inspectionTarget &&
+                    (inspectionMode == .transparent || inspectionMode == .cutaway || seeInside)
+                let xrayTarget=inspectionTarget && inspectionMode == .xray
+                geometry.firstMaterial?.transparency=CGFloat(transparentTarget ? inspectionOpacity : 1)*CGFloat(item.opacity)
+                geometry.firstMaterial?.fillMode=xrayTarget ? .lines : .fill
+                geometry.firstMaterial?.isDoubleSided=xrayTarget || cut
                 next.rootNode.addChildNode(node)
             }
         }
