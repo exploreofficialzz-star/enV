@@ -36,6 +36,7 @@ export type ABookRevision = {
 const DATABASE_NAME = "env-a-book-local";
 const DATABASE_VERSION = 1;
 const MAX_REVISIONS_PER_NOTE = 40;
+const MAX_LOCAL_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 let databasePromise: Promise<IDBDatabase> | undefined;
 
 function createId(): string {
@@ -290,7 +291,17 @@ export async function restoreRevision(noteId: string, revisionId: string): Promi
   });
 }
 
+export function assertABookAttachmentSize(file: Pick<Blob, "size">): void {
+  if (!Number.isSafeInteger(file.size) || file.size <= 0) {
+    throw new Error("Choose a non-empty attachment.");
+  }
+  if (file.size > MAX_LOCAL_ATTACHMENT_BYTES) {
+    throw new Error("Each attachment must be 100 MB or smaller so it can be included in a local A book backup.");
+  }
+}
+
 export async function addAttachment(noteId: string, file: File): Promise<ABookAttachment> {
+  assertABookAttachmentSize(file);
   const db = await openDatabase();
   const attachment: ABookAttachment = {
     id: createId(),
