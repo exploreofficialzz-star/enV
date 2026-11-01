@@ -220,7 +220,6 @@ export async function splitSelectedPdfsIntoZip(files: ABookPdfInput[], pageGroup
 
 function uniqueArchiveEntryName(requestedName: string, used: Map<string, string>): string {
   const dot = requestedName.lastIndexOf(".");
-  const requestedStem = dot > 0 ? requestedName.slice(0, dot) : requestedName;
   const extension = dot > 0 ? requestedName.slice(dot) : "";
   const key = requestedName.toLowerCase();
   const existing = used.get(key);
