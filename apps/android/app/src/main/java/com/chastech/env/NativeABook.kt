@@ -238,6 +238,9 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
             val existingRevisions=scalarLong("SELECT COUNT(*) FROM revisions")
             val existingAttachments=scalarLong("SELECT COUNT(*) FROM attachments")
             val existingAttachmentBytes=scalarLong("SELECT COALESCE(SUM(size),0) FROM attachments")
+            require(importAttachments.all{it.size in 1..(100L*1024*1024)}){
+                "Each imported attachment must be between 1 byte and 100 MB."
+            }
             val incomingAttachmentBytes=importAttachments.sumOf{it.size}
             require(existingNotes+importNotes.size<=10_000L){
                 "A book supports up to 10,000 local notes. Export or remove older notes before importing this backup."
@@ -248,11 +251,10 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
             require(existingAttachments+importAttachments.size<=10_000L){
                 "A book supports up to 10,000 local attachments. Remove unused files before importing this backup."
             }
-            require(existingAttachmentBytes>=0&&existingAttachmentBytes+incomingAttachmentBytes<=150L*1024*1024){
+            val maxLibraryAttachmentBytes=150L*1024*1024
+            require(existingAttachmentBytes in 0..maxLibraryAttachmentBytes
+                && incomingAttachmentBytes<=maxLibraryAttachmentBytes-existingAttachmentBytes){
                 "The complete local library attachment limit is 150 MB. Export and remove older files before importing this backup."
-            }
-            require(importAttachments.all{it.size in 1..(100L*1024*1024)}){
-                "Each imported attachment must be between 1 byte and 100 MB."
             }
             importNotes.forEach{note->db.insertOrThrow("notes",null,ContentValues().apply{
                 put("id",note.id);put("title",note.title);put("body",note.body);put("notebook",note.notebook);put("tags",note.tags)
@@ -450,7 +452,7 @@ private fun importABookBackup(context:Context,db:ABookLocalDb,source:File):Int{
             require(Regex("^attachments/\\d+\\.bin$").matches(archivePath)&&expectedPaths.add(archivePath)){"The backup contains an unsafe or duplicate attachment path."}
             val bytes=entries[archivePath]?:throw IllegalArgumentException("A backup attachment is missing.")
             val size=item.getLong("size")
-            require(size==bytes.size.toLong()&&size<=100L*1024*1024){"A backup attachment failed its size check."}
+            require(size==bytes.size.toLong()&&size in 1..(100L*1024*1024)){"A backup attachment must be non-empty and no larger than 100 MB."}
             totalAttachmentBytes+=size;require(totalAttachmentBytes<=150L*1024*1024){"Backup attachments exceed 150 MB."}
             val name=item.getString("name");val mime=item.getString("type")
             require(name.isNotBlank()&&name.length<=500&&mime.length<=200){"A backup attachment has invalid metadata."}
