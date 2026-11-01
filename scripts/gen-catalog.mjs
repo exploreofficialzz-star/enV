@@ -11,7 +11,6 @@ import { describeExpansion } from "../src/lib/calc/expansion-rows.mjs";
 const currentCatalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
 const audioStudioSupplementStart = currentCatalogSource.indexOf("\nconst audioStudioTools: ToolMeta[] = [");
 const audioStudioSupplement = audioStudioSupplementStart >= 0 ? currentCatalogSource.slice(audioStudioSupplementStart) : "";
-const audioStudioSupplement = audioStudioSupplementStart >= 0 ? currentCatalogSource.slice(audioStudioSupplementStart) : "";
 if (!audioStudioSupplement) throw new Error("Cannot regenerate the catalogue without preserving its Audio Studio supplement.");
 
 /** @typedef {[string, string, string, string, string, string, string, number, number, string?]} Tuple */
