@@ -14191,10 +14191,10 @@ private final class ABookLocalStore {
                         revision: Int(entity.revision))
     }
 
-    func notes(includeArchived: Bool = false) throws -> [ABookNativeNote] {
+    func notes(includeArchived: Bool = false, includeDeleted: Bool = false) throws -> [ABookNativeNote] {
         try perform { context in
             let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
-            request.predicate = includeArchived ? NSPredicate(format: "deletedAt == nil") : NSPredicate(format: "deletedAt == nil AND archived == NO")
+            request.predicate = includeDeleted ? NSPredicate(format: "deletedAt != nil") : (includeArchived ? NSPredicate(format: "deletedAt == nil") : NSPredicate(format: "deletedAt == nil AND archived == NO"))
             request.sortDescriptors = [NSSortDescriptor(key: "pinned", ascending: false), NSSortDescriptor(key: "updatedAt", ascending: false)]
             return try context.fetch(request).map(value)
         }
@@ -14238,6 +14238,43 @@ private final class ABookLocalStore {
             if existing != nil && changed { record.revision += 1 }
             try context.save()
             return value(record)
+        }
+    }
+
+    func restoreTrashedNote(noteID: UUID) throws -> ABookNativeNote {
+        try perform { context in
+            let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            request.predicate = NSPredicate(format: "id == %@ AND deletedAt != nil", noteID as CVarArg)
+            guard let note = try context.fetch(request).first else {
+                throw NSError(domain: "ABookLocalStore", code: 4, userInfo: [NSLocalizedDescriptionKey: "That trashed note is no longer available."])
+            }
+            note.deletedAt = nil
+            note.archived = false
+            note.updatedAt = Date()
+            try context.save()
+            return value(note)
+        }
+    }
+
+    func permanentlyDeleteNote(noteID: UUID) throws {
+        try perform { context in
+            let attachmentsRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+            attachmentsRequest.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            let attachments = try context.fetch(attachmentsRequest)
+            let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("Abook", isDirectory: true).standardizedFileURL
+            for attachment in attachments {
+                let fileURL = root.appendingPathComponent(attachment.relativePath).standardizedFileURL
+                if fileURL.path.hasPrefix(root.path + "/") { try? fileManager.removeItem(at: fileURL) }
+                context.delete(attachment)
+            }
+            let revisionsRequest = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+            revisionsRequest.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            try context.fetch(revisionsRequest).forEach(context.delete)
+            let noteRequest = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            noteRequest.predicate = NSPredicate(format: "id == %@", noteID as CVarArg)
+            try context.fetch(noteRequest).forEach(context.delete)
+            try context.save()
         }
     }
 
@@ -14341,6 +14378,7 @@ private struct NativeABookView: View {
     @State private var tags = ""
     @State private var query = ""
     @State private var showArchived = false
+    @State private var showTrash = false
     @State private var attachments: [ABookNativeAttachment] = []
     @State private var revisions: [ABookNativeRevision] = []
     @State private var status = "Saved on this device"
@@ -14355,7 +14393,7 @@ private struct NativeABookView: View {
     @State private var activePDFSelection: UUID?
 
     private var saveKey: String {
-        (selectedID?.uuidString ?? "") + "|" + title + "|" + notebook + "|" + tags + "|" + bodyText + "|" + String(showArchived)
+        (selectedID?.uuidString ?? "") + "|" + title + "|" + notebook + "|" + tags + "|" + bodyText + "|" + String(showArchived) + "|" + String(showTrash)
     }
 
     var body: some View {
@@ -14382,7 +14420,13 @@ private struct NativeABookView: View {
                 Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
                 Button(showArchived ? "Active notes" : "Archive") {
                     showArchived.toggle()
-                    do { notes = try store.notes(includeArchived: showArchived); select(notes.first) } catch { showError(error) }
+                    showTrash = false
+                    reload(includeDeleted: false, includeArchived: showArchived)
+                }.buttonStyle(.bordered)
+                Button(showTrash ? "All notes" : "Trash") {
+                    showTrash.toggle()
+                    if showTrash { showArchived = false }
+                    reload(includeDeleted: showTrash, includeArchived: false)
                 }.buttonStyle(.bordered)
             }
             TextField("Search notes", text: $query)
@@ -14411,21 +14455,27 @@ private struct NativeABookView: View {
                     }
                     if selectedID != nil {
                         Divider().padding(.vertical, 4)
-                        TextField("Note title", text: $title).font(.title3.weight(.semibold))
+                        TextField("Note title", text: $title).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).font(.title3.weight(.semibold))
                             .textFieldStyle(.roundedBorder)
-                        TextField("Notebook", text: $notebook).textFieldStyle(.roundedBorder)
-                        TextField("Tags, separated by commas", text: $tags).textFieldStyle(.roundedBorder)
+                        TextField("Notebook", text: $notebook).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
+                        TextField("Tags, separated by commas", text: $tags).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
                         TextEditor(text: $bodyText)
                             .frame(minHeight: 220)
                             .padding(6)
                             .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                             .accessibilityLabel("Note content")
+                            .disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil)
                         HStack(spacing: 8) {
-                            Button("Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
-                            Button("Archive") { updateSelected(archived: true) }.buttonStyle(.bordered)
-                            Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
-                            Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
+                            if let selected = notes.first(where: { $0.id == selectedID }), selected.deletedAt != nil {
+                                Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
+                                Button("Delete permanently") { permanentlyDeleteSelectedNote() }.buttonStyle(.bordered)
+                            } else {
+                                Button("Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
+                                Button("Archive") { updateSelected(archived: true) }.buttonStyle(.bordered)
+                                Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
+                                Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
+                            }
                         }
                         Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
                         ForEach(attachments) { attachment in
@@ -14503,9 +14553,9 @@ private struct NativeABookView: View {
         status = "Not saved"
     }
 
-    private func reload(preferred: UUID? = nil) {
+    private func reload(preferred: UUID? = nil, includeDeleted: Bool? = nil, includeArchived: Bool? = nil) {
         do {
-            notes = try store.notes(includeArchived: showArchived)
+            notes = try store.notes(includeArchived: includeArchived ?? showArchived, includeDeleted: includeDeleted ?? showTrash)
             let note = notes.first(where: { $0.id == (preferred ?? selectedID) }) ?? notes.first
             select(note)
             status = "Saved on this device"
@@ -14541,11 +14591,32 @@ private struct NativeABookView: View {
                                       updatedAt: Date(), revision: notes.first(where: { $0.id == id })?.revision ?? 0)
         do {
             let saved = try store.save(current)
-            notes = try store.notes(includeArchived: showArchived)
+            notes = try store.notes(includeArchived: showArchived, includeDeleted: showTrash)
             if let index = notes.firstIndex(where: { $0.id == id }) { notes[index] = saved }
             revisions = try store.revisions(noteID: id)
             status = "Saved on this device"
             errorText = ""
+        } catch { showError(error) }
+    }
+
+    private func restoreTrashedNote() {
+        guard let id = selectedID else { return }
+        do {
+            let restored = try store.restoreTrashedNote(noteID: id)
+            showTrash = false
+            reload(preferred: restored.id, includeDeleted: false)
+        } catch { showError(error) }
+    }
+
+    private func permanentlyDeleteSelectedNote() {
+        guard let id = selectedID else { return }
+        do {
+            try store.permanentlyDeleteNote(noteID: id)
+            selectedID = nil
+            title = ""; bodyText = ""; notebook = "Inbox"; tags = ""
+            showTrash = true
+            reload(includeDeleted: true)
+            status = "Permanently deleted from this device"
         } catch { showError(error) }
     }
 
