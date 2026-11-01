@@ -301,7 +301,7 @@ fun NativeWorldLabViewport(
                             val section=cap.values.toList()
                             val centre=NativeLabVector(section.sumOf{it.x}/section.size,
                                 section.sumOf{it.y}/section.size,section.sumOf{it.z}/section.size)
-                            fun planeAngle(point:NativeLabVector){
+                            fun planeAngle(point:NativeLabVector):Double{
                                 val rx=point.x-centre.x;val ry=point.y-centre.y;val rz=point.z-centre.z
                                 val u=rx*basisUX+ry*basisUY+rz*basisUZ
                                 val v=rx*basisVX+ry*basisVY+rz*basisVZ
