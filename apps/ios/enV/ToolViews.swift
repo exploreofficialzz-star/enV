@@ -14544,7 +14544,7 @@ private final class ABookLocalStore {
             for url in urls {
                 let access = url.startAccessingSecurityScopedResource()
                 defer { if access { url.stopAccessingSecurityScopedResource() } }
-                if let knownSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, let knownSize {
+                if let values = try? url.resourceValues(forKeys: [.fileSizeKey]), let knownSize = values.fileSize {
                     guard knownSize > 0, knownSize <= 100 * 1024 * 1024 else {
                         throw NSError(domain: "ABookAttachment", code: 2, userInfo: [NSLocalizedDescriptionKey: "Each attachment must be between 1 byte and 100 MB so it can be included in a local A book backup."])
                     }
