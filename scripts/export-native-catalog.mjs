@@ -61,9 +61,9 @@ if (missingCategories.length) {
 }
 const active = exportedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
 const planned = exportedTools.length - active;
-const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
+const catalogVersion = createHash("sha256").update(catalogSource).update(JSON.stringify(exportedTools)).digest("hex").slice(0, 12);
 const runtimeInventoryVersion = createHash("sha256")
-  .update(catalogSource + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
+  .update(catalogVersion + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
   .digest("hex").slice(0, 12);
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
