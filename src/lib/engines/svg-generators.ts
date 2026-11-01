@@ -80,7 +80,7 @@ export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#fff
   }).join(" ");
   const path = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} ${curve} Z`;
   const strokeAttributes = safeStrokeWidth > 0 ? ` stroke="${safeStroke}" stroke-width="${safeStrokeWidth}" vector-effect="non-scaling-stroke"` : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100"><path fill="${safeColor}"${strokeAttributes} transform="rotate(${safeRotation} 50 50)" d="${path}"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100" role="img" aria-label="Generated organic blob shape"><title>Generated organic blob shape</title><path fill="${safeColor}"${strokeAttributes} transform="rotate(${safeRotation} 50 50)" d="${path}"/></svg>`;
 }
 
 export function buildWaveSvg(options: WaveSvgOptions): string {
@@ -120,7 +120,7 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
     return `<path fill="${color}" opacity="${1 - index * 0.12}" d="${path}"/>`;
   }).join("");
   const canvas = options.transparent ? "" : `<rect width="1440" height="240" fill="${background}"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 240" preserveAspectRatio="none">${canvas}${paths}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 240" preserveAspectRatio="none" role="img" aria-label="Generated layered wave background"><title>Generated layered wave background</title>${canvas}${paths}</svg>`;
 }
 
 export type NoiseType = "fractalNoise" | "turbulence";

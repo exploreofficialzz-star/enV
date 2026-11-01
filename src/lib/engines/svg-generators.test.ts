@@ -9,6 +9,8 @@ test("blob generator is deterministic, bounded and safely colors its output", ()
   assert.equal(first, again);
   assert.notEqual(first, changed);
   assert.match(first, /viewBox="0 0 100 100"/);
+  assert.match(first, /aria-label="Generated organic blob shape"/);
+  assert.match(first, /<title>Generated organic blob shape<\/title>/);
   assert.match(buildBlobSvg({ seed: 18, points: 12, color: "#0d9f8a" }), /<path /);
   assert.match(first, /fill="#0d9f8a"/);
   const round = buildBlobSvg({ seed: 17, points: 12, color: "#0d9f8a", irregularity: 0 });
@@ -39,6 +41,8 @@ test("wave geometry responds to frequency, phase, layers and transparent canvas"
   const changed = buildWaveSvg({ amplitude: 34, layers: 5, frequency: 4, phase: 45, baseline: 90, fill: "#0d9f8a", secondary: "#7c4dff", background: "#ffffff", transparent: true });
   assert.match(basic, /<rect width="1440" height="240" fill="#ffffff"\/>/);
   assert.match(basic, /viewBox="0 0 1440 240"/);
+  assert.match(basic, /aria-label="Generated layered wave background"/);
+  assert.match(basic, /<title>Generated layered wave background<\/title>/);
   assert.match(basic, /L1440 240 L0 240 Z/);
   assert.equal((basic.match(/<path /g) ?? []).length, 2);
   assert.equal((changed.match(/<path /g) ?? []).length, 5);
