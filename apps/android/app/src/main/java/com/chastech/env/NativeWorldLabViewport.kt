@@ -77,7 +77,8 @@ fun NativeWorldLabViewport(
 ){
     val screenDensity=LocalDensity.current.density
     val cutOffset=NativeWorldLabInspection.planeOffset(project,selectedId,inspection)
-    fun clip(vertices:List<NativeLabVector>)=if(cutOffset==null)vertices else NativeWorldLabInspection.clipPolygon(vertices,inspection.axis,cutOffset)
+    val cutTargets=NativeWorldLabInspection.targetIds(project,selectedId)
+    fun clip(vertices:List<NativeLabVector>,entityId:String)=if(cutOffset==null||entityId !in cutTargets)vertices else NativeWorldLabInspection.clipPolygon(vertices,inspection.axis,cutOffset)
     fun alpha()=when(inspection.mode){NativeInspectionMode.NORMAL->0.86f;NativeInspectionMode.TRANSPARENT->inspection.opacity;NativeInspectionMode.XRAY->minOf(0.22f,inspection.opacity);NativeInspectionMode.CUTAWAY->inspection.opacity;NativeInspectionMode.ISOLATE->0.86f;NativeInspectionMode.EXPLODED->0.86f}
     val savedCameraPose=remember(project.id,project.revision){
         NativeWorldLabCamera.poseFromPosition(project.cameraPositionMeters,project.cameraLookingAtMeters)
@@ -209,11 +210,16 @@ fun NativeWorldLabViewport(
                 val p=centerProjection
                 if(p.visible){
                     val radius=(dimensions.x.toFloat()*p.scale*0.5f).coerceIn(1f,100f)
-                    drawCircle(color.copy(alpha=alpha()),radius,Offset(p.x,p.y))
-                    if(inspection.mode==NativeInspectionMode.CUTAWAY&&cutOffset!=null&&inspection.axis==NativeInspectionAxis.X)
-                        drawArc(color.copy(alpha=0.25f),270f,180f,true,topLeft=Offset(p.x-radius,p.y-radius),size=androidx.compose.ui.geometry.Size(radius*2,radius*2))
-                    drawCircle(if(selected||inspection.mode==NativeInspectionMode.XRAY)Color.White else color.copy(alpha=0.65f),
-                        radius,Offset(p.x,p.y),style=Stroke(if(selected||inspection.mode==NativeInspectionMode.XRAY)2.5f else 1.2f))
+                    if(inspection.mode==NativeInspectionMode.CUTAWAY&&cutOffset!=null&&inspection.axis==NativeInspectionAxis.X){
+                        drawArc(color.copy(alpha=alpha()),270f,180f,true,
+                            topLeft=Offset(p.x-radius,p.y-radius),size=androidx.compose.ui.geometry.Size(radius*2,radius*2))
+                        drawArc(Color.White,270f,180f,false,
+                            topLeft=Offset(p.x-radius,p.y-radius),size=androidx.compose.ui.geometry.Size(radius*2,radius*2),style=Stroke(2f))
+                    }else{
+                        drawCircle(color.copy(alpha=alpha()),radius,Offset(p.x,p.y))
+                        drawCircle(if(selected||inspection.mode==NativeInspectionMode.XRAY)Color.White else color.copy(alpha=0.65f),
+                            radius,Offset(p.x,p.y),style=Stroke(if(selected||inspection.mode==NativeInspectionMode.XRAY)2.5f else 1.2f))
+                    }
                     drawArc(Color.White.copy(alpha=0.25f),200f,135f,false,
                         topLeft=Offset(p.x-radius*0.72f,p.y-radius*0.72f),
                         size=androidx.compose.ui.geometry.Size(radius*1.44f,radius*1.44f),
@@ -234,7 +240,7 @@ fun NativeWorldLabViewport(
                     NativeLabVector(center.x+local.x,center.y+local.y,center.z+local.z)
                 }
                 fun drawCylinderPolygon(vertices:List<NativeLabVector>,fill:Color,outline:Boolean=false){
-                    val projected=clip(vertices).map{projection(it,size.width,size.height,focalLength)}
+                    val projected=clip(vertices,solid.id).map{projection(it,size.width,size.height,focalLength)}
                     if(projected.size>=3&&projected.all{it.visible}){
                         val path=Path().apply{projected.forEachIndexed{i,point->if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)};close()}
                         drawPath(path,fill.copy(alpha=if(inspection.mode==NativeInspectionMode.XRAY)minOf(0.2f,inspection.opacity) else fill.alpha))
@@ -266,7 +272,7 @@ fun NativeWorldLabViewport(
                 ).mapIndexed{index,ids->ids.map{points[it]}.let{it to index}}
                     .sortedByDescending{(vertices,_)->vertices.map{projection(it,size.width,size.height,focalLength).depth}.average()}
                 faces.forEach{(vertices,face)->
-                    val projected=clip(vertices).map{projection(it,size.width,size.height,focalLength)}
+                    val projected=clip(vertices,solid.id).map{projection(it,size.width,size.height,focalLength)}
                     if(projected.size>=3&&projected.all{it.visible}){
                         val path=Path().apply{projected.forEachIndexed{i,p->if(i==0)moveTo(p.x,p.y) else lineTo(p.x,p.y)};close()}
                         val faceAlpha=when(face%3){0->0.62f;1->0.82f;else->0.72f}

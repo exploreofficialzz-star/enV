@@ -13,7 +13,7 @@ object NativeWorldLabInspection{
   if(selectedId.isNullOrBlank()||project.entities.none{it.id==selectedId})return emptySet()
   return project.assemblies.firstOrNull{selectedId in it.entityIds}?.entityIds?.toSet()?:setOf(selectedId)
  }
- fun visible(project:NativeWorldLabProject,selectedId:String?,settings:NativeInspectionSettings,id:String)=settings.mode!=NativeInspectionMode.ISOLATE||id in targetIds(project,selectedId)
+ fun visible(project:NativeWorldLabProject,selectedId:String?,settings:NativeInspectionSettings,id:String):Boolean {val ids=targetIds(project,selectedId);return settings.mode!=NativeInspectionMode.ISOLATE||ids.isEmpty()||id in ids}
  fun renderPosition(project:NativeWorldLabProject,selectedId:String?,settings:NativeInspectionSettings,id:String):NativeLabVector{
   val solid=project.entities.firstOrNull{it.id==id}?:throw IllegalArgumentException("Inspection target is missing")
   val ids=targetIds(project,selectedId)
