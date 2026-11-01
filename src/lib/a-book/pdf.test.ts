@@ -17,6 +17,11 @@ import {
   splitSelectedPdfsIntoZip,
 } from "./pdf.ts";
 
+function pdfBlob(bytes: Uint8Array): Blob {
+  const owned = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return new Blob([owned], { type: "application/pdf" });
+}
+
 async function samplePdf(pageCount: number, title = "A book test"): Promise<Blob> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(title);
@@ -250,7 +255,7 @@ test("extracts embedded PDF text locally and reports page-level progress", async
   }
   const bytes = await pdf.save();
   const progress: Array<[number, number]> = [];
-  const result = await extractPdfTextLocally(new Blob([bytes]), {
+  const result = await extractPdfTextLocally(pdfBlob(bytes), {
     onProgress: (page, total) => progress.push([page, total]),
   });
   assert.equal(result.pageCount, 2);
@@ -278,8 +283,8 @@ test("extracts several PDFs into distinct local searchable text files", async ()
   const secondFont = await second.embedFont(StandardFonts.Helvetica);
   second.addPage([300, 400]).drawText("Research beta note", { x: 24, y: 340, font: secondFont });
   const archive = await extractSelectedPdfTextLocally([
-    { name: "Research.pdf", blob: new Blob([await first.save()]) },
-    { name: "research.PDF", blob: new Blob([await second.save()]) },
+    { name: "Research.pdf", blob: pdfBlob(await first.save()) },
+    { name: "research.PDF", blob: pdfBlob(await second.save()) },
   ]);
   const entries = unzipSync(archive);
   assert.deepEqual(Object.keys(entries).sort(), ["Research-2.txt", "Research.txt"]);
