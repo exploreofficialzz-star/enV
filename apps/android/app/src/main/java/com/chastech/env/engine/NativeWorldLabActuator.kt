@@ -24,7 +24,8 @@ data class NativeActuatorInput(
     val forceConstantNPerA:Double=8.0,
     val dampingNsPerM:Double=0.5,
     val durationSeconds:Double=4.0,
-    val thermal:NativeActuatorThermal?=null
+    val thermal:NativeActuatorThermal?=null,
+    val powerOffAtSeconds:Double?=null
 )
 data class NativeActuatorSample(
     val timeSeconds:Double,
@@ -35,6 +36,7 @@ data class NativeActuatorSample(
     val backEmfV:Double,
     val resistiveHeatW:Double,
     val sourcePowerW:Double,
+    val sourceVoltageV:Double,
     val kineticEnergyJ:Double,
     val gravityEnergyJ:Double,
     val magneticEnergyJ:Double,
@@ -112,6 +114,7 @@ object NativeWorldLabActuator {
         bounded(i.forceConstantNPerA,0.0,10000.0,"Motor constant")
         bounded(i.dampingNsPerM,0.0,100000.0,"Damping")
         bounded(i.durationSeconds,0.1,12.0,"Duration")
+        i.powerOffAtSeconds?.let{bounded(it,0.0,i.durationSeconds,"Power-off event time")}
         bounded(requestedStepSeconds,0.0001,0.05,"Step")
         i.thermal?.let{t->
             bounded(t.initialTemperatureK,1.0,1500.0,"Initial temperature")
@@ -177,7 +180,7 @@ object NativeWorldLabActuator {
      * reference model. Internal numerical consistency is not measured proof.
      */
     fun numericalAudit(input:NativeActuatorInput,run:NativeActuatorResult):NativeActuatorNumericalAudit {
-        require((run.modelVersion=="1.0.0"||run.modelVersion=="1.1.0") && run.samples.size>=2 &&
+        require((run.modelVersion=="1.0.0"||run.modelVersion=="1.1.0"||run.modelVersion=="1.2.0") && run.samples.size>=2 &&
             run.stepSeconds.isFinite() && run.stepSeconds>0) {
             "A completed native actuator trajectory is required"
         }
