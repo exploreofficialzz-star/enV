@@ -477,6 +477,9 @@ struct NativeWorldLabView:View {
                     Text("See inside is visual transparency, not an X-ray or molecular measurement.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                if let project=project {
+                    NativeWorldLabElasticWavePanel(project:project)
+                }
                 Divider()
                 HStack {
                     Button("New project"){askToReplace("new")}.buttonStyle(.borderedProminent)
@@ -2476,5 +2479,143 @@ Text("Invent chemical heat").font(.headline)
         scene=next
         applyDropPosition()
         applyMotorPosition()
+    }
+}
+
+
+// MARK: - Independent native iOS elastic wave experiment
+private struct NativeWorldLabElasticWavePanel:View {
+    let project:NativeWorldLabProject
+    @State private var rodIndex=0
+    @State private var mode="1"
+    @State private var amplitude="0.00001"
+    @State private var cycles="4"
+    @State private var run:NativeElasticWaveRun?
+    @State private var fraction=0.0
+    @State private var playing=false
+    @State private var speed=1.0
+    @State private var problem=""
+    @State private var exporting=false
+    @State private var evidenceFile:NativeWorldLabJsonFile?
+
+    private var rods:[NativeLabSolid] {
+        project.entities.filter{$0.shape=="box" || $0.shape=="cylinder"}
+    }
+    private var current:NativeElasticWaveRun? {
+        guard let r=run,!rods.isEmpty,
+              r.projectId==project.id && r.projectRevision==project.revision &&
+              r.entityId==rods[rodIndex%rods.count].id else {return nil}
+        return r
+    }
+    var body:some View {
+        VStack(alignment:.leading,spacing:8){
+            Text("Make waves inside invented matter").font(.headline)
+            Text("Analytic 1D standing waves from inventor-assumed density and stiffness. No measured material response, bending or fracture.")
+                .font(.caption).foregroundStyle(.secondary)
+            if !rods.isEmpty {
+                Button("Rod: "+rods[rodIndex%rods.count].name){
+                    rodIndex=(rodIndex+1)%rods.count
+                    run=nil;playing=false
+                }.buttonStyle(.bordered)
+                HStack{
+                    TextField("Mode 1–12",text:$mode).keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Cycles 1–20",text:$cycles).keyboardType(.numberPad)
+                        .textFieldStyle(.roundedBorder)
+                }
+                TextField("Amplitude in metres",text:$amplitude)
+                    .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                Button("Calculate local elastic wave"){
+                    do{
+                        guard let n=Int(mode),let c=Int(cycles),
+                              let a=Double(amplitude) else {
+                            throw NativeWorldLabError.invalid("Enter valid wave parameters")
+                        }
+                        run=try NativeWorldLabElasticWave.evaluate(project,
+                            id:rods[rodIndex%rods.count].id,mode:n,
+                            amplitudeMeters:a,cycles:c)
+                        fraction=0;playing=false;problem=""
+                    }catch{
+                        run=nil;playing=false;problem=error.localizedDescription
+                    }
+                }.buttonStyle(.borderedProminent)
+                if let r=current {
+                    let sample=try? r.sample(r.durationSeconds*fraction)
+                    Text("Wave speed: "+String(format:"%.5g",r.waveSpeedMps)+
+                        " m/s · frequency: "+String(format:"%.5g",r.frequencyHz)+" Hz")
+                        .font(.caption)
+                    Text("Maximum axial stress: "+String(format:"%.5g",r.maximumStressPa)+" Pa")
+                        .font(.caption)
+                    if let sample=sample {
+                        GeometryReader{frame in
+                            Path{path in
+                                for (i,y) in sample.displacementsMeters.enumerated(){
+                                    let x=frame.size.width*CGFloat(i)/
+                                        CGFloat(sample.displacementsMeters.count-1)
+                                    let v=frame.size.height*(0.5-
+                                        0.35*y/r.amplitudeMeters)
+                                    let point=CGPoint(x:x,y:v)
+                                    if i==0 {path.move(to:point)}
+                                    else {path.addLine(to:point)}
+                                }
+                            }.stroke(.primary,lineWidth:2)
+                        }.frame(height:100)
+                            .accessibilityLabel("Computed wave displacement along invented rod")
+                        Slider(value:$fraction,in:0...1,onEditingChanged:{editing in
+                            if editing{playing=false}
+                        }).accessibilityLabel("Wave simulated time")
+                        Text("Simulated time "+String(format:"%.5g",sample.timeSeconds)+" s")
+                            .font(.caption)
+                        HStack{
+                            Button(playing ? "Pause wave":"Play wave"){playing.toggle()}
+                            Button("Reset"){playing=false;fraction=0}
+                            Button("Speed "+String(format:"%.1f",speed)+"×"){
+                                speed=speed==1 ? 4 : speed==4 ? 0.1 : 1
+                            }
+                        }.buttonStyle(.bordered)
+                        Text("Kinetic: "+String(format:"%.5g",sample.kineticEnergyJ)+
+                            " J · stored strain: "+String(format:"%.5g",sample.strainEnergyJ)+" J")
+                            .font(.caption)
+                        Text("Ideal total energy: "+String(format:"%.5g",sample.totalEnergyJ)+" J")
+                            .font(.caption)
+                    }
+                    Button("Export elastic-wave evidence"){
+                        do{
+                            let frames=try (0...80).map{
+                                try r.sample(r.durationSeconds*Double($0)/80)
+                            }
+                            let bytes=try JSONEncoder().encode(
+                                NativeElasticWaveEvidence(result:r,frames:frames))
+                            guard bytes.count<=1_048_576 else {
+                                throw NativeWorldLabError.invalid("Wave evidence exceeds 1 MB")
+                            }
+                            evidenceFile=NativeWorldLabJsonFile(content:bytes)
+                            exporting=true;problem=""
+                        }catch{problem=error.localizedDescription}
+                    }.buttonStyle(.bordered)
+                    Text(r.validity).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Text("Invent a box or cylinder and assume density and Young's modulus.")
+                    .font(.caption)
+            }
+            if !problem.isEmpty{
+                Text(problem).font(.caption).foregroundStyle(.red)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
+        }
+        .task(id:playing){
+            while playing && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds:40_000_000)
+                guard let r=current else {playing=false;break}
+                fraction=min(1,fraction+0.04*speed/(Double(r.cycles)*0.75))
+                if fraction>=1{playing=false}
+            }
+        }
+        .fileExporter(isPresented:$exporting,document:evidenceFile,
+            contentType:.json,defaultFilename:"world-lab-elastic-wave"){result in
+                if case .failure(let error)=result{problem=error.localizedDescription}
+                evidenceFile=nil
+            }
     }
 }

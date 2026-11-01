@@ -699,3 +699,10 @@ release-candidate evidence bundle are unfinished.
 - Browser recovery drafts now include bounded, individually verified numerical runs and scientific evidence as well as the invented project. The explicit restore action brings back those session results without overwriting a saved version; legacy project-only recovery drafts remain readable.
 - Adding a numerical run now marks the session for recovery, rather than relying only on geometry edits. IndexedDB debounces the combined snapshot and enforces a 24 MB per-draft cap, 20 numerical records, 20 scientific records, ownership and unique IDs.
 - Added pure source regressions covering unsaved RC experiment recovery, legacy drafts and duplicated immutable record IDs. No build or test execution has been claimed.
+
+
+## Invented-material axial wave science — 2026-11-01
+- Web, Android Kotlin and iOS Swift now independently implement an exact small-strain 1D longitudinal standing-wave mode in an inventor-authored uniform box/cylinder. Material density and Young's modulus are expressly user-assumed; no unsupported property prediction is made.
+- Interactive native/Web mode/amplitude/cycle authoring, time scrubbing, playback-rate controls, computed spatial displacement profiles, maximum axial stress, frequency, wave speed and kinetic/strain-energy balance. Separate bounded JSON evidence export includes source project identity/revision and scientific-domain disclosure.
+- Numerical regression cases cover analytic wave speed, free-end zero stress, quarter-period kinetic-energy transfer, conserved mode energy, invalid amplitude/assumptions and extreme wave speed. This is NOT measured acoustics, heterogeneous solids, sound in air, nonlinear fracture, or general structural FEM.
+- Dependency-consistency repair aligns the existing root minimatch override with its patched lockfile. Build/CI and platform accessibility still require new-head checks; source integration is not itself a production certification.

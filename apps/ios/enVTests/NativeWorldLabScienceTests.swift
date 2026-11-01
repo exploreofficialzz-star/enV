@@ -60,3 +60,35 @@ final class NativeWorldLabScienceTests:XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabDropScience.evaluate(badBounce))
     }
 }
+
+
+final class NativeWorldLabElasticWaveTests:XCTestCase {
+    func testStandingWaveConservationAndFreeEnds() throws {
+        let r=try NativeWorldLabElasticWave.parameters(
+            projectId:"p",projectRevision:3,entityId:"rod",materialId:"matter",
+            lengthMeters:1,crossSectionM2:0.06,densityKgM3:8000,
+            youngModulusPa:200e9,mode:1,amplitudeMeters:1e-5,cycles:4)
+        XCTAssertEqual(r.waveSpeedMps,5000,accuracy:1e-9)
+        XCTAssertEqual(r.frequencyHz,2500,accuracy:1e-9)
+        let initial=try r.sample(0)
+        XCTAssertEqual(try XCTUnwrap(initial.displacementsMeters.first),1e-5,accuracy:1e-14)
+        XCTAssertEqual(try XCTUnwrap(initial.displacementsMeters.last),-1e-5,accuracy:1e-14)
+        XCTAssertLessThan(abs(try XCTUnwrap(initial.stressesPa.first)),1e-6)
+        XCTAssertLessThan(abs(try XCTUnwrap(initial.stressesPa.last)),1e-6)
+        let quarter=try r.sample(r.periodSeconds/4)
+        XCTAssertEqual(quarter.kineticEnergyJ,r.totalEnergyJ,accuracy:1e-7)
+        XCTAssertEqual(quarter.strainEnergyJ,0,accuracy:1e-16)
+        XCTAssertEqual(quarter.totalEnergyJ,initial.totalEnergyJ,accuracy:1e-7)
+        XCTAssertEqual(r.inputEvidence,"hypothetical-user-assumed")
+    }
+    func testNonlinearAssumptionsAreRejected() {
+        XCTAssertThrowsError(try NativeWorldLabElasticWave.parameters(
+            projectId:"p",projectRevision:1,entityId:"r",materialId:"m",
+            lengthMeters:1,crossSectionM2:0.06,densityKgM3:8000,
+            youngModulusPa:200e9,mode:1,amplitudeMeters:0.1,cycles:4))
+        XCTAssertThrowsError(try NativeWorldLabElasticWave.parameters(
+            projectId:"p",projectRevision:1,entityId:"r",materialId:"m",
+            lengthMeters:1,crossSectionM2:0.06,densityKgM3:0.001,
+            youngModulusPa:1e15,mode:1,amplitudeMeters:1e-5,cycles:4))
+    }
+}

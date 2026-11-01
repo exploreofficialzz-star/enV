@@ -1361,3 +1361,130 @@ extension NativeMaterialHeatRun {
         try c.encode(validity,forKey:.validity)
     }
 }
+
+
+// MARK: - Assumption-bound axial waves in invented solids (independent Swift model)
+struct NativeElasticWaveSample:Encodable {
+    let timeSeconds:Double
+    let positionsMeters:[Double]
+    let displacementsMeters:[Double]
+    let velocitiesMetersPerSecond:[Double]
+    let stressesPa:[Double]
+    let kineticEnergyJ:Double
+    let strainEnergyJ:Double
+    let totalEnergyJ:Double
+}
+struct NativeElasticWaveRun:Encodable {
+    let format="env-world-lab-elastic-wave"
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let inputEvidence="hypothetical-user-assumed"
+    let projectId:String
+    let projectRevision:Int
+    let entityId:String
+    let materialId:String
+    let mode:Int
+    let amplitudeMeters:Double
+    let cycles:Int
+    let lengthMeters:Double
+    let crossSectionM2:Double
+    let assumedDensityKgM3:Double
+    let assumedYoungModulusPa:Double
+    let waveSpeedMps:Double
+    let frequencyHz:Double
+    let periodSeconds:Double
+    let durationSeconds:Double
+    let maximumStressPa:Double
+    let totalEnergyJ:Double
+    let validity:String
+
+    func sample(_ seconds:Double,points:Int=41)throws->NativeElasticWaveSample {
+        guard seconds.isFinite && seconds>=0 && seconds<=durationSeconds &&
+              (3...101).contains(points) else {
+            throw NativeWorldLabError.invalid("Wave playback time or sample grid is invalid")
+        }
+        let phase=2*Double.pi*frequencyHz*seconds
+        let k=Double.pi*Double(mode)/lengthMeters
+        let omega=2*Double.pi*frequencyHz
+        let positions=(0..<points).map{Double($0)*lengthMeters/Double(points-1)}
+        let displacement=positions.map{amplitudeMeters*cos(k*$0)*cos(phase)}
+        let velocity=positions.map{-amplitudeMeters*omega*cos(k*$0)*sin(phase)}
+        let stress=positions.map{-assumedYoungModulusPa*amplitudeMeters*k*
+            sin(k*$0)*cos(phase)}
+        let kinetic=totalEnergyJ*pow(sin(phase),2)
+        let strain=totalEnergyJ*pow(cos(phase),2)
+        return NativeElasticWaveSample(timeSeconds:seconds,positionsMeters:positions,
+            displacementsMeters:displacement,velocitiesMetersPerSecond:velocity,
+            stressesPa:stress,kineticEnergyJ:kinetic,strainEnergyJ:strain,
+            totalEnergyJ:kinetic+strain)
+    }
+}
+struct NativeElasticWaveEvidence:Encodable {
+    let result:NativeElasticWaveRun
+    let frames:[NativeElasticWaveSample]
+}
+enum NativeWorldLabElasticWave {
+    static func evaluate(_ project:NativeWorldLabProject,id:String,
+        mode:Int,amplitudeMeters:Double,cycles:Int)throws->NativeElasticWaveRun {
+        guard let solid=project.entities.first(where:{$0.id==id}),
+              solid.shape=="box" || solid.shape=="cylinder" else {
+            throw NativeWorldLabError.invalid("Choose an authored box or cylinder rod")
+        }
+        guard let material=project.materials.first(where:{$0.id==solid.materialId}),
+              material.evidence=="hypothetical-user-assumed",
+              let density=material.densityKgM3,
+              let modulus=material.youngModulusPa else {
+            throw NativeWorldLabError.invalid("Assign assumed density and modulus to the rod")
+        }
+        let dimensions=solid.dimensionsMeters
+        let area=solid.shape=="box" ? dimensions[0]*dimensions[2] :
+            Double.pi*dimensions[0]*dimensions[0]/4
+        return try parameters(projectId:project.id,projectRevision:project.revision,
+            entityId:solid.id,materialId:material.id,lengthMeters:dimensions[1],
+            crossSectionM2:area,densityKgM3:density,youngModulusPa:modulus,
+            mode:mode,amplitudeMeters:amplitudeMeters,cycles:cycles)
+    }
+    static func parameters(projectId:String,projectRevision:Int,entityId:String,
+        materialId:String,lengthMeters:Double,crossSectionM2:Double,
+        densityKgM3:Double,youngModulusPa:Double,
+        mode:Int,amplitudeMeters:Double,cycles:Int)throws->NativeElasticWaveRun {
+        guard !projectId.isEmpty && !entityId.isEmpty && !materialId.isEmpty &&
+              projectRevision>=0 && lengthMeters.isFinite &&
+              (0.001...10000).contains(lengthMeters) && crossSectionM2.isFinite &&
+              (1e-10...1e8).contains(crossSectionM2) && densityKgM3.isFinite &&
+              (0.001...1e9).contains(densityKgM3) && youngModulusPa.isFinite &&
+              (1...1e15).contains(youngModulusPa) && (1...12).contains(mode) &&
+              (1...20).contains(cycles) else {
+            throw NativeWorldLabError.invalid("Elastic-wave material, geometry or mode is outside the bounded model")
+        }
+        let maximumAmplitude=min(0.01,0.001*lengthMeters/(Double.pi*Double(mode)))
+        guard amplitudeMeters.isFinite && amplitudeMeters>=1e-9 &&
+              amplitudeMeters<=maximumAmplitude else {
+            throw NativeWorldLabError.invalid("Wave amplitude violates the small-strain model")
+        }
+        let speed=sqrt(youngModulusPa/densityKgM3)
+        guard speed.isFinite && (1e-6...1e6).contains(speed) else {
+            throw NativeWorldLabError.invalid("Invented elastic-wave speed exceeds model limits")
+        }
+        let frequency=Double(mode)*speed/(2*lengthMeters)
+        let period=1/frequency, duration=Double(cycles)*period
+        let omega=2*Double.pi*frequency
+        let energy=0.25*densityKgM3*crossSectionM2*lengthMeters*
+            pow(amplitudeMeters*omega,2)
+        let stress=youngModulusPa*amplitudeMeters*Double.pi*Double(mode)/lengthMeters
+        guard duration.isFinite && (1e-9...1e7).contains(duration) &&
+              energy.isFinite && (0...1e40).contains(energy) &&
+              stress.isFinite && (0...1e16).contains(stress) else {
+            throw NativeWorldLabError.invalid("Nonfinite or unsupported wave energy/stress")
+        }
+        return NativeElasticWaveRun(projectId:projectId,projectRevision:projectRevision,
+            entityId:entityId,materialId:materialId,mode:mode,amplitudeMeters:amplitudeMeters,
+            cycles:cycles,lengthMeters:lengthMeters,crossSectionM2:crossSectionM2,
+            assumedDensityKgM3:densityKgM3,assumedYoungModulusPa:youngModulusPa,
+            waveSpeedMps:speed,frequencyHz:frequency,periodSeconds:period,
+            durationSeconds:duration,maximumStressPa:stress,totalEnergyJ:energy,
+            validity:"Ideal linear free-free axial standing mode in a uniform invented bar. "+
+                "Assumed, unmeasured density/modulus; no bending, fracture, damping, "+
+                "acoustics in air or nonlinear material behavior.")
+    }
+}
