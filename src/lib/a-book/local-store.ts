@@ -498,40 +498,64 @@ export function assertABookImportQuotas(input: {
   }
 }
 
+export function assertABookImportRecords(data: {
+  notes: ABookNote[];
+  revisions: ABookRevision[];
+  attachments: ABookAttachment[];
+}): void {
+  if (!Array.isArray(data.notes) || !Array.isArray(data.revisions) || !Array.isArray(data.attachments)
+    || data.notes.length > MAX_LOCAL_NOTES || data.revisions.length > MAX_LOCAL_REVISIONS
+    || data.attachments.length > MAX_LOCAL_ATTACHMENTS) {
+    throw new Error("This backup exceeds the A book local library item limits.");
+  }
+
+  const noteIds = new Set<string>();
+  for (const note of data.notes) {
+    try { assertABookNoteForStorage(note); }
+    catch { throw new Error("The backup contains an invalid note record."); }
+    if (noteIds.has(note.id)) throw new Error("The backup contains an empty or duplicate note ID.");
+    noteIds.add(note.id);
+  }
+
+  const revisionIds = new Set<string>();
+  for (const revision of data.revisions) {
+    if (!revision || typeof revision.id !== "string" || !revision.id.trim() || revision.id.length > 180
+      || revisionIds.has(revision.id) || !noteIds.has(revision.noteId)
+      || typeof revision.title !== "string" || revision.title.length > 10_000
+      || typeof revision.body !== "string" || revision.body.length > 5_000_000
+      || typeof revision.notebook !== "string" || revision.notebook.length > 500
+      || !Array.isArray(revision.tags) || revision.tags.length > 50
+      || !revision.tags.every((tag) => typeof tag === "string" && tag.length <= 200)
+      || !Number.isSafeInteger(revision.revision) || revision.revision < 0
+      || !Number.isSafeInteger(revision.createdAt)) {
+      throw new Error("The backup contains an invalid or duplicate revision record.");
+    }
+    revisionIds.add(revision.id);
+  }
+
+  const attachmentIds = new Set<string>();
+  for (const attachment of data.attachments) {
+    if (!attachment || typeof attachment.id !== "string" || !attachment.id.trim() || attachment.id.length > 180
+      || attachmentIds.has(attachment.id) || !noteIds.has(attachment.noteId)
+      || typeof attachment.name !== "string" || !attachment.name.trim() || attachment.name.length > 500
+      || typeof attachment.type !== "string" || attachment.type.length > 200
+      || !Number.isSafeInteger(attachment.createdAt)
+      || !attachment.blob || !Number.isSafeInteger(attachment.size)
+      || attachment.size !== attachment.blob.size || attachment.size <= 0
+      || attachment.size > MAX_LOCAL_ATTACHMENT_BYTES) {
+      throw new Error("The backup contains invalid or duplicate attachment metadata.");
+    }
+    attachmentIds.add(attachment.id);
+  }
+}
+
 export async function importLocalLibrary(data: {
   notes: ABookNote[];
   revisions: ABookRevision[];
   attachments: ABookAttachment[];
 }): Promise<number> {
-  if (data.notes.length > MAX_LOCAL_NOTES || data.revisions.length > MAX_LOCAL_REVISIONS
-    || data.attachments.length > MAX_LOCAL_ATTACHMENTS) {
-    throw new Error("This backup exceeds the A book local library item limits.");
-  }
-  const originalNoteIds = new Set<string>();
-  for (const note of data.notes) {
-    if (!note.id || originalNoteIds.has(note.id)) {
-      throw new Error("The backup contains an empty or duplicate note ID.");
-    }
-    originalNoteIds.add(note.id);
-  }
-  for (const revision of data.revisions) {
-    if (!originalNoteIds.has(revision.noteId) || !revision.id || revision.title.length > 10_000
-      || revision.body.length > 5_000_000 || revision.notebook.length > 500
-      || revision.tags.length > 50 || !revision.tags.every((tag) => typeof tag === "string" && tag.length <= 200)
-      || !Number.isSafeInteger(revision.revision) || revision.revision < 0
-      || !Number.isSafeInteger(revision.createdAt)) {
-      throw new Error("The backup contains an invalid revision record.");
-    }
-  }
-  const attachmentIds = new Set<string>();
-  for (const attachment of data.attachments) {
-    if (!originalNoteIds.has(attachment.noteId) || !attachment.id || attachmentIds.has(attachment.id)
-      || attachment.name.length > 500 || attachment.type.length > 200) {
-      throw new Error("The backup contains invalid or duplicate attachment metadata.");
-    }
-    attachmentIds.add(attachment.id);
-  }
-
+  assertABookImportRecords(data);
+  const originalNoteIds = new Set(data.notes.map((note) => note.id));
   const db = await openDatabase();
   const noteIds = new Map<string, string>();
   for (const note of data.notes) noteIds.set(note.id, createId());
