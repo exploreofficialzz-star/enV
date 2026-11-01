@@ -1111,11 +1111,11 @@ object NativeWorldLabEditor {
             solid.positionMeters.x,solid.positionMeters.y,solid.positionMeters.z
         ).map{value->
             val snapped=kotlin.math.floor(value/gridMeters+0.5)*gridMeters
-            val rounded=kotlin.math.round(snapped*1e6)/1e6
+            val rounded=kotlin.math.floor(snapped*1e6+0.5)/1e6
             require(rounded.isFinite() && rounded in -100000.0..100000.0){
                 "Snapped coordinate is outside the local world"
             }
-            rounded
+            if(rounded==0.0)0.0 else rounded
         }
         return positionSolid(source,id,position)
     }
@@ -1130,7 +1130,7 @@ object NativeWorldLabEditor {
             require(original.length()==3){"Selected CAD coordinates are invalid"}
             val snapped=(0..2).map{axis->
                 val raw=kotlin.math.floor(original.getDouble(axis)/gridMeters+0.5)*gridMeters
-                val rounded=kotlin.math.round(raw*1e6)/1e6
+                val rounded=kotlin.math.floor(raw*1e6+0.5)/1e6
                 require(rounded.isFinite()&&rounded in -100000.0..100000.0){
                     "Snapped position exceeds the local-world coordinate envelope"
                 }
