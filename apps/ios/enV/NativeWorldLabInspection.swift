@@ -569,7 +569,7 @@ enum NativeWorldLabFieldLayerCodec {
         for key in ["acquiredAtUTC","validFromUTC","validToUTC"] {
             if let value=time[key],!(value is NSNull) {
                 guard let text=value as? String,utc(text) else {
-                    throw NativeWorldLabError.invalid("Field timestamp (key) must be UTC.")
+                    throw NativeWorldLabError.invalid("Field timestamp \\(key) must be UTC.")
                 }
             }
         }
@@ -584,7 +584,7 @@ enum NativeWorldLabFieldLayerCodec {
                   source["inputEvidence"] as? String=="hypothetical-user-assumed" else {
                 throw NativeWorldLabError.invalid("Computed field provenance needs a versioned solver and input evidence.")
             }
-            sourceDescription="Solver (model) v(version) · run (run)"
+            sourceDescription="Solver \\(model) v\\(version) · run \\(run)"
         case "dataset":
             let provider=try string(source,"provider",240),dataset=try string(source,"datasetId",240)
             let version=try string(source,"datasetVersion",120),license=try string(source,"license",240)
@@ -592,7 +592,7 @@ enum NativeWorldLabFieldLayerCodec {
             guard utc(retrieved),["measured-observed","forecast"].contains(source["evidence"] as? String ?? "") else {
                 throw NativeWorldLabError.invalid("Dataset provenance needs UTC retrieval and an evidence type.")
             }
-            sourceDescription="Dataset (provider) · (dataset) v(version) · (license)"
+            sourceDescription="Dataset \\(provider) · \\(dataset) v\\(version) · \\(license)"
         default:
             throw NativeWorldLabError.invalid("Field source provenance is missing.")
         }
