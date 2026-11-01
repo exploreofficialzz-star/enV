@@ -95,8 +95,8 @@ for (const family of EXPANSION_FAMILIES) {
     for (const target of ["a", "b", "c"] as const) {
       const equationTitle = expansionCalculatorName(info, target);
       generatedCalculatorPresentation.set(`exp-${family}-${info.key}-${target}`, {
-        name: info.title ? `${info.title}: ${equationTitle}` : equationTitle,
-        description: `${expansionCalculatorDescription(info, target)} Enter the other two values to calculate the missing value.`,
+        name: equationTitle,
+        description: expansionCalculatorDescription(info, target),
         keywords: expansionCalculatorKeywords(family, info, target).split(/\s+/),
       });
     }
