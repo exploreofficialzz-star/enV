@@ -174,4 +174,19 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.categories.first?.blurb, "on-device checks")
         XCTAssertTrue(NativeCopy.isWebRuntimeOnly("webcodecs-audio-checker"))
     }
+
+    func testABookPDFPageSelectionPreservesOrderAndRejectsDuplicates() throws {
+        XCTAssertEqual(try parseABookPageSelection("3,1-2", pageCount: 4), [3, 1, 2])
+        XCTAssertThrowsError(try parseABookPageSelection("1-3,3", pageCount: 4))
+        XCTAssertThrowsError(try parseABookPageSelection("1-5", pageCount: 4))
+        XCTAssertThrowsError(try parseABookPageSelection("", pageCount: 4))
+    }
+
+    func testABookPDFSplitGroupsPreservePartOrderAndRejectCrossPartDuplicates() throws {
+        XCTAssertEqual(try parseABookPageGroups("3,1;4-5", pageCount: 5), [[3, 1], [4, 5]])
+        XCTAssertThrowsError(try parseABookPageGroups("1-3;3-4", pageCount: 5))
+        XCTAssertThrowsError(try parseABookPageGroups("1-3", pageCount: 5))
+        XCTAssertThrowsError(try parseABookPageGroups("1-6;7-8", pageCount: 5))
+    }
+
 }
