@@ -14423,7 +14423,7 @@ private final class ABookLocalStore {
               note.deletedAt == nil || note.deletedAt?.timeIntervalSince1970.isFinite == true else {
             throw NSError(domain: "ABookLocalStore", code: 40, userInfo: [NSLocalizedDescriptionKey: "This note exceeds A book's local storage limits or contains invalid metadata."])
         }
-        try perform { context in
+        return try perform { context in
             let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
             request.predicate = NSPredicate(format: "id == %@", note.id as CVarArg)
             let existing = try context.fetch(request).first
