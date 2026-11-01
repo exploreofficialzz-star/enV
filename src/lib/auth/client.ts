@@ -1,6 +1,7 @@
 import { createAuthClient } from "better-auth/react";
 import { OAUTH_PROVIDERS } from "./providers";
 
+// Generic OAuth providers now share Better Auth's standard social client API.
 export const authClient = createAuthClient();
 
 /** Authentication remains off unless it is explicitly enabled at build time. */
