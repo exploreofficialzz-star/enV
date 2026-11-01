@@ -4477,8 +4477,7 @@ private struct NativeWorldLabFieldImportPanel:View {
         switch layer.kind {
         case .scalar:return try? layer.scalarSlice(timeSeconds,plane:plane,sliceIndex:sliceIndex)
         case .vector:
-            guard layer.rendererKind=="glyphs" else{return nil}
-            return try? layer.vectorGlyphs(timeSeconds,plane:plane,sliceIndex:sliceIndex)
+            return try? layer.vectorDisplaySlice(timeSeconds,plane:plane,sliceIndex:sliceIndex)
         case .tensor:return try? layer.tensorSlice(timeSeconds,component:tensorComponent,plane:plane,sliceIndex:sliceIndex)
         }
     }
