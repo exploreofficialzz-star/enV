@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { parseGeneratedCatalog } from './catalog-reader.mjs';
 
-const catalog = await readFile(new URL('../src/data/catalog.ts', import.meta.url), 'utf8');
+const catalog = parseGeneratedCatalog(await readFile(new URL('../src/data/catalog.ts', import.meta.url), 'utf8'));
 const web = await readFile(new URL('../src/components/engines/business-engine.tsx', import.meta.url), 'utf8');
 const android = await readFile(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeBusinessEngine.kt', import.meta.url), 'utf8');
 const androidPdf = await readFile(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeBusinessPdfExporter.kt', import.meta.url), 'utf8');
@@ -19,9 +20,12 @@ const androidTests = await readFile(new URL('../apps/android/app/src/test/java/c
 const iosTests = await readFile(new URL('../apps/ios/enVTests/NativeBusinessEngineTests.swift', import.meta.url), 'utf8');
 
 for (const slug of ['invoice-generator', 'receipt-generator', 'quotation-generator', 'estimate-generator', 'meeting-agenda-generator', 'meeting-minutes-generator', 'payslip-calculator', 'break-even-calculator']) {
-  assert.ok(catalog.includes(`\\"id\\":\\"${slug}\\"`), `legacy slug retained: ${slug}`);
+  assert.ok(catalog.some((tool) => tool.id === slug), `legacy slug retained: ${slug}`);
 }
-assert.match(catalog, /\\"id\\":\\"break-even-calculator\\"[\s\S]{0,1000}\\"engine\\":\{\\"type\\":\\"business\\",\\"op\\":\\"break-even\\"\}/);
+const breakEvenTool = catalog.find((tool) => tool.id === 'break-even-calculator');
+assert.ok(breakEvenTool, 'legacy break-even calculator remains in the canonical catalogue');
+assert.equal(breakEvenTool.engine.type, 'business', 'legacy break-even route uses the business engine');
+assert.equal(breakEvenTool.engine.op, 'break-even', 'legacy break-even route keeps its Finance Studio operation');
 assert.match(web, /op === "payslip"/);
 assert.match(web, /MEETING MINUTES|Decisions:/);
 assert.match(web, /Meeting title/);
@@ -159,7 +163,7 @@ assert.match(iosTests, /testBlankEditableDocumentRowsDoNotInventAServiceOrTotal/
 // Every mapped legacy slug must still resolve to a catalog tool ID.
 const mappedSlugs = slugMap.trim().split(/\r?\n/).slice(1).map((line) => line.split(',')[0].replace(/^"|"$/g, '')).filter(Boolean);
 assert.equal(mappedSlugs.length, 105, 'documented business slug map row count');
-for (const slug of mappedSlugs) assert.ok(catalog.includes(`\\"id\\":\\"${slug}\\"`), `mapped slug still exists in the catalog: ${slug}`);
+for (const slug of mappedSlugs) assert.ok(catalog.some((tool) => tool.id === slug), `mapped slug still exists in the catalog: ${slug}`);
 
 // Golden formula fixtures from the business prompt.
 assert.equal(3 * 250, 750); // invoice subtotal
