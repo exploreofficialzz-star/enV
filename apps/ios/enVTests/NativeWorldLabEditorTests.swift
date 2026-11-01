@@ -188,3 +188,30 @@ final class NativeWorldLabEditorTests: XCTestCase {
     }
 
 }
+
+    func testNativeCADRotationScaleDuplicatePatternAndCameraRoundtrip() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"cad")
+        data=try NativeWorldLabEditor.rotateSolid(data,id:"cad",axis:2,deltaDegrees:45)
+        var parsed=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(parsed.entities[0].effectiveRotationRadians[2],Double.pi/4,accuracy:1e-12)
+        data=try NativeWorldLabEditor.scaleSolid(data,id:"cad",factors:[2,1,1])
+        XCTAssertEqual(try NativeWorldLabProject.decode(data).entities[0].dimensionsMeters[0],2,accuracy:1e-12)
+        data=try NativeWorldLabEditor.duplicateSolid(data,id:"cad",offsetMeters:[2,0,0],newId:"copy")
+        XCTAssertEqual(try NativeWorldLabProject.decode(data).entities.count,2)
+        data=try NativeWorldLabEditor.linearPattern(data,id:"copy",axis:0,spacingMeters:3,copies:2)
+        parsed=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(parsed.entities.count,4)
+        XCTAssertEqual(parsed.entities.last?.positionMeters[0],8,accuracy:1e-12)
+        data=try NativeWorldLabEditor.saveCameraViewpoint(data,
+            positionMeters:[10,8,-10],lookingAtMeters:[1,2,3])
+        parsed=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(parsed.cameraPositionMeters,[10,8,-10])
+        XCTAssertEqual(parsed.cameraLookingAtMeters,[1,2,3])
+    }
+    func testNativeCADRejectsUnsafeTransformParameters() throws {
+        let data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"sphere",id:"s")
+        XCTAssertThrowsError(try NativeWorldLabEditor.rotateSolid(data,id:"s",axis:4,deltaDegrees:15))
+        XCTAssertThrowsError(try NativeWorldLabEditor.rotateSolid(data,id:"s",axis:0,deltaDegrees:Double.nan))
+        XCTAssertThrowsError(try NativeWorldLabEditor.scaleSolid(data,id:"s",factors:[-1,1,1]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.linearPattern(data,id:"s",axis:0,spacingMeters:0,copies:2))
+    }

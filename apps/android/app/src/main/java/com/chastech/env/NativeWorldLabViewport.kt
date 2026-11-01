@@ -93,7 +93,7 @@ fun NativeWorldLabViewport(
             .pointerInput(project.id,project.revision,zoom,yaw,pan){
                 detectTapGestures{touch->
                     val hit=project.entities.map{e->
-                        val p=projection(e.positionMeters,size.width,size.height)
+                        val p=projection(e.positionMeters,size.width.toFloat(),size.height.toFloat())
                         e to hypot(p.x-touch.x,p.y-touch.y)
                     }.filter{it.second<44f}.minByOrNull{it.second}
                     hit?.first?.let{onSelect(it.id)}

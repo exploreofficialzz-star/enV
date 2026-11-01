@@ -415,6 +415,21 @@ enum NativeWorldLabEditor {
             root["entities"]=entities
         }
     }
+    static func saveCameraViewpoint(_ data:Data,positionMeters:[Double],
+        lookingAtMeters:[Double])throws->Data {
+        guard positionMeters.count==3,lookingAtMeters.count==3,
+              (positionMeters+lookingAtMeters).allSatisfy({$0.isFinite && abs($0)<=100000}) else {
+            throw NativeWorldLabError.invalid("Camera viewpoint requires six finite bounded world coordinates")
+        }
+        return try mutate(data){root in
+            guard var camera=root["camera"] as? [String:Any] else {
+                throw NativeWorldLabError.invalid("Project camera settings are unavailable")
+            }
+            camera["positionMeters"]=positionMeters
+            camera["lookingAtMeters"]=lookingAtMeters
+            root["camera"]=camera
+        }
+    }
     static func addHypotheticalMaterial(_ data:Data,name:String,densityKgM3:Double?,
                                         youngModulusPa:Double?=nil,
                                         id:String=UUID().uuidString,

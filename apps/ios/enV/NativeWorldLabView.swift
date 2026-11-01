@@ -163,6 +163,7 @@ struct NativeWorldLabView:View {
     @State private var motorThermalEnabled=false
     @State private var motorSpeed=1.0
     @State private var scene=SCNScene()
+    @State private var sceneCameraNode=SCNNode()
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
@@ -421,7 +422,12 @@ struct NativeWorldLabView:View {
                     .font(.footnote).foregroundStyle(.secondary)
                 SceneView(scene:scene,options:[.allowsCameraControl,.autoenablesDefaultLighting])
                     .frame(height:260).clipShape(RoundedRectangle(cornerRadius:12))
-                    .accessibilityLabel("Illustrative 3D scene; model values are displayed below.")
+                    .accessibilityLabel("Interactive native 3D invention scene; drag to orbit and pinch to zoom.")
+                HStack{
+                    Button("Save viewpoint"){saveObserverViewpoint()}.buttonStyle(.bordered)
+                    Button("Restore viewpoint"){restoreObserverViewpoint()}.buttonStyle(.bordered)
+                    Button("Surface"){returnObserverToSurface()}.buttonStyle(.bordered)
+                }
                 Picker("Experiment",selection:$mode){
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
@@ -2046,6 +2052,19 @@ Text("Invent chemical heat").font(.headline)
                                     $0,id:solid.id,dimensionsMeters:scaled)}
                             }
                         }.buttonStyle(.bordered)
+                        Text("Rotate and transform").font(.headline)
+                        HStack{
+                            Button("X +15°"){applyProject{try NativeWorldLabEditor.rotateSolid($0,id:solid.id,axis:0,deltaDegrees:15)}}
+                            Button("Y +15°"){applyProject{try NativeWorldLabEditor.rotateSolid($0,id:solid.id,axis:1,deltaDegrees:15)}}
+                            Button("Z +15°"){applyProject{try NativeWorldLabEditor.rotateSolid($0,id:solid.id,axis:2,deltaDegrees:15)}}
+                        }.buttonStyle(.bordered)
+                        HStack{
+                            Button("Scale 1.1×"){applyProject{try NativeWorldLabEditor.scaleSolid($0,id:solid.id,factors:[1.1,1.1,1.1])}}
+                            Button("Duplicate +X"){applyProject{try NativeWorldLabEditor.duplicateSolid($0,id:solid.id,offsetMeters:[gridSpacing,0,0])}}
+                            Button("Linear pattern"){applyProject{try NativeWorldLabEditor.linearPattern($0,id:solid.id,axis:0,spacingMeters:gridSpacing,copies:2)}}
+                        }.buttonStyle(.bordered)
+                        Text("Rotation: "+solid.effectiveRotationRadians.map{String(format:"%.3f",$0)}.joined(separator:" / ")+" rad")
+                            .font(.caption).foregroundStyle(.secondary)
                         Text("Position and measure").font(.headline)
                         HStack {
                             Picker("Grid spacing",selection:$gridSpacing) {
@@ -2372,11 +2391,47 @@ Text("Invent chemical heat").font(.headline)
         let index=max(0,min(run.samples.count-1,Int((dropTime/run.stepSeconds).rounded())))
         node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightAboveGroundM)
     }
+    private func saveObserverViewpoint(){
+        guard let current=project,let data=projectData else{return}
+        do{
+            let position=sceneCameraNode.position
+            let next=try NativeWorldLabEditor.saveCameraViewpoint(data,
+                positionMeters:[Double(position.x),Double(position.y),Double(position.z)],
+                lookingAtMeters:current.cameraLookingAtMeters)
+            projectData=next;project=try NativeWorldLabProject.decode(next)
+            savedSnapshot=nil;problem="Observer viewpoint saved with this invention."
+            redraw()
+        }catch{problem=error.localizedDescription}
+    }
+    private func restoreObserverViewpoint(){
+        guard let current=project else{return}
+        sceneCameraNode.position=SCNVector3(
+            Float(current.cameraPositionMeters[0]),
+            Float(current.cameraPositionMeters[1]),
+            Float(current.cameraPositionMeters[2]))
+        sceneCameraNode.look(at:SCNVector3(Float(current.cameraLookingAtMeters[0]),
+            Float(current.cameraLookingAtMeters[1]),Float(current.cameraLookingAtMeters[2])))
+    }
+    private func returnObserverToSurface(){
+        sceneCameraNode.position=SCNVector3(0,1.65,-8)
+        sceneCameraNode.look(at:SCNVector3(0,1.2,0))
+    }
     private func redraw(){
         let next=SCNScene()
         let floor=SCNNode(geometry:SCNFloor())
         floor.geometry?.firstMaterial?.diffuse.contents=UIColor.systemGreen
         next.rootNode.addChildNode(floor)
+        let savedCamera=SCNNode()
+        savedCamera.name="world-lab-observer-camera"
+        savedCamera.camera=SCNCamera()
+        let position=project?.cameraPositionMeters ?? [0,1.65,-8]
+        let target=project?.cameraLookingAtMeters ?? [0,1.2,0]
+        savedCamera.position=SCNVector3(Float(position[0]),Float(position[1]),Float(position[2]))
+        savedCamera.camera?.zNear=0.03
+        savedCamera.camera?.zFar=5_000_000
+        savedCamera.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        next.rootNode.addChildNode(savedCamera)
+        sceneCameraNode=savedCamera
         if let project {
             for item in project.entities.prefix(200){
                 let xyz=item.dimensionsMeters
@@ -2391,6 +2446,8 @@ Text("Invent chemical heat").font(.headline)
                 node.name="lab-solid-"+item.id
                 node.position=SCNVector3(Float(item.positionMeters[0]),
                     Float(item.positionMeters[1]),Float(item.positionMeters[2]))
+                let rotation=item.effectiveRotationRadians
+                if rotation.count==3 {node.eulerAngles=SCNVector3(Float(rotation[0]),Float(rotation[1]),Float(rotation[2]))}
                 if let hex=UInt64(item.color.dropFirst(),radix:16){
                     geometry.firstMaterial?.diffuse.contents=UIColor(
                         red:CGFloat((hex>>16)&255)/255,
