@@ -532,10 +532,10 @@ fun NativeABookScreen(){
             }
         }
         if(selected!=null){
-            OutlinedTextField(title,{title=it},label={Text("Title")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-            OutlinedTextField(notebook,{notebook=it},label={Text("Notebook")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-            OutlinedTextField(tags,{tags=it},label={Text("Tags · comma separated")},modifier=Modifier.fillMaxWidth(),singleLine=true)
-            OutlinedTextField(body,{body=it},label={Text("Write a note")},modifier=Modifier.fillMaxWidth().heightIn(min=180.dp),minLines=7)
+            OutlinedTextField(title,{title=it},label={Text("Title")},modifier=Modifier.fillMaxWidth(),singleLine=true,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
+            OutlinedTextField(notebook,{notebook=it},label={Text("Notebook")},modifier=Modifier.fillMaxWidth(),singleLine=true,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
+            OutlinedTextField(tags,{tags=it},label={Text("Tags · comma separated")},modifier=Modifier.fillMaxWidth(),singleLine=true,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
+            OutlinedTextField(body,{body=it},label={Text("Write a note")},modifier=Modifier.fillMaxWidth().heightIn(min=180.dp),minLines=7,enabled=notes.firstOrNull{it.id==selected}?.deletedAt==null)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 val selectedNote=notes.firstOrNull{it.id==selected}
                 if(selectedNote?.deletedAt!=null){
