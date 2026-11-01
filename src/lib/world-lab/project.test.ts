@@ -85,3 +85,24 @@ test("invented matter can be revised without changing its identity or inventing 
   assert.throws(()=>reviseWorldLabMaterial(p,"new-matter",{
     name:"Invalid",densityKgM3:Number.NaN,youngModulusPa:1}));
 });
+
+import {setWorldLabGeodeticOrigin} from "./project.ts";
+test("optional WGS84 world origin remains backward compatible and maps local ENU solids",()=>{
+ const old=blankWorldLabProject("legacy-earth",now);
+ const {geodeticOrigin:_,...legacyWorld}=old.world;
+ const legacy=parseWorldLabProject({...old,world:legacyWorld});
+ assert.equal(legacy.world.geodeticOrigin,undefined);
+ const saved=setWorldLabGeodeticOrigin(legacy,
+  {latitudeDegrees:51.5074,longitudeDegrees:-0.1278,heightMeters:35});
+ assert.deepEqual(saved.world.geodeticOrigin,
+  {latitudeDegrees:51.5074,longitudeDegrees:-0.1278,heightMeters:35});
+ assert.equal(legacy.world.geodeticOrigin,undefined);
+ const cleared=setWorldLabGeodeticOrigin(saved,null);
+ assert.equal(cleared.world.geodeticOrigin,null);
+});
+test("WGS84 project origin rejects invalid latitude longitude and height",()=>{
+ const p=blankWorldLabProject("invalid-earth",now);
+ assert.throws(()=>setWorldLabGeodeticOrigin(p,{latitudeDegrees:91,longitudeDegrees:0,heightMeters:0}),/WGS84/);
+ assert.throws(()=>setWorldLabGeodeticOrigin(p,{latitudeDegrees:0,longitudeDegrees:181,heightMeters:0}),/WGS84/);
+ assert.throws(()=>setWorldLabGeodeticOrigin(p,{latitudeDegrees:0,longitudeDegrees:0,heightMeters:Infinity}),/WGS84/);
+});
