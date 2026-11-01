@@ -58,7 +58,7 @@ function isValidRevision(value: unknown, noteIds: Set<string>): value is ABookRe
 }
 
 function inspectZipDirectory(bytes: Uint8Array): string[] {
-  if (bytes.byteLength < 22) fail("This is not a valid A book backup archive.");
+  if (bytes.byteLength < 22) fail("The backup archive directory is missing or invalid.");
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const min = Math.max(0, bytes.byteLength - 65_557);
   let end = -1;
