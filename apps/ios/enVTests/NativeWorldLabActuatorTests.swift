@@ -54,6 +54,40 @@ final class NativeWorldLabActuatorTests:XCTestCase {
         XCTAssertTrue(result.maximumEnergyResidualFraction.isFinite)
         XCTAssertNotNil(result.maximumRelativeStateDifference)
     }
+    func testTimedMotorIsolationPreservesInductiveCurrentThenDecays() throws {
+        var input=NativeActuatorInput(massKg:1)
+        input.gravityMps2=0
+        input.forceConstantNPerA=0
+        input.powerOffAtSeconds=1
+        let run=try NativeWorldLabActuator.evaluate(input)
+        XCTAssertEqual(run.modelVersion,"1.2.0")
+        let before=try XCTUnwrap(run.samples.last(where:{$0.timeSeconds<1}))
+        let after=try XCTUnwrap(run.samples.first(where:{$0.timeSeconds>=1}))
+        let later=try XCTUnwrap(run.samples.min(by:{
+            abs($0.timeSeconds-2)<abs($1.timeSeconds-2)
+        }))
+        let final=try XCTUnwrap(run.samples.last)
+        XCTAssertGreaterThan(before.sourceVoltageV,0)
+        XCTAssertEqual(after.sourceVoltageV,0,accuracy:0)
+        XCTAssertGreaterThan(after.currentA,0)
+        XCTAssertLessThan(later.currentA,after.currentA)
+        XCTAssertLessThan(final.currentA,1e-6)
+        XCTAssertEqual(final.motorForceN,0,accuracy:1e-9)
+        XCTAssertTrue(run.samples.allSatisfy{$0.energyResidualJ.isFinite})
+        XCTAssertLessThan(abs(final.energyResidualJ),0.02*max(1,abs(final.suppliedEnergyJ)))
+        let audit=try NativeWorldLabActuator.numericalAudit(input,run)
+        XCTAssertNotEqual(audit.status,"unavailable")
+    }
+    func testTimedMotorIsolationBoundsAndImmediateOpen() throws {
+        var invalid=NativeActuatorInput(massKg:1)
+        invalid.powerOffAtSeconds=5
+        XCTAssertThrowsError(try NativeWorldLabActuator.evaluate(invalid))
+        var open=NativeActuatorInput(massKg:1)
+        open.gravityMps2=0;open.forceConstantNPerA=0;open.powerOffAtSeconds=0
+        let run=try NativeWorldLabActuator.evaluate(open)
+        XCTAssertEqual(run.samples.first?.sourceVoltageV,0)
+        XCTAssertTrue(run.samples.allSatisfy{$0.currentA==0 && $0.motorForceN==0})
+    }
     func testCoilThermalFeedbackChangesCurrent() throws {
         var hot=NativeActuatorInput(massKg:1)
         hot.thermal=NativeActuatorThermalInput()
