@@ -36,7 +36,7 @@ private data class ABookNoteRecord(
     val id:String,val title:String,val body:String,val notebook:String,val tags:String,
     val pinned:Boolean,val archived:Boolean,val deletedAt:Long?,val createdAt:Long,val updatedAt:Long,val revision:Int
 )
-private data class ABookFileRecord(val id:String,val name:String,val mime:String,val relativePath:String,val size:Long)
+private data class ABookFileRecord(val id:String,val noteId:String,val name:String,val mime:String,val relativePath:String,val size:Long,val createdAt:Long)
 
 private fun parseABookPageGroups(value:String,pageCount:Int):List<List<Int>>{
     require(pageCount>0){"This PDF has no readable pages."}
@@ -111,7 +111,7 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
     }
     fun attachments(noteId:String):List<ABookFileRecord> =
         readableDatabase.query("attachments",null,"note_id=?",arrayOf(noteId),null,null,"created_at").use{c->buildList{
-            while(c.moveToNext())add(ABookFileRecord(c.getString(c.getColumnIndexOrThrow("id")),c.getString(c.getColumnIndexOrThrow("name")),c.getString(c.getColumnIndexOrThrow("mime")),c.getString(c.getColumnIndexOrThrow("path")),c.getLong(c.getColumnIndexOrThrow("size"))))
+            while(c.moveToNext())add(ABookFileRecord(c.getString(c.getColumnIndexOrThrow("id")),c.getString(c.getColumnIndexOrThrow("note_id")),c.getString(c.getColumnIndexOrThrow("name")),c.getString(c.getColumnIndexOrThrow("mime")),c.getString(c.getColumnIndexOrThrow("path")),c.getLong(c.getColumnIndexOrThrow("size")),c.getLong(c.getColumnIndexOrThrow("created_at")) ))
         }}
     fun restore(noteId:String){
         writableDatabase.update("notes",ContentValues().apply{putNull("deleted_at");put("archived",0);put("updated_at",System.currentTimeMillis())},"id=?",arrayOf(noteId))
@@ -138,6 +138,27 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
             db.setTransactionSuccessful();return paths
         }finally{db.endTransaction()}
     }
+    fun importLibrary(importNotes:List<ABookNoteRecord>,importRevisions:List<ABookRevisionRecord>,importAttachments:List<ABookFileRecord>){
+        val db=writableDatabase;db.beginTransaction()
+        try{
+            importNotes.forEach{note->db.insertOrThrow("notes",null,ContentValues().apply{
+                put("id",note.id);put("title",note.title);put("body",note.body);put("notebook",note.notebook);put("tags",note.tags)
+                put("pinned",if(note.pinned)1 else 0);put("archived",if(note.archived)1 else 0)
+                if(note.deletedAt==null)putNull("deleted_at")else put("deleted_at",note.deletedAt)
+                put("created_at",note.createdAt);put("updated_at",note.updatedAt);put("revision",note.revision)
+            })}
+            importRevisions.forEach{revision->db.insertOrThrow("revisions",null,ContentValues().apply{
+                put("id",revision.id);put("note_id",revision.noteId);put("title",revision.title);put("body",revision.body)
+                put("notebook",revision.notebook);put("tags",revision.tags);put("revision",revision.revision);put("created_at",revision.createdAt)
+            })}
+            importAttachments.forEach{attachment->db.insertOrThrow("attachments",null,ContentValues().apply{
+                put("id",attachment.id);put("note_id",attachment.noteId);put("name",attachment.name);put("mime",attachment.mime)
+                put("path",attachment.relativePath);put("size",attachment.size);put("created_at",attachment.createdAt)
+            })}
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+    }
+
     fun addFile(noteId:String,name:String,mime:String,path:String,size:Long){
         writableDatabase.insertOrThrow("attachments",null,ContentValues().apply{
             put("id",UUID.randomUUID().toString());put("note_id",noteId);put("name",name);put("mime",mime);put("path",path);put("size",size);put("created_at",System.currentTimeMillis())
