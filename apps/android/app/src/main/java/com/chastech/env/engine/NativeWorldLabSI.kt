@@ -310,14 +310,15 @@ object NativeWorldLabExecution {
             NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(sourceVoltageV,"V")),0.0,0.0,0.0)
         }
         val load=NativeScientificAdapter("load","series-rc-load","1.0.0"){time,_,inputs->
-            require(inputs.containsKey("Vin")){"RC load requires its connected source voltage"}
-            val voltage=sourceVoltageV+(initialVoltageV-sourceVoltageV)*
+            val connectedVoltage=inputs["Vin"]?.let{NativeWorldLabSI.convert(it,"V")}
+                ?:error("RC load requires its connected source voltage")
+            val voltage=connectedVoltage+(initialVoltageV-connectedVoltage)*
                 kotlin.math.exp(-time/(resistanceOhm*capacitanceF))
-            val current=(sourceVoltageV-voltage)/resistanceOhm
+            val current=(connectedVoltage-voltage)/resistanceOhm
             NativeScientificStepOutput(mapOf(
                 "Vc" to NativeWorldLabSI.declare(voltage,"V","physics-model-computed"),
                 "I" to NativeWorldLabSI.declare(current,"A","physics-model-computed")
-            ),sourceVoltageV*current,current*current*resistanceOhm,voltage*current)
+            ),connectedVoltage*current,current*current*resistanceOhm,voltage*current)
         }
         return listOf(source,load)
     }
