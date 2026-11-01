@@ -426,7 +426,14 @@ struct NativeScientificAdapter {
     let componentId:String
     let modelId:String
     let modelVersion:String
+    let initialOutputs:[String:NativeScienceQuantity]
     let advance:(Double,Double,[String:NativeScienceQuantity]) throws -> NativeScientificStepOutput
+    init(componentId:String,modelId:String,modelVersion:String,
+         initialOutputs:[String:NativeScienceQuantity]=[:],
+         advance:@escaping (Double,Double,[String:NativeScienceQuantity]) throws -> NativeScientificStepOutput) {
+        self.componentId=componentId;self.modelId=modelId;self.modelVersion=modelVersion
+        self.initialOutputs=initialOutputs;self.advance=advance
+    }
 }
 struct NativeScientificExchangeSample {
     let timeSeconds:Double;let stepSeconds:Double;let eventBoundary:Bool
@@ -483,10 +490,25 @@ enum NativeWorldLabExecution {
         guard order.count==components.count else {
             throw NativeWorldLabError.invalid("Algebraic loop requires an explicitly supported implicit solver")
         }
+        var incoming:[String:[NativeScienceEdge]]=[:]
+        for edge in graph.connections {incoming[edge.toComponentId,default:[]].append(edge)}
         var samples:[NativeScientificExchangeSample]=[]
         var now=0.0
         var scheduled:Double?
         var previous:[String:NativeScienceQuantity]=[:]
+        for adapter in adapters {
+            guard let component=components[adapter.componentId] else {
+                throw NativeWorldLabError.invalid("Initial state references an unknown component")
+            }
+            for (portId,value) in adapter.initialOutputs {
+                guard let port=component.ports.first(where:{$0.id==portId}),
+                      port.direction != "input",port.unit==value.unit else {
+                    throw NativeWorldLabError.invalid("Initial state references an unregistered output port or unit")
+                }
+                try NativeWorldLabSI.validate(value)
+                previous[adapter.componentId+":"+portId]=value
+            }
+        }
         while now<durationSeconds-1e-12 && samples.count<50000 {
             let end=min(durationSeconds,min(now+stepSeconds,scheduled ?? durationSeconds))
             guard end>now+1e-12 else {
@@ -500,12 +522,12 @@ enum NativeWorldLabExecution {
                     throw NativeWorldLabError.invalid("Missing trusted scientific component adapter")
                 }
                 var inputs:[String:NativeScienceQuantity]=[:]
-                for edge in graph.connections where edge.toComponentId==id {
+                for edge in incoming[id] ?? [] {
                     let sourceMap=edge.delayed ? previous : values
                     guard let source=sourceMap[edge.fromComponentId+":"+edge.fromPortId] else {
-                        // Only a delayed feedback edge may initialize from solver-owned state.
-                        if edge.delayed && samples.isEmpty {continue}
-                        throw NativeWorldLabError.invalid("Connected scientific source did not emit its declared output port")
+                        throw NativeWorldLabError.invalid(edge.delayed ?
+                            "Delayed scientific input requires a registered initial output value" :
+                            "Connected scientific source did not emit its declared output port")
                     }
                     guard let port=component.ports.first(where:{$0.id==edge.toPortId}) else {
                         throw NativeWorldLabError.invalid("Scientific edge targets an absent port")
@@ -575,13 +597,18 @@ enum NativeWorldLabExecution {
             NativeScientificStepOutput(outputs:["V":try NativeWorldLabSI.declare(sourceVoltageV,unit:"V")],
                 suppliedW:0,dissipatedW:0,storedRateW:0)
         }
-        let load=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0"){time,_,inputs in
+        var capacitorVoltage=initialVoltageV
+        let load=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0"){_,delta,inputs in
             guard let connected=inputs["Vin"] else {
                 throw NativeWorldLabError.invalid("RC load requires its connected source voltage")
             }
+            guard delta.isFinite,delta>0 else {
+                throw NativeWorldLabError.invalid("RC solver requires a positive finite step")
+            }
             let connectedVoltage=try NativeWorldLabSI.convert(connected,to:"V")
-            let voltage=connectedVoltage+(initialVoltageV-connectedVoltage)*exp(-time/(resistanceOhm*capacitanceF))
+            let voltage=connectedVoltage+(capacitorVoltage-connectedVoltage)*exp(-delta/(resistanceOhm*capacitanceF))
             let current=(connectedVoltage-voltage)/resistanceOhm
+            capacitorVoltage=voltage
             return NativeScientificStepOutput(
                 outputs:["Vc":try NativeWorldLabSI.declare(voltage,unit:"V",evidence:"physics-model-computed"),
                          "I":try NativeWorldLabSI.declare(current,unit:"A",evidence:"physics-model-computed")],
