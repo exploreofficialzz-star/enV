@@ -158,7 +158,7 @@ export async function createABookArchive(
   const manifestBytes = strToU8(JSON.stringify(manifest));
   if (manifestBytes.byteLength + totalBytes > MAX_UNCOMPRESSED_BYTES) fail("This backup exceeds the 150 MB total library limit.");
   files["manifest.json"] = manifestBytes;
-  const zipped = zipSync(files, { level: 6 });
+  const zipped = zipSync(files, { level: 0 });
   if (zipped.byteLength > MAX_ARCHIVE_BYTES) fail("The backup archive exceeds 180 MB.");
   const copy = zipped.slice();
   return new Blob([copy.buffer as ArrayBuffer], { type: "application/zip" });
