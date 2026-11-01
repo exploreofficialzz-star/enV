@@ -55,7 +55,7 @@ class NativeWorldLabRecordedTimeTest {
    run().copy(sampleTimesSeconds=listOf(0.0,0.2,0.2)).validate()
   }
   assertThrows(IllegalArgumentException::class.java){
-   run().copy(mandatoryEventTimesSeconds=listOf(0.25)).validate()
+   run().copy(mandatoryEventTimesSeconds=listOf(0.6)).validate()
   }
   assertThrows(IllegalArgumentException::class.java){
    NativeWorldLabRecordedTime.advance(run(),state(),Double.NaN)
@@ -63,6 +63,7 @@ class NativeWorldLabRecordedTimeTest {
  }
 }
 
+class NativeWorldLabRecordedTimeCheckpointCodecTest {
  @Test fun checkpointJsonRoundTripsAndRejectsUnknownOrOversizedFields(){
   val run=run()
   val state=NativeWorldLabRecordedTime.seek(run,state(),0.3)
@@ -88,3 +89,4 @@ class NativeWorldLabRecordedTimeTest {
   val checkpoint=NativeWorldLabRecordedTime.checkpoint(run,next)
   assertEquals(0.15,NativeWorldLabRecordedTime.restore(run,checkpoint).simulationTimeSeconds,1e-9)
  }
+}
