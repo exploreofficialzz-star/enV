@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { extractPdfTextLocally, extractSelectedPdfTextLocally } from "@/lib/a-book/pdf-reader";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +51,26 @@ function formatDate(timestamp: number) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(timestamp);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^\${}()|[\]\\]/g, "\\function noteFingerprint(note: ABookNote): string {");
+}
+
+function countTextMatches(value: string, query: string): number {
+  const term = query.trim();
+  if (!term) return 0;
+  return value.match(new RegExp(escapeRegExp(term), "gi"))?.length ?? 0;
+}
+
+function renderPdfTextMatches(value: string, query: string) {
+  const term = query.trim();
+  if (!term) return value;
+  return value.split(new RegExp("(" + escapeRegExp(term) + ")", "gi")).map((part, index) =>
+    index % 2 === 1
+      ? <mark key={index} className="rounded bg-amber-300/70 px-0.5 text-inherit dark:bg-amber-400/30">{part}</mark>
+      : <span key={index}>{part}</span>,
+  );
+}
+
 function noteFingerprint(note: ABookNote): string {
   return JSON.stringify([
     note.id, note.title, note.body, note.notebook, note.tags,
@@ -68,6 +89,8 @@ export function ABookEngine() {
   const [storageMessage, setStorageMessage] = useState("Saved on this device");
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
+  const [pdfText, setPdfText] = useState("");
+  const [pdfTextSearch, setPdfTextSearch] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
   const pdfAbortController = useRef<AbortController | null>(null);
   const [selectedPdfs, setSelectedPdfs] = useState<string[]>([]);
@@ -148,6 +171,8 @@ export function ABookEngine() {
     try {
       await flushCurrentDraft();
       pdfAbortController.current?.abort();
+      setPdfText("");
+      setPdfTextSearch("");
       setCurrentNote(note);
       setError("");
     } catch (cause) {
@@ -211,6 +236,8 @@ export function ABookEngine() {
         setRevisions([]);
         setSelectedPdfs([]);
         setPdfInfo("");
+        setPdfText("");
+        setPdfTextSearch("");
         setPreviewUrl("");
         setQuery("");
         setShowArchived(false);
@@ -371,6 +398,35 @@ export function ABookEngine() {
       setPdfInfo(`${file.name}: ${details.pageCount} pages${details.title ? ` · ${details.title}` : ""}`);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(file.blob));
+      setError("");
+    });
+  }
+
+  async function extractSelectedPdfText() {
+    const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
+    if (!files.length) { setError("Select at least one PDF."); return; }
+    await runPdfOperation("Extracting PDF text", "The selected PDF text could not be extracted locally.", async (signal) => {
+      if (files.length === 1) {
+        const file = files[0];
+        const result = await extractPdfTextLocally(file.blob, {
+          signal,
+          onProgress: (page, total) => setPdfInfo("Reading " + file.name + " · page " + page + " of " + total),
+        });
+        setPdfText(result.text);
+        setPdfTextSearch("");
+        setPdfInfo(
+          result.text.trim()
+            ? "Text extracted from " + file.name + " · " + result.pagesProcessed + "/" + result.pageCount + " pages" + (result.truncated ? " · bounded output" : "")
+            : "No selectable text found in " + file.name + ". It may contain scanned images.",
+        );
+      } else {
+        const archive = await extractSelectedPdfTextLocally(
+          files.map((file) => ({ name: file.name, blob: file.blob })),
+          { signal },
+        );
+        zipDownload(archive, "a-book-pdf-text.zip");
+        setPdfInfo("Extracted text from " + files.length + " PDFs locally");
+      }
       setError("");
     });
   }
@@ -666,11 +722,29 @@ export function ABookEngine() {
                 <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void rotateSelectedBatch()}>Rotate selected PDFs</Button>
                 <input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="PDF page numbers" placeholder="Pages e.g. 1-3,5" className="min-h-8 w-36 rounded-md border border-border bg-background px-2 text-xs" />
                 <input value={splitRanges} onChange={(event) => setSplitRanges(event.target.value)} aria-label="PDF split page groups" placeholder="Parts e.g. 1-3;4-6" className="min-h-8 w-40 rounded-md border border-border bg-background px-2 text-xs" />
+                <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void extractSelectedPdfText()}>Extract PDF text</Button>
                 <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void exportPdf()}>Extract selected pages</Button>
                 <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void splitSelectedPdf()}>Split selected PDFs</Button>
                 <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
               {previewUrl ? <iframe title="Local PDF preview" src={previewUrl} className="h-[480px] w-full rounded-md border border-border bg-background" /> : null}
+              {pdfText ? <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold">Extracted PDF text · local</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => localDownload(new Blob([pdfText], { type: "text/plain;charset=utf-8" }), "a-book-extracted-text.txt")}>Download .txt</Button>
+                    <Button type="button" size="sm" variant="outline" disabled={!current} onClick={() => {
+                      if (!current) return;
+                      updateCurrent({ body: [current.body, pdfText].filter(Boolean).join("\n\n") });
+                    }}>Insert into note</Button>
+                  </div>
+                </div>
+                <input value={pdfTextSearch} onChange={(event) => setPdfTextSearch(event.target.value)} aria-label="Search extracted PDF text" placeholder="Search extracted text" className="min-h-9 w-full rounded-md border border-border bg-background px-3 text-xs" />
+                {pdfTextSearch.trim()
+                  ? <p className="text-xs text-muted">{countTextMatches(pdfText, pdfTextSearch)} matches</p>
+                  : <p className="text-xs text-muted">{pdfText.length.toLocaleString()} characters · searchable local text</p>}
+                <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words text-xs leading-relaxed">{renderPdfTextMatches(pdfText, pdfTextSearch)}</pre>
+              </div> : null}
             </div> : null}
           </section>
 
