@@ -95,7 +95,7 @@ function inspectZipDirectory(bytes: Uint8Array): string[] {
       fail("The backup archive contains an invalid entry.");
     }
     const name = new TextDecoder().decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
-    if (!name || name.startsWith("/") || name.includes("\\\\")
+    if (!name || name.startsWith("/") || name.includes("\\")
       || name.split("/").some((part) => part === ".." || part === "." || part === "")) {
       fail("The backup archive contains an unsafe file path.");
     }
@@ -155,7 +155,9 @@ export async function createABookArchive(
     revisions,
     attachments: attachmentManifest,
   };
-  files["manifest.json"] = strToU8(JSON.stringify(manifest));
+  const manifestBytes = strToU8(JSON.stringify(manifest));
+  if (manifestBytes.byteLength + totalBytes > MAX_UNCOMPRESSED_BYTES) fail("This backup exceeds the 150 MB total library limit.");
+  files["manifest.json"] = manifestBytes;
   const zipped = zipSync(files, { level: 6 });
   if (zipped.byteLength > MAX_ARCHIVE_BYTES) fail("The backup archive exceeds 180 MB.");
   const copy = zipped.slice();
