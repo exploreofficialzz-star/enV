@@ -17,3 +17,4 @@ test("contact navigation moves to the nearest previous or next recorded event",(
  assert.equal(nextEventTime(1,5,events),2);
  assert.equal(nextEventTime(2,5,events),5);
 });
+test("checkpoint rejects a missing or nonnumeric sample index",()=>{const r=makeRun();const c=createRecordedTimelineCheckpoint(r,0.5) as any;delete c.sampleIndex;assert.throws(()=>restoreRecordedTimelineCheckpoint(r,c),/different run/);});
