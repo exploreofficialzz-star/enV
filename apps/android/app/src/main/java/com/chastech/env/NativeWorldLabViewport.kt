@@ -76,10 +76,22 @@ fun NativeWorldLabViewport(
     onInspectionChange:(NativeInspectionSettings)->Unit={},
 ){
     val screenDensity=LocalDensity.current.density
+    var showLabels by remember(project.id){mutableStateOf(true)}
+    var showViewportOverlays by remember(project.id){mutableStateOf(true)}
+    val selectedEntity=project.entities.firstOrNull{it.id==selectedId}
     val cutOffset=NativeWorldLabInspection.planeOffset(project,selectedId,inspection)
     val cutTargets=NativeWorldLabInspection.targetIds(project,selectedId)
     fun clip(vertices:List<NativeLabVector>,entityId:String)=if(cutOffset==null||entityId !in cutTargets)vertices else NativeWorldLabInspection.clipPolygon(vertices,inspection.axis,cutOffset)
-    fun alpha()=when(inspection.mode){NativeInspectionMode.NORMAL->0.86f;NativeInspectionMode.TRANSPARENT->inspection.opacity;NativeInspectionMode.XRAY->minOf(0.22f,inspection.opacity);NativeInspectionMode.CUTAWAY->inspection.opacity;NativeInspectionMode.ISOLATE->0.86f;NativeInspectionMode.EXPLODED->0.86f}
+    fun isInspectionTarget(entityId:String)=entityId in cutTargets
+    fun alpha(entityId:String):Float{
+        if(!isInspectionTarget(entityId))return 0.86f
+        return when(inspection.mode){
+            NativeInspectionMode.NORMAL,NativeInspectionMode.ISOLATE,NativeInspectionMode.EXPLODED->0.86f
+            NativeInspectionMode.TRANSPARENT,NativeInspectionMode.CUTAWAY->inspection.opacity
+            NativeInspectionMode.XRAY->minOf(0.22f,inspection.opacity)
+        }
+    }
+    fun isXrayTarget(entityId:String)=inspection.mode==NativeInspectionMode.XRAY&&isInspectionTarget(entityId)
     val savedCameraPose=remember(project.id,project.revision){
         NativeWorldLabCamera.poseFromPosition(project.cameraPositionMeters,project.cameraLookingAtMeters)
     }
@@ -104,7 +116,7 @@ fun NativeWorldLabViewport(
     fun projection(point:NativeLabVector,width:Float,height:Float,focalLength:Float)=
         labPerspectivePoint(point,focus,yaw,cameraDistance,focalLength,pan,width,height,elevation)
     Text("Explore your invention",style=MaterialTheme.typography.titleSmall)
-    Text("Drag to move · pinch to zoom · twist to orbit · tap a part to select. "+
+    if(showViewportOverlays)Text("Drag to move · pinch to zoom · twist to orbit · tap a part to select. "+
         "The local world uses perspective depth; y=0 is the authored surface reference and underground bands are schematic, not surveyed geology.",
         style=MaterialTheme.typography.bodySmall)
     Canvas(
@@ -269,8 +281,8 @@ fun NativeWorldLabViewport(
                                         if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)
                                     };close()
                                 }
-                                drawPath(path,color.copy(alpha=alpha()))
-                                if(inspection.mode==NativeInspectionMode.XRAY||selected)
+                                drawPath(path,color.copy(alpha=alpha(solid.id)))
+                                if(isXrayTarget(solid.id)||selected)
                                     drawPath(path,Color.White.copy(alpha=0.8f),style=Stroke(1f))
                             }
                         }
@@ -296,9 +308,9 @@ fun NativeWorldLabViewport(
                             }
                         }
                     }else{
-                        drawCircle(color.copy(alpha=alpha()),radius,Offset(p.x,p.y))
-                        drawCircle(if(selected||inspection.mode==NativeInspectionMode.XRAY)Color.White else color.copy(alpha=0.65f),
-                            radius,Offset(p.x,p.y),style=Stroke(if(selected||inspection.mode==NativeInspectionMode.XRAY)2.5f else 1.2f))
+                        drawCircle(color.copy(alpha=alpha(solid.id)),radius,Offset(p.x,p.y))
+                        drawCircle(if(selected||isXrayTarget(solid.id))Color.White else color.copy(alpha=0.65f),
+                            radius,Offset(p.x,p.y),style=Stroke(if(selected||isXrayTarget(solid.id))2.5f else 1.2f))
                         drawArc(Color.White.copy(alpha=0.25f),200f,135f,false,
                             topLeft=Offset(p.x-radius*0.72f,p.y-radius*0.72f),
                             size=androidx.compose.ui.geometry.Size(radius*1.44f,radius*1.44f),
@@ -323,8 +335,8 @@ fun NativeWorldLabViewport(
                     val projected=clip(vertices,solid.id).map{projection(it,size.width,size.height,focalLength)}
                     if(projected.size>=3&&projected.all{it.visible}){
                         val path=Path().apply{projected.forEachIndexed{i,point->if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)};close()}
-                        drawPath(path,fill.copy(alpha=if(inspection.mode==NativeInspectionMode.XRAY)minOf(0.2f,inspection.opacity) else fill.alpha*alpha()))
-                        if(selected&&outline||inspection.mode==NativeInspectionMode.XRAY)drawPath(path,Color.White.copy(alpha=0.85f),style=Stroke(2f))
+                        drawPath(path,fill.copy(alpha=if(isXrayTarget(solid.id))minOf(0.2f,inspection.opacity) else fill.alpha*alpha(solid.id)))
+                        if(selected&&outline||isXrayTarget(solid.id))drawPath(path,Color.White.copy(alpha=0.85f),style=Stroke(2f))
                     }
                 }
                 val sideFaces=(0 until segments).map{index->
@@ -356,14 +368,46 @@ fun NativeWorldLabViewport(
                     if(projected.size>=3&&projected.all{it.visible}){
                         val path=Path().apply{projected.forEachIndexed{i,p->if(i==0)moveTo(p.x,p.y) else lineTo(p.x,p.y)};close()}
                         val faceAlpha=when(face%3){0->0.62f;1->0.82f;else->0.72f}
-                        drawPath(path,color.copy(alpha=if(inspection.mode==NativeInspectionMode.XRAY)minOf(0.2f,inspection.opacity) else faceAlpha*alpha()))
-                        if(selected||inspection.mode==NativeInspectionMode.XRAY)drawPath(path,Color.White.copy(alpha=0.85f),style=Stroke(2f))
+                        drawPath(path,color.copy(alpha=if(isXrayTarget(solid.id))minOf(0.2f,inspection.opacity) else faceAlpha*alpha(solid.id)))
+                        if(selected||isXrayTarget(solid.id))drawPath(path,Color.White.copy(alpha=0.85f),style=Stroke(2f))
                     }
                 }
             }
         }
     }
     Text("See Inside and inspect",style=MaterialTheme.typography.titleSmall)
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+        OutlinedButton(onClick={
+            selectedEntity?.let{solid->
+                val target=solid.positionMeters
+                val distance=(cameraDistance*0.45).coerceIn(0.5,100000.0)
+                val angle=Math.toRadians(elevation.toDouble())
+                val horizontalDistance=distance*cos(angle)
+                val position=listOf(
+                    target.x-sin(yaw.toDouble())*horizontalDistance,
+                    target.y+distance*sin(angle),
+                    target.z-cos(yaw.toDouble())*horizontalDistance
+                )
+                onSaveView(position,listOf(target.x,target.y,target.z))
+                observerDepthMeters=0f;pan=Offset.Zero
+                zoom=(45.0*8.0/distance).toFloat().coerceIn(0.1f,160f)
+            }
+        },enabled=selectedEntity!=null){Text("Zoom to selected")}
+        OutlinedButton(onClick={showLabels=!showLabels}){Text(if(showLabels)"Hide labels" else "Show labels")}
+        OutlinedButton(onClick={showViewportOverlays=!showViewportOverlays}){
+            Text(if(showViewportOverlays)"Hide overlays" else "Show overlays")
+        }
+        OutlinedButton(onClick={
+            onInspectionChange(NativeInspectionSettings())
+            showLabels=true;showViewportOverlays=true
+        }){Text("Reset")}
+    }
+    if(selectedEntity!=null&&showLabels&&showViewportOverlays){
+        Text("Selected: "+selectedEntity.name+" · "+selectedEntity.shape,
+            style=MaterialTheme.typography.bodySmall,
+            modifier=Modifier.semantics{contentDescription="Selected object label"})
+    }
+
     Text("Display-only views never alter material properties or scientific results.",style=MaterialTheme.typography.bodySmall)
     Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
         listOf(NativeInspectionMode.NORMAL,NativeInspectionMode.TRANSPARENT,NativeInspectionMode.XRAY).forEach{item->
