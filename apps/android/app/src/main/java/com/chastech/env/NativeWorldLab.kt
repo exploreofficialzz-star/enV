@@ -1136,8 +1136,22 @@ fun NativeWorldLabForm() {
                     Text("Resistor heat: "+labNumber(result.resistorHeatW)+" W")
                     Text("Power residual: "+labNumber(result.powerResidualW)+" W")
                     result.branchCurrentsA.forEach{(id,current)->
-                        Text(id+": "+labNumber(current)+" A")
+                        val part=net.components.firstOrNull{it.id==id}
+                        val positive=current>1e-12
+                        val negative=current< -1e-12
+                        val fromId=if(positive)part?.positiveNodeId else part?.negativeNodeId
+                        val toId=if(positive)part?.negativeNodeId else part?.positiveNodeId
+                        val fromLabel=fromId?.let{node->net.nodes.firstOrNull{it.id==node}?.label?:node}
+                        val toLabel=toId?.let{node->net.nodes.firstOrNull{it.id==node}?.label?:node}
+                        val flow=when{
+                            !positive&&!negative->"0 A · no net branch current"
+                            fromLabel!=null&&toLabel!=null->labNumber(kotlin.math.abs(current))+" A · "+fromLabel+" → "+toLabel
+                            else->labNumber(kotlin.math.abs(current))+" A · signed branch flow"
+                        }
+                        Text(id+": "+flow)
                     }
+                    Text("Direction follows the calculated signed conventional branch current; this is circuit topology, not a measured 3D electromagnetic field.",
+                        style=MaterialTheme.typography.bodySmall)
                     Text(result.validity,style=MaterialTheme.typography.bodySmall)
                 }
             }
