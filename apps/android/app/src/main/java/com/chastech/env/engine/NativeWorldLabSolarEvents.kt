@@ -8,7 +8,7 @@ import kotlin.math.*
 
 enum class NativeWorldLabSolarStatus { NORMAL, POLAR_DAY, POLAR_NIGHT }
 
-data class NativeWorldLabSolarEvents(
+data class NativeWorldLabSolarEventResult(
     val dateUTC:String,
     val latitudeDegrees:Double,
     val longitudeDegrees:Double,
@@ -31,7 +31,7 @@ object NativeWorldLabSolarEvents {
             date.atStartOfDay(ZoneOffset.UTC).toInstant().plusNanos(nanos))
     }
 
-    fun calculate(dateUTC:String,latitudeDegrees:Double,longitudeDegrees:Double):NativeWorldLabSolarEvents {
+    fun calculate(dateUTC:String,latitudeDegrees:Double,longitudeDegrees:Double):NativeWorldLabSolarEventResult {
         require(Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(dateUTC)) {
             "Solar date must use YYYY-MM-DD UTC form."
         }
@@ -93,7 +93,7 @@ object NativeWorldLabSolarEvents {
                 }
             }
         }
-        return NativeWorldLabSolarEvents(dateUTC,latitudeDegrees,longitudeDegrees,status,
+        return NativeWorldLabSolarEventResult(dateUTC,latitudeDegrees,longitudeDegrees,status,
             noon,sunrise,sunset,daylight)
     }
 }

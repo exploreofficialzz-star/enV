@@ -1992,7 +1992,7 @@ fun NativeWorldLabForm() {
             }
             solarResult.fold(onSuccess={events->
                 when(events.status){
-                    NativeWorldLabSolarEvents.Status.NORMAL->{
+                    NativeWorldLabSolarStatus.NORMAL->{
                         Text("Sunrise "+solarFormatter.format(java.time.Instant.parse(events.sunriseUTC!!))+
                             " · Sunset "+solarFormatter.format(java.time.Instant.parse(events.sunsetUTC!!)),
                             style=MaterialTheme.typography.bodyMedium)
@@ -2000,10 +2000,10 @@ fun NativeWorldLabForm() {
                             " · Daylight "+labNumber(events.daylightMinutes!!/60.0)+" h",
                             style=MaterialTheme.typography.bodySmall)
                     }
-                    NativeWorldLabSolarEvents.Status.POLAR_DAY->Text(
+                    NativeWorldLabSolarStatus.POLAR_DAY->Text(
                         "Polar day · Sun remains above the model's apparent horizon for this UTC date.",
                         style=MaterialTheme.typography.bodySmall)
-                    NativeWorldLabSolarEvents.Status.POLAR_NIGHT->Text(
+                    NativeWorldLabSolarStatus.POLAR_NIGHT->Text(
                         "Polar night · Sun remains below the model's apparent horizon for this UTC date.",
                         style=MaterialTheme.typography.bodySmall)
                 }
