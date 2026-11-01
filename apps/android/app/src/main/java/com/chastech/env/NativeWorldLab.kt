@@ -24,6 +24,7 @@ import com.chastech.env.engine.NativeWorldLabProjectCodec
 import com.chastech.env.engine.NativeWorldLabDemoCheckpoint
 import com.chastech.env.engine.NativeWorldLabDemoCheckpointCodec
 import com.chastech.env.engine.nextWorldLabEventTime
+import com.chastech.env.engine.advanceWorldLabEventTime
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
 import com.chastech.env.engine.NativeChemicalThermalResult
@@ -119,6 +120,7 @@ fun NativeWorldLabForm() {
     var collisionRun by remember { mutableStateOf<NativeLabCollisionResult?>(null) }
     var collisionTime by remember { mutableFloatStateOf(0f) }
     var collisionPlaying by remember { mutableStateOf(false) }
+    var collisionReversePlayback by remember { mutableStateOf(false) }
     var collisionSpeed by remember { mutableFloatStateOf(1f) }
     var sphereTargetIndex by remember { mutableIntStateOf(0) }
     var sphereFirstVelocity by remember { mutableStateOf("2,0,0") }
@@ -127,6 +129,7 @@ fun NativeWorldLabForm() {
     var sphereRun by remember { mutableStateOf<NativeSphereImpactResult?>(null) }
     var sphereTime by remember { mutableFloatStateOf(0f) }
     var spherePlaying by remember { mutableStateOf(false) }
+    var sphereReversePlayback by remember { mutableStateOf(false) }
     var sphereSpeed by remember { mutableFloatStateOf(1f) }
     var deviceName by remember { mutableStateOf("") }
     var deviceAssumption by remember { mutableStateOf("") }
@@ -549,22 +552,22 @@ fun NativeWorldLabForm() {
             if(dropFrame==result.samples.lastIndex)dropPlaying=false
         }
     }
-    LaunchedEffect(spherePlaying,sphereSpeed,sphereRun) {
+    LaunchedEffect(spherePlaying,sphereSpeed,sphereRun,sphereReversePlayback) {
         while(spherePlaying){
             delay(40)
             val run=sphereRun?:break
-            sphereTime=nextWorldLabEventTime(sphereTime.toDouble(),0.04,sphereSpeed.toDouble(),
-                run.durationSeconds,listOf(run.impactTimeSeconds)).toFloat()
-            if(sphereTime>=run.durationSeconds.toFloat())spherePlaying=false
+            sphereTime=advanceWorldLabEventTime(sphereTime.toDouble(),0.04,sphereSpeed.toDouble(),
+                run.durationSeconds,listOf(run.impactTimeSeconds),sphereReversePlayback).toFloat()
+            if((sphereReversePlayback&&sphereTime<=0f)||(!sphereReversePlayback&&sphereTime>=run.durationSeconds.toFloat()))spherePlaying=false
         }
     }
-    LaunchedEffect(collisionPlaying,collisionSpeed,collisionRun) {
+    LaunchedEffect(collisionPlaying,collisionSpeed,collisionRun,collisionReversePlayback) {
         while(collisionPlaying){
             delay(40)
             val run=collisionRun?:break
-            collisionTime=nextWorldLabEventTime(collisionTime.toDouble(),0.04,
-                collisionSpeed.toDouble(),run.durationSeconds,listOf(run.impactTimeSeconds)).toFloat()
-            if(collisionTime>=run.durationSeconds.toFloat())collisionPlaying=false
+            collisionTime=advanceWorldLabEventTime(collisionTime.toDouble(),0.04,
+                collisionSpeed.toDouble(),run.durationSeconds,listOf(run.impactTimeSeconds),collisionReversePlayback).toFloat()
+            if((collisionReversePlayback&&collisionTime<=0f)||(!collisionReversePlayback&&collisionTime>=run.durationSeconds.toFloat()))collisionPlaying=false
         }
     }
     LaunchedEffect(motorPlaying,motorSpeed,motorResult) {
@@ -1125,10 +1128,13 @@ fun NativeWorldLabForm() {
                     },valueRange=0f..run.durationSeconds.toFloat(),
                         modifier=Modifier.semantics{contentDescription="Explore spatial impact time"})
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                        OutlinedButton(onClick={spherePlaying=!spherePlaying}){
+                        OutlinedButton(onClick={sphereReversePlayback=false;spherePlaying=!spherePlaying}){
                             Text(if(spherePlaying)"Pause 3D impact" else "Play 3D impact")
                         }
-                        OutlinedButton(onClick={spherePlaying=false;sphereTime=0f}){
+                        OutlinedButton(onClick={sphereReversePlayback=true;spherePlaying=sphereTime>0f}){
+                            Text("Rewind recording")
+                        }
+                        OutlinedButton(onClick={spherePlaying=false;sphereReversePlayback=false;sphereTime=0f}){
                             Text("Reset 3D impact")
                         }
 }
@@ -1244,10 +1250,13 @@ fun NativeWorldLabForm() {
                     },valueRange=0f..run.durationSeconds.toFloat(),
                         modifier=Modifier.semantics{contentDescription="Explore collision time"})
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                        OutlinedButton(onClick={collisionPlaying=!collisionPlaying}){
+                        OutlinedButton(onClick={collisionReversePlayback=false;collisionPlaying=!collisionPlaying}){
                             Text(if(collisionPlaying)"Pause collision" else "Play collision")
                         }
-                        OutlinedButton(onClick={collisionPlaying=false;collisionTime=0f}){
+                        OutlinedButton(onClick={collisionReversePlayback=true;collisionPlaying=collisionTime>0f}){
+                            Text("Rewind recording")
+                        }
+                        OutlinedButton(onClick={collisionPlaying=false;collisionReversePlayback=false;collisionTime=0f}){
                             Text("Reset collision")
                         }
 }
