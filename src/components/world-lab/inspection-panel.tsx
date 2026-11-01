@@ -1,6 +1,7 @@
 import type {InspectionAxis,InspectionMode} from "@/lib/world-lab/inspection";
 import type {WorldLabEntity} from "@/lib/world-lab/project";
-type Props={mode:InspectionMode;onModeChange:(v:InspectionMode)=>void;opacity:number;onOpacityChange:(v:number)=>void;axis:InspectionAxis;onAxisChange:(v:InspectionAxis)=>void;cutawayFraction:number;onCutawayFractionChange:(v:number)=>void;explosionDistanceM:number;onExplosionDistanceChange:(v:number)=>void;selected:WorldLabEntity|null;onSelectedOpacityChange:(v:number)=>void;hasAssembly:boolean;onZoomSelected:()=>void;onReset:()=>void;showLabels:boolean;onShowLabelsChange:(v:boolean)=>void;uiHidden:boolean;onUiHiddenChange:(v:boolean)=>void;};
+type Props={mode:InspectionMode;onModeChange:(v:InspectionMode)=>void;opacity:number;onOpacityChange:(v:number)=>void;axis:InspectionAxis;onAxisChange:(v:InspectionAxis)=>void;cutawayFraction:number;onCutawayFractionChange:(v:number)=>void;explosionDistanceM:number;onExplosionDistanceChange:(v:number)=>void;selected:WorldLabEntity|null;onSelectedOpacityChange:(v:number)=>void;hasAssembly:boolean;onZoomSelected:()=>void;onReset:()=>void;showLabels:boolean;onShowLabelsChange:(v:boolean)=>void;uiHidden:boolean;onUiHiddenChange:(v:boolean)=>void;
+ canUndoView:boolean;canRedoView:boolean;onUndoView:()=>void;onRedoView:()=>void;};
 const selectClass="mt-1 w-full rounded border border-border bg-bg p-2 text-sm";
 export function WorldLabInspectionPanel(p:Props){
  return <section className="mt-3 rounded-xl border border-border p-3" aria-label="See inside and inspect selected invention">
@@ -32,6 +33,10 @@ export function WorldLabInspectionPanel(p:Props){
     onClick={()=>p.onUiHiddenChange(!p.uiHidden)} aria-pressed={p.uiHidden}>
     {p.uiHidden?"Show viewport overlays":"Hide viewport overlays"}
    </button>
+   <button type="button" className="rounded border border-border px-3 py-2 text-sm"
+    disabled={!p.canUndoView} onClick={p.onUndoView}>Undo view</button>
+   <button type="button" className="rounded border border-border px-3 py-2 text-sm"
+    disabled={!p.canRedoView} onClick={p.onRedoView}>Redo view</button>
    <button type="button" className="rounded border border-border px-3 py-2 text-sm"
     onClick={p.onReset}>Reset inspection</button>
   </div>
