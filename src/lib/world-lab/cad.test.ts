@@ -62,6 +62,6 @@ function axisRotationForTest(axis:number,r:number):number[]{
  if(axis===1)return [c,0,s,0,1,0,-s,0,c];
  return [c,-s,0,s,c,0,0,0,1];
 }
-function multiplyForTest(a:number[],b:number[]):number[]{
+function multiplyForTest(a:readonly number[],b:readonly number[]):number[]{
  return Array.from({length:9},(_,i)=>{const row=Math.floor(i/3),col=i%3;return a[row*3]*b[col]+a[row*3+1]*b[3+col]+a[row*3+2]*b[6+col];});
 }
