@@ -62,6 +62,49 @@ final class NativeWorldLabScienceTests:XCTestCase {
 }
 
 
+final class NativeWorldLabBranchTests:XCTestCase {
+    func testSameModelBranchRecordsDiffAndRecomputesNewRun() throws {
+        let source=NativeLabInput.spring(massKg:1,springNPerM:4,dampingNsPerM:0.2,x0:0.5,v0:0)
+        let target=NativeLabInput.spring(massKg:2,springNPerM:9,dampingNsPerM:0.2,x0:0.5,v0:0)
+        let original=try NativeWorldLabScience.evaluate(source,atSeconds:0.5)
+        let record=try NativeWorldLabBranch.make(source:source,target:target,
+            sourceTimeSeconds:0.5,sourceRunId:"source-run",
+            createdAtUTC:"2026-11-01T12:00:00Z")
+        let result=try NativeWorldLabBranch.recompute(target,record:record)
+        XCTAssertEqual(record.sourceRunId,"source-run")
+        XCTAssertEqual(record.sourceModelId,"spring")
+        XCTAssertEqual(record.targetModelId,"spring")
+        XCTAssertEqual(record.fidelity,"recomputed-new-run")
+        XCTAssertEqual(record.inputDiff.map{$0.field},["massKg","springNPerM"])
+        XCTAssertEqual(record.inputDiff[0].previous,1)
+        XCTAssertEqual(record.inputDiff[0].next,2)
+        XCTAssertNotEqual(original.xMeters,result.xMeters)
+        XCTAssertEqual(record.sourceParameters["massKg"],1)
+        XCTAssertEqual(record.targetParameters["massKg"],2)
+    }
+    func testCrossModelBranchRecordsRemovedAndAddedAssumptions() throws {
+        let source=NativeLabInput.rc()
+        let target=NativeLabInput.heat()
+        let record=try NativeWorldLabBranch.make(source:source,target:target,
+            sourceTimeSeconds:0.2,sourceRunId:"rc-source",
+            createdAtUTC:"2026-11-01T12:00:00Z")
+        XCTAssertEqual(record.sourceModelId,"rc")
+        XCTAssertEqual(record.targetModelId,"heat")
+        XCTAssertTrue(record.inputDiff.contains{$0.field=="resistanceOhm" && $0.previous==1000 && $0.next==nil})
+        XCTAssertTrue(record.inputDiff.contains{$0.field=="diffusivityM2S" && $0.previous==nil && $0.next==0.02})
+        XCTAssertEqual(try NativeWorldLabBranch.recompute(target,record:record).temperatureK?.count,21)
+    }
+    func testBranchRejectsInvalidTimeAndTamperedTarget() throws {
+        let source=NativeLabInput.spring()
+        XCTAssertThrowsError(try NativeWorldLabBranch.make(source:source,target:.rc(),
+            sourceTimeSeconds:-0.1))
+        let target=NativeLabInput.rc()
+        let record=try NativeWorldLabBranch.make(source:source,target:target,sourceTimeSeconds:0.1)
+        XCTAssertThrowsError(try NativeWorldLabBranch.recompute(.rc(resistanceOhm:500),record:record))
+        XCTAssertThrowsError(try NativeWorldLabBranch.recompute(source,record:record))
+    }
+}
+
 final class NativeWorldLabElasticWaveTests:XCTestCase {
     func testStandingWaveConservationAndFreeEnds() throws {
         let r=try NativeWorldLabElasticWave.parameters(
