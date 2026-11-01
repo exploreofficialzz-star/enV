@@ -30,7 +30,7 @@ export function parseMathExerciseCatalog(source) {
       }
     }
 
-    if (specs.has(key)) throw new Error(\`Duplicate math exercise spec: \${key}\`);
+    if (specs.has(key)) throw new Error("Duplicate math exercise spec: " + key);
     specs.set(key, { name, targetLabels });
   }
   return specs;
@@ -39,8 +39,8 @@ export function parseMathExerciseCatalog(source) {
 /** @param {Map<string, { name: string, targetLabels: Record<string, string> }>} specs @param {string} key @param {string} target */
 export function mathExercisePresentation(specs, key, target) {
   const spec = specs.get(key);
-  if (!spec) throw new Error(\`Missing math exercise presentation metadata for \${key}.\`);
+  if (!spec) throw new Error("Missing math exercise presentation metadata for " + key + ".");
   const targetLabel = spec.targetLabels[target];
-  if (!targetLabel) throw new Error(\`Missing human-readable label for math exercise target \${key}.\${target}.\`);
+  if (!targetLabel) throw new Error("Missing human-readable label for math exercise target " + key + "." + target + ".");
   return { name: spec.name, targetLabel };
 }
