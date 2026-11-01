@@ -1310,7 +1310,7 @@ enum NativeWorldLabEditor {
                       position.count==3 else {
                     throw NativeWorldLabError.invalid("A selected CAD part has invalid coordinates")
                 }
-                let snapped=position.map{value -> Double in
+                let snapped=try position.map{value -> Double in
                     let raw=floor(value/gridMeters+0.5)*gridMeters
                     let rounded=floor(raw*1e6+0.5)/1e6
                     guard rounded.isFinite,abs(rounded)<=100000 else {
