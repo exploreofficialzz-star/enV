@@ -33,6 +33,24 @@ test("forward and reverse replay traverse actual stored samples only",()=>{
  assert.equal(reverse.direction,"reverse-recording");
  assert.equal(stepTimeEngine(r,reverse,1).simulationTimeSeconds,0.02);
 });
+test("forward and reverse playback stop on mandatory recorded event boundaries",()=>{
+ const r=run();
+ const start=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.1,paused:false});
+ const forward=advanceTimeEngine(r,start,0.4,[0.25,0.7]);
+ assert.equal(forward.simulationTimeSeconds,0.25);
+ const reverseState=withTimeEngineDirection(createTimeEngineState(r,{
+  wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.5,paused:false
+ }),"reverse-recording");
+ const reverse=advanceTimeEngine(r,reverseState,0.4,[0.2,0.3]);
+ assert.equal(reverse.simulationTimeSeconds,0.3);
+ assert.equal(reverse.fidelity,"cached-recording-reverse");
+});
+test("event playback rejects boundaries outside the immutable run",()=>{
+ const r=run(),state=createTimeEngineState(r,{paused:false});
+ assert.throws(()=>advanceTimeEngine(r,state,0.1,[1.1]),/Mandatory event time/);
+ const reverse=withTimeEngineDirection(createTimeEngineState(r,{simulationTimeSeconds:0.5,paused:false}),"reverse-recording");
+ assert.throws(()=>advanceTimeEngine(r,reverse,0.1,[-0.1]),/Mandatory event time/);
+});
 test("seek snaps to an authoritative sample and checkpoint restores independent clock values",()=>{
  const r=run(),base=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.5,playbackRate:100,timezoneDisplay:"Africa/Lagos"});
  const sought=seekTimeEngine(r,base,0.533);
