@@ -44,7 +44,7 @@ test("Design / Build / Delivery Effort titles use semantic labels, not internal 
   assert.equal(expansionCalculatorName(info, "a"), "Delivery effort = Design + Build — Solve for Design");
   assert.equal(expansionCalculatorName(info, "b"), "Delivery effort = Design + Build — Solve for Build");
   assert.equal(expansionCalculatorName(info, "c"), "Delivery effort = Design + Build — Solve for Delivery effort");
-  assert.equal(expansionCalculatorDescription(info, "a"), "Formula exercise calculator: Delivery effort = Design + Build. Solve for Design.");
+  assert.equal(expansionCalculatorDescription(info, "a"), "Formula exercise calculator: Delivery effort = Design + Build. Solve for Design. Enter the other two values to calculate the missing value.");
 });
 
 test("every expansion row generates three public titles with its actual target label", () => {
@@ -61,4 +61,12 @@ test("every expansion row generates three public titles with its actual target l
     }
   }
   assert.equal(generated, (625 + 609 + 622) * 3);
+});
+
+ 
+test("titled expansion rows retain their descriptive title without exposing slot keys", () => {
+  const row = (mathExpansion as Record<string, string[][]>).ratio.find((entry) => entry[0] === "ratio-absent");
+  if (!row) throw new Error("ratio-absent row is missing");
+  const info = describeExpansion("ratio", row);
+  assert.equal(expansionCalculatorName(info, "a"), "Absence Rate: Absence rate = Absent ÷ Enrolled — Solve for Absent");
 });
