@@ -457,6 +457,26 @@ fun NativeABookScreen(){
             result.fold({files=it;status="Files saved on this device"},{error=it.message?:"Import failed";status="Not saved"})
         }
     }
+    fun startLocalBackup(){
+        scope.launch{
+            status="Preparing local backup…";error=""
+            val result=withContext(Dispatchers.IO){runCatching{createABookBackup(context,db)}}
+            result.fold({pendingZip=it;status="Local backup ready";exportZip.launch("a-book-backup.zip")},{error=it.message?: "Backup export failed";status="Not saved"})
+        }
+    }
+    val importArchivePicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null){
+            scope.launch{
+                status="Restoring local backup…";error=""
+                val result=withContext(Dispatchers.IO){runCatching{
+                    val temp=File(context.cacheDir,"a-book-import-"+UUID.randomUUID()+".zip")
+                    context.contentResolver.openInputStream(uri)?.use{input->temp.outputStream().use{output->input.copyTo(output)}}?:throw IllegalStateException("Cannot read the selected backup")
+                    try{importABookBackup(context,db,temp)}finally{temp.delete()}
+                }}
+                result.fold({count->showTrash=false;archived=false;reload();status="Restored "+count+" notes and attachments on this device"},{error=it.message?: "Backup restore failed";status="Not restored"})
+            }
+        }
+    }
     val exportMarkdown=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/markdown")){uri->
         if(uri!=null)runCatching{
             val text="# ${title.ifBlank{"Untitled note"}}\n\n$body\n\nNotebook: $notebook\nTags: $tags\n"
@@ -497,6 +517,8 @@ fun NativeABookScreen(){
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
             Button(onClick={val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id)}){Text("New note")}
             OutlinedButton(onClick={exportMarkdown.launch("${title.ifBlank{"note"}}.md")},enabled=selected!=null){Text("Export .md")}
+            OutlinedButton(onClick={startLocalBackup}){Text("Export backup")}
+            OutlinedButton(onClick={importArchivePicker.launch(arrayOf("*/*"))}){Text("Import backup")}
             OutlinedButton(onClick={showTrash=!showTrash;archived=false;notes=db.notes(false,showTrash);selected=null;title="";body="";files=emptyList();revisions=emptyList()}){Text(if(showTrash)"All notes" else "Trash")}
             if(!showTrash)OutlinedButton(onClick={archived=!archived;notes=db.notes(archived,false)}){Text(if(archived)"Hide archived" else "Archived")}
         }
