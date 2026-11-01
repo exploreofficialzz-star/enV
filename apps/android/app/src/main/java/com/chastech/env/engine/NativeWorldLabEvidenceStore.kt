@@ -43,7 +43,8 @@ class NativeWorldLabEvidenceStore(private val root:File){
             result.getInt("projectRevision")==revision&&
             result.getString("modelVersion")=="1.0.0"&&
             result.getString("evidence")=="physics-model-computed"&&
-            result.getString("materialEvidence")=="hypothetical-user-assumed"&&
+            (result.optString("materialEvidence")== "hypothetical-user-assumed" ||
+                result.optString("inputEvidence")=="hypothetical-user-assumed")&&
             result.getString("validity").length in 30..2000){
             "Scientific result does not match the saved hypothesis"}
         when(kind){
@@ -57,6 +58,9 @@ class NativeWorldLabEvidenceStore(private val root:File){
                 require(result.getString("format")=="env-world-lab-material-heat-transfer"&&
                     result.getJSONArray("samples").length()==121){
                     "Invalid native contact-heat evidence dimensions"}
+            }
+            "elastic-wave","thermal-radiation"->{
+                NativeWorldLabExtendedEvidence.validate(kind,result)
             }
             "interface-optics","optical-scene-ray"->{
                 NativeWorldLabOpticsEvidenceStore(root).validatePortableEnvelope(
@@ -127,6 +131,8 @@ class NativeWorldLabEvidenceStore(private val root:File){
             "env-world-lab-material-heat-transfer"->"material-heat"
             "env-world-lab-interface-optics"->"interface-optics"
             "env-world-lab-optical-scene-ray"->"optical-scene-ray"
+            "env-world-lab-elastic-wave"->"elastic-wave"
+            "env-world-lab-thermal-radiation"->"thermal-radiation"
             else->error("Unrecognized scientific evidence")
         }
         val envelope=JSONObject().put("id",recordId).put("projectId",project.id)
@@ -227,4 +233,170 @@ object NativeWorldLabEvidenceJson {
                     .put("interfaceHeatFlowW",sample.interfaceHeatFlowW)
                     .put("energyResidualJ",sample.energyResidualJ))
             }})
+}
+
+
+/** Portable, typed, finite analytical evidence shared with the Android
+ * project-archive importer. Never deserialize user code or trust solver claims. */
+object NativeWorldLabExtendedEvidence {
+    fun wave(run:NativeElasticWaveRun):JSONObject {
+        val fields=JSONObject()
+            .put("format",run.format).put("modelVersion",run.modelVersion)
+            .put("projectId",run.projectId).put("projectRevision",run.projectRevision)
+            .put("entityId",run.entityId).put("materialId",run.materialId)
+            .put("evidence",run.evidence).put("inputEvidence",run.inputEvidence)
+            .put("mode",run.mode).put("cycles",run.cycles)
+            .put("amplitudeMeters",run.amplitudeMeters)
+            .put("lengthMeters",run.lengthMeters).put("crossSectionM2",run.crossSectionM2)
+            .put("assumedDensityKgM3",run.assumedDensityKgM3)
+            .put("assumedYoungModulusPa",run.assumedYoungModulusPa)
+            .put("frequencyHz",run.frequencyHz).put("waveSpeedMps",run.waveSpeedMps)
+            .put("periodSeconds",run.periodSeconds)
+            .put("durationSeconds",run.durationSeconds)
+            .put("maximumStressPa",run.maximumStressPa)
+            .put("totalEnergyJ",run.totalEnergyJ)
+            .put("validity",run.validity)
+        // Optional independently sampled displacement envelope is portable;
+        // validation always recomputes exact coefficients from assumptions.
+        val frames=JSONArray()
+        for(i in 0..80){
+            val s=run.sample(run.durationSeconds*i/80.0)
+            frames.put(JSONObject()
+                .put("timeSeconds",s.timeSeconds)
+                .put("positionsMeters",JSONArray(s.positionsMeters))
+                .put("displacementsMeters",JSONArray(s.displacementsMeters))
+                .put("velocitiesMetersPerSecond",JSONArray(s.velocitiesMetersPerSecond))
+                .put("stressesPa",JSONArray(s.stressesPa))
+                .put("kineticEnergyJ",s.kineticEnergyJ)
+                .put("strainEnergyJ",s.strainEnergyJ)
+                .put("totalEnergyJ",s.totalEnergyJ))
+        }
+        return fields.put("frames",frames)
+    }
+    fun radiation(run:NativeRadiationRun):JSONObject {
+        val fields=JSONObject()
+            .put("format",run.format).put("modelVersion",run.modelVersion)
+            .put("projectId",run.projectId).put("projectRevision",run.projectRevision)
+            .put("entityId",run.entityId).put("materialId",run.materialId)
+            .put("evidence",run.evidence).put("inputEvidence",run.inputEvidence)
+            .put("initialTemperatureK",run.initialTemperatureK)
+            .put("environmentTemperatureK",run.environmentTemperatureK)
+            .put("emissivity",run.emissivity)
+            .put("durationSeconds",run.durationSeconds)
+            .put("massKg",run.massKg).put("areaM2",run.areaM2)
+            .put("assumedDensityKgM3",run.assumedDensityKgM3)
+            .put("assumedSpecificHeatJPerKgK",run.assumedSpecificHeatJPerKgK)
+            .put("steps",run.steps)
+            .put("validity",run.validity)
+        val samples=JSONArray()
+        for(s in run.samples){
+            samples.put(JSONObject().put("timeSeconds",s.timeSeconds)
+                .put("temperatureK",s.temperatureK)
+                .put("netRadiatedPowerW",s.netRadiatedPowerW)
+                .put("transferredEnergyJ",s.transferredEnergyJ)
+                .put("internalThermalEnergyJ",s.internalThermalEnergyJ)
+                .put("energyResidualJ",s.energyResidualJ))
+        }
+        return fields.put("samples",samples)
+    }
+    private fun number(source:JSONObject,key:String):Double {
+        val value=source.opt(key)
+        require(value is Number){"Expected finite numerical scientific evidence field: "+key}
+        val result=value.toDouble()
+        require(result.isFinite()){"Nonfinite scientific evidence field: "+key}
+        return result
+    }
+    private fun close(a:Double,b:Double)=a.isFinite()&&b.isFinite()&&
+        kotlin.math.abs(a-b)<=1e-7*kotlin.math.max(1.0,kotlin.math.abs(b))
+    fun validate(kind:String,result:JSONObject) {
+        require(result.getString("modelVersion")=="1.0.0"&&
+            result.getString("evidence")=="physics-model-computed"&&
+            result.getString("inputEvidence")=="hypothetical-user-assumed"&&
+            result.getString("entityId").matches(Regex("[A-Za-z0-9_-]{1,120}"))&&
+            result.getString("materialId").matches(Regex("[A-Za-z0-9_-]{1,120}"))){
+            "Invalid invented scientific source identity"}
+        when(kind){
+            "elastic-wave"->{
+                require(result.getString("format")=="env-world-lab-elastic-wave"){
+                    "Incorrect stored wave format"}
+                val mode=number(result,"mode")
+                val cycles=number(result,"cycles")
+                val length=number(result,"lengthMeters")
+                val area=number(result,"crossSectionM2")
+                val density=number(result,"assumedDensityKgM3")
+                val modulus=number(result,"assumedYoungModulusPa")
+                val amplitude=number(result,"amplitudeMeters")
+                require(mode%1==0.0&&mode in 1.0..12.0&&cycles%1==0.0&&
+                    cycles in 1.0..20.0&&length in 0.001..10000.0&&
+                    area in 1e-10..1e8&&density in 0.001..1e9&&
+                    modulus in 1.0..1e15&&amplitude>=1e-9&&
+                    amplitude<=minOf(0.01,0.001*length/(Math.PI*mode))){
+                    "Invented wave material or geometry is outside model bounds"}
+                val predictedSpeed=kotlin.math.sqrt(modulus/density)
+                val predictedFrequency=mode*predictedSpeed/(2*length)
+                val predictedEnergy=0.25*density*area*length*
+                    Math.pow(amplitude*2*Math.PI*predictedFrequency,2.0)
+                val predictedStress=modulus*amplitude*Math.PI*mode/length
+                require(predictedSpeed in 1e-6..1e6&&
+                    close(number(result,"waveSpeedMps"),predictedSpeed)&&
+                    close(number(result,"frequencyHz"),predictedFrequency)&&
+                    close(number(result,"periodSeconds"),1/predictedFrequency)&&
+                    close(number(result,"durationSeconds"),cycles/predictedFrequency)&&
+                    close(number(result,"totalEnergyJ"),predictedEnergy)&&
+                    close(number(result,"maximumStressPa"),predictedStress)){
+                    "Stored wave result conflicts with its claimed material assumptions"}
+            }
+            "thermal-radiation"->{
+                require(result.getString("format")=="env-world-lab-thermal-radiation"){
+                    "Incorrect stored radiative format"}
+                val start=number(result,"initialTemperatureK")
+                val ambient=number(result,"environmentTemperatureK")
+                val duration=number(result,"durationSeconds")
+                val epsilon=number(result,"emissivity")
+                val mass=number(result,"massKg")
+                val area=number(result,"areaM2")
+                val density=number(result,"assumedDensityKgM3")
+                val specific=number(result,"assumedSpecificHeatJPerKgK")
+                val steps=number(result,"steps")
+                val heatCapacity=mass*specific
+                require(start in 1.0..3000.0&&ambient in 1.0..3000.0&&
+                    duration in 0.01..3600.0&&epsilon in 0.0..1.0&&
+                    mass in 1e-9..1e15&&area in 1e-9..1e9&&
+                    density in 0.001..1e9&&specific in 0.01..1e7&&
+                    heatCapacity.isFinite()&&heatCapacity in 1e-9..1e20&&
+                    steps%1==0.0&&steps in 120.0..20000.0){
+                    "Invalid bounded radiative heat assumptions"}
+                val samples=result.getJSONArray("samples")
+                require(samples.length() in 2..122){"Unsupported radiative sample count"}
+                var oldTime=Double.NEGATIVE_INFINITY
+                var oldTemperature=start
+                for(i in 0 until samples.length()){
+                    val frame=samples.getJSONObject(i)
+                    val time=number(frame,"timeSeconds")
+                    val temperature=number(frame,"temperatureK")
+                    val power=number(frame,"netRadiatedPowerW")
+                    val transferred=number(frame,"transferredEnergyJ")
+                    val stored=number(frame,"internalThermalEnergyJ")
+                    val residual=number(frame,"energyResidualJ")
+                    val expected=heatCapacity*(start-temperature)
+                    val radiation=epsilon*NativeWorldLabRadiation.SIGMA*area*
+                        (Math.pow(temperature,4.0)-Math.pow(ambient,4.0))
+                    require(time>=0&&time>=oldTime&&time<=duration+1e-7&&
+                        temperature>=minOf(start,ambient)-1e-6&&
+                        temperature<=maxOf(start,ambient)+1e-6&&
+                        (if(start<ambient)temperature>=oldTemperature-1e-6
+                         else temperature<=oldTemperature+1e-6)&&
+                        close(power,radiation)&&close(stored,heatCapacity*temperature)&&
+                        close(residual,expected-transferred)&&
+                        kotlin.math.abs(residual)<=1e-7*maxOf(1.0,kotlin.math.abs(expected))){
+                        "Stored radiative curve violates the assumed energy ledger"}
+                    oldTime=time;oldTemperature=temperature
+                }
+                require(close(number(samples.getJSONObject(0),"timeSeconds"),0.0)&&
+                    close(oldTime,duration)){
+                    "Radiative evidence must cover the complete model duration"}
+            }
+            else->error("Unknown invented scientific computation")
+        }
+    }
 }

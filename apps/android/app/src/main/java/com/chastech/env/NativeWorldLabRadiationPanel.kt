@@ -34,35 +34,14 @@ fun NativeWorldLabRadiationPanel(project:NativeWorldLabProject,onError:(String)-
     var speed by remember(project.id,project.revision){mutableFloatStateOf(1f)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val scope=rememberCoroutineScope()
+    val science=remember(context){NativeWorldLabEvidenceStore(context.filesDir)}
+    var saveStatus by remember(project.id,project.revision){mutableStateOf("")}
     val export=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null&&run!=null)scope.launch{
             runCatching{withContext(Dispatchers.IO){
                 val active=run?:error("No radiation calculation")
-                val evidence=JSONObject()
-                    .put("format",active.format).put("modelVersion",active.modelVersion)
-                    .put("evidence",active.evidence).put("inputEvidence",active.inputEvidence)
-                    .put("projectId",active.projectId)
-                    .put("projectRevision",active.projectRevision)
-                    .put("entityId",active.entityId).put("materialId",active.materialId)
-                    .put("initialTemperatureK",active.initialTemperatureK)
-                    .put("environmentTemperatureK",active.environmentTemperatureK)
-                    .put("emissivity",active.emissivity)
-                    .put("durationSeconds",active.durationSeconds)
-                    .put("massKg",active.massKg).put("areaM2",active.areaM2)
-                    .put("assumedDensityKgM3",active.assumedDensityKgM3)
-                    .put("assumedSpecificHeatJPerKgK",active.assumedSpecificHeatJPerKgK)
-                    .put("validity",active.validity)
-                val frames=JSONArray()
-                active.samples.forEach{
-                    frames.put(JSONObject().put("timeSeconds",it.timeSeconds)
-                        .put("temperatureK",it.temperatureK)
-                        .put("netRadiatedPowerW",it.netRadiatedPowerW)
-                        .put("transferredEnergyJ",it.transferredEnergyJ)
-                        .put("internalThermalEnergyJ",it.internalThermalEnergyJ)
-                        .put("energyResidualJ",it.energyResidualJ))
-                }
-                evidence.put("frames",frames)
+                val evidence=NativeWorldLabExtendedEvidence.radiation(active)
                 val bytes=evidence.toString(2).toByteArray(Charsets.UTF_8)
                 require(bytes.size<=1048576){"Radiation evidence exceeds 1 MB"}
                 context.contentResolver.openOutputStream(uri,"wt")?.use{
@@ -147,6 +126,18 @@ fun NativeWorldLabRadiationPanel(project:NativeWorldLabProject,onError:(String)-
         }
         Text("Transferred heat "+String.format(Locale.US,"%.6g",observed.transferredEnergyJ)+
             " J; energy residual "+String.format(Locale.US,"%.5g",observed.energyResidualJ)+" J")
+        OutlinedButton(onClick={
+            runCatching {
+                science.save(project,NativeWorldLabExtendedEvidence.radiation(active))
+            }.onSuccess{
+                saveStatus="Radiative evidence preserved with this saved invention."
+                onError("")
+            }.onFailure{
+                saveStatus=""
+                onError(it.message?:"Save this invention before keeping radiative evidence")
+            }
+        }){Text("Keep heat with saved invention")}
+        if(saveStatus.isNotBlank())Text(saveStatus,style=MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick={export.launch("world-lab-radiative-heat.json")}){
             Text("Export radiative evidence")
         }

@@ -35,38 +35,14 @@ fun NativeWorldLabWavePanel(project:NativeWorldLabProject,onError:(String)->Unit
     var rate by remember(project.id,project.revision){mutableFloatStateOf(1f)}
     val context=androidx.compose.ui.platform.LocalContext.current
     val scope=rememberCoroutineScope()
+    val science=remember(context){NativeWorldLabEvidenceStore(context.filesDir)}
+    var saveStatus by remember(project.id,project.revision){mutableStateOf("")}
     val export=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null&&run!=null)scope.launch{
             runCatching{withContext(Dispatchers.IO){
                 val active=run?:error("No elastic-wave experiment")
-                val fields=JSONObject()
-                    .put("format",active.format).put("modelVersion",active.modelVersion)
-                    .put("projectId",active.projectId)
-                    .put("projectRevision",active.projectRevision)
-                    .put("entityId",active.entityId).put("materialId",active.materialId)
-                    .put("evidence",active.evidence).put("inputEvidence",active.inputEvidence)
-                    .put("mode",active.mode).put("cycles",active.cycles)
-                    .put("amplitudeMeters",active.amplitudeMeters)
-                    .put("assumedDensityKgM3",active.assumedDensityKgM3)
-                    .put("assumedYoungModulusPa",active.assumedYoungModulusPa)
-                    .put("lengthMeters",active.lengthMeters)
-                    .put("crossSectionM2",active.crossSectionM2)
-                    .put("frequencyHz",active.frequencyHz)
-                    .put("waveSpeedMps",active.waveSpeedMps)
-                    .put("totalEnergyJ",active.totalEnergyJ)
-                    .put("validity",active.validity)
-                val samples=JSONArray()
-                for(i in 0..80){
-                    val s=active.sample(active.durationSeconds*i/80)
-                    samples.put(JSONObject().put("timeSeconds",s.timeSeconds)
-                        .put("positionsMeters",JSONArray(s.positionsMeters))
-                        .put("displacementsMeters",JSONArray(s.displacementsMeters))
-                        .put("stressesPa",JSONArray(s.stressesPa))
-                        .put("kineticEnergyJ",s.kineticEnergyJ)
-                        .put("strainEnergyJ",s.strainEnergyJ))
-                }
-                fields.put("frames",samples)
+                val fields=NativeWorldLabExtendedEvidence.wave(active)
                 val bytes=fields.toString(2).toByteArray(Charsets.UTF_8)
                 require(bytes.size<=1048576){"Wave evidence exceeds 1 MB"}
                 context.contentResolver.openOutputStream(uri,"wt")?.use{
@@ -142,6 +118,18 @@ fun NativeWorldLabWavePanel(project:NativeWorldLabProject,onError:(String)->Unit
             " J; strain: "+String.format(Locale.US,"%.5g",sample.strainEnergyJ)+" J")
         Text("Total conserved ideal energy: "+
             String.format(Locale.US,"%.5g",sample.totalEnergyJ)+" J")
+        OutlinedButton(onClick={
+            runCatching {
+                science.save(project,NativeWorldLabExtendedEvidence.wave(active))
+            }.onSuccess{
+                saveStatus="Wave evidence preserved with this saved invention."
+                onError("")
+            }.onFailure{
+                saveStatus=""
+                onError(it.message?:"Save this invention before keeping wave evidence")
+            }
+        }){Text("Keep wave with saved invention")}
+        if(saveStatus.isNotBlank())Text(saveStatus,style=MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick={export.launch("world-lab-elastic-wave.json")}){
             Text("Export elastic-wave evidence")
         }
