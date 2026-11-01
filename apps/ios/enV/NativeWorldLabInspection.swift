@@ -106,7 +106,7 @@ enum NativeWorldLabInspectionGeometry {
     private static func clipped(_ polygon:[[Double]],normal:[Double],offset:Double)->(vertices:[[Double]],intersections:[[Double]]) {
         guard polygon.count>=3,normal.count==3,normal.allSatisfy({$0.isFinite}),
               sqrt(normal.reduce(0){$0+$1*$1})>1e-9,offset.isFinite else{return([],[])}
-        var output:[[Double]]=[],crossings:[[Double]]()
+        var output:[[Double]]=[],crossings:[[Double]]=[]
         for i in polygon.indices {
             let current=polygon[i],previous=polygon[(i+polygon.count-1)%polygon.count]
             guard current.count==3,previous.count==3 else{return([],[])}
