@@ -5,9 +5,9 @@ import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
-let chromium;
+let playwright;
 try {
-  ({ chromium } = require("playwright"));
+  playwright = require("playwright");
 } catch (error) {
   console.error("Design category browser audit requires Playwright.");
   console.error(error instanceof Error ? error.message : String(error));
@@ -19,15 +19,26 @@ const baseUrl = (
   ?? process.env.AUDIT_BASE_URL
   ?? "http://127.0.0.1:8080"
 ).replace(/\/+$/, "");
-const browserOptions = { headless: true };
-if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
-  browserOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-}
-const browser = await chromium.launch(browserOptions);
+const requestedBrowser = process.argv.find((argument) => argument.startsWith("--browser="))?.slice("--browser=".length) ?? "chromium";
+const browserMap = [
+  ["chromium", playwright.chromium],
+  ["firefox", playwright.firefox],
+  ["webkit", playwright.webkit],
+];
+const browserEntries = requestedBrowser === "all"
+  ? browserMap
+  : browserMap.filter(([name]) => name === requestedBrowser);
+assert.ok(browserEntries.length > 0, `Unsupported browser "${requestedBrowser}". Use chromium, firefox, webkit or all.`);
 const outputDir = resolve("artifacts/design-category");
 await mkdir(outputDir, { recursive: true });
 
-try {
+for (const [browserName, browserType] of browserEntries) {
+  const browserOptions = { headless: true };
+  if (browserName === "chromium" && process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+    browserOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  }
+  const browser = await browserType.launch(browserOptions);
+  try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const failures = [];
   page.on("pageerror", (error) => failures.push(error.message));
@@ -60,8 +71,8 @@ try {
   console.log("PASS Design tool route smoke test: " + routeChecks.length + " routes returned HTTP 200.");
 
   const search = page.getByRole("textbox", { name: "Search design tools" });
-  await search.click();
-  await search.fill("Gradient Token Generator");
+  await search.focus();
+  await page.keyboard.insertText("Gradient Token Generator");
   await page.waitForFunction(() => {
     const status = [...document.querySelectorAll('[aria-live="polite"]')]
       .find((element) => /tools? found/.test(element.textContent ?? ""));
@@ -72,38 +83,55 @@ try {
   assert.equal(await cards.count(), 1, "Search should find the generated Gradient Token Generator alone");
 
   await search.fill("");
-  await page.getByRole("button", { name: "Gradients & effects", exact: true }).click();
+  const filterGradientseffects = page.getByRole("button", { name: "Gradients & effects", exact: true });
+  await filterGradientseffects.focus();
+  await page.keyboard.press("Enter");
   await page.locator('a[href="/tools/design/shadow-builder"]').waitFor({ state: "visible" });
   assert.ok(await cards.count() > 7, "Effects filter should include the generated effect workflows");
 
-  await page.getByRole("button", { name: "UI components", exact: true }).click();
+  const filterUIcomponents = page.getByRole("button", { name: "UI components", exact: true });
+  await filterUIcomponents.focus();
+  await page.keyboard.press("Enter");
   await page.locator('a[href="/tools/design/button-builder"]').waitFor({ state: "visible" });
   assert.ok(await cards.count() > 2, "Components filter should include generated component workflows");
 
-  await page.getByRole("button", { name: "SVG & backgrounds", exact: true }).click();
+  const filterSVGbackgrounds = page.getByRole("button", { name: "SVG & backgrounds", exact: true });
+  await filterSVGbackgrounds.focus();
+  await page.keyboard.press("Enter");
   await page.locator('a[href="/tools/design/pattern-generator"]').waitFor({ state: "visible" });
   assert.ok(await cards.count() > 2, "SVG filter should include generated pattern and artwork workflows");
 
-  await page.getByRole("button", { name: "Color & palettes", exact: true }).click();
+  const filterColorpalettes = page.getByRole("button", { name: "Color & palettes", exact: true });
+  await filterColorpalettes.focus();
+  await page.keyboard.press("Enter");
   await page.locator('a[href="/tools/design/color-builder"]').waitFor({ state: "visible" });
   assert.ok(await cards.count() > 7, "Color filter should include generated color workflows");
 
-  await page.getByRole("button", { name: "Accessibility", exact: true }).click();
+  const filterAccessibility = page.getByRole("button", { name: "Accessibility", exact: true });
+  await filterAccessibility.focus();
+  await page.keyboard.press("Enter");
   assert.equal(await cards.count(), 3, "Accessibility group should retain the three curated tools");
 
-  await page.getByRole("button", { name: "All tools", exact: true }).click();
+  const filterAlltools = page.getByRole("button", { name: "All tools", exact: true });
+  await filterAlltools.focus();
+  await page.keyboard.press("Enter");
   const restoredCount = await cards.count();
   assert.equal(restoredCount, advertisedCount, "All tools filter should restore the full Design catalogue");
-  await page.screenshot({ path: resolve(outputDir, "design-category-desktop.png"), fullPage: true });
+  await page.screenshot({ path: resolve(outputDir, `design-category-${browserName}-desktop.png`), fullPage: true });
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(await cards.count(), advertisedCount, "Mobile layout should retain every Design card");
-  const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  assert.ok(mobileOverflow <= 1, "Design category should not horizontally overflow a 390px viewport");
-  await page.screenshot({ path: resolve(outputDir, "design-category-mobile.png"), fullPage: true });
+  for (const viewport of [{ width: 320, height: 740 }, { width: 390, height: 844 }, { width: 768, height: 1024 }]) {
+    await page.setViewportSize(viewport);
+    assert.equal(await cards.count(), advertisedCount, `Layout should retain every Design card at ${viewport.width}px`);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(overflow <= 1, `Design category should not horizontally overflow a ${viewport.width}px viewport`);
+    if (viewport.width === 390) {
+      await page.screenshot({ path: resolve(outputDir, `design-category-${browserName}-mobile.png`), fullPage: true });
+    }
+  }
 
   assert.deepEqual(failures, [], "Design category route should not emit uncaught browser errors");
   console.log("PASS Design category browser audit: " + advertisedCount + " tool cards, search, five filters, desktop and mobile layouts.");
-} finally {
-  await browser.close();
+  } finally {
+    await browser.close();
+  }
 }
