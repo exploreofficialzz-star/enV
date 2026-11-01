@@ -88,7 +88,7 @@ private fun NativeWorldLabFieldRenderer(layer:NativeWorldLabFieldLayer,timeSecon
             when(layer.kind){
                 NativeWorldLabFieldKind.SCALAR->layer.scalarSlice(timeSeconds,plane,sliceIndex)
                 NativeWorldLabFieldKind.TENSOR->layer.tensorSlice(timeSeconds,tensorComponent,plane,sliceIndex)
-                NativeWorldLabFieldKind.VECTOR->layer.vectorGlyphs(timeSeconds,plane,sliceIndex)
+                NativeWorldLabFieldKind.VECTOR->layer.vectorDisplaySlice(timeSeconds,plane,sliceIndex)
             }
         }
     }
