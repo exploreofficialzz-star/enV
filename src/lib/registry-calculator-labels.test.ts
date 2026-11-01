@@ -4,6 +4,7 @@ import { getAllTools } from "./registry.ts";
 import mathExpansion from "../data/math-expansion.json" with { type: "json" };
 import { EXPANSION_FAMILIES, describeExpansion } from "./calc/expansion-rows.mjs";
 import { MATH_EXERCISE_CATALOG } from "./engines/math-exercise-calculators.ts";
+import { calculators } from "./engines/formulas.ts";
 
 const allTools = getAllTools();
 const generated = allTools.filter((tool) =>
@@ -32,6 +33,10 @@ test("every generated formula calculator uses a human-readable unknown in its pu
       assert.ok(label, `${tool.id} has a target label in the engine metadata`);
       assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `${tool.id} title should include ${label}: ${tool.name}`);
       assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `${tool.id} description should include ${label}: ${tool.description}`);
+      const definition = calculators[formula];
+      assert.ok(definition, `${tool.id} has a live calculator definition`);
+      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), `${tool.id} formula caption should include ${label}: ${definition.formula}`);
+      assert.doesNotMatch(definition.formula ?? "", /solve for [abc]\b/i, `${tool.id} leaked an internal key in the formula caption`);
       assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `${tool.id} description should include ${label}: ${tool.description}`);
     } else {
       const expansion = getExpansionInfo(formula);
