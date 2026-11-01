@@ -1041,6 +1041,9 @@ fun NativeWorldLabForm() {
             }else{
                 val net=project!!.networks.first()
                 Text(net.name+" · "+net.components.size+" wired parts")
+                NativeWorldLabCircuitSchematicPanel(net,dcRun?.takeIf{
+                    it.projectId==project!!.id&&it.projectRevision==project!!.revision&&it.networkId==net.id
+                })
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedButton(onClick={applyProjectEdit{
                         NativeWorldLabEditor.addParallelCircuitResistor(it)
@@ -1158,26 +1161,6 @@ fun NativeWorldLabForm() {
                     Text("Delivered DC power: "+labNumber(result.deliveredPowerW)+" W")
                     Text("Resistor heat: "+labNumber(result.resistorHeatW)+" W")
                     Text("Power residual: "+labNumber(result.powerResidualW)+" W")
-                    result.branchCurrentsA.forEach{(id,current)->
-                        val part=net.components.firstOrNull{it.id==id}
-                        val resolved=part?.let{
-                            runCatching{com.chastech.env.engine.NativeWorldLabBranchCurrent.resolve(
-                                it.positiveNodeId,it.negativeNodeId,current)}.getOrNull()
-                        }
-                        val flow=if(resolved==null) "Direction unavailable"
-                            else if(resolved.direction==com.chastech.env.engine.NativeLabBranchFlowDirection.ZERO)
-                                "0 A · no net branch current"
-                            else {
-                                val fromId=resolved.fromNodeId.orEmpty()
-                                val toId=resolved.toNodeId.orEmpty()
-                                val from=net.nodes.firstOrNull{it.id==fromId}?.label?:fromId
-                                val to=net.nodes.firstOrNull{it.id==toId}?.label?:toId
-                                labNumber(resolved.magnitudeA)+" A · "+from+" → "+to
-                            }
-                        Text(id+": "+flow)
-                    }
-                    Text("Direction follows the calculated signed conventional branch current; this is circuit topology, not a measured 3D electromagnetic field.",
-                        style=MaterialTheme.typography.bodySmall)
                     Text(result.validity,style=MaterialTheme.typography.bodySmall)
                 }
             }
