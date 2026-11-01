@@ -1581,9 +1581,12 @@ fun NativeWorldLabForm() {
         Text("Simulated time: "+labNumber(time.toDouble())+" s")
         Slider(value=time,onValueChange={time=it;playing=false},valueRange=0f..12f,
             modifier=Modifier.semantics { contentDescription="Simulated elapsed time" })
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            listOf(0.1f,1f,10f).forEach { rate ->
-                OutlinedButton(onClick={speed=rate}) { Text(labNumber(rate.toDouble())+"×") }
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            listOf(0.01f,0.1f,1f,10f,100f).forEach { rate ->
+                OutlinedButton(onClick={speed=rate},modifier=Modifier.weight(1f),
+                    contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)) {
+                    Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                }
             }
         }
         if(kind=="spring") {

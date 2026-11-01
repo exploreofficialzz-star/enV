@@ -523,12 +523,23 @@ struct NativeWorldLabView:View {
                 Picker("Experiment",selection:$mode){
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
-                HStack{
+                HStack(spacing:6){
+                    Button("Beginning"){playing=false;seconds=0}
+                        .buttonStyle(.bordered)
+                    Button("Prev"){playing=false;seconds=max(0,seconds-1.0/240)}
+                        .buttonStyle(.bordered)
                     Button(playing ? "Pause":"Play"){playing.toggle()}
                         .buttonStyle(.borderedProminent)
-                    Button("Reset"){playing=false;seconds=0}.buttonStyle(.bordered)
-                    Button("Step"){playing=false;seconds=min(12,seconds+1.0/240)}
+                    Button("Next"){playing=false;seconds=min(12,seconds+1.0/240)}
                         .buttonStyle(.bordered)
+                    Button("End"){playing=false;seconds=12}
+                        .buttonStyle(.bordered)
+                }
+                HStack{
+                    Picker("Playback speed",selection:$speed){
+                        Text("0.01×").tag(0.01);Text("0.1×").tag(0.1)
+                        Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
+                    }.pickerStyle(.segmented)
                     Toggle("See inside",isOn:$seeInside).labelsHidden()
                     Text("See inside").font(.caption)
                 }
