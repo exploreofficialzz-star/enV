@@ -7,6 +7,8 @@ import { parseCssColor } from "@/lib/engines/accessibility-color";
 import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
+import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
+import { toHex } from "@/lib/engines/accessibility-color";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,12 +43,6 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "preset", label: "Start with a shadow preset", type: "select", defaultValue: "soft", options: [{ value: "subtle", label: "Subtle elevation" }, { value: "soft", label: "Soft elevation" }, { value: "medium", label: "Medium elevation" }, { value: "hard", label: "Hard shadow" }, { value: "glow", label: "Colour glow" }, { value: "inset", label: "Inset depth" }, { value: "custom", label: "Custom layer" }] },
   ],
   "text-shadow": [
-    { name: "layers", label: "Shadow layers", type: "select", defaultValue: "1", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }, { value: "4", label: "4 layers" }] },
-    { name: "x", label: "Horizontal offset", type: "number", defaultValue: 2, min: -40, max: 40, suffix: "px" },
-    { name: "y", label: "Vertical offset", type: "number", defaultValue: 3, min: -40, max: 40, suffix: "px" },
-    { name: "blur", label: "Blur", type: "number", defaultValue: 8, min: 0, max: 80, suffix: "px" },
-    { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.72, min: 0, max: 1, step: 0.01 },
-    { name: "color", label: "Shadow color", type: "color", defaultValue: "#202a3b" },
     { name: "textColor", label: "Text color", type: "color", defaultValue: "#ffffff" },
   ],
   border: [
@@ -157,6 +153,17 @@ function numberValue(values: Record<string, string>, key: string, fallback: numb
   const parsed = Number(values[key]);
   return clamp(Number.isFinite(parsed) ? parsed : fallback, min, max);
 }
+
+function mixColor(color: string | undefined, whiteRatio: number): string {
+  const parsed = parseCssColor(color ?? "#0d9f8a") ?? { r: 13, g: 159, b: 138, a: 1 };
+  const ratio = clamp(whiteRatio, 0, 1);
+  return toHex({
+    r: parsed.r + (255 - parsed.r) * ratio,
+    g: parsed.g + (255 - parsed.g) * ratio,
+    b: parsed.b + (255 - parsed.b) * ratio,
+    a: 1,
+  }).slice(0, 7);
+}
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -202,6 +209,7 @@ function cssFor(
   gradientStops: GradientStop[] = [],
   gradientOverlay: { enabled: boolean; color: string; x: number; y: number } = { enabled: false, color: "#ffffff", x: 24, y: 20 },
   shadowLayers: ShadowLayer[] = createShadowPreset("soft"),
+  textShadowLayers: TextShadowLayer[] = createTextShadowPreset("soft"),
 ) {
   if (family === "gradient") {
     const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
@@ -235,20 +243,7 @@ function cssFor(
     return { css: `box-shadow: ${boxShadow};`, style: { boxShadow } };
   }
   if (family === "text-shadow") {
-    const x = numberValue(values, "x", 2, -40, 40);
-    const y = numberValue(values, "y", 3, -40, 40);
-    const blur = numberValue(values, "blur", 8, 0, 80);
-    const opacity = numberValue(values, "opacity", 0.72, 0, 1);
-    const color = parseCssColor(values.color ?? "#202a3b") ?? { r: 32, g: 42, b: 59, a: 1 };
-    const rgba = (alpha: number) => `rgba(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)}, ${clamp(alpha, 0, 1).toFixed(3)})`;
-    const layerCount = Math.round(numberValue(values, "layers", 1, 1, 4));
-    const shadows = Array.from({ length: layerCount }, (_, index) => {
-      const multiplier = index + 1;
-      const layerOpacity = opacity * (1 - index * 0.16);
-      const layerBlur = Math.max(0, blur * (1 - index * 0.2));
-      return `${x * multiplier}px ${y * multiplier}px ${layerBlur.toFixed(1)}px ${rgba(layerOpacity)}`;
-    });
-    const textShadow = shadows.join(", ");
+    const textShadow = buildTextShadow(textShadowLayers);
     const textColor = values.textColor ?? "#ffffff";
     return { css: `text-shadow: ${textShadow};\ncolor: ${textColor};`, style: { textShadow, color: textColor } };
   }
@@ -269,10 +264,12 @@ function cssFor(
     const px = numberValue(values, "px", 16, 0, 64);
     const py = numberValue(values, "py", 10, 0, 40);
     const variant = values.variant ?? "solid";
-    const background = variant === "outline" || variant === "ghost" ? "transparent" : variant === "soft" ? "#e8f7f3" : values.bg;
+    const softBackground = mixColor(values.bg, 0.12);
+    const softHover = mixColor(values.bg, 0.2);
+    const background = variant === "outline" || variant === "ghost" ? "transparent" : variant === "soft" ? softBackground : values.bg;
     const color = variant === "solid" ? values.text : values.bg;
     const border = variant === "outline" ? "1px solid " + values.bg : "1px solid transparent";
-    const hoverBackground = variant === "outline" || variant === "ghost" ? "#e8f7f3" : variant === "soft" ? "#d6f0e9" : values.hover;
+    const hoverBackground = variant === "outline" || variant === "ghost" ? softBackground : variant === "soft" ? softHover : values.hover;
     const css = `.env-button {\n  background: ${background};\n  color: ${color};\n  border: ${border};\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n  font-weight: 600;\n  transition: background-color 160ms ease, transform 160ms ease;\n}\n.env-button:hover:not(:disabled) { background: ${hoverBackground}; }\n.env-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }\n.env-button:disabled { opacity: .52; cursor: not-allowed; }\n@media (prefers-reduced-motion: reduce) { .env-button { transition: none; } }`;
     return { css, style: { background, color, border, borderRadius: `${radius}px`, padding: `${py}px ${px}px`, opacity: values.disabled === "yes" ? 0.52 : 1, cursor: values.disabled === "yes" ? "not-allowed" : "pointer" } };
   }
@@ -380,6 +377,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   }), [allFields, family, values.colorSpace, values.kind]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
   const [shadowLayers, setShadowLayers] = useState<ShadowLayer[]>(() => createShadowPreset("soft"));
+  const [textShadowLayers, setTextShadowLayers] = useState<TextShadowLayer[]>(() => createTextShadowPreset("soft"));
   const [gradientGlow, setGradientGlow] = useState(false);
   const [glowColor, setGlowColor] = useState("#ffffff");
   const [glowX, setGlowX] = useState(24);
@@ -389,6 +387,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     setValues(initialValues(allFields));
     setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop })));
     setShadowLayers(createShadowPreset("soft"));
+    setTextShadowLayers(createTextShadowPreset("soft"));
     setGradientGlow(false);
     setGlowColor("#ffffff");
     setGlowX(24);
@@ -396,7 +395,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     setSampleText("Continue");
   }, [family, allFields]);
   const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
-  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay, shadowLayers), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, shadowLayers, values]);
+  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay, shadowLayers, textShadowLayers), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, shadowLayers, textShadowLayers, values]);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "text-shadow";
@@ -564,6 +563,57 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
               </div>
             </section>
           ) : null}
+          {family === "text-shadow" ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="text-shadow-stack-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="text-shadow-stack-heading" className="text-sm font-semibold text-fg">Independent text-shadow layers</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">Build soft depth, hard offset shadows or layered glow. Each layer has its own position, blur and opacity.</p>
+                </div>
+                <Button type="button" size="sm" onClick={() => setTextShadowLayers((previous) => [...previous, { ...createTextShadowPreset("custom")[0], id: "text-shadow-" + Date.now() }])} disabled={textShadowLayers.length >= 5}>Add layer ({textShadowLayers.length}/5)</Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["Soft", "soft"],
+                  ["Hard", "hard"],
+                  ["Neon", "neon"],
+                  ["Long", "long"],
+                ] as const).map(([label, preset]) => (
+                  <Button key={preset} type="button" size="sm" variant="outline" onClick={() => setTextShadowLayers(createTextShadowPreset(preset))}>{label}</Button>
+                ))}
+                <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers([])}>Clear layers</Button>
+              </div>
+              <div className="space-y-3">
+                {textShadowLayers.map((layer, index) => (
+                  <div key={layer.id} className="space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                    <div className="flex min-h-10 items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-fg">
+                        <input type="checkbox" checked={layer.enabled} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, enabled: event.target.checked } : item))} className="size-4 accent-accent" />
+                        Layer {index + 1}
+                      </label>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => previous.filter((item) => item.id !== layer.id))} aria-label={"Remove text shadow layer " + (index + 1)}>Remove</Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <label className="space-y-1 text-xs text-muted">Color
+                        <Input type="color" value={layer.color} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, color: event.target.value } : item))} className="h-10 w-full p-1" aria-label={"Text shadow layer " + (index + 1) + " color"} />
+                      </label>
+                      {([
+                        ["x", "X offset", -80, 80],
+                        ["y", "Y offset", -80, 80],
+                        ["blur", "Blur", 0, 120],
+                        ["opacity", "Opacity", 0, 1],
+                      ] as const).map(([key, label, min, max]) => (
+                        <label key={key} className="space-y-1 text-xs text-muted">{label}
+                          <Input type="number" value={String(layer[key])} min={min} max={max} step={key === "opacity" ? 0.01 : 1} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, [key]: Number(event.target.value) } : item))} className="h-10 font-mono text-xs" aria-label={"Text shadow layer " + (index + 1) + " " + label} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {textShadowLayers.length === 0 ? <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted">No shadow layers. Add one or choose a preset; the export will use <code>text-shadow: none</code>.</p> : null}
+              </div>
+            </section>
+          ) : null}
           <FieldGrid fields={fields} values={values} onChange={(name, value) => {
             setValues((previous) => {
               const next = { ...previous, [name]: value };
@@ -587,7 +637,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
         </div>
 
         <div className="min-w-0 space-y-3 lg:sticky lg:top-4">
-          {family === "button" ? <style>{`.env-live-button:hover:not(:disabled) { background: ${values.variant === "outline" || values.variant === "ghost" ? "#e8f7f3" : values.variant === "soft" ? "#d6f0e9" : values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
+          {family === "button" ? <style>{`.env-live-button:hover:not(:disabled) { background: ${values.variant === "outline" || values.variant === "ghost" ? mixColor(values.bg, 0.12) : values.variant === "soft" ? mixColor(values.bg, 0.2) : values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
           {family === "input" ? <style>{`.env-live-input:focus-visible { outline: 3px solid ${values.focus ?? "#0d9f8a"}; outline-offset: 2px; }`}</style> : null}
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-fg">Live preview</p>

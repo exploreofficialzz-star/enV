@@ -109,12 +109,12 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
       const controlTwoY = end.y - end.derivative / 3;
       path += ` C ${(start.x + dx / 3).toFixed(2)} ${controlOneY.toFixed(2)} ${(end.x - dx / 3).toFixed(2)} ${controlTwoY.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
     }
-    path += " L1440 160 L0 160 Z";
+    path += " L1440 240 L0 240 Z";
     const color = index % 2 === 0 ? fill : secondary;
     return `<path fill="${color}" opacity="${1 - index * 0.12}" d="${path}"/>`;
   }).join("");
-  const canvas = options.transparent ? "" : `<rect width="1440" height="160" fill="${background}"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 160" preserveAspectRatio="none">${canvas}${paths}</svg>`;
+  const canvas = options.transparent ? "" : `<rect width="1440" height="240" fill="${background}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 240" preserveAspectRatio="none">${canvas}${paths}</svg>`;
 }
 
 export function buildNoiseDataUrl(color: string, density: number, strength = 1): string {

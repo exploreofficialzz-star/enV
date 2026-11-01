@@ -32,6 +32,10 @@ const designColor = read("src/lib/engines/design-color.ts");
 const designColorTests = read("src/lib/engines/design-color.test.ts");
 const svgGenerators = read("src/lib/engines/svg-generators.ts");
 const svgGeneratorTests = read("src/lib/engines/svg-generators.test.ts");
+const paletteImage = read("src/lib/engines/palette-image.ts");
+const paletteImageTests = read("src/lib/engines/palette-image.test.ts");
+const textShadow = read("src/lib/engines/css-text-shadow.ts");
+const textShadowTests = read("src/lib/engines/css-text-shadow.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -72,6 +76,9 @@ const checks = [
   ["Multi-style pattern and outlined rotated blob controls", cssEngine.includes("Pattern style") && cssEngine.includes("Outline width") && cssEngine.includes("Rotation")],
   ["Wave customization, transparency and five-layer support", cssEngine.includes("Wave frequency") && cssEngine.includes("Wave phase") && cssEngine.includes("Canvas background") && cssEngine.includes("value: \"5\", label: \"5 layers\"") && svgGenerators.includes("clamp(options.layers, 1, 5)")],
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
+  ["Median-cut image palette extraction and transparent-pixel filtering", paletteImage.includes("extractDominantColors") && paletteImage.includes("selectedChannel") && paletteImageTests.includes("ignores transparent pixels") && colorEngine.includes("extractDominantColors(pixels, 5, 160)")],
+  ["Independently editable text-shadow layers and presets", textShadow.includes("buildTextShadow") && textShadow.includes("normalizeTextShadowLayers") && textShadowTests.includes("keeps its own editable values") && cssEngine.includes("Independent text-shadow layers") && cssEngine.includes("Add layer (")],
+  ["Consistent SVG wave export dimensions", svgGenerators.includes('viewBox="0 0 1440 240"') && svgGenerators.includes("L1440 240 L0 240 Z") && svgGeneratorTests.includes('viewBox="0 0 1440 240"')],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
 if (design.length !== expectedIds.length || missing.length || unexpected.length || duplicates.length || invalid.length || badType.length || failedChecks.length) {

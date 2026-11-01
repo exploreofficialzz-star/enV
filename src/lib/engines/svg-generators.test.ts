@@ -34,7 +34,9 @@ test("pattern generator clamps settings and rejects unsafe color values", () => 
 test("wave geometry responds to frequency, phase, layers and transparent canvas", () => {
   const basic = buildWaveSvg({ amplitude: 24, layers: 2, frequency: 2, phase: 0, baseline: 76, fill: "#0d9f8a", secondary: "#7c4dff", background: "#ffffff", transparent: false });
   const changed = buildWaveSvg({ amplitude: 34, layers: 5, frequency: 4, phase: 45, baseline: 90, fill: "#0d9f8a", secondary: "#7c4dff", background: "#ffffff", transparent: true });
-  assert.match(basic, /<rect width="1440" height="160" fill="#ffffff"\/>/);
+  assert.match(basic, /<rect width="1440" height="240" fill="#ffffff"\/>/);
+  assert.match(basic, /viewBox="0 0 1440 240"/);
+  assert.match(basic, /L1440 240 L0 240 Z/);
   assert.equal((basic.match(/<path /g) ?? []).length, 2);
   assert.equal((changed.match(/<path /g) ?? []).length, 5);
   assert.doesNotMatch(changed, /<rect /);
