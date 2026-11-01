@@ -181,6 +181,7 @@ data class NativeScientificStepOutput(
 )
 data class NativeScientificAdapter(
     val componentId:String,val modelId:String,val modelVersion:String,
+    val initialOutputs:Map<String,NativeScienceQuantity> = emptyMap(),
     val advance:(Double,Double,Map<String,NativeScienceQuantity>)->NativeScientificStepOutput
 )
 data class NativeScientificExchangeSample(
@@ -206,6 +207,7 @@ object NativeWorldLabExecution {
         val byId=adapters.associateBy{it.componentId}
         require(byId.size==adapters.size){"Duplicate trusted component adapter"}
         val components=graph.components.associateBy{it.id}
+        val incoming=graph.connections.groupBy{it.toComponentId}
         graph.components.forEach{part->
             val adapter=byId[part.id]
             require(adapter!=null&&adapter.modelId==part.modelId&&
@@ -232,7 +234,19 @@ object NativeWorldLabExecution {
         val samples=mutableListOf<NativeScientificExchangeSample>()
         var now=0.0
         var scheduled:Double?=null
-        var previous=emptyMap<String,NativeScienceQuantity>()
+        val initialValues=linkedMapOf<String,NativeScienceQuantity>()
+        adapters.forEach{adapter->
+            val component=components.getValue(adapter.componentId)
+            adapter.initialOutputs.forEach{(portId,value)->
+                val port=component.ports.firstOrNull{it.id==portId}
+                require(port!=null&&port.direction!="input"&&port.unit==value.unit){
+                    "Initial state references an unregistered output port or unit"
+                }
+                NativeWorldLabSI.validate(value)
+                initialValues[adapter.componentId+":"+portId]=value.copy(dimension=value.dimension.toList())
+            }
+        }
+        var previous:Map<String,NativeScienceQuantity>=initialValues
         while(now<durationSeconds-1e-12&&samples.size<50000){
             val end=minOf(durationSeconds,now+stepSeconds,scheduled?:durationSeconds)
             require(end>now+1e-12){"Scientific solver failed to advance"}
@@ -242,14 +256,12 @@ object NativeWorldLabExecution {
             for(id in order){
                 val component=components.getValue(id)
                 val inputs=linkedMapOf<String,NativeScienceQuantity>()
-                graph.connections.filter{it.toComponentId==id}.forEach{edge->
+                (incoming[id]?:emptyList()).forEach{edge->
                     val sourceValues=if(edge.delayed)previous else values
                     val source=sourceValues[edge.fromComponentId+":"+edge.fromPortId]
-                    if(source==null){
-                        // Only a delayed feedback edge may initialize from solver-owned state.
-                        if(edge.delayed&&samples.isEmpty())return@forEach
-                        error("Connected scientific source did not emit its declared output port")
-                    }
+                        ?:throw IllegalStateException(if(edge.delayed)
+                            "Delayed scientific input requires a registered initial output value"
+                            else "Connected scientific source did not emit its declared output port")
                     val port=component.ports.first{it.id==edge.toPortId}
                     val converted=source.copy(unit=port.unit)
                     NativeWorldLabSI.validate(converted)
@@ -313,12 +325,15 @@ object NativeWorldLabExecution {
         val source=NativeScientificAdapter("source","ideal-dc-source","1.0.0"){_,_,_->
             NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(sourceVoltageV,"V")),0.0,0.0,0.0)
         }
-        val load=NativeScientificAdapter("load","series-rc-load","1.0.0"){time,_,inputs->
+        var capacitorVoltage=initialVoltageV
+        val load=NativeScientificAdapter("load","series-rc-load","1.0.0"){_,delta,inputs->
             val connectedVoltage=inputs["Vin"]?.let{NativeWorldLabSI.convert(it,"V")}
                 ?:error("RC load requires its connected source voltage")
-            val voltage=connectedVoltage+(initialVoltageV-connectedVoltage)*
-                kotlin.math.exp(-time/(resistanceOhm*capacitanceF))
+            require(delta.isFinite()&&delta>0.0){"RC solver requires a positive finite step"}
+            val voltage=connectedVoltage+(capacitorVoltage-connectedVoltage)*
+                kotlin.math.exp(-delta/(resistanceOhm*capacitanceF))
             val current=(connectedVoltage-voltage)/resistanceOhm
+            capacitorVoltage=voltage
             NativeScientificStepOutput(mapOf(
                 "Vc" to NativeWorldLabSI.declare(voltage,"V","physics-model-computed"),
                 "I" to NativeWorldLabSI.declare(current,"A","physics-model-computed")
