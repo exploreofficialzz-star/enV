@@ -142,6 +142,11 @@ final class NativeWorldLabRecordedTimeTests:XCTestCase {
 }
 
 final class NativeWorldLabRecordedEventBoundaryTests:XCTestCase {
+    private func run()->NativeWorldLabRecordedRun {
+        NativeWorldLabRecordedRun(runId:"run-1",modelId:"spring",modelVersion:"2.1.0",
+            worldEpochUTC:"2026-11-01T00:00:00Z",
+            sampleTimesSeconds:[0,0.1,0.2,0.3,0.4,0.5])
+    }
     func testMandatoryEventBetweenSamplesStopsAtExactSimulationTime()throws {
         let base=run()
         let recording=NativeWorldLabRecordedRun(runId:base.runId,modelId:base.modelId,
