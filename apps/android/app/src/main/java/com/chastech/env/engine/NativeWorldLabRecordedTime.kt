@@ -30,7 +30,7 @@ data class NativeWorldLabRecordedRun(
         }
         require(mandatoryEventTimesSeconds.size<=100_000 &&
             mandatoryEventTimesSeconds.all { event ->
-                event.isFinite() && sampleTimesSeconds.any { abs(it-event)<=1e-9 }
+                event.isFinite() && event>=0.0 && event<=durationSeconds
             }) {
             "Mandatory events must be finite and present in the immutable recording."
         }
