@@ -102,6 +102,15 @@ fun NativeWorldLabForm() {
     var branchStatus by remember { mutableStateOf("") }
     var pendingTimelineJson by remember { mutableStateOf<String?>(null) }
     var inspection by remember { mutableStateOf(com.chastech.env.engine.NativeInspectionSettings()) }
+    var inspectionHistory by remember { mutableStateOf(com.chastech.env.engine.NativeWorldLabInspectionHistory()) }
+    fun updateInspection(next:com.chastech.env.engine.NativeInspectionSettings){
+        val committed=inspectionHistory.commit(next)
+        inspectionHistory=committed;inspection=committed.present
+    }
+    fun travelInspection(redo:Boolean){
+        val next=if(redo)inspectionHistory.redo() else inspectionHistory.undo()
+        inspectionHistory=next;inspection=next.present
+    }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
     var projectJson by remember { mutableStateOf<String?>(null) }
     var dcRun by remember { mutableStateOf<NativeLabDcResult?>(null) }
@@ -1855,7 +1864,11 @@ fun NativeWorldLabForm() {
                 }},
                 onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
                 onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}},
-                inspection=inspection,onInspectionChange={inspection=it})
+                inspection=inspection,onInspectionChange={updateInspection(it)},
+                canUndoInspectionView=inspectionHistory.past.isNotEmpty(),
+                canRedoInspectionView=inspectionHistory.future.isNotEmpty(),
+                onUndoInspectionView={travelInspection(false)},
+                onRedoInspectionView={travelInspection(true)})
             NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
                 applyProjectEdit(transform)
             }
