@@ -30,3 +30,25 @@ test("contrast correction suggestions use the same selected canvas as evaluation
   assert.ok(suggestion);
   assert.ok(contrastRatio(suggestion, background, canvas) >= 4.5);
 });
+
+test("contrast suggestions can adjust either color and preserve or increase alpha safely", () => {
+  const white = parseCssColor("#ffffff")!;
+  const gray = parseCssColor("#777777")!;
+  const suggestions = suggestContrastCorrections(gray, white, "normal-aa");
+  assert.ok(suggestions.background);
+  assert.ok(contrastRatio(gray, suggestions.background!) >= 4.5);
+  assert.ok(suggestions.foreground);
+  assert.ok(contrastRatio(suggestions.foreground!, white) >= 4.5);
+
+  const translucentForeground = parseCssColor("rgba(0, 0, 0, 0.5)")!;
+  const foregroundOpacity = suggestContrastCorrections(translucentForeground, white, "normal-aa").foregroundOpacity;
+  assert.ok(foregroundOpacity);
+  assert.ok(foregroundOpacity.a >= translucentForeground.a);
+  assert.ok(contrastRatio(foregroundOpacity, white) >= 4.5);
+
+  const translucentBackground = parseCssColor("rgba(0, 0, 0, 0.1)")!;
+  const backgroundOpacity = suggestContrastCorrections(white, translucentBackground, "normal-aa").backgroundOpacity;
+  assert.ok(backgroundOpacity);
+  assert.ok(backgroundOpacity.a >= translucentBackground.a);
+  assert.ok(contrastRatio(white, backgroundOpacity) >= 4.5);
+});

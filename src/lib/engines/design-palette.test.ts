@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette } from "./design-palette.ts";
+import { buildDesignPaletteExport, buildPaletteSwatchesSvg, createColorShadeScale, createHarmonyPalette } from "./design-palette.ts";
 import { parseCssColor, rgbToHsl, toHex } from "./accessibility-color.ts";
 
 const colors = {
@@ -19,7 +19,19 @@ test("primary shade scale is ordered, bounded and keeps its source at 500", () =
   const scale = createColorShadeScale(colors.primary);
   assert.deepEqual(scale.map(({ step }) => step), [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]);
   assert.equal(scale.find(({ step }) => step === 500)?.color, colors.primary);
-  assert.equal(scale[0].color, "#f0f9f8");
+  assert.notEqual(scale[0].color, scale[4].color);
+  assert.notEqual(scale[9].color, scale[5].color);
+  const shadeLum = (hex: string) => {
+    const color = parseCssColor(hex)!;
+    const linear = (channel: number) => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+  };
+  assert.ok(shadeLum(scale[0].color) > shadeLum(scale[5].color));
+  assert.ok(shadeLum(scale[5].color) > shadeLum(scale[9].color));
+  assert.equal(createColorShadeScale("#808080")[5].color, "#808080");
   assert.equal(createColorShadeScale("not-a-color").length, 0);
 });
 
@@ -51,6 +63,7 @@ test("harmony palette generator respects selectable counts from three to eight",
       const palette = createHarmonyPalette(source, harmony, count);
       assert.equal(palette.length, count, `${harmony} count ${count}`);
       assert.ok(palette.every((color) => color.r >= 0 && color.r <= 255 && color.g >= 0 && color.g <= 255 && color.b >= 0 && color.b <= 255));
+      assert.equal(new Set(palette.map(toHex)).size, count, `${harmony} count ${count} must not contain duplicate swatches`);
     }
   }
   assert.equal(new Set(createHarmonyPalette(source, "triadic", 3).map(toHex)).size, 3);
@@ -59,4 +72,27 @@ test("harmony palette generator respects selectable counts from three to eight",
   const hueDelta = (hue: number) => ((hue - sourceHue + 540) % 360) - 180;
   assert.ok(Math.abs(hueDelta(analogous[0]) + 40) < 1);
   assert.ok(Math.abs(hueDelta(analogous[2]) - 40) < 1);
+});
+
+test("palette swatch SVG export is self-contained, accessible and escapes labels", () => {
+  const svg = buildPaletteSwatchesSvg(
+    ["#0d9f8a", "rgb(90 158 232)", "#7c4dff", "not-a-color"],
+    ["Primary", "Secondary", "<script>alert(1)</script>"],
+  );
+  assert.match(svg, /viewBox="0 0 1200 300"/);
+  assert.match(svg, /<title id="palette-title">enV color palette<\/title>/);
+  assert.match(svg, /#0D9F8A/);
+  assert.match(svg, /#5A9EE8/);
+  assert.match(svg, /&lt;script&gt;/);
+  assert.doesNotMatch(svg, /<script>/);
+  assert.equal((svg.match(/<rect /g) ?? []).length, 4); // one canvas plus three valid swatches
+  const alphaSvg = buildPaletteSwatchesSvg(["rgba(0, 0, 0, 0.5)"]);
+  assert.match(alphaSvg, /fill="#808080"/, "transparent swatches should match their appearance on the white export canvas");
+});
+
+test("palette swatch SVG export rejects an empty or invalid palette", () => {
+  assert.throws(() => buildPaletteSwatchesSvg([]), /At least one valid color/);
+  assert.throws(() => buildPaletteSwatchesSvg(["not-a-color"]), /At least one valid color/);
+  const many = buildPaletteSwatchesSvg(Array.from({ length: 12 }, (_, index) => { const value = (index + 1).toString(16).padStart(2, "0"); return `#${value}${value}${value}`; }));
+  assert.equal((many.match(/<text /g) ?? []).length, 16); // eight swatches, each with a name and HEX value
 });

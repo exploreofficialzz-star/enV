@@ -78,42 +78,35 @@ The upgrade direction is to preserve the compact nature of enV while making ever
 
 ## Changes prepared in this implementation
 
-- Dedicated Design workspace with grouped tools, live search, category filters, result counts and empty state.
-- Converter workflows receive the actual tool ID so HEX/RGB/HSL/HSV/CMYK pages can show the right input format and full conversions.
-- Palette generation adds harmony choices and a sample interface preview.
-- Contrast UI uses separate WCAG text and non-text requirements plus alpha-aware calculation and adjustment suggestions.
-- Color-vision simulation is separated into a reusable local utility and has regression tests for neutral endpoints, valid outputs and distinct modes.
-- The active Accessibility Studio's multi-surface and side-by-side color-vision previews also use that same shared simulation utility, so legacy simulator routes and the newer studio cannot silently diverge.
-- Gradient generator gains linear/radial/conic and repeating modes, a live 2–8 stop editor with independently editable colors/positions, presets, reverse/even distribution actions, shape/center controls, fallback CSS and copy/export output.
-- Box shadow generator gains presets, inset treatment and multiple coordinated layers.
-- Button/card/border/glass/neumorphic generators gain more real-world controls; button output includes hover/focus rules and the live preview now responds to hover/focus instead of showing a permanently static state.
-- Blob/wave generators expose fill and variation settings; the CSS noise overlay uses generated SVG turbulence instead of a placeholder URL.
+- Dedicated Design workspace with grouped tools, live search, keyboard-accessible category filters, result counts and empty state. The catalogue explorer also discovers generated Design utilities without hiding them behind the curated 21 core tools.
+- Converter workflows receive the actual tool ID so HEX/RGB/HSL/HSV/CMYK pages show the right input format and full conversions; color parsing/formatting also covers HWB and OKLCH, with the CMYK print-profile caveat retained.
+- Palette generation includes harmony choices, 3–8 swatches, individual edits/locks, randomized unlocked colors, local image extraction, shareable URLs, OKLCH shade ramps, editable semantic roles, contrast pair feedback, CSS/SCSS/Tailwind/JSON/W3C token exports, four context previews (landing, dashboard, forms and content), light/dark themes, and labeled SVG plus locally rendered PNG swatch-sheet exports.
+- Contrast UI uses separate WCAG text and non-text requirements, alpha-aware compositing over an explicit canvas, result details and suggested foreground/background/opacity corrections.
+- Color-vision simulation is separated into a reusable local utility with regression tests for neutral endpoints, valid outputs and distinct modes. The active Accessibility Studio's multi-surface and side-by-side previews use the same shared simulation utility.
+- Gradient generator gains linear/radial/conic and repeating modes, editable 2–8 stop gradients with pointer drag-to-reorder and keyboard/touch move buttons, color-space interpolation, mesh-style backgrounds, presets, reverse/even distribution actions, shape/center controls, fallback CSS and copy/export output.
+- Box-shadow and text-shadow generators have independent editable/reorderable layers, presets and inset treatment. Border controls support independent edge widths and corner radii.
+- Button, badge, input and card generators have real-world style controls and state previews; generated styles cover hover, keyboard focus and reduced motion, with component contrast feedback.
+- SVG/background tools include expanded pattern tiles, seeded organic blobs, five-layer waves, low-poly triangulation, particle scatter, standalone mesh gradients, paper/halftone/topographic/woven textures, transparent backgrounds, copyable SVG and PNG export paths. Noise generation uses actual SVG turbulence rather than a placeholder URL.
+- Added focused engine/property regression tests, a generated-catalogue implementation audit, a rendered route/search/filter/responsive audit and browser checks configured for Chromium, Firefox and WebKit.
 
-## Remaining competitive roadmap
+## Remaining / consciously deferred
 
-**Next priority — design-system workflow**
-- Semantic palette roles: text, background, surface, border, primary, secondary, accent and status colors.
-- Full page previews for landing page, dashboard, forms and content layouts, including light/dark variants.
-- Lock individual palette swatches, randomize the rest and preserve state in a shareable URL.
-- Export CSS variables, Tailwind theme, SCSS, JSON/W3C design tokens and PNG/SVG swatches.
-- Add image-to-palette extraction without uploading images.
+The following items are intentionally not represented as completed:
 
-**Next priority — professional color and gradients**
-- OKLCH/OKLab support, perceptual interpolation and optional Display-P3 where browser support allows.
-- Drag-to-reorder stops, editable radial size/center offsets, multi-layer gradients and PNG/SVG export.
-- Better palette shade scales and APCA as a clearly separate advanced preview metric.
+- **APCA:** not included in the current contrast workflow. The APCA reference project has version-specific implementation requirements, required explanatory wording and licensing/usage constraints. Do not substitute a home-grown approximation or claim APCA compliance until the correct package/version and its use terms are reviewed. WCAG 2.2 contrast evaluation remains the implemented normative check.
+- **Display-P3:** the current color parsing, palette math and exports target sRGB. Wide-gamut input/output and device-aware color management need a separate tested design rather than implying that OKLCH output alone is Display-P3 support.
+- **Recoloring arbitrary live websites from a URL:** remains a later product direction. It needs an explicit URL-fetching security model, origin/SSRF protections, clear user consent and robust handling of authenticated or dynamic sites.
+- **True Safari/iOS device validation:** WebKit is included in the automated Playwright matrix, but that does not replace testing on physical iPhones/iPads and the installed native app. Android/iOS native screenshots, assistive technology and device-specific color rendering still need real-device acceptance.
+- **Independent user research:** the reviewed public feedback is directional and some review samples are very small. The design choices still need validation with enV users and representative low-end Android devices.
 
-**Next priority — SVG asset studio**
-- More shape families: layered waves, dot/line grids, circle scatter, low-poly, mesh/blurred gradients and pattern tiles.
-- Per-generator presets, seeded randomize, copy SVG, download SVG and PNG.
-- Show transparent/background options and asset dimensions.
+## Implementation acceptance checklist
 
-**Quality gates**
-- Each tool keeps its own stable route and opens with the matching controls.
-- All controls update the preview; generated CSS/SVG is valid and copy/download output matches the visible result.
-- Unit tests for conversions, contrast thresholds/alpha, shape path output and shadow/gradient presets.
-- Browser QA at phone widths and desktop widths, keyboard-only navigation, reduced motion and accessible names.
-- Test in current Chromium, Firefox and Safari before declaring cross-browser parity. Local source changes alone do not prove production/device behavior.
+- Preserve the existing tool IDs, route slugs, bookmarks and old entry points; expose generated Design tools through discoverable filter groups.
+- Verify the entire catalogue, live search, all filters, keyboard activation, hydration and no horizontal overflow at 320px, 390px, 768px and desktop widths.
+- In Chromium, Firefox and WebKit, verify the four palette page previews in both light and dark themes, confirm actual SVG/PNG downloads and drag-to-reorder gradient stops; verify the swatch SVG is valid, self-contained and safely escaped.
+- Keep WCAG 2.2 target thresholds distinct, composite alpha correctly, and state clearly that pair-level contrast checks do not certify an entire interface.
+- Keep SVG generators deterministic where seeded, bound user inputs, avoid external assets and ensure exported SVG labels/content are safe.
+- Require the feature branch's current-head unit, catalogue, Web/Android/iOS and rendered-browser workflows to pass before merging. A Vercel deployment-rate-limit status is an external infrastructure blocker, not proof of code correctness; it must be resolved or explicitly treated under repository branch-protection policy rather than bypassed.
 
 ## Source index
 

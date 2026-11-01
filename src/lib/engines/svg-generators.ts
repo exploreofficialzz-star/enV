@@ -1,5 +1,5 @@
-export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal";
-export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number };
+export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal" | "rings" | "chevron" | "hexagons" | "crosshatch" | "checkerboard" | "triangles" | "polka" | "waves" | "zigzag";
+export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number; irregularity?: number };
 export type WaveSvgOptions = {
   amplitude: number;
   layers: number;
@@ -25,7 +25,7 @@ function safeHex(value: string, fallback: string): string {
   return fallback;
 }
 
-export function buildPatternSvg(size: number, opacity: number, color: string, pattern: PatternStyle = "diagonal"): string {
+export function buildPatternSvg(size: number, opacity: number, color: string, pattern: PatternStyle = "diagonal", rotation = 0): string {
   const safeSize = Math.round(clamp(size, 6, 160));
   const safeOpacity = clamp(opacity, 0, 1);
   const safeColor = safeHex(color, "#0d9f8a");
@@ -37,21 +37,38 @@ export function buildPatternSvg(size: number, opacity: number, color: string, pa
     diagonal: `<path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}" ${stroke}/>`,
     cross: `<path d="M${center} 0V${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
     horizontal: `<path d="M0 ${center}H${safeSize}" ${stroke}/>`,
+    rings: `<circle cx="${center}" cy="${center}" r="${safeSize * 0.18}" ${stroke} fill="none"/><circle cx="${center}" cy="${center}" r="${safeSize * 0.4}" ${stroke} fill="none"/>`,
+    chevron: `<path d="M-${safeSize / 2} 0L${center} ${center}L-${safeSize / 2} ${safeSize}M${center} 0L${safeSize * 1.5} ${center}L${center} ${safeSize}" ${stroke} fill="none"/>`,
+    hexagons: `<path d="M${center} 0L${safeSize * 0.86} ${safeSize * 0.25}V${safeSize * 0.75}L${center} ${safeSize}L${safeSize * 0.14} ${safeSize * 0.75}V${safeSize * 0.25}Z M${safeSize * 1.5} ${safeSize * 0.5}L${safeSize * 1.86} ${safeSize * 0.75}V${safeSize * 1.25}L${safeSize * 1.5} ${safeSize * 1.5}L${safeSize * 1.14} ${safeSize * 1.25}V${safeSize * 0.75}Z" ${stroke} fill="none"/>`,
+    crosshatch: `<path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}M${center} 0L${center} ${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
+    checkerboard: `<rect x="0" y="0" width="${center}" height="${center}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><rect x="${center}" y="${center}" width="${center}" height="${center}" fill="${safeColor}" fill-opacity="${safeOpacity}"/>`,
+
+    triangles: `<path d="M0 0L${center} ${center}L0 ${safeSize}M${center} ${center}L${safeSize} 0L${safeSize} ${safeSize}M0 0H${safeSize}M0 ${safeSize}H${safeSize}" ${stroke} fill="none"/>`,
+    polka: `<circle cx="${center}" cy="${center}" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="0" cy="0" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="${safeSize}" cy="0" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="0" cy="${safeSize}" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="${safeSize}" cy="${safeSize}" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/>`,
+    waves: `<path d="M0 ${safeSize * 0.28}C${safeSize * 0.25} ${safeSize * 0.02} ${safeSize * 0.25} ${safeSize * 0.54} ${center} ${safeSize * 0.28}S${safeSize * 0.75} ${safeSize * 0.54} ${safeSize} ${safeSize * 0.28}M0 ${safeSize * 0.72}C${safeSize * 0.25} ${safeSize * 0.46} ${safeSize * 0.25} ${safeSize * 0.98} ${center} ${safeSize * 0.72}S${safeSize * 0.75} ${safeSize * 0.98} ${safeSize} ${safeSize * 0.72}" ${stroke} fill="none"/>`,
+    zigzag: `<path d="M0 0L${center} ${center}L${safeSize} 0M0 ${center}L${center} ${safeSize}L${safeSize} ${center}M0 ${safeSize}L${center} ${center}" ${stroke} fill="none"/>`,
   };
   const safePattern = Object.prototype.hasOwnProperty.call(patternShapes, pattern) ? pattern : "diagonal";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}">${patternShapes[safePattern]}</svg>`;
+  const safeRotation = clamp(rotation, 0, 360);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}"><g transform="rotate(${safeRotation} ${center} ${center})">${patternShapes[safePattern]}</g></svg>`;
 }
 
-export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#ffffff", strokeWidth = 0 }: BlobSvgOptions): string {
+export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#ffffff", strokeWidth = 0, irregularity = 0.7 }: BlobSvgOptions): string {
   const safeSeed = Math.round(clamp(seed, 1, 999));
   const count = Math.round(clamp(points, 8, 18));
   const safeColor = safeHex(color, "#0d9f8a");
   const safeStroke = safeHex(stroke, "#ffffff");
   const safeRotation = clamp(rotation, 0, 360);
   const safeStrokeWidth = clamp(strokeWidth, 0, 8);
+  const safeIrregularity = clamp(irregularity, 0, 1);
+  let randomState = safeSeed >>> 0;
+  const random = () => {
+    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+    return randomState / 4294967296;
+  };
   const coordinates = Array.from({ length: count }, (_, index) => {
     const angle = (index / count) * Math.PI * 2;
-    const radius = 28 + ((safeSeed * (index + 3) * 13) % 18);
+    const radius = 42 - safeIrregularity * 9 + random() * safeIrregularity * 18;
     return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
   });
   const middle = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
@@ -63,12 +80,12 @@ export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#fff
   }).join(" ");
   const path = `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} ${curve} Z`;
   const strokeAttributes = safeStrokeWidth > 0 ? ` stroke="${safeStroke}" stroke-width="${safeStrokeWidth}" vector-effect="non-scaling-stroke"` : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100"><path fill="${safeColor}"${strokeAttributes} transform="rotate(${safeRotation} 50 50)" d="${path}"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 100 100" role="img" aria-label="Generated organic blob shape"><title>Generated organic blob shape</title><path fill="${safeColor}"${strokeAttributes} transform="rotate(${safeRotation} 50 50)" d="${path}"/></svg>`;
 }
 
 export function buildWaveSvg(options: WaveSvgOptions): string {
   const amplitude = clamp(options.amplitude, 0, 58);
-  const layerCount = Math.round(clamp(options.layers, 1, 3));
+  const layerCount = Math.round(clamp(options.layers, 1, 5));
   const frequency = Math.round(clamp(options.frequency, 1, 5));
   const phase = clamp(options.phase, 0, 360) * Math.PI / 180;
   const baseline = clamp(options.baseline, 30, 140);
@@ -76,8 +93,10 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
   const secondary = safeHex(options.secondary, "#7c4dff");
   const background = safeHex(options.background, "#ffffff");
   const paths = Array.from({ length: layerCount }, (_, index) => {
-    const offset = (layerCount - index - 1) * amplitude * 0.32;
-    const height = Math.max(0, amplitude * (1 - index * 0.16));
+    // Keep stacked waves inside the 240px export canvas at every allowed baseline.
+    const offset = (layerCount - index - 1) * Math.min(10, amplitude * 0.18);
+    const centerY = baseline + offset;
+    const height = Math.max(0, Math.min(amplitude * (1 - index * 0.16), centerY - 8, 232 - centerY));
     const segmentCount = frequency * 4;
     const layerPhase = phase + index * 0.42;
     const points = Array.from({ length: segmentCount + 1 }, (_, pointIndex) => {
@@ -85,7 +104,7 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
       const angle = progress * frequency * Math.PI * 2 + layerPhase;
       return {
         x: progress * 1440,
-        y: baseline + offset - Math.sin(angle) * height,
+        y: centerY - Math.sin(angle) * height,
         derivative: -Math.cos(angle) * height * frequency * Math.PI * 2 / segmentCount,
       };
     });
@@ -94,19 +113,27 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
       const start = points[pointIndex];
       const end = points[pointIndex + 1];
       const dx = end.x - start.x;
-      const controlOneY = start.y + start.derivative / 3;
-      const controlTwoY = end.y - end.derivative / 3;
+      const controlOneY = clamp(start.y + start.derivative / 3, 0, 240);
+      const controlTwoY = clamp(end.y - end.derivative / 3, 0, 240);
       path += ` C ${(start.x + dx / 3).toFixed(2)} ${controlOneY.toFixed(2)} ${(end.x - dx / 3).toFixed(2)} ${controlTwoY.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
     }
-    path += " L1440 160 L0 160 Z";
+    path += " L1440 240 L0 240 Z";
     const color = index % 2 === 0 ? fill : secondary;
     return `<path fill="${color}" opacity="${1 - index * 0.12}" d="${path}"/>`;
   }).join("");
-  const canvas = options.transparent ? "" : `<rect width="1440" height="160" fill="${background}"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 160" preserveAspectRatio="none">${canvas}${paths}</svg>`;
+  const canvas = options.transparent ? "" : `<rect width="1440" height="240" fill="${background}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 240" preserveAspectRatio="none" role="img" aria-label="Generated layered wave background"><title>Generated layered wave background</title>${canvas}${paths}</svg>`;
 }
 
-export function buildNoiseDataUrl(color: string, density: number, strength = 1): string {
+export type NoiseType = "fractalNoise" | "turbulence";
+export type NoiseOptions = { type?: NoiseType; octaves?: number; seed?: number };
+
+export function buildNoiseDataUrl(
+  color: string,
+  density: number,
+  strength = 1,
+  options: NoiseOptions = {},
+): string {
   const safeColor = safeHex(color, "#111827").slice(1);
   const red = parseInt(safeColor.slice(0, 2), 16) / 255;
   const green = parseInt(safeColor.slice(2, 4), 16) / 255;
@@ -114,6 +141,9 @@ export function buildNoiseDataUrl(color: string, density: number, strength = 1):
   const matrix = `${red} 0 0 0 0 0 ${green} 0 0 0 0 0 ${blue} 0 0 0 0 0 1 0`;
   const safeDensity = clamp(density, 0.1, 3);
   const safeStrength = clamp(strength, 0, 1);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="${safeDensity}" numOctaves="2" stitchTiles="stitch" result="noise"/><feColorMatrix in="noise" type="matrix" values="${matrix}"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="${safeStrength}"/></svg>`;
+  const type: NoiseType = options.type === "turbulence" ? "turbulence" : "fractalNoise";
+  const octaves = Math.round(clamp(options.octaves ?? 2, 1, 5));
+  const seed = Math.round(clamp(options.seed ?? 1, 1, 999));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="${type}" baseFrequency="${safeDensity}" numOctaves="${octaves}" seed="${seed}" stitchTiles="stitch" result="noise"/><feColorMatrix in="noise" type="matrix" values="${matrix}"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="${safeStrength}"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }

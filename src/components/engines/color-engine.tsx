@@ -18,8 +18,9 @@ import {
   type RgbaColor,
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
-import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony } from "@/lib/engines/design-palette";
-import { formatCmyk, formatHsv, parseDesignColor } from "@/lib/engines/design-color";
+import { buildDesignPaletteExport, buildPaletteSwatchesSvg, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony, type SemanticPaletteColors } from "@/lib/engines/design-palette";
+import { formatCmyk, formatHsv, formatHwb, formatOklch, parseDesignColor } from "@/lib/engines/design-color";
+import { extractDominantColors } from "@/lib/engines/palette-image";
 
 type Harmony = PaletteHarmony;
 const DEFAULT_VISION_COLORS = [
@@ -32,8 +33,8 @@ const DEFAULT_VISION_COLORS = [
 ];
 
 const CONVERTER_DEFAULTS: Record<string, string> = {
-  "hex-converter": "#0d9f8a",
   "hex-color-converter": "#0d9f8a",
+  "hex-converter": "#0d9f8a",
   "rgb-converter": "rgb(13, 159, 138)",
   "hsl-converter": "hsl(172 85% 34%)",
   "hsv-converter": "hsv(172 92% 62%)",
@@ -49,6 +50,58 @@ function colorInputValue(color: RgbaColor): string {
   return toHex({ ...color, a: 1 }).slice(0, 7);
 }
 
+function downloadPaletteAsPng(colors: RgbaColor[], filename: string): void {
+  const swatches = colors.slice(0, 8).map((color, index) => {
+    const opaque = {
+      r: color.r * color.a + 255 * (1 - color.a),
+      g: color.g * color.a + 255 * (1 - color.a),
+      b: color.b * color.a + 255 * (1 - color.a),
+      a: 1,
+    };
+    return { color: toHex(opaque).slice(0, 7), label: `Color ${index + 1}` };
+  });
+  if (swatches.length === 0) throw new Error("Generate at least one palette color before exporting PNG.");
+
+  // Keep the download synchronous with the user's click so browsers retain download activation.
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 300;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This browser could not create a PNG canvas.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const gap = 18;
+  const left = 28;
+  const swatchWidth = (canvas.width - left * 2 - gap * (swatches.length - 1)) / swatches.length;
+  context.textBaseline = "alphabetic";
+  swatches.forEach(({ color, label }, index) => {
+    const x = left + index * (swatchWidth + gap);
+    context.fillStyle = color;
+    context.beginPath();
+    context.roundRect(x, 28, swatchWidth, 176, 16);
+    context.fill();
+    context.fillStyle = "#111827";
+    context.font = "600 17px sans-serif";
+    context.fillText(label, x + 2, 238);
+    context.fillStyle = "#475569";
+    context.font = "15px monospace";
+    context.fillText(color.toUpperCase(), x + 2, 266);
+  });
+
+  // Use the canvas PNG data URL directly. This keeps the browser download in
+  // the original click activation and avoids a transient blob URL lifecycle.
+  const dataUrl = canvas.toDataURL("image/png");
+  const anchor = document.createElement("a");
+  anchor.href = dataUrl;
+  anchor.download = filename;
+  anchor.setAttribute("aria-hidden", "true");
+  anchor.style.position = "fixed";
+  anchor.style.left = "-10000px";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
 function extractImageColors(file: File): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -56,8 +109,8 @@ function extractImageColors(file: File): Promise<string[]> {
     image.onload = () => {
       try {
         const canvas = document.createElement("canvas");
-        canvas.width = 72;
-        canvas.height = 72;
+        canvas.width = 96;
+        canvas.height = 96;
         const context = canvas.getContext("2d", { willReadFrequently: true });
         if (!context) throw new Error("This browser could not read the selected image.");
         const sourceWidth = image.naturalWidth || image.width;
@@ -73,16 +126,7 @@ function extractImageColors(file: File): Promise<string[]> {
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-        const counts = new Map<string, number>();
-        for (let index = 0; index < pixels.length; index += 4) {
-          if (pixels[index + 3] < 160) continue;
-          const red = Math.min(255, Math.round(pixels[index] / 17) * 17);
-          const green = Math.min(255, Math.round(pixels[index + 1] / 17) * 17);
-          const blue = Math.min(255, Math.round(pixels[index + 2] / 17) * 17);
-          const hex = "#" + [red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("");
-          counts.set(hex, (counts.get(hex) ?? 0) + 1);
-        }
-        const colors = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([hex]) => hex);
+        const colors = extractDominantColors(pixels, 5, 160);
         if (!colors.length) throw new Error("No visible colors could be sampled from this image.");
         resolve(colors);
       } catch (error) {
@@ -120,10 +164,13 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [visionColors, setVisionColors] = useState(DEFAULT_VISION_COLORS);
   const [converterValue, setConverterValue] = useState(() => CONVERTER_DEFAULTS[toolId ?? ""] ?? "#0d9f8a");
   const [lockedSwatches, setLockedSwatches] = useState<Record<number, string>>({});
+  const [roleOverrides, setRoleOverrides] = useState<Partial<SemanticPaletteColors>>({});
   const [previewMode, setPreviewMode] = useState<"light" | "dark">("light");
+  const [previewLayout, setPreviewLayout] = useState<"landing" | "dashboard" | "forms" | "content">("dashboard");
   const [exportFormat, setExportFormat] = useState<PaletteExportFormat>("css");
   const [imagePalette, setImagePalette] = useState<string[]>([]);
   const [paletteError, setPaletteError] = useState("");
+  const [isExtractingPalette, setIsExtractingPalette] = useState(false);
 
   useEffect(() => {
     const initialConverterValue = CONVERTER_DEFAULTS[toolId ?? ""];
@@ -133,15 +180,39 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   useEffect(() => {
     if (op !== "palette" || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const sharedTheme = params.get("theme");
+    if (sharedTheme === "light" || sharedTheme === "dark") setPreviewMode(sharedTheme);
+    const sharedPreview = params.get("preview");
+    if (sharedPreview && ["landing", "dashboard", "forms", "content"].includes(sharedPreview)) {
+      setPreviewLayout(sharedPreview as "landing" | "dashboard" | "forms" | "content");
+    }
     const sharedBase = params.get("base");
     const sharedHarmony = params.get("harmony");
     const sharedLocks = params.get("locks");
+    const sharedRoles = params.get("roles");
     if (sharedBase && parseDesignColor(sharedBase)) setColorValue(sharedBase);
     if (sharedHarmony && ["analogous", "complementary", "triadic", "split", "tetradic", "monochromatic"].includes(sharedHarmony)) {
       setHarmony(sharedHarmony as Harmony);
     }
     const sharedCount = Number(params.get("count"));
     if (Number.isInteger(sharedCount) && sharedCount >= 3 && sharedCount <= 8) setPaletteCount(sharedCount);
+    if (sharedRoles) {
+      try {
+        const parsed = JSON.parse(sharedRoles) as Record<string, unknown>;
+        const allowedRoles: Array<keyof SemanticPaletteColors> = ["primary", "secondary", "accent", "success", "info", "background", "surface", "text", "border"];
+        const safeRoles: Partial<SemanticPaletteColors> = {};
+        for (const role of allowedRoles) {
+          const value = parsed[role];
+          if (typeof value === "string") {
+            const parsedColor = parseDesignColor(value);
+            if (parsedColor) safeRoles[role] = toHex(parsedColor).slice(0, 7);
+          }
+        }
+        setRoleOverrides(safeRoles);
+      } catch {
+        setPaletteError("The shared semantic color roles were invalid; generated role colors are still available.");
+      }
+    }
     if (sharedLocks) {
       try {
         const parsed = JSON.parse(sharedLocks) as Record<string, string>;
@@ -173,20 +244,38 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   }, [color, harmony, lockedSwatches, paletteCount]);
   const primaryColor = toHex(palette[2] ?? { r: 13, g: 159, b: 138, a: 1 });
   const shadeScale = useMemo(() => createColorShadeScale(primaryColor), [primaryColor]);
-  const roleColors = useMemo(() => ({
-    primary: primaryColor,
-    secondary: toHex(palette[1] ?? { r: 90, g: 158, b: 232, a: 1 }),
-    accent: toHex(palette[4] ?? { r: 124, g: 77, b: 255, a: 1 }),
-    success: toHex(palette[3] ?? { r: 34, g: 153, b: 104, a: 1 }),
-    info: toHex(palette[0] ?? { r: 52, g: 127, b: 196, a: 1 }),
-    background: previewMode === "light" ? "#f8fafc" : "#0f172a",
-    surface: previewMode === "light" ? "#ffffff" : "#1e293b",
-    text: previewMode === "light" ? "#111827" : "#f8fafc",
-    border: previewMode === "light" ? "#e2e8f0" : "#334155",
-  }), [palette, previewMode, primaryColor]);
+  const roleColors = useMemo<SemanticPaletteColors>(() => {
+    const generated: SemanticPaletteColors = {
+      primary: primaryColor,
+      secondary: toHex(palette[1] ?? { r: 90, g: 158, b: 232, a: 1 }),
+      accent: toHex(palette[4] ?? { r: 124, g: 77, b: 255, a: 1 }),
+      success: toHex(palette[3] ?? { r: 34, g: 153, b: 104, a: 1 }),
+      info: toHex(palette[0] ?? { r: 52, g: 127, b: 196, a: 1 }),
+      background: previewMode === "light" ? "#f8fafc" : "#0f172a",
+      surface: previewMode === "light" ? "#ffffff" : "#1e293b",
+      text: previewMode === "light" ? "#111827" : "#f8fafc",
+      border: previewMode === "light" ? "#e2e8f0" : "#334155",
+    };
+    return { ...generated, ...roleOverrides };
+  }, [palette, previewMode, primaryColor, roleOverrides]);
+  const semanticContrast = useMemo(() => {
+    const text = parseDesignColor(roleColors.text);
+    const background = parseDesignColor(roleColors.background);
+    const primary = parseDesignColor(roleColors.primary);
+    return {
+      body: text && background ? contrastRatio(text, background) : null,
+      primary: primary && background ? contrastRatio(primary, background) : null,
+    };
+  }, [roleColors]);
   const paletteExport = useMemo(
     () => buildDesignPaletteExport(roleColors, shadeScale, exportFormat),
     [exportFormat, roleColors, shadeScale],
+  );
+  const paletteSwatchesSvg = useMemo(
+    () => palette.length > 0
+      ? buildPaletteSwatchesSvg(palette.map((swatch) => toHex(swatch)), palette.map((_, index) => `Color ${index + 1}`))
+      : "",
+    [palette],
   );
   const paletteShareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -195,8 +284,11 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     url.searchParams.set("harmony", harmony);
     url.searchParams.set("count", String(paletteCount));
     url.searchParams.set("locks", JSON.stringify(lockedSwatches));
+    url.searchParams.set("roles", JSON.stringify(roleOverrides));
+    url.searchParams.set("theme", previewMode);
+    url.searchParams.set("preview", previewLayout);
     return url.toString();
-  }, [colorValue, harmony, lockedSwatches, paletteCount]);
+  }, [colorValue, harmony, lockedSwatches, paletteCount, previewLayout, previewMode, roleOverrides]);
   const contrastChecks = useMemo(() => foreground && background && canvas
     ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value, canvas) }))
     : [], [foreground, background, canvas]);
@@ -209,7 +301,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     ? suggestContrastCorrections(foreground, background, target, canvas)
     : null;
 
-  const converterIds = ["hex-converter", "hex-color-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter"];
+  const converterIds = ["hex-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter"];
   if (toolId && converterIds.includes(toolId)) {
     const format = toolId.startsWith("hex") ? "HEX" : toolId.startsWith("rgb") ? "RGB" : toolId.startsWith("hsl") ? "HSL" : toolId.startsWith("hsv") ? "HSV / HSB" : "CMYK";
     return (
@@ -223,8 +315,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
             <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent">Live</span>
           </div>
           <Label htmlFor="design-color-converter" className="mt-4 block">Color value</Label>
-          <Input id="design-color-converter" value={converterValue} onChange={(event) => setConverterValue(event.target.value)} placeholder="HEX, RGB, HSL, HSV or CMYK" className="mt-1.5 font-mono" />
-          {converterValue && !converted ? <p className="mt-2 text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV or CMYK value.</p> : null}
+          <Input id="design-color-converter" value={converterValue} onChange={(event) => setConverterValue(event.target.value)} placeholder="HEX, RGB, HSL, HSV, CMYK, HWB or OKLCH" className="mt-1.5 font-mono" />
+          {converterValue && !converted ? <p className="mt-2 text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV, CMYK, HWB or OKLCH value.</p> : null}
         </div>
         {converted ? (
           <>
@@ -242,6 +334,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                 ["RGB", toRgbString(converted)],
                 ["HSL", toHslString(converted)],
                 ["HSV / HSB", formatHsv(converted)],
+                ["HWB", formatHwb(converted)],
+                ["OKLCH", formatOklch(converted)],
                 ["CMYK · screen estimate", formatCmyk(converted)],
               ].map(([label, value]) => (
                 <div key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3">
@@ -349,13 +443,47 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   </span>
                 </div>
               ) : null}
-              {correction?.foreground && !activeCheck?.result.passes ? (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-3">
-                  <div>
-                    <p className="text-xs font-semibold text-fg">Suggested foreground</p>
-                    <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.foreground)}</p>
+              {!activeCheck?.result.passes && correction ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-semibold text-fg">Ways to reach the selected contrast target</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {correction.foreground ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Adjust foreground</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.foreground)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setForegroundValue(toHex(correction.foreground!))}>Apply</Button>
+                      </div>
+                    ) : null}
+                    {correction.background ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Adjust background</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.background)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setBackgroundValue(toHex(correction.background!))}>Apply</Button>
+                      </div>
+                    ) : null}
+                    {correction.foregroundOpacity ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Increase foreground opacity</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.foregroundOpacity)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setForegroundValue(toHex(correction.foregroundOpacity!))}>Apply</Button>
+                      </div>
+                    ) : null}
+                    {correction.backgroundOpacity ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Increase background opacity</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.backgroundOpacity)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setBackgroundValue(toHex(correction.backgroundOpacity!))}>Apply</Button>
+                      </div>
+                    ) : null}
                   </div>
-                  <Button type="button" size="sm" onClick={() => setForegroundValue(toHex(correction.foreground!))}>Apply suggestion</Button>
                 </div>
               ) : null}
             </div>
@@ -448,7 +576,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
             <h3 id="image-palette-heading" className="text-sm font-semibold text-fg">Extract colors from an image</h3>
             <p className="mt-1 text-xs leading-5 text-muted">Choose a photo or design file. The image is sampled locally in this browser; it is not uploaded.</p>
           </div>
-          <Input type="file" accept="image/*" aria-label="Choose an image to extract a color palette" onChange={async (event) => {
+          <Input type="file" accept="image/*" aria-label="Choose an image to extract a color palette" disabled={isExtractingPalette} aria-busy={isExtractingPalette} onChange={async (event) => {
             const file = event.target.files?.[0];
             if (!file) return;
             if (file.size > 12 * 1024 * 1024) {
@@ -456,17 +584,21 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               event.target.value = "";
               return;
             }
+            setIsExtractingPalette(true);
+            setPaletteError("");
             try {
               const extracted = await extractImageColors(file);
               setImagePalette(extracted);
               setColorValue(extracted[0]);
               setLockedSwatches({});
-              setPaletteError("");
             } catch (error) {
               setPaletteError(error instanceof Error ? error.message : "Could not read the image.");
+            } finally {
+              setIsExtractingPalette(false);
+              event.target.value = "";
             }
-            event.target.value = "";
           }} className="min-h-11" />
+          {isExtractingPalette ? <p role="status" className="text-xs text-muted">Sampling image colors locally…</p> : null}
           {imagePalette.length > 0 ? <div className="flex flex-wrap gap-2" aria-label="Extracted image colors">
             {imagePalette.map((value) => <button key={value} type="button" onClick={() => setColorValue(value)} className="group flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2 text-xs" aria-label={`Use extracted color ${value}`}>
               <span className="size-7 rounded-md border border-black/10" style={{ background: value }} />
@@ -515,43 +647,154 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                 );
               })}
             </div>
+            <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="palette-swatch-export-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="palette-swatch-export-heading" className="text-sm font-semibold text-fg">Export palette swatches</h3>
+                  <p id="palette-export-help" className="mt-1 text-xs leading-5 text-muted">Create a clean, labeled color sheet. PNG rendering happens locally in your browser.</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" data-testid="palette-download-png" aria-describedby="palette-export-help" onClick={() => downloadPaletteAsPng(palette, "env-palette-swatches.png")}>Download PNG</Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {palette.map((swatch, index) => <div key={index} className="overflow-hidden rounded-lg border border-border">
+                  <div className="h-12" style={{ background: toHex(swatch) }} />
+                  <div className="bg-surface px-2 py-1.5"><p className="text-[10px] font-medium text-fg">Color {index + 1}</p><p className="font-mono text-[9px] text-muted">{toHex(swatch).toUpperCase()}</p></div>
+                </div>)}
+              </div>
+              <CodeResult code={paletteSwatchesSvg} filename="env-palette-swatches.svg" />
+            </section>
             <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="semantic-colors-heading">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 id="semantic-colors-heading" className="text-sm font-semibold text-fg">Interface color roles</h3>
                   <p className="mt-1 text-xs leading-5 text-muted">A palette mapped to practical roles instead of disconnected swatches.</p>
                 </div>
-                <Select value={previewMode} onChange={(event) => setPreviewMode(event.target.value as "light" | "dark")} aria-label="Preview color theme" className="w-32">
-                  <option value="light">Light preview</option>
-                  <option value="dark">Dark preview</option>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {Object.entries(roleColors).map(([role, value]) => <div key={role} className="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 p-2">
-                  <span className="size-8 shrink-0 rounded-md border border-black/10" style={{ background: value }} />
-                  <span className="min-w-0"><span className="block text-[11px] font-semibold capitalize text-fg">{role}</span><span className="block truncate font-mono text-[10px] text-muted">{value.toUpperCase()}</span></span>
-                </div>)}
-              </div>
-              <div className="overflow-hidden rounded-xl border" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }}>
-                <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
-                  <span className="text-sm font-bold">Acme workspace</span>
-                  <span className="rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: "#ffffff" }}>PRO</span>
+                <div className="flex flex-wrap gap-2">
+                  <Select value={previewLayout} onChange={(event) => setPreviewLayout(event.target.value as "landing" | "dashboard" | "forms" | "content")} aria-label="Page preview layout" className="w-36">
+                    <option value="landing">Landing page</option>
+                    <option value="dashboard">Dashboard</option>
+                    <option value="forms">Forms</option>
+                    <option value="content">Content</option>
+                  </Select>
+                  <Select value={previewMode} onChange={(event) => setPreviewMode(event.target.value as "light" | "dark")} aria-label="Preview color theme" className="w-32">
+                    <option value="light">Light preview</option>
+                    <option value="dark">Dark preview</option>
+                  </Select>
                 </div>
-                <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr]">
-                  <div className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
-                    <p className="text-xs font-medium opacity-70">Overview</p>
-                    <p className="mt-2 text-xl font-bold">Design system</p>
-                    <p className="mt-1 text-xs opacity-70">Semantic colors, components and states.</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="rounded-md px-3 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Primary action</span>
-                      <span className="rounded-md border px-3 py-2 text-xs font-semibold" style={{ background: roleColors.surface, borderColor: roleColors.secondary, color: roleColors.text }}>Secondary</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted">Edit any role without regenerating the rest of your palette.</p>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setRoleOverrides({})} disabled={Object.keys(roleOverrides).length === 0}>Reset generated roles</Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {(Object.entries(roleColors) as Array<[keyof SemanticPaletteColors, string]>).map(([role, value]) => <label key={role} className="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 p-2">
+                  <Input type="color" aria-label={"Edit " + role + " role"} value={value} onChange={(event) => setRoleOverrides((previous) => ({ ...previous, [role]: event.target.value }))} className="h-9 w-10 shrink-0 p-1" />
+                  <span className="min-w-0"><span className="block text-[11px] font-semibold capitalize text-fg">{role}</span><span className="block truncate font-mono text-[10px] text-muted">{value.toUpperCase()}</span></span>
+                </label>)}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2" aria-live="polite">
+                <div className="rounded-lg border border-border p-2">
+                  <p className="text-[11px] text-muted">Body text on background</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">{semanticContrast.body === null ? "Unavailable" : semanticContrast.body.toFixed(2) + ":1"}</p>
+                  <p className="text-[10px] text-muted">{semanticContrast.body !== null && semanticContrast.body >= 4.5 ? "Meets normal-text AA" : "Below normal-text AA target"}</p>
+                </div>
+                <div className="rounded-lg border border-border p-2">
+                  <p className="text-[11px] text-muted">Primary / background pair (3:1 reference)</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">{semanticContrast.primary === null ? "Unavailable" : semanticContrast.primary.toFixed(2) + ":1"}</p>
+                  <p className="text-[10px] text-muted">{semanticContrast.primary !== null && semanticContrast.primary >= 3 ? "Reaches the 3:1 non-text reference" : "Below the 3:1 non-text reference"}</p>
+                </div>
+              </div>
+              <p className="text-[10px] leading-4 text-muted">These pair checks are colour-contrast references only. They do not certify all text, component states, imagery or a complete page against WCAG.</p>
+              <div className="overflow-hidden rounded-xl border" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }}>
+                {previewLayout === "landing" ? (
+                  <div data-testid="palette-preview-landing">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                      <span className="text-sm font-bold">northstar<span style={{ color: roleColors.primary }}>.</span></span>
+                      <div className="flex flex-wrap items-center gap-3 text-[11px]" style={{ color: roleColors.text }}>
+                        <span>Product</span><span>Solutions</span><span>Resources</span>
+                        <span className="rounded-md px-3 py-2 font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Get started</span>
+                      </div>
+                    </div>
+                    <div className="grid gap-5 p-5 sm:grid-cols-[1.15fr_0.85fr] sm:items-center sm:p-8">
+                      <div>
+                        <span className="inline-flex rounded-full px-3 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: primaryText }}>A clearer way to work</span>
+                        <h4 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">Make your next idea feel possible.</h4>
+                        <p className="mt-3 max-w-md text-xs leading-6 opacity-75">A landing-page preview to test your primary, accent, text and surface colors together before exporting a design system.</p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="rounded-md px-4 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Explore the platform</span>
+                          <span className="rounded-md border px-4 py-2 text-xs font-semibold" style={{ borderColor: roleColors.border }}>See how it works</span>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border p-4" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                        <div className="flex items-center justify-between"><span className="text-xs font-semibold">Project overview</span><span className="size-2 rounded-full" style={{ background: roleColors.success }} /></div>
+                        <div className="mt-5 grid grid-cols-2 gap-2">
+                          <div className="rounded-lg p-3" style={{ background: roleColors.background }}><span className="text-[10px] opacity-70">Growth</span><p className="mt-1 text-xl font-bold">+28%</p></div>
+                          <div className="rounded-lg p-3" style={{ background: roleColors.background }}><span className="text-[10px] opacity-70">Projects</span><p className="mt-1 text-xl font-bold">124</p></div>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: roleColors.border }}><div className="h-full w-3/4 rounded-full" style={{ background: roleColors.primary }} /></div>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 border-t p-4 sm:grid-cols-3" style={{ borderColor: roleColors.border }}>
+                      {["Flexible workflows", "Useful insights", "One shared workspace"].map((item) => <div key={item} className="rounded-lg p-3 text-xs font-semibold" style={{ background: roleColors.surface }}>{item}</div>)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
-                    <span className="size-9 rounded-full" style={{ background: roleColors.success }} />
-                    <span><span className="block text-sm font-semibold">All systems normal</span><span className="block text-xs opacity-70">Status uses a label as well as color.</span></span>
+                ) : previewLayout === "forms" ? (
+                  <div data-testid="palette-preview-forms" className="grid gap-5 p-4 sm:grid-cols-[0.9fr_1.1fr] sm:p-7">
+                    <div className="flex flex-col justify-center rounded-xl p-5" style={{ background: roleColors.primary, color: primaryText }}>
+                      <p className="text-xs font-semibold uppercase tracking-wider">Welcome aboard</p>
+                      <h4 className="mt-3 text-2xl font-bold">A good first impression starts here.</h4>
+                      <p className="mt-3 text-xs leading-6 opacity-85">Check form surfaces, labels, helper text, focus colors and action contrast against your selected theme.</p>
+                    </div>
+                    <div className="rounded-xl border p-4 sm:p-5" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                      <h4 className="text-lg font-bold">Create your account</h4>
+                      <p className="mt-1 text-xs opacity-70">A sample form using your semantic color roles.</p>
+                      <div className="mt-4 space-y-3">
+                        <label className="block space-y-1 text-xs font-semibold">Full name<input aria-label="Preview full name" readOnly value="Alex Morgan" className="block w-full rounded-lg border px-3 py-2 text-xs font-normal" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }} /></label>
+                        <label className="block space-y-1 text-xs font-semibold">Email address<input aria-label="Preview email address" readOnly value="alex@example.com" className="block w-full rounded-lg border px-3 py-2 text-xs font-normal" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }} /></label>
+                        <p className="text-[10px] leading-4" style={{ color: roleColors.info }}>We’ll only use this address for your account updates.</p>
+                        <span className="block rounded-lg px-4 py-2.5 text-center text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Create account</span>
+                        <p className="text-center text-[10px] opacity-70">Already have an account? <span className="font-semibold" style={{ color: roleColors.info }}>Sign in</span></p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : previewLayout === "content" ? (
+                  <div data-testid="palette-preview-content">
+                    <header className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                      <span className="text-sm font-bold">The Daily Edit</span><span className="text-[10px] font-semibold" style={{ color: roleColors.accent }}>Ideas worth keeping</span>
+                    </header>
+                    <div className="grid gap-4 p-4 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
+                      <article className="overflow-hidden rounded-xl border" style={{ borderColor: roleColors.border, background: roleColors.surface }}>
+                        <div className="flex h-28 items-end p-4 sm:h-40" style={{ background: `linear-gradient(135deg, ${roleColors.primary}, ${roleColors.accent})`, color: primaryText }}><span className="text-xs font-semibold">FEATURED STORY</span></div>
+                        <div className="p-4"><h4 className="text-xl font-bold">Designing for the moments that matter</h4><p className="mt-2 text-xs leading-5 opacity-75">A content preview for checking headline hierarchy, paragraph readability, tags, links and card surfaces.</p><span className="mt-3 inline-block text-xs font-semibold" style={{ color: roleColors.info }}>Read the story →</span></div>
+                      </article>
+                      <aside className="space-y-2">
+                        {["A practical guide to better systems", "Small details, stronger experiences", "What thoughtful teams measure"].map((item, index) => <article key={item} className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}><p className="text-[10px] font-semibold" style={{ color: roleColors.accent }}>0{index + 1} · EDITOR’S PICK</p><h5 className="mt-2 text-sm font-semibold">{item}</h5><p className="mt-1 text-[10px] leading-4 opacity-70">A short supporting description for this story.</p></article>)}
+                      </aside>
+                    </div>
+                  </div>
+                ) : (
+                  <div data-testid="palette-preview-dashboard">
+                    <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                      <span className="text-sm font-bold">Acme workspace</span>
+                      <span className="rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: primaryText }}>PRO</span>
+                    </div>
+                    <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr]">
+                      <div className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                        <p className="text-xs font-medium opacity-70">Overview</p>
+                        <p className="mt-2 text-xl font-bold">Design system</p>
+                        <p className="mt-1 text-xs opacity-70">Semantic colors, components and states.</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-md px-3 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Primary action</span>
+                          <span className="rounded-md border px-3 py-2 text-xs font-semibold" style={{ background: roleColors.surface, borderColor: roleColors.secondary, color: roleColors.text }}>Secondary</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                        <span className="size-9 rounded-full" style={{ background: roleColors.success }} />
+                        <span><span className="block text-sm font-semibold">All systems normal</span><span className="block text-xs opacity-70">Status uses a label as well as color.</span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
             <section className="space-y-2" aria-labelledby="shade-scale-heading">
@@ -571,7 +814,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   <option value="tokens">W3C tokens</option>
                 </Select>
               </div>
-              <div className="flex flex-wrap gap-2"><CopyButton text={paletteShareUrl} label="Copy share link" /><span className="self-center text-xs text-muted">Locked swatches and harmony are included.</span></div>
+              <div className="flex flex-wrap gap-2"><CopyButton text={paletteShareUrl} label="Copy share link" /><span className="self-center text-xs text-muted">Locked swatches, editable roles and harmony are included.</span></div>
               <CodeResult code={paletteExport} filename={`env-design-tokens.${exportFormat === "css" ? "css" : exportFormat === "scss" ? "scss" : exportFormat === "tailwind" ? "js" : "json"}`} />
             </section>
           </>
@@ -586,7 +829,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
         <div className="space-y-2">
           <Label htmlFor="design-color">Color value</Label>
           <Input id="design-color" value={colorValue} onChange={(event) => setColorValue(event.target.value)} className="font-mono" />
-          {!color ? <p className="text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV or CMYK color.</p> : null}
+          {!color ? <p className="text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV, CMYK, HWB or OKLCH color.</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="design-color-picker">Pick a color</Label>
@@ -610,7 +853,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
             className="min-h-9 w-full accent-accent"
             aria-label="Color opacity"
           />
-          <p className="text-xs text-muted">The HEX and RGB outputs include alpha when it is below 100%.</p>
+          <p className="text-xs text-muted">HEX, RGB, HWB and OKLCH values preserve the selected alpha where the format supports it.</p>
         </div>
       ) : null}
       {color ? (
@@ -629,6 +872,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               ["RGB", toRgbString(color)],
               ["HSL", toHslString(color)],
               ["HSV / HSB", formatHsv(color)],
+              ["HWB", formatHwb(color)],
+              ["OKLCH", formatOklch(color)],
               ["CMYK · screen estimate", formatCmyk(color)],
             ].map(([label, value]) => (
               <div key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3">
