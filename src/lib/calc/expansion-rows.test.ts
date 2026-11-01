@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import mathExpansion from "../../data/math-expansion.json" with { type: "json" };
-import { EXPANSION_FAMILIES, describeExpansion, expansionLabel, parseExpansionRow } from "./expansion-rows.mjs";
+import { EXPANSION_FAMILIES, describeExpansion, expansionCalculatorDescription, expansionCalculatorName, expansionLabel, parseExpansionRow } from "./expansion-rows.mjs";
 
 test("four- and five-element rows are read with the right variable in each slot", () => {
   assert.deepEqual(parseExpansionRow(["k", "a", "b", "c"]), { key: "k", title: null, a: "a", b: "b", c: "c" });
@@ -34,4 +34,31 @@ test("every row of every family is parseable and has three distinct, non-empty v
     }
   }
   assert.equal(rows, 625 + 609 + 622);
+});
+
+
+test("Design / Build / Delivery Effort titles use semantic labels, not internal slots", () => {
+  const row = (mathExpansion as Record<string, string[][]>).sum.find((entry) => entry[0] === "math-design-build-delivery-effort");
+  if (!row) throw new Error("math-design-build-delivery-effort row is missing");
+  const info = describeExpansion("sum", row);
+  assert.equal(expansionCalculatorName(info, "a"), "Delivery effort = Design + Build — Solve for Design");
+  assert.equal(expansionCalculatorName(info, "b"), "Delivery effort = Design + Build — Solve for Build");
+  assert.equal(expansionCalculatorName(info, "c"), "Delivery effort = Design + Build — Solve for Delivery effort");
+  assert.equal(expansionCalculatorDescription(info, "a"), "Formula exercise calculator: Delivery effort = Design + Build. Solve for Design.");
+});
+
+test("every expansion row generates three public titles with its actual target label", () => {
+  let generated = 0;
+  for (const family of EXPANSION_FAMILIES) {
+    for (const row of (mathExpansion as Record<string, string[][]>)[family]) {
+      const info = describeExpansion(family, row);
+      for (const target of ["a", "b", "c"] as const) {
+        const name = expansionCalculatorName(info, target);
+        assert.ok(name.endsWith(`— Solve for ${info.labels[target]}`), `${family}:${info.key}:${target} has the wrong target title`);
+        assert.ok(name.includes(info.relation), `${family}:${info.key}:${target} hides the relationship`);
+        generated++;
+      }
+    }
+  }
+  assert.equal(generated, (625 + 609 + 622) * 3);
 });
