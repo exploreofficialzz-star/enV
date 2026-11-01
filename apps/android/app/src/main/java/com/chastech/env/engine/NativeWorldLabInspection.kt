@@ -45,3 +45,26 @@ object NativeWorldLabInspection{
   return result
  }
 }
+
+
+/** View-only history; it never mutates the authored project or solver evidence. */
+data class NativeWorldLabInspectionHistory(
+ val past:List<NativeInspectionSettings> = emptyList(),
+ val present:NativeInspectionSettings = NativeInspectionSettings(),
+ val future:List<NativeInspectionSettings> = emptyList(),
+) {
+ companion object { const val LIMIT=50 }
+ fun commit(next:NativeInspectionSettings):NativeWorldLabInspectionHistory {
+  val validated=next.copy()
+  if(validated==present)return this
+  return copy(past=(past+present).takeLast(LIMIT),present=validated,future=emptyList())
+ }
+ fun undo():NativeWorldLabInspectionHistory {
+  if(past.isEmpty())return this
+  return copy(past=past.dropLast(1),present=past.last(),future=(listOf(present)+future).take(LIMIT))
+ }
+ fun redo():NativeWorldLabInspectionHistory {
+  if(future.isEmpty())return this
+  return copy(past=(past+present).takeLast(LIMIT),present=future.first(),future=future.drop(1))
+ }
+}
