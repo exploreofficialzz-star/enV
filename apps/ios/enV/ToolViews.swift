@@ -14542,7 +14542,7 @@ private final class ABookLocalStore {
                 "archived": note.archived, "createdAt": note.createdAt.timeIntervalSince1970 * 1000,
                 "updatedAt": note.updatedAt.timeIntervalSince1970 * 1000, "revision": note.revision
             ]
-            item["deletedAt"] = note.deletedAt.map { $0.timeIntervalSince1970 * 1000 } ?? NSNull()
+            if let deletedAt = note.deletedAt { item["deletedAt"] = deletedAt.timeIntervalSince1970 * 1000 } else { item["deletedAt"] = NSNull() }
             noteJSON.append(item)
 
             for revision in try revisions(noteID: note.id) {
@@ -14762,6 +14762,13 @@ private struct ABookPDFDocument: FileDocument {
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
 }
 
+private struct ABookArchiveDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.zip] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
 private struct NativeABookView: View {
     private let store = ABookLocalStore.shared
     @State private var notes: [ABookNativeNote] = []
@@ -14784,6 +14791,9 @@ private struct NativeABookView: View {
     @State private var exportingPDF = false
     @State private var exportingNote = false
     @State private var importingFiles = false
+    @State private var importingArchive = false
+    @State private var exportingArchive = false
+    @State private var archiveData = Data()
     @State private var commentText = ""
     @State private var activePDFSelection: UUID?
 
@@ -14813,6 +14823,11 @@ private struct NativeABookView: View {
                 } label: { Label("New note", systemImage: "plus") }
                 .buttonStyle(.borderedProminent)
                 Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
+                Button("Export backup") {
+                    do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
+                    catch { showError(error) }
+                }.buttonStyle(.bordered)
+                Button("Import backup") { importingArchive = true }.buttonStyle(.bordered)
                 Button(showArchived ? "Active notes" : "Archive") {
                     showArchived.toggle()
                     showTrash = false
@@ -14905,6 +14920,22 @@ private struct NativeABookView: View {
         .padding(12)
         .onAppear { reload() }
         .task(id: saveKey) { await autosave() }
+        .fileImporter(isPresented: $importingArchive, allowedContentTypes: [.zip]) { result in
+            switch result {
+            case .success(let url):
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let count = try store.importBackupArchive(Data(contentsOf: url))
+                    showTrash = false
+                    showArchived = false
+                    reload()
+                    status = "Imported " + String(count) + " notes and attachments on this device"
+                    errorText = ""
+                } catch { showError(error) }
+            case .failure(let error): showError(error)
+            }
+        }
         .fileImporter(isPresented: $importingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls):
@@ -14924,6 +14955,9 @@ private struct NativeABookView: View {
         }
         .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
                       contentType: .pdf, defaultFilename: pdfName) { result in
+            if case .failure(let error) = result { showError(error) }
+        }        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
+                      contentType: .zip, defaultFilename: "a-book-backup.zip") { result in
             if case .failure(let error) = result { showError(error) }
         }
         .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
