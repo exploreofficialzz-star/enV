@@ -85,7 +85,7 @@ export function describeExpansion(family, row) {
 export function expansionCalculatorName(info, target) {
   const label = info.labels[target];
   if (!label) throw new Error(`Unknown expansion target "${target}" for ${info.key}.`);
-  return `${info.relation} — Solve for ${label}`;
+  return `${info.title ? `${info.title}: ` : ""}${info.relation} — Solve for ${label}`;
 }
 
 /**
@@ -96,7 +96,7 @@ export function expansionCalculatorName(info, target) {
 export function expansionCalculatorDescription(info, target) {
   const label = info.labels[target];
   if (!label) throw new Error(`Unknown expansion target "${target}" for ${info.key}.`);
-  return `Formula exercise calculator: ${info.relation}. Solve for ${label}.`;
+  return `Formula exercise calculator: ${info.relation}. Solve for ${label}. Enter the other two values to calculate the missing value.`;
 }
 
 /**
