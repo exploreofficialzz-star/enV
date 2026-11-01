@@ -844,22 +844,22 @@ struct NativeWorldLabReplayManifest:Equatable {
 
     static func parameterKeys(_ modelId:String)throws->[String] {
         switch modelId {
-        case "spring":return ["massKg","springNPerM","dampingNsPerM","initialDisplacementM","initialVelocityMPerS"]
-        case "rc":return ["resistanceOhm","capacitanceF","supplyVoltageV","initialVoltageV"]
-        case "heat":return ["diffusivityM2PerS","lengthMeters","ambientTemperatureK","centerTemperatureK"]
+        case "damped-oscillator":return ["massKg","springNPerM","dampingNsPerM","initialDisplacementM","initialVelocityMPerS"]
+        case "rc-circuit":return ["resistanceOhm","capacitanceF","supplyVoltageV","initialVoltageV"]
+        case "heat-rod":return ["thermalDiffusivityM2PerS","lengthMeters","ambientTemperatureK","centerTemperatureK"]
         default:throw NativeWorldLabError.invalid("Unsupported deterministic reference model.")
         }
     }
     private static func values(_ input:NativeLabInput)->(String,[String:Double]) {
         switch input {
         case let .spring(mass,spring,damping,x0,v0):
-            return ("spring",["massKg":mass,"springNPerM":spring,
+            return ("damped-oscillator",["massKg":mass,"springNPerM":spring,
                 "dampingNsPerM":damping,"initialDisplacementM":x0,"initialVelocityMPerS":v0])
         case let .rc(resistance,capacitance,supply,initial):
-            return ("rc",["resistanceOhm":resistance,"capacitanceF":capacitance,
+            return ("rc-circuit",["resistanceOhm":resistance,"capacitanceF":capacitance,
                 "supplyVoltageV":supply,"initialVoltageV":initial])
         case let .heat(diffusivity,length,ambient,center):
-            return ("heat",["diffusivityM2PerS":diffusivity,"lengthMeters":length,
+            return ("heat-rod",["thermalDiffusivityM2PerS":diffusivity,"lengthMeters":length,
                 "ambientTemperatureK":ambient,"centerTemperatureK":center])
         }
     }
@@ -934,11 +934,11 @@ struct NativeWorldLabReplayManifest:Equatable {
         try validate()
         let p=parameters
         switch modelId {
-        case "spring":return .spring(massKg:p["massKg"]!,springNPerM:p["springNPerM"]!,
+        case "damped-oscillator":return .spring(massKg:p["massKg"]!,springNPerM:p["springNPerM"]!,
             dampingNsPerM:p["dampingNsPerM"]!,x0:p["initialDisplacementM"]!,v0:p["initialVelocityMPerS"]!)
-        case "rc":return .rc(resistanceOhm:p["resistanceOhm"]!,capacitanceF:p["capacitanceF"]!,
+        case "rc-circuit":return .rc(resistanceOhm:p["resistanceOhm"]!,capacitanceF:p["capacitanceF"]!,
             supplyV:p["supplyVoltageV"]!,initialV:p["initialVoltageV"]!)
-        default:return .heat(diffusivityM2S:p["diffusivityM2PerS"]!,lengthM:p["lengthMeters"]!,
+        default:return .heat(diffusivityM2S:p["thermalDiffusivityM2PerS"]!,lengthM:p["lengthMeters"]!,
             backgroundK:p["ambientTemperatureK"]!,centerK:p["centerTemperatureK"]!)
         }
     }

@@ -29,7 +29,7 @@ data class NativeWorldLabReplayManifest(
         require(format==NativeWorldLabReplayCodec.FORMAT&&schemaVersion==1){
             "Replay manifest format or schema is unsupported."
         }
-        require(modelId in setOf("spring","rc","heat")&&modelVersion=="1.0.0"){
+        require(modelId in setOf("damped-oscillator","rc-circuit","heat-rod")&&modelVersion=="1.0.0"){
             "Replay manifest model or solver version is unsupported."
         }
         require(worldEpochUTC.endsWith("Z")&&runCatching{Instant.parse(worldEpochUTC)}.isSuccess){
@@ -80,22 +80,22 @@ object NativeWorldLabReplayCodec {
     private val policySolver="rebuild-from-validated-inputs"
 
     fun parameterKeys(modelId:String):Set<String> = when(modelId){
-        "spring"->linkedSetOf("massKg","springNPerM","dampingNsPerM","initialDisplacementM","initialVelocityMPerS")
-        "rc"->linkedSetOf("resistanceOhm","capacitanceF","supplyVoltageV","initialVoltageV")
-        "heat"->linkedSetOf("diffusivityM2PerS","lengthMeters","ambientTemperatureK","centerTemperatureK")
+        "damped-oscillator"->linkedSetOf("massKg","springNPerM","dampingNsPerM","initialDisplacementM","initialVelocityMPerS")
+        "rc-circuit"->linkedSetOf("resistanceOhm","capacitanceF","supplyVoltageV","initialVoltageV")
+        "heat-rod"->linkedSetOf("thermalDiffusivityM2PerS","lengthMeters","ambientTemperatureK","centerTemperatureK")
         else->throw IllegalArgumentException("Unsupported deterministic reference model.")
     }
 
     private fun parameters(input:NativeLabInput):Pair<String,Map<String,Double>> = when(input){
-        is NativeLabInput.Spring->"spring" to linkedMapOf(
+        is NativeLabInput.Spring->"damped-oscillator" to linkedMapOf(
             "massKg" to input.massKg,"springNPerM" to input.springNPerM,
             "dampingNsPerM" to input.dampingNsPerM,
             "initialDisplacementM" to input.x0,"initialVelocityMPerS" to input.v0)
-        is NativeLabInput.RC->"rc" to linkedMapOf(
+        is NativeLabInput.RC->"rc-circuit" to linkedMapOf(
             "resistanceOhm" to input.resistanceOhm,"capacitanceF" to input.capacitanceF,
             "supplyVoltageV" to input.supplyV,"initialVoltageV" to input.initialV)
-        is NativeLabInput.Heat->"heat" to linkedMapOf(
-            "diffusivityM2PerS" to input.diffusivityM2S,"lengthMeters" to input.lengthM,
+        is NativeLabInput.Heat->"heat-rod" to linkedMapOf(
+            "thermalDiffusivityM2PerS" to input.diffusivityM2S,"lengthMeters" to input.lengthM,
             "ambientTemperatureK" to input.backgroundK,"centerTemperatureK" to input.centerK)
     }
 
@@ -112,12 +112,12 @@ object NativeWorldLabReplayCodec {
     fun toInput(manifest:NativeWorldLabReplayManifest):NativeLabInput {
         val p=manifest.parameters
         return when(manifest.modelId){
-            "spring"->NativeLabInput.Spring(p.getValue("massKg"),p.getValue("springNPerM"),
+            "damped-oscillator"->NativeLabInput.Spring(p.getValue("massKg"),p.getValue("springNPerM"),
                 p.getValue("dampingNsPerM"),p.getValue("initialDisplacementM"),
                 p.getValue("initialVelocityMPerS"))
-            "rc"->NativeLabInput.RC(p.getValue("resistanceOhm"),p.getValue("capacitanceF"),
+            "rc-circuit"->NativeLabInput.RC(p.getValue("resistanceOhm"),p.getValue("capacitanceF"),
                 p.getValue("supplyVoltageV"),p.getValue("initialVoltageV"))
-            else->NativeLabInput.Heat(p.getValue("diffusivityM2PerS"),p.getValue("lengthMeters"),
+            else->NativeLabInput.Heat(p.getValue("thermalDiffusivityM2PerS"),p.getValue("lengthMeters"),
                 p.getValue("ambientTemperatureK"),p.getValue("centerTemperatureK"))
         }
     }
