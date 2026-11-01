@@ -43,8 +43,42 @@ struct NativeWorldLabView:View {
     @State private var inspectionAxis:NativeWorldLabInspectionAxis = .x
     @State private var inspectionCutawayFraction=0.0
     @State private var inspectionExplodeDistance=1.0
+    @State private var inspectionViewHistory=NativeWorldLabInspectionHistory()
     @State private var showInspectionLabels=true
     @State private var showInspectionOverlays=true
+
+    private var currentInspectionView:NativeWorldLabInspectionSettings {
+        NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
+            axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
+            explosionDistanceMeters:inspectionExplodeDistance)
+    }
+    private func applyInspectionView(_ settings:NativeWorldLabInspectionSettings,record:Bool=true) {
+        do {
+            try settings.validate()
+            if record {
+                var history=inspectionViewHistory
+                try history.commit(settings)
+                inspectionViewHistory=history
+            }
+            inspectionMode=settings.mode;inspectionOpacity=settings.opacity
+            inspectionAxis=settings.axis;inspectionCutawayFraction=settings.cutawayFraction
+            inspectionExplodeDistance=settings.explosionDistanceMeters
+            seeInside=settings.mode == .transparent || settings.mode == .xray || settings.mode == .cutaway
+            redraw()
+        } catch {problem=error.localizedDescription}
+    }
+    private func undoInspectionView() {
+        var history=inspectionViewHistory
+        guard let restored=history.undo() else{return}
+        inspectionViewHistory=history
+        applyInspectionView(restored,record:false)
+    }
+    private func redoInspectionView() {
+        var history=inspectionViewHistory
+        guard let restored=history.redo() else{return}
+        inspectionViewHistory=history
+        applyInspectionView(restored,record:false)
+    }
     @State private var exportingTimelineCheckpoint=false
     @State private var importingTimelineCheckpoint=false
     @State private var timelineCheckpointFile:NativeWorldLabJsonFile?
@@ -557,27 +591,40 @@ struct NativeWorldLabView:View {
                         Text("0.01×").tag(0.01);Text("0.1×").tag(0.1)
                         Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
                     }.pickerStyle(.segmented)
-                    Toggle("See inside",isOn:$seeInside).labelsHidden()
+                    Toggle("See inside",isOn:Binding(get:{seeInside},set:{enabled in
+                        var next=currentInspectionView;next.mode=enabled ? .transparent:.normal
+                        applyInspectionView(next)
+                    })).labelsHidden()
                     Text("See inside").font(.caption)
                 }
-                Picker("Inspection view",selection:$inspectionMode){
+                Picker("Inspection view",selection:Binding(get:{inspectionMode},set:{value in
+                    var next=currentInspectionView;next.mode=value;applyInspectionView(next)
+                })){
                     ForEach(NativeWorldLabInspectionMode.allCases){item in Text(item.title).tag(item)}
                 }.pickerStyle(.menu)
                 if inspectionMode == .transparent || inspectionMode == .xray || inspectionMode == .cutaway {
                     Text("Selected target opacity \(Int(inspectionOpacity*100))%").font(.caption)
-                    Slider(value:$inspectionOpacity,in:0...1).accessibilityLabel("See Inside selected target opacity")
+                    Slider(value:Binding(get:{inspectionOpacity},set:{value in
+                        var next=currentInspectionView;next.opacity=value;applyInspectionView(next)
+                    }),in:0...1).accessibilityLabel("See Inside selected target opacity")
                 }
                 if inspectionMode == .cutaway {
-                    Picker("Cutaway axis",selection:$inspectionAxis){
+                    Picker("Cutaway axis",selection:Binding(get:{inspectionAxis},set:{value in
+                        var next=currentInspectionView;next.axis=value;applyInspectionView(next)
+                    })){
                         ForEach(NativeWorldLabInspectionAxis.allCases){axis in Text(axis.rawValue.uppercased()).tag(axis)}
                     }.pickerStyle(.segmented)
                     Text("Cutaway plane \(String(format:"%.2f",inspectionCutawayFraction))").font(.caption)
-                    Slider(value:$inspectionCutawayFraction,in:-1...1).accessibilityLabel("Cutaway plane position")
+                    Slider(value:Binding(get:{inspectionCutawayFraction},set:{value in
+                        var next=currentInspectionView;next.cutawayFraction=value;applyInspectionView(next)
+                    }),in:-1...1).accessibilityLabel("Cutaway plane position")
                     Text("The selected primitive is clipped in world coordinates with a generated cut face.").font(.caption).foregroundStyle(.secondary)
                 }
                 if inspectionMode == .exploded {
                     Text("Assembly separation \(String(format:"%.1f",inspectionExplodeDistance)) m").font(.caption)
-                    Slider(value:$inspectionExplodeDistance,in:0...10).accessibilityLabel("Exploded assembly separation")
+                    Slider(value:Binding(get:{inspectionExplodeDistance},set:{value in
+                        var next=currentInspectionView;next.explosionDistanceMeters=value;applyInspectionView(next)
+                    }),in:0...10).accessibilityLabel("Exploded assembly separation")
                 }
                 HStack(spacing:6){
                     Button("Zoom to selected"){zoomToSelected()}.disabled(project?.entities.indices.contains(selected) != true)
@@ -587,11 +634,11 @@ struct NativeWorldLabView:View {
                     Button(showInspectionOverlays ? "Hide overlays":"Show overlays"){
                         showInspectionOverlays.toggle()
                     }
+                    Button("Undo view",action:undoInspectionView).disabled(inspectionViewHistory.past.isEmpty)
+                    Button("Redo view",action:redoInspectionView).disabled(inspectionViewHistory.future.isEmpty)
                     Button("Reset inspection"){
-                        inspectionMode = .normal;seeInside=false;inspectionOpacity=0.32
-                        inspectionAxis = .x;inspectionCutawayFraction=0
-                        inspectionExplodeDistance=1;showInspectionLabels=true;showInspectionOverlays=true
-                        redraw()
+                        applyInspectionView(NativeWorldLabInspectionSettings())
+                        showInspectionLabels=true;showInspectionOverlays=true
                     }
                 }.buttonStyle(.bordered)
                 if showInspectionOverlays,showInspectionLabels,
