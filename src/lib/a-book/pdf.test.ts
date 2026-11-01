@@ -95,10 +95,12 @@ test("extracts the same page range from a PDF batch into distinct local ZIP entr
 });
 
 test("batch extraction validates every source before producing an archive", async () => {
+  const valid = await samplePdf(4);
+  const tooShort = await samplePdf(2);
   await assert.rejects(
     () => extractSelectedPdfs([
-      { name: "valid.pdf", blob: samplePdf(4) },
-      { name: "too-short.pdf", blob: samplePdf(2) },
+      { name: "valid.pdf", blob: valid },
+      { name: "too-short.pdf", blob: tooShort },
     ], "1-3"),
     /Choose page numbers from 1 to 2/,
   );
@@ -123,10 +125,12 @@ test("splits several PDFs locally with unique entries and independent part conte
 });
 
 test("batch split validates all source page groups before constructing the ZIP", async () => {
+  const valid = await samplePdf(6);
+  const tooShort = await samplePdf(2);
   await assert.rejects(
     () => splitSelectedPdfsIntoZip([
-      { name: "valid.pdf", blob: samplePdf(6) },
-      { name: "too-short.pdf", blob: samplePdf(2) },
+      { name: "valid.pdf", blob: valid },
+      { name: "too-short.pdf", blob: tooShort },
     ], "1-2;3-4"),
     /Choose page numbers from 1 to 2/,
   );
