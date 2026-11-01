@@ -213,3 +213,41 @@ export function buildDesignPaletteExport(
   }
   throw new Error("Unsupported design token export format.");
 }
+
+/** Create a self-contained, accessible SVG sheet for sharing or handing off palette swatches. */
+export function buildPaletteSwatchesSvg(colors: readonly string[], labels: readonly string[] = []): string {
+  const swatches = colors.slice(0, 8).flatMap((value, index) => {
+    const parsed = parseCssColor(value);
+    if (!parsed) return [];
+    const label = String(labels[index] ?? `Color ${index + 1}`).slice(0, 48)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&apos;");
+    return [{ color: toHex({ ...parsed, a: 1 }).slice(0, 7), label }];
+  });
+  if (swatches.length === 0) throw new Error("At least one valid color is required to export palette swatches.");
+
+  const width = 1200;
+  const height = 300;
+  const gap = 18;
+  const left = 28;
+  const swatchWidth = (width - left * 2 - gap * (swatches.length - 1)) / swatches.length;
+  const shapes = swatches.map(({ color, label }, index) => {
+    const x = left + index * (swatchWidth + gap);
+    const textX = x + 2;
+    return [
+      `<rect x="${x.toFixed(1)}" y="28" width="${swatchWidth.toFixed(1)}" height="176" rx="16" fill="${color}"/>`,
+      `<text x="${textX.toFixed(1)}" y="238" fill="#111827" font-size="17" font-weight="600">${label}</text>`,
+      `<text x="${textX.toFixed(1)}" y="266" fill="#475569" font-size="15" font-family="monospace">${color.toUpperCase()}</text>`,
+    ].join("");
+  }).join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="palette-title palette-description">
+  <title id="palette-title">enV color palette</title>
+  <desc id="palette-description">${swatches.length} accessible color swatches with their HEX values.</desc>
+  <rect width="${width}" height="${height}" fill="#ffffff"/>
+  ${shapes}
+</svg>`;
+}
