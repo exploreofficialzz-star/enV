@@ -6,6 +6,7 @@ import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
 import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
+import { buildLowPolySvg, buildMeshGradientSvg, buildScatterSvg, buildTextureSvg } from "@/lib/engines/svg-backgrounds";
 import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
 import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
 import { toHex } from "@/lib/engines/accessibility-color";
@@ -127,13 +128,25 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "opacity", label: "Opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
   ],
   blob: [
-    { name: "seed", label: "Shape variation", type: "number", defaultValue: 7, min: 1, max: 999, step: 1 },
+    { name: "artStyle", label: "Artwork family", type: "select", defaultValue: "organic", options: [{ value: "organic", label: "Organic blob" }, { value: "low-poly", label: "Low-poly geometry" }, { value: "scatter", label: "Scatter / particles" }, { value: "mesh-gradient", label: "Mesh gradient" }, { value: "texture", label: "Surface texture" }] },
+    { name: "seed", label: "Variation seed", type: "number", defaultValue: 7, min: 1, max: 999, step: 1 },
     { name: "points", label: "Shape detail", type: "select", defaultValue: "12", options: [{ value: "8", label: "Simple" }, { value: "12", label: "Balanced" }, { value: "18", label: "Detailed" }] },
     { name: "irregularity", label: "Organic variation", type: "number", defaultValue: 0.7, min: 0, max: 1, step: 0.01 },
+    { name: "detail", label: "Triangle detail", type: "number", defaultValue: 8, min: 3, max: 18, step: 1 },
+    { name: "scatterStyle", label: "Particle style", type: "select", defaultValue: "dots", options: [{ value: "dots", label: "Dots" }, { value: "stars", label: "Stars" }, { value: "confetti", label: "Confetti" }] },
+    { name: "count", label: "Particle count", type: "number", defaultValue: 120, min: 12, max: 400, step: 1 },
+    { name: "textureStyle", label: "Texture style", type: "select", defaultValue: "paper", options: [{ value: "paper", label: "Paper grain" }, { value: "halftone", label: "Halftone" }, { value: "topography", label: "Topographic lines" }, { value: "woven", label: "Woven grid" }] },
+    { name: "density", label: "Texture density", type: "number", defaultValue: 12, min: 4, max: 48, step: 1 },
+    { name: "softness", label: "Mesh softness", type: "number", defaultValue: 72, min: 35, max: 95, suffix: "%" },
+    { name: "size", label: "Particle size", type: "number", defaultValue: 8, min: 2, max: 28, suffix: "px" },
+    { name: "opacity", label: "Artwork opacity", type: "number", defaultValue: 0.72, min: 0, max: 1, step: 0.01 },
     { name: "rotation", label: "Rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
-    { name: "color", label: "Fill color", type: "color", defaultValue: "#0d9f8a" },
+    { name: "color", label: "Primary color", type: "color", defaultValue: "#0d9f8a" },
+    { name: "secondary", label: "Secondary color", type: "color", defaultValue: "#7c4dff" },
+    { name: "background", label: "Background color", type: "color", defaultValue: "#f8fafc" },
     { name: "stroke", label: "Outline color", type: "color", defaultValue: "#ffffff" },
     { name: "strokeWidth", label: "Outline width", type: "number", defaultValue: 0, min: 0, max: 8, suffix: "px" },
+    { name: "transparent", label: "Canvas background", type: "select", defaultValue: "no", options: [{ value: "no", label: "Solid background" }, { value: "yes", label: "Transparent" }] },
   ],
   wave: [
     { name: "amp", label: "Wave height", type: "number", defaultValue: 24, min: 0, max: 58, suffix: "px" },
@@ -356,15 +369,45 @@ function cssFor(
     return { css: `background-image: ${backgroundImage};\nbackground-size: ${size}px ${size}px;`, style: { backgroundImage, backgroundSize: `${size}px ${size}px` }, svg };
   }
   if (family === "blob") {
-    const svg = buildBlobSvg({
-      seed: numberValue(values, "seed", 7, 1, 999),
-      points: Number(values.points ?? 12),
-      color: values.color ?? "#0d9f8a",
-      rotation: numberValue(values, "rotation", 0, 0, 360),
-      stroke: values.stroke ?? "#ffffff",
-      strokeWidth: numberValue(values, "strokeWidth", 0, 0, 8),
-      irregularity: numberValue(values, "irregularity", 0.7, 0, 1),
-    });
+    const seed = numberValue(values, "seed", 7, 1, 999);
+    const color = values.color ?? "#0d9f8a";
+    const secondary = values.secondary ?? "#7c4dff";
+    const background = values.background ?? "#f8fafc";
+    const rotation = numberValue(values, "rotation", 0, 0, 360);
+    const transparent = values.transparent === "yes";
+    const artStyle = values.artStyle ?? "organic";
+    let svg: string;
+    if (artStyle === "low-poly") {
+      svg = buildLowPolySvg({
+        seed, detail: numberValue(values, "detail", 8, 3, 18), color, secondary, background,
+        stroke: values.stroke ?? "#ffffff", strokeWidth: numberValue(values, "strokeWidth", 0.8, 0, 4),
+        rotation, transparent,
+      });
+    } else if (artStyle === "scatter") {
+      svg = buildScatterSvg({
+        seed, count: numberValue(values, "count", 120, 12, 400), color, secondary, background,
+        style: (values.scatterStyle ?? "dots") as import("@/lib/engines/svg-backgrounds").ScatterStyle,
+        size: numberValue(values, "size", 8, 2, 28), opacity: numberValue(values, "opacity", 0.72, 0, 1),
+        transparent,
+      });
+    } else if (artStyle === "mesh-gradient") {
+      svg = buildMeshGradientSvg({
+        seed, colors: [color, secondary], background,
+        softness: numberValue(values, "softness", 72, 35, 95), transparent,
+      });
+    } else if (artStyle === "texture") {
+      svg = buildTextureSvg({
+        seed, style: (values.textureStyle ?? "paper") as import("@/lib/engines/svg-backgrounds").TextureStyle,
+        color, background, density: numberValue(values, "density", 12, 4, 48),
+        opacity: numberValue(values, "opacity", 0.22, 0, 1), transparent,
+      });
+    } else {
+      svg = buildBlobSvg({
+        seed, points: Number(values.points ?? 12), color, rotation,
+        stroke: values.stroke ?? "#ffffff", strokeWidth: numberValue(values, "strokeWidth", 0, 0, 8),
+        irregularity: numberValue(values, "irregularity", 0.7, 0, 1),
+      });
+    }
     return { css: svg, style: {}, svg };
   }
   if (family === "wave") {
@@ -398,17 +441,35 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   const { family } = familyAndWorkflow(op, toolId);
   const allFields = BASE_FIELDS[family] ?? BASE_FIELDS.gradient;
   const [values, setValues] = useState(() => initialValues(allFields));
-  const fields = useMemo(() => family !== "gradient" ? allFields : allFields.filter((field) => {
-    const meshMode = values.meshMode === "yes";
-    if (field.name === "meshFade" && !meshMode) return false;
-    if (field.name === "kind" && meshMode) return false;
-    if (field.name === "angle" && values.kind === "radial" && !meshMode) return false;
-    if ((field.name === "shape" || field.name === "radialSize") && (values.kind !== "radial" || meshMode)) return false;
-    if ((field.name === "centerX" || field.name === "centerY") && (values.kind === "linear" || meshMode)) return false;
-    if (field.name === "repeating" && meshMode) return false;
-    if (field.name === "hueMethod" && !["hsl", "hwb", "lch", "oklch"].includes(values.colorSpace ?? "srgb")) return false;
-    return true;
-  }), [allFields, family, values.colorSpace, values.kind, values.meshMode]);
+  const fields = useMemo(() => {
+    if (family === "gradient") {
+      return allFields.filter((field) => {
+        const meshMode = values.meshMode === "yes";
+        if (field.name === "meshFade" && !meshMode) return false;
+        if (field.name === "kind" && meshMode) return false;
+        if (field.name === "angle" && values.kind === "radial" && !meshMode) return false;
+        if ((field.name === "shape" || field.name === "radialSize") && (values.kind !== "radial" || meshMode)) return false;
+        if ((field.name === "centerX" || field.name === "centerY") && (values.kind === "linear" || meshMode)) return false;
+        if (field.name === "repeating" && meshMode) return false;
+        if (field.name === "hueMethod" && !["hsl", "hwb", "lch", "oklch"].includes(values.colorSpace ?? "srgb")) return false;
+        return true;
+      });
+    }
+    if (family === "blob") {
+      const style = values.artStyle ?? "organic";
+      const common = ["artStyle", "seed", "color", "transparent"];
+      const byStyle: Record<string, string[]> = {
+        organic: ["points", "irregularity", "rotation", "stroke", "strokeWidth"],
+        "low-poly": ["detail", "secondary", "background", "rotation", "stroke", "strokeWidth"],
+        scatter: ["scatterStyle", "count", "secondary", "background", "size", "opacity"],
+        "mesh-gradient": ["secondary", "background", "softness"],
+        texture: ["textureStyle", "background", "density", "opacity"],
+      };
+      const visible = new Set([...common, ...(byStyle[style] ?? byStyle.organic)]);
+      return allFields.filter((field) => visible.has(field.name));
+    }
+    return allFields;
+  }, [allFields, family, values.artStyle, values.colorSpace, values.kind, values.meshMode]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
   const [shadowLayers, setShadowLayers] = useState<ShadowLayer[]>(() => createShadowPreset("soft"));
   const [textShadowLayers, setTextShadowLayers] = useState<TextShadowLayer[]>(() => createTextShadowPreset("soft"));

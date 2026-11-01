@@ -50,6 +50,8 @@ const designColor = read("src/lib/engines/design-color.ts");
 const designColorTests = read("src/lib/engines/design-color.test.ts");
 const svgGenerators = read("src/lib/engines/svg-generators.ts");
 const svgGeneratorTests = read("src/lib/engines/svg-generators.test.ts");
+const svgBackgrounds = read("src/lib/engines/svg-backgrounds.ts");
+const svgBackgroundTests = read("src/lib/engines/svg-backgrounds.test.ts");
 const paletteImage = read("src/lib/engines/palette-image.ts");
 const paletteImageTests = read("src/lib/engines/palette-image.test.ts");
 const textShadow = read("src/lib/engines/css-text-shadow.ts");
@@ -108,6 +110,11 @@ const checks = [
   ["Median-cut image palette extraction and transparent-pixel filtering", paletteImage.includes("extractDominantColors") && paletteImage.includes("selectedChannel") && paletteImageTests.includes("ignores transparent pixels") && colorEngine.includes("extractDominantColors(pixels, 5, 160)")],
   ["Independently editable and reorderable text-shadow layers", textShadow.includes("buildTextShadow") && textShadow.includes("normalizeTextShadowLayers") && textShadowTests.includes("keeps its own editable values") && cssEngine.includes("Independent text-shadow layers") && cssEngine.includes("Move text shadow layer") && cssEngine.includes("Add layer (" )],
   ["Consistent SVG wave export dimensions", svgGenerators.includes('viewBox="0 0 1440 240"') && svgGenerators.includes("L1440 240 L0 240 Z") && svgGeneratorTests.includes('viewBox="0 0 1440 240"')],
+  ["Low-poly SVG artwork with deterministic triangulation", svgBackgrounds.includes("buildLowPolySvg") && svgBackgrounds.includes("createRandom") && svgBackgroundTests.includes("low-poly artwork is deterministic") && cssEngine.includes("Low-poly geometry")],
+  ["Scatter generator with dots, stars and confetti families", svgBackgrounds.includes("buildScatterSvg") && ["dots", "stars", "confetti"].every((style) => svgBackgrounds.includes('"'+style+'"')) && svgBackgroundTests.includes("scatter generator supports dots, stars and confetti") && cssEngine.includes("Particle style")],
+  ["Standalone SVG mesh-gradient generator", svgBackgrounds.includes("buildMeshGradientSvg") && svgBackgrounds.includes("radialGradient") && svgBackgroundTests.includes("mesh gradients sanitize colors") && cssEngine.includes("Mesh gradient")],
+  ["Reusable paper, halftone, topographic and woven SVG textures", svgBackgrounds.includes("buildTextureSvg") && ["paper", "halftone", "topography", "woven"].every((style) => svgBackgrounds.includes('"'+style+'"')) && svgBackgroundTests.includes("texture generator exports four deterministic") && cssEngine.includes("Surface texture")],
+  ["SVG artwork family selector and conditional controls", cssEngine.includes("Artwork family") && cssEngine.includes('if (family === "blob")') && cssEngine.includes("values.artStyle") && cssEngine.includes("buildTextureSvg")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
 if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length) {
