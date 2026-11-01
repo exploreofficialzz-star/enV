@@ -2,6 +2,7 @@ package com.chastech.env.engine
 
 import java.time.Instant
 import java.time.ZoneId
+import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -201,5 +202,75 @@ object NativeWorldLabRecordedTime {
         checkpoint:NativeWorldLabRecordedCheckpoint):NativeWorldLabRecordedClock {
         run.validate();checkpoint.validate(run)
         return checkpoint.clock.copy(paused=true).also{it.validate(run)}
+    }
+}
+
+
+object NativeWorldLabRecordedCheckpointCodec {
+    private const val FORMAT="env-world-lab-recorded-clock"
+    private const val MAX_BYTES=16*1024
+    private val keys=setOf("format","schemaVersion","runId","modelId","modelVersion",
+        "worldEpochUTC","sampleIndex","sampleTimeSeconds","clock")
+    private val clockKeys=setOf("wallTimeUTC","worldDateUTC","simulationTimeSeconds",
+        "solverInternalTimeSeconds","displaySampleTimeSeconds","sampleIndex","playbackRate",
+        "direction","paused","timezoneDisplay","fidelity")
+    fun encode(value:NativeWorldLabRecordedCheckpoint,run:NativeWorldLabRecordedRun):String {
+        value.validate(run)
+        val clock=value.clock
+        val clockJson=JSONObject()
+            .put("wallTimeUTC",clock.wallTimeUTC)
+            .put("worldDateUTC",clock.worldDateUTC)
+            .put("simulationTimeSeconds",clock.simulationTimeSeconds)
+            .put("solverInternalTimeSeconds",clock.solverInternalTimeSeconds?:JSONObject.NULL)
+            .put("displaySampleTimeSeconds",clock.displaySampleTimeSeconds)
+            .put("sampleIndex",clock.sampleIndex)
+            .put("playbackRate",clock.playbackRate)
+            .put("direction",clock.direction)
+            .put("paused",clock.paused)
+            .put("timezoneDisplay",clock.timezoneDisplay)
+            .put("fidelity",clock.fidelity)
+        val json=JSONObject().put("format",FORMAT).put("schemaVersion",1)
+            .put("runId",value.runId).put("modelId",value.modelId)
+            .put("modelVersion",value.modelVersion).put("worldEpochUTC",value.worldEpochUTC)
+            .put("sampleIndex",value.sampleIndex).put("sampleTimeSeconds",value.sampleTimeSeconds)
+            .put("clock",clockJson).toString(2)
+        require(json.toByteArray(Charsets.UTF_8).size<=MAX_BYTES) {
+            "Recorded timeline checkpoint exceeds 16 KB."
+        }
+        return json
+    }
+    fun decode(json:String,run:NativeWorldLabRecordedRun):NativeWorldLabRecordedCheckpoint {
+        require(json.toByteArray(Charsets.UTF_8).size<=MAX_BYTES) {
+            "Recorded timeline checkpoint exceeds 16 KB."
+        }
+        val root=JSONObject(json)
+        require(root.keys().asSequence().toSet()==keys &&
+            root.getString("format")==FORMAT && root.getInt("schemaVersion")==1) {
+            "Recorded checkpoint contains unsupported or missing fields."
+        }
+        val c=root.getJSONObject("clock")
+        require(c.keys().asSequence().toSet()==clockKeys) {
+            "Recorded clock contains unsupported or missing fields."
+        }
+        fun number(o:JSONObject,key:String):Double {
+            val value=o.get(key) as? Number?:throw IllegalArgumentException("$key must be numeric.")
+            return value.toDouble().also{require(it.isFinite()){"$key must be finite."}}
+        }
+        val internal=if(c.isNull("solverInternalTimeSeconds"))null
+            else number(c,"solverInternalTimeSeconds")
+        val clock=NativeWorldLabRecordedClock(
+            wallTimeUTC=c.getString("wallTimeUTC"),worldDateUTC=c.getString("worldDateUTC"),
+            simulationTimeSeconds=number(c,"simulationTimeSeconds"),
+            solverInternalTimeSeconds=internal,
+            displaySampleTimeSeconds=number(c,"displaySampleTimeSeconds"),
+            sampleIndex=c.getInt("sampleIndex"),playbackRate=number(c,"playbackRate"),
+            direction=c.getString("direction"),paused=c.getBoolean("paused"),
+            timezoneDisplay=c.getString("timezoneDisplay"),fidelity=c.getString("fidelity"))
+        val value=NativeWorldLabRecordedCheckpoint(runId=root.getString("runId"),
+            modelId=root.getString("modelId"),modelVersion=root.getString("modelVersion"),
+            worldEpochUTC=root.getString("worldEpochUTC"),sampleIndex=root.getInt("sampleIndex"),
+            sampleTimeSeconds=number(root,"sampleTimeSeconds"),clock=clock)
+        value.validate(run)
+        return value
     }
 }
