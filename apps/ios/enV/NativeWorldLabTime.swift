@@ -138,7 +138,7 @@ struct NativeWorldLabRecordedRun:Equatable {
               worldEpochUTC.hasSuffix("Z"),NativeWorldLabRecordedTime.parseUTC(worldEpochUTC) != nil,
               (2...200_000).contains(sampleTimesSeconds.count),durationSeconds<=315_576_000,
               sampleTimesSeconds.allSatisfy({$0.isFinite && $0>=0}),
-              zip(sampleTimesSeconds,sampleTimesSeconds.dropFirst()).allSatisfy({$1>$0}),
+              zip(sampleTimesSeconds,sampleTimesSeconds.dropFirst()).allSatisfy({$0.1>$0.0}),
               mandatoryEventTimesSeconds.count<=100_000,
               mandatoryEventTimesSeconds.allSatisfy({event in
                   event.isFinite && sampleTimesSeconds.contains(where:{abs($0-event)<=1e-9})
@@ -213,7 +213,7 @@ struct NativeWorldLabRecordedCheckpoint:Codable,Equatable {
 
 enum NativeWorldLabRecordedTime {
     static let epsilon=1e-9
-    private static func parseUTC(_ value:String)->Date? {
+    static func parseUTC(_ value:String)->Date? {
         guard value.hasSuffix("Z") else{return nil}
         let fractional=ISO8601DateFormatter()
         fractional.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
