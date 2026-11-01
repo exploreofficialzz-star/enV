@@ -600,6 +600,125 @@ object NativeWorldLabEditor {
     }
 
 
+
+    fun translateSolids(source:String,ids:List<String>,deltaMeters:List<Double>):String=edit(source){project->
+        require(deltaMeters.size==3&&deltaMeters.all{it.isFinite()&&it in -100000.0..100000.0}){
+            "Translation needs three finite bounded SI offsets"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        val targets=selected.associate{solid->
+            val old=solid.getJSONArray("positionMeters")
+            val next=(0..2).map{old.getDouble(it)+deltaMeters[it]}
+            require(next.all{it.isFinite()&&it in -100000.0..100000.0}){
+                "A translated part would leave the local world"
+            }
+            solid.getString("id") to next
+        }
+        for(index in 0 until rows.length()){
+            val row=rows.getJSONObject(index)
+            val position=targets[row.getString("id")]?:continue
+            row.put("positionMeters",JSONArray(position))
+        }
+    }
+    fun mirrorSolids(source:String,ids:List<String>,axis:Int,planeMeters:Double):String=edit(source){project->
+        require(axis in 0..2&&planeMeters.isFinite()&&planeMeters in -100000.0..100000.0){
+            "Multi-part mirror needs a bounded X/Y/Z plane"
+        }
+        val (_,selected)=selectedCadRows(project,ids)
+        selected.forEach{solid->
+            val position=solid.getJSONArray("positionMeters")
+            val coordinate=2*planeMeters-position.getDouble(axis)
+            require(coordinate.isFinite()&&coordinate in -100000.0..100000.0){
+                "Mirroring a selected part would leave local-world bounds"
+            }
+            position.put(axis,coordinate)
+            val angles=if(solid.has("rotationRadians"))
+                (0..2).map{solid.getJSONArray("rotationRadians").getDouble(it)}
+                else listOf(0.0,0.0,0.0)
+            val matrix=rotationMatrix(angles)
+            val signs=listOf(1.0,1.0,1.0).toMutableList().also{it[axis]=-1.0}
+            val localSigns=listOf(-1.0,1.0,1.0)
+            val reflected=Array(3){row->DoubleArray(3){col->
+                signs[row]*matrix[row][col]*localSigns[col]
+            }}
+            solid.put("rotationRadians",JSONArray(matrixAngles(reflected)))
+        }
+    }
+    fun linearPatternSolids(source:String,ids:List<String>,axis:Int,
+        spacingMeters:Double,copies:Int):String=edit(source){project->
+        require(axis in 0..2&&spacingMeters.isFinite()&&spacingMeters in -100000.0..100000.0&&
+            spacingMeters!=0.0&&copies in 1..50){
+            "Multi-part linear pattern needs an axis, non-zero spacing and 1–50 copies"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        require(rows.length()+selected.size*copies<=200){
+            "Multi-part linear pattern exceeds the 200-solid project limit"
+        }
+        val clones=mutableListOf<JSONObject>()
+        val used=(0 until rows.length()).map{rows.getJSONObject(it).getString("id")}.toMutableSet()
+        for(n in 1..copies)for(original in selected){
+            val clone=JSONObject(original.toString())
+            val position=clone.getJSONArray("positionMeters")
+            val value=position.getDouble(axis)+spacingMeters*n
+            require(value.isFinite()&&value in -100000.0..100000.0){
+                "Linear pattern position exceeds local-world bounds"
+            }
+            position.put(axis,value)
+            var id=UUID.randomUUID().toString()
+            while(id in used)id=UUID.randomUUID().toString()
+            used.add(id)
+            clone.put("id",id).put("name",(original.getString("name")+" "+(n+1)).take(120))
+            if(!clone.has("rotationRadians"))clone.put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
+            clones.add(clone)
+        }
+        clones.forEach{rows.put(it)}
+    }
+    fun circularPatternSolids(source:String,ids:List<String>,axis:Int,
+        centerMeters:List<Double>,instances:Int):String=edit(source){project->
+        require(axis in 0..2&&centerMeters.size==3&&
+            centerMeters.all{it.isFinite()&&it in -100000.0..100000.0}&&instances in 2..36){
+            "Multi-part circular pattern requires an axis, bounded center and 2–36 instances"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        require(rows.length()+selected.size*(instances-1)<=200){
+            "Multi-part circular pattern exceeds the 200-solid project limit"
+        }
+        val a=axis;val b=(a+1)%3;val c=(a+2)%3
+        val clones=mutableListOf<JSONObject>()
+        val used=(0 until rows.length()).map{rows.getJSONObject(it).getString("id")}.toMutableSet()
+        for(n in 1 until instances){
+            val angle=2*Math.PI*n/instances
+            val co=kotlin.math.cos(angle);val si=kotlin.math.sin(angle)
+            for(original in selected){
+                val position=original.getJSONArray("positionMeters")
+                val next=(0..2).map{position.getDouble(it)}.toMutableList()
+                val u=position.getDouble(b)-centerMeters[b]
+                val v=position.getDouble(c)-centerMeters[c]
+                next[b]=centerMeters[b]+u*co-v*si
+                next[c]=centerMeters[c]+u*si+v*co
+                require(next.all{it.isFinite()&&it in -100000.0..100000.0}){
+                    "Multi-part circular pattern position overflow"
+                }
+                val angles=if(original.has("rotationRadians"))
+                    (0..2).map{original.getJSONArray("rotationRadians").getDouble(it)}
+                    else listOf(0.0,0.0,0.0)
+                val sourceRotation=rotationMatrix(angles)
+                val world=Array(3){row->DoubleArray(3){0.0}}
+                world[a][a]=1.0;world[b][b]=co;world[b][c]=-si
+                world[c][b]=si;world[c][c]=co
+                val clone=JSONObject(original.toString())
+                var id=UUID.randomUUID().toString()
+                while(id in used)id=UUID.randomUUID().toString()
+                used.add(id)
+                clone.put("id",id).put("name",(original.getString("name")+" "+(n+1)).take(120))
+                    .put("positionMeters",JSONArray(next))
+                    .put("rotationRadians",JSONArray(matrixAngles(multiplyRotation(world,sourceRotation))))
+                clones.add(clone)
+            }
+        }
+        clones.forEach{rows.put(it)}
+    }
+
     fun mirrorSolid(source:String,id:String,axis:Int,planeMeters:Double):String=edit(source){project->
         require(axis in 0..2&&planeMeters.isFinite()&&planeMeters in -100000.0..100000.0){
             "Mirror requires an X/Y/Z plane inside local-world bounds"

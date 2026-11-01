@@ -655,6 +655,158 @@ enum NativeWorldLabEditor {
     }
 
 
+
+    static func translateSolids(_ data:Data,ids:[String],deltaMeters:[Double])throws->Data {
+        guard deltaMeters.count==3,deltaMeters.allSatisfy({$0.isFinite&&abs($0)<=100000}) else {
+            throw NativeWorldLabError.invalid("Translation needs three finite bounded SI offsets")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            var targets:[String:[Double]]=[:]
+            for part in selected {
+                guard let id=part["id"] as? String,
+                      let position=part["positionMeters"] as? [Double],position.count==3 else{
+                    throw NativeWorldLabError.invalid("A selected part has invalid position")
+                }
+                let next=zip(position,deltaMeters).map{$0+$1}
+                guard next.allSatisfy({$0.isFinite&&abs($0)<=100000}) else{
+                    throw NativeWorldLabError.invalid("A translated part leaves local-world bounds")
+                }
+                targets[id]=next
+            }
+            for index in entities.indices{
+                guard let id=entities[index]["id"] as? String,
+                      let position=targets[id] else{continue}
+                entities[index]["positionMeters"]=position
+            }
+            root["entities"]=entities
+        }
+    }
+    static func mirrorSolids(_ data:Data,ids:[String],axis:Int,planeMeters:Double)throws->Data {
+        guard (0...2).contains(axis),planeMeters.isFinite,abs(planeMeters)<=100000 else {
+            throw NativeWorldLabError.invalid("Multi-part mirror needs a bounded X/Y/Z plane")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for part in selected{
+                guard let id=part["id"] as? String,
+                      let index=entities.firstIndex(where:{$0["id"] as? String==id}),
+                      var position=entities[index]["positionMeters"] as? [Double],
+                      position.count==3 else{
+                    throw NativeWorldLabError.invalid("A selected part disappeared during mirror")
+                }
+                position[axis]=2*planeMeters-position[axis]
+                guard position[axis].isFinite,abs(position[axis])<=100000 else{
+                    throw NativeWorldLabError.invalid("A mirrored part leaves local-world bounds")
+                }
+                let angles=entities[index]["rotationRadians"] as? [Double] ?? [0,0,0]
+                guard angles.count==3,angles.allSatisfy({$0.isFinite}) else{
+                    throw NativeWorldLabError.invalid("Selected rotation is invalid")
+                }
+                let matrix=Self.rotationMatrix(angles)
+                var signs=[1.0,1.0,1.0];signs[axis] = -1
+                let local=[-1.0,1.0,1.0]
+                let reflected=(0..<3).map{row in
+                    (0..<3).map{col in signs[row]*matrix[row][col]*local[col]}
+                }
+                entities[index]["positionMeters"]=position
+                entities[index]["rotationRadians"]=Self.matrixAngles(reflected)
+            }
+            root["entities"]=entities
+        }
+    }
+    static func linearPatternSolids(_ data:Data,ids:[String],axis:Int,
+        spacingMeters:Double,copies:Int)throws->Data {
+        guard (0...2).contains(axis),spacingMeters.isFinite,abs(spacingMeters)<=100000,
+              spacingMeters != 0,(1...50).contains(copies) else{
+            throw NativeWorldLabError.invalid("Multi-part linear pattern needs an axis, non-zero spacing and 1–50 copies")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            guard entities.count+selected.count*copies<=200 else{
+                throw NativeWorldLabError.invalid("Multi-part linear pattern exceeds the 200-solid limit")
+            }
+            var used=Set(entities.compactMap{$0["id"] as? String})
+            var clones:[[String:Any]]=[]
+            for n in 1...copies{
+                for original in selected{
+                    guard var clone=original as? [String:Any],
+                          var position=clone["positionMeters"] as? [Double],
+                          position.count==3,
+                          let name=original["name"] as? String else{
+                        throw NativeWorldLabError.invalid("Pattern part has invalid position/name")
+                    }
+                    position[axis]+=spacingMeters*Double(n)
+                    guard position[axis].isFinite,abs(position[axis])<=100000 else{
+                        throw NativeWorldLabError.invalid("Linear pattern leaves local-world bounds")
+                    }
+                    var id=UUID().uuidString
+                    while used.contains(id){id=UUID().uuidString}
+                    used.insert(id)
+                    clone["id"]=id;clone["name"]=String((name+" \(n+1)").prefix(120))
+                    clone["positionMeters"]=position
+                    if clone["rotationRadians"]==nil{clone["rotationRadians"]=[0,0,0]}
+                    clones.append(clone)
+                }
+            }
+            entities.append(contentsOf:clones)
+            root["entities"]=entities
+        }
+    }
+    static func circularPatternSolids(_ data:Data,ids:[String],axis:Int,
+        centerMeters:[Double],instances:Int)throws->Data {
+        guard (0...2).contains(axis),centerMeters.count==3,
+              centerMeters.allSatisfy({$0.isFinite&&abs($0)<=100000}),
+              (2...36).contains(instances) else{
+            throw NativeWorldLabError.invalid("Multi-part circular pattern needs a bounded center, axis and 2–36 instances")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            guard entities.count+selected.count*(instances-1)<=200 else{
+                throw NativeWorldLabError.invalid("Multi-part circular pattern exceeds the 200-solid limit")
+            }
+            var used=Set(entities.compactMap{$0["id"] as? String})
+            var clones:[[String:Any]]=[]
+            let a=axis,b=(a+1)%3,c=(a+2)%3
+            for n in 1..<instances{
+                let angle=2*Double.pi*Double(n)/Double(instances)
+                let co=cos(angle),si=sin(angle)
+                for original in selected{
+                    guard var clone=original as? [String:Any],
+                          let position=original["positionMeters"] as? [Double],
+                          position.count==3,
+                          let name=original["name"] as? String else{
+                        throw NativeWorldLabError.invalid("Circular-pattern source is invalid")
+                    }
+                    var next=position
+                    let u=position[b]-centerMeters[b],v=position[c]-centerMeters[c]
+                    next[b]=centerMeters[b]+u*co-v*si
+                    next[c]=centerMeters[c]+u*si+v*co
+                    guard next.allSatisfy({$0.isFinite&&abs($0)<=100000}) else{
+                        throw NativeWorldLabError.invalid("Circular pattern leaves local-world bounds")
+                    }
+                    let sourceRotation=Self.rotationMatrix(original["rotationRadians"] as? [Double] ?? [0,0,0])
+                    var world=Array(repeating:Array(repeating:0.0,count:3),count:3)
+                    world[a][a]=1;world[b][b]=co;world[b][c] = -si
+                    world[c][b]=si;world[c][c]=co
+                    var id=UUID().uuidString
+                    while used.contains(id){id=UUID().uuidString}
+                    used.insert(id)
+                    clone["id"]=id;clone["name"]=String((name+" \(n+1)").prefix(120))
+                    clone["positionMeters"]=next
+                    clone["rotationRadians"]=Self.matrixAngles(Self.multiplyRotation(world,sourceRotation))
+                    clones.append(clone)
+                }
+            }
+            entities.append(contentsOf:clones)
+            root["entities"]=entities
+        }
+    }
+
     static func mirrorSolid(_ data:Data,id:String,axis:Int,planeMeters:Double)throws->Data {
         guard (0...2).contains(axis),planeMeters.isFinite,abs(planeMeters)<=100000 else {
             throw NativeWorldLabError.invalid("Mirror requires an axis and bounded local-world plane")
