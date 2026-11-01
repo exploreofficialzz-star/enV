@@ -127,8 +127,17 @@ final class NativeWorldLabProjectStoreTests:XCTestCase {
         XCTAssertEqual(opened.project.id,project.id)
         XCTAssertEqual(try NativeWorldLabScientificEvidenceStore(directory:second)
             .list(project.id).count,1)
-        XCTAssertThrowsError(try NativeWorldLabPortableArchiveStore(directory:second)
-            .importArchive(portable))
+        let retried=try NativeWorldLabPortableArchiveStore(directory:second).importArchive(portable)
+        XCTAssertEqual(retried.project.id,project.id)
+        XCTAssertEqual(try NativeWorldLabScientificEvidenceStore(directory:second)
+            .list(project.id).count,1)
+        var altered=try XCTUnwrap(JSONSerialization.jsonObject(with:portable) as? [String:Any])
+        var alteredProject=try XCTUnwrap(altered["project"] as? [String:Any])
+        alteredProject["title"]="Conflicting archive edit"
+        altered["project"]=alteredProject
+        let changed=try JSONSerialization.data(withJSONObject:altered,options:[.sortedKeys])
+        XCTAssertThrowsError(try NativeWorldLabPortableArchiveStore(directory:second).importArchive(changed))
+        XCTAssertEqual(try NativeWorldLabProjectStore(directory:second).read(project.id).1.title,project.title)
     }
 
 }
