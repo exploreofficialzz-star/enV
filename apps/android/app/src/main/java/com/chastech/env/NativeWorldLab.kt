@@ -85,6 +85,7 @@ fun NativeWorldLabForm() {
     var resistance by remember { mutableFloatStateOf(1000f) }
     var diffusivity by remember { mutableFloatStateOf(0.02f) }
     var inside by remember { mutableStateOf(false) }
+    var inspection by remember { mutableStateOf(com.chastech.env.engine.NativeInspectionSettings()) }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
     var projectJson by remember { mutableStateOf<String?>(null) }
     var dcRun by remember { mutableStateOf<NativeLabDcResult?>(null) }
@@ -522,8 +523,8 @@ fun NativeWorldLabForm() {
         while(collisionPlaying){
             delay(40)
             val run=collisionRun?:break
-            collisionTime=(collisionTime+0.04f*collisionSpeed)
-                .coerceAtMost(run.durationSeconds.toFloat())
+            collisionTime=nextWorldLabEventTime(collisionTime.toDouble(),0.04,
+                collisionSpeed.toDouble(),run.durationSeconds,listOf(run.impactTimeSeconds)).toFloat()
             if(collisionTime>=run.durationSeconds.toFloat())collisionPlaying=false
         }
     }
@@ -1525,10 +1526,11 @@ fun NativeWorldLabForm() {
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onClick={playing=false;time=0f}) { Text("Beginning") }
+            OutlinedButton(onClick={playing=false;time=(time-1f/240f).coerceAtLeast(0f)}) { Text("Previous") }
             Button(onClick={playing=!playing}) { Text(if(playing)"Pause" else "Play") }
-            OutlinedButton(onClick={playing=false;time=0f}) { Text("Reset") }
-            OutlinedButton(onClick={playing=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Step") }
-            OutlinedButton(onClick={inside=!inside}) { Text(if(inside)"Hide" else "See inside") }
+            OutlinedButton(onClick={playing=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Next") }
+            OutlinedButton(onClick={playing=false;time=12f}) { Text("End") }
         }
         Text("Simulated time: "+labNumber(time.toDouble())+" s")
         Slider(value=time,onValueChange={time=it;playing=false},valueRange=0f..12f,
@@ -1670,7 +1672,8 @@ fun NativeWorldLabForm() {
                     NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
                 }},
                 onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
-                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}})
+                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}},
+                inspection=inspection,onInspectionChange={inspection=it})
             NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
                 applyProjectEdit(transform)
             }
