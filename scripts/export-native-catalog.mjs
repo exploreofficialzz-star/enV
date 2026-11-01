@@ -13,7 +13,12 @@ const [{ tools: catalogTools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTE
 ]);
 // Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
 // runtime extensions are validated below but are not duplicated into the generated base export.
-const tools = catalogTools.map(presentGeneratedCalculator);
+// The native catalogue indexes the public name and description directly; preserve its
+// existing keyword array to keep the generated JSON compact while search still finds labels.
+const tools = catalogTools.map((tool) => {
+  const presented = presentGeneratedCalculator(tool);
+  return { ...presented, keywords: tool.keywords };
+});
 
 const runtimeCatalogExtensions = [
   {
