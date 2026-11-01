@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
+import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
 import { applyViewMode, usePrefs } from "@/lib/storage";
@@ -11,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
+import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
+import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 
@@ -32,6 +35,44 @@ export function ToolShell({
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
+  const toolStartedRef = useRef(false);
+  const toolFinishedRef = useRef(false);
+  const toolAbandonmentRecordedRef = useRef(false);
+  const toolStartedAtRef = useRef<number | null>(null);
+  const toolViewedAtRef = useRef(Date.now());
+  const executionStartedAtRef = useRef<number | null>(null);
+  const executionFinishedRef = useRef(false);
+  const lastExecutionStartAtRef = useRef(0);
+
+  const startToolExecution = (entryPoint: string) => {
+    const startedAt = Date.now();
+    // A submit button emits both click and submit events. Count that as one run.
+    if (entryPoint === "form_submit" && startedAt - lastExecutionStartAtRef.current < 1000) return;
+    lastExecutionStartAtRef.current = startedAt;
+    executionStartedAtRef.current = startedAt;
+    executionFinishedRef.current = false;
+    toolStartedRef.current = true;
+    toolFinishedRef.current = false;
+    toolAbandonmentRecordedRef.current = false;
+    toolStartedAtRef.current = startedAt;
+    if (toolInterfaceRef.current) toolInterfaceRef.current.dataset.envToolStartedAt = String(startedAt);
+    recordAnalyticsEvent({
+      name: "tool_started",
+      toolId: tool.id,
+      outcome: "unknown",
+      durationMs: Math.min(3600000, Math.max(0, startedAt - toolViewedAtRef.current)),
+      properties: { entry_point: entryPoint },
+    });
+  };
+
+  const executionTelemetry = useMemo<ToolExecutionTelemetry>(() => ({
+    finish: (outcome: ToolExecutionOutcome, errorCode?: string) => {
+      const startedAt = executionStartedAtRef.current;
+      if (startedAt === null || executionFinishedRef.current) return;
+      executionFinishedRef.current = true;
+      recordToolExecutionResult(tool.id, outcome, Date.now() - startedAt, "shared_result", errorCode);
+    },
+  }), [tool.id]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
@@ -52,7 +93,44 @@ export function ToolShell({
   useEffect(() => {
     recordRecent(tool.id);
     setVisibleRelatedCount(6);
+    toolStartedRef.current = false;
+    toolFinishedRef.current = false;
+    toolAbandonmentRecordedRef.current = false;
+    toolStartedAtRef.current = null;
+    executionStartedAtRef.current = null;
+    executionFinishedRef.current = false;
+    lastExecutionStartAtRef.current = 0;
+    toolViewedAtRef.current = Date.now();
   }, [tool.id, recordRecent]);
+
+  useEffect(() => {
+    const onExecutionResult = (event: Event) => {
+      const detail = (event as CustomEvent<{ toolId?: string; outcome?: string }>).detail;
+      if (detail?.toolId === tool.id && ["success", "failure", "cancelled"].includes(detail.outcome ?? "")) {
+        toolFinishedRef.current = true;
+        executionFinishedRef.current = true;
+      }
+    };
+    const reportAbandoned = () => {
+      if (!toolStartedRef.current || toolFinishedRef.current || toolAbandonmentRecordedRef.current) return;
+      toolAbandonmentRecordedRef.current = true;
+      const startedAt = toolStartedAtRef.current ?? toolViewedAtRef.current;
+      recordAnalyticsEvent({
+        name: "tool_abandoned",
+        toolId: tool.id,
+        outcome: "abandoned",
+        durationMs: Math.min(3600000, Math.max(0, Date.now() - startedAt)),
+        properties: { stage: "exit_without_recorded_result" },
+      });
+    };
+    window.addEventListener("env-tool-execution-result", onExecutionResult);
+    window.addEventListener("pagehide", reportAbandoned);
+    return () => {
+      reportAbandoned();
+      window.removeEventListener("env-tool-execution-result", onExecutionResult);
+      window.removeEventListener("pagehide", reportAbandoned);
+    };
+  }, [tool.id]);
 
   useEffect(() => {
     const syncFullscreen = () => {
@@ -167,13 +245,26 @@ export function ToolShell({
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
+        data-env-tool-id={tool.id}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
           : ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id) ? "env-tool-interface relative mt-6" : "env-tool-interface relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
         role={isFullscreen ? "dialog" : undefined}
         aria-modal={isFullscreen || undefined}
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
+        onClickCapture={(event) => {
+          const target = event.target;
+          if (!(target instanceof Element) || target.closest(".env-tool-fullscreen__toolbar")) return;
+          const action = target.closest("button,[role=button]");
+          if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
+          const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
+          if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label)) {
+            startToolExecution("action_button");
+          }
+        }}
+        onSubmitCapture={() => startToolExecution("form_submit")}
       >
+        <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
         {isMusicSandbox ? (
           <>
             {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
@@ -197,9 +288,11 @@ export function ToolShell({
             <div className="env-tool-fullscreen__content">{children}</div>
           </>
         ) : children}
+        </ToolExecutionTelemetryContext.Provider>
       </section>
 
       <AiAssistPanel toolId={tool.id} />
+      <ToolCommunityPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>

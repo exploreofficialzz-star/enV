@@ -229,7 +229,10 @@ try {
   const browserErrors = [];
   page.on("pageerror", (error) => browserErrors.push({ tool: "category index", type: "pageerror", message: error.message }));
   page.on("console", (message) => {
-    if (message.type() === "error") browserErrors.push({ tool: "category index", type: "console", message: message.text() });
+    if (message.type() === "error") browserErrors.push({ tool: "category index", type: "console", message: message.text(), url: message.location().url || null });
+  });
+  page.on("response", (response) => {
+    if (response.status() === 406) browserErrors.push({ tool: "category index", type: "http-response", status: 406, url: response.url(), resourceType: response.request().resourceType() });
   });
 
   const failures = [];
@@ -252,7 +255,10 @@ try {
     let currentTool = "unknown calculator";
     page.on("pageerror", (error) => browserErrors.push({ tool: currentTool, type: "pageerror", message: error.message }));
     page.on("console", (message) => {
-      if (message.type() === "error") browserErrors.push({ tool: currentTool, type: "console", message: message.text() });
+      if (message.type() === "error") browserErrors.push({ tool: currentTool, type: "console", message: message.text(), url: message.location().url || null });
+    });
+    page.on("response", (response) => {
+      if (response.status() === 406) browserErrors.push({ tool: currentTool, type: "http-response", status: 406, url: response.url(), resourceType: response.request().resourceType() });
     });
     while (true) {
     const i = nextIndex++;

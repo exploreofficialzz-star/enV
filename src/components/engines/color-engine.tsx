@@ -33,6 +33,7 @@ const DEFAULT_VISION_COLORS = [
 
 const CONVERTER_DEFAULTS: Record<string, string> = {
   "hex-converter": "#0d9f8a",
+  "hex-color-converter": "#0d9f8a",
   "rgb-converter": "rgb(13, 159, 138)",
   "hsl-converter": "hsl(172 85% 34%)",
   "hsv-converter": "hsv(172 92% 62%)",
@@ -208,7 +209,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     ? suggestContrastCorrections(foreground, background, target, canvas)
     : null;
 
-  const converterIds = ["hex-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter"];
+  const converterIds = ["hex-converter", "hex-color-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter"];
   if (toolId && converterIds.includes(toolId)) {
     const format = toolId.startsWith("hex") ? "HEX" : toolId.startsWith("rgb") ? "RGB" : toolId.startsWith("hsl") ? "HSL" : toolId.startsWith("hsv") ? "HSV / HSB" : "CMYK";
     return (

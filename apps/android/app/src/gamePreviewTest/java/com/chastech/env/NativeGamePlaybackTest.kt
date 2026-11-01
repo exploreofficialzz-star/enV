@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertNotNull
@@ -106,8 +107,45 @@ class NativeGamePlaybackTest {
         }
         val afterCapture = automation.executeShellCommand("screencap -p /sdcard/Download/env-game-after.png")
         ParcelFileDescriptor.AutoCloseInputStream(afterCapture).use { it.readBytes() }
+        val screenWidth = image.width
+        val screenHeight = image.height
+        assertTrue("Touch movement did not change the rendered scene; changed samples=$changed", changed > 25)
+        // The Godot runtime is isolated in :game_preview. Exit it before the test
+        // runner uninstalls the app, so the native graphics process releases EGL
+        // and its SurfaceView normally instead of being torn down by package cleanup.
+        val exitNode = automation.rootInActiveWindow
+            ?.findAccessibilityNodeInfosByText("Exit")
+            ?.firstOrNull()
+        val exitedByAccessibility = exitNode?.performAction(
+            android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+        ) == true
+        if (!exitedByAccessibility) {
+            val exitX = screenWidth * 92 / 100
+            val exitY = screenHeight * 10 / 100
+            val exitTap = automation.executeShellCommand("input tap $exitX $exitY")
+            ParcelFileDescriptor.AutoCloseInputStream(exitTap).use { it.readBytes() }
+        }
+        val previewDeadline = SystemClock.elapsedRealtime() + 15_000
+        var returnedToPreview = false
+        while (SystemClock.elapsedRealtime() < previewDeadline) {
+            // The preview is a Compose screen. Query its semantics tree directly:
+            // Android's global accessibility root can lag behind the task switch
+            // even after the preview Activity has resumed.
+            val previewVisible = runCatching {
+                compose.onNodeWithText("Play preset").assertIsDisplayed()
+            }.isSuccess
+            if (previewVisible) {
+                returnedToPreview = true
+                break
+            }
+            SystemClock.sleep(250)
+        }
+        assertTrue(
+            "Native game did not exit cleanly back to the preview screen before instrumentation cleanup",
+            returnedToPreview
+        )
+        println("Native game exited cleanly before instrumentation cleanup")
         image.recycle()
         after.recycle()
-        assertTrue("Touch movement did not change the rendered scene; changed samples=$changed", changed > 25)
     }
 }

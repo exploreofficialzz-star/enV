@@ -185,6 +185,7 @@ enum OfflineWalletNativeAPI {
     }
 
     static func synchronize(journal: OfflineWalletJournal, allowanceID: String, finalize: Bool = false) async throws -> String {
+        let syncStartedAt = Date()
         if finalize {
             let availability = await checkAvailability()
             guard availability.enabled && availability.code == "LOCAL_TEST_ONLY" else {
@@ -197,11 +198,37 @@ enum OfflineWalletNativeAPI {
         if try journal.pendingTransactionCount(allowanceID: allowanceID) == 0 && !finalize { return "No pending offline operations need synchronization." }
         let batch = try journal.buildSyncBatch(allowanceID: allowanceID, finalize: finalize)
         let body = try JSONEncoder().encode(batch)
-        let result = try await makeRequest(path: "api/billing/offline/sync", method: "POST", body: body, bearer: bearer)
+        let result: (Int, [String: Any])
+        do {
+            result = try await makeRequest(path: "api/billing/offline/sync", method: "POST", body: body, bearer: bearer)
+        } catch {
+            await NativeAnalyticsClient.record(
+                "offline_sync_failed",
+                outcome: "failure",
+                durationMs: Int(Date().timeIntervalSince(syncStartedAt) * 1000),
+                errorCode: "OFFLINE_NETWORK_FAILED"
+            )
+            throw error
+        }
         let (status, object) = result
         if (200...299).contains(status), object["ok"] as? Bool == true,
            let data = object["data"] as? [String: Any], let resultStatus = data["status"] as? String {
-            try journal.acknowledgeSyncBatch(allowanceID: allowanceID, batchID: batch.batchId, resultStatus: resultStatus)
+            do {
+                try journal.acknowledgeSyncBatch(allowanceID: allowanceID, batchID: batch.batchId, resultStatus: resultStatus)
+            } catch {
+                await NativeAnalyticsClient.record(
+                    "offline_sync_failed",
+                    outcome: "failure",
+                    durationMs: Int(Date().timeIntervalSince(syncStartedAt) * 1000),
+                    errorCode: "OFFLINE_LOCAL_ACK_FAILED"
+                )
+                throw error
+            }
+            await NativeAnalyticsClient.record(
+                "offline_sync_succeeded",
+                outcome: "success",
+                durationMs: Int(Date().timeIntervalSince(syncStartedAt) * 1000)
+            )
             if resultStatus == "reconciled" {
                 let accepted = (data["acceptedSubunits"] as? NSNumber)?.doubleValue ?? 0
                 let released = (data["releasedSubunits"] as? NSNumber)?.doubleValue ?? 0
@@ -213,12 +240,24 @@ enum OfflineWalletNativeAPI {
         let code = object["error"] as? String ?? ""
         if status == 409 && ["SEQUENCE_GAP", "CHECKPOINT_SEQUENCE_MISMATCH"].contains(code) {
             try journal.prepareRetryAfterRecoverableRejection(allowanceID: allowanceID, batchID: batch.batchId, reasonCode: code)
+            await NativeAnalyticsClient.record(
+                "offline_sync_failed",
+                outcome: "failure",
+                durationMs: Int(Date().timeIntervalSince(syncStartedAt) * 1000),
+                errorCode: "OFFLINE_RETRY_REQUIRED"
+            )
             return "The server requested a safe retry; local transaction records and spending counters were preserved."
         }
         if (status == 409 && ((object["data"] as? [String: Any])?["status"] as? String) == "needs_recovery") ||
             ["INVALID_DEVICE_SIGNATURE", "DEVICE_BINDING_MISMATCH", "INVALID_ALLOWANCE_TOKEN", "IDEMPOTENCY_CONFLICT", "OFFLINE_NEEDS_RECOVERY"].contains(code) {
             try journal.markNeedsRecovery(allowanceID: allowanceID)
         }
+        await NativeAnalyticsClient.record(
+            "offline_sync_failed",
+            outcome: "failure",
+            durationMs: Int(Date().timeIntervalSince(syncStartedAt) * 1000),
+            errorCode: code.range(of: "^[A-Z0-9_]{1,64}$", options: .regularExpression) != nil ? code : "OFFLINE_SYNC_REJECTED"
+        )
         throw OfflineWalletNativeAPIError.unavailable(object["message"] as? String ?? "Synchronization failed (HTTP \(status)); local records were preserved.")
     }
 }

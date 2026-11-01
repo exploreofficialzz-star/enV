@@ -420,7 +420,7 @@ add([
 
 add([
   ["color-picker","Color Picker","design","Pick a color and copy HEX, RGB, HSL, and HSV.","color","picker","color picker hex rgb",1,95],
-  ["hex-converter","HEX Color Converter","design","Convert HEX to RGB, HSL, and HSV.","color","hex","hex color",0,86],
+  ["hex-color-converter","HEX Color Converter","design","Convert HEX to RGB, HSL, and HSV.","color","hex","hex color",0,86],
   ["rgb-converter","RGB Color Converter","design","Convert RGB to HEX, HSL, and HSV.","color","rgb","rgb color",0,85],
   ["hsl-converter","HSL Color Converter","design","Convert HSL to HEX and RGB.","color","hsl","hsl color",0,80],
   ["hsv-converter","HSV Color Converter","design","Convert HSV to HEX and RGB.","color","hsv","hsv hsb color",0,74],

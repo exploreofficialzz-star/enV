@@ -4,7 +4,7 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, moveGradientStop, normalizeGradientStops, type CssGradientKind, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -204,7 +204,7 @@ function cssFor(
   gradientOverlay: { enabled: boolean; color: string; x: number; y: number } = { enabled: false, color: "#ffffff", x: 24, y: 20 },
 ) {
   if (family === "gradient") {
-    const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
+    const kind: CssGradientKind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
     const angle = numberValue(values, "angle", 135, 0, 360);
     const normalized = normalizeGradientStops(gradientStops);
     const position = `${numberValue(values, "centerX", 50, 0, 100)}% ${numberValue(values, "centerY", 50, 0, 100)}%`;

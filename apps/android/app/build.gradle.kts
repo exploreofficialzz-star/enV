@@ -13,6 +13,7 @@ android {
         minSdk = 26
         targetSdk = 36
         buildConfigField("String", "ENV_API_BASE_URL", "\"${providers.gradleProperty("ENV_API_BASE_URL").orNull ?: "https://env-q3mq.onrender.com"}\"")
+        buildConfigField("boolean", "ANALYTICS_ENABLED", providers.gradleProperty("envAnalyticsEnabled").orNull ?: "false")
         versionCode = 6
         versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

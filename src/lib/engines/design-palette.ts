@@ -1,4 +1,4 @@
-import { parseCssColor, rgbToHsl, toHex, type RgbaColor } from "./accessibility-color";
+import { parseCssColor, rgbToHsl, toHex, type RgbaColor } from "./accessibility-color.ts";
 
 export type PaletteExportFormat = "css" | "scss" | "tailwind" | "json" | "tokens";
 export type PaletteHarmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
@@ -130,6 +130,9 @@ export function buildDesignPaletteExport(
     const roleEntries = Object.fromEntries(Object.entries(normalized).filter(([name]) => name !== "primary").map(([name, value]) => [name, value]));
     return `export default {\n  theme: {\n    extend: {\n      colors: ${JSON.stringify({ primary, ...roleEntries }, null, 6).replace(/\n/g, "\n      ")}\n    }\n  }\n};`;
   }
+  if (format === "json") {
+    return JSON.stringify({ colors: normalized, primaryScale: scale }, null, 2);
+  }
   if (format === "tokens") {
     const tokens = {
       color: Object.fromEntries(Object.entries(normalized).map(([name, value]) => [name, { $type: "color", $value: value }])),
@@ -137,5 +140,5 @@ export function buildDesignPaletteExport(
     };
     return JSON.stringify(tokens, null, 2);
   }
-  return JSON.stringify({ colors: normalized, primaryScale: scale }, null, 2);
+  throw new Error("Unsupported palette export format.");
 }

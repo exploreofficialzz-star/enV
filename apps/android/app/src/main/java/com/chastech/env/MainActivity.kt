@@ -10,6 +10,7 @@ import com.chastech.env.ui.CharacterSpacedText as Text
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioFormat
@@ -83,9 +84,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -462,6 +465,9 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         item {
             Box(Modifier.fillMaxWidth().zIndex(if (homeSearchFocused && homeQuery.isNotBlank()) 1f else 0f), contentAlignment = Alignment.TopCenter) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (screenWidth >= 640) 20.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
+                NativeAnalyticsConsentPanel()
+                NativeProductUpdatesBanner()
+                NativeFeedbackEntry()
                 EnVLogo(Modifier.width(if (screenWidth >= 640) 163.dp else 142.dp).height(if (screenWidth >= 640) 64.dp else 56.dp), darkTheme = darkMode, homeHero = true)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val suggestionWidth = maxWidth
@@ -1021,6 +1027,12 @@ private fun ToolDetail(
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
     val context = LocalContext.current
+    LaunchedEffect(tool.id) {
+        if (BuildConfig.ANALYTICS_ENABLED) {
+            NativeAnalytics.record(context, "tool_viewed", tool.id)
+            runCatching { NativeAnalytics.flush(context) }
+        }
+    }
     val related = remember(catalog, tool) { catalog.relatedTools(tool, Int.MAX_VALUE) }
     val parentDeveloperStudio = remember(catalog, tool) { catalog.developerStudioForLegacyTool(tool) }
     var visibleRelatedCount by remember(tool.id) { mutableIntStateOf(6) }
@@ -1150,6 +1162,9 @@ private fun ToolDetail(
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             Text(tool.description, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(28.dp))
+            NativeToolCommunityPanel(tool.id)
+            Spacer(Modifier.height(28.dp))
             TextButton(
                 onClick = {
                     CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(
@@ -1195,21 +1210,29 @@ private fun NativeToolInterfaceContent(
     startInWorkspace: Boolean = false,
 ) {
     val context = LocalContext.current
-    when {
-        backend -> NativeBackendToolForm(tool, true)
-        supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
-        tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusPill("Coming soon")
-            Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val scope = rememberCoroutineScope()
+    val telemetry = remember(tool.id) {
+        NativeToolExecutionTelemetry(context.applicationContext, tool.id) {
+            scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } }
         }
-        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusPill("Web only")
-            Text("This tool is available in the Web product and is not executable natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = {
-                val url = Uri.Builder().scheme("https").authority("envtools.store")
-                    .appendPath("tools").appendPath(tool.category).appendPath(tool.slug).build()
-                context.startActivity(Intent(Intent.ACTION_VIEW, url))
-            }) { Text("Open in Web") }
+    }
+    CompositionLocalProvider(LocalNativeToolExecutionTelemetry provides telemetry) {
+        when {
+            backend -> NativeBackendToolForm(tool, true)
+            supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
+            tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill("Coming soon")
+                Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill("Web only")
+                Text("This tool is available in the Web product and is not executable natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = {
+                    val url = Uri.Builder().scheme("https").authority("android.envtools.store")
+                        .appendPath("tools").appendPath(tool.category).appendPath(tool.slug).build()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, url))
+                }) { Text("Open in Web") }
+            }
         }
     }
 }
@@ -3003,16 +3026,56 @@ private fun InputField(value: String, onValueChange: (String) -> Unit, label: St
     OutlinedTextField(value, onValueChange, modifier.fillMaxWidth().then(if (tall) Modifier.height(170.dp) else Modifier), label = { Text(label) }, placeholder = placeholder?.let { { Text(it) } }, minLines = minLines, singleLine = singleLine)
 }
 
+internal class NativeToolExecutionTelemetry(
+    private val context: Context,
+    private val toolId: String,
+    private val flush: () -> Unit,
+) {
+    private var startedAtMs: Long? = null
+    private var resultRecorded = false
+
+    @Synchronized fun start() {
+        startedAtMs = SystemClock.elapsedRealtime()
+        resultRecorded = false
+        NativeAnalytics.record(context, "tool_started", toolId)
+        flush()
+    }
+
+    @Synchronized fun finish(success: Boolean) {
+        val start = startedAtMs ?: return
+        if (resultRecorded) return
+        resultRecorded = true
+        val duration = (SystemClock.elapsedRealtime() - start).coerceIn(0L, 3_600_000L)
+        NativeAnalytics.record(
+            context,
+            if (success) "tool_completed" else "tool_failed",
+            toolId,
+            outcome = if (success) "success" else "failure",
+            durationMs = duration,
+            errorCode = if (success) null else "NATIVE_TOOL_FAILED",
+        )
+        flush()
+    }
+}
+
+internal val LocalNativeToolExecutionTelemetry = staticCompositionLocalOf<NativeToolExecutionTelemetry?> { null }
+
 @Composable
 private fun ActionRow(onRun: () -> Unit, onReset: () -> Unit) {
+    val telemetry = LocalNativeToolExecutionTelemetry.current
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onRun) { Text("Run") }
+        Button(onClick = { telemetry?.start(); onRun() }) { Text("Run") }
         Button(onClick = onReset) { Text("Reset") }
     }
 }
 
 @Composable
 private fun ResultBox(output: String, error: String, onCopy: (String) -> Unit) {
+    val telemetry = LocalNativeToolExecutionTelemetry.current
+    LaunchedEffect(telemetry, output, error) {
+        if (error.isNotEmpty()) telemetry?.finish(false)
+        else if (output.isNotEmpty()) telemetry?.finish(true)
+    }
     if (error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) { Text("Check your input: $error", color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(12.dp)) }
     if (output.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {

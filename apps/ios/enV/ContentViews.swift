@@ -1,5 +1,8 @@
 import SwiftUI
 import UIKit
+import Security
+import Network
+import Dispatch
 
 private func styledEnVUnit(_ label: String, unitSize: CGFloat) -> Text {
     var attributed = AttributedString(label)
@@ -14,6 +17,442 @@ struct Screen: ViewModifier {
         content
             .scrollContentBackground(.hidden)
             .background(Color.envSurface.ignoresSafeArea())
+    }
+}
+
+
+private struct NativeProductUpdate: Decodable, Identifiable {
+    let id: String
+    let slug: String
+    let title: String
+    let summary: String
+    let body: String
+    let type: String
+    let severity: String
+    let publishedAt: String
+    let expiresAt: String?
+    let minimumVersion: String?
+}
+private struct NativeProductUpdateFeed: Decodable {
+    let platform: String
+    let channel: String
+    let updates: [NativeProductUpdate]
+}
+private struct NativeProductUpdateEnvelope: Decodable {
+    let ok: Bool
+    let data: NativeProductUpdateFeed?
+}
+private enum NativeProductUpdatesClient {
+    private static var baseURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
+              let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else { return nil }
+        return url
+    }
+    static func load() async throws -> [NativeProductUpdate] {
+        guard let base = baseURL else { throw URLError(.badURL) }
+        var components = URLComponents(url: base.appendingPathComponent("api").appendingPathComponent("updates"), resolvingAgainstBaseURL: false)
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        components?.queryItems = [
+            URLQueryItem(name: "platform", value: "ios"),
+            URLQueryItem(name: "channel", value: "stable"),
+            URLQueryItem(name: "version", value: version),
+            URLQueryItem(name: "limit", value: "5")
+        ]
+        guard let url = components?.url else { throw URLError(.badURL) }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return [] }
+        let envelope = try JSONDecoder().decode(NativeProductUpdateEnvelope.self, from: data)
+        return envelope.ok ? (envelope.data?.updates ?? []) : []
+    }
+}
+struct NativeProductUpdatesBanner: View {
+    @AppStorage("env.product-updates.dismissed.v1") private var dismissedIDs = ""
+    @State private var updates: [NativeProductUpdate] = []
+    @State private var expanded = false
+    private var dismissed: Set<String> { Set(dismissedIDs.split(separator: "|").map(String.init)) }
+    private var current: NativeProductUpdate? { updates.first { !dismissed.contains($0.id) } }
+    var body: some View {
+        Group {
+            if let update = current {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "bell.badge")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.envAccent)
+                            .frame(width: 34, height: 34)
+                            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 9))
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                enVCharacterSpacedText(update.type.uppercased()).font(.envScaled(size: 10, weight: .semibold)).foregroundStyle(Color.envAccent)
+                                if update.severity == "warning" || update.severity == "critical" {
+                                    enVCharacterSpacedText(update.severity.uppercased()).font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envMuted)
+                                }
+                            }
+                            enVCharacterSpacedText(update.title).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk)
+                            enVCharacterSpacedText(update.summary).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        Button {
+                            var next = dismissed
+                            next.insert(update.id)
+                            dismissedIDs = next.sorted().joined(separator: "|")
+                        } label: {
+                            Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.envMuted).frame(width: 28, height: 28)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Dismiss product update")
+                    }
+                    if expanded {
+                        enVCharacterSpacedText(update.body).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envInk).fixedSize(horizontal: false, vertical: true).padding(.leading, 44)
+                    }
+                    HStack(spacing: 16) {
+                        Button(expanded ? "Show less" : "Read update") { expanded.toggle() }
+                            .font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        Link("All updates", destination: URL(string: "https://updates.envtools.store")!)
+                            .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
+                    }
+                    .padding(.leading, 44)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+            }
+        }
+        .task {
+            updates = (try? await NativeProductUpdatesClient.load()) ?? []
+            if !updates.isEmpty { NativeAnalyticsClient.record("update_viewed") }
+            try? await NativeAnalyticsClient.flush()
+        }
+    }
+}
+
+
+private enum NativeAnalyticsKeychain {
+    private static let service = "com.chastech.env.analytics"
+    static let subjectAccount = "installation-subject"
+    static let queueAccount = "pending-events"
+    static let revokeAccount = "pending-revocation"
+
+    static func read(account: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func write(_ value: String, account: String) -> Bool {
+        let data = Data(value.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+        guard updateStatus == errSecItemNotFound else { return false }
+        var added = query
+        attributes.forEach { added[$0.key] = $0.value }
+        let addStatus = SecItemAdd(added as CFDictionary, nil)
+        if addStatus == errSecDuplicateItem {
+            return SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecSuccess
+        }
+        return addStatus == errSecSuccess
+    }
+
+    static func remove(account: String) {
+        SecItemDelete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ] as CFDictionary)
+    }
+}
+
+@MainActor
+enum NativeAnalyticsClient {
+    private static let defaults = UserDefaults.standard
+    private static let policyVersion = "2026-10-30.v1"
+    private static let choiceKey = "env.analytics.choice.v1"
+    private static let queueKey = "env.analytics.queue.v1"
+    private static let revokeKey = "env.analytics.revoke.v1"
+    private static let maxQueue = 25
+    private static let sessionID = UUID().uuidString.lowercased()
+    private static let networkQueue = DispatchQueue(label: "com.chastech.env.analytics.network")
+    private static var networkMonitor: NWPathMonitor?
+    private static var networkOnline: Bool?
+    private static var networkType = "unknown"
+
+    private static func startNetworkMonitor() {
+        guard networkMonitor == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            let online = path.status == .satisfied
+            let kind = path.usesInterfaceType(.wifi) ? "wifi"
+                : path.usesInterfaceType(.cellular) ? "cellular"
+                : path.usesInterfaceType(.wiredEthernet) ? "ethernet"
+                : "unknown"
+            Task { @MainActor in
+                networkOnline = online
+                networkType = kind
+            }
+        }
+        networkMonitor = monitor
+        monitor.start(queue: networkQueue)
+    }
+
+    private static func readQueue() -> [[String: Any]] {
+        if let raw = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.queueAccount),
+           let data = raw.data(using: .utf8),
+           let queue = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            return queue
+        }
+        if let legacy = defaults.array(forKey: queueKey) as? [[String: Any]] {
+            if writeQueue(legacy) {
+                defaults.removeObject(forKey: queueKey)
+                return legacy
+            }
+            return legacy
+        }
+        return []
+    }
+
+    private static func writeQueue(_ queue: [[String: Any]]) -> Bool {
+        guard let data = try? JSONSerialization.data(withJSONObject: queue),
+              let value = String(data: data, encoding: .utf8) else { return false }
+        return NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.queueAccount)
+    }
+
+    private static func readPendingRevocation() -> String? {
+        NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.revokeAccount)
+            ?? defaults.string(forKey: revokeKey)
+    }
+
+    private static func storePendingRevocation(_ value: String) {
+        if NativeAnalyticsKeychain.write(value, account: NativeAnalyticsKeychain.revokeAccount) {
+            defaults.removeObject(forKey: revokeKey)
+        } else {
+            // Retain a retryable fallback rather than losing a pending withdrawal.
+            defaults.set(value, forKey: revokeKey)
+        }
+    }
+
+    private static func clearPendingRevocation() {
+        NativeAnalyticsKeychain.remove(account: NativeAnalyticsKeychain.revokeAccount)
+        defaults.removeObject(forKey: revokeKey)
+    }
+
+    static var isEnabled: Bool {
+        (Bundle.main.object(forInfoDictionaryKey: "ENV_ANALYTICS_ENABLED") as? Bool) == true
+    }
+    static var choice: String { defaults.string(forKey: choiceKey) ?? "unset" }
+    private static var baseURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
+              let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https", url.host != nil else { return nil }
+        return url
+    }
+
+    static func start() async {
+        startNetworkMonitor()
+        if isEnabled && choice == "granted" { record("app_opened") }
+        // Consent withdrawal retries even when this app build has collection disabled.
+        try? await flush()
+    }
+
+    static func chooseConsent(granted: Bool) async throws {
+        if granted && !isEnabled {
+            throw NSError(domain: "enVAnalytics", code: 503, userInfo: [NSLocalizedDescriptionKey: "Analytics is not enabled in this app build."])
+        }
+        let oldSubject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount)
+        let subject = oldSubject ?? UUID().uuidString.lowercased()
+        if granted {
+            // Keep the local revocation identifier before the server records consent.
+            guard NativeAnalyticsKeychain.write(subject, account: NativeAnalyticsKeychain.subjectAccount) else {
+                throw NSError(domain: "enVAnalytics", code: Int(errSecNotAvailable), userInfo: [NSLocalizedDescriptionKey: "Secure device storage is unavailable. Analytics consent was not enabled."])
+            }
+            try await postConsent(subject, granted: true)
+            defaults.set("granted", forKey: choiceKey)
+            clearPendingRevocation()
+            record("app_opened")
+            try await flush()
+        } else {
+            defaults.set("denied", forKey: choiceKey)
+            _ = writeQueue([])
+            defaults.removeObject(forKey: queueKey)
+            if oldSubject != nil {
+                do {
+                    try await postConsent(subject, granted: false)
+                    clearPendingRevocation()
+                } catch {
+                    storePendingRevocation(subject)
+                }
+            }
+            NativeAnalyticsKeychain.remove(account: NativeAnalyticsKeychain.subjectAccount)
+        }
+    }
+
+    static func record(_ name: String, toolID: String? = nil, outcome: String = "unknown", durationMs: Int? = nil, errorCode: String? = nil) {
+        startNetworkMonitor()
+        guard isEnabled, choice == "granted", NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) != nil else { return }
+        let allowed = Set(["app_opened", "tool_viewed", "tool_started", "tool_completed", "tool_failed", "tool_cancelled", "tool_abandoned", "feedback_submitted", "comment_created", "reaction_created", "update_viewed", "offline_sync_succeeded", "offline_sync_failed"])
+        guard allowed.contains(name) else { return }
+        var event: [String: Any] = [
+            "eventId": UUID().uuidString.lowercased(),
+            "name": name,
+            "occurredAt": ISO8601DateFormatter().string(from: Date()),
+            "outcome": outcome,
+            "isOffline": networkOnline == false,
+            "networkType": networkType,
+            "networkEffectiveType": "unknown",
+            "deviceClass": UIDevice.current.userInterfaceIdiom == .pad ? "tablet" : "phone",
+            "appVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+            "properties": ["surface": "native"]
+        ]
+        if let toolID { event["toolId"] = toolID }
+        if let durationMs, (0...3_600_000).contains(durationMs) { event["durationMs"] = durationMs }
+        if let errorCode, errorCode.range(of: "^[A-Z0-9_]{1,64}$", options: .regularExpression) != nil { event["errorCode"] = errorCode }
+        var queue = readQueue()
+        queue.append(event)
+        _ = writeQueue(Array(queue.suffix(maxQueue)))
+    }
+
+    static func flush() async throws {
+        // A previously accepted consent decision can always be withdrawn,
+        // regardless of whether analytics collection is enabled in this build.
+        if let pending = readPendingRevocation() {
+            do {
+                try await postConsent(pending, granted: false)
+                clearPendingRevocation()
+            } catch { /* Retry the revocation next time the app becomes active. */ }
+        }
+        guard isEnabled, choice == "granted", let subject = NativeAnalyticsKeychain.read(account: NativeAnalyticsKeychain.subjectAccount) else { return }
+        let queue = readQueue()
+        guard !queue.isEmpty else { return }
+        let batch = Array(queue.prefix(maxQueue))
+        guard let baseURL else { throw URLError(.badURL) }
+        let url = baseURL.appendingPathComponent("api").appendingPathComponent("analytics").appendingPathComponent("events")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(sessionID, forHTTPHeaderField: "x-env-analytics-session")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "subjectId": subject, "platform": "ios", "policyVersion": policyVersion, "events": batch
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        let envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard (200...299).contains(http.statusCode), envelope?["ok"] as? Bool == true else {
+            throw NSError(domain: "enVAnalytics", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: envelope?["message"] as? String ?? "Analytics events were not accepted."])
+        }
+        _ = writeQueue(Array(queue.dropFirst(batch.count)))
+    }
+
+    private static func postConsent(_ subject: String, granted: Bool) async throws {
+        guard let baseURL else { throw URLError(.badURL) }
+        let url = baseURL.appendingPathComponent("api").appendingPathComponent("analytics").appendingPathComponent("consent")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "subjectId": subject, "platform": "ios", "granted": granted, "policyVersion": policyVersion
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        let envelope = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard (200...299).contains(http.statusCode), envelope?["ok"] as? Bool == true else {
+            throw NSError(domain: "enVAnalytics", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: envelope?["message"] as? String ?? "The analytics preference could not be saved."])
+        }
+    }
+}
+
+private struct NativeAnalyticsConsentPanel: View {
+    @AppStorage("env.analytics.choice.v1") private var choice = "unset"
+    @State private var expanded = false
+    @State private var busy = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if NativeAnalyticsClient.isEnabled || choice != "unset" {
+                VStack(alignment: .leading, spacing: 9) {
+                    if choice == "unset" || expanded {
+                        enVCharacterSpacedText(NativeAnalyticsClient.isEnabled ? "Help improve enV" : "Analytics is disabled in this app version")
+                            .font(.envScaled(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.envInk)
+                        enVCharacterSpacedText(NativeAnalyticsClient.isEnabled ? "Optional analytics records tool activity, outcomes and approximate device categories. We do not collect your files, text you enter, search queries or tool output. Nothing is sent until you choose Allow." : "Analytics collection is disabled in this app version. You can withdraw a previously saved analytics choice here.")
+                            .font(.envScaled(size: 11, weight: .regular))
+                            .foregroundStyle(Color.envMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let errorMessage {
+                            enVCharacterSpacedText(errorMessage).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(.red)
+                        }
+                        HStack(spacing: 8) {
+                            if NativeAnalyticsClient.isEnabled {
+                                Button { Task { await decide(true) } } label: {
+                                enVCharacterSpacedText(busy ? "Saving…" : "Allow analytics")
+                                    .font(.envScaled(size: 11, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 13).padding(.vertical, 9)
+                                    .background(Color.envAccent, in: Capsule())
+                            }
+                                .disabled(busy)
+                            }
+                            Button { Task { await decide(false) } } label: {
+                                enVCharacterSpacedText("No thanks").font(.envScaled(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color.envInk).padding(.horizontal, 13).padding(.vertical, 9)
+                                    .overlay(Capsule().stroke(Color.envBorder, lineWidth: 1))
+                            }
+                            .disabled(busy)
+                            if choice != "unset" {
+                                Button("Close") { expanded = false }.font(.envScaled(size: 11, weight: .medium))
+                            }
+                        }
+                    } else {
+                        HStack {
+                            enVCharacterSpacedText(!NativeAnalyticsClient.isEnabled ? "Analytics collection is disabled" : choice == "granted" ? "Analytics is enabled" : "Analytics is disabled")
+                                .font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
+                            Spacer()
+                            Button("Privacy choices") { expanded = true }.font(.envScaled(size: 11, weight: .semibold)).foregroundStyle(Color.envAccent)
+                        }
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                .task { await NativeAnalyticsClient.start() }
+            }
+        }
+    }
+
+    @MainActor
+    private func decide(_ granted: Bool) async {
+        busy = true
+        errorMessage = nil
+        defer { busy = false }
+        do {
+            try await NativeAnalyticsClient.chooseConsent(granted: granted)
+            choice = granted ? "granted" : "denied"
+            expanded = false
+        } catch { errorMessage = error.localizedDescription }
     }
 }
 
@@ -50,6 +489,15 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     VStack(alignment: .center, spacing: horizontalSizeClass == .regular ? 20 : 16) {
+                        NativeAnalyticsConsentPanel()
+                        NativeProductUpdatesBanner()
+                        Link(destination: URL(string: "https://feedback.envtools.store")!) {
+                            Label("Send feedback to enV", systemImage: "bubble.left.and.bubble.right")
+                                .font(.envScaled(size: 12, weight: .medium))
+                                .foregroundStyle(Color.envAccent)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
                         EnVLogo(homeHero: true).frame(width: horizontalSizeClass == .regular ? 163 : 142, height: horizontalSizeClass == .regular ? 64 : 56)
                         HStack(spacing: 16) {
                             EnVLogo().frame(width: 56, height: 36)

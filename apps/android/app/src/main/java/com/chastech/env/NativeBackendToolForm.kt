@@ -36,6 +36,7 @@ private val DOCUMENT_MIME_TYPES = arrayOf(
 fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val telemetry = LocalNativeToolExecutionTelemetry.current
     val isDocument = tool.engine.type == "document-backend"
     val operation = tool.engine.extras["op"] ?: tool.engine.id ?: tool.id
     val allowsMultipleDocuments = Regex("merger|comparison|splitter").containsMatchIn(operation)
@@ -133,6 +134,7 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                         error = "Choose the document or file required by this tool."
                         return@Button
                     }
+                    telemetry?.start()
                     working = true
                     output = ""
                     bytes = null
@@ -156,10 +158,12 @@ fun NativeBackendToolForm(tool: ToolRecord, backend: Boolean) {
                                 } else {
                                     result.text ?: "Output ready: ${result.fileName ?: tool.id}"
                                 }
+                                telemetry?.finish(true)
                             },
                             { caught ->
                                 error = caught.message ?: "Tool failed"
                                 output = ""
+                                telemetry?.finish(false)
                             },
                         )
                         working = false

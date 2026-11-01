@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
+import { PrivacyControls } from "@/components/layout/privacy-controls";
 
 export const Route = createFileRoute("/privacy")({ component: Privacy });
 
@@ -40,6 +41,29 @@ function Privacy() {
         <h2 className="text-lg font-semibold text-fg">Cookies, sessions, and account requests</h2>
         <p>Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. These are not the same as a marketing-cookie profile.</p>
         <p>If you have used a sign-in-enabled deployment and want to ask about, correct, or delete account information, email <a className="text-accent underline underline-offset-4" href="mailto:envtoolkit@gmail.com">envtoolkit@gmail.com</a>. Information stored only on your device can generally be removed by clearing that browser’s site data or the app’s local data.</p>
+      </section>
+
+      <PrivacyControls />
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold text-fg">Optional analytics</h2>
+        <p>When enabled and only after you opt in, enV may collect a limited set of events such as app opened, tool viewed, first interaction, completion, failure, cancellation and offline synchronization outcomes. Allowed metadata can include a tool catalogue ID, approximate device class, browser family, network category, application version, duration and short machine-readable error code. Analytics does not collect file contents, tool input, generated output, search terms, passwords, payment details, full page URLs or raw IP addresses.</p>
+        <p>The Web client keeps a bounded event queue in local storage and sends it when online. Android and iOS keep separate bounded native queues. You can withdraw consent above; withdrawal immediately stops new local collection and clears the pending local queue. When connectivity is available, the client sends a server revocation. Previously collected raw events are removed under the published retention process; daily aggregate history may remain without individual installation or session identifiers.</p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold text-fg">Community and public content</h2>
+        <p>Comments, replies, chosen display labels, reactions, reports and blocks are stored as community records. Other users can see visible comments and selected display labels. Choosing “Anonymous” hides your display label from the public feed, but the service keeps a private pseudonymous abuse-prevention identifier so blocking, reporting and moderation can work. You can remove your own visible comments from the tool discussion. Moderators may hide or remove reported content.</p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold text-fg">Private product feedback</h2>
+        <p>Feedback submitted through the feedback form is a private developer ticket, not a public comment. The report can include its category, platform, optional tool ID and app version, title and description. The form does not ask for your email address. Do not include passwords, authentication tokens, payment details or sensitive personal information. Resolved and closed tickets are scheduled for deletion under the stated retention period.</p>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold text-fg">Service updates</h2>
+        <p>Update dismissals are stored locally on your device. The public update feed returns published notices for the platform and release channel you request. Viewing a notice does not automatically enroll you in marketing communications or push notifications.</p>
       </section>
 
       <section className="space-y-2">

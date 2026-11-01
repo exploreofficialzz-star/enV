@@ -29,6 +29,9 @@
 	<dict/>
 	<key>ENV_API_BASE_URL</key>
 	<string>$(ENV_API_BASE_URL)</string>
+	<!-- Opt-in analytics UI remains disabled unless the native release explicitly enables it. -->
+	<key>ENV_ANALYTICS_ENABLED</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>enV uses the camera only when you start a QR/barcode scan or a live video music performance recording. Scanning is processed on this device.</string>
 	<key>NSMicrophoneUsageDescription</key>

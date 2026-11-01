@@ -224,7 +224,7 @@ assert.match(android, /LaunchedEffect\(selected\?\.id\)[\s\S]*?favorites\.record
 assert.match(androidStore, /private val recentKey = "recent_tool_ids"/);
 assert.match(androidStore, /fun recordRecent\(toolId: String\): List<String>/);
 assert.match(androidStore, /\.filterNot \{ it == toolId \}.*\.take\(24\)/s);
-assert.match(iosTools, /\.onAppear \{ store\.recordRecent\(tool\.id\) \}/);
+assert.match(iosTools, /\.onAppear\s*\{\s*store\.recordRecent\(tool\.id\)[\s\S]*?\}\s*\.fullScreenCover/);
 assert.match(iosCatalog, /@Published private\(set\) var recentIDs: \[String\]/);
 assert.match(iosCatalog, /func recordRecent\(_ toolID: String\)/);
 assert.match(iosCatalog, /\.prefix\(24\)/);
@@ -281,12 +281,12 @@ assert.match(android, /catalog\.webSearch\(value, limit = 8, includeRelatedRefer
 assert.match(android, /\(catalog\.tools \+ catalog\.relatedReferenceTools\)\.filter \{ it\.id in favorites \}/);
 assert.match(androidCatalog, /\(tools \+ relatedReferenceTools\)\.asSequence\(\)/);
 assert.ok(android.includes("NativeCopy.isWebRuntimeOnly(tool.id)") && android.includes('Text("Web only"'), "Android discovery labels retained browser-only tools");
-assert.match(android, /authority\("envtools\.store"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
+assert.match(android, /authority\("android.envtools\.store"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
 assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\)/);
 assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
 assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)(?: \+ catalog\.developerStudioTools\(\))?\)\.filter \{ favoriteIDs\.contains/);
 assert.match(iosCatalog, /catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)/);
-assert.ok(iosTools.includes("https://envtools.store/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
+assert.ok(iosTools.includes("https://ios.envtools.store/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
 assert.match(iosContent, /NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
 assert.match(android, /private fun nativeSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);
 assert.match(android, /private fun nativeBackendSupported\(tool: ToolRecord\): Boolean = !NativeCopy\.isWebRuntimeOnly\(tool\.id\)/);

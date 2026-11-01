@@ -12,7 +12,7 @@ const GROUPS = [
     title: "Color & palettes",
     description: "Pick colors, convert formats and build coordinated palettes.",
     icon: Palette,
-    ids: ["color-picker", "hex-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter", "palette-generator"],
+    ids: ["color-picker", "hex-color-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter", "palette-generator"],
   },
   {
     id: "effects",

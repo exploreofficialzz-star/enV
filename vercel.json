@@ -1,6 +1,20 @@
 {
   "installCommand": "npm ci --no-audit --no-fund",
   "buildCommand": "npm run build",
+  "crons": [
+    {
+      "path": "/api/analytics/retention",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/feedback/retention",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/community/retention",
+      "schedule": "30 3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -35,6 +49,78 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "android.envtools.store"
+        }
+      ],
+      "destination": "/platform/android"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "ios.envtools.store"
+        }
+      ],
+      "destination": "/platform/ios"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "feedback.envtools.store"
+        }
+      ],
+      "destination": "/feedback"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "updates.envtools.store"
+        }
+      ],
+      "destination": "/updates"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "userbehavior.envtools.store"
+        }
+      ],
+      "destination": "/userbehavior"
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "feedback.envtools.store"
+        }
+      ],
+      "destination": "/developer"
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "updates.envtools.store"
+        }
+      ],
+      "destination": "/developer"
     }
   ]
 }
