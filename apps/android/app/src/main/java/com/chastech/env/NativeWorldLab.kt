@@ -30,11 +30,6 @@ import com.chastech.env.engine.NativeWorldLabDemoCheckpoint
 import com.chastech.env.engine.NativeWorldLabDemoCheckpointCodec
 import com.chastech.env.engine.nextWorldLabEventTime
 import com.chastech.env.engine.advanceWorldLabEventTime
-private data class NativeWorldLabDemoRecording(
-    val clockRun:NativeWorldLabRecordedRun,
-    val samples:List<NativeLabResult>
-)
-
 import com.chastech.env.engine.NativeWorldLabRecordedRun
 import com.chastech.env.engine.NativeWorldLabRecordedClock
 import com.chastech.env.engine.NativeWorldLabRecordedTime
@@ -82,6 +77,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private data class NativeWorldLabDemoRecording(
+    val clockRun:NativeWorldLabRecordedRun,
+    val samples:List<NativeLabResult>
+)
 
 private data class NativeWorldLabImportResult(
     val projectJson:String,val project:NativeWorldLabProject,
