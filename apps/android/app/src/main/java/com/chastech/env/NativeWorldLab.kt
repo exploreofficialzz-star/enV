@@ -17,6 +17,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.NativeLabInput
+import com.chastech.env.engine.NativeWorldLabBranch
+import com.chastech.env.engine.NativeWorldLabBranchRecord
+import com.chastech.env.engine.toJson
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabEditHistory
@@ -92,6 +95,11 @@ fun NativeWorldLabForm() {
     var diffusivity by remember { mutableFloatStateOf(0.02f) }
     var inside by remember { mutableStateOf(false) }
     var timelineStatus by remember { mutableStateOf("") }
+    var branchSourceInput by remember { mutableStateOf<NativeLabInput?>(null) }
+    var branchSourceRunId by remember { mutableStateOf("") }
+    var branchSourceTime by remember { mutableFloatStateOf(0f) }
+    var branchRecord by remember { mutableStateOf<NativeWorldLabBranchRecord?>(null) }
+    var branchStatus by remember { mutableStateOf("") }
     var pendingTimelineJson by remember { mutableStateOf<String?>(null) }
     var inspection by remember { mutableStateOf(com.chastech.env.engine.NativeInspectionSettings()) }
     var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
@@ -200,6 +208,25 @@ fun NativeWorldLabForm() {
         NativeWorldLabScience.evaluate(model,time.toDouble())
     } }
     val observation=result.getOrNull()
+    fun captureBranchSource(){
+        branchSourceInput=model
+        branchSourceRunId=java.util.UUID.randomUUID().toString()
+        branchSourceTime=time
+        branchRecord=null
+        branchStatus="Source snapshot captured. Change a model or parameter, then calculate a new branch."
+    }
+    fun calculateNativeBranch(){
+        val source=branchSourceInput?:return
+        runCatching{
+            val record=NativeWorldLabBranch.create(source,model,branchSourceTime.toDouble(),
+                branchSourceRunId,java.time.Instant.now().toString())
+            NativeWorldLabBranch.recompute(model,record)
+            branchRecord=record
+            time=branchSourceTime
+            playing=false;reversePlayback=false
+            branchStatus="New branch recomputed from the source time. The captured source inputs remain unchanged."
+        }.onFailure{branchStatus=it.message?:"The requested branch could not be calculated safely."}
+    }
     val solid=project?.entities?.getOrNull(selected)
     val material=project?.materials?.firstOrNull { it.id==solid?.materialId }
     val derivedMass=if(solid!=null && material?.densityKgM3!=null)
@@ -411,6 +438,20 @@ fun NativeWorldLabForm() {
                     ?:error("Cannot write timeline checkpoint")
             }}.onSuccess{timelineStatus="Reference experiment checkpoint saved."}
                 .onFailure{timelineStatus=it.message?:"Timeline checkpoint export failed."}}
+        }
+    }
+    val branchExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        val record=branchRecord
+        if(uri!=null&&record!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=record.toJson().toByteArray(Charsets.UTF_8)
+                require(bytes.size<=64*1024){"Branch evidence exceeds 64 KB"}
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(bytes);it.flush()
+                }?:error("Cannot open experiment branch export destination")
+            }}.onSuccess{branchStatus="Versioned branch evidence exported."}
+                .onFailure{branchStatus=it.message?:"Branch evidence export failed."}
         }
     }
     val timelineImportPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
@@ -1644,6 +1685,30 @@ fun NativeWorldLabForm() {
             Text("Thermal diffusivity: "+labNumber(diffusivity.toDouble())+" m²/s")
             Slider(value=diffusivity,onValueChange={diffusivity=it;playing=false},valueRange=0.001f..0.08f)
         }
+        HorizontalDivider()
+        Text("Experiment branches",style=MaterialTheme.typography.titleMedium)
+        Text("Capture the current model inputs as an immutable source, edit inputs, then calculate a separate child run at the same simulation time. Rewind remains cached playback only.",
+            style=MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            OutlinedButton(onClick={captureBranchSource}){Text("Capture source")}
+            OutlinedButton(onClick={calculateNativeBranch},
+                enabled=branchSourceInput!=null&&branchSourceInput!=model){Text("Calculate new branch")}
+        }
+        branchRecord?.let{branch->
+            Text("Branch "+branch.branchId+" · "+branch.sourceModelId+" → "+branch.targetModelId,
+                style=MaterialTheme.typography.bodySmall)
+            Text("Source run "+branch.sourceRunId+" · "+branch.inputDiff.size+" changed inputs · "+
+                branch.targetTimeSeconds+" s · "+branch.fidelity,style=MaterialTheme.typography.bodySmall)
+            branch.inputDiff.forEach{change->
+                Text(change.field+": "+(change.previous?.let{labNumber(it)}?:"unset")+
+                    " → "+(change.next?.let{labNumber(it)}?:"unset"),
+                    style=MaterialTheme.typography.bodySmall)
+            }
+            OutlinedButton(onClick={branchExportPicker.launch("world-lab-native-branch.json")}){
+                Text("Export branch evidence")
+            }
+        }
+        if(branchStatus.isNotBlank())Text(branchStatus,style=MaterialTheme.typography.bodySmall)
         Text("Computed observations",style=MaterialTheme.typography.titleMedium)
         if(observation==null) Text(result.exceptionOrNull()?.message?:"Unsupported input",
             color=MaterialTheme.colorScheme.error)
