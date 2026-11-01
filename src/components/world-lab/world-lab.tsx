@@ -51,6 +51,7 @@ import { calculateHydrostatics,type HydrostaticResult } from "@/lib/world-lab/hy
 import {runFluidMotion,sampleFluidMotion,type FluidMotionRun}
   from "@/lib/world-lab/fluid-motion";
 import { WorldLabFluidCutaway } from "./fluid-cutaway";
+import { WorldLabVehiclePanel } from "./vehicle-panel";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
@@ -2431,6 +2432,7 @@ export default function WorldLab() {
           remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
           ?remoteJob.status:null}
         onCloudVerify={()=>{void submitRemoteJob("exhaustive-logic");}}/>
+      <WorldLabVehiclePanel project={project}/>
       <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
         <h3 className="text-sm font-semibold">Connect electricity</h3>
         <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>
