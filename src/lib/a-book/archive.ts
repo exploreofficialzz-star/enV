@@ -234,3 +234,46 @@ export async function readABookArchive(file: Blob): Promise<ABookArchiveData> {
   }
   return { notes, revisions, attachments };
 }
+
+
+export function parseABookLegacyNotesJson(source: string): ABookNote[] {
+  if (!source || new TextEncoder().encode(source).byteLength > MAX_ARCHIVE_BYTES) {
+    fail("Choose a non-empty A book JSON backup smaller than 180 MB.");
+  }
+  let payload: unknown;
+  try { payload = JSON.parse(source); }
+  catch { fail("The A book JSON backup is not valid JSON."); }
+  if (!isRecord(payload) || payload.format !== "env.abook.notes.v1" || !Array.isArray(payload.notes)) {
+    fail("This file is not a supported A book notes export.");
+  }
+  if (payload.notes.length > MAX_NOTES) fail("The backup contains too many notes.");
+  const seen = new Set<string>();
+  const now = Date.now();
+  return payload.notes.map((raw): ABookNote => {
+    if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id.trim() || raw.id.length > 180
+      || typeof raw.title !== "string" || raw.title.length > 10_000
+      || typeof raw.body !== "string" || raw.body.length > 5_000_000
+      || (raw.notebook !== undefined && (typeof raw.notebook !== "string" || raw.notebook.length > 500))
+      || !Array.isArray(raw.tags) || raw.tags.length > 50
+      || !raw.tags.every((tag) => typeof tag === "string" && tag.length <= 200)
+      || (raw.pinned !== undefined && typeof raw.pinned !== "boolean")
+      || (raw.archived !== undefined && typeof raw.archived !== "boolean")) {
+      fail("The backup contains an invalid note record.");
+    }
+    if (seen.has(raw.id)) fail("The backup contains duplicate note IDs.");
+    seen.add(raw.id);
+    return {
+      id: raw.id,
+      title: raw.title,
+      body: raw.body,
+      notebook: typeof raw.notebook === "string" && raw.notebook.trim() ? raw.notebook : "Imported",
+      tags: raw.tags as string[],
+      pinned: raw.pinned === true,
+      archived: raw.archived === true,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      revision: 0,
+    };
+  });
+}
