@@ -59,7 +59,8 @@ fun NativeWorldLabMultiSpherePanel(
         while(playing){
             delay(40)
             val active=run?:break
-            time=(time+0.04f*rate).coerceAtMost(active.durationSeconds.toFloat())
+            time=nextWorldLabEventTime(time.toDouble(),0.04,rate.toDouble(),
+                active.durationSeconds,active.events.map{it.atSeconds}).toFloat()
             if(time>=active.durationSeconds.toFloat())playing=false
         }
     }
@@ -153,13 +154,34 @@ fun NativeWorldLabMultiSpherePanel(
                 String.format("%.4f",event.atSeconds)+" s")
         }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-            OutlinedButton(onClick={playing=!playing}){
-                Text(if(playing)"Pause group" else "Play group")
+            OutlinedButton(onClick={playing=false;time=0f}){Text("Beginning")}
+            OutlinedButton(onClick={
+                playing=false
+                time=active.events.lastOrNull{it.atSeconds<time.toDouble()-1e-8}
+                    ?.atSeconds?.toFloat()?:0f
+            },enabled=active.events.any{it.atSeconds<time.toDouble()-1e-8}){
+                Text("Previous contact")
             }
-            OutlinedButton(onClick={playing=false;time=0f}){Text("Reset group")}
+            OutlinedButton(onClick={playing=!playing}){
+                Text(if(playing)"Pause" else "Play")
+            }
+            OutlinedButton(onClick={
+                playing=false
+                time=active.events.firstOrNull{it.atSeconds>time.toDouble()+1e-8}
+                    ?.atSeconds?.toFloat()?:active.durationSeconds.toFloat()
+            }){
+                Text("Next contact")
+            }
+            OutlinedButton(onClick={playing=false;time=active.durationSeconds.toFloat()}){
+                Text("End")
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             OutlinedButton(onClick={rate=if(rate==0.1f)1f else if(rate==1f)4f else 0.1f}){
                 Text(String.format("%.1f",rate)+"×")
             }
+            Text("Playback stops at every computed contact event.",
+                style=MaterialTheme.typography.bodySmall)
         }
         OutlinedButton(onClick={export.launch("world-lab-multi-sphere-evidence.json")}){
             Text("Export group evidence")
