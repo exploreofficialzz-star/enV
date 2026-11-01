@@ -1,5 +1,5 @@
 import type {LabRun,ModelSample} from "./model.ts";
-const finite=(n:number)=>typeof n==="number"&&Number.isFinite(n);
+const finite=(n:unknown):n is number=>typeof n==="number"&&Number.isFinite(n);
 function bounded(n:number,min:number,max:number,label:string){if(!finite(n)||n<min||n>max)throw new Error(label+" is outside the recorded timeline.");}
 export type RecordedTimelineCheckpoint=Readonly<{format:"env-world-lab-time-checkpoint";schemaVersion:1;runId:string;modelId:string;modelVersion:string;worldDateUTC:string;simulatedSeconds:number;sampleIndex:number;seed:null;eventQueue:readonly never[];state:ModelSample;}>;
 export function stepRecordedTime(run:LabRun,timeSeconds:number,direction:-1|1):number{bounded(timeSeconds,0,run.time.simulatedDurationSeconds,"Playback position");const nearest=Math.round(timeSeconds/run.time.solverStepSeconds);const index=Math.max(0,Math.min(run.samples.length-1,nearest+direction));return run.samples[index].simulatedSeconds;}

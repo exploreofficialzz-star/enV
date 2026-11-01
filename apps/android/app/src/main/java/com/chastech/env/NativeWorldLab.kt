@@ -21,6 +21,9 @@ import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabEditHistory
 import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabDemoCheckpoint
+import com.chastech.env.engine.NativeWorldLabDemoCheckpointCodec
+import com.chastech.env.engine.nextWorldLabEventTime
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
 import com.chastech.env.engine.NativeChemicalThermalResult
@@ -1534,20 +1537,6 @@ fun NativeWorldLabForm() {
         Canvas(Modifier.fillMaxWidth().height(170.dp)
             .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
             .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
-            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-            OutlinedButton(onClick={
-                runCatching{
-                    pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
-                        NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
-                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble()))
-                    timelineExportPicker.launch("world-lab-time-checkpoint.json")
-                }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
-            }){Text("Save checkpoint")}
-            OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
-                Text("Restore checkpoint")
-            }
-        }
-        if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
         if(kind=="spring") {
                 drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
                     Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
@@ -1571,6 +1560,20 @@ fun NativeWorldLabForm() {
                 }
             }
         }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+            OutlinedButton(onClick={
+                runCatching{
+                    pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
+                        NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
+                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble()))
+                    timelineExportPicker.launch("world-lab-time-checkpoint.json")
+                }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
+            }){Text("Save checkpoint")}
+            OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
+                Text("Restore checkpoint")
+            }
+        }
+        if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick={playing=false;time=0f}) { Text("Beginning") }
             OutlinedButton(onClick={playing=false;time=(time-1f/240f).coerceAtLeast(0f)}) { Text("Previous") }

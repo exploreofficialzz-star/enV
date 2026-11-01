@@ -659,6 +659,7 @@ export default function WorldLab() {
       }
     }
     for (const entity of project?.entities ?? []) {
+      if (!project) continue;
       let mesh = scene.addedShapes.get(entity.id);
       if (!mesh || mesh.metadata?.worldLabShape !== entity.shape) {
         if (mesh) { mesh.material?.dispose(); mesh.dispose(); }

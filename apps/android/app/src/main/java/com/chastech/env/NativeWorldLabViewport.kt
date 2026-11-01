@@ -196,7 +196,7 @@ fun NativeWorldLabViewport(
             drawCircle(Color(0xFFFFD166),5f,Offset(observerMarker.x,observerMarker.y))
             drawCircle(Color.White,8f,Offset(observerMarker.x,observerMarker.y),style=Stroke(1f))
         }
-        val ordered=project.entities.filter{NativeWorldLabInspection.visible(project,selectedId,inspection)}
+        val ordered=project.entities.filter{solid->NativeWorldLabInspection.visible(project,selectedId,inspection,solid.id)}
             .map{solid->val at=NativeWorldLabInspection.renderPosition(project,selectedId,inspection,solid.id)
                 solid to (at to projection(at,size.width,size.height,focalLength))}
             .filter{it.second.second.visible}.sortedByDescending{it.second.second.depth}
