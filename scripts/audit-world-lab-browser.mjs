@@ -273,7 +273,7 @@ try{
   assert.deepEqual(data.entities[0].dimensionsMeters,[2,1,1]);
   assert.equal(data.entities[0].positionMeters[0],3);
   await page.getByRole("button",{name:"Save on device"}).click();
-  await page.getByText(/scientific runs saved on this device/).waitFor();
+  await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
   await page.reload({waitUntil:"domcontentloaded"});
   await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({timeout:90000});
   await page.getByRole("combobox",{name:"Open recorded run (local device)"}).waitFor({state:"visible"});
