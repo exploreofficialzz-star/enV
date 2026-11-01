@@ -1,10 +1,11 @@
 import type {FieldLayer,FieldPalette,FieldVectorPlane} from "@/lib/world-lab/field-layer";
+import {fieldTensorSliceAtTime} from "@/lib/world-lab/field-layer";
 import {fieldFrameAtTime,fieldScalarSliceAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
 
 type Props={layers:readonly FieldLayer[];selectedId:string;onSelect:(id:string)=>void;
  timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void;
  vectorPlane:FieldVectorPlane;onVectorPlaneChange:(v:FieldVectorPlane)=>void;
- vectorSliceIndex:number;onVectorSliceIndexChange:(v:number)=>void};
+ vectorSliceIndex:number;onVectorSliceIndexChange:(v:number)=>void;tensorComponent:number;onTensorComponentChange:(v:number)=>void};
 const palette:Record<FieldPalette,readonly [number,number,number][]>={
  cividis:[[0,32,76],[55,77,104],[123,124,118],[182,168,109],[254,232,56]],
  viridis:[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]],
@@ -72,6 +73,23 @@ export function WorldLabFieldPanel(p:Props){
       </label>
      </div>;
     })()}
+    {layer.kind==="tensor"&&layer.renderer.kind==="slice"&&(()=>{
+      const normalAxis=p.vectorPlane==="xy"?2:p.vectorPlane==="xz"?1:0;
+      const maximumSlice=layer.resolution.dimensions[normalAxis]-1;
+      const slice=Math.max(0,Math.min(maximumSlice,p.vectorSliceIndex));
+      const labels=["Txx","Txy","Txz","Tyx","Tyy","Tyz","Tzx","Tzy","Tzz"];
+      return <div className="mt-2 grid gap-2 sm:grid-cols-2">
+       <label className="text-xs">Tensor plane<select className="mt-1 w-full rounded border border-border bg-bg p-2"
+        value={p.vectorPlane} onChange={e=>p.onVectorPlaneChange(e.target.value as FieldVectorPlane)}>
+        <option value="xy">XY</option><option value="xz">XZ</option><option value="yz">YZ</option></select></label>
+       <label className="text-xs">Tensor component<select className="mt-1 w-full rounded border border-border bg-bg p-2"
+        value={p.tensorComponent} onChange={e=>p.onTensorComponentChange(Number(e.target.value))}>
+        {labels.map((label,index)=><option key={label} value={index}>{label}</option>)}</select></label>
+       <label className="text-xs sm:col-span-2">Slice index · {slice+1}/{maximumSlice+1}
+        <input className="mt-1 w-full" type="range" min="0" max={maximumSlice} value={slice} step="1"
+         onChange={e=>p.onVectorSliceIndexChange(Number(e.target.value))}/></label>
+      </div>;
+    })()}
     {layer.kind==="vector"&&(layer.renderer.kind==="glyphs"||layer.renderer.kind==="streamlines")&&(()=>{
      const normalAxis=p.vectorPlane==="xy"?2:p.vectorPlane==="xz"?1:0;
      const maximumSlice=layer.resolution.dimensions[normalAxis]-1;
@@ -108,7 +126,7 @@ export function WorldLabFieldPanel(p:Props){
  </section>;
 }
 export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number;visible:boolean;
- vectorPlane:FieldVectorPlane;vectorSliceIndex:number}){
+ vectorPlane:FieldVectorPlane;vectorSliceIndex:number;tensorComponent:number}){
  const layer=p.layer;
  if(!p.visible||!layer)return null;
  if(!isFieldOverlayRendererImplemented(layer.kind,layer.renderer.kind)){
@@ -131,6 +149,26 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
    role="img" aria-label={layer.legend.accessibleDescription}>
    <p className="font-semibold">{layer.legend.title}</p>
    <p>{layer.network?.nodes.length??0} nodes · {layer.network?.edges.length??0} links</p>
+  </div>;
+ }
+ if(layer.kind==="tensor"&&layer.renderer.kind==="slice"){
+  const frame=fieldTensorSliceAtTime(layer,p.timeSeconds,p.vectorPlane,p.vectorSliceIndex);
+  const component=Math.max(0,Math.min(8,p.tensorComponent)),limit=Math.max(Math.abs(layer.range.minimumSI),Math.abs(layer.range.maximumSI),1e-12);
+  const labels=["Txx","Txy","Txz","Tyx","Tyy","Tyz","Tzx","Tzy","Tzz"],cellWidth=256/frame.dimensionU,cellHeight=116/frame.dimensionV;
+  return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
+   role="img" aria-label={layer.legend.accessibleDescription+"; "+labels[component]+" tensor component; "+frame.plane.toUpperCase()+" slice "+(frame.sliceIndex+1)+"; recorded sample "+frame.sampleTimeSeconds.toFixed(4)+" seconds"}>
+   <p className="text-xs font-semibold">{layer.legend.title} · {labels[component]} · {frame.sampleTimeSeconds.toFixed(3)} s</p>
+   <svg viewBox="0 0 300 160" width="100%" height="132" role="presentation">
+    <path d="M22 12 V140 H286" fill="none" stroke="currentColor" opacity=".28"/>
+    {frame.cells.map((cell,index)=>{const value=cell.components[component];
+     return <rect key={index} x={22+cell.uIndex*cellWidth} y={140-(cell.vIndex+1)*cellHeight}
+      width={cellWidth} height={cellHeight} fill={value===null?"#555":colorFor(value,-limit,limit,"blue-orange")}
+      stroke="currentColor" strokeOpacity=".16" strokeWidth=".5">
+      <title>{value===null?"No data":labels[component]+" = "+value.toPrecision(5)+" "+layer.units.display}</title>
+     </rect>;})}
+   </svg>
+   <div className="flex justify-between text-[10px]"><span>{(-limit).toPrecision(3)} {layer.units.display}</span><span>{limit.toPrecision(3)} {layer.units.display}</span></div>
+   <p className="text-[10px] text-muted-foreground">{frame.plane.toUpperCase()} slice {frame.sliceIndex+1} · signed component on a zero-centred diverging scale · {frame.cells.filter(c=>c.components[component]!==null).length} valid cells</p>
   </div>;
  }
  if(layer.kind==="scalar"&&layer.renderer.kind==="slice"){

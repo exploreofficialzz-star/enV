@@ -174,6 +174,7 @@ export default function WorldLab() {
   const [fieldOverlayEnabled,setFieldOverlayEnabled]=useState(false);
   const [fieldVectorPlane,setFieldVectorPlane]=useState<FieldVectorPlane>("xy");
   const [fieldVectorSliceIndex,setFieldVectorSliceIndex]=useState(0);
+  const [fieldTensorComponent,setFieldTensorComponent]=useState(0);
   const [showInspectionLabels,setShowInspectionLabels]=useState(true);
   const [inspectionUiHidden,setInspectionUiHidden]=useState(false);
   const [inspectionMode,setInspectionMode]=useState<InspectionMode>("normal");
@@ -2703,7 +2704,7 @@ export default function WorldLab() {
               aria-label="Interactive 3D illustrative environment. Touch or drag to look around; use WASD or arrow keys to move."
               tabIndex={0} />
             <WorldLabFieldOverlay layer={activeFieldLayer} timeSeconds={timeSeconds} visible={fieldOverlayEnabled&&!inspectionUiHidden}
-              vectorPlane={fieldVectorPlane} vectorSliceIndex={fieldVectorSliceIndex}/>
+              vectorPlane={fieldVectorPlane} vectorSliceIndex={fieldVectorSliceIndex} tensorComponent={fieldTensorComponent}/>
             {graphicsError && (
               <div role="alert" className="absolute inset-0 flex items-center justify-center bg-bg p-4 text-center text-sm">
                 3D unavailable: {graphicsError}. The scientific controls and values remain accessible below.
@@ -2836,7 +2837,8 @@ export default function WorldLab() {
             onSelect={setFieldLayerId} timeSeconds={timeSeconds}
             overlayEnabled={fieldOverlayEnabled} onOverlayChange={setFieldOverlayEnabled}
             vectorPlane={fieldVectorPlane} onVectorPlaneChange={setFieldVectorPlane}
-            vectorSliceIndex={fieldVectorSliceIndex} onVectorSliceIndexChange={setFieldVectorSliceIndex}/>
+            vectorSliceIndex={fieldVectorSliceIndex} onVectorSliceIndexChange={setFieldVectorSliceIndex}
+            tensorComponent={fieldTensorComponent} onTensorComponentChange={setFieldTensorComponent}/>
           <p className="mt-2 text-xs text-muted-foreground">
             Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
             Added solids are visual geometry with analytic volume. Without material density, mass is unknown;

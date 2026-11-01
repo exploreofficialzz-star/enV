@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {runExperiment,type ModelInput} from "./model.ts";
-import {createComputedFieldLayers,fieldFrameAtTime,fieldScalarSliceAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
+import {createComputedFieldLayers,fieldFrameAtTime,fieldScalarSliceAtTime,fieldTensorSliceAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
 const run=(kind:"damped-oscillator"|"rc-circuit"|"heat-rod")=>{
  const inputs:ModelInput=kind==="damped-oscillator"
   ?{kind,massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0}
@@ -201,4 +201,28 @@ test("scalar slice preserves nodata and refuses invalid indices and field kinds"
 test("scalar slice renderer is advertised only for the real scalar implementation",()=>{
  assert.equal(isFieldOverlayRendererImplemented("scalar","slice"),true);
  assert.equal(isFieldOverlayRendererImplemented("tensor","slice"),false);
+});
+
+function tensorSliceLayer(){
+ const base=createComputedFieldLayers(run("damped-oscillator"))[0],timeSamples=base.timeReference.sampleTimesSeconds.length;
+ const values=Array.from({length:timeSamples},(_,t)=>Array.from({length:8},(_,cell)=>Array.from({length:9},(_,k)=>t*100+cell*9+k)).flat()).flat();
+ return parseFieldLayer({...base,id:"stress-tensor",label:"Stress tensor",kind:"tensor",
+  resolution:{dimensions:[2,2,2],spacingMeters:[1,1,1],sampleCount:8},values,mask:null,
+  renderer:{kind:"slice",implementationId:"env-tensor-slice-v1"},
+  range:{...base.range,minimumSI:0,maximumSI:timeSamples*100+100}});
+}
+test("tensor slices expose all nine ordered components from recorded cells",()=>{
+ const layer=tensorSliceLayer(),xy=fieldTensorSliceAtTime(layer,0.099,"xy",1);
+ assert.equal(xy.sampleTimeSeconds,0.1);assert.equal(xy.sampleIndex,10);
+ assert.deepEqual(xy.cells[0].components,[1000,1001,1002,1003,1004,1005,1006,1007,1008]);
+ const yz=fieldTensorSliceAtTime(layer,0.1,"yz",1);
+ assert.deepEqual(yz.cells[0].components,[1009,1010,1011,1012,1013,1014,1015,1016,1017]);
+});
+test("tensor slices preserve masked components and reject invalid slice indices",()=>{
+ const layer=tensorSliceLayer(),raw=JSON.parse(JSON.stringify(layer));
+ raw.mask=Array(raw.values.length).fill(true);raw.mask[0]=false;raw.values[0]=null;
+ const frame=fieldTensorSliceAtTime(parseFieldLayer(raw),0,"xy",0);
+ assert.equal(frame.cells[0].components[0],null);assert.equal(frame.cells[0].components[1],1);
+ assert.throws(()=>fieldTensorSliceAtTime(layer,0,"xy",2),/slice index/);
+ assert.equal(isFieldOverlayRendererImplemented("tensor","slice"),true);
 });

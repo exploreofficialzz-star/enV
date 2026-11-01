@@ -44,6 +44,7 @@ export function isFieldOverlayRendererImplemented(kind:FieldKind,renderer:FieldR
  if(kind==="network")return renderer==="event-trace";
  if(kind==="scalar")return renderer==="slice"||renderer==="heatmap"||renderer==="line-plot";
  if(kind==="vector")return renderer==="glyphs"||renderer==="streamlines";
+ if(kind==="tensor")return renderer==="slice";
  return false;
 }
 const palettes:readonly FieldPalette[]=["cividis","viridis","magma","blue-orange"];
@@ -241,6 +242,22 @@ export function fieldScalarSliceAtTime(layer:FieldLayer,timeSeconds:number,
  return Object.freeze({sampleTimeSeconds:frame.sampleTimeSeconds,sampleIndex:frame.sampleIndex,
   plane,sliceIndex:slice,dimensionU:dims[axes.u],dimensionV:dims[axes.v],
   cells:Object.freeze(cells)});
+}
+export type FieldTensorSliceFrame=Readonly<{sampleTimeSeconds:number;sampleIndex:number;plane:FieldVectorPlane;sliceIndex:number;dimensionU:number;dimensionV:number;cells:readonly Readonly<{uIndex:number;vIndex:number;components:readonly (number|null)[]} >[]}>;
+/** Exact tensor component slices from recorded cells; no interpolation or symmetry is assumed. */
+export function fieldTensorSliceAtTime(layer:FieldLayer,timeSeconds:number,plane:FieldVectorPlane="xy",requestedSliceIndex?:number):FieldTensorSliceFrame{
+ if(layer.kind!=="tensor"||layer.renderer.kind!=="slice")throw new Error("Tensor slices require a tensor field with the slice renderer.");
+ const axes=plane==="xy"?{u:0,v:1,n:2}:plane==="xz"?{u:0,v:2,n:1}:{u:1,v:2,n:0};
+ const dims=layer.resolution.dimensions,sliceCount=dims[axes.n],slice=requestedSliceIndex??Math.floor((sliceCount-1)/2);
+ if(!Number.isSafeInteger(slice)||slice<0||slice>=sliceCount)throw new Error("Tensor slice index is outside the field resolution.");
+ const frame=fieldFrameAtTime(layer,timeSeconds),cells:FieldTensorSliceFrame["cells"][number][]=[];
+ for(let vIndex=0;vIndex<dims[axes.v];vIndex++)for(let uIndex=0;uIndex<dims[axes.u];uIndex++){
+  const c=[0,0,0];c[axes.u]=uIndex;c[axes.v]=vIndex;c[axes.n]=slice;
+  const cellIndex=c[0]+dims[0]*(c[1]+dims[1]*c[2]);
+  cells.push(Object.freeze({uIndex,vIndex,components:Object.freeze([...frame.values.slice(cellIndex*9,cellIndex*9+9)])}));
+ }
+ return Object.freeze({sampleTimeSeconds:frame.sampleTimeSeconds,sampleIndex:frame.sampleIndex,plane,sliceIndex:slice,
+  dimensionU:dims[axes.u],dimensionV:dims[axes.v],cells:Object.freeze(cells)});
 }
 export type FieldVectorPlane="xy"|"xz"|"yz";
 export type FieldVectorGlyphFrame=Readonly<{
