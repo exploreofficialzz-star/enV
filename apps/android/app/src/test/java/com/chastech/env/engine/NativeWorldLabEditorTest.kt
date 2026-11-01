@@ -452,7 +452,7 @@ class NativeWorldLabEditorTest {
         var source=NativeWorldLabEditor.blank()
         source=NativeWorldLabEditor.addSolid(source,"box",id="box-source")
         source=NativeWorldLabEditor.positionSolid(source,"box-source",listOf(1.0,2.0,3.0))
-        source=NativeWorldLabEditor.rotateSolid(source,"box-source",listOf(0.1,0.2,0.3))
+        source=NativeWorldLabEditor.rotateSolid(source,"box-source",2,17.188733853924695)
         source=NativeWorldLabEditor.addHypotheticalMaterial(source,"Assumed alloy",7850.0,2e11,id="mat-used")
         source=NativeWorldLabEditor.assignMaterial(source,"box-source","mat-used")
         source=NativeWorldLabEditor.addHypotheticalMaterial(source,"Unused",null,null,id="mat-unused")

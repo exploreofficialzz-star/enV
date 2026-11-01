@@ -21,6 +21,7 @@ import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabEditHistory
 import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabImportResult
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
 import com.chastech.env.engine.NativeChemicalThermalResult
@@ -52,6 +53,11 @@ import com.chastech.env.engine.NativeActuatorResult
 import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
+
+private data class NativeWorldLabImportResult(
+    val projectJson:String,val project:NativeWorldLabProject,
+    val isArchive:Boolean=false,val isCadGeometry:Boolean=false,
+)
 import com.chastech.env.engine.NativeWorldLabDigitalMotor
 import com.chastech.env.engine.NativeDigitalMotorResult
 import com.chastech.env.engine.NativeWorldLabNetworkMotor
@@ -341,6 +347,21 @@ fun NativeWorldLabForm() {
             }
         }
     }
+    val cadExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null)scope.launch {
+            runCatching{withContext(Dispatchers.IO){
+                val source=projectJson?:error("Create or open an invention first")
+                val json=NativeWorldLabEditor.exportCadExchange(source)
+                val bytes=json.toByteArray(Charsets.UTF_8)
+                require(bytes.size<=8*1024*1024){"CAD geometry file exceeds 8 MB"}
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(bytes);it.flush()
+                }?:error("Cannot open CAD geometry export destination")
+            }}.onSuccess{warning="Supported CAD geometry exported in metres and LOCAL_ENU coordinates."}
+                .onFailure{warning=it.message?:"CAD geometry export failed."}
+        }
+    }
     val archiveExportPicker=rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null)scope.launch {
@@ -405,23 +426,33 @@ fun NativeWorldLabForm() {
                 }?:error("File could not be opened.")
                 val json=out.toString(Charsets.UTF_8.name())
                 val format=org.json.JSONObject(json).optString("format")
-                if(format=="env-world-lab-archive"){
+                if(format=="env-world-lab-cad"){
+                    val current=projectJson?:error("Create or open an invention before importing CAD geometry.")
+                    val merged=NativeWorldLabEditor.importCadExchange(current,json)
+                    NativeWorldLabImportResult(merged,NativeWorldLabProjectCodec.decode(merged),
+                        isArchive=false,isCadGeometry=true)
+                }else if(format=="env-world-lab-archive"){
                     val imported=NativeWorldLabPortableArchiveStore(context.filesDir).import(json)
-                    Triple(imported.projectJson,imported.project,true)
+                    NativeWorldLabImportResult(imported.projectJson,imported.project,isArchive=true)
                 }else{
                     require(out.size()<=NativeWorldLabProjectCodec.MAX_BYTES){
                         "Standalone projects cannot exceed 1 MB"}
-                    Triple(json,NativeWorldLabProjectCodec.decode(json),false)
+                    NativeWorldLabImportResult(json,NativeWorldLabProjectCodec.decode(json))
                 }
-            } }.onSuccess {
-                projectJson=it.first;project=it.second
-                savedSnapshot=if(it.third)it.first else null
-                selectedSavedId=it.second.id
-                selected=0;warning=if(it.third)
-                    "Portable project and scientific history imported and saved on device."
-                    else ""
+            } }.onSuccess {result->
+                projectJson=result.projectJson;project=result.project
+                if(!result.isCadGeometry){
+                    savedSnapshot=if(result.isArchive)result.projectJson else null
+                    selectedSavedId=result.project.id
+                }
+                selected=if(result.isCadGeometry)(result.project.entities.size-1).coerceAtLeast(0) else 0
+                warning=when {
+                    result.isArchive->"Portable project and scientific history imported and saved on device."
+                    result.isCadGeometry->"CAD geometry merged into the current invention. Save locally to preserve it."
+                    else->""
+                }
                 editHistory.clear()
-                if(it.third)refreshSavedProjects()
+                if(result.isArchive)refreshSavedProjects()
             }
                 .onFailure { warning=it.message?:"Unable to inspect this project." }
         }
@@ -637,13 +668,20 @@ fun NativeWorldLabForm() {
             Button(onClick={askReplace("new")}){Text("New project")}
             OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
                 enabled=projectJson!=null){Text("Export JSON")}
+            OutlinedButton(onClick={projectJson?.let{cadExportPicker.launch("world-lab-cad.envcad.json")}},
+                enabled=projectJson!=null&&project!!.entities.isNotEmpty()){Text("Export CAD")}
             OutlinedButton(onClick={
                 if(projectJson!=null)archiveExportPicker.launch(
                     "world-lab-complete-archive.json")
             },enabled=projectJson!=null){Text("Export complete archive")}
         }
-        OutlinedButton(onClick={askReplace("import")}) {
-            Text("Import project or complete archive JSON")
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            OutlinedButton(onClick={askReplace("import")}) {
+                Text("Import project or archive")
+            }
+            OutlinedButton(onClick={picker.launch(arrayOf("application/json"))}){
+                Text("Import CAD geometry")
+            }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             Button(onClick={
