@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createABookArchive, readABookArchive } from "./archive.ts";
-import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas, assertABookNoteForStorage, getABookLocalDatabaseName } from "./local-store.ts";
+import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas, assertABookImportRecords, assertABookNoteForStorage, getABookLocalDatabaseName } from "./local-store.ts";
 import type { ABookAttachment, ABookNote, ABookRevision } from "./local-store.ts";
 
 const note: ABookNote = {
@@ -174,4 +174,34 @@ test("A book note writes stay inside the portable local note limits", () => {
   assert.throws(() => assertABookNoteForStorage({ ...note, tags: Array.from({ length: 51 }, () => "tag") }), /local storage limits/);
   assert.throws(() => assertABookNoteForStorage({ ...note, tags: ["x".repeat(201)] }), /local storage limits/);
   assert.throws(() => assertABookNoteForStorage({ ...note, revision: -1 }), /local storage limits/);
+});
+
+
+test("A book direct database imports validate all note, revision and attachment records", () => {
+  assertABookImportRecords({ notes: [note], revisions: [revision], attachments: [attachment] });
+  assert.throws(() => assertABookImportRecords({
+    notes: [{ ...note, body: "x".repeat(5_000_001) }], revisions: [], attachments: [],
+  }), /invalid note record/);
+  assert.throws(() => assertABookImportRecords({
+    notes: [note, note], revisions: [], attachments: [],
+  }), /duplicate note ID/);
+  assert.throws(() => assertABookImportRecords({
+    notes: [note], revisions: [revision, revision], attachments: [],
+  }), /duplicate revision record/);
+  assert.throws(() => assertABookImportRecords({
+    notes: [note], revisions: [{ ...revision, noteId: "missing-note" }], attachments: [],
+  }), /invalid or duplicate revision record/);
+  assert.throws(() => assertABookImportRecords({
+    notes: [note], revisions: [], attachments: [{ ...attachment, size: 0, blob: new Blob([]) }],
+  }), /invalid or duplicate attachment metadata/);
+  assert.throws(() => assertABookImportRecords({
+    notes: [note], revisions: [], attachments: [{ ...attachment, size: 4 }],
+  }), /invalid or duplicate attachment metadata/);
+});
+
+test("A book archive export rejects empty local attachments", async () => {
+  await assert.rejects(
+    () => createABookArchive([note], [], [{ ...attachment, size: 0, blob: new Blob([]) }]),
+    /attachment is invalid or exceeds/,
+  );
 });
