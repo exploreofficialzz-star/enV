@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {blankWorldLabProject,newSolid} from "./project.ts";
 import {emptyWorldLabEditHistory,recordWorldLabEdit,travelWorldLabEdit,
-  measureSolidCenters,snapSolidPosition,MAX_WORLD_LAB_UNDO} from "./edit-history.ts";
+  measureSolidCenters,snapSolidPosition,snapSolidsToGrid,MAX_WORLD_LAB_UNDO} from "./edit-history.ts";
 const now="2026-10-31T00:00:00Z";
 test("undo redo preserve actual portable project entities",()=>{
  const a=blankWorldLabProject("lab",now);
@@ -46,4 +46,20 @@ test("precise snapping and real Euclidean center distances are geometry-only",()
  assert.deepEqual(snapSolidPosition({...a,positionMeters:[0.24,-0.26,2.49]},0.5)
    .positionMeters,[0,-0.5,2.5]);
  assert.throws(()=>snapSolidPosition(a,0),/Grid spacing/);
+});
+
+test("multi-part grid snapping is atomic, bounded and matches native half-grid rounding",()=>{
+ const p=blankWorldLabProject("grid",now);
+ const a={...newSolid("a","box",0),positionMeters:[0.25,-0.25,2.49] as [number,number,number]};
+ const b={...newSolid("b","sphere",1),positionMeters:[3,4,12] as [number,number,number]};
+ const outside={...newSolid("outside","cylinder",2),positionMeters:[8.25,0,0] as [number,number,number]};
+ const project={...p,entities:[a,b,outside]};
+ const result=snapSolidsToGrid(project,["a","b"],0.5);
+ assert.deepEqual(result.entities[0].positionMeters,[0.5,0,2.5]);
+ assert.deepEqual(result.entities[1].positionMeters,[3,4,12]);
+ assert.deepEqual(result.entities[2],outside);
+ assert.deepEqual(project.entities[0].positionMeters,[0.25,-0.25,2.49]);
+ assert.throws(()=>snapSolidsToGrid(project,["a","missing"],0.5),/no longer exists/);
+ assert.throws(()=>snapSolidsToGrid(project,["a","a"],0.5),/distinct/);
+ assert.throws(()=>snapSolidsToGrid(project,["a"],0),/Grid spacing/);
 });
