@@ -55,6 +55,8 @@ jobs:
           src/lib/production-notice.test.ts
       - name: Audit every Design catalogue entry and implementation gate
         run: node scripts/check-design.mjs
+      - name: Verify Web Design availability and native production boundaries
+        run: npm run check:production-gating
 
   design-browser-acceptance:
     name: Rendered Design browser and responsive acceptance
@@ -73,6 +75,10 @@ jobs:
         run: npm ci
       - name: Build production Web application
         run: npm run build
+      - name: Typecheck Web application
+        run: npm run typecheck
+      - name: Lint Web application
+        run: npm run lint
       - name: Install Chromium, Firefox and WebKit
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Start production preview server
