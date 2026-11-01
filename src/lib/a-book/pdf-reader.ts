@@ -56,11 +56,19 @@ function sanitizeTextFileName(value: string): string {
   return safe || "document";
 }
 
-function uniqueTextFileName(base: string, used: Set<string>): string {
+function uniqueTextFileName(base: string, used: Map<string, string>): string {
   let candidate = `${base}.txt`;
+  const existing = used.get(candidate.toLowerCase());
+  if (!existing) {
+    used.set(candidate.toLowerCase(), candidate);
+    return candidate;
+  }
+  const existingDot = existing.lastIndexOf(".");
+  const canonicalStem = existingDot > 0 ? existing.slice(0, existingDot) : existing;
   let suffix = 2;
-  while (used.has(candidate.toLowerCase())) candidate = `${base}-${suffix++}.txt`;
-  used.add(candidate.toLowerCase());
+  candidate = `${canonicalStem}-${suffix++}.txt`;
+  while (used.has(candidate.toLowerCase())) candidate = `${canonicalStem}-${suffix++}.txt`;
+  used.set(candidate.toLowerCase(), candidate);
   return candidate;
 }
 
@@ -185,7 +193,7 @@ export async function extractSelectedPdfTextLocally(
   }
 
   const output: Record<string, Uint8Array> = {};
-  const used = new Set<string>();
+  const used = new Map<string, string>();
   let totalPages = 0;
 
   for (let index = 0; index < files.length; index += 1) {
