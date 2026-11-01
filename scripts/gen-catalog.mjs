@@ -1167,7 +1167,6 @@ for (const [key, targets] of mathExerciseRows) {
 }
 
 const expansionData = JSON.parse(readFileSync(new URL("../src/data/math-expansion.json", import.meta.url), "utf8"));
-const titleCase = (text) => String(text).replace(/\b\w/g, (c) => c.toUpperCase());
 for (const [family, rows] of Object.entries(expansionData)) {
   for (const row of rows) {
     // Rows are [key, a, b, c] or [key, title, a, b, c]; see src/lib/calc/expansion-rows.mjs.
