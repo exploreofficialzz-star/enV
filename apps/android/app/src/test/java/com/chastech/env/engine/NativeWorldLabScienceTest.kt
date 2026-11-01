@@ -532,4 +532,35 @@ class NativeWorldLabVehicleTests {
             NativeWorldLabVehicle.validate(NativeWorldLabVehicleInput(durationSeconds=120.0,solverStepSeconds=0.001))
         }
     }
+    @Test fun timedMotorIsolationPreservesCurrentThenComputesRlDecay(){
+        val input=NativeActuatorInput(massKg=1.0,gravityMps2=0.0,
+            forceConstantNPerA=0.0,powerOffAtSeconds=1.0)
+        val run=NativeWorldLabActuator.evaluate(input)
+        assertEquals("1.2.0",run.modelVersion)
+        val before=run.samples.last{it.timeSeconds<1.0}
+        val after=run.samples.first{it.timeSeconds>=1.0}
+        val later=run.samples.minBy{abs(it.timeSeconds-2.0)}
+        val final=run.samples.last()
+        assertTrue(before.sourceVoltageV>0.0)
+        assertEquals(0.0,after.sourceVoltageV,0.0)
+        assertTrue(after.currentA>0.0)
+        assertTrue(later.currentA<after.currentA)
+        assertTrue(final.currentA<1e-6)
+        assertEquals(0.0,final.motorForceN,1e-9)
+        assertTrue(run.samples.all{it.energyResidualJ.isFinite()})
+        assertTrue(abs(final.energyResidualJ)<0.02*max(1.0,abs(final.suppliedEnergyJ)))
+        val audit=NativeWorldLabActuator.numericalAudit(input,run)
+        assertNotEquals("unavailable",audit.status)
+    }
+    @Test fun motorIsolationTimeMustBeInsideTheRun(){
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabActuator.evaluate(NativeActuatorInput(
+                massKg=1.0,powerOffAtSeconds=5.0))
+        }
+        val off=NativeWorldLabActuator.evaluate(NativeActuatorInput(
+            massKg=1.0,gravityMps2=0.0,forceConstantNPerA=0.0,
+            powerOffAtSeconds=0.0))
+        assertEquals(0.0,off.samples.first().sourceVoltageV,0.0)
+        assertTrue(off.samples.all{it.currentA==0.0&&it.motorForceN==0.0})
+    }
 }
