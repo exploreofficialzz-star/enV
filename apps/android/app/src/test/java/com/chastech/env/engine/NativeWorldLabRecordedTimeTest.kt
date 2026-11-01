@@ -98,3 +98,35 @@ class NativeWorldLabRecordedTimeCheckpointCodecTest {
   assertEquals(0.15,NativeWorldLabRecordedTime.restore(run,checkpoint).simulationTimeSeconds,1e-9)
  }
 }
+
+
+class NativeWorldLabDemoRecordingTest {
+ @Test fun springRcAndHeatOutputsUseTheSameRecordedClockAxis(){
+  val models=listOf(
+   "native-spring" to NativeLabInput.Spring(),
+   "native-rc" to NativeLabInput.RC(),
+   "native-heat" to NativeLabInput.Heat()
+  )
+  for((id,model) in models){
+   val samples=(0..120).map{index->
+    NativeWorldLabScience.evaluate(model,index/10.0)
+   }
+   assertEquals(121,samples.size)
+   assertEquals(12.0,samples.last().timeSeconds,1e-12)
+   assertTrue(samples.all{it.timeSeconds.isFinite()})
+   val run=NativeWorldLabRecordedRun(
+    runId="recorded-$id",modelId=id,modelVersion=samples.first().modelVersion,
+    worldEpochUTC="2026-11-01T00:00:00Z",
+    sampleTimesSeconds=samples.map{it.timeSeconds})
+   val started=NativeWorldLabRecordedTime.start(run,
+    "2026-11-01T12:00:00Z","Africa/Lagos")
+   val selected=NativeWorldLabRecordedTime.seek(run,started,0.76)
+   assertEquals(0.8,selected.simulationTimeSeconds,1e-12)
+   val clock=selected.copy(solverInternalTimeSeconds=samples[selected.sampleIndex].timeSeconds)
+   val checkpoint=NativeWorldLabRecordedTime.checkpoint(run,clock)
+   val restored=NativeWorldLabRecordedTime.restore(run,checkpoint)
+   assertEquals(selected.sampleIndex,restored.sampleIndex)
+   assertEquals(selected.displaySampleTimeSeconds,restored.displaySampleTimeSeconds,1e-12)
+  }
+ }
+}
