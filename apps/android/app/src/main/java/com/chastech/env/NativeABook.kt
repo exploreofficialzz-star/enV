@@ -263,6 +263,19 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
             db.setTransactionSuccessful()
         }finally{db.endTransaction()}
     }
+    fun removeFile(id:String):String?{
+        val db=writableDatabase
+        var path:String?=null
+        db.beginTransaction()
+        try{
+            path=db.query("attachments",arrayOf("path"),"id=?",arrayOf(id),null,null,null).use{cursor->
+                if(cursor.moveToFirst())cursor.getString(0)else null
+            }
+            db.delete("attachments","id=?",arrayOf(id))
+            db.setTransactionSuccessful()
+        }finally{db.endTransaction()}
+        return path
+    }
 }
 
 
@@ -456,6 +469,19 @@ fun NativeABookScreen(){
         selected=n?.id;title=n?.title.orEmpty();body=n?.body.orEmpty();notebook=n?.notebook?:"Inbox"
         tags=n?.let{runCatching{JSONArray(it.tags).let{a->(0 until a.length()).joinToString(", "){i->a.getString(i)}}}.getOrDefault("")}.orEmpty()
         files=n?.let{db.attachments(it.id)}?:emptyList();revisions=n?.let{db.revisions(it.id)}?:emptyList()
+    }
+
+    fun removeAttachment(record:ABookFileRecord){
+        val path=db.removeFile(record.id)
+        if(path!=null){
+            val root=context.filesDir.canonicalFile
+            val target=File(context.filesDir,path).canonicalFile
+            if(target.path.startsWith(root.path+File.separator))target.delete()
+        }
+        selectedPdfIds=selectedPdfIds-record.id
+        if(activePdf?.id==record.id){activePdf=null;pdfText=""}
+        selected?.let{id->files=db.attachments(id)}
+        status="Attachment removed from this device";error=""
     }
 
     fun selectedPdfFiles():List<ABookFileRecord> = files.filter{it.id in selectedPdfIds && (it.mime=="application/pdf"||it.name.endsWith(".pdf",true))}
@@ -722,6 +748,7 @@ fun NativeABookScreen(){
                     if(isPdf)Checkbox(checked=f.id in selectedPdfIds,onCheckedChange={checked->selectedPdfIds=if(checked)selectedPdfIds+f.id else selectedPdfIds-f.id})
                     Text("${f.name} · ${f.size/1024} KB",modifier=Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
                     if(isPdf)OutlinedButton(onClick={activePdf=f;pdfText=""}){Text("PDF tools")}
+                    TextButton(onClick={removeAttachment(f)){Text("Remove",color=MaterialTheme.colorScheme.error)}
                 }
             }
             val selectedCount=selectedPdfFiles().size
