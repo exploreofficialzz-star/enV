@@ -116,6 +116,24 @@ private suspend fun recognizeABookPdfOffline(file: File): String = withContext(D
     output.toString().take(150_000)
 }
 
+private fun parseABookPageSelection(value:String,pageCount:Int):List<Int>{
+    require(pageCount>0){"This PDF has no readable pages."}
+    val tokens=value.split(",").map{it.trim()}.filter{it.isNotEmpty()}
+    require(tokens.isNotEmpty()){"Enter page numbers, for example 1-3,5."}
+    val result=mutableListOf<Int>();val used=mutableSetOf<Int>()
+    for(token in tokens){
+        require(Regex("^\\d+(?:-\\d+)?$").matches(token)){"Invalid page range: $token"}
+        val bounds=token.split("-");val first=bounds[0].toInt();val last=bounds.getOrNull(1)?.toInt()?:first
+        require(first>=1&&last>=first&&last<=pageCount){"Choose page numbers from 1 to $pageCount."}
+        for(page in first..last){
+            require(used.add(page)){"Page $page is selected more than once."}
+            require(used.size<=5000){"A maximum of 5,000 pages can be extracted at once."}
+            result.add(page)
+        }
+    }
+    return result
+}
+
 private fun safeABookPdfName(value:String):String =
     value.substringBeforeLast(".",value).replace(Regex("[^A-Za-z0-9._-]+"),"-").trim('-').take(80).ifBlank{"document"}
 
@@ -422,6 +440,7 @@ fun NativeABookScreen(){
     var confirmPermanentDelete by rememberSaveable{mutableStateOf(false)}
     var selectedPdfIds by rememberSaveable{mutableStateOf(setOf<String>())}
     var splitPageGroups by rememberSaveable{mutableStateOf("1-3;4-6")}
+    var extractPageRange by rememberSaveable{mutableStateOf("1-3")}
     var pendingZip by remember{mutableStateOf<File?>(null)}
     var revisions by remember{mutableStateOf(emptyList<ABookRevisionRecord>())}
     var status by remember{mutableStateOf("Saved on this device")}
@@ -500,6 +519,29 @@ fun NativeABookScreen(){
             result.fold({pendingZip=it;status="Rotated ${chosen.size} PDFs locally";exportZip.launch("a-book-rotated-pdfs.zip")},{error=it.message?:"PDF batch rotation failed";status="Not saved"})
         }
     }
+    fun extractSelectedPdfPages(){
+        val record=activePdf
+        if(record==null){error="Choose a PDF first";return}
+        scope.launch{
+            status="Extracting PDF pages locally…";error=""
+            val result=withContext(Dispatchers.IO){runCatching{
+                require(record.size<=200L*1024*1024){"This PDF exceeds the 200 MB local processing limit."}
+                PDFBoxResourceLoader.init(context)
+                val local=File(context.filesDir,record.relativePath)
+                PDDocument.load(local).use{source->
+                    val pages=parseABookPageSelection(extractPageRange,source.numberOfPages)
+                    val outputDocument=PDDocument()
+                    try{
+                        pages.forEach{number->outputDocument.importPage(source.getPage(number-1))}
+                        val output=File(context.cacheDir,"a-book-extracted-"+UUID.randomUUID()+".pdf")
+                        outputDocument.save(output);output
+                    }finally{outputDocument.close()}
+                }
+            }}
+            result.fold({output->pendingPdf=output;status="Extracted selected pages locally";exportPdf.launch(safeABookPdfName(record.name)+"-pages.pdf")},{failure->error=failure.message?:"PDF page extraction failed";status="Not saved"})
+        }
+    }
+
     fun splitActivePdf(){
         val record=activePdf
         if(record==null){error="Choose a PDF first";return}
@@ -692,6 +734,8 @@ fun NativeABookScreen(){
             activePdf?.let{f->
                 val local=File(context.filesDir,f.relativePath)
                 Text(f.name,style=MaterialTheme.typography.titleSmall)
+                OutlinedTextField(extractPageRange,{extractPageRange=it},label={Text("Extract pages · e.g. 1-3,5")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+                OutlinedButton(onClick={extractSelectedPdfPages()}){Text("Extract selected pages")}
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(onClick={scope.launch{
                         status="Extracting PDF text locally…";error=""
