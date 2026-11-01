@@ -84,8 +84,9 @@ export function executeScientificGraph(graphInput:ScientificGraph,
       }
       const output=byId.get(id)!.advance(end,end-now,Object.freeze(inputs));
       if(!output||!output.outputs||
-        ![output.suppliedW,output.dissipatedW,output.storedRateW].every(Number.isFinite))
-        throw new Error("Scientific solver emitted a nonfinite energy rate.");
+        ![output.suppliedW,output.dissipatedW,output.storedRateW].every(Number.isFinite)||
+        output.dissipatedW<0)
+        throw new Error("Scientific solver emitted an invalid energy rate or negative dissipation.");
       for(const [portId,raw] of Object.entries(output.outputs)){
         const port=component.ports.find(p=>p.id===portId);
         if(!port||port.direction==="input")
@@ -114,4 +115,36 @@ export function executeScientificGraph(graphInput:ScientificGraph,
   if(!samples.length||Math.abs(samples[samples.length-1].timeSeconds-duration)>1e-9)
     throw new Error("Scientific simulation failed to reach its duration.");
   return Object.freeze({graph,samples:Object.freeze(samples)});
+}
+
+
+/** Trusted built-in analytic RC adapter pair for real cross-model SI exchange. */
+export function createIdealRcAdapters(input:{
+  sourceVoltageV:number;resistanceOhm:number;capacitanceF:number;initialVoltageV?:number;
+}):readonly ScientificAdapter[]{
+  const initial=input.initialVoltageV??0;
+  if(!Number.isFinite(input.sourceVoltageV)||Math.abs(input.sourceVoltageV)>1000||
+    !Number.isFinite(initial)||Math.abs(initial)>1000||
+    !Number.isFinite(input.resistanceOhm)||input.resistanceOhm<0.001||input.resistanceOhm>1e9||
+    !Number.isFinite(input.capacitanceF)||input.capacitanceF<1e-9||input.capacitanceF>1000)
+    throw new Error("Ideal RC assumptions are outside the supported physical domain.");
+  const supply:ScientificAdapter={
+    componentId:"source",modelId:"ideal-dc-source",modelVersion:"1.0.0",
+    advance:()=>({outputs:{V:quantity(input.sourceVoltageV,"V","hypothetical-user-assumed")},
+      suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null}),
+  };
+  const load:ScientificAdapter={
+    componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0",
+    advance:(atSeconds,_deltaSeconds,ports)=>{
+      if(!ports.Vin)throw new Error("RC load requires its connected source voltage.");
+      const voltage=input.sourceVoltageV+(initial-input.sourceVoltageV)*
+        Math.exp(-atSeconds/(input.resistanceOhm*input.capacitanceF));
+      const current=(input.sourceVoltageV-voltage)/input.resistanceOhm;
+      return {outputs:{Vc:quantity(voltage,"V","physics-model-computed"),
+        I:quantity(current,"A","physics-model-computed")},
+        suppliedW:input.sourceVoltageV*current,dissipatedW:current*current*input.resistanceOhm,
+        storedRateW:voltage*current,nextEventSeconds:null};
+    },
+  };
+  return Object.freeze([supply,load]);
 }
