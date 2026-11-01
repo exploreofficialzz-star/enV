@@ -62,3 +62,46 @@ export function clipInspectionPolygon(vertices:readonly Vec3Tuple[],plane:Readon
  }
  return Object.freeze(out);
 }
+
+
+export type InspectionViewState=Readonly<Pick<InspectionSettings,
+ "mode"|"opacity"|"axis"|"cutawayFraction"|"explosionDistanceM">>;
+export type InspectionViewHistory=Readonly<{
+ past:readonly InspectionViewState[];
+ present:InspectionViewState;
+ future:readonly InspectionViewState[];
+}>;
+const INSPECTION_VIEW_HISTORY_LIMIT=50;
+function validateInspectionViewState(state:InspectionViewState):InspectionViewState{
+ const validated=validateInspectionSettings({...state,selectedEntityId:""});
+ return Object.freeze({mode:validated.mode,opacity:validated.opacity,axis:validated.axis,
+  cutawayFraction:validated.cutawayFraction,explosionDistanceM:validated.explosionDistanceM});
+}
+function sameInspectionView(a:InspectionViewState,b:InspectionViewState):boolean{
+ return a.mode===b.mode&&a.opacity===b.opacity&&a.axis===b.axis&&
+  a.cutawayFraction===b.cutawayFraction&&a.explosionDistanceM===b.explosionDistanceM;
+}
+export function createInspectionViewHistory(initial:InspectionViewState):InspectionViewHistory{
+ return Object.freeze({past:Object.freeze([]),present:validateInspectionViewState(initial),
+  future:Object.freeze([])});
+}
+export function commitInspectionViewHistory(history:InspectionViewHistory,
+ next:InspectionViewState):InspectionViewHistory{
+ const present=validateInspectionViewState(next);
+ if(sameInspectionView(history.present,present))return history;
+ const past=Object.freeze([...history.past.slice(-(INSPECTION_VIEW_HISTORY_LIMIT-1)),history.present]);
+ return Object.freeze({past,present,future:Object.freeze([])});
+}
+export function travelInspectionViewHistory(history:InspectionViewHistory,
+ direction:"undo"|"redo"):InspectionViewHistory{
+ if(direction==="undo"){
+  if(history.past.length===0)return history;
+  const present=history.past[history.past.length-1];
+  return Object.freeze({past:Object.freeze(history.past.slice(0,-1)),present,
+   future:Object.freeze([history.present,...history.future].slice(0,INSPECTION_VIEW_HISTORY_LIMIT))});
+ }
+ if(history.future.length===0)return history;
+ const present=history.future[0];
+ return Object.freeze({past:Object.freeze([...history.past.slice(-(INSPECTION_VIEW_HISTORY_LIMIT-1)),history.present]),
+  present,future:Object.freeze(history.future.slice(1))});
+}
