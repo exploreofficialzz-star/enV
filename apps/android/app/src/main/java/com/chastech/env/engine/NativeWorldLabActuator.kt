@@ -96,6 +96,13 @@ object NativeWorldLabActuator {
         bounded(i.gravityMps2,0.0,100.0,"Gravity")
         bounded(i.initialHeightM,0.0,100.0,"Initial height")
         bounded(i.supplyVoltageV,0.0,1000.0,"Voltage")
+        // Native SI boundary on the actual electrical-to-mechanical calculation.
+        val supply=NativeWorldLabSI.declare(i.supplyVoltageV,"V")
+        NativeWorldLabSI.compatible(
+            NativeSciencePort("source","output","V","SCALAR","electrical"),
+            NativeSciencePort("coil","input","V","SCALAR","electrical"))
+        require(NativeWorldLabSI.convert(supply,"V")==i.supplyVoltageV){
+            "Motor supply dimensional exchange failed"}
         bounded(i.resistanceOhm,0.01,10000.0,"Resistance")
         bounded(i.inductanceH,0.0001,1000.0,"Inductance")
         bounded(i.forceConstantNPerA,0.0,10000.0,"Motor constant")
