@@ -127,7 +127,7 @@ test("an opened motor supply is an exact-time event; inductive current decays in
   assert.equal(run.modelVersion,"1.2.0");
   const firstAtOrAfterSwitch=run.samples.findIndex(s=>s.timeSeconds>=1-1e-9);
   assert.ok(firstAtOrAfterSwitch>0,"the switch must have a preceding recorded sample");
-  const before=run.samples[firstAtOrAfterSwitch-1];
+  const before=sampleActuator(run,0.9);
   assert.ok(before.timeSeconds<1,"pre-switch sample must precede the exact event time");
   const at=sampleActuator(run,1);
   const later=sampleActuator(run,2);
