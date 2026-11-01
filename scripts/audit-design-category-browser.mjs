@@ -162,7 +162,21 @@ for (const [browserName, browserType] of browserEntries) {
     await preview.screenshot({ path: resolve(outputDir, `palette-preview-${browserName}-${layout}-dark.png`) });
   }
 
-  assert.deepEqual(failures, [], "Design category and palette preview routes should not emit uncaught browser errors");
+  // Verify native drag-and-drop reorders the real gradient stops while keyboard controls remain available.
+  const gradientResponse = await page.goto(baseUrl + "/tools/design/gradient-generator", { waitUntil: "domcontentloaded", timeout: 60000 });
+  assert.ok(gradientResponse && gradientResponse.ok(), "Gradient Generator route should respond successfully");
+  const startStop = page.locator('[data-testid="gradient-stop-start"]');
+  const endStop = page.locator('[data-testid="gradient-stop-end"]');
+  await startStop.waitFor({ state: "visible" });
+  await startStop.dragTo(endStop);
+  await page.waitForFunction(() => {
+    const order = [...document.querySelectorAll('[data-testid^="gradient-stop-"]')]
+      .map((element) => element.getAttribute("data-testid"));
+    return order.join(",") === "gradient-stop-middle,gradient-stop-end,gradient-stop-start";
+  }, { timeout: 10000 });
+  assert.equal(await page.getByRole("button", { name: "Move stop 2 earlier" }).isVisible(), true, "Keyboard reorder controls should remain available");
+
+  assert.deepEqual(failures, [], "Design category, palette and gradient routes should not emit uncaught browser errors");
   console.log("PASS Design browser audit: " + advertisedCount + " tools, search, keyboard filters, 3 viewport widths and 4 page previews in light/dark themes.");
   } finally {
     await browser.close();
