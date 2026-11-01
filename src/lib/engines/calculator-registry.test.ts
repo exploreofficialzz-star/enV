@@ -202,7 +202,7 @@ test("equation-family tools describe the same relationship in the catalog and in
         const tool = byId.get(id);
         if (!tool) throw new Error(`${id} is missing from the catalog`);
         assert.ok(tool.description.includes(info.relation), `${id} description states "${info.relation}"`);
-        assert.ok(tool.description.includes(`Solve for ${target} (${info.labels[target]})`), `${id} description names the unknown`);
+        assert.ok(tool.description.includes(`Solve for ${info.labels[target]}`), `${id} description names the human-readable unknown`);
         if (info.title) assert.ok(tool.name.startsWith(`${info.title}:`), `${id} name starts with its title`);
         const definition = definitionOf(tool)!;
         assert.ok(definition.formula?.startsWith(info.relation), `${id} engine formula is "${info.relation}"`);
