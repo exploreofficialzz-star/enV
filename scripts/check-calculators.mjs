@@ -36,7 +36,7 @@ const planned = calculators.filter((tool) => tool.status === "planned");
 const presentationPipelineMissing = !generatorText.includes("mathExercisePresentation(mathExerciseCatalog, key, target)")
   || !generatorText.includes("const targetLabel = info.labels[target]")
   || !presentationHelperText.includes("Missing human-readable label for math exercise target");
-const legacyGeneratedTitleLogic = generatorText.includes("Solve for ${target}");
+const legacyGeneratedTitleLogic = generatorText.includes("Solve for ${target}") || mathExerciseText.includes("formula: `${spec.formula} · solve for ${target}`");
 
 console.log(`Calculator audit: ${calculators.length} formula-engine tools across ${categoryTools.length} category entries`);
 console.log(`Executable definitions: ${keys.size}`);
