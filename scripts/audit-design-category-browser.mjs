@@ -140,7 +140,7 @@ for (const [browserName, browserType] of browserEntries) {
   await swatchExport.waitFor({ state: "visible" });
   const [pngDownload] = await Promise.all([
     page.waitForEvent("download", { timeout: 15000 }),
-    page.getByRole("button", { name: "Download PNG", exact: true }).click(),
+    page.getByTestId("palette-download-png").click(),
   ]);
   assert.match(pngDownload.suggestedFilename(), /\.png$/i, "Palette PNG export should produce a PNG file");
   const pngPath = resolve(outputDir, `palette-swatches-${browserName}.png`);
