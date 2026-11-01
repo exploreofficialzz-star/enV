@@ -578,6 +578,14 @@ fun NativeWorldLabForm() {
         }){Text("Discard draft")}},
         dismissButton={TextButton(onClick={confirmingDraftDelete=false}){Text("Cancel")}}
     )
+    // Keep large native feature panels in independent composable lambdas. This
+    // prevents NativeWorldLabForm from compiling into a JVM method over 64 KB.
+    val digitalCircuitContent: @Composable () -> Unit = {
+            digitalCircuitContent()
+    }
+    val selectedSolidContent: @Composable () -> Unit = {
+            selectedSolidContent()
+    }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("The World Lab",style=MaterialTheme.typography.titleLarge)
         Text("Native offline reference models. Ground and shapes are illustrative, not measured or certified.",
