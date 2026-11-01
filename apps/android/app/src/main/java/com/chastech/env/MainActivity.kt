@@ -255,7 +255,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "datetime", "developer", "ecommerce", "qr", "video")
+private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video")
 
 private fun ToolRecord.isUnderProduction(): Boolean = !productionExemptCategories.contains(category.lowercase(Locale.ROOT))
 
