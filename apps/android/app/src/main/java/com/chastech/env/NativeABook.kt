@@ -567,7 +567,7 @@ fun NativeABookScreen(){
         Text(status,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(error.isNotBlank())Text(error,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            Button(onClick={val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id)}){Text("New note")}
+            Button(onClick={showTrash=false;archived=false;selectedPdfIds=emptySet();val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id,false)}){Text("New note")}
             OutlinedButton(onClick={exportMarkdown.launch("${title.ifBlank{"note"}}.md")},enabled=selected!=null){Text("Export .md")}
             OutlinedButton(onClick={startLocalBackup}){Text("Export backup")}
             OutlinedButton(onClick={importArchivePicker.launch(arrayOf("*/*"))}){Text("Import backup")}
