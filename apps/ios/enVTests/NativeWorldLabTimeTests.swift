@@ -44,6 +44,16 @@ final class NativeWorldLabTimeCheckpointTests:XCTestCase {
   XCTAssertEqual(NativeWorldLabTime.next(current:1,elapsed:0.5,rate:10,duration:5,events:[1,2]),2,accuracy:1e-12)
   XCTAssertEqual(NativeWorldLabTime.next(current:2,elapsed:0.1,rate:1,duration:5,events:[1,2]),2.1,accuracy:1e-12)
  }
+ func testReversePlaybackStopsAtThePreviousRecordedEvent() {
+  XCTAssertEqual(NativeWorldLabTime.previous(current:3,elapsed:0.5,rate:4,
+      duration:5,events:[1,2]),2,accuracy:1e-12)
+  XCTAssertEqual(NativeWorldLabTime.advance(current:2,elapsed:0.5,rate:4,
+      duration:5,events:[1,2],reverse:true),1,accuracy:1e-12)
+  XCTAssertEqual(NativeWorldLabTime.previous(current:1,elapsed:0.5,rate:1,
+      duration:5,events:[1,2]),0.5,accuracy:1e-12)
+  XCTAssertEqual(NativeWorldLabTime.advance(current:1,elapsed:0.5,rate:1,
+      duration:5,events:[Double.nan,6],reverse:true),0.5,accuracy:1e-12)
+ }
  func testPreviousAndNextContactNavigationIsBoundedAndSorted() {
   let events=[0.8,0.2,0.5,0.5,Double.nan,-1,4]
   XCTAssertEqual(NativeWorldLabTime.previousEvent(current:0,duration:3,events:events),0,accuracy:1e-12)
