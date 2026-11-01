@@ -22,6 +22,7 @@ data class NativeWorldLabRecordedRun(
             "World epoch must be a canonical UTC timestamp."
         }
         require(sampleTimesSeconds.size in 2..200_000 &&
+            sampleTimesSeconds.last()<=315_576_000.0 &&
             sampleTimesSeconds.all { it.isFinite() && it>=0.0 } &&
             sampleTimesSeconds.zipWithNext().all { (a,b)->b>a }) {
             "Recorded sample times must be finite, non-negative and strictly increasing."
