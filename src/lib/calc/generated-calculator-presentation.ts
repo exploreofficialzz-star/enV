@@ -20,8 +20,8 @@ for (const spec of MATH_EXERCISE_CATALOG) {
         "exercise",
         "formula",
         spec.key,
-        ...spec.name.toLowerCase().split(/\\s+/),
-        ...targetLabel.toLowerCase().split(/\\s+/),
+        ...spec.name.toLowerCase().split(/\s+/),
+        ...targetLabel.toLowerCase().split(/\s+/),
       ],
     });
   }
@@ -35,7 +35,7 @@ for (const family of EXPANSION_FAMILIES) {
       generatedCalculatorPresentation.set(`exp-${family}-${info.key}-${target}`, {
         name: expansionCalculatorName(info, target),
         description: expansionCalculatorDescription(info, target),
-        keywords: expansionCalculatorKeywords(family, info, target).split(/\\s+/),
+        keywords: expansionCalculatorKeywords(family, info, target).split(/\s+/),
       });
     }
   }
