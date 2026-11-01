@@ -15006,6 +15006,8 @@ private struct NativeABookView: View {
     @State private var extractPageRange = "1-3"
     @State private var commentText = ""
     @State private var activePDFSelection: UUID?
+    @State private var pdfProcessingTask: Task<Void, Never>?
+    @State private var pdfProcessingID: UUID?
 
     private var saveKey: String {
         (selectedID?.uuidString ?? "") + "|" + title + "|" + notebook + "|" + tags + "|" + bodyText + "|" + String(showArchived) + "|" + String(showTrash)
@@ -15231,9 +15233,16 @@ private struct NativeABookView: View {
     }
 
     private func select(_ note: ABookNativeNote?) {
+        let nextID = note?.id
+        if selectedID != nextID {
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
+            pdfText = ""
+            activePDFSelection = nil
+        }
         selectedPDFIDs = []
-        activePDFSelection = nil
-        selectedID = note?.id
+        selectedID = nextID
         title = note?.title ?? ""
         bodyText = note?.body ?? ""
         notebook = note?.notebook ?? "Inbox"
@@ -15312,7 +15321,13 @@ private struct NativeABookView: View {
             try store.removeAttachment(id: attachment.id)
             attachments = try store.attachments(noteID: attachment.noteID)
             selectedPDFIDs.remove(attachment.id)
-            if activePDFSelection == attachment.id { activePDFSelection = nil; pdfText = "" }
+            if activePDFSelection == attachment.id {
+                pdfProcessingTask?.cancel()
+                pdfProcessingTask = nil
+                pdfProcessingID = nil
+                activePDFSelection = nil
+                pdfText = ""
+            }
             status = "Attachment removed from this device"
             errorText = ""
         } catch { showError(error) }
@@ -15656,19 +15671,49 @@ private struct NativeABookView: View {
     }
 
     private func processPDF(_ attachment: ABookNativeAttachment, operation: String) {
+        guard let noteID = selectedID,
+              attachments.contains(where: { $0.id == attachment.id && $0.noteID == noteID }) else {
+            return
+        }
+        guard attachment.size > 0, attachment.size <= 200 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 72, userInfo: [
+                NSLocalizedDescriptionKey: "Choose a readable PDF smaller than 200 MB."
+            ]))
+            return
+        }
         let sourceURL: URL
         do { sourceURL = try store.fileURL(for: attachment) }
         catch { showError(error); return }
-        let attachmentID = attachment.id
-        let attachmentName = attachment.name
-        Task.detached(priority: .userInitiated) {
+
+        // A new PDF task supersedes the previous one. Selection changes and
+        // attachment removal cancel active work and invalidate its result token.
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        activePDFSelection = attachment.id
+        pdfText = ""
+        status = operation == "ocr" ? "Recognizing scanned PDF locally…" : operation == "rotate" ? "Rotating PDF locally…" : "Extracting PDF text locally…"
+
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
             do {
-                guard let document = PDFDocument(url: sourceURL) else { throw NSError(domain: "ABookPDF", code: 1, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."]) }
+                try Task.checkCancellation()
+                guard let document = PDFDocument(url: sourceURL) else {
+                    throw NSError(domain: "ABookPDF", code: 1, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."])
+                }
+                guard document.pageCount > 0 else {
+                    throw NSError(domain: "ABookPDF", code: 73, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."])
+                }
+                if operation != "ocr", document.pageCount > 5_000 {
+                    throw NSError(domain: "ABookPDF", code: 74, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be processed in one operation."])
+                }
+
                 var extracted = ""
                 if operation == "extract" {
+                    try Task.checkCancellation()
                     extracted = String((document.string ?? "").prefix(150_000))
                 } else if operation == "ocr" {
                     for index in 0..<min(document.pageCount, 100) {
+                        try Task.checkCancellation()
                         guard let page = document.page(at: index) else { continue }
                         let image = page.thumbnail(of: CGSize(width: 1600, height: 2200), for: .mediaBox)
                         guard let cgImage = image.cgImage else { continue }
@@ -15676,37 +15721,69 @@ private struct NativeABookView: View {
                         request.recognitionLevel = .accurate
                         request.usesLanguageCorrection = true
                         try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+                        try Task.checkCancellation()
                         let rows = request.results?.compactMap { $0.topCandidates(1).first?.string } ?? []
                         extracted += rows.joined(separator: "\n") + "\n"
-                        if extracted.count > 150_000 { break }
+                        if extracted.count >= 150_000 { break }
                     }
                     extracted = String(extracted.prefix(150_000))
                 } else if operation == "rotate" {
                     for index in 0..<document.pageCount {
+                        try Task.checkCancellation()
                         guard let page = document.page(at: index) else { continue }
                         page.rotation = (page.rotation + 90) % 360
                     }
-                    guard let data = document.dataRepresentation() else { throw NSError(domain: "ABookPDF", code: 2, userInfo: [NSLocalizedDescriptionKey: "The rotated PDF could not be exported."]) }
-                    let rotatedName = attachmentName.replacingOccurrences(of: ".pdf", with: "", options: .caseInsensitive) + "-rotated.pdf"
+                    guard let data = document.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 2, userInfo: [NSLocalizedDescriptionKey: "The rotated PDF could not be exported."])
+                    }
+                    try Task.checkCancellation()
                     await MainActor.run {
+                        guard pdfProcessingID == operationID,
+                              selectedID == noteID,
+                              attachments.contains(where: { $0.id == attachment.id }) else { return }
                         pdfData = data
-                        pdfName = rotatedName
+                        pdfName = attachment.name.replacingOccurrences(of: ".pdf", with: "", options: .caseInsensitive) + "-rotated.pdf"
                         exportingPDF = true
                         status = "PDF processed locally"
-                        activePDFSelection = attachmentID
                         pdfText = ""
+                        pdfProcessingTask = nil
+                        pdfProcessingID = nil
                     }
                     return
+                } else {
+                    throw NSError(domain: "ABookPDF", code: 75, userInfo: [NSLocalizedDescriptionKey: "Unsupported local PDF operation."])
                 }
+
+                try Task.checkCancellation()
                 let extractedText = extracted
+                let truncatedOCR = operation == "ocr" && document.pageCount > 100
                 await MainActor.run {
+                    guard pdfProcessingID == operationID,
+                          selectedID == noteID,
+                          attachments.contains(where: { $0.id == attachment.id }) else { return }
                     pdfText = extractedText
-                    activePDFSelection = attachmentID
-                    status = operation == "ocr" ? "OCR completed on this device" : "Text extracted on this device"
+                    activePDFSelection = attachment.id
+                    if extractedText.isEmpty {
+                        status = operation == "ocr" ? "No readable text found on this PDF" : "No selectable text found on this PDF"
+                    } else if operation == "ocr" {
+                        status = truncatedOCR ? "On-device OCR completed · first 100 pages" : "OCR completed on this device"
+                    } else {
+                        status = "Text extracted on this device"
+                    }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
                     errorText = ""
                 }
             } catch {
-                await MainActor.run { showError(error) }
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID,
+                          attachments.contains(where: { $0.id == attachment.id }) else { return }
+                    showError(error)
+                }
             }
         }
     }
