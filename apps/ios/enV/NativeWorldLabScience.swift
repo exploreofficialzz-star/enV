@@ -300,3 +300,83 @@ enum NativeWorldLabSI {
         }
     }
 }
+
+
+struct NativeScienceComponent {
+    let id:String
+    let modelId:String
+    let ports:[NativeSciencePort]
+}
+struct NativeScienceEdge {
+    let fromComponentId:String
+    let fromPortId:String
+    let toComponentId:String
+    let toPortId:String
+    let delayed:Bool
+}
+struct NativeScientificGraph {
+    let projectId:String
+    let projectRevision:Int
+    let components:[NativeScienceComponent]
+    let connections:[NativeScienceEdge]
+}
+/** Swift-native strict graph preflight; project JSON is data, not executable adapters. */
+enum NativeWorldLabGraph {
+    private static func validId(_ value:String)->Bool{
+        !value.isEmpty && value.range(of:"^[A-Za-z0-9_-]{1,120}$",
+                                     options:.regularExpression) != nil
+    }
+    static func validate(_ graph:NativeScientificGraph)throws {
+        guard validId(graph.projectId),graph.projectRevision>=0,
+              graph.projectRevision<=1_000_000_000,
+              (1...128).contains(graph.components.count),
+              graph.connections.count<=512 else {
+            throw NativeWorldLabError.invalid("Invalid scientific graph identity or capacity")
+        }
+        var parts:[String:NativeScienceComponent]=[:]
+        for item in graph.components {
+            guard validId(item.id),validId(item.modelId),parts[item.id]==nil,
+                  (1...20).contains(item.ports.count) else {
+                throw NativeWorldLabError.invalid("Duplicate component or unsupported port count")
+            }
+            var used=Set<String>()
+            for port in item.ports {
+                guard validId(port.id),used.insert(port.id).inserted,
+                      ["input","output","bidirectional"].contains(port.direction),
+                      ["SCALAR","LOCAL_ENU","ECEF","INERTIAL"].contains(port.frame),
+                      ["electrical","mechanical","thermal","fluid","chemical","signal"].contains(port.flow) else {
+                    throw NativeWorldLabError.invalid("Invalid scientific port metadata")
+                }
+                _ = try NativeWorldLabSI.declare(0,unit:port.unit)
+            }
+            parts[item.id]=item
+        }
+        var targetIds=Set<String>()
+        var adjacency=Dictionary(uniqueKeysWithValues:parts.keys.map{($0,Set<String>())})
+        for edge in graph.connections {
+            guard let origin=parts[edge.fromComponentId]?.ports.first(where:{$0.id==edge.fromPortId}),
+                  let destination=parts[edge.toComponentId]?.ports.first(where:{$0.id==edge.toPortId}) else {
+                throw NativeWorldLabError.invalid("Scientific graph references an unknown port")
+            }
+            try NativeWorldLabSI.connect(origin,destination)
+            guard targetIds.insert(edge.toComponentId+":"+edge.toPortId).inserted else {
+                throw NativeWorldLabError.invalid("Scientific input has multiple upstream drivers")
+            }
+            if !edge.delayed {
+                adjacency[edge.fromComponentId,default:[]].insert(edge.toComponentId)
+            }
+        }
+        var seen=Set<String>(),active=Set<String>()
+        func visit(_ key:String)throws {
+            if seen.contains(key){return}
+            guard !active.contains(key) else {
+                throw NativeWorldLabError.invalid("Instantaneous scientific feedback cycle")
+            }
+            active.insert(key)
+            for next in adjacency[key] ?? [] {try visit(next)}
+            active.remove(key)
+            seen.insert(key)
+        }
+        for key in parts.keys {try visit(key)}
+    }
+}
