@@ -374,13 +374,47 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   </span>
                 </div>
               ) : null}
-              {correction?.foreground && !activeCheck?.result.passes ? (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-3">
-                  <div>
-                    <p className="text-xs font-semibold text-fg">Suggested foreground</p>
-                    <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.foreground)}</p>
+              {!activeCheck?.result.passes && correction ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-semibold text-fg">Ways to reach the selected contrast target</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {correction.foreground ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Adjust foreground</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.foreground)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setForegroundValue(toHex(correction.foreground!))}>Apply</Button>
+                      </div>
+                    ) : null}
+                    {correction.background ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Adjust background</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.background)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setBackgroundValue(toHex(correction.background!))}>Apply</Button>
+                      </div>
+                    ) : null}
+                    {correction.foregroundOpacity ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Increase foreground opacity</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.foregroundOpacity)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setForegroundValue(toHex(correction.foregroundOpacity!))}>Apply</Button>
+                      </div>
+                    ) : null}
+                    {correction.backgroundOpacity ? (
+                      <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-surface-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-fg">Increase background opacity</p>
+                          <p className="mt-1 font-mono text-xs text-muted">{toHex(correction.backgroundOpacity)}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => setBackgroundValue(toHex(correction.backgroundOpacity!))}>Apply</Button>
+                      </div>
+                    ) : null}
                   </div>
-                  <Button type="button" size="sm" onClick={() => setForegroundValue(toHex(correction.foreground!))}>Apply suggestion</Button>
                 </div>
               ) : null}
             </div>

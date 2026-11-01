@@ -40,6 +40,7 @@ const componentA11y = read("src/lib/engines/design-component-a11y.ts");
 const componentA11yTests = read("src/lib/engines/design-component-a11y.test.ts");
 const cssBorder = read("src/lib/engines/css-border.ts");
 const cssBorderTests = read("src/lib/engines/css-border.test.ts");
+const contrastTests = read("src/lib/engines/accessibility-color.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -75,6 +76,7 @@ const checks = [
   ["Live contrast feedback for generated buttons, cards, badges and inputs", componentA11y.includes("inspectDesignComponentContrast") && componentA11y.includes("non-text") && componentA11yTests.includes("cards check title") && cssEngine.includes("Component contrast check") && cssEngine.includes("inspectDesignComponentContrast(family, values)")],
   ["Editable color-vision palette", colorEngine.includes("Test your own interface colors") && colorEngine.includes("Reset sample colors")],
   ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background, canvas)") && colorEngine.includes("previewPair.background")],
+  ["Foreground, background and opacity contrast correction choices", colorEngine.includes("Adjust foreground") && colorEngine.includes("Adjust background") && colorEngine.includes("Increase foreground opacity") && colorEngine.includes("Increase background opacity") && contrastTests.includes("can adjust either color")],
   ["Independent border edge widths, corner radii and safe CSS export", cssBorder.includes("border-width:") && cssBorder.includes("border-radius:") && cssBorderTests.includes("independent edge widths") && cssEngine.includes("Top edge width") && cssEngine.includes("buildCssBorder")],
   ["SVG noise filter and bounded export utility", svgGenerators.includes("feTurbulence") && svgGenerators.includes("safeHex") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
   ["Blob, pattern and wave generator regression tests", svgGenerators.includes("buildWaveSvg") && svgGenerators.includes("buildBlobSvg") && svgGenerators.includes("PatternStyle") && svgGeneratorTests.includes("wave geometry responds to frequency") && svgGeneratorTests.includes("pattern generator clamps settings") && svgGeneratorTests.includes("outlined")],
