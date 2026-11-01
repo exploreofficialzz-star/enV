@@ -14,6 +14,7 @@ async function runDirect(task: ABookPdfWorkerTask): Promise<unknown> {
     case "split-batch": return pdf.splitSelectedPdfsIntoZip(task.files, task.pageGroups);
     case "rotate-batch": return pdf.rotateSelectedPdfs(task.files, task.angle);
     case "merge": return pdf.mergePdfs(task.files);
+    default: throw new Error("Unsupported local PDF operation.");
   }
 }
 
