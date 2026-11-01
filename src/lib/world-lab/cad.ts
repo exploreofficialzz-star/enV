@@ -15,7 +15,24 @@ export function cadRotationMatrix(rotation:readonly [number,number,number]):Matr
  const rx:Matrix3=[1,0,0,0,cx,-sx,0,sx,cx],ry:Matrix3=[cy,0,sy,0,1,0,-sy,0,cy],rz:Matrix3=[cz,-sz,0,sz,cz,0,0,0,1];
  return multiply(multiply(ry,rx),rz);
 }
-export type CadBounds=Readonly<{min:readonly [number,number,number];max:readonly [number,number,number];center:readonly [number,number,number];halfExtents:readonly [number,number,number]}>;
+export type CadBounds=Readonly<{min:readonly [number,number,number];max:readonly [number,number,number];center:readonly [number,number,number];halfExtents:readonly [number,number,number]}>
+function cadMatrixAngles(m:Matrix3):[number,number,number]{
+ const x=Math.asin(Math.max(-1,Math.min(1,-m[5]))),cx=Math.cos(x);
+ const y=Math.abs(cx)>1e-8?Math.atan2(m[2],m[8]):Math.atan2(-m[6],m[0]);
+ const z=Math.abs(cx)>1e-8?Math.atan2(m[3],m[4]):0;
+ return [wrap(x),wrap(y),wrap(z)];
+}
+function axisRotation(axis:number,radians:number):Matrix3{
+ const c=Math.cos(radians),s=Math.sin(radians);
+ if(axis===0)return [1,0,0,0,c,-s,0,s,c];
+ if(axis===1)return [c,0,s,0,1,0,-s,0,c];
+ return [c,-s,0,s,c,0,0,0,1];
+}
+function rotatedPoint(p:readonly [number,number,number],pivot:readonly [number,number,number],m:Matrix3):[number,number,number]{
+ const d=p.map((v,i)=>v-pivot[i]);
+ return [0,1,2].map(row=>pivot[row]+m[row*3]*d[0]+m[row*3+1]*d[1]+m[row*3+2]*d[2]) as [number,number,number];
+}
+;
 export function cadBounds(entity:WorldLabEntity):CadBounds{
  const r=cadRotationMatrix(entity.rotationRadians??[0,0,0]),d=entity.dimensionsMeters.map(v=>v/2);
  const h:[number,number,number]=[
@@ -65,11 +82,22 @@ export function linearPattern(p:WorldLabProject,entityIds:readonly string[],axis
 }
 export function circularPattern(p:WorldLabProject,entityIds:readonly string[],axis:CadAxis,center:readonly [number,number,number],instances:number,idFactory:()=>string):WorldLabProject{
  if(!Number.isInteger(instances)||instances<2||instances>36)throw new Error("Circular patterns support 2–36 total instances.");center.forEach(v=>bounded(v,-100000,100000,"Pattern center"));
- const project=parseWorldLabProject(p),items=chosen(project,entityIds);if(project.entities.length+items.length*(instances-1)>200)throw new Error("Circular pattern would exceed the 200-part project limit.");
+ const project=parseWorldLabProject(p),items=chosen(project,entityIds);
+ if(project.entities.length+items.length*(instances-1)>200)throw new Error("Circular pattern would exceed the 200-part project limit.");
  const a=axisIndex(axis),b=(a+1)%3,c=(a+2)%3,used=new Set(project.entities.map(e=>e.id)),clones:WorldLabEntity[]=[];
- for(let n=1;n<instances;n++){const angle=n*2*Math.PI/instances,co=Math.cos(angle),si=Math.sin(angle);for(const e of items){const pos=[...e.positionMeters] as [number,number,number],u=e.positionMeters[b]-center[b],v=e.positionMeters[c]-center[c];pos[b]=center[b]+u*co-v*si;pos[c]=center[c]+u*si+v*co;bounded(pos[b],-100000,100000,"Circular-pattern position");bounded(pos[c],-100000,100000,"Circular-pattern position");const rot=[...(e.rotationRadians??[0,0,0])] as [number,number,number];rot[a]=wrap(rot[a]+angle);clones.push({...e,id:uniqueId(idFactory,used),name:(e.name+" "+(n+1)).slice(0,120),positionMeters:pos,rotationRadians:rot});}}
+ for(let n=1;n<instances;n++){
+  const angle=n*2*Math.PI/instances,co=Math.cos(angle),si=Math.sin(angle),world=axisRotation(a,angle);
+  for(const e of items){
+   const pos=[...e.positionMeters] as [number,number,number],u=e.positionMeters[b]-center[b],v=e.positionMeters[c]-center[c];
+   pos[b]=center[b]+u*co-v*si;pos[c]=center[c]+u*si+v*co;
+   bounded(pos[b],-100000,100000,"Circular-pattern position");bounded(pos[c],-100000,100000,"Circular-pattern position");
+   const rotation=cadMatrixAngles(multiply(world,cadRotationMatrix(e.rotationRadians??[0,0,0])));
+   clones.push({...e,id:uniqueId(idFactory,used),name:(e.name+" "+(n+1)).slice(0,120),positionMeters:pos,rotationRadians:rotation});
+  }
+ }
  return finalize(project,[...project.entities,...clones]);
 }
+
 /** Reflect a symmetric primitive and its right-handed orientation across a world-axis plane. */
 export function mirrorSolids(p:WorldLabProject,entityIds:readonly string[],axis:CadAxis,planeCoordinate:number):WorldLabProject{
  const project=parseWorldLabProject(p),selected=new Set(chosen(project,entityIds).map(e=>e.id)),a=axisIndex(axis);bounded(planeCoordinate,-100000,100000,"Mirror plane");
@@ -87,6 +115,37 @@ export function distributeSolids(p:WorldLabProject,entityIds:readonly string[],a
  const sorted=items.map(e=>({e,b:cadBounds(e)})).sort((x,y)=>x.b.center[a]-y.b.center[a]),next=new Map<string,number>();let cursor=sorted[0].b.max[a];
  for(let i=1;i<sorted.length;i++){const item=sorted[i],center=cursor+gapMeters+item.b.halfExtents[a];bounded(center,-100000,100000,"Distributed position");next.set(item.e.id,center);cursor=center+item.b.halfExtents[a];}
  const selected=new Set(items.map(e=>e.id));return finalize(project,project.entities.map(e=>{if(!selected.has(e.id)||!next.has(e.id))return e;const pos=[...e.positionMeters] as [number,number,number];pos[a]=next.get(e.id)!;return {...e,positionMeters:pos};}));
+}
+
+
+/** Rotate selected part centres and orientations around their shared centroid. */
+export function rotateGroupAroundCentroid(p:WorldLabProject,entityIds:readonly string[],axis:CadAxis,degrees:number):WorldLabProject{
+ const project=parseWorldLabProject(p),items=chosen(project,entityIds),a=axisIndex(axis);
+ bounded(degrees,-3600,3600,"Group rotation increment");
+ const pivot=[0,1,2].map(i=>items.reduce((sum,e)=>sum+e.positionMeters[i],0)/items.length) as [number,number,number];
+ const group=axisRotation(a,degrees*Math.PI/180);
+ const rotations=new Map(items.map(e=>[e.id,cadMatrixAngles(multiply(group,cadRotationMatrix(e.rotationRadians??[0,0,0])))]));
+ return finalize(project,project.entities.map(e=>{
+  if(!rotations.has(e.id))return e;
+  const position=rotatedPoint(e.positionMeters,pivot,group);
+  position.forEach(v=>bounded(v,-100000,100000,"Group rotation position"));
+  return {...e,positionMeters:position,rotationRadians:rotations.get(e.id)!};
+ }));
+}
+/** Uniformly scale selected parts and their relative offsets about their shared centroid. */
+export function scaleGroupAroundCentroid(p:WorldLabProject,entityIds:readonly string[],factor:number):WorldLabProject{
+ const project=parseWorldLabProject(p),items=chosen(project,entityIds);
+ bounded(factor,0.001,1000,"Group scale factor");
+ const pivot=[0,1,2].map(i=>items.reduce((sum,e)=>sum+e.positionMeters[i],0)/items.length) as [number,number,number];
+ const selected=new Set(items.map(e=>e.id));
+ return finalize(project,project.entities.map(e=>{
+  if(!selected.has(e.id))return e;
+  const position=e.positionMeters.map((v,i)=>pivot[i]+(v-pivot[i])*factor) as [number,number,number];
+  const dimensions=e.dimensionsMeters.map(v=>v*factor) as [number,number,number];
+  position.forEach(v=>bounded(v,-100000,100000,"Group scale position"));
+  dimensions.forEach(v=>bounded(v,0.001,10000,"Group scale dimensions"));
+  return {...e,positionMeters:position,dimensionsMeters:dimensions};
+ }));
 }
 
 export type SketchExtrusionInput=Readonly<{

@@ -705,7 +705,7 @@ object NativeWorldLabEditor {
                 else listOf(0.0,0.0,0.0)
             val matrix=rotationMatrix(angles)
             val signs=listOf(1.0,1.0,1.0).toMutableList().also{it[axis]=-1.0}
-            val localSigns=listOf(-1.0,1.0,1.0)
+            val localSigns=listOf(1.0,1.0,1.0).toMutableList().also{it[axis]=-1.0}
             val reflected=Array(3){row->DoubleArray(3){col->
                 signs[row]*matrix[row][col]*localSigns[col]
             }}
@@ -800,7 +800,7 @@ object NativeWorldLabEditor {
         p.put(axis,coordinate)
         val r=rotationMatrix(if(solid.has("rotationRadians"))(0..2).map{solid.getJSONArray("rotationRadians").getDouble(it)} else listOf(0.0,0.0,0.0))
         val signs=listOf(1.0,1.0,1.0).toMutableList();signs[axis]=-1.0
-        val localSigns=listOf(-1.0,1.0,1.0)
+        val localSigns=listOf(1.0,1.0,1.0).toMutableList().also{it[axis]=-1.0}
         val reflected=Array(3){row->DoubleArray(3){col->signs[row]*r[row][col]*localSigns[col]}}
         solid.put("rotationRadians",JSONArray(matrixAngles(reflected)))
     }

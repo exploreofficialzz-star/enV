@@ -742,3 +742,10 @@ release-candidate evidence bundle are unfinished.
 - Translation and reflection retain selection identity; pattern operations clone complete source geometry/material metadata with fresh IDs, preserve rotations by composing world-axis matrices, reject non-finite/out-of-range coordinates, and enforce the 200-part and pattern-count limits.
 - Native CAD panels now expose controls for translation, mirror plane, linear spacing/copy count, circular center and instance count.
 - Added native test source for group translation/reflection/pattern growth and invalid settings. These tests are pending exact-head CI.
+
+
+## C/D cross-platform CAD group-transform parity — 2026-11-01
+- The TypeScript/Web CAD engine now provides shared-centroid group rotation and uniform group scaling, matching Android and iOS native editors. Selected part centres/orientations move as one assembly; unselected parts remain unchanged.
+- Circular pattern orientation composes a world-axis rotation matrix with each part's full source orientation, including pre-tilted parts, across Web, Android and iOS.
+- Native reflection decomposition now uses the same selected axis for local and world reflection, matching the Web right-handed reflection convention.
+- Added Web regressions for group pivot transforms, unselected-part isolation, invalid inputs and patterns from already-tilted source geometry.

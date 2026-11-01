@@ -1,6 +1,6 @@
 import test from "node:test";import assert from "node:assert/strict";
 import {blankWorldLabProject,newSolid} from "./project.ts";
-import {alignSolids,cadBounds,circularPattern,distributeSolids,duplicateSolids,linearPattern,mirrorSolids,rotateSolids,scaleSolids} from "./cad.ts";
+import {alignSolids,cadBounds,cadRotationMatrix,circularPattern,distributeSolids,duplicateSolids,linearPattern,mirrorSolids,rotateGroupAroundCentroid,rotateSolids,scaleGroupAroundCentroid,scaleSolids} from "./cad.ts";
 const base=()=>{const p=blankWorldLabProject("cad_lab","2026-11-01T00:00:00Z");p.entities.push({...newSolid("a","box",0),positionMeters:[0,0,0]},{...newSolid("b","box",1),positionMeters:[4,0,0]},{...newSolid("c","box",2),positionMeters:[10,0,0]});return p;};
 const ids=(prefix:string)=>{let i=0;return ()=>prefix+"_"+(++i);};
 test("rotation produces orientation-aware bounds without mutating source",()=>{const p=base(),q=rotateSolids(p,["a"],"z",45);assert.ok(Math.abs(q.entities[0].rotationRadians[2]-Math.PI/4)<1e-12);assert.ok(cadBounds(q.entities[0]).halfExtents[0]>0.7);assert.deepEqual(p.entities[0].rotationRadians,[0,0,0]);});
@@ -32,4 +32,36 @@ test("sketch extrusion rejects invalid profiles, locations and entity limits",()
 function solidVolume(e:{shape:string;dimensionsMeters:readonly number[]}){
  const [x,y,z]=e.dimensionsMeters;
  return e.shape==="cylinder"?Math.PI*x*z*y/4:x*y*z;
+}
+
+test("group rotation and scaling use a shared centroid and isolate unselected parts",()=>{
+ const p=base();p.entities[0].positionMeters=[-2,0.5,0];p.entities[1].positionMeters=[2,0.5,0];
+ const rotated=rotateGroupAroundCentroid(p,["a","b"],"y",90);
+ assert.ok(Math.abs(rotated.entities[0].positionMeters[0])<1e-9);
+ assert.ok(Math.abs(rotated.entities[0].positionMeters[2]-2)<1e-9);
+ assert.ok(Math.abs(rotated.entities[1].positionMeters[2]+2)<1e-9);
+ assert.deepEqual(rotated.entities[2].positionMeters,p.entities[2].positionMeters);
+ const scaled=scaleGroupAroundCentroid(rotated,["a","b"],2);
+ assert.deepEqual(scaled.entities[0].dimensionsMeters,[2,2,2]);
+ assert.ok(Math.abs(scaled.entities[0].positionMeters[2]-4)<1e-9);
+ assert.ok(Math.abs(scaled.entities[1].positionMeters[2]+4)<1e-9);
+ assert.deepEqual(scaled.entities[2].positionMeters,p.entities[2].positionMeters);
+ assert.throws(()=>rotateGroupAroundCentroid(p,["missing"],"x",20),/no longer exists/);
+ assert.throws(()=>scaleGroupAroundCentroid(p,["a","b"],0),/Group scale/);
+});
+test("circular pattern composes world-axis rotation with a tilted source orientation",()=>{
+ const p=base();p.entities[1].rotationRadians=[0.35,-0.2,0.6];
+ const ring=circularPattern(p,["b"],"y",[0,0,0],4,ids("tilt"));
+ const actual=cadRotationMatrix(ring.entities[3].rotationRadians??[0,0,0]);
+ const expected=multiplyForTest(axisRotationForTest(1,Math.PI/2),cadRotationMatrix(p.entities[1].rotationRadians));
+ for(let i=0;i<9;i++)assert.ok(Math.abs(actual[i]-expected[i])<1e-8);
+});
+function axisRotationForTest(axis:number,r:number):number[]{
+ const c=Math.cos(r),s=Math.sin(r);
+ if(axis===0)return [1,0,0,0,c,-s,0,s,c];
+ if(axis===1)return [c,0,s,0,1,0,-s,0,c];
+ return [c,-s,0,s,c,0,0,0,1];
+}
+function multiplyForTest(a:number[],b:number[]):number[]{
+ return Array.from({length:9},(_,i)=>{const row=Math.floor(i/3),col=i%3;return a[row*3]*b[col]+a[row*3+1]*b[3+col]+a[row*3+2]*b[6+col];});
 }

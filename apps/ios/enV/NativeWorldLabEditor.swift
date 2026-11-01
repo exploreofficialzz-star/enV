@@ -779,7 +779,7 @@ enum NativeWorldLabEditor {
                 }
                 let matrix=Self.rotationMatrix(angles)
                 var signs=[1.0,1.0,1.0];signs[axis] = -1
-                let local=[-1.0,1.0,1.0]
+                var local=[1.0,1.0,1.0];local[axis] = -1
                 let reflected=(0..<3).map{row in
                     (0..<3).map{col in signs[row]*matrix[row][col]*local[col]}
                 }
@@ -891,7 +891,7 @@ enum NativeWorldLabEditor {
             let angles=solid["rotationRadians"] as? [Double] ?? [0,0,0]
             let r=Self.rotationMatrix(angles)
             var signs=[1.0,1.0,1.0];signs[axis] = -1
-            let local=[-1.0,1.0,1.0]
+            var local=[1.0,1.0,1.0];local[axis] = -1
             let reflected=(0..<3).map{row in (0..<3).map{col in signs[row]*r[row][col]*local[col]}}
             solid["positionMeters"]=position
             solid["rotationRadians"]=Self.matrixAngles(reflected)
