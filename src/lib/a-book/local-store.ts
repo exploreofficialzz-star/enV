@@ -327,6 +327,50 @@ export async function deleteAttachment(id: string): Promise<void> {
   await done;
 }
 
+
+export async function importLocalLibrary(data: {
+  notes: ABookNote[];
+  revisions: ABookRevision[];
+  attachments: ABookAttachment[];
+}): Promise<number> {
+  const db = await openDatabase();
+  const noteIds = new Map<string, string>();
+  for (const note of data.notes) noteIds.set(note.id, createId());
+  const importedNotes = data.notes.map((note) => ({ ...note, id: noteIds.get(note.id)! }));
+  const importedRevisions = data.revisions
+    .filter((revision) => noteIds.has(revision.noteId))
+    .map((revision) => ({ ...revision, id: createId(), noteId: noteIds.get(revision.noteId)! }));
+  const importedAttachments = data.attachments
+    .filter((attachment) => noteIds.has(attachment.noteId))
+    .map((attachment) => ({ ...attachment, id: createId(), noteId: noteIds.get(attachment.noteId)! }));
+  const tx = db.transaction(["notes", "revisions", "attachments"], "readwrite");
+  const done = transactionDone(tx, "The A book backup could not be imported completely.");
+  const notes = tx.objectStore("notes");
+  const revisions = tx.objectStore("revisions");
+  const attachments = tx.objectStore("attachments");
+  importedNotes.forEach((note) => notes.add(note));
+  importedRevisions.forEach((revision) => revisions.add(revision));
+  importedAttachments.forEach((attachment) => attachments.add(attachment));
+  await done;
+  return importedNotes.length;
+}
+
+export async function permanentlyDeleteNote(noteId: string): Promise<void> {
+  const db = await openDatabase();
+  const tx = db.transaction(["notes", "revisions", "attachments"], "readwrite");
+  const done = transactionDone(tx, "The note could not be permanently deleted.");
+  tx.objectStore("notes").delete(noteId);
+  for (const storeName of ["revisions", "attachments"] as const) {
+    const cursorRequest = tx.objectStore(storeName).index("noteId").openCursor(IDBKeyRange.only(noteId));
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (cursor) { cursor.delete(); cursor.continue(); }
+    };
+    cursorRequest.onerror = () => tx.abort();
+  }
+  await done;
+}
+
 export async function getLocalStorageStatus(): Promise<{ persistent: boolean; quota?: number; usage?: number }> {
   if (typeof navigator === "undefined") return { persistent: false };
   let persistent = false;
