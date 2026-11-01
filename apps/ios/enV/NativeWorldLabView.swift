@@ -23,6 +23,13 @@ private struct NativeWorldLabJsonFile: FileDocument {
 struct NativeWorldLabView:View {
     @State private var mode=0
     @State private var seconds=0.0
+    @State private var branchSourceInput:NativeLabInput?
+    @State private var branchSourceRunId=""
+    @State private var branchSourceTime=0.0
+    @State private var branchRecord:NativeWorldLabBranchRecord?
+    @State private var branchStatus=""
+    @State private var exportingBranch=false
+    @State private var branchFile:NativeWorldLabJsonFile?
     @State private var speed=1.0
     @State private var playing=false
     @State private var reversePlayback=false
@@ -633,6 +640,62 @@ struct NativeWorldLabView:View {
                     Text("Thermal diffusivity: "+String(format:"%.4f",diffusivity)+" m²/s")
                     Slider(value:$diffusivity,in:0.001...0.08)
                 }
+                GroupBox("Experiment branches") {
+                    VStack(alignment:.leading,spacing:8) {
+                        Text("Capture the current native model inputs as a source, change model assumptions, then calculate a separate child run at the same simulation time. The source snapshot is preserved.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        HStack {
+                            Button("Capture source") {
+                                branchSourceInput=input
+                                branchSourceRunId=UUID().uuidString
+                                branchSourceTime=seconds
+                                branchRecord=nil
+                                branchStatus="Source snapshot captured. Change a model or parameter, then calculate a new branch."
+                            }.buttonStyle(.bordered)
+                            Button("Calculate new branch") {
+                                guard let source=branchSourceInput else{return}
+                                do {
+                                    let record=try NativeWorldLabBranch.make(source:source,target:input,
+                                        sourceTimeSeconds:branchSourceTime,sourceRunId:branchSourceRunId)
+                                    _ = try NativeWorldLabBranch.recompute(input,record:record)
+                                    branchRecord=record
+                                    seconds=branchSourceTime
+                                    playing=false;reversePlayback=false
+                                    branchStatus="New branch recomputed. The captured source inputs remain unchanged."
+                                }catch{branchStatus=error.localizedDescription}
+                            }.buttonStyle(.borderedProminent)
+                                .disabled(branchSourceInput == nil)
+                        }
+                        if let branchRecord {
+                            Text("Branch "+branchRecord.branchId+" · "+
+                                branchRecord.sourceModelId+" → "+branchRecord.targetModelId)
+                                .font(.caption).textSelection(.enabled)
+                            Text("Source run "+branchRecord.sourceRunId+" · "+
+                                String(branchRecord.inputDiff.count)+" changed inputs · "+
+                                String(format:"%.4f",branchRecord.targetTimeSeconds)+" s · "+
+                                branchRecord.fidelity)
+                                .font(.caption).foregroundStyle(.secondary)
+                            ForEach(branchRecord.inputDiff,id:\.field){change in
+                                Text(change.field+": "+
+                                    (change.previous.map{String(format:"%.6g",$0)} ?? "unset")+
+                                    " → "+(change.next.map{String(format:"%.6g",$0)} ?? "unset"))
+                                    .font(.caption)
+                            }
+                            Button("Export branch evidence") {
+                                do {
+                                    let encoder=JSONEncoder()
+                                    encoder.outputFormatting=[.prettyPrinted,.sortedKeys]
+                                    branchFile=NativeWorldLabJsonFile(content:try encoder.encode(branchRecord))
+                                    exportingBranch=true
+                                }catch{branchStatus=error.localizedDescription}
+                            }.buttonStyle(.bordered)
+                        }
+                        if !branchStatus.isEmpty {
+                            Text(branchStatus).font(.caption).foregroundStyle(.secondary)
+                                .accessibilityAddTraits(.updatesFrequently)
+                        }
+                    }
+                }
                 Text("Computed observations").font(.headline)
                 if let reading=values {
                     if mode==0 {
@@ -942,6 +1005,11 @@ struct NativeWorldLabView:View {
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingBranch,document:branchFile,
+            contentType:.json,defaultFilename:"world-lab-native-branch"){result in
+                if case .failure(let error)=result {branchStatus=error.localizedDescription}
+                else {branchStatus="Versioned branch evidence exported."}
             }
         .fileExporter(isPresented:$exportingCAD,document:cadExchangeFile,
             contentType:.json,defaultFilename:"world-lab-cad-geometry"){result in
