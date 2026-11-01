@@ -74,6 +74,8 @@ fun NativeWorldLabViewport(
     onClearGeodeticOrigin:()->Unit,
     inspection:NativeInspectionSettings=NativeInspectionSettings(),
     onInspectionChange:(NativeInspectionSettings)->Unit={},
+    canUndoInspectionView:Boolean=false,canRedoInspectionView:Boolean=false,
+    onUndoInspectionView:()->Unit={},onRedoInspectionView:()->Unit={},
 ){
     val screenDensity=LocalDensity.current.density
     var showLabels by remember(project.id){mutableStateOf(true)}
@@ -397,6 +399,8 @@ fun NativeWorldLabViewport(
         OutlinedButton(onClick={showViewportOverlays=!showViewportOverlays}){
             Text(if(showViewportOverlays)"Hide overlays" else "Show overlays")
         }
+        OutlinedButton(onClick=onUndoInspectionView,enabled=canUndoInspectionView){Text("Undo view")}
+        OutlinedButton(onClick=onRedoInspectionView,enabled=canRedoInspectionView){Text("Redo view")}
         OutlinedButton(onClick={
             onInspectionChange(NativeInspectionSettings())
             showLabels=true;showViewportOverlays=true
