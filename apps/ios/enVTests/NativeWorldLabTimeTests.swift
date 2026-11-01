@@ -140,3 +140,23 @@ final class NativeWorldLabRecordedTimeTests:XCTestCase {
         XCTAssertThrowsError(try event.validate())
     }
 }
+
+    func testMandatoryEventBetweenSamplesStopsAtExactSimulationTime()throws {
+        let base=run()
+        let recording=NativeWorldLabRecordedRun(runId:base.runId,modelId:base.modelId,
+            modelVersion:base.modelVersion,worldEpochUTC:base.worldEpochUTC,
+            sampleTimesSeconds:base.sampleTimesSeconds,mandatoryEventTimesSeconds:[0.15])
+        let initial=try NativeWorldLabRecordedTime.start(run:recording,
+            wallTimeUTC:"2026-11-01T12:00:00Z",timezoneDisplay:"Africa/Lagos")
+        let running=NativeWorldLabRecordedClock(wallTimeUTC:initial.wallTimeUTC,
+            worldDateUTC:initial.worldDateUTC,simulationTimeSeconds:0,
+            solverInternalTimeSeconds:nil,displaySampleTimeSeconds:0,sampleIndex:0,
+            playbackRate:10,direction:"forward",paused:false,
+            timezoneDisplay:"Africa/Lagos",fidelity:"recorded-sample-playback")
+        let stopped=try NativeWorldLabRecordedTime.advance(run:recording,state:running,
+            elapsedSeconds:0.05,paused:false)
+        XCTAssertEqual(stopped.simulationTimeSeconds,0.15,accuracy:1e-9)
+        let checkpoint=try NativeWorldLabRecordedTime.checkpoint(run:recording,state:stopped)
+        XCTAssertEqual(try NativeWorldLabRecordedTime.restore(run:recording,checkpoint:checkpoint)
+            .simulationTimeSeconds,0.15,accuracy:1e-9)
+    }
