@@ -173,3 +173,42 @@ test("A book PDF worker client preserves local processing in non-Worker test env
   const merged = await mergePdfsInWorker([one, two]);
   assert.equal((await PDFDocument.load(merged)).getPageCount(), 7);
 });
+
+
+test("A book PDF worker cancellation terminates the worker and rejects with AbortError", async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  let terminated = false;
+  let posted = false;
+
+  class FakeWorker {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    onerror: ((event: ErrorEvent) => void) | null = null;
+    onmessageerror: (() => void) | null = null;
+    postMessage() { posted = true; }
+    terminate() { terminated = true; }
+  }
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    },
+  });
+  Object.defineProperty(globalThis, "Worker", { configurable: true, value: FakeWorker });
+
+  try {
+    const controller = new AbortController();
+    const pending = inspectPdfInWorker(new Blob(["not used by the fake worker"]), controller.signal);
+    controller.abort();
+    await assert.rejects(pending, (cause: unknown) => cause instanceof DOMException && cause.name === "AbortError");
+    assert.equal(posted, true);
+    assert.equal(terminated, true);
+  } finally {
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if (originalWorker) Object.defineProperty(globalThis, "Worker", originalWorker);
+    else Reflect.deleteProperty(globalThis, "Worker");
+  }
+});
