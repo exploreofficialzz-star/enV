@@ -749,3 +749,8 @@ release-candidate evidence bundle are unfinished.
 - Circular pattern orientation composes a world-axis rotation matrix with each part's full source orientation, including pre-tilted parts, across Web, Android and iOS.
 - Native reflection decomposition now uses the same selected axis for local and world reflection, matching the Web right-handed reflection convention.
 - Added Web regressions for group pivot transforms, unselected-part isolation, invalid inputs and patterns from already-tilted source geometry.
+
+
+## C/D group-pivot control integration — 2026-11-01
+- Web, Android and iOS multi-part CAD panels now expose distinct per-part and shared-centroid group rotation/scale actions, with matching terminology so users can choose whether selected parts spin in place or move together around a common pivot.
+- Operations remain bounded, revisioned edits; errors are presented in the native/Web panel without partial geometry changes.

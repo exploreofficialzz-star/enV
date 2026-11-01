@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState,type PointerEvent as ReactPointerEvent} from "react";
+import {rotateGroupAroundCentroid,scaleGroupAroundCentroid} from "@/lib/world-lab/cad";
 import {
   alignSolids,circularPattern,distributeSolids,duplicateSolids,extrudeCircle,
   extrudeRectangle,linearPattern,mirrorSolids,rotateSolids,scaleSolids,type CadAxis,type CadAlignment,
@@ -105,6 +106,7 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
     <div className="mt-2 flex flex-wrap gap-2">
      <button className={button} disabled={!canEdit} onClick={()=>apply(p=>rotateSolids(p,selection,axis,degrees))}>Rotate +{degrees}°</button>
      <button className={button} disabled={!canEdit} onClick={()=>apply(p=>rotateSolids(p,selection,axis,-degrees))}>Rotate −{degrees}°</button>
+     <button className={button} disabled={!canEdit} onClick={()=>apply(p=>rotateGroupAroundCentroid(p,selection,axis,degrees))}>Rotate group around centre</button>
     </div>
     <div className="mt-3 grid grid-cols-2 gap-2">
      <label className="text-xs">Uniform scale factor
@@ -117,7 +119,8 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
      </label>
     </div>
     <div className="mt-2 flex flex-wrap gap-2">
-     <button className={button} disabled={!canEdit} onClick={()=>apply(p=>scaleSolids(p,selection,[factor,factor,factor]))}>Scale selected</button>
+     <button className={button} disabled={!canEdit} onClick={()=>apply(p=>scaleSolids(p,selection,[factor,factor,factor]))}>Scale parts</button>
+     <button className={button} disabled={!canEdit} onClick={()=>apply(p=>scaleGroupAroundCentroid(p,selection,factor))}>Scale group around centre</button>
      <button className={button} disabled={!canEdit||project.entities.length+selected.length>200}
       onClick={()=>apply(p=>duplicateSolids(p,selection,
        axis==="x"?[spacing,0,0]:axis==="y"?[0,spacing,0]:[0,0,spacing],idFactory))}>Duplicate selected</button>

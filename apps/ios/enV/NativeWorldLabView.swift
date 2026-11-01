@@ -2997,18 +2997,30 @@ private struct NativeWorldLabMultiCadPanel:View {
                     .textFieldStyle(.roundedBorder)
             }
             HStack{
-                Button("Rotate selection"){
+                Button("Rotate parts"){
                     guard let angle=Double(degrees) else{
                         error="Enter a valid rotation angle";return
                     }
                     apply{try NativeWorldLabEditor.rotateSolids($0,ids:ids,axis:axis,degrees:angle)}
                 }.disabled(ids.isEmpty)
-                Button("Scale selection"){
+                Button("Rotate group"){
+                    guard let angle=Double(degrees) else{
+                        error="Enter a valid group rotation";return
+                    }
+                    apply{try NativeWorldLabEditor.rotateGroupAroundCentroid($0,ids:ids,axis:axis,degrees:angle)}
+                }.disabled(ids.isEmpty)
+                Button("Scale parts"){
                     guard let size=Double(factor) else{
                         error="Enter a valid scale factor";return
                     }
                     apply{try NativeWorldLabEditor.scaleSolids($0,ids:ids,
                         factors:[size,size,size])}
+                }.disabled(ids.isEmpty)
+                Button("Scale group"){
+                    guard let size=Double(factor) else{
+                        error="Enter a valid group scale";return
+                    }
+                    apply{try NativeWorldLabEditor.scaleGroupAroundCentroid($0,ids:ids,factor:size)}
                 }.disabled(ids.isEmpty)
             }.buttonStyle(.bordered)
             HStack{

@@ -73,12 +73,22 @@ fun NativeWorldLabMultiCadPanel(
                 runCatching{degrees.toDouble()}.onSuccess{angle->
                     apply{NativeWorldLabEditor.rotateSolids(it,ids,axis,angle)}
                 }.onFailure{feedback="Enter a valid rotation angle"}
-            }){Text("Rotate selection")}
+            }){Text("Rotate parts")}
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                runCatching{degrees.toDouble()}.onSuccess{angle->
+                    apply{NativeWorldLabEditor.rotateGroupAroundCentroid(it,ids,axis,angle)}
+                }.onFailure{feedback="Enter a valid group rotation"}
+            }){Text("Rotate group")}
             OutlinedButton(enabled=ids.isNotEmpty(),onClick={
                 runCatching{scale.toDouble()}.onSuccess{factor->
                     apply{NativeWorldLabEditor.scaleSolids(it,ids,listOf(factor,factor,factor))}
                 }.onFailure{feedback="Enter a valid scale factor"}
-            }){Text("Scale selection")}
+            }){Text("Scale parts")}
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                runCatching{scale.toDouble()}.onSuccess{factor->
+                    apply{NativeWorldLabEditor.scaleGroupAroundCentroid(it,ids,factor)}
+                }.onFailure{feedback="Enter a valid group scale"}
+            }){Text("Scale group")}
         }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             OutlinedTextField(value=spacing,onValueChange={spacing=it},
