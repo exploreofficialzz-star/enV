@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import {
   addAttachments,
@@ -13,6 +14,7 @@ import {
   restoreNote,
   restoreRevision,
   saveNote,
+  setABookLocalProfile,
   setNoteArchived,
   trashNote,
   type ABookAttachment,
@@ -159,24 +161,68 @@ export function ABookEngine() {
     }
   }
 
+  const { user: currentUser, isPending: authPending } = useCurrentUserState();
+  const activeProfileId = currentUser?.id ?? null;
+
   useEffect(() => {
     let mounted = true;
-    listNotes().then((loaded) => {
-      if (!mounted) return;
-      loaded.forEach((note) => savedFingerprints.current.set(note.id, noteFingerprint(note)));
-      setNotes(loaded);
-      setCurrentNote(loaded[0] ?? null);
-      setIsReady(true);
-      void getLocalStorageStatus().then((status) => {
-        if (mounted && !status.persistent) setStorageMessage("Saved locally · browser data may be cleared; export a backup");
-      });
-    }).catch((cause: unknown) => {
-      if (!mounted) return;
-      setError(cause instanceof Error ? cause.message : "A book could not open local storage.");
-      setStorageMessage("Local storage unavailable");
-    });
-    return () => { mounted = false; };
-  }, []);
+    window.clearTimeout(saveTimer.current);
+    setIsReady(false);
+    setStorageMessage(authPending ? "Checking local library…" : "Opening local library…");
+
+    void (async () => {
+      try {
+        // Flush while the previous profile's database is still selected. This
+        // prevents a queued draft from being written into the next account's library.
+        try {
+          await flushCurrentDraft();
+        } catch (cause) {
+          if (mounted) {
+            setError(cause instanceof Error
+              ? `The previous local library could not finish saving: ${cause.message}`
+              : "The previous local library could not finish saving.");
+          }
+        }
+        if (!mounted || authPending) return;
+
+        setABookLocalProfile(activeProfileId);
+        setCurrentNote(null);
+        setNotes([]);
+        setAttachments([]);
+        setRevisions([]);
+        setSelectedPdfs([]);
+        setPdfInfo("");
+        setPreviewUrl("");
+        setQuery("");
+        setShowArchived(false);
+        setShowTrash(false);
+        savedFingerprints.current.clear();
+
+        const loaded = await listNotes();
+        if (!mounted) return;
+        loaded.forEach((note) => savedFingerprints.current.set(note.id, noteFingerprint(note)));
+        setNotes(loaded);
+        setCurrentNote(loaded[0] ?? null);
+        setIsReady(true);
+        const storageStatus = await getLocalStorageStatus();
+        if (mounted && !storageStatus.persistent) {
+          setStorageMessage("Saved locally · browser data may be cleared; export a backup");
+        } else if (mounted) {
+          setStorageMessage("Saved on this device");
+        }
+      } catch (cause) {
+        if (!mounted) return;
+        setError(cause instanceof Error ? cause.message : "A book could not open local storage.");
+        setStorageMessage("Local storage unavailable");
+        setIsReady(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(saveTimer.current);
+    };
+  }, [activeProfileId, authPending]);
 
   useEffect(() => {
     if (!current || !isReady) return;
@@ -448,6 +494,12 @@ export function ABookEngine() {
       setNotes((items) => items.map((item) => item.id === restored.id ? restored : item));
       setError("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not restore this revision."); }
+  }
+
+  if (authPending || !isReady) {
+    return <section className="rounded-xl border border-border bg-surface p-6 text-sm text-muted" aria-live="polite">
+      Opening your private local library…
+    </section>;
   }
 
   return <section className="space-y-4" aria-label="A book local notes workspace" data-local-only="true">
