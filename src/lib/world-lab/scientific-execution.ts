@@ -6,6 +6,8 @@ export type ScientificAdapter=Readonly<{
   componentId:string;modelId:string;modelVersion:string;
   /** Explicit t=0 outputs for stateful delayed feedback edges. */
   initialOutputs?:Readonly<Record<string,ScientificQuantity>>;
+  /** Reset solver-owned mutable state before each independent run. */
+  reset?:()=>void;
   advance:(atSeconds:number,deltaSeconds:number,
     inputs:Readonly<Record<string,ScientificQuantity>>)=>Readonly<{
       outputs:Readonly<Record<string,ScientificQuantity>>;
@@ -46,6 +48,7 @@ export function executeScientificGraph(graphInput:ScientificGraph,
       !/^\d+\.\d+\.\d+$/.test(adapter.modelVersion))
       throw new Error("Unregistered or mismatched scientific model version.");
   }
+  for(const adapter of adapters)adapter.reset?.();
   const inbound=new Map(graph.components.map(c=>[c.id,0]));
   const forward=new Map(graph.components.map(c=>[c.id,new Set<string>()]));
   for(const e of graph.edges)if(!e.delayed&&!forward.get(e.fromComponentId)!.has(e.toComponentId)){
@@ -156,6 +159,7 @@ export function createIdealRcAdapters(input:{
   let capacitorVoltage=initial;
   const load:ScientificAdapter={
     componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0",
+    reset:()=>{capacitorVoltage=initial;},
     advance:(_atSeconds,deltaSeconds,ports)=>{
       const connectedVoltage=ports.Vin?.valueSI;
       if(!Number.isFinite(connectedVoltage))
