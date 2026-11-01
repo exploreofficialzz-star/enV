@@ -121,6 +121,21 @@ function openDatabase(): Promise<IDBDatabase> {
   return pending;
 }
 
+export function assertABookNoteForStorage(note: ABookNote): void {
+  if (!note || typeof note.id !== "string" || !note.id.trim() || note.id.length > 180
+    || typeof note.title !== "string" || note.title.length > 10_000
+    || typeof note.body !== "string" || note.body.length > 5_000_000
+    || typeof note.notebook !== "string" || note.notebook.length > 500
+    || !Array.isArray(note.tags) || note.tags.length > 50
+    || !note.tags.every((tag) => typeof tag === "string" && tag.length <= 200)
+    || typeof note.pinned !== "boolean" || typeof note.archived !== "boolean"
+    || (note.deletedAt !== null && !Number.isSafeInteger(note.deletedAt))
+    || !Number.isSafeInteger(note.createdAt) || !Number.isSafeInteger(note.updatedAt)
+    || !Number.isSafeInteger(note.revision) || note.revision < 0) {
+    throw new Error("This note exceeds A book's local storage limits or contains invalid fields.");
+  }
+}
+
 export function createNote(): ABookNote {
   const now = Date.now();
   return {
@@ -151,6 +166,7 @@ export async function listNotes(options: { includeArchived?: boolean; includeDel
 }
 
 export async function saveNote(note: ABookNote): Promise<ABookNote> {
+  assertABookNoteForStorage(note);
   const db = await openDatabase();
   const next: ABookNote = { ...note, updatedAt: Date.now(), revision: Math.max(0, note.revision) };
   return new Promise((resolve, reject) => {
@@ -158,8 +174,9 @@ export async function saveNote(note: ABookNote): Promise<ABookNote> {
     const notes = tx.objectStore("notes");
     const revisions = tx.objectStore("revisions");
     const lookup = notes.get(next.id);
-    lookup.onsuccess = () => {
-      const previous = lookup.result as ABookNote | undefined;
+    let validationError: Error | undefined;
+
+    const writeNote = (previous: ABookNote | undefined) => {
       const contentChanged = previous && (
         previous.title !== next.title ||
         previous.body !== next.body ||
@@ -193,10 +210,34 @@ export async function saveNote(note: ABookNote): Promise<ABookNote> {
         };
       }
     };
-    lookup.onerror = () => tx.abort();
+
+    lookup.onsuccess = () => {
+      const previous = lookup.result as ABookNote | undefined;
+      if (previous) {
+        writeNote(previous);
+        return;
+      }
+      const count = notes.count();
+      count.onsuccess = () => {
+        if (count.result >= MAX_LOCAL_NOTES) {
+          validationError = new Error("A book supports up to 10,000 local notes. Export or remove older notes before creating another.");
+          try { tx.abort(); } catch { /* The transaction may already be inactive. */ }
+          return;
+        }
+        writeNote(undefined);
+      };
+      count.onerror = () => {
+        validationError = new Error("Could not verify the local note limit.");
+        try { tx.abort(); } catch { /* The transaction may already be inactive. */ }
+      };
+    };
+    lookup.onerror = () => {
+      validationError = new Error("Could not find the note to save.");
+      try { tx.abort(); } catch { /* The transaction may already be inactive. */ }
+    };
     tx.oncomplete = () => resolve(next);
-    tx.onerror = () => reject(tx.error ?? new Error("Your note could not be saved locally."));
-    tx.onabort = () => reject(tx.error ?? new Error("Your note could not be saved locally."));
+    tx.onerror = () => reject(validationError ?? tx.error ?? new Error("Your note could not be saved locally."));
+    tx.onabort = () => reject(validationError ?? tx.error ?? new Error("Your note could not be saved locally."));
   });
 }
 
