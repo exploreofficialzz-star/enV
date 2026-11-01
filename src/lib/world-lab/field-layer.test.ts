@@ -95,7 +95,7 @@ test("renderer capability is explicit and unsupported vector or tensor renderers
  assert.equal(isFieldOverlayRendererImplemented("scalar","line-plot"),true);
  assert.equal(isFieldOverlayRendererImplemented("scalar","heatmap"),true);
  assert.equal(isFieldOverlayRendererImplemented("vector","glyphs"),true);
- assert.equal(isFieldOverlayRendererImplemented("vector","streamlines"),false);
+ assert.equal(isFieldOverlayRendererImplemented("vector","streamlines"),true);
  assert.equal(isFieldOverlayRendererImplemented("tensor","isosurface"),false);
  assert.equal(isFieldOverlayRendererImplemented("event","event-trace"),true);
  assert.equal(isFieldOverlayRendererImplemented("network","event-trace"),true);
