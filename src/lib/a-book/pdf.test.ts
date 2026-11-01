@@ -260,6 +260,14 @@ test("extracts embedded PDF text locally and reports page-level progress", async
   assert.deepEqual(progress, [[1, 2], [2, 2]]);
 });
 
+test("image-only and blank PDF pages return no selectable text", async () => {
+  const result = await extractPdfTextLocally(await samplePdf(2));
+  assert.equal(result.pageCount, 2);
+  assert.equal(result.pagesProcessed, 2);
+  assert.equal(result.text, "");
+  assert.equal(result.truncated, false);
+});
+
 test("extracts several PDFs into distinct local searchable text files", async () => {
   const { unzipSync } = await import("fflate");
   const first = await PDFDocument.create();
