@@ -26,6 +26,11 @@ const missing = [
 ];
 const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
 const invalid = design.filter((tool) => tool.status === "planned" || !tool.engine?.type || !tool.engine?.op);
+// Keep Design a first-class category. Color/CSS Design engines must never leak
+// into Calculators (or any other category), and core Design IDs must stay here.
+const misplacedDesignTools = tools.filter((tool) =>
+  (expectedIds.includes(tool.id) || ["color", "cssgen"].includes(tool.engine?.type)) && tool.category !== "design",
+);
 const allowedTypes = new Set(["color", "cssgen"]);
 const badType = design.filter((tool) => !allowedTypes.has(tool.engine?.type));
 const allowedColorOps = new Set(["picker", "palette", "contrast"]);
@@ -89,6 +94,7 @@ const unmappedGeneratedDesignTools = generatedDesignTools.filter((tool) => {
   return !generatedFamilyGroups[String(tool.engine?.op ?? "").split(":")[0]];
 });
 const checks = [
+  ["Design tools are isolated from Calculators and other categories", misplacedDesignTools.length === 0],
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
   ["Every core Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedIds.length],
@@ -150,8 +156,8 @@ const checks = [
   ["SVG artwork family selector and conditional controls", cssEngine.includes("Artwork family") && cssEngine.includes('if (family === "blob")') && cssEngine.includes("values.artStyle") && cssEngine.includes("buildTextureSvg")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
-if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length || missingExplorerIds.length || duplicateExplorerIds.length || unexpectedExplorerIds.length || unmappedGeneratedDesignTools.length) {
-  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), missingExplorerIds, duplicateExplorerIds, unexpectedExplorerIds, unmappedGeneratedDesignTools: unmappedGeneratedDesignTools.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), failedChecks });
+if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || misplacedDesignTools.length || failedChecks.length || missingExplorerIds.length || duplicateExplorerIds.length || unexpectedExplorerIds.length || unmappedGeneratedDesignTools.length) {
+  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), misplacedDesignTools: misplacedDesignTools.map((tool) => ({ id: tool.id, category: tool.category, type: tool.engine?.type })), missingExplorerIds, duplicateExplorerIds, unexpectedExplorerIds, unmappedGeneratedDesignTools: unmappedGeneratedDesignTools.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), failedChecks });
   process.exit(1);
 }
 console.log(`Design audit passed: ${design.length} active catalogue entries, ${expectedIds.length} core tool IDs present, every engine operation supported, ${checks.length} implementation checks passed.`);
