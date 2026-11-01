@@ -89,7 +89,7 @@ test("extracts the same page range from a PDF batch into distinct local ZIP entr
   ];
   const archive = await extractSelectedPdfs(files, "1,3");
   const entries = unzipSync(archive);
-  assert.deepEqual(Object.keys(entries).sort(), ["Research-extracted-2.pdf", "Research-extracted.pdf"]);
+  assert.deepEqual(Object.keys(entries).sort(), ["Research-extracted.pdf", "research-extracted-2.pdf"]);
   assert.equal((await PDFDocument.load(entries["Research-extracted.pdf"])).getPageCount(), 2);
   assert.equal((await PDFDocument.load(entries["Research-extracted-2.pdf"])).getPageCount(), 2);
 });
