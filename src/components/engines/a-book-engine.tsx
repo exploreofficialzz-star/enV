@@ -109,7 +109,7 @@ export function ABookEngine() {
         setCurrent((value) => value?.id === saved.id && value.revision !== saved.revision
           ? { ...value, revision: saved.revision }
           : value);
-        setNotes(await listNotes({ includeArchived: showArchived, includeDeleted: showTrash }));
+        await refresh(saved.id);
         setStorageMessage("Saved on this device");
         setError("");
       }).catch((cause: unknown) => {
@@ -150,9 +150,10 @@ export function ABookEngine() {
 
   async function createNewNote() {
     try {
+      setShowTrash(false);
+      setShowArchived(false);
       const note = await saveNote(createNote());
-      setNotes((items) => [note, ...items]);
-      setCurrent(note);
+      await refresh(note.id, false, false);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create a local note.");
@@ -459,7 +460,7 @@ export function ABookEngine() {
           </details>
         </> : <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-center">
           <h2 className="text-lg font-semibold">Your notes, on this device</h2>
-          <p className="max-w-sm text-sm text-muted">Create a note or import a local A book notes export. No cloud storage or upload is used.</p>
+          <p className="max-w-sm text-sm text-muted">Create a note or restore a full local A book backup. No cloud storage or upload is used.</p>
           <Button type="button" onClick={() => void createNewNote()}>Create a note</Button>
         </div>}
       </main>
