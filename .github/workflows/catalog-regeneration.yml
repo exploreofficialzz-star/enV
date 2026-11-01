@@ -1,0 +1,94 @@
+name: Regenerate catalogue from canonical sources
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/catalog-regeneration.yml"
+      - "src/data/math-expansion.json"
+      - "scripts/gen-catalog.mjs"
+      - "scripts/export-native-engine-data.mjs"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/export-native-execution-matrix.mjs"
+      - "scripts/generate-billing-profiles.mjs"
+      - "scripts/generate-offline-eligible-tools.mjs"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog-regeneration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    name: Regenerate Web, Android and iOS catalogues
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.ref }}
+          token: ${{ github.token }}
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.18.0"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Regenerate Web catalogue
+        run: node scripts/gen-catalog.mjs
+      - name: Regenerate Android and iOS engine data and coverage
+        run: npm run export:native-engine-data
+      - name: Regenerate shared native catalogue
+        run: npm run export:native-catalog
+      - name: Regenerate native execution matrix
+        run: npm run export:native-execution-matrix
+      - name: Regenerate billing profiles
+        run: npm run generate:billing-profiles
+      - name: Regenerate offline eligibility
+        run: npm run generate:offline-eligibility
+      - name: Verify calculator, Design, native catalogue and billing invariants
+        run: |
+          npm run check:calculators
+          npm run check:design
+          npm run check:native-coverage
+          npm run check:native-math-exercises
+          npm run check:billing
+          node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/calc/expansion-rows.test.ts
+          npm run typecheck
+          npm run build
+      - name: Commit regenerated outputs when needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
+            src/data/catalog.ts \
+            src/data/billing-profile-index.json \
+            src/data/billing-profile-runtime-extensions.json \
+            src/data/offline-eligible-tools.json \
+            apps/shared/catalog.json \
+            apps/shared/native-engine-inventory.json \
+            apps/shared/native-execution-matrix.json \
+            apps/shared/native-math-expansion.json \
+            apps/shared/native-math-exercise.json \
+            apps/shared/native-unit-data.json \
+            apps/shared/offline-eligible-tools.json \
+            apps/android/app/src/main/java/com/chastech/env/engine/NativeEngineData.kt \
+            apps/ios/enV/NativeEngineData.swift \
+            apps/android/native-tool-coverage.txt \
+            apps/ios/native-tool-coverage.txt \
+            apps/android/native-family-coverage/ \
+            apps/ios/native-family-coverage/ \
+            docs/billing-tool-audit-2026-10-18.md
+          if git diff --cached --quiet; then
+            echo "Generated catalogues are already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(catalog): regenerate platform catalogues"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
