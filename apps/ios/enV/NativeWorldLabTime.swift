@@ -115,3 +115,221 @@ enum NativeWorldLabTime {
                 : next(current:current,elapsed:elapsed,rate:rate,duration:duration,events:events)
     }
 }
+
+
+/// Immutable metadata for a native, already-computed solver recording.
+struct NativeWorldLabRecordedRun:Equatable {
+    let runId:String
+    let modelId:String
+    let modelVersion:String
+    let worldEpochUTC:String
+    let sampleTimesSeconds:[Double]
+    let mandatoryEventTimesSeconds:[Double]
+    init(runId:String,modelId:String,modelVersion:String,worldEpochUTC:String,
+         sampleTimesSeconds:[Double],mandatoryEventTimesSeconds:[Double]=[]) {
+        self.runId=runId;self.modelId=modelId;self.modelVersion=modelVersion
+        self.worldEpochUTC=worldEpochUTC;self.sampleTimesSeconds=sampleTimesSeconds
+        self.mandatoryEventTimesSeconds=mandatoryEventTimesSeconds
+    }
+    var durationSeconds:Double { sampleTimesSeconds.last ?? 0 }
+    func validate()throws {
+        guard !runId.isEmpty,runId.count<=160,!modelId.isEmpty,modelId.count<=120,
+              !modelVersion.isEmpty,modelVersion.count<=80,
+              worldEpochUTC.hasSuffix("Z"),ISO8601DateFormatter().date(from:worldEpochUTC) != nil,
+              (2...200_000).contains(sampleTimesSeconds.count),
+              sampleTimesSeconds.allSatisfy({$0.isFinite && $0>=0}),
+              zip(sampleTimesSeconds,sampleTimesSeconds.dropFirst()).allSatisfy({$1>$0}),
+              mandatoryEventTimesSeconds.count<=100_000,
+              mandatoryEventTimesSeconds.allSatisfy({event in
+                  event.isFinite && sampleTimesSeconds.contains(where:{abs($0-event)<=1e-9})
+              }) else {
+            throw NativeWorldLabError.invalid(
+                "Recorded run identity, UTC epoch, samples or mandatory event times are invalid.")
+        }
+    }
+}
+
+struct NativeWorldLabRecordedClock:Equatable {
+    let wallTimeUTC:String
+    let worldDateUTC:String
+    let simulationTimeSeconds:Double
+    let solverInternalTimeSeconds:Double?
+    let displaySampleTimeSeconds:Double
+    let sampleIndex:Int
+    let playbackRate:Double
+    let direction:String
+    let paused:Bool
+    let timezoneDisplay:String
+    let fidelity:String
+}
+
+struct NativeWorldLabRecordedCheckpoint:Codable,Equatable {
+    let format:String
+    let schemaVersion:Int
+    let runId:String
+    let modelId:String
+    let modelVersion:String
+    let worldEpochUTC:String
+    let sampleIndex:Int
+    let sampleTimeSeconds:Double
+    let clock:NativeWorldLabRecordedClock
+    init(runId:String,modelId:String,modelVersion:String,worldEpochUTC:String,
+         sampleIndex:Int,sampleTimeSeconds:Double,clock:NativeWorldLabRecordedClock) {
+        format="env-world-lab-recorded-clock";schemaVersion=1
+        self.runId=runId;self.modelId=modelId;self.modelVersion=modelVersion
+        self.worldEpochUTC=worldEpochUTC;self.sampleIndex=sampleIndex
+        self.sampleTimeSeconds=sampleTimeSeconds;self.clock=clock
+    }
+    func validate(run:NativeWorldLabRecordedRun)throws {
+        try run.validate()
+        guard format=="env-world-lab-recorded-clock",schemaVersion==1,
+              runId==run.runId,modelId==run.modelId,modelVersion==run.modelVersion,
+              worldEpochUTC==run.worldEpochUTC,
+              run.sampleTimesSeconds.indices.contains(sampleIndex),
+              abs(sampleTimeSeconds-run.sampleTimesSeconds[sampleIndex])<=1e-9,
+              try NativeWorldLabRecordedTime.nearestIndex(run:run,timeSeconds:clock.simulationTimeSeconds)==sampleIndex,
+              clock.sampleIndex==sampleIndex,
+              abs(clock.displaySampleTimeSeconds-sampleTimeSeconds)<=1e-9 else {
+            throw NativeWorldLabError.invalid(
+                "Checkpoint belongs to a different run or does not identify the exact recorded sample.")
+        }
+        try NativeWorldLabRecordedTime.validate(clock:clock,run:run)
+    }
+    func encodeBounded()throws->Data {
+        let encoder=JSONEncoder();encoder.outputFormatting=[.prettyPrinted,.sortedKeys]
+        let data=try encoder.encode(self)
+        guard data.count<=16*1024 else {
+            throw NativeWorldLabError.invalid("Recorded timeline checkpoint exceeds 16 KB.")
+        }
+        return data
+    }
+    static func decodeBounded(_ data:Data)throws->Self {
+        guard data.count<=16*1024 else {
+            throw NativeWorldLabError.invalid("Recorded timeline checkpoint exceeds 16 KB.")
+        }
+        return try JSONDecoder().decode(Self.self,from:data)
+    }
+}
+
+enum NativeWorldLabRecordedTime {
+    static let epsilon=1e-9
+    static func nearestIndex(run:NativeWorldLabRecordedRun,timeSeconds:Double)throws->Int {
+        try run.validate()
+        guard timeSeconds.isFinite,(0...run.durationSeconds).contains(timeSeconds) else {
+            throw NativeWorldLabError.invalid("Seek time is outside the immutable recording.")
+        }
+        return run.sampleTimesSeconds.indices.min(by:{
+            abs(run.sampleTimesSeconds[$0]-timeSeconds)<abs(run.sampleTimesSeconds[$1]-timeSeconds)
+        }) ?? 0
+    }
+    static func validate(clock:NativeWorldLabRecordedClock,run:NativeWorldLabRecordedRun)throws {
+        guard clock.wallTimeUTC.hasSuffix("Z"),clock.worldDateUTC.hasSuffix("Z"),
+              let wall=ISO8601DateFormatter().date(from:clock.wallTimeUTC),
+              let world=ISO8601DateFormatter().date(from:clock.worldDateUTC),
+              clock.simulationTimeSeconds.isFinite,
+              (0...run.durationSeconds).contains(clock.simulationTimeSeconds),
+              run.sampleTimesSeconds.indices.contains(clock.sampleIndex),
+              abs(clock.displaySampleTimeSeconds-run.sampleTimesSeconds[clock.sampleIndex])<=epsilon,
+              try nearestIndex(run:run,timeSeconds:clock.simulationTimeSeconds)==clock.sampleIndex,
+              clock.solverInternalTimeSeconds == nil ||
+                (clock.solverInternalTimeSeconds!.isFinite && clock.solverInternalTimeSeconds!>=0),
+              clock.playbackRate.isFinite,(0.01...100).contains(clock.playbackRate),
+              ["forward","reverse-recording"].contains(clock.direction),
+              clock.timezoneDisplay.count<=100,TimeZone(identifier:clock.timezoneDisplay) != nil,
+              clock.fidelity=="recorded-sample-playback" else {
+            throw NativeWorldLabError.invalid("Recorded playback clock fields are inconsistent or out of bounds.")
+        }
+        _ = wall
+        let epoch=ISO8601DateFormatter().date(from:run.worldEpochUTC)!
+        let expected=epoch.addingTimeInterval(clock.simulationTimeSeconds)
+        guard abs(expected.timeIntervalSince(world))<=0.001 else {
+            throw NativeWorldLabError.invalid("World date does not agree with recorded simulation time.")
+        }
+    }
+    static func start(run:NativeWorldLabRecordedRun,wallTimeUTC:String,
+        timezoneDisplay:String,playbackRate:Double=1,direction:String="forward")throws->NativeWorldLabRecordedClock {
+        try run.validate()
+        let state=NativeWorldLabRecordedClock(wallTimeUTC:wallTimeUTC,
+            worldDateUTC:run.worldEpochUTC,simulationTimeSeconds:0,
+            solverInternalTimeSeconds:nil,displaySampleTimeSeconds:run.sampleTimesSeconds[0],
+            sampleIndex:0,playbackRate:playbackRate,direction:direction,paused:true,
+            timezoneDisplay:timezoneDisplay,fidelity:"recorded-sample-playback")
+        try validate(clock:state,run:run)
+        return state
+    }
+    static func advance(run:NativeWorldLabRecordedRun,state:NativeWorldLabRecordedClock,
+        elapsedSeconds:Double,paused:Bool?=nil)throws->NativeWorldLabRecordedClock {
+        try run.validate();try validate(clock:state,run:run)
+        guard elapsedSeconds.isFinite,(0...60).contains(elapsedSeconds),
+              let wall=ISO8601DateFormatter().date(from:state.wallTimeUTC) else {
+            throw NativeWorldLabError.invalid("Elapsed wall time or wall clock is invalid.")
+        }
+        let wallString=ISO8601DateFormatter().string(from:wall.addingTimeInterval(elapsedSeconds))
+        if paused ?? state.paused {
+            let result=NativeWorldLabRecordedClock(wallTimeUTC:wallString,worldDateUTC:state.worldDateUTC,
+                simulationTimeSeconds:state.simulationTimeSeconds,solverInternalTimeSeconds:nil,
+                displaySampleTimeSeconds:state.displaySampleTimeSeconds,sampleIndex:state.sampleIndex,
+                playbackRate:state.playbackRate,direction:state.direction,paused:true,
+                timezoneDisplay:state.timezoneDisplay,fidelity:"recorded-sample-playback")
+            try validate(clock:result,run:run);return result
+        }
+        let signed=elapsedSeconds*state.playbackRate*(state.direction=="reverse-recording" ? -1:1)
+        var next=min(run.durationSeconds,max(0,state.simulationTimeSeconds+signed))
+        let crossed=run.mandatoryEventTimesSeconds.filter{event in
+            signed>0 ? event>state.simulationTimeSeconds+epsilon && event<=next+epsilon :
+            signed<0 ? event<state.simulationTimeSeconds-epsilon && event>=next-epsilon : false
+        }
+        if !crossed.isEmpty {next=signed>0 ? crossed.min()!:crossed.max()!}
+        let index=try nearestIndex(run:run,timeSeconds:next)
+        let sample=run.sampleTimesSeconds[index]
+        let epoch=ISO8601DateFormatter().date(from:run.worldEpochUTC)!
+        let world=ISO8601DateFormatter().string(from:epoch.addingTimeInterval(next))
+        let result=NativeWorldLabRecordedClock(wallTimeUTC:wallString,worldDateUTC:world,
+            simulationTimeSeconds:next,solverInternalTimeSeconds:nil,
+            displaySampleTimeSeconds:sample,sampleIndex:index,playbackRate:state.playbackRate,
+            direction:state.direction,paused:false,timezoneDisplay:state.timezoneDisplay,
+            fidelity:"recorded-sample-playback")
+        try validate(clock:result,run:run);return result
+    }
+    static func seek(run:NativeWorldLabRecordedRun,state:NativeWorldLabRecordedClock,
+        timeSeconds:Double)throws->NativeWorldLabRecordedClock {
+        try run.validate();try validate(clock:state,run:run)
+        let index=try nearestIndex(run:run,timeSeconds:timeSeconds)
+        let sample=run.sampleTimesSeconds[index]
+        let epoch=ISO8601DateFormatter().date(from:run.worldEpochUTC)!
+        let world=ISO8601DateFormatter().string(from:epoch.addingTimeInterval(sample))
+        let result=NativeWorldLabRecordedClock(wallTimeUTC:state.wallTimeUTC,
+            worldDateUTC:world,simulationTimeSeconds:sample,solverInternalTimeSeconds:nil,
+            displaySampleTimeSeconds:sample,sampleIndex:index,playbackRate:state.playbackRate,
+            direction:state.direction,paused:true,timezoneDisplay:state.timezoneDisplay,
+            fidelity:"recorded-sample-playback")
+        try validate(clock:result,run:run);return result
+    }
+    static func step(run:NativeWorldLabRecordedRun,state:NativeWorldLabRecordedClock,
+        direction:Int)throws->NativeWorldLabRecordedClock {
+        guard direction==1 || direction == -1 else {
+            throw NativeWorldLabError.invalid("Recorded step direction must be +1 or -1.")
+        }
+        let index=min(run.sampleTimesSeconds.count-1,max(0,state.sampleIndex+direction))
+        return try seek(run:run,state:state,timeSeconds:run.sampleTimesSeconds[index])
+    }
+    static func checkpoint(run:NativeWorldLabRecordedRun,
+        state:NativeWorldLabRecordedClock)throws->NativeWorldLabRecordedCheckpoint {
+        try validate(clock:state,run:run)
+        let result=NativeWorldLabRecordedCheckpoint(runId:run.runId,modelId:run.modelId,
+            modelVersion:run.modelVersion,worldEpochUTC:run.worldEpochUTC,
+            sampleIndex:state.sampleIndex,sampleTimeSeconds:state.displaySampleTimeSeconds,clock:state)
+        try result.validate(run:run);return result
+    }
+    static func restore(run:NativeWorldLabRecordedRun,
+        checkpoint:NativeWorldLabRecordedCheckpoint)throws->NativeWorldLabRecordedClock {
+        try checkpoint.validate(run:run)
+        let clock=checkpoint.clock
+        let restored=NativeWorldLabRecordedClock(wallTimeUTC:clock.wallTimeUTC,
+            worldDateUTC:clock.worldDateUTC,simulationTimeSeconds:clock.simulationTimeSeconds,
+            solverInternalTimeSeconds:nil,displaySampleTimeSeconds:clock.displaySampleTimeSeconds,
+            sampleIndex:clock.sampleIndex,playbackRate:clock.playbackRate,direction:clock.direction,
+            paused:true,timezoneDisplay:clock.timezoneDisplay,fidelity:"recorded-sample-playback")
+        try validate(clock:restored,run:run);return restored
+    }
+}
