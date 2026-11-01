@@ -10,6 +10,7 @@ import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engi
 import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
 import { toHex } from "@/lib/engines/accessibility-color";
 import { inspectDesignComponentContrast } from "@/lib/engines/design-component-a11y";
+import { buildCssBorder } from "@/lib/engines/css-border";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,10 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   border: [
     { name: "style", label: "Border style", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }, { value: "double", label: "Double" }] },
     { name: "width", label: "Width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "topWidth", label: "Top edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "rightWidth", label: "Right edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "bottomWidth", label: "Bottom edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "leftWidth", label: "Left edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
     { name: "radius", label: "Uniform radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "topLeft", label: "Top left radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "topRight", label: "Top right radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
@@ -257,16 +262,20 @@ function cssFor(
     return { css: `text-shadow: ${textShadow};\ncolor: ${textColor};`, style: { textShadow, color: textColor } };
   }
   if (family === "border") {
-    const width = numberValue(values, "width", 1, 0, 24);
     const radius = numberValue(values, "radius", 16, 0, 120);
-    const radii = ["topLeft", "topRight", "bottomRight", "bottomLeft"].map((key) => numberValue(values, key, radius, 0, 120));
-    const style = values.style ?? "solid";
-    const color = values.color ?? "#b9c5d5";
-    const borderRadius = radii.map((value) => `${value}px`).join(" ");
-    return {
-      css: `border: ${width}px ${style} ${color};\nborder-radius: ${borderRadius};`,
-      style: { border: `${width}px ${style} ${color}`, borderRadius },
-    };
+    const width = numberValue(values, "width", 1, 0, 24);
+    return buildCssBorder({
+      color: values.color ?? "#b9c5d5",
+      style: (values.style ?? "solid") as import("@/lib/engines/css-border").BorderStyle,
+      topWidth: numberValue(values, "topWidth", width, 0, 24),
+      rightWidth: numberValue(values, "rightWidth", width, 0, 24),
+      bottomWidth: numberValue(values, "bottomWidth", width, 0, 24),
+      leftWidth: numberValue(values, "leftWidth", width, 0, 24),
+      topLeft: numberValue(values, "topLeft", radius, 0, 120),
+      topRight: numberValue(values, "topRight", radius, 0, 120),
+      bottomRight: numberValue(values, "bottomRight", radius, 0, 120),
+      bottomLeft: numberValue(values, "bottomLeft", radius, 0, 120),
+    });
   }
   if (family === "button") {
     const radius = numberValue(values, "radius", 10, 0, 48);
@@ -318,8 +327,9 @@ function cssFor(
       ? `rgba(${Math.round(parsedTint.r)}, ${Math.round(parsedTint.g)}, ${Math.round(parsedTint.b)}, ${opacity.toFixed(3)})`
       : `rgba(255, 255, 255, ${opacity.toFixed(3)})`;
     const background = rgba(alpha);
+    const fallbackBackground = rgba(Math.max(alpha, 0.72));
     const border = `1px solid ${rgba(borderAlpha)}`;
-    const css = `background: ${background};\nbackdrop-filter: blur(${blur}px);\n-webkit-backdrop-filter: blur(${blur}px);\nborder: ${border};`;
+    const css = `.env-glass {\n  background: ${fallbackBackground};\n  border: ${border};\n  border-radius: 16px;\n}\n@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {\n  .env-glass {\n    background: ${background};\n    backdrop-filter: blur(${blur}px);\n    -webkit-backdrop-filter: blur(${blur}px);\n  }\n}`;
     return { css, style: { background, backdropFilter: `blur(${blur}px)`, border, borderRadius: "16px" } };
   }
   if (family === "neomorph") {
@@ -636,6 +646,12 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                 next.topRight = value;
                 next.bottomRight = value;
                 next.bottomLeft = value;
+              }
+              if (family === "border" && name === "width") {
+                next.topWidth = value;
+                next.rightWidth = value;
+                next.bottomWidth = value;
+                next.leftWidth = value;
               }
               return next;
             });

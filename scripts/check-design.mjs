@@ -38,6 +38,8 @@ const textShadow = read("src/lib/engines/css-text-shadow.ts");
 const textShadowTests = read("src/lib/engines/css-text-shadow.test.ts");
 const componentA11y = read("src/lib/engines/design-component-a11y.ts");
 const componentA11yTests = read("src/lib/engines/design-component-a11y.test.ts");
+const cssBorder = read("src/lib/engines/css-border.ts");
+const cssBorderTests = read("src/lib/engines/css-border.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -56,6 +58,7 @@ const checks = [
   ["Gradient modes, editable stops and mesh-style blends", cssEngine.includes("Add stop (") && cssEngine.includes("Distribute evenly") && cssEngine.includes("Reverse") && cssEngine.includes("GRADIENT_PRESETS.map") && cssEngine.includes("Move earlier") && cssEngine.includes("Add a second soft gradient layer") && cssEngine.includes("buildCssMeshGradient") && cssEngine.includes("meshMode")],
   ["Gradient stop engine and regression tests", cssGradient.includes("normalizeGradientStops") && cssGradient.includes("moveGradientStop") && cssGradient.includes("buildCssMeshGradient") && cssGradient.includes("oklch") && cssGradientTests.includes("perceptual interpolation and radial sizing") && cssGradientTests.includes("mesh-style gradients stack") && cssEngine.includes("@supports (background-image: ${enhanced})")],
   ["Layered text shadow controls", cssEngine.includes("Shadow layers") && cssEngine.includes("textShadow") && cssEngine.includes("rgba(")],
+  ["Glassmorphism fallback and progressive blur enhancement", cssEngine.includes("fallbackBackground") && cssEngine.includes("@supports (backdrop-filter: blur(1px)) or") && cssEngine.includes("-webkit-backdrop-filter")],
   ["Neumorphism accessibility usage guidance", cssEngine.includes("Neumorphic effects can make controls")],
   ["Editable semantic roles with pair contrast feedback", colorEngine.includes("Edit any role without regenerating") && colorEngine.includes("semanticContrast.body") && colorEngine.includes("semanticContrast.primary")],
   ["Shareable semantic role overrides", colorEngine.includes('url.searchParams.set("roles", JSON.stringify(roleOverrides))') && colorEngine.includes('params.get("roles")')],
@@ -72,7 +75,7 @@ const checks = [
   ["Live contrast feedback for generated buttons, cards, badges and inputs", componentA11y.includes("inspectDesignComponentContrast") && componentA11y.includes("non-text") && componentA11yTests.includes("cards check title") && cssEngine.includes("Component contrast check") && cssEngine.includes("inspectDesignComponentContrast(family, values)")],
   ["Editable color-vision palette", colorEngine.includes("Test your own interface colors") && colorEngine.includes("Reset sample colors")],
   ["Alpha-aware contrast preview", colorEngine.includes("resolveRenderedPair(foreground, background, canvas)") && colorEngine.includes("previewPair.background")],
-  ["Independent border corner radii", cssEngine.includes("Top left radius") && cssEngine.includes("bottomLeft")],
+  ["Independent border edge widths, corner radii and safe CSS export", cssBorder.includes("border-width:") && cssBorder.includes("border-radius:") && cssBorderTests.includes("independent edge widths") && cssEngine.includes("Top edge width") && cssEngine.includes("buildCssBorder")],
   ["SVG noise filter and bounded export utility", svgGenerators.includes("feTurbulence") && svgGenerators.includes("safeHex") && !cssEngine.includes('background-image:url("data:image/svg+xml,...")')],
   ["Blob, pattern and wave generator regression tests", svgGenerators.includes("buildWaveSvg") && svgGenerators.includes("buildBlobSvg") && svgGenerators.includes("PatternStyle") && svgGeneratorTests.includes("wave geometry responds to frequency") && svgGeneratorTests.includes("pattern generator clamps settings") && svgGeneratorTests.includes("outlined")],
   ["Expanded SVG pattern families and rotation", ["Concentric rings", "Chevron", "Hexagons", "Crosshatch", "Checkerboard", "Triangles", "Polka dots", "Wave lines", "Zigzag"].every((name) => cssEngine.includes(name)) && ["checkerboard", "triangles", "polka", "waves", "zigzag"].every((name) => svgGenerators.includes(name)) && svgGeneratorTests.includes("new Set(variants).size, 14")],
