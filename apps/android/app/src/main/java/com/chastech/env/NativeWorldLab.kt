@@ -197,6 +197,8 @@ fun NativeWorldLabForm() {
     var motorReversePlayback by remember { mutableStateOf(false) }
     var motorRunIdentity by remember { mutableStateOf("") }
     var motorClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
+    var pendingMotorCheckpointJson by remember { mutableStateOf<String?>(null) }
+    var motorCheckpointStatus by remember { mutableStateOf("") }
     var motorThermalEnabled by remember { mutableStateOf(false) }
     var motorPowerOffAtSeconds by remember { mutableStateOf<Double?>(null) }
     var motorSpeed by remember { mutableFloatStateOf(1f) }
@@ -457,6 +459,44 @@ fun NativeWorldLabForm() {
                     }?:error("Unable to open sphere-impact evidence destination")
                 }}.onFailure{warning=it.message?:"Could not export 3D impact evidence"}
             }
+        }
+    }
+    val motorCheckpointExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        val json=pendingMotorCheckpointJson
+        if(uri!=null&&json!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                require(json.toByteArray(Charsets.UTF_8).size<=16*1024)
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(json.toByteArray(Charsets.UTF_8));it.flush()
+                }?:error("Cannot write recorded motor checkpoint")
+            }}.onSuccess{motorCheckpointStatus="Recorded motor checkpoint saved."}
+                .onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint export failed."}
+        }
+    }
+    val motorCheckpointImportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{
+            val recording=motorRecordedRun
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                    val out=ByteArrayOutputStream();val buffer=ByteArray(4096)
+                    while(true){val count=input.read(buffer);if(count<0)break
+                        require(out.size()+count<=16*1024){"Motor checkpoint exceeds 16 KB"}
+                        out.write(buffer,0,count)
+                    }
+                    out.toByteArray()
+                }?:error("Cannot read recorded motor checkpoint")
+                val run=recording?:error("Run the same motor experiment before restoring its checkpoint.")
+                val checkpoint=NativeWorldLabRecordedCheckpointCodec.decode(
+                    bytes.toString(Charsets.UTF_8),run)
+                NativeWorldLabRecordedTime.restore(run,checkpoint)
+            }}.onSuccess{restored->
+                motorPlaying=false;motorClock=restored;motorFrame=restored.sampleIndex
+                motorReversePlayback=restored.direction=="reverse-recording"
+                motorSpeed=restored.playbackRate.toFloat()
+                motorCheckpointStatus="Matching current recorded motor run restored at sample "+(restored.sampleIndex+1)+"."
+            }.onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint restore failed."}
         }
     }
     val timelineExportPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
@@ -1653,6 +1693,26 @@ fun NativeWorldLabForm() {
                             } ?: run { motorFrame=index }
                         },valueRange=0f..run.samples.lastIndex.toFloat(),
                             modifier=Modifier.semantics { contentDescription="Motor recorded sample position" })
+                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(onClick={
+                                runCatching {
+                                    val recording=motorRecordedRun?:error("A valid recorded motor run is required.")
+                                    val clock=motorClock?:error("Motor timeline is not ready.")
+                                    val checkpoint=NativeWorldLabRecordedTime.checkpoint(recording,clock)
+                                    pendingMotorCheckpointJson=NativeWorldLabRecordedCheckpointCodec.encode(checkpoint,recording)
+                                    motorCheckpointExportPicker.launch("world-lab-motor-clock.json")
+                                    motorCheckpointStatus=""
+                                }.onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint could not be created."}
+                            }){Text("Save motor checkpoint")}
+                            OutlinedButton(onClick={
+                                if(motorRecordedRun==null)motorCheckpointStatus="Run the motor experiment before restoring a matching checkpoint."
+                                else motorCheckpointImportPicker.launch(arrayOf("application/json"))
+                            }){Text("Restore motor checkpoint")}
+                        }
+                        if(motorCheckpointStatus.isNotBlank())Text(motorCheckpointStatus,
+                            style=MaterialTheme.typography.bodySmall)
+                        Text("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.",
+                            style=MaterialTheme.typography.bodySmall)
                         Text("Playback rate: "+labNumber(motorSpeed.toDouble())+"×")
                         Slider(value=motorSpeed,onValueChange={motorSpeed=it},
                             valueRange=0.01f..100f,modifier=Modifier.semantics {
