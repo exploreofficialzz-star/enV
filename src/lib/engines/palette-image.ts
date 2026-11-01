@@ -1,6 +1,6 @@
 export type PalettePixelBuffer = ArrayLike<number>;
 
-type Pixel = { r: number; g: number; b: number };
+type Pixel = { r: number; g: number; b: number; count: number };
 type Channel = "r" | "g" | "b";
 
 function clamp(value: number, min: number, max: number): number {
@@ -31,23 +31,23 @@ export function extractDominantColors(
 ): string[] {
   const target = Math.round(clamp(count, 1, 8));
   const threshold = clamp(alphaThreshold, 0, 255);
-  const pixels: Pixel[] = [];
+  const histogram = new Map<string, Pixel>();
 
   for (let index = 0; index + 3 < rgba.length; index += 4) {
     const alpha = Number(rgba[index + 3]);
     if (!Number.isFinite(alpha) || alpha < threshold) continue;
-    const red = Number(rgba[index]);
-    const green = Number(rgba[index + 1]);
-    const blue = Number(rgba[index + 2]);
+    const red = Math.round(clamp(Number(rgba[index]), 0, 255));
+    const green = Math.round(clamp(Number(rgba[index + 1]), 0, 255));
+    const blue = Math.round(clamp(Number(rgba[index + 2]), 0, 255));
     if (![red, green, blue].every(Number.isFinite)) continue;
-    pixels.push({
-      r: Math.round(clamp(red, 0, 255)),
-      g: Math.round(clamp(green, 0, 255)),
-      b: Math.round(clamp(blue, 0, 255)),
-    });
+    const hex = colorHex({ r: red, g: green, b: blue });
+    const previous = histogram.get(hex);
+    if (previous) previous.count += 1;
+    else histogram.set(hex, { r: red, g: green, b: blue, count: 1 });
   }
 
-  if (pixels.length === 0) return [];
+  if (histogram.size === 0) return [];
+  const pixels = [...histogram.values()];
   const boxes: Pixel[][] = [pixels];
 
   while (boxes.length < target) {
@@ -63,7 +63,8 @@ export function extractDominantColors(
         ["b", channelRange(box, "b")],
       ];
       ranges.sort((a, b) => b[1] - a[1]);
-      const score = ranges[0][1] * Math.sqrt(box.length);
+      const population = box.reduce((sum, pixel) => sum + pixel.count, 0);
+      const score = ranges[0][1] * Math.sqrt(population);
       if (score > selectedScore) {
         selectedScore = score;
         selectedIndex = index;
@@ -74,23 +75,35 @@ export function extractDominantColors(
     if (selectedIndex < 0 || selectedScore <= 0) break;
     const selected = boxes[selectedIndex];
     selected.sort((a, b) => a[selectedChannel] - b[selectedChannel]);
-    const midpoint = Math.max(1, Math.min(selected.length - 1, Math.floor(selected.length / 2)));
+    const totalWeight = selected.reduce((sum, pixel) => sum + pixel.count, 0);
+    let accumulated = 0;
+    let midpoint = 1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < selected.length; index += 1) {
+      accumulated += selected[index - 1].count;
+      const distance = Math.abs(accumulated - totalWeight / 2);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        midpoint = index;
+      }
+    }
     boxes.splice(selectedIndex, 1, selected.slice(0, midpoint), selected.slice(midpoint));
   }
 
   const colors = boxes
     .map((box) => {
       const total = box.reduce((sum, pixel) => ({
-        r: sum.r + pixel.r,
-        g: sum.g + pixel.g,
-        b: sum.b + pixel.b,
-      }), { r: 0, g: 0, b: 0 });
+        r: sum.r + pixel.r * pixel.count,
+        g: sum.g + pixel.g * pixel.count,
+        b: sum.b + pixel.b * pixel.count,
+        count: sum.count + pixel.count,
+      }), { r: 0, g: 0, b: 0, count: 0 });
       return {
-        count: box.length,
+        count: total.count,
         color: colorHex({
-          r: total.r / box.length,
-          g: total.g / box.length,
-          b: total.b / box.length,
+          r: total.r / total.count,
+          g: total.g / total.count,
+          b: total.b / total.count,
         }),
       };
     })
