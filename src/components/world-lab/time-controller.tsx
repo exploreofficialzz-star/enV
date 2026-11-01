@@ -126,6 +126,10 @@ export function WorldLabTimeController(p:Props){
    accept=".json,application/json" disabled={!run} onChange={event=>{
     const file=event.currentTarget.files?.[0];event.currentTarget.value="";
     if(!file||!run)return;
+    if(file.size>16*1024){
+     setRestoreStatus("Checkpoint exceeds the 16 KB import limit.");
+     return;
+    }
     void file.text().then(text=>{
      const raw=JSON.parse(text) as {format?:string};
      if(raw.format==="env-world-lab-time-engine-checkpoint"){
