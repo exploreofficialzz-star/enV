@@ -25,21 +25,27 @@ import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabProject
 import kotlin.math.*
 
-private data class LabScreenPoint(val x:Float,val y:Float)
-private fun labIsoPoint(
-    point:NativeLabVector,focus:NativeLabVector,yaw:Float,zoom:Float,
-    pan:Offset,width:Float,height:Float,elevationDegrees:Float=30f,
+private data class LabScreenPoint(val x:Float,val y:Float,val scale:Float,val visible:Boolean)
+private fun labPerspectivePoint(
+    point:NativeLabVector,focus:NativeLabVector,yaw:Float,cameraDistance:Double,
+    focalLength:Float,pan:Offset,width:Float,height:Float,elevationDegrees:Float,
 ):LabScreenPoint{
     val dx=point.x-focus.x;val dy=point.y-focus.y;val dz=point.z-focus.z
     val angle=yaw.toDouble()
-    val rightX=cos(angle);val rightZ=sin(angle)
-    val forwardX=sin(angle);val forwardZ=-cos(angle)
-    val horizontal=dx*rightX+dz*rightZ
-    val depth=dx*forwardX+dz*forwardZ
-    val elevation=Math.toRadians(elevationDegrees.toDouble().coerceIn(5.0,80.0))
-    val vertical=dy*cos(elevation)-depth*sin(elevation)
-    return LabScreenPoint(width/2f+pan.x+(horizontal*zoom).toFloat(),
-        height/2f+pan.y-(vertical*zoom).toFloat())
+    val elevation=Math.toRadians(elevationDegrees.toDouble().coerceIn(5.0,85.0))
+    // Camera basis: yaw rotates around world-up; elevation looks above/below the target.
+    val rightX=cos(angle);val rightZ=-sin(angle)
+    val upX=sin(angle)*sin(elevation);val upY=cos(elevation);val upZ=cos(angle)*sin(elevation)
+    val forwardX=sin(angle)*cos(elevation);val forwardY=-sin(elevation);val forwardZ=cos(angle)*cos(elevation)
+    val cameraX=dx*rightX+dz*rightZ
+    val cameraY=dx*upX+dy*upY+dz*upZ
+    val depth=cameraDistance+dx*forwardX+dy*forwardY+dz*forwardZ
+    val visible=depth.isFinite()&&depth>0.05&&depth<50_000_000.0
+    if(!visible)return LabScreenPoint(Float.NaN,Float.NaN,0f,false)
+    val scale=focalLength/depth.toFloat()
+    val x=width/2f+pan.x+cameraX.toFloat()*scale
+    val y=height/2f+pan.y-cameraY.toFloat()*scale
+    return LabScreenPoint(x,y,scale,x.isFinite()&&y.isFinite())
 }
 private fun labRotatePoint(x:Double,y:Double,z:Double,rotation:NativeLabVector):NativeLabVector{
     val cx=cos(rotation.x);val sx=sin(rotation.x)
@@ -52,13 +58,13 @@ private fun labRotatePoint(x:Double,y:Double,z:Double,rotation:NativeLabVector):
         r3x*x+r3y*y+r3z*z)
 }
 private fun labProjectCenter(
-    solid:NativeLabSolid,focus:NativeLabVector,yaw:Float,zoom:Float,
-    pan:Offset,width:Float,height:Float,
-)=labIsoPoint(solid.positionMeters,focus,yaw,zoom,pan,width,height)
+    solid:NativeLabSolid,focus:NativeLabVector,yaw:Float,cameraDistance:Double,
+    focalLength:Float,pan:Offset,width:Float,height:Float,elevation:Float,
+)=labPerspectivePoint(solid.positionMeters,focus,yaw,cameraDistance,focalLength,pan,width,height,elevation)
 
 /**
- * Native isometric observer viewport. The projection is an interaction/placement
- * aid, not a substitute for a physically rendered terrain or photogrammetric 3D map.
+ * Native perspective observer viewport. The local ground and subsurface bands are
+ * explicitly schematic; they are not terrain, geology, or a surveyed Earth dataset.
  */
 @Composable
 fun NativeWorldLabViewport(
@@ -88,14 +94,16 @@ fun NativeWorldLabViewport(
         (project.cameraLookingAtMeters.y+observerDepthMeters).coerceIn(-20000.0,100000.0),
         project.cameraLookingAtMeters.z)
     val viewRangeMeters=(45.0*8.0/zoom.toDouble()).coerceIn(0.5,100000.0)
+    val elevationRadians=Math.toRadians(elevation.toDouble())
+    val cameraDistance=(viewRangeMeters/cos(elevationRadians).coerceAtLeast(0.08)).coerceIn(0.5,100000.0)
     var latitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.latitudeDegrees?.toString() ?: "0")}
     var longitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.longitudeDegrees?.toString() ?: "0")}
     var height by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.heightMeters?.toString() ?: "0")}
-    fun projection(point:NativeLabVector,width:Float,height:Float)=
-        labIsoPoint(point,focus,yaw,zoom,pan,width,height,elevation)
+    fun projection(point:NativeLabVector,width:Float,height:Float,focalLength:Float)=
+        labPerspectivePoint(point,focus,yaw,cameraDistance,focalLength,pan,width,height,elevation)
     Text("Explore your invention",style=MaterialTheme.typography.titleSmall)
-    Text("Drag to pan · pinch to zoom · twist to orbit · tap a part to select. "+
-        "Use the observer controls below to change vertical view and elevation. The environment remains illustrative.",
+    Text("Drag to move · pinch to zoom · twist to orbit · tap a part to select. "+
+        "The local world uses perspective depth; underground bands are schematic, not surveyed geology.",
         style=MaterialTheme.typography.bodySmall)
     Canvas(
         Modifier.fillMaxWidth().height(250.dp)
@@ -110,15 +118,16 @@ fun NativeWorldLabViewport(
             .pointerInput(project.id,project.revision,zoom,yaw,pan){
                 detectTapGestures{touch->
                     val hit=project.entities.map{e->
-                        val p=projection(e.positionMeters,size.width.toFloat(),size.height.toFloat())
-                        e to hypot(p.x-touch.x,p.y-touch.y)
+                        val p=projection(e.positionMeters,size.width.toFloat(),size.height.toFloat(),360f*density)
+                        e to if(p.visible)hypot(p.x-touch.x,p.y-touch.y) else Float.POSITIVE_INFINITY
                     }.filter{it.second<44f}.minByOrNull{it.second}
                     hit?.first?.let{onSelect(it.id)}
                 }
             }
-            .semantics{contentDescription="Interactive isometric World Lab view with drag, pinch, orbit and part selection"}
+            .semantics{contentDescription="Interactive perspective 3D World Lab view with drag, pinch zoom, orbit, elevation and part selection"}
     ){
-        // Ground grid follows the saved observer target and adapts to zoom.
+        val focalLength=360f*density
+        // Ground grid follows the saved target and adapts to the current visible range.
         val unit=when{
             zoom>80->0.25;zoom>35->0.5;zoom>12->2.0;zoom>6->10.0
             zoom>2->50.0;zoom>0.7->100.0;zoom>0.25->500.0;else->1000.0
@@ -127,12 +136,12 @@ fun NativeWorldLabViewport(
         for(i in -extent..extent){
             val a=NativeLabVector(focus.x+i*unit,focus.y,focus.z-extent*unit)
             val b=NativeLabVector(focus.x+i*unit,focus.y,focus.z+extent*unit)
-            val pa=projection(a,size.width,size.height);val pb=projection(b,size.width,size.height)
-            drawLine(Color(0xFF3E5968),Offset(pa.x,pa.y),Offset(pb.x,pb.y),strokeWidth=1f)
+            val pa=projection(a,size.width,size.height,focalLength);val pb=projection(b,size.width,size.height,focalLength)
+            if(pa.visible&&pb.visible)drawLine(Color(0xFF3E5968),Offset(pa.x,pa.y),Offset(pb.x,pb.y),strokeWidth=1f)
             val c=NativeLabVector(focus.x-extent*unit,focus.y,focus.z+i*unit)
             val d=NativeLabVector(focus.x+extent*unit,focus.y,focus.z+i*unit)
-            val pc=projection(c,size.width,size.height);val pd=projection(d,size.width,size.height)
-            drawLine(Color(0xFF3E5968),Offset(pc.x,pc.y),Offset(pd.x,pd.y),strokeWidth=1f)
+            val pc=projection(c,size.width,size.height,focalLength);val pd=projection(d,size.width,size.height,focalLength)
+            if(pc.visible&&pd.visible)drawLine(Color(0xFF3E5968),Offset(pc.x,pc.y),Offset(pd.x,pd.y),strokeWidth=1f)
         }
         val ordered=project.entities.sortedBy{it.positionMeters.y+it.positionMeters.x+it.positionMeters.z}
         for(solid in ordered){
@@ -141,27 +150,31 @@ fun NativeWorldLabViewport(
             val color=runCatching{Color(android.graphics.Color.parseColor(solid.color))}.getOrDefault(Color(0xFFA4C9C6))
             val selected=solid.id==selectedId
             if(solid.shape=="sphere"){
-                val p=projection(center,size.width,size.height)
-                val radius=(dimensions.x.toFloat()*zoom*0.5f).coerceIn(2f,100f)
-                drawCircle(color.copy(alpha=0.88f),radius,Offset(p.x,p.y))
-                drawCircle(if(selected)Color.White else color.copy(alpha=0.65f),
-                    radius,Offset(p.x,p.y),style=Stroke(if(selected)3f else 1.2f))
-                drawArc(Color.White.copy(alpha=0.25f),200f,135f,false,
-                    topLeft=Offset(p.x-radius*0.72f,p.y-radius*0.72f),
-                    size=androidx.compose.ui.geometry.Size(radius*1.44f,radius*1.44f),
-                    style=Stroke(1f))
+                val p=projection(center,size.width,size.height,focalLength)
+                if(p.visible){
+                    val radius=(dimensions.x.toFloat()*p.scale*0.5f).coerceIn(1f,100f)
+                    drawCircle(color.copy(alpha=0.88f),radius,Offset(p.x,p.y))
+                    drawCircle(if(selected)Color.White else color.copy(alpha=0.65f),
+                        radius,Offset(p.x,p.y),style=Stroke(if(selected)3f else 1.2f))
+                    drawArc(Color.White.copy(alpha=0.25f),200f,135f,false,
+                        topLeft=Offset(p.x-radius*0.72f,p.y-radius*0.72f),
+                        size=androidx.compose.ui.geometry.Size(radius*1.44f,radius*1.44f),
+                        style=Stroke(1f))
+                }
             }else if(solid.shape=="cylinder"){
-                val p=projection(center,size.width,size.height)
-                val radius=(dimensions.x.toFloat()*zoom*0.5f).coerceIn(2f,80f)
-                val heightPx=(dimensions.y.toFloat()*zoom*cos(Math.toRadians(elevation.toDouble())).toFloat()).coerceIn(3f,160f)
-                val left=p.x-radius;val top=p.y-heightPx/2
-                drawRect(color.copy(alpha=0.72f),Offset(left,top),androidx.compose.ui.geometry.Size(radius*2,heightPx))
-                drawOval(color,topLeft=Offset(left,top-radius*0.22f),
-                    size=androidx.compose.ui.geometry.Size(radius*2,radius*0.44f))
-                drawOval(if(selected)Color.White else color.copy(alpha=0.8f),
-                    topLeft=Offset(left,p.y+heightPx/2-radius*0.22f),
-                    size=androidx.compose.ui.geometry.Size(radius*2,radius*0.44f),
-                    style=Stroke(if(selected)3f else 1f))
+                val p=projection(center,size.width,size.height,focalLength)
+                if(p.visible){
+                    val radius=(dimensions.x.toFloat()*p.scale*0.5f).coerceIn(1f,80f)
+                    val heightPx=(dimensions.y.toFloat()*p.scale*cos(Math.toRadians(elevation.toDouble())).toFloat()).coerceIn(1f,160f)
+                    val left=p.x-radius;val top=p.y-heightPx/2
+                    drawRect(color.copy(alpha=0.72f),Offset(left,top),androidx.compose.ui.geometry.Size(radius*2,heightPx))
+                    drawOval(color,topLeft=Offset(left,top-radius*0.22f),
+                        size=androidx.compose.ui.geometry.Size(radius*2,radius*0.44f))
+                    drawOval(if(selected)Color.White else color.copy(alpha=0.8f),
+                        topLeft=Offset(left,p.y+heightPx/2-radius*0.22f),
+                        size=androidx.compose.ui.geometry.Size(radius*2,radius*0.44f),
+                        style=Stroke(if(selected)3f else 1f))
+                }
             }else{
                 val hx=dimensions.x/2;val hy=dimensions.y/2;val hz=dimensions.z/2
                 val raw=listOf(
@@ -169,17 +182,19 @@ fun NativeWorldLabViewport(
                     listOf(-hx,-hy,hz),listOf(hx,-hy,hz),listOf(hx,hy,hz),listOf(-hx,hy,hz))
                 val points=raw.map{local->
                     val rotated=labRotatePoint(local[0],local[1],local[2],solid.rotationRadians)
-                    projection(NativeLabVector(center.x+rotated.x,center.y+rotated.y,center.z+rotated.z),size.width,size.height)
+                    projection(NativeLabVector(center.x+rotated.x,center.y+rotated.y,center.z+rotated.z),size.width,size.height,focalLength)
                 }
                 val faces=listOf(listOf(0,1,2,3),listOf(1,5,6,2),listOf(3,2,6,7))
                 faces.forEachIndexed{face,indices->
-                    val path=Path().apply{
-                        indices.forEachIndexed{i,index->
-                            val p=points[index];if(i==0)moveTo(p.x,p.y) else lineTo(p.x,p.y)
-                        };close()
+                    val vertices=indices.map{points[it]}
+                    if(vertices.all{it.visible}){
+                        val path=Path().apply{
+                            vertices.forEachIndexed{i,p->if(i==0)moveTo(p.x,p.y) else lineTo(p.x,p.y)}
+                            close()
+                        }
+                        drawPath(path,if(face==2)color else color.copy(alpha=if(face==0)0.6f else 0.78f))
+                        if(selected)drawPath(path,Color.White,style=Stroke(2.5f))
                     }
-                    drawPath(path,if(face==2)color else color.copy(alpha=if(face==0)0.6f else 0.78f))
-                    if(selected)drawPath(path,Color.White,style=Stroke(2.5f))
                 }
             }
         }
@@ -219,6 +234,8 @@ fun NativeWorldLabViewport(
         (if(observerDepthMeters<0)"below" else if(observerDepthMeters>0)"above" else "at")+
         " saved target by "+String.format(java.util.Locale.US,"%.1f",abs(observerDepthMeters))+" m",
         style=MaterialTheme.typography.bodySmall)
+    Text("Perspective observer · "+String.format(java.util.Locale.US,"%.2f",cameraDistance)+" m from focus · "+
+        "visible far range is clipped at 50,000 km",style=MaterialTheme.typography.bodySmall)
     Text("Observer elevation: "+elevation.toInt()+"°")
     Slider(value=elevation,onValueChange={elevation=it},valueRange=5f..80f,
         modifier=Modifier.semantics{contentDescription="Observer camera elevation angle"})
