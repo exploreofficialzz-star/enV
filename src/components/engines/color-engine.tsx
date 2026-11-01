@@ -18,7 +18,7 @@ import {
   type RgbaColor,
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
-import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony, type SemanticPaletteColors } from "@/lib/engines/design-palette";
+import { buildDesignPaletteExport, buildPaletteSwatchesSvg, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony, type SemanticPaletteColors } from "@/lib/engines/design-palette";
 import { formatCmyk, formatHsv, formatHwb, formatOklch, parseDesignColor } from "@/lib/engines/design-color";
 import { extractDominantColors } from "@/lib/engines/palette-image";
 
@@ -48,6 +48,37 @@ function clamp(value: number, min: number, max: number): number {
 
 function colorInputValue(color: RgbaColor): string {
   return toHex({ ...color, a: 1 }).slice(0, 7);
+}
+
+function downloadSvgAsPng(svg: string, filename: string): void {
+  const sourceUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  const image = new Image();
+  image.onload = () => {
+    try {
+      const sourceWidth = image.naturalWidth || 1200;
+      const sourceHeight = image.naturalHeight || 300;
+      const scale = Math.min(2, 2048 / sourceWidth, 2048 / sourceHeight);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((png) => {
+        if (!png) return;
+        const pngUrl = URL.createObjectURL(png);
+        const anchor = document.createElement("a");
+        anchor.href = pngUrl;
+        anchor.download = filename;
+        anchor.click();
+        URL.revokeObjectURL(pngUrl);
+      }, "image/png");
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
+  };
+  image.onerror = () => URL.revokeObjectURL(sourceUrl);
+  image.src = sourceUrl;
 }
 
 function extractImageColors(file: File): Promise<string[]> {
@@ -212,6 +243,10 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const paletteExport = useMemo(
     () => buildDesignPaletteExport(roleColors, shadeScale, exportFormat),
     [exportFormat, roleColors, shadeScale],
+  );
+  const paletteSwatchesSvg = useMemo(
+    () => buildPaletteSwatchesSvg(palette.map((swatch, index) => toHex(swatch)), palette.map((_, index) => `Color ${index + 1}`)),
+    [palette],
   );
   const paletteShareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -581,6 +616,22 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                 );
               })}
             </div>
+            <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="palette-swatch-export-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="palette-swatch-export-heading" className="text-sm font-semibold text-fg">Export palette swatches</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">Create a clean, labeled color sheet. PNG rendering happens locally in your browser.</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => downloadSvgAsPng(paletteSwatchesSvg, "env-palette-swatches.png")}>Download PNG</Button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {palette.map((swatch, index) => <div key={index} className="overflow-hidden rounded-lg border border-border">
+                  <div className="h-12" style={{ background: toHex(swatch) }} />
+                  <div className="bg-surface px-2 py-1.5"><p className="text-[10px] font-medium text-fg">Color {index + 1}</p><p className="font-mono text-[9px] text-muted">{toHex(swatch).toUpperCase()}</p></div>
+                </div>)}
+              </div>
+              <CodeResult code={paletteSwatchesSvg} filename="env-palette-swatches.svg" />
+            </section>
             <section className="space-y-3 rounded-xl border border-border p-4" aria-labelledby="semantic-colors-heading">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
