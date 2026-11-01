@@ -104,3 +104,21 @@ test("A book attachment batches enforce per-file, total-library and count limits
   assert.throws(() => assertABookAttachmentBatch([{ size: 1 }], 0, 10_000), /10,000 local attachments/);
   assert.throws(() => assertABookAttachmentBatch([]), /at least one attachment/);
 });
+
+
+test("A book exports stored ZIP entries accepted by the native iOS archive reader", async () => {
+  const archive = await createABookArchive([note], [], [attachment]);
+  const bytes = new Uint8Array(await archive.arrayBuffer());
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.equal(view.getUint32(0, true), 0x04034b50, "first entry must be a ZIP local-file header");
+  assert.equal(view.getUint16(8, true), 0, "Web backups must use ZIP STORE (method 0) for native iOS portability");
+  const centralOffset = (() => {
+    for (let offset = bytes.length - 22; offset >= Math.max(0, bytes.length - 65_557); offset -= 1) {
+      if (view.getUint32(offset, true) === 0x06054b50) return view.getUint32(offset + 16, true);
+    }
+    throw new Error("ZIP end-of-central-directory record not found");
+  })();
+  assert.equal(view.getUint32(centralOffset, true), 0x02014b50);
+  assert.equal(view.getUint16(centralOffset + 10, true), 0);
+  assert.deepEqual((await readABookArchive(archive)).attachments[0].blob.size, attachment.size);
+});
