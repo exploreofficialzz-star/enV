@@ -62,3 +62,18 @@ class NativeWorldLabRecordedTimeTest {
   }
  }
 }
+
+ @Test fun checkpointJsonRoundTripsAndRejectsUnknownOrOversizedFields(){
+  val run=run()
+  val state=NativeWorldLabRecordedTime.seek(run,state(),0.3)
+  val checkpoint=NativeWorldLabRecordedTime.checkpoint(run,state)
+  val json=NativeWorldLabRecordedCheckpointCodec.encode(checkpoint,run)
+  val decoded=NativeWorldLabRecordedCheckpointCodec.decode(json,run)
+  assertEquals(checkpoint,decoded)
+  assertThrows(IllegalArgumentException::class.java){
+   NativeWorldLabRecordedCheckpointCodec.decode(json.replace("\\"sampleIndex\\"","\\"unexpected\\""),run)
+  }
+  assertThrows(IllegalArgumentException::class.java){
+   NativeWorldLabRecordedCheckpointCodec.decode(" ".repeat(16*1024+1),run)
+  }
+ }
