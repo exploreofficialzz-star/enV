@@ -259,3 +259,52 @@ final class NativeWorldLabEditorTests: XCTestCase {
             XCTAssertEqual(hypot(e.positionMeters[0],e.positionMeters[1]-0.5),2,accuracy:1e-9)
         }
     }
+
+
+    func testMultiSelectionCADTransformsAreAtomicAndRespectRotatedPrimitiveBounds() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"b")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"cylinder",id:"c")
+        data=try NativeWorldLabEditor.positionSolid(data,id:"a",positionMeters:[0,0.5,0])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"b",positionMeters:[4,0.5,0])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"c",positionMeters:[10,0.5,0])
+        let initial=try NativeWorldLabProject.decode(data).revision
+        data=try NativeWorldLabEditor.rotateSolids(data,ids:["a","b"],axis:2,degrees:45)
+        var project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.revision,initial+1)
+        XCTAssertEqual(project.entities[0].effectiveRotationRadians[2],Double.pi/4,accuracy:1e-12)
+        XCTAssertEqual(project.entities[1].effectiveRotationRadians[2],Double.pi/4,accuracy:1e-12)
+        data=try NativeWorldLabEditor.scaleSolids(data,ids:["a","b","c"],factors:[2,3,4])
+        project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.entities[0].dimensionsMeters,[2,3,4])
+        XCTAssertEqual(project.entities[1].dimensionsMeters[0],project.entities[1].dimensionsMeters[2],accuracy:1e-12)
+        XCTAssertEqual(project.entities[2].dimensionsMeters[0],project.entities[2].dimensionsMeters[2],accuracy:1e-12)
+        data=try NativeWorldLabEditor.alignSolids(data,ids:["a","b","c"],axis:0,alignment:"min")
+        project=try NativeWorldLabProject.decode(data)
+        let extents=project.entities.map{part->Double in
+            let d=part.dimensionsMeters,angle=part.effectiveRotationRadians[2]
+            return (abs(cos(angle))*d[0]+abs(sin(angle))*d[1])/2
+        }
+        let minima=project.entities.enumerated().map{index,part in
+            part.positionMeters[0]-extents[index]
+        }
+        XCTAssertLessThan((minima.max() ?? 0)-(minima.min() ?? 0),1e-8)
+        data=try NativeWorldLabEditor.distributeSolids(data,ids:["a","b","c"],axis:0,gapMeters:0.5)
+        project=try NativeWorldLabProject.decode(data)
+        let sorted=project.entities.enumerated().sorted{$0.element.positionMeters[0]<$1.element.positionMeters[0]}
+        for index in 0..<2 {
+            let left=sorted[index].element.positionMeters[0]+extents[sorted[index].offset]
+            let right=sorted[index+1].element.positionMeters[0]-extents[sorted[index+1].offset]
+            XCTAssertEqual(right-left,0.5,accuracy:1e-8)
+        }
+        data=try NativeWorldLabEditor.duplicateSolids(data,ids:["a","b"],offsetMeters:[10,0,0])
+        XCTAssertEqual(try NativeWorldLabProject.decode(data).entities.count,5)
+    }
+    func testMultiSelectionCADRejectsInvalidIDsAndTransforms() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"b")
+        XCTAssertThrowsError(try NativeWorldLabEditor.rotateSolids(data,ids:["a","missing"],axis:0,degrees:10))
+        XCTAssertThrowsError(try NativeWorldLabEditor.scaleSolids(data,ids:["a","a"],factors:[1,1,1]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.duplicateSolids(data,ids:["a","b"],offsetMeters:[Double.nan,0,0]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.distributeSolids(data,ids:["a","b"],axis:0,gapMeters:1))
+    }

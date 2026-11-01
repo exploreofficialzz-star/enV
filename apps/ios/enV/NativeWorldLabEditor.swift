@@ -464,6 +464,197 @@ enum NativeWorldLabEditor {
     private static func multiplyRotation(_ a:[[Double]],_ b:[[Double]])->[[Double]] {
         (0..<3).map{row in (0..<3).map{col in (0..<3).reduce(0.0){$0+a[row][$1]*b[$1][col]}}}
     }
+
+    private struct NativeCadBounds {
+        let center:[Double];let half:[Double];let min:[Double];let max:[Double]
+    }
+    private static func cadBounds(_ entity:[String:Any])throws->NativeCadBounds {
+        guard let position=entity["positionMeters"] as? [Double],
+              let dimensions=entity["dimensionsMeters"] as? [Double],
+              position.count==3,dimensions.count==3,
+              dimensions.allSatisfy({$0.isFinite && $0>0}) else {
+            throw NativeWorldLabError.invalid("CAD part coordinates or dimensions are invalid")
+        }
+        let angles=entity["rotationRadians"] as? [Double] ?? [0,0,0]
+        guard angles.count==3,angles.allSatisfy({$0.isFinite && abs($0)<=2*Double.pi}) else {
+            throw NativeWorldLabError.invalid("CAD part rotation is invalid")
+        }
+        let rotation=Self.rotationMatrix(angles)
+        let half=(0..<3).map{axis in
+            (0..<3).reduce(0.0){$0+abs(rotation[axis][$1])*dimensions[$1]/2}
+        }
+        return NativeCadBounds(center:position,half:half,
+            min:(0..<3).map{position[$0]-half[$0]},
+            max:(0..<3).map{position[$0]+half[$0]})
+    }
+    private static func selectedCAD(_ root:[String:Any],_ ids:[String])throws->[[String:Any]] {
+        guard !ids.isEmpty,Set(ids).count==ids.count,
+              let entities=root["entities"] as? [[String:Any]] else {
+            throw NativeWorldLabError.invalid("Select one or more distinct CAD parts")
+        }
+        let selected=ids.compactMap{id in entities.first(where:{$0["id"] as? String==id})}
+        guard selected.count==ids.count else {
+            throw NativeWorldLabError.invalid("A selected part no longer exists")
+        }
+        return selected
+    }
+    static func rotateSolids(_ data:Data,ids:[String],axis:Int,degrees:Double)throws->Data {
+        guard (0...2).contains(axis),degrees.isFinite,(-3600...3600).contains(degrees) else {
+            throw NativeWorldLabError.invalid("Multi-part rotation needs an axis and bounded finite degrees")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for part in selected {
+                guard let id=part["id"] as? String,
+                      let index=entities.firstIndex(where:{$0["id"] as? String==id}) else {
+                    throw NativeWorldLabError.invalid("A selected CAD part disappeared")
+                }
+                var rotation=entities[index]["rotationRadians"] as? [Double] ?? [0,0,0]
+                guard rotation.count==3,rotation.allSatisfy({$0.isFinite&&abs($0)<=2*Double.pi}) else {
+                    throw NativeWorldLabError.invalid("Stored part rotation is invalid")
+                }
+                let raw=rotation[axis]+degrees*Double.pi/180
+                let wrapped=(raw+Double.pi).truncatingRemainder(dividingBy:2*Double.pi)
+                let normalized=wrapped<0 ? wrapped+2*Double.pi-Double.pi:wrapped-Double.pi
+                rotation[axis]=abs(normalized)<1e-12 ? 0:normalized
+                entities[index]["rotationRadians"]=rotation
+            }
+            root["entities"]=entities
+        }
+    }
+    static func scaleSolids(_ data:Data,ids:[String],factors:[Double])throws->Data {
+        guard factors.count==3,factors.allSatisfy({$0.isFinite&&(0.001...1000).contains($0)}) else {
+            throw NativeWorldLabError.invalid("Multi-part scale requires three positive bounded factors")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for part in selected {
+                guard let id=part["id"] as? String,
+                      let index=entities.firstIndex(where:{$0["id"] as? String==id}),
+                      let old=entities[index]["dimensionsMeters"] as? [Double],
+                      old.count==3 else {
+                    throw NativeWorldLabError.invalid("A selected CAD part has invalid dimensions")
+                }
+                let shape=entities[index]["shape"] as? String ?? "box"
+                let next:[Double]
+                switch shape {
+                case "sphere":next=Array(repeating:old[0]*factors[0],count:3)
+                case "cylinder":
+                    let radial=sqrt(factors[0]*factors[2])
+                    next=[old[0]*radial,old[1]*factors[1],old[2]*radial]
+                default:next=zip(old,factors).map{$0*$1}
+                }
+                guard next.allSatisfy({$0.isFinite&&(0.001...10000).contains($0)}) else {
+                    throw NativeWorldLabError.invalid("Multi-part scale exceeds supported geometry bounds")
+                }
+                entities[index]["dimensionsMeters"]=next
+            }
+            root["entities"]=entities
+        }
+    }
+    static func duplicateSolids(_ data:Data,ids:[String],offsetMeters:[Double])throws->Data {
+        guard offsetMeters.count==3,offsetMeters.allSatisfy({$0.isFinite&&abs($0)<=100000}) else {
+            throw NativeWorldLabError.invalid("Multi-part duplicate offset is outside the local world")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            guard entities.count+selected.count<=200 else {
+                throw NativeWorldLabError.invalid("Duplicating the selection exceeds the 200-part limit")
+            }
+            var used=Set(entities.compactMap{$0["id"] as? String})
+            for original in selected {
+                guard let position=original["positionMeters"] as? [Double],
+                      position.count==3 else {
+                    throw NativeWorldLabError.invalid("Selected part cannot be duplicated")
+                }
+                var clone=original
+                let next=zip(position,offsetMeters).map{$0+$1}
+                guard next.allSatisfy({$0.isFinite&&abs($0)<=100000}) else {
+                    throw NativeWorldLabError.invalid("A duplicate part would leave the local world")
+                }
+                var id=UUID().uuidString
+                while used.contains(id){id=UUID().uuidString}
+                used.insert(id)
+                clone["id"]=id
+                clone["name"]=String(((original["name"] as? String ?? "Solid")+" copy").prefix(120))
+                clone["positionMeters"]=next
+                if clone["rotationRadians"]==nil{clone["rotationRadians"]=[0,0,0]}
+                entities.append(clone)
+            }
+            root["entities"]=entities
+        }
+    }
+    static func alignSolids(_ data:Data,ids:[String],axis:Int,alignment:String)throws->Data {
+        guard (0...2).contains(axis),["min","center","max"].contains(alignment) else {
+            throw NativeWorldLabError.invalid("Alignment needs an axis and min, center or max")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            guard selected.count>=2 else {
+                throw NativeWorldLabError.invalid("Alignment needs at least two parts")
+            }
+            let details=try selected.map{($0,try Self.cadBounds($0))}
+            let target:Double
+            switch alignment {
+            case "min":target=details.map{$0.1.min[axis]}.min()!
+            case "max":target=details.map{$0.1.max[axis]}.max()!
+            default:target=details.map{$0.1.center[axis]}.reduce(0,+)/Double(details.count)
+            }
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for (part,bounds) in details {
+                guard let id=part["id"] as? String,
+                      let index=entities.firstIndex(where:{$0["id"] as? String==id}),
+                      var position=entities[index]["positionMeters"] as? [Double],
+                      position.count==3 else {
+                    throw NativeWorldLabError.invalid("A selected part disappeared during alignment")
+                }
+                position[axis]=alignment=="min" ? target+bounds.half[axis] :
+                    alignment=="max" ? target-bounds.half[axis] : target
+                guard position[axis].isFinite,abs(position[axis])<=100000 else {
+                    throw NativeWorldLabError.invalid("Aligned part leaves the local world")
+                }
+                entities[index]["positionMeters"]=position
+            }
+            root["entities"]=entities
+        }
+    }
+    static func distributeSolids(_ data:Data,ids:[String],axis:Int,gapMeters:Double)throws->Data {
+        guard (0...2).contains(axis),gapMeters.isFinite,(0...100000).contains(gapMeters) else {
+            throw NativeWorldLabError.invalid("Distribution requires an axis and nonnegative bounded gap")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            guard selected.count>=3 else {
+                throw NativeWorldLabError.invalid("Distribution needs at least three parts")
+            }
+            let sorted=try selected.map{($0,try Self.cadBounds($0))}
+                .sorted{$0.1.center[axis]<$1.1.center[axis]}
+            var positions:[String:Double]=[:]
+            var cursor=sorted[0].1.max[axis]
+            for (part,bounds) in sorted.dropFirst(){
+                let next=cursor+gapMeters+bounds.half[axis]
+                guard next.isFinite,abs(next)<=100000,
+                      let id=part["id"] as? String else {
+                    throw NativeWorldLabError.invalid("Distribution leaves local-world bounds")
+                }
+                positions[id]=next
+                cursor=next+bounds.half[axis]
+            }
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for index in entities.indices{
+                guard let id=entities[index]["id"] as? String,
+                      let coordinate=positions[id],
+                      var position=entities[index]["positionMeters"] as? [Double] else{continue}
+                position[axis]=coordinate;entities[index]["positionMeters"]=position
+            }
+            root["entities"]=entities
+        }
+    }
+
+
     static func mirrorSolid(_ data:Data,id:String,axis:Int,planeMeters:Double)throws->Data {
         guard (0...2).contains(axis),planeMeters.isFinite,abs(planeMeters)<=100000 else {
             throw NativeWorldLabError.invalid("Mirror requires an axis and bounded local-world plane")

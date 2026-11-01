@@ -729,3 +729,9 @@ release-candidate evidence bundle are unfinished.
 - Native CAD regression tests cover multi-selection transforms, primitive dimension invariants, rotated bounds, alignment, spacing, atomic revisions, malformed IDs and invalid parameters.
 - Existing Web saved-viewpoint scale clipping, transform/pattern/extrusion CAD and rotation-aware 3D rendering are retained; no duplicate Web implementation was added.
 - The remaining iOS native observer and multi-part editor parity is a separate implementation tranche; no C/D acceptance scenario is marked verified until the exact-head browser, Android and iOS interaction/accessibility tests pass.
+
+
+## C/D iOS native CAD continuation — 2026-11-01
+- iOS native CAD now supports atomic multi-selection rotation, scale, duplication, alignment using rotated primitive bounds and minimum-gap distribution. All operations validate every selected part and preserve sphere/cylinder geometry invariants.
+- XCTest coverage exercises multi-selection transformations, shape-preserving scale, rotated bounds, alignment, spacing, revision increments, duplication and invalid input rejection.
+- Observer zoom/vertical-offset controls and SwiftUI multi-selection controls are being integrated separately; no native acceptance scenario is marked verified by the editor-only source change.
