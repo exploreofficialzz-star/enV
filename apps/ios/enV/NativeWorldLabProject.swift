@@ -223,9 +223,14 @@ struct NativeWorldLabProject: Decodable {
             try requireKeys(o, ["id","name","shape","positionMeters","dimensionsMeters",
                                 "color","materialId","scientificRole","opacity"])
         }
+        let requiredMaterialKeys:Set<String>=["id","name","densityKgM3","youngModulusPa","evidence"]
+        let optionalMaterialKeys:Set<String>=["thermalConductivityWPerMK","specificHeatJPerKgK","refractiveIndex"]
         for o in materials {
-            try requireKeys(o, ["id","name","densityKgM3","youngModulusPa",
-                "thermalConductivityWPerMK","specificHeatJPerKgK","refractiveIndex","evidence"])
+            let supplied=Set(o.keys)
+            guard requiredMaterialKeys.isSubset(of:supplied),
+                  supplied.subtracting(requiredMaterialKeys).isSubset(of:optionalMaterialKeys) else {
+                throw NativeWorldLabError.invalid("Invented material has missing or unsupported fields")
+            }
         }
         if root.keys.contains("networks") && !(root["networks"] is [[String:Any]]) {
             throw NativeWorldLabError.invalid("Circuit networks must be an array of objects")
