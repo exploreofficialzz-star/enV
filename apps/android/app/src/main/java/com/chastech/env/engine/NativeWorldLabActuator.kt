@@ -98,9 +98,13 @@ object NativeWorldLabActuator {
         bounded(i.supplyVoltageV,0.0,1000.0,"Voltage")
         // Native SI boundary on the actual electrical-to-mechanical calculation.
         val supply=NativeWorldLabSI.declare(i.supplyVoltageV,"V")
-        NativeWorldLabSI.compatible(
-            NativeSciencePort("source","output","V","SCALAR","electrical"),
-            NativeSciencePort("coil","input","V","SCALAR","electrical"))
+        NativeWorldLabGraph.validate(NativeScientificGraph("native-actuator",0,
+            listOf(
+                NativeScienceComponent("voltage","ideal-dc-source",listOf(
+                    NativeSciencePort("supply","output","V","SCALAR","electrical"))),
+                NativeScienceComponent("coil","rl-electromechanics",listOf(
+                    NativeSciencePort("input","input","V","SCALAR","electrical")))
+            ),listOf(NativeScienceConnection("voltage","supply","coil","input"))))
         require(NativeWorldLabSI.convert(supply,"V")==i.supplyVoltageV){
             "Motor supply dimensional exchange failed"}
         bounded(i.resistanceOhm,0.01,10000.0,"Resistance")
