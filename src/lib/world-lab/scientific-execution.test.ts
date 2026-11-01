@@ -117,3 +117,62 @@ test("connected scientific inputs fail closed when a source omits its declared o
     durationSeconds:0.3,stepSeconds:0.1
   }),/did not emit its declared output port/);
 });
+
+
+test("RC capacitor state persists when its connected source switches off",()=>{
+  const rcGraph=validateScientificGraph({schemaVersion:1,projectId:"rc-switch",projectRevision:1,
+    components:[
+      {id:"source",modelId:"ideal-dc-source",ports:[{id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+      {id:"load",modelId:"series-rc-load",ports:[
+        {id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical"}]}],
+    edges:[{fromComponentId:"source",fromPortId:"V",toComponentId:"load",toPortId:"Vin",delayed:false}]});
+  const adapters=createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5});
+  const switched:ScientificAdapter={...adapters[0],advance:(time)=>({
+    outputs:{V:quantity(time<0.15?12:0,"V","hypothetical-user-assumed")},
+    suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null,
+  })};
+  const run=executeScientificGraph(rcGraph,[switched,adapters[1]],
+    {durationSeconds:0.3,stepSeconds:0.1});
+  const charged=12*(1-Math.exp(-0.1/3));
+  const expected=charged*Math.exp(-0.2/3);
+  assert.ok(Math.abs(run.samples.at(-1)!.values["load:Vc"].valueSI-expected)<1e-12);
+});
+
+test("delayed graph feedback requires explicit initial outputs and advances from prior samples",()=>{
+  const delayGraph=validateScientificGraph({schemaVersion:1,projectId:"delay-loop",projectRevision:1,
+    components:["a","b"].map(id=>({id,modelId:"delay-step",ports:[
+      {id:"out",direction:"output",unit:"1",frame:"SCALAR",flow:"signal"},
+      {id:"in",direction:"input",unit:"1",frame:"SCALAR",flow:"signal"}]})),
+    edges:[
+      {fromComponentId:"a",fromPortId:"out",toComponentId:"b",toPortId:"in",delayed:true},
+      {fromComponentId:"b",fromPortId:"out",toComponentId:"a",toPortId:"in",delayed:true}]});
+  const step=(componentId:string,initial:number):ScientificAdapter=>({
+    componentId,modelId:"delay-step",modelVersion:"1.0.0",
+    initialOutputs:{out:quantity(initial,"1","hypothetical-user-assumed")},
+    advance:(_time,_delta,inputs)=>({
+      outputs:{out:quantity(inputs.in.valueSI+1,"1","physics-model-computed")},
+      suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null,
+    }),
+  });
+  const run=executeScientificGraph(delayGraph,[step("a",1),step("b",10)],
+    {durationSeconds:0.2,stepSeconds:0.1});
+  assert.deepEqual(run.samples.map(s=>[s.values["a:out"].valueSI,s.values["b:out"].valueSI]),
+    [[11,2],[3,12]]);
+  assert.throws(()=>executeScientificGraph(delayGraph,[
+    {...step("a",1),initialOutputs:undefined},step("b",10)],
+    {durationSeconds:0.1,stepSeconds:0.1}),/initial output value/);
+});
+
+test("Web scheduler completes more than 20,000 steps within its 50,000-step budget",()=>{
+  const graph=validateScientificGraph({schemaVersion:1,projectId:"step-budget",projectRevision:0,
+    components:[{id:"source",modelId:"ideal-voltage",ports:[
+      {id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]}],
+    edges:[]});
+  const adapter:ScientificAdapter={componentId:"source",modelId:"ideal-voltage",modelVersion:"1.0.0",
+    advance:()=>({outputs:{V:quantity(1,"V","hypothetical-user-assumed")},
+      suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null})};
+  const run=executeScientificGraph(graph,[adapter],{durationSeconds:0.20001,stepSeconds:0.00001});
+  assert.equal(run.samples.length,20001);
+});
