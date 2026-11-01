@@ -1287,11 +1287,11 @@ enum NativeWorldLabEditor {
         }
         let result=try solid.positionMeters.map{value -> Double in
             let raw=floor(value/gridMeters+0.5)*gridMeters
-            let rounded=(raw*1e6).rounded()/1e6
+            let rounded=floor(raw*1e6+0.5)/1e6
             guard rounded.isFinite,abs(rounded)<=100000 else {
                 throw NativeWorldLabError.invalid("Snapped position outside local world")
             }
-            return rounded
+            return rounded==0 ? 0:rounded
         }
         return try positionSolid(data,id:id,positionMeters:result)
     }
