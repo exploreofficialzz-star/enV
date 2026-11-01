@@ -123,11 +123,12 @@ export function restoreTimeEngineCheckpoint(run:LabRun,raw:unknown):TimeEngineSt
  if(c.format!=="env-world-lab-time-engine-checkpoint"||c.schemaVersion!==1||
   c.runId!==run.id||c.modelId!==run.modelId||c.modelVersion!==run.modelVersion||
   c.worldEpochUTC!==run.time.worldDateUTC||!Number.isSafeInteger(c.sampleIndex)||
+  (c.sampleIndex as number)<0||(c.sampleIndex as number)>=run.samples.length||
   !c.clock||!c.sample||typeof c.clock!=="object")
   throw new Error("Checkpoint belongs to a different run or solver version.");
- const sample=run.samples[c.sampleIndex as number];
- if(!sample||JSON.stringify(sample)!==JSON.stringify(c.sample))
-  throw new Error("Checkpoint sample differs from immutable recorded solver output.");
+ const expected=nearestSample(run,c.clock.simulationTimeSeconds);
+ if(expected.index!==c.sampleIndex||JSON.stringify(expected.sample)!==JSON.stringify(c.sample))
+  throw new Error("Checkpoint sample index does not match the selected immutable simulation time.");
  const state=createTimeEngineState(run,{
   wallTimeUTC:c.clock.wallTimeUTC,simulationTimeSeconds:c.clock.simulationTimeSeconds,
   playbackRate:c.clock.playbackRate,direction:c.clock.direction,paused:true,
