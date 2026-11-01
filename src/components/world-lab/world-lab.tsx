@@ -12,6 +12,7 @@ import { deleteLocalWorldLabRun, listLocalWorldLabProjects, listLocalWorldLabRun
   saveLocalWorldLabScientificEvidence,
   type WorldLabDraft } from "@/lib/world-lab/local-storage";
 import { deriveOscillatorFromSolid } from "@/lib/world-lab/coupling";
+import {mergeWorldLabCadExchange,parseWorldLabCadExchange,serializeWorldLabCadExchange} from "@/lib/world-lab/cad-interchange";
 import {parseWorldLabArchive,serializeWorldLabArchive,WORLD_LAB_ARCHIVE_MAX_BYTES}
   from "@/lib/world-lab/portable-archive";
 import {newScientificEvidenceRecord,parseScientificEvidenceRecord,
@@ -245,6 +246,7 @@ export default function WorldLab() {
   const [coilHeatCapacity,setCoilHeatCapacity] = useState(80);
   const [coilCooling,setCoilCooling] = useState(0.3);
   const importInput = useRef<HTMLInputElement>(null);
+  const cadImportInput=useRef<HTMLInputElement>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
   const [materialName, setMaterialName] = useState("");
@@ -1769,6 +1771,59 @@ export default function WorldLab() {
       setError(cause instanceof Error?cause.message:"Could not save this project. Export a JSON backup.");
     }
   }
+
+  function exportCadGeometry(){
+    const current=projectForEdits.current;
+    if(!current)return;
+    try{
+      const json=serializeWorldLabCadExchange(current);
+      downloadJson("world-lab-cad-"+current.id+".envcad.json",JSON.parse(json));
+      setMessage("Supported CAD geometry and referenced material assumptions exported in metres (LOCAL_ENU).");
+      setError("");
+    }catch(cause){setError(cause instanceof Error?cause.message:"CAD geometry could not be exported.");}
+  }
+  async function importCadGeometry(file:File|undefined){
+    if(!file)return;
+    const current=projectForEdits.current;
+    if(!current){setError("Create or open an invention before importing CAD geometry.");return;}
+    try{
+      if(file.size>8*1024*1024)throw new Error("CAD geometry files must be 8 MB or smaller.");
+      const exchange=parseWorldLabCadExchange(await file.text());
+      const merged=mergeWorldLabCadExchange(current,exchange,()=>crypto.randomUUID());
+      const importedCount=exchange.entities.length;
+      mutateProject(()=>merged);
+      setMessage("Imported "+importedCount+" supported CAD part(s). Existing scientific records and project settings were preserved.");
+      setError("");
+    }catch(cause){setError(cause instanceof Error?cause.message:"CAD geometry could not be imported.");}
+  }
+  async function exportCadGlb(){
+    const current=projectForEdits.current,handles=sceneRef.current;
+    if(!current||!handles){setError("Open the 3D workspace before exporting CAD geometry.");return;}
+    const roots=current.entities.map(entity=>handles.addedShapes.get(entity.id)).filter((mesh):mesh is B.Mesh=>Boolean(mesh));
+    if(!roots.length){setError("Add at least one supported solid before exporting a GLB model.");return;}
+    try{
+      const snapshot=current;
+      const {GLTF2Export}=await import("babylonjs-serializers");
+      const output=await GLTF2Export.GLBAsync(handles.scene,"world-lab-cad",{
+        shouldExportNode:node=>roots.some(root=>node===root||node.isDescendantOf(root)),
+      });
+      if(projectForEdits.current?.id!==snapshot.id||
+         projectForEdits.current?.revision!==snapshot.revision)
+        throw new Error("The invention changed during export. Export again from the latest revision.");
+      const blob=output.files["world-lab-cad.glb"];
+      if(!(blob instanceof Blob))throw new Error("The 3D CAD model could not be generated.");
+      if(blob.size>15*1024*1024)throw new Error("GLB geometry export exceeds the 15 MB limit.");
+      const url=URL.createObjectURL(blob);
+      try{
+        const anchor=document.createElement("a");anchor.href=url;
+        anchor.download="world-lab-cad-"+snapshot.id+".glb";
+        document.body.appendChild(anchor);anchor.click();anchor.remove();
+      }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
+      setMessage("Exported the authored 3D solids as a GLB model. Project settings and scientific evidence remain in the CAD JSON and complete archive exports.");
+      setError("");
+    }catch(cause){setError(cause instanceof Error?cause.message:"GLB geometry export failed.");}
+  }
+
   function exportProject() {
     if (!project) return;
     try {
@@ -1958,6 +2013,8 @@ export default function WorldLab() {
           <button type="button" className={buttonClass} onClick={newProject}>New project</button>
           <button type="button" className={buttonClass} onClick={() => void save()} disabled={!project}>Save on device</button>
           <button type="button" className={buttonClass} onClick={exportProject} disabled={!project}>Export project</button>
+          <button type="button" className={buttonClass} onClick={exportCadGeometry} disabled={!project||!project.entities.length}>Export CAD JSON</button>
+          <button type="button" className={buttonClass} onClick={()=>void exportCadGlb()} disabled={!project||!project.entities.length}>Export GLB</button>
           <button type="button" className={buttonClass} onClick={exportCompleteArchive}
             disabled={!project}>Export complete archive</button>
           <input ref={importInput} className="sr-only" type="file" accept=".json,application/json"
@@ -1965,6 +2022,11 @@ export default function WorldLab() {
               void importProject(event.target.files?.[0]);event.target.value="";
             }}/>
           <button type="button" className={buttonClass} onClick={()=>importInput.current?.click()}>Import JSON</button>
+          <input ref={cadImportInput} className="sr-only" type="file" accept=".envcad.json,.json,application/json"
+            aria-label="Import enV CAD geometry" onChange={event=>{
+              void importCadGeometry(event.target.files?.[0]);event.target.value="";
+            }}/>
+          <button type="button" className={buttonClass} onClick={()=>cadImportInput.current?.click()}>Import CAD JSON</button>
         </div>
       </header>
       {project && (
