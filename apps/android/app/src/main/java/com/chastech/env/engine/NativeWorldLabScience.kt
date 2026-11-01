@@ -41,6 +41,7 @@ object NativeWorldLabScience {
                 domain(input.capacitanceF,1e-9,1000.0,"Capacitance")
                 domain(input.supplyV,-1000.0,1000.0,"Voltage")
                 domain(input.initialV,-1000.0,1000.0,"Initial voltage")
+                NativeWorldLabGraph.validate(NativeWorldLabExecution.idealRcGraph())
                 1.0/240.0
             }
             is NativeLabInput.Heat->{
@@ -73,9 +74,21 @@ object NativeWorldLabScience {
                     mechanicalEnergyJ=(input.massKg*v*v+input.springNPerM*x*x)/2)
             }
             is NativeLabInput.RC->{
-                val voltage=input.supplyV+(input.initialV-input.supplyV)*
-                    exp(-atSeconds/(input.resistanceOhm*input.capacitanceF))
-                val current=(input.supplyV-voltage)/input.resistanceOhm
+                val voltage:Double
+                val current:Double
+                if(atSeconds<0.001){
+                    voltage=input.initialV
+                    current=(input.supplyV-voltage)/input.resistanceOhm
+                }else{
+                    val run=NativeWorldLabExecution.execute(
+                        NativeWorldLabExecution.idealRcGraph(),
+                        NativeWorldLabExecution.idealRcAdapters(input.supplyV,
+                            input.resistanceOhm,input.capacitanceF,input.initialV),
+                        atSeconds,min(1.0/240.0,stable))
+                    val sample=run.samples.lastOrNull()?:error("RC graph scheduler returned no samples")
+                    voltage=sample.values["load:Vc"]?.valueSI?:error("RC graph omitted capacitor voltage")
+                    current=sample.values["load:I"]?.valueSI?:error("RC graph omitted circuit current")
+                }
                 NativeLabResult(atSeconds,voltageV=voltage,currentA=current,
                     resistorHeatW=current*current*input.resistanceOhm,
                     storedEnergyJ=input.capacitanceF*voltage*voltage/2)
