@@ -2881,7 +2881,7 @@ Text("Invent chemical heat").font(.headline)
                                 }
                                 value("Applied source voltage",sample.sourceVoltageV,"V")
                                 if run.modelVersion=="1.2.0" {
-                                    Text(sample.timeSeconds < (motorPowerOffAtSeconds ?? 0)
+                                    Text((motorClock?.simulationTimeSeconds ?? sample.timeSeconds) < (motorPowerOffAtSeconds ?? 0)
                                         ? "Supply connected"
                                         : abs(sample.currentA)>1e-4
                                             ? "Supply isolated · coil current decaying"
