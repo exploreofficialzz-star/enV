@@ -81,8 +81,8 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         if (typeof Worker === "undefined") {
           throw new Error("This browser does not support isolated local PDF viewing. Enable Web Workers or use a supported browser.");
         }
-        const pdfjs = await import("pdfjs-dist");
-        const workerAsset = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+        const workerAsset = await import("pdfjs-dist/legacy/build/pdf.worker.mjs?url");
         pdfjs.GlobalWorkerOptions.workerSrc = workerAsset.default;
         if (cancelled || loadTimedOut) return;
         loadingTask = pdfjs.getDocument({
