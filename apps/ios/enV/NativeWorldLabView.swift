@@ -1866,9 +1866,22 @@ Text("Invent chemical heat").font(.headline)
                             value("Power delivered",run.deliveredPowerW,"W")
                             value("Resistor heating",run.resistorHeatW,"W")
                             value("Power residual",run.powerResidualW,"W")
-                            ForEach(run.branchCurrentsA.keys.sorted(),id:\.self){id in
-                                value(id+" current",run.branchCurrentsA[id],"A")
+                            ForEach(circuit.components,id:\.id){part in
+                                if let signed=run.branchCurrentsA[part.id] {
+                                    let forward=signed>1e-12
+                                    let reverse=signed < -1e-12
+                                    let fromId=forward ? part.positiveNodeId:part.negativeNodeId
+                                    let toId=forward ? part.negativeNodeId:part.positiveNodeId
+                                    let from=circuit.nodes.first(where:{$0.id==fromId})?.label ?? fromId
+                                    let to=circuit.nodes.first(where:{$0.id==toId})?.label ?? toId
+                                    Text(abs(signed)<=1e-12
+                                        ? part.id+": 0 A · no net branch current"
+                                        : part.id+": "+String(format:"%.6g",abs(signed))+" A · "+from+" → "+to)
+                                        .font(.caption)
+                                }
                             }
+                            Text("Direction follows the calculated signed conventional branch current; these are circuit-topology indicators, not a measured 3D electromagnetic field.")
+                                .font(.caption).foregroundStyle(.secondary)
                             Text(run.validity).font(.caption).foregroundStyle(.secondary)
                         }
                     
