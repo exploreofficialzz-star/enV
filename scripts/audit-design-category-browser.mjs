@@ -38,8 +38,9 @@ for (const [browserName, browserType] of browserEntries) {
     browserOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
   }
   const browser = await browserType.launch(browserOptions);
+  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
   try {
-  const page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
   const failures = [];
   page.on("pageerror", (error) => failures.push(error.message));
   const response = await page.goto(baseUrl + "/tools/design", { waitUntil: "domcontentloaded", timeout: 60000 });
