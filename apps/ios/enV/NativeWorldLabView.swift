@@ -171,6 +171,8 @@ struct NativeWorldLabView:View {
     @State private var motorSpeed=1.0
     @State private var scene=SCNScene()
     @State private var sceneCameraNode=SCNNode()
+    @State private var observerVerticalOffset=0.0
+    @State private var appliedObserverVerticalOffset=0.0
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
     private let localProjects=NativeWorldLabProjectStore()
@@ -464,10 +466,18 @@ struct NativeWorldLabView:View {
                         ecef.xMeters,ecef.yMeters,ecef.zMeters)).font(.caption)
                 }
                 HStack{
+                    Button("Zoom in"){zoomObserverView(factor:0.8)}.buttonStyle(.bordered)
+                    Button("Zoom out"){zoomObserverView(factor:1.25)}.buttonStyle(.bordered)
                     Button("Save viewpoint"){saveObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Restore viewpoint"){restoreObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Surface"){returnObserverToSurface()}.buttonStyle(.bordered)
                 }
+                Text("Vertical observer offset: "+String(format:"%.1f",observerVerticalOffset)+
+                    " m · illustrative volume, not mapped geology")
+                    .font(.caption).foregroundStyle(.secondary)
+                Slider(value:$observerVerticalOffset,in:-20000...20000){_ in
+                    applyObserverVerticalOffset()
+                }.accessibilityLabel("World Lab observer vertical offset")
                 Picker("Experiment",selection:$mode){
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
@@ -2475,30 +2485,67 @@ Text("Invent chemical heat").font(.headline)
         let index=max(0,min(run.samples.count-1,Int((dropTime/run.stepSeconds).rounded())))
         node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightAboveGroundM)
     }
+    private func currentObserverTarget()->[Double]{
+        var target=project?.cameraLookingAtMeters ?? [0,1.2,0]
+        target[1]=max(-20000,min(100000,target[1]+observerVerticalOffset))
+        return target
+    }
+    private func updateObserverCameraClip(){
+        let target=currentObserverTarget(),position=sceneCameraNode.position
+        let distance=max(0.25,hypot(hypot(Double(position.x)-target[0],Double(position.y)-target[1]),Double(position.z)-target[2]))
+        sceneCameraNode.camera?.zNear=max(0.005,min(0.25,distance*0.0001))
+        sceneCameraNode.camera?.zFar=max(1000,min(50_000_000,distance*128))
+    }
+    private func applyObserverVerticalOffset(){
+        let target=currentObserverTarget()
+        let delta=observerVerticalOffset-appliedObserverVerticalOffset
+        let position=sceneCameraNode.position
+        sceneCameraNode.position=SCNVector3(position.x,position.y+Float(delta),position.z)
+        appliedObserverVerticalOffset=observerVerticalOffset
+        sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        updateObserverCameraClip()
+    }
+    private func zoomObserverView(factor:Double){
+        guard factor.isFinite,factor>0 else{return}
+        let target=currentObserverTarget(),position=sceneCameraNode.position
+        let dx=Double(position.x)-target[0],dy=Double(position.y)-target[1],dz=Double(position.z)-target[2]
+        let old=max(0.25,hypot(hypot(dx,dy),dz))
+        let next=max(0.25,min(100000,old*factor))
+        let ratio=next/old
+        sceneCameraNode.position=SCNVector3(Float(target[0]+dx*ratio),Float(target[1]+dy*ratio),Float(target[2]+dz*ratio))
+        sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        updateObserverCameraClip()
+    }
     private func saveObserverViewpoint(){
         guard let current=project,let data=projectData else{return}
         do{
             let position=sceneCameraNode.position
+            let target=currentObserverTarget()
             let next=try NativeWorldLabEditor.saveCameraViewpoint(data,
                 positionMeters:[Double(position.x),Double(position.y),Double(position.z)],
-                lookingAtMeters:current.cameraLookingAtMeters)
+                lookingAtMeters:target)
             projectData=next;project=try NativeWorldLabProject.decode(next)
+            observerVerticalOffset=0;appliedObserverVerticalOffset=0
             savedSnapshot=nil;problem="Observer viewpoint saved with this invention."
             redraw()
         }catch{problem=error.localizedDescription}
     }
     private func restoreObserverViewpoint(){
         guard let current=project else{return}
+        observerVerticalOffset=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(
             Float(current.cameraPositionMeters[0]),
             Float(current.cameraPositionMeters[1]),
             Float(current.cameraPositionMeters[2]))
         sceneCameraNode.look(at:SCNVector3(Float(current.cameraLookingAtMeters[0]),
             Float(current.cameraLookingAtMeters[1]),Float(current.cameraLookingAtMeters[2])))
+        updateObserverCameraClip()
     }
     private func returnObserverToSurface(){
+        observerVerticalOffset=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(0,1.65,-8)
         sceneCameraNode.look(at:SCNVector3(0,1.2,0))
+        updateObserverCameraClip()
     }
     private func redraw(){
         let next=SCNScene()
@@ -2591,12 +2638,9 @@ Text("Invent chemical heat").font(.headline)
                 next.rootNode.addChildNode(pathNode)
             }
         }
-        let camera=SCNNode()
-        camera.camera=SCNCamera()
-        camera.position=SCNVector3(0,3,-8)
-        camera.look(at:SCNVector3(0,1,0))
-        next.rootNode.addChildNode(camera)
         scene=next
+        observerVerticalOffset=0;appliedObserverVerticalOffset=0
+        updateObserverCameraClip()
         applyDropPosition()
         applyMotorPosition()
     }
