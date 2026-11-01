@@ -93,6 +93,37 @@ object NativeWorldLabActuator {
         if(clamp&&(n[0]<0||(n[0]==0.0&&n[1]<0))) {n[0]=0.0;n[1]=0.0}
         return n
     }
+    private data class Segment(
+        val before:DoubleArray,val after:DoubleArray,val stepSeconds:Double,
+        val sourceVoltageV:Double,val impactLossJ:Double
+    )
+    private data class Integrated(val state:DoubleArray,val segments:List<Segment>)
+    private fun oneSegment(state:DoubleArray,input:NativeActuatorInput,dt:Double):Segment {
+        val raw=step(state,input,dt,false)
+        val impacted=raw[0]<0.0||(raw[0]==0.0&&raw[1]<0.0)
+        val after=raw.copyOf()
+        if(impacted){after[0]=0.0;after[1]=0.0}
+        val impactLoss=if(impacted&&raw[1]<0.0)0.5*input.massKg*raw[1]*raw[1] else 0.0
+        return Segment(state,after,dt,input.supplyVoltageV,impactLoss)
+    }
+    /** Split at the source-opening instant so no RK stage straddles the event. */
+    private fun advance(state:DoubleArray,input:NativeActuatorInput,dt:Double,
+                        startSeconds:Double):Integrated {
+        val cutoff=input.powerOffAtSeconds
+        if(cutoff!=null&&cutoff>startSeconds+1e-12&&cutoff<=startSeconds+dt+1e-12){
+            val before=input.copy(powerOffAtSeconds=null)
+            val after=input.copy(supplyVoltageV=0.0,powerOffAtSeconds=null)
+            val first=oneSegment(state,before,cutoff-startSeconds)
+            val remaining=startSeconds+dt-cutoff
+            if(remaining<=1e-12)return Integrated(first.after,listOf(first))
+            val second=oneSegment(first.after,after,remaining)
+            return Integrated(second.after,listOf(first,second))
+        }
+        val effective=if(cutoff!=null&&cutoff<=startSeconds+1e-12)
+            input.copy(supplyVoltageV=0.0,powerOffAtSeconds=null) else input
+        val segment=oneSegment(state,effective,dt)
+        return Integrated(segment.after,listOf(segment))
+    }
     fun evaluate(i:NativeActuatorInput,requestedStepSeconds:Double=1.0/240):NativeActuatorResult{
         bounded(i.massKg,0.001,10000.0,"Mass")
         bounded(i.gravityMps2,0.0,100.0,"Gravity")
