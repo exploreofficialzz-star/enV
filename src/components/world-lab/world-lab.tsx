@@ -33,6 +33,7 @@ import {WorldLabGeoreferencePanel} from "./georeference-panel";
 import {WorldLabRadiationPanel} from "./radiation-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
+import {advanceEventSafeTime} from "@/lib/world-lab/timeline";
 import type {GravityConfig,GravityFrame,GravityBody,GravityRun} from "@/lib/world-lab/gravity";
 import {inspectWorldLabSpatialClearance} from "@/lib/world-lab/spatial-clearance";
 import {calculateStructuralBending,type StructuralBendingEvidence} from "@/lib/world-lab/structural-bending";
@@ -54,7 +55,7 @@ import { WorldLabFluidCutaway } from "./fluid-cutaway";
 import { WorldLabVehiclePanel } from "./vehicle-panel";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
-import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
+import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,inspectionTargetIds,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
 import { WorldLabInspectionPanel } from "./inspection-panel";
 import { WorldLabTimeController } from "./time-controller";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES,
@@ -573,7 +574,6 @@ export default function WorldLab() {
           cutawayFraction:inspection.cutawayFraction,explosionDistanceM:inspection.explosionDistanceM,
           selectedEntityId:inspection.selectedEntityId,
         }):null;
-        scene!.clipPlane=plane?new B.Plane(plane.normal[0],plane.normal[1],plane.normal[2],-plane.offset):null;
         groundMaterial.alpha = depth > 0 || camera.position.y < 0.75
           ? 0.12 : inspection.seeInside ? inspection.opacity / 100 : 1;
         for (const material of strataMaterials)
@@ -672,6 +672,8 @@ export default function WorldLab() {
         scene.addedShapes.set(entity.id, mesh);
       }
       const settings=visualSettings.current;
+      const plane=inspectionPlane(project,settings);
+      const clipTargets=inspectionTargetIds(project,settings.selectedEntityId);
       const renderPosition=inspectionRenderPosition(project,settings,entity.id);
       mesh.position.copyFromFloats(...renderPosition);
       mesh.rotation.copyFromFloats(...(entity.rotationRadians??[0,0,0]));
@@ -684,6 +686,7 @@ export default function WorldLab() {
         mesh.material.wireframe=settings.mode==="xray";
         mesh.material.backFaceCulling=settings.mode!=="xray";
         mesh.material.needDepthPrePass=settings.mode==="xray";
+        mesh.material.clipPlane=plane&&clipTargets.has(entity.id)?new B.Plane(plane.normal[0],plane.normal[1],plane.normal[2],-plane.offset):null;
       }
     }
   }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity,inspectionMode,cutawayAxis,cutawayFraction,explosionDistanceM,selectedEntityId, project, currentRun, heat]);
@@ -694,7 +697,7 @@ export default function WorldLab() {
     const tick=(now:number)=>{
       if(previous){
         const elapsed=Math.min(0.05,(now-previous)/1000);
-        setCollisionTime(t=>Math.min(selectedCollision.durationSeconds,t+elapsed*collisionPlaybackRate));
+        setCollisionTime(t=>advanceEventSafeTime(t,elapsed,collisionPlaybackRate,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));
       }
       previous=now;frame=requestAnimationFrame(tick);
     };
@@ -723,7 +726,7 @@ export default function WorldLab() {
     const tick=(now:number)=>{
       if(previous){
         const dt=Math.min(0.05,(now-previous)/1000);
-        setSphereTime(t=>Math.min(selectedSphereRun.durationSeconds,t+dt*spherePlaybackRate));
+        setSphereTime(t=>advanceEventSafeTime(t,dt,spherePlaybackRate,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));
       }
       previous=now;frame=requestAnimationFrame(tick);
     };
@@ -748,7 +751,7 @@ export default function WorldLab() {
     const tick=(now:number)=>{
       if(previous){
         const dt=Math.min(0.05,(now-previous)/1000);
-        setGroupTime(t=>Math.min(activeGroupRun.durationSeconds,t+dt*groupRate));
+        setGroupTime(t=>advanceEventSafeTime(t,dt,groupRate,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));
       }
       previous=now;frame=requestAnimationFrame(tick);
     };

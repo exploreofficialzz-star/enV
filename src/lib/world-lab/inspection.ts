@@ -20,7 +20,8 @@ export function inspectionTargetIds(project:WorldLabProject,selectedId:string):R
  return new Set(group?.entityIds??[selectedId]);
 }
 export function inspectionEntityVisible(project:WorldLabProject,s:InspectionSettings,id:string):boolean{
- return s.mode!=="isolate"||inspectionTargetIds(project,s.selectedEntityId).has(id);
+ const targets=inspectionTargetIds(project,s.selectedEntityId);
+ return s.mode!=="isolate"||targets.size===0||targets.has(id);
 }
 export function inspectionRenderPosition(project:WorldLabProject,s:InspectionSettings,id:string):Vec3Tuple{
  const entity=project.entities.find(e=>e.id===id);
