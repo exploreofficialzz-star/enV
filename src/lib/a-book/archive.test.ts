@@ -27,7 +27,7 @@ test("A book backup round-trips notes, revision history and attachment bytes", a
 
 test("A book backup rejects an empty or unsupported archive", async () => {
   await assert.rejects(() => readABookArchive(new Blob()), /non-empty/);
-  await assert.rejects(() => readABookArchive(new Blob(["not a zip"])), /not a valid A book backup/);
+  await assert.rejects(() => readABookArchive(new Blob(["not a zip"])), /archive directory/);
 });
 
 test("A book backup rejects inconsistent attachment metadata", async () => {
