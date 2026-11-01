@@ -32,6 +32,24 @@ export function measureSolidCenters(a:WorldLabEntity,b:WorldLabEntity){
   return {fromId:a.id,toId:b.id,deltaMeters:delta,centerDistanceMeters,
     horizontalDistanceMeters,evidence:"geometry-computed" as const};
 }
+/** Snap a multi-part selection atomically; no unselected part is modified. */
+export function snapSolidsToGrid(projectValue:WorldLabProject,entityIds:readonly string[],
+  stepMeters:number):WorldLabProject{
+  const project=parseWorldLabProject(projectValue);
+  if(!Number.isFinite(stepMeters)||stepMeters<0.001||stepMeters>100)
+    throw new Error("Grid spacing must be between 0.001 and 100 metres.");
+  if(!entityIds.length||new Set(entityIds).size!==entityIds.length)
+    throw new Error("Select one or more distinct solids.");
+  const selected=new Set(entityIds);
+  if(entityIds.some(id=>!project.entities.some(entity=>entity.id===id)))
+    throw new Error("A selected solid no longer exists.");
+  const entities=project.entities.map(entity=>{
+    if(!selected.has(entity.id))return entity;
+    return snapSolidPosition(entity,stepMeters);
+  });
+  return parseWorldLabProject({...project,entities});
+}
+
 export function snapSolidPosition(entity:WorldLabEntity,stepMeters:number):WorldLabEntity{
   if(!Number.isFinite(stepMeters)||stepMeters<0.001||stepMeters>100)
     throw new Error("Grid spacing must be between 0.001 and 100 metres.");
