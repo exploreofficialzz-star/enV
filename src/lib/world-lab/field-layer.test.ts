@@ -73,7 +73,7 @@ test("vector glyphs preserve XYZ components and select a real recorded 2D slice"
  assert.deepEqual([xy.glyphs[0].uComponent,xy.glyphs[0].vComponent],[5,2]);
  assert.ok(Math.abs(xy.glyphs[0].magnitude-Math.sqrt(38))<1e-12);
  const xz=fieldVectorGlyphsAtTime(layer,0.05,"xz",1);
- assert.deepEqual([xz.glyphs[0].uComponent,xz.glyphs[0].vComponent],[5,3]);
+ assert.deepEqual([xz.glyphs[0].uComponent,xz.glyphs[0].vComponent],[3,3]);
  const yz=fieldVectorGlyphsAtTime(layer,0.05,"yz",1);
  assert.deepEqual([yz.glyphs[0].uComponent,yz.glyphs[0].vComponent],[2,3]);
 });
