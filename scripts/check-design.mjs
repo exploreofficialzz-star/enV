@@ -65,9 +65,15 @@ const layerUtils = read("src/lib/engines/design-layer-utils.ts");
 const layerUtilsTests = read("src/lib/engines/design-layer-utils.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
+const explorerGroupIds = [...explorer.matchAll(/ids:\s*\[([^\]]+)\]/g)]
+  .flatMap((match) => [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
+const missingExplorerIds = expectedIds.filter((id) => !explorerGroupIds.includes(id));
+const duplicateExplorerIds = explorerGroupIds.filter((id, index) => explorerGroupIds.indexOf(id) !== index);
+const unexpectedExplorerIds = explorerGroupIds.filter((id) => !expectedIds.includes(id));
 const checks = [
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
+  ["Every core Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedIds.length],
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
   ["Color picker alpha control and extended CSS Color 4 outputs", colorEngine.includes("design-color-alpha") && colorEngine.includes("Opacity / alpha") && colorEngine.includes('["HWB", formatHwb(color)]') && colorEngine.includes('["OKLCH", formatOklch(color)]')],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],
@@ -118,8 +124,8 @@ const checks = [
   ["SVG artwork family selector and conditional controls", cssEngine.includes("Artwork family") && cssEngine.includes('if (family === "blob")') && cssEngine.includes("values.artStyle") && cssEngine.includes("buildTextureSvg")],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
-if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length) {
-  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), failedChecks });
+if (design.length < generatedCoreIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length || missingExplorerIds.length || duplicateExplorerIds.length || unexpectedExplorerIds.length) {
+  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), missingExplorerIds, duplicateExplorerIds, unexpectedExplorerIds, failedChecks });
   process.exit(1);
 }
 console.log(`Design audit passed: ${design.length} active catalogue entries, ${expectedIds.length} core tool IDs present, every engine operation supported, ${checks.length} implementation checks passed.`);
