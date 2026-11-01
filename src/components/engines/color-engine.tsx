@@ -159,6 +159,12 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   useEffect(() => {
     if (op !== "palette" || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const sharedTheme = params.get("theme");
+    if (sharedTheme === "light" || sharedTheme === "dark") setPreviewMode(sharedTheme);
+    const sharedPreview = params.get("preview");
+    if (sharedPreview && ["landing", "dashboard", "forms", "content"].includes(sharedPreview)) {
+      setPreviewLayout(sharedPreview as "landing" | "dashboard" | "forms" | "content");
+    }
     const sharedBase = params.get("base");
     const sharedHarmony = params.get("harmony");
     const sharedLocks = params.get("locks");
@@ -258,8 +264,10 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     url.searchParams.set("count", String(paletteCount));
     url.searchParams.set("locks", JSON.stringify(lockedSwatches));
     url.searchParams.set("roles", JSON.stringify(roleOverrides));
+    url.searchParams.set("theme", previewMode);
+    url.searchParams.set("preview", previewLayout);
     return url.toString();
-  }, [colorValue, harmony, lockedSwatches, paletteCount, roleOverrides]);
+  }, [colorValue, harmony, lockedSwatches, paletteCount, previewLayout, previewMode, roleOverrides]);
   const contrastChecks = useMemo(() => foreground && background && canvas
     ? TARGETS.map((item) => ({ ...item, result: evaluateContrast(foreground, background, item.value, canvas) }))
     : [], [foreground, background, canvas]);
