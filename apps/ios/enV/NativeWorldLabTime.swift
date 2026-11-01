@@ -459,13 +459,24 @@ struct NativeWorldLabSolarEvents:Equatable {
         let dayOfYear=calendar.ordinality(of:.day,in:.year,for:start) ?? 1
         let yearLength=Double(calendar.range(of:.day,in:.year,for:start)?.count ?? 365)
         let gamma=2*Double.pi/yearLength*Double(dayOfYear-1)
-        let equationOfTime=229.18*(0.000075+0.001868*cos(gamma)-
-            0.032077*sin(gamma)-0.014615*cos(2*gamma)-
-            0.040849*sin(2*gamma))
-        let declination=0.006918-0.399912*cos(gamma)+
-            0.070257*sin(gamma)-0.006758*cos(2*gamma)+
-            0.000907*sin(2*gamma)-0.002697*cos(3*gamma)+
+        let equationOfTimeTerms:[Double] = [
+            0.000075,
+            0.001868*cos(gamma),
+            -0.032077*sin(gamma),
+            -0.014615*cos(2*gamma),
+            -0.040849*sin(2*gamma)
+        ]
+        let equationOfTime:Double = 229.18*equationOfTimeTerms.reduce(0,+)
+        let declinationTerms:[Double] = [
+            0.006918,
+            -0.399912*cos(gamma),
+            0.070257*sin(gamma),
+            -0.006758*cos(2*gamma),
+            0.000907*sin(2*gamma),
+            -0.002697*cos(3*gamma),
             0.00148*sin(3*gamma)
+        ]
+        let declination:Double = declinationTerms.reduce(0,+)
         let latitude=latitudeDegrees*Double.pi/180
         let zenith=90.833*Double.pi/180
         let noonMinutes=720-4*longitudeDegrees-equationOfTime
@@ -494,11 +505,11 @@ struct NativeWorldLabSolarEvents:Equatable {
                 status = .polarDay
             } else {
                 let hourAngle=acos(min(1,max(-1,cosHour)))*180/Double.pi
-                let riseMinutes=noonMinutes-4*hourAngle
-                let setMinutes=noonMinutes+4*hourAngle
+                let riseMinutes:Double = noonMinutes - 4.0*hourAngle
+                let setMinutes:Double = noonMinutes + 4.0*hourAngle
                 sunrise=start.addingTimeInterval(riseMinutes*60)
                 sunset=start.addingTimeInterval(setMinutes*60)
-                daylight=setMinutes-riseMinutes
+                daylight = setMinutes - riseMinutes
             }
         }
         return NativeWorldLabSolarEvents(dateUTC:dateUTC,latitudeDegrees:latitudeDegrees,

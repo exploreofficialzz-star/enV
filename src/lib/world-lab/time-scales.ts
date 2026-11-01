@@ -99,7 +99,7 @@ function makeSeries(rows:EarthOrientationSample[],volume:string,number:number,is
 /** Parse the published plain-text IERS RS/PC Bulletin A (ser7.dat) without losing provenance. */
 export function parseIersBulletinA(rawText:string):IersBulletinASeries{
  if(typeof rawText!=="string"||rawText.length<100||rawText.length>2_000_000||
-  !/IERS\s+BULLETIN\s*[-–]\s*A/i.test(rawText))
+  !/I\\s*E\\s*R\\s*S\\s+B\\s*U\\s*L\\s*L\\s*E\\s*T\\s*I\\s*N\\s*[-–]\\s*A/i.test(rawText))
   throw new Error("Import must be the official plain-text IERS Bulletin A product (ser7.dat).");
  const header=rawText.match(/\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\s+Vol\.\s+([IVXLCDM]+)\s+No\.\s*(\d+)/i);
  if(!header)throw new Error("IERS Bulletin A issue date and bulletin number could not be identified.");
