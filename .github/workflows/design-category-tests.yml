@@ -1,9 +1,6 @@
 name: Design category — standalone engine tests
 
 on:
-  push:
-    branches:
-      - feat/design-quality-mainline-20261101
   pull_request:
     paths:
       - "src/components/engines/color-engine.tsx"
