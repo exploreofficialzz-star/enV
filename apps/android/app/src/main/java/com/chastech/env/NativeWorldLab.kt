@@ -576,7 +576,7 @@ fun NativeWorldLabForm() {
                                 NativeWorldLabRecordedTime.nearestIndex(
                                     recording.clockRun,checkpoint.timeSeconds)].timeSeconds,
                             playbackRate=checkpoint.playbackRate?:1.0,
-                            direction=checkpoint.playbackDirection)
+                            direction=checkpoint.playbackDirection?:"forward")
                     }.onSuccess{selected->
                         demoClock=selected;time=selected.simulationTimeSeconds.toFloat()
                     }.onFailure{warning=it.message?:"Recorded timeline restore was rejected."}
