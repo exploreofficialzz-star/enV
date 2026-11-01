@@ -572,15 +572,16 @@ enum NativeWorldLabExecution {
                 suppliedW:0,dissipatedW:0,storedRateW:0)
         }
         let load=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0"){time,_,inputs in
-            guard inputs["Vin"] != nil else {
+            guard let connected=inputs["Vin"] else {
                 throw NativeWorldLabError.invalid("RC load requires its connected source voltage")
             }
-            let voltage=sourceVoltageV+(initialVoltageV-sourceVoltageV)*exp(-time/(resistanceOhm*capacitanceF))
-            let current=(sourceVoltageV-voltage)/resistanceOhm
+            let connectedVoltage=try NativeWorldLabSI.convert(connected,to:"V")
+            let voltage=connectedVoltage+(initialVoltageV-connectedVoltage)*exp(-time/(resistanceOhm*capacitanceF))
+            let current=(connectedVoltage-voltage)/resistanceOhm
             return NativeScientificStepOutput(
                 outputs:["Vc":try NativeWorldLabSI.declare(voltage,unit:"V",evidence:"physics-model-computed"),
                          "I":try NativeWorldLabSI.declare(current,unit:"A",evidence:"physics-model-computed")],
-                suppliedW:sourceVoltageV*current,dissipatedW:current*current*resistanceOhm,
+                suppliedW:connectedVoltage*current,dissipatedW:current*current*resistanceOhm,
                 storedRateW:voltage*current)
         }
         return [source,load]
