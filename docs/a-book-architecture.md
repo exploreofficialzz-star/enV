@@ -15,8 +15,8 @@ This section records code that exists in the current implementation branch. It i
 | Platform | Implemented in the branch | Not yet implemented or not yet verified |
 |---|---|---|
 | Web | React tool route; IndexedDB notes, attachments and revision stores; local autosave, search/filter, pin/archive/trash/restore, revision restore; local backup export/import; local PDF inspect, rotate, page extraction, merge, split and batch rotation using pdf-lib/fflate. | OPFS storage, verified offline PWA startup, rich-text AST editor, local OCR, PDF annotations and browser full-text indexing are not currently implemented. |
-| Android | Native Kotlin/Jetpack Compose screen; SQLiteOpenHelper persistence, app-private attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFBox text extraction, rotation, merge, split and batch rotation. | Current store is SQLiteOpenHelper, not Room. Bundled ML Kit Latin-script OCR is implemented for local PDF pages (up to 100 pages per operation). Rich-text parity, PDF annotation and production device coverage are not currently implemented or verified. |
-| iOS | Native SwiftUI screen; Core Data/SQLite persistence, app-support attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFKit extraction/rotation/merge/split/batch rotation and Vision on-device OCR. | Rich-text parity, PDF annotation, broader document editing and production device coverage are not currently implemented or verified. |
+| Android | Native Kotlin/Jetpack Compose screen; SQLiteOpenHelper persistence, app-private attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFBox text extraction, rotation, merge, split and batch rotation; bundled ML Kit Latin-script OCR (up to 100 pages per operation). The A Book database, SQLite WAL/SHM/journal sidecars and attachment directory are excluded from cloud backup and device transfer. | The store is SQLiteOpenHelper rather than Room and still needs stronger migration/persistence tests. Rich-text parity, PDF annotation and production real-device coverage are not currently implemented or verified. |
+| iOS | Native SwiftUI screen; Core Data/SQLite persistence, app-support attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFKit extraction/rotation/merge/split/batch rotation and Vision on-device OCR. The A Book Application Support directory is excluded from OS backup. | Rich-text parity, PDF annotation, broader document editing and production real-device coverage are not currently implemented or verified. |
 
 **Data boundary:** notes, attachments, archives and processing remain local. No A book content API, hosted file store, cloud sync or cloud backup is part of this release.
 
@@ -411,18 +411,22 @@ The generic tool route must not be used as an excuse to embed the Web applicatio
 ### Release criteria
 Do not mark the tool active or production-ready until all three platform entry points work, core mutations have durable local persistence, import/export and recovery tests pass, PDF/document processing is genuinely local on each claimed platform, privacy/network tests confirm no content upload, and Web/Android/iOS platform tests pass. A passing catalog check alone is not feature verification.
 
-## 14. Readiness blockers to resolve before implementation
+## 14. Remaining implementation and release blockers
 
-1. Finalize the shared versioned document AST and verify Web/Android/iOS round-trip fixtures.
-2. Pin and license-audit the Web editor, PDF renderer/manipulation and local OCR packages.
-3. Confirm PDFBox Android functionality and performance for each proposed operation.
-4. Confirm PDFKit/Vision functionality against the project's iOS 16.4 deployment target.
-5. Select local OCR language packs and define storage/performance constraints on low-end Android devices and browsers.
-6. Define local database migrations, revision retention, trash retention and archive format.
-7. Implement browser quota/persistence warnings and a clear export reminder.
-8. Implement full-library export and restore before calling local storage production-ready.
-9. Add local privacy/network-inspection tests and cross-platform import/export tests.
-10. Verify Web, Android and iOS launch/route integration and native tool coverage.
+The following are actual gaps after the current cross-platform implementation. They must be closed or explicitly scoped out before production release.
+
+1. **Shared document contract:** the versioned document schema exists, but the three editors still store/render their current note representation rather than a canonical rich-text AST. Implement safe block/mark round-tripping and shared Web/Android/iOS fixtures before enabling rich-text blocks.
+2. **Web document processing:** Web currently supports local PDF metadata inspection and page operations; local PDF rendering, text selection/extraction, in-document search and PDF OCR are not implemented. Add a locally bundled PDF renderer and worker only after package licensing, worker isolation, memory use and low-end mobile performance are verified. Keep OCR local and optional.
+3. **Rich-text parity:** Web, Android and iOS currently provide Markdown-capable/plain-text editing rather than the planned block editor. Implement and test headings, lists, checklists, quotes, links, code blocks and tables as structured content, or keep those capabilities visibly out of scope on all platforms.
+4. **Browser durability:** IndexedDB is implemented, but OPFS-backed large-file storage, verified offline PWA reopening, quota/eviction handling and persistence prompts still need implementation and browser testing.
+5. **Native persistence hardening:** Android currently uses SQLiteOpenHelper (not Room) and iOS uses a programmatically defined Core Data model. Add explicit upgrade/migration, process-death, reopen, transaction rollback, low-storage and attachment-orphan recovery tests on both platforms.
+6. **Archive interoperability:** Web, Android and iOS implement the same `env.abook.archive.v1` ZIP manifest shape. Add automated cross-platform fixtures that export on each platform and import on the other two, including attachments, revision history, trash state, malformed records and interrupted/failed imports.
+7. **PDF/OCR verification:** maintain the real platform capability gates. Validate password-protected, malformed, image-heavy and large files; page geometry and rotations; text extraction correctness; OCR model availability and supported languages. Android's bundled ML Kit OCR currently supports Latin script, while iOS uses Vision. Web PDF OCR is not available yet.
+8. **Data integrity and recovery:** add persistence tests for account/profile isolation, autosave during rapid edits, app termination, attachment deletion, revision pruning, quota failure and backup restoration. Browser data may be evicted or cleared; the user-controlled archive remains the recovery mechanism.
+9. **Release validation:** final-head Web build/typecheck/tests, Android unit/lint/emulator launch, iOS simulator build/XCTest, rendered accessibility audits and local-only network inspection must all pass. Real-device tests remain necessary for native document pickers, OCR availability, large PDFs and storage behavior.
+10. **External deployment:** the connected Vercel status has reported an account build-rate-limit failure. Resolve the provider quota or explicitly restore a successful deployment check before merging; do not hide this external gate as a code success.
+
+Already implemented in this branch: local notes and attachments, autosave, search/filter, pin/archive/trash/restore, revision history, full-library `.abook` backup/restore, Markdown and legacy JSON export/import, guarded ZIP parsing/import quotas, platform routes, native PDF text/OCR where documented above, and local-only backup exclusions. These features still require the release tests listed here.
 
 No cloud provider, cloud bucket, database credential, upload token, cloud backup subscription or server-side A book infrastructure needs to be provisioned.
 
