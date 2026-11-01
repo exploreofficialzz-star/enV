@@ -5,6 +5,7 @@ import {
   extrudeRectangle,linearPattern,mirrorSolids,rotateSolids,scaleSolids,type CadAxis,type CadAlignment,
 } from "@/lib/world-lab/cad";
 import type {WorldLabProject} from "@/lib/world-lab/project";
+import {measureSolidCenters,snapSolidsToGrid} from "@/lib/world-lab/edit-history";
 
 const input="w-full rounded border border-border bg-bg px-2 py-2 text-sm";
 const button="rounded border border-border px-3 py-2 text-sm";
@@ -24,6 +25,7 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
  const [center,setCenter]=useState<[number,number,number]>([0,0,0]);
  const [alignment,setAlignment]=useState<CadAlignment>("center");
  const [gap,setGap]=useState(0.25);
+ const [gridStep,setGridStep]=useState(0.5);
  const [sketchWidth,setSketchWidth]=useState(2);
  const [sketchDepth,setSketchDepth]=useState(2);
  const [extrusionHeight,setExtrusionHeight]=useState(1);
@@ -70,6 +72,8 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
  const selected=useMemo(()=>project?.entities.filter(e=>selection.includes(e.id))??[],
    [project,entityKey,selection]);
  const canEdit=Boolean(project&&selected.length);
+ const pairMeasurement=selected.length===2?measureSolidCenters(selected[0],selected[1]):null;
+ const sketchRotationRadians=sketchRotationDegrees.map(value=>value*Math.PI/180) as [number,number,number];
  function apply(transform:(p:WorldLabProject)=>WorldLabProject){
    try{setError("");onChange(transform);}
    catch(e){setError(e instanceof Error?e.message:"CAD transformation was rejected.");}
@@ -94,6 +98,25 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
       </label>)}
      </div>
     </fieldset>
+    <div className="mt-3 rounded border border-border p-2">
+     <p className="text-xs font-medium">Position tools</p>
+     <div className="mt-2 flex flex-wrap items-end gap-2">
+      <label className="text-xs">Grid spacing (m)
+       <input className={input} type="number" min={0.001} max={100} step="any"
+        value={gridStep} onChange={event=>setGridStep(Number(event.target.value))}/>
+      </label>
+      <button type="button" className={button} disabled={!canEdit}
+       onClick={()=>apply(p=>snapSolidsToGrid(p,selection,gridStep))}>
+       Snap selected to grid
+      </button>
+     </div>
+     {pairMeasurement?<div className="mt-2 text-xs" role="status" aria-label="Selected part centre measurement">
+       <p>Centre-to-centre: {pairMeasurement.centerDistanceMeters.toFixed(4)} m</p>
+       <p>Horizontal distance: {pairMeasurement.horizontalDistanceMeters.toFixed(4)} m</p>
+       <p>Offset X/Y/Z: {pairMeasurement.deltaMeters.map(value=>value.toFixed(3)).join(" / ")} m</p>
+       <p className="text-muted-foreground">Geometry-derived centre measurement; not surface clearance or proof of contact.</p>
+      </div>:<p className="mt-2 text-xs text-muted-foreground">Select exactly two parts to measure centre-to-centre distance and axis offsets.</p>}
+    </div>
     <div className="mt-3 grid grid-cols-2 gap-2">
      <label className="text-xs">Transform axis
       <select className={input} value={axis} onChange={e=>setAxis(e.target.value as CadAxis)}>
@@ -226,13 +249,15 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
      </div>
      <div className="mt-2 flex flex-wrap gap-2">
       <button className={button} disabled={!project||project.entities.length>=200}
-       onClick={()=>apply(p=>extrudeRectangle(p,{center:[0,0,0],
-        widthMeters:sketchWidth,depthMeters:sketchDepth,heightMeters:extrusionHeight},idFactory))}>
+       onClick={()=>apply(p=>extrudeRectangle(p,{center:sketchBaseCenter,
+        widthMeters:sketchWidth,depthMeters:sketchDepth,heightMeters:extrusionHeight,
+        rotationRadians:sketchRotationRadians},idFactory))}>
        Extrude rectangle
       </button>
       <button className={button} disabled={!project||project.entities.length>=200}
-       onClick={()=>apply(p=>extrudeCircle(p,{center:[0,0,0],
-        radiusMeters:circleRadius,heightMeters:extrusionHeight},idFactory))}>
+       onClick={()=>apply(p=>extrudeCircle(p,{center:sketchBaseCenter,
+        radiusMeters:circleRadius,heightMeters:extrusionHeight,
+        rotationRadians:sketchRotationRadians},idFactory))}>
        Extrude circle
       </button>
      </div>
