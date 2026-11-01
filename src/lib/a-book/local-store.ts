@@ -41,7 +41,18 @@ const MAX_LOCAL_REVISIONS = 100_000;
 const MAX_LOCAL_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const MAX_LOCAL_LIBRARY_ATTACHMENT_BYTES = 150 * 1024 * 1024;
 const MAX_LOCAL_ATTACHMENTS = 10_000;
-let databasePromise: Promise<IDBDatabase> | undefined;
+let activeLocalProfileId = "guest";
+const databasePromises = new Map<string, Promise<IDBDatabase>>();
+
+export function getABookLocalDatabaseName(profileId: string | null | undefined): string {
+  const normalized = profileId?.trim() || "guest";
+  return `${DATABASE_NAME}::${encodeURIComponent(normalized)}`;
+}
+
+/** Select a separate on-device library for each authenticated account. Null is the device guest library. */
+export function setABookLocalProfile(profileId: string | null | undefined): void {
+  activeLocalProfileId = profileId?.trim() || "guest";
+}
 
 function createId(): string {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -67,9 +78,12 @@ function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(new Error("This browser does not support the local database required by A book."));
   }
-  if (databasePromise) return databasePromise;
-  databasePromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+  const databaseName = getABookLocalDatabaseName(activeLocalProfileId);
+  const existing = databasePromises.get(databaseName);
+  if (existing) return existing;
+
+  const pending = new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(databaseName, DATABASE_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains("notes")) {
@@ -90,17 +104,21 @@ function openDatabase(): Promise<IDBDatabase> {
       const db = request.result;
       db.onversionchange = () => {
         db.close();
-        databasePromise = undefined;
+        databasePromises.delete(databaseName);
       };
       resolve(db);
     };
     request.onerror = () => {
-      databasePromise = undefined;
+      databasePromises.delete(databaseName);
       reject(request.error ?? new Error("A book could not open its local database."));
     };
-    request.onblocked = () => reject(new Error("Close other enV tabs to finish updating A book's local database."));
+    request.onblocked = () => {
+      databasePromises.delete(databaseName);
+      reject(new Error("Close other enV tabs to finish updating A book's local database."));
+    };
   });
-  return databasePromise;
+  databasePromises.set(databaseName, pending);
+  return pending;
 }
 
 export function createNote(): ABookNote {
