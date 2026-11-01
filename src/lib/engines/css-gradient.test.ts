@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "./css-gradient.ts";
+import { buildCssGradient, buildCssMeshGradient, moveGradientStop, moveGradientStopTo, normalizeGradientStops, type GradientStop } from "./css-gradient.ts";
 
 const sample: GradientStop[] = [
   { id: "end", color: "#ffffff", position: 100 },
@@ -50,4 +50,16 @@ test("mesh-style gradients stack positioned radial layers and retain an sRGB bas
   assert.match(safe, /transparent 92%/);
   assert.match(safe, /linear-gradient\(0deg,/);
   assert.throws(() => buildCssMeshGradient([sample[0]]), /at least two/);
+});
+
+test("drag reordering moves a stop to the dropped stop without losing values", () => {
+  const movedToEnd = moveGradientStopTo(sample, "start", "end");
+  assert.deepEqual(movedToEnd.map((stop) => stop.id), ["middle", "end", "start"]);
+  assert.deepEqual(movedToEnd.map((stop) => stop.position), [0, 52.5, 100]);
+  assert.equal(movedToEnd.find((stop) => stop.id === "start")?.color, "#000000");
+
+  const movedToStart = moveGradientStopTo(sample, "end", "start");
+  assert.deepEqual(movedToStart.map((stop) => stop.id), ["end", "start", "middle"]);
+  assert.deepEqual(movedToStart.map((stop) => stop.position), [0, 52.5, 100]);
+  assert.deepEqual(moveGradientStopTo(sample, "missing", "end").map((stop) => stop.id), ["start", "middle", "end"]);
 });
