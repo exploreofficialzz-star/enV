@@ -1,8 +1,9 @@
-import {useEffect,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import type {LabRun,ModelInput} from "@/lib/world-lab/model";
 import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepRecordedTime} from "@/lib/world-lab/timeline";
 import {createTimeEngineCheckpoint,createTimeEngineState,restoreTimeEngineCheckpoint,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
 import {WorldLabSolarEventsPanel} from "./solar-events-panel";
+import {parseIersBulletinA,utcToTaiTt,utcToUt1,type IersBulletinASeries} from "@/lib/world-lab/time-scales";
 type Props={run:LabRun|null;timeSeconds:number;playing:boolean;rate:number;direction:TimeEngineDirection;
  onDirectionChange:(v:TimeEngineDirection)=>void;timezoneDisplay:string;onTimezoneDisplayChange:(v:string)=>void;
  wallTimeUTC:string;geodeticOrigin:Readonly<{latitudeDegrees:number;longitudeDegrees:number}>|null;
@@ -16,6 +17,8 @@ function displayTime(value:string,timezone:string){
 }
 export function WorldLabTimeController(p:Props){
  const [restoreStatus,setRestoreStatus]=useState("");
+ const [earthOrientation,setEarthOrientation]=useState<IersBulletinASeries|null>(null);
+ const [earthOrientationError,setEarthOrientationError]=useState("");
  const [branchDraft,setBranchDraft]=useState<ModelInput|null>(p.run?.inputs??null);
  useEffect(()=>setBranchDraft(p.run?.inputs??null),[p.run?.id]);
  const run=p.run,duration=run?.time.simulatedDurationSeconds??0;
@@ -27,6 +30,16 @@ export function WorldLabTimeController(p:Props){
  const clock=run?createTimeEngineState(run,{wallTimeUTC:p.wallTimeUTC,
   simulationTimeSeconds:p.timeSeconds,playbackRate:p.rate,direction:p.direction,
   paused:!p.playing,timezoneDisplay:p.timezoneDisplay}):null;
+ const taiTt=useMemo(()=>{
+  if(!clock)return null;
+  try{return {value:utcToTaiTt(clock.worldDateUTC),error:""};}
+  catch(error){return {value:null,error:error instanceof Error?error.message:"TAI/TT conversion unavailable."};}
+ },[clock?.worldDateUTC]);
+ const ut1=useMemo(()=>{
+  if(!clock||!earthOrientation)return null;
+  try{return {value:utcToUt1(clock.worldDateUTC,earthOrientation),error:""};}
+  catch(error){return {value:null,error:error instanceof Error?error.message:"UT1 conversion unavailable."};}
+ },[clock?.worldDateUTC,earthOrientation]);
  const branch=run?.branch;
  return <section className="mt-3 rounded-lg border border-border p-3"
   aria-label="Universal experiment time engine">
@@ -72,6 +85,40 @@ export function WorldLabTimeController(p:Props){
     :"Playback speed changes recorded-frame playback only; numerical solver steps and coefficients remain unchanged.")+
     " Sample "+Math.min(run.samples.length,sample+1)+" of "+run.samples.length+"; solver dt "+run.time.solverStepSeconds.toPrecision(4)+" s.":"Start a reference experiment to enable the recorded time engine."}
   </p>
+  <details className="mt-3 rounded-lg border border-border p-3">
+   <summary className="cursor-pointer text-sm font-semibold">Astronomical time scales · UTC / TAI / TT / UT1</summary>
+   <p className="mt-2 text-xs text-muted-foreground">UTC is the stored civil reference. TAI and TT use the versioned IERS leap-second table. UT1 requires an imported IERS Bulletin A series and is marked observed or predicted with uncertainty.</p>
+   {taiTt?.value&&<dl className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+    <div><dt className="text-muted-foreground">TAI · TAI−UTC {taiTt.value.taiMinusUtcSeconds.toFixed(0)} s</dt><dd className="font-mono">{taiTt.value.tai}</dd></div>
+    <div><dt className="text-muted-foreground">TT · TT−UTC {taiTt.value.ttMinusUtcSeconds.toFixed(3)} s</dt><dd className="font-mono">{taiTt.value.tt}</dd></div>
+   </dl>}
+   {taiTt?.error&&<p className="mt-2 text-xs" role="status">{taiTt.error}</p>}
+   <div className="mt-3">
+    <label className="block text-xs font-medium" htmlFor="worldlab-iers-bulletin">Import official IERS Bulletin A (ser7.dat)</label>
+    <input id="worldlab-iers-bulletin" className="mt-1 block w-full text-xs" type="file" accept=".dat,.txt,text/plain"
+     onChange={event=>{
+      const file=event.currentTarget.files?.[0];if(!file)return;
+      void file.text().then(source=>{
+       const parsed=parseIersBulletinA(source);
+       setEarthOrientation(parsed);setEarthOrientationError("");
+      }).catch(error=>{
+       setEarthOrientation(null);
+       setEarthOrientationError(error instanceof Error?error.message:"IERS Bulletin A could not be imported.");
+      });
+     }}/>
+    {earthOrientation&&<p className="mt-1 text-xs text-muted-foreground" role="status">
+     IERS Bulletin A · Vol. {earthOrientation.volume} No. {earthOrientation.number} · issued {earthOrientation.issuedDateUTC} · {earthOrientation.samples.length} daily samples · {earthOrientation.samples.filter(x=>x.quality==="observed").length} observed / {earthOrientation.samples.filter(x=>x.quality==="predicted").length} predicted
+    </p>}
+    {earthOrientationError&&<p className="mt-1 text-xs text-red-600" role="alert">{earthOrientationError}</p>}
+    {ut1?.value&&<div className="mt-2 rounded border border-border p-2 text-xs">
+     <p className="text-muted-foreground">UT1 · DUT1 (UT1−UTC) · {ut1.value.quality}</p>
+     <p className="font-mono">{ut1.value.ut1}</p>
+     <p>DUT1 {ut1.value.ut1MinusUtcSeconds.toFixed(6)} s ± {ut1.value.uncertaintySeconds.toFixed(6)} s</p>
+     <p className="text-muted-foreground">{ut1.value.bulletin} · issued {ut1.value.issuedDateUTC}</p>
+    </div>}
+    {earthOrientation&&ut1?.error&&<p className="mt-2 text-xs text-muted-foreground" role="status">{ut1.error}</p>}
+   </div>
+  </details>
   <WorldLabSolarEventsPanel latitudeDegrees={p.geodeticOrigin?.latitudeDegrees??null}
    longitudeDegrees={p.geodeticOrigin?.longitudeDegrees??null} timezone={p.timezoneDisplay}
    worldDateUTC={clock?.worldDateUTC??run?.time.worldDateUTC??p.wallTimeUTC} runId={run?.id??""}/>
