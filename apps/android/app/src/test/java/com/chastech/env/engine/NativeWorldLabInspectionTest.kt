@@ -24,3 +24,29 @@ class NativeWorldLabInspectionTest{
   assertTrue(NativeWorldLabInspection.clipPolygon(poly,NativeInspectionAxis.X,3.0).isEmpty())
  }
 }
+
+ @Test fun inspectionViewHistoryRestoresCutawayAndXrayWithoutChangingProject(){
+  val initial=NativeInspectionSettings()
+  val original=NativeWorldLabInspectionHistory(present=initial)
+  val cutaway=original.commit(initial.copy(mode=NativeInspectionMode.CUTAWAY,
+   axis=NativeInspectionAxis.Z,cutawayFraction=0.4f))
+  val xray=cutaway.commit(cutaway.present.copy(mode=NativeInspectionMode.XRAY,opacity=0.25f))
+  assertEquals(NativeInspectionMode.XRAY,xray.present.mode)
+  val undoXray=xray.undo()
+  assertEquals(NativeInspectionMode.CUTAWAY,undoXray.present.mode)
+  assertEquals(NativeInspectionAxis.Z,undoXray.present.axis)
+  assertEquals(0.4f,undoXray.present.cutawayFraction,0f)
+  val undoCutaway=undoXray.undo()
+  assertEquals(initial,undoCutaway.present)
+  assertEquals(NativeInspectionMode.CUTAWAY,undoCutaway.redo().present.mode)
+  assertSame(original,original.undo())
+ }
+ @Test fun inspectionViewHistoryIsBoundedAndNewEditClearsRedo(){
+  var history=NativeWorldLabInspectionHistory()
+  repeat(65){index->history=history.commit(history.present.copy(
+   opacity=if(index%2==0)0.3f else 0.6f,cutawayFraction=(index%20)/20f))}
+  assertEquals(NativeWorldLabInspectionHistory.LIMIT,history.past.size)
+  val undone=history.undo()
+  val edited=undone.commit(undone.present.copy(mode=NativeInspectionMode.TRANSPARENT))
+  assertTrue(edited.future.isEmpty())
+ }
