@@ -748,7 +748,7 @@ fun NativeABookScreen(){
                     if(isPdf)Checkbox(checked=f.id in selectedPdfIds,onCheckedChange={checked->selectedPdfIds=if(checked)selectedPdfIds+f.id else selectedPdfIds-f.id})
                     Text("${f.name} · ${f.size/1024} KB",modifier=Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
                     if(isPdf)OutlinedButton(onClick={activePdf=f;pdfText=""}){Text("PDF tools")}
-                    TextButton(onClick={removeAttachment(f)){Text("Remove",color=MaterialTheme.colorScheme.error)}
+                    TextButton(onClick={removeAttachment(f)}){Text("Remove",color=MaterialTheme.colorScheme.error)}
                 }
             }
             val selectedCount=selectedPdfFiles().size
