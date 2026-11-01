@@ -568,7 +568,20 @@ fun NativeWorldLabForm() {
                 playing=false;reversePlayback=checkpoint.playbackDirection=="reverse-recording"
                 checkpoint.worldEpochUTC?.let{worldEpochUTC=it}
                 checkpoint.playbackRate?.let{speed=it.toFloat()}
-                timelineStatus="Matching reference experiment inputs and clock state restored."
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    runCatching {
+                        NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                            checkpoint.timeSeconds).copy(
+                            solverInternalTimeSeconds=recording.samples[
+                                NativeWorldLabRecordedTime.nearestIndex(
+                                    recording.clockRun,checkpoint.timeSeconds)].timeSeconds,
+                            playbackRate=checkpoint.playbackRate?:1.0,
+                            direction=checkpoint.playbackDirection)
+                    }.onSuccess{selected->
+                        demoClock=selected;time=selected.simulationTimeSeconds.toFloat()
+                    }.onFailure{warning=it.message?:"Recorded timeline restore was rejected."}
+                }}
+                timelineStatus="Reference experiment inputs and recorded-sample clock restored."
             }.onFailure{timelineStatus=it.message?:"Timeline checkpoint restore failed."}
         }
     }
