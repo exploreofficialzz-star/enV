@@ -212,3 +212,28 @@ test("A book PDF worker cancellation terminates the worker and rejects with Abor
     else Reflect.deleteProperty(globalThis, "Worker");
   }
 });
+
+
+test("A book rejects browser PDF work when Web Workers are unavailable", async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    },
+  });
+  Reflect.deleteProperty(globalThis, "Worker");
+  try {
+    await assert.rejects(
+      inspectPdfInWorker(new Blob(["not used"])),
+      /does not support isolated local PDF processing/,
+    );
+  } finally {
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+    if (originalWorker) Object.defineProperty(globalThis, "Worker", originalWorker);
+    else Reflect.deleteProperty(globalThis, "Worker");
+  }
+});
