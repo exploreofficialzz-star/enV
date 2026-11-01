@@ -36,3 +36,15 @@ test("diagonal clearance uses Euclidean 3D distance and validates bounded coordi
   ...other,positionMeters:[Number.NaN,3,0],
  }),/Invalid bounded/);
 });
+
+import {rotateSolids} from "./cad.ts";
+test("rotated box clearance uses its transformed broad-phase bounds",()=>{
+ const p=blankWorldLabProject("rotated","2026-11-01T00:00:00Z");
+ const a={...newSolid("a","box",0),dimensionsMeters:[4,0.2,0.2],rotationRadians:[0,0,Math.PI/4] as [number,number,number]};
+ const b={...newSolid("b","box",1),positionMeters:[0,2.8,0],dimensionsMeters:[0.2,0.2,0.2]};
+ p.entities.push(a,b);
+ const rotated=inspectWorldLabSpatialClearance(a,b);
+ const original=inspectWorldLabSpatialClearance({...a,rotationRadians:[0,0,0]},b);
+ assert.ok(rotated.gapLowerBoundMeters<original.gapLowerBoundMeters);
+ assert.equal(rotated.exactForBoxes,false);
+});

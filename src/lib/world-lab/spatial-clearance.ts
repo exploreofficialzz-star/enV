@@ -1,3 +1,4 @@
+import {cadBounds} from "./cad.ts";
 import type {WorldLabEntity} from "./project.ts";
 
 /**
@@ -22,19 +23,21 @@ export function inspectWorldLabSpatialClearance(
   if(coords.some(x=>!Number.isFinite(x)||Math.abs(x)>100000)||
     sizes.some(x=>!Number.isFinite(x)||x<=0||x>10000))
     throw new Error("Invalid bounded primitive geometry.");
+  const boundA=cadBounds(a),boundB=cadBounds(b);
   const gaps:[number,number,number]=[0,0,0];
   const overlap:[number,number,number]=[0,0,0];
   for(let axis=0;axis<3;axis++){
-    const halfA=a.dimensionsMeters[axis]/2,halfB=b.dimensionsMeters[axis]/2;
-    const minA=a.positionMeters[axis]-halfA,maxA=a.positionMeters[axis]+halfA;
-    const minB=b.positionMeters[axis]-halfB,maxB=b.positionMeters[axis]+halfB;
+    const minA=boundA.min[axis],maxA=boundA.max[axis];
+    const minB=boundB.min[axis],maxB=boundB.max[axis];
     gaps[axis]=Math.max(0,minA-maxB,minB-maxA);
     overlap[axis]=Math.max(0,Math.min(maxA,maxB)-Math.max(minA,minB));
   }
   const gap=Math.hypot(...gaps);
   const separated=gap>1e-9;
   const touching=!separated&&overlap.some(x=>x<=1e-9);
-  const exact=a.shape==="box"&&b.shape==="box";
+  const exact=a.shape==="box"&&b.shape==="box"&&
+    (a.rotationRadians??[0,0,0]).every(v=>Math.abs(v)<1e-10)&&
+    (b.rotationRadians??[0,0,0]).every(v=>Math.abs(v)<1e-10);
   const status=separated?"separated":touching?"bounds-touch":
     exact?"box-intersection":"potential-curved-intersection";
   return {fromId:a.id,toId:b.id,gapLowerBoundMeters:gap,

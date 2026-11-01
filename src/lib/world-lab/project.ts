@@ -29,6 +29,8 @@ const entitySchema = z.object({
   shape: z.enum(["box", "sphere", "cylinder"]),
   positionMeters: coords,
   dimensionsMeters: dimensions,
+  /** Optional in v1 JSON; old saved inventions decode with a zero rotation. */
+  rotationRadians: z.tuple([scalar.min(-Math.PI*2).max(Math.PI*2),scalar.min(-Math.PI*2).max(Math.PI*2),scalar.min(-Math.PI*2).max(Math.PI*2)]).default([0,0,0]),
   color: hexColor,
   materialId: uid.nullable(),
   scientificRole: z.enum(["visual-only", "reference-solid"]),
@@ -239,7 +241,7 @@ export function newSolid(id: string, shape: WorldLabEntity["shape"], at: number)
   return entitySchema.parse({
     id, name: shape === "box" ? "Cube" : shape === "sphere" ? "Sphere" : "Cylinder",
     shape, positionMeters: [-2 + (at % 5), 0.5, 1.8 + Math.floor(at / 5)],
-    dimensionsMeters: dims, color: "#CFD7D6", materialId: null,
+    dimensionsMeters: dims, rotationRadians:[0,0,0], color: "#CFD7D6", materialId: null,
     scientificRole: "visual-only", opacity: 1,
   });
 }
