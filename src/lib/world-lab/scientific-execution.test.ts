@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {quantity} from "./quantity-contract.ts";
 import {validateScientificGraph} from "./scientific-graph.ts";
-import {executeScientificGraph,type ScientificAdapter} from "./scientific-execution.ts";
+import {executeScientificGraph,createIdealRcAdapters,type ScientificAdapter} from "./scientific-execution.ts";
 const source={id:"supply",modelId:"ideal-voltage",ports:[
   {id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]};
 const resistor={id:"load",modelId:"ideal-resistor",ports:[
@@ -68,4 +68,23 @@ test("untrusted missing model, altered port unit, false conserved power and huge
     durationSeconds:0.2,stepSeconds:0.1}),/Conservation residual/);
   assert.throws(()=>executeScientificGraph(graph,[supply,load],{
     durationSeconds:60,stepSeconds:0.00001}),/bounded execution steps/);
+});
+
+
+test("trusted ideal RC adapters exchange real voltage/current and conserve source, resistor and capacitor power",()=>{
+  const rcGraph=validateScientificGraph({schemaVersion:1,projectId:"rc-contract",projectRevision:2,
+    components:[
+      {id:"source",modelId:"ideal-dc-source",ports:[{id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+      {id:"load",modelId:"series-rc-load",ports:[
+        {id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical"}]}],
+    edges:[{fromComponentId:"source",fromPortId:"V",toComponentId:"load",toPortId:"Vin",delayed:false}]});
+  const run=executeScientificGraph(rcGraph,createIdealRcAdapters({
+    sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5}),{durationSeconds:0.3,stepSeconds:0.1});
+  const last=run.samples.at(-1)!;
+  assert.ok(Math.abs(last.values["load:Vc"].valueSI-12*(1-Math.exp(-0.3/3)))<1e-12);
+  assert.ok(last.values["load:I"].valueSI>0);
+  assert.ok(run.samples.every(s=>Math.abs(s.residualW)<1e-10&&s.dissipatedW>=0));
+  assert.throws(()=>createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:-1,capacitanceF:0.5}),/outside the supported/);
 });
