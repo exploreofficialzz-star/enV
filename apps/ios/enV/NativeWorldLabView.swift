@@ -3102,6 +3102,7 @@ private struct NativeWorldLabMultiCadPanel:View {
     @State private var factor="1.1"
     @State private var offset="1"
     @State private var gap="0.25"
+    @State private var gridStep="0.5"
     @State private var plane="0"
     @State private var patternSpacing="2"
     @State private var copies="2"
@@ -3132,6 +3133,27 @@ private struct NativeWorldLabMultiCadPanel:View {
                 }
             }
             Text("Selected: \(ids.count) / \(project.entities.count)").font(.caption)
+            HStack{
+                TextField("Grid spacing m",text:$gridStep).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Snap selected"){
+                    guard let step=Double(gridStep) else{
+                        error="Enter a grid spacing from 0.001 to 100 metres";return
+                    }
+                    apply{try NativeWorldLabEditor.snapSolids($0,ids:ids,gridMeters:step)}
+                }.disabled(ids.isEmpty)
+            }.buttonStyle(.bordered)
+            if ids.count==2,
+               let measurement=try? NativeWorldLabEditor.measureCenters(project,fromId:ids[0],toId:ids[1]){
+                Text("Centre distance: "+String(format:"%.3f",measurement.centerDistanceM)+
+                    " m · ΔX "+String(format:"%.3f",measurement.offsetXM)+
+                    " · ΔY "+String(format:"%.3f",measurement.offsetYM)+
+                    " · ΔZ "+String(format:"%.3f",measurement.offsetZM)+" m")
+                    .font(.caption)
+            }else{
+                Text("Select exactly two parts to measure their centre-to-centre distance.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Picker("Axis",selection:$axis){
                 Text("X").tag(0);Text("Y").tag(1);Text("Z").tag(2)
             }.pickerStyle(.segmented)
