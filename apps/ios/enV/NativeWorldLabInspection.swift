@@ -86,7 +86,8 @@ enum NativeWorldLabInspectionGeometry {
             let current=polygon[i],previous=polygon[(i+polygon.count-1)%polygon.count]
             guard current.count==3,previous.count==3 else{return([],[])}
             let dc=current[axis]-offset,dp=previous[axis]-offset
-            let insideCurrent=dc>= -1e-10,insidePrevious=dp>= -1e-10
+            let insideCurrent = dc >= (-1.0e-10)
+            let insidePrevious = dp >= (-1.0e-10)
             if insideCurrent != insidePrevious {
                 let denominator=dp-dc
                 if abs(denominator)>1e-14 {
