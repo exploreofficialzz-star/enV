@@ -2,6 +2,13 @@ package com.chastech.env
 
 import android.content.ContentValues
 import android.content.Context
+com.google.mlkit.vision.text.latin.TextRecognizerOptions
+com.google.mlkit.vision.text.TextRecognition
+com.google.mlkit.vision.common.InputImage
+com.google.android.gms.tasks.Tasks
+android.os.ParcelFileDescriptor
+android.graphics.pdf.PdfRenderer
+android.graphics.Bitmap
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.provider.OpenableColumns
@@ -61,6 +68,52 @@ private fun parseABookPageGroups(value:String,pageCount:Int):List<List<Int>>{
         require(pages.isNotEmpty()){"Each PDF part must contain at least one page."}
         pages
     }
+}
+
+private suspend fun recognizeABookPdfOffline(file: File): String = withContext(Dispatchers.IO) {
+    require(file.isFile && file.length() in 1..(100L * 1024 * 1024)) {
+        "Choose a readable PDF smaller than 100 MB."
+    }
+    val output = StringBuilder()
+    val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+    try {
+        PdfRenderer(descriptor).use { renderer ->
+            require(renderer.pageCount in 1..100) {
+                "On-device OCR supports PDFs with 1 to 100 pages per operation."
+            }
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            try {
+                for (index in 0 until renderer.pageCount) {
+                    val page = renderer.openPage(index)
+                    try {
+                        val scale = minOf(1600f / page.width, 2200f / page.height, 2f)
+                        val width = (page.width * scale).toInt().coerceAtLeast(1)
+                        val height = (page.height * scale).toInt().coerceAtLeast(1)
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        try {
+                            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            val recognized = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)))
+                            if (recognized.text.isNotBlank()) {
+                                if (output.isNotEmpty()) output.append("\n\n")
+                                output.append("Page ").append(index + 1).append("\n")
+                                    .append(recognized.text)
+                            }
+                        } finally {
+                            bitmap.recycle()
+                        }
+                    } finally {
+                        page.close()
+                    }
+                    if (output.length >= 150_000) break
+                }
+            } finally {
+                recognizer.close()
+            }
+        }
+    } finally {
+        descriptor.close()
+    }
+    output.toString().take(150_000)
 }
 
 private fun safeABookPdfName(value:String):String =
@@ -637,6 +690,17 @@ fun NativeABookScreen(){
                         }}
                         result.fold({pendingPdf=it;exportPdf.launch("${f.name.substringBeforeLast(".")}-rotated.pdf")},{error=it.message?:"PDF rotation failed"})
                     }}){Text("Rotate 90°")}
+                    OutlinedButton(onClick={scope.launch{
+                        status="Recognizing scanned PDF locally…";error=""
+                        val result=runCatching{recognizeABookPdfOffline(local)}
+                        result.fold({text->
+                            pdfText=text
+                            status=if(text.isBlank())"No readable text found on this PDF" else "OCR completed on this device"
+                        },{failure->
+                            error=failure.message?:"Local OCR failed"
+                            status="OCR not completed"
+                        })
+                    }}){Text("OCR locally")}
                 }
                 if(pdfText.isNotBlank()){
                     Text("Text extracted locally",style=MaterialTheme.typography.labelMedium)
