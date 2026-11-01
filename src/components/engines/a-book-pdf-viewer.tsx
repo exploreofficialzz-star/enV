@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { computeABookPdfBackingScale } from "@/lib/a-book/pdf-viewer-utils";
 
 type PdfViewport = { width: number; height: number };
 type PdfPageProxy = {
@@ -147,15 +148,13 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         const fitScale = Math.min(1, Math.max(0.2, (containerWidth - 24) / base.width));
         const desiredScale = Math.min(2.5, Math.max(0.35, fitScale * zoom));
         const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-        // Bound each backing canvas to ~48 MB of RGBA pixel memory.
-        const maxBackingScale = Math.min(
-          Math.sqrt(12_000_000 / (base.width * base.height)),
-          8192 / Math.max(base.width, base.height),
+        // Bound each backing canvas to ~48 MB and 8,192 pixels on either edge.
+        const backingScale = computeABookPdfBackingScale(
+          base.width,
+          base.height,
+          desiredScale,
+          pixelRatio,
         );
-        const backingScale = Math.min(desiredScale * pixelRatio, maxBackingScale, 2);
-        if (!Number.isFinite(backingScale) || backingScale <= 0) {
-          throw new Error("This PDF page is too large to render safely on this device.");
-        }
         const scale = backingScale / pixelRatio;
         const cssViewport = page.getViewport({ scale });
         const renderViewport = page.getViewport({ scale: backingScale });
