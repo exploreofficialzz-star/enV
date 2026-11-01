@@ -171,3 +171,15 @@ class NativeWorldLabStatefulGraphExecutionTest {
         assertTrue("Delayed feedback without t=0 state must be rejected",rejected)
     }
 }
+
+
+class NativeWorldLabRepeatRunStateTests {
+    @Test fun statefulAdaptersResetBeforeEveryIndependentRun() {
+        val graph=NativeWorldLabExecution.idealRcGraph("rc-repeat-run",1)
+        val adapters=NativeWorldLabExecution.idealRcAdapters(12.0,6.0,0.5)
+        val first=NativeWorldLabExecution.execute(graph,adapters,0.3,0.1)
+        val repeated=NativeWorldLabExecution.execute(graph,adapters,0.3,0.1)
+        assertEquals(first.samples.map{it.values.getValue("load:Vc").valueSI},
+            repeated.samples.map{it.values.getValue("load:Vc").valueSI})
+    }
+}

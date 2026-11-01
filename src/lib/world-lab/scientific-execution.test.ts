@@ -176,3 +176,21 @@ test("Web scheduler completes more than 20,000 steps within its 50,000-step budg
   const run=executeScientificGraph(graph,[adapter],{durationSeconds:0.20001,stepSeconds:0.00001});
   assert.equal(run.samples.length,20001);
 });
+
+
+test("stateful scientific adapters reset before every independent simulation run",()=>{
+  const graph=validateScientificGraph({schemaVersion:1,projectId:"rc-repeat-run",projectRevision:1,
+    components:[
+      {id:"source",modelId:"ideal-dc-source",ports:[
+        {id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+      {id:"load",modelId:"series-rc-load",ports:[
+        {id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical"}]},
+    ],edges:[{fromComponentId:"source",fromPortId:"V",toComponentId:"load",toPortId:"Vin",delayed:false}]});
+  const adapters=createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5});
+  const first=executeScientificGraph(graph,adapters,{durationSeconds:0.3,stepSeconds:0.1});
+  const repeated=executeScientificGraph(graph,adapters,{durationSeconds:0.3,stepSeconds:0.1});
+  assert.deepEqual(repeated.samples.map(s=>s.values["load:Vc"].valueSI),
+    first.samples.map(s=>s.values["load:Vc"].valueSI));
+});

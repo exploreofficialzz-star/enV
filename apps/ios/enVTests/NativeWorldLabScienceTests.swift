@@ -316,3 +316,19 @@ final class NativeWorldLabStatefulExecutionParityTests:XCTestCase {
             adapters:[noInitial,try adapter("b",10)],durationSeconds:0.1,stepSeconds:0.1))
     }
 }
+
+
+final class NativeWorldLabRepeatRunStateTests:XCTestCase {
+    func testStatefulAdaptersResetBeforeEveryIndependentRun() throws {
+        let graph=NativeWorldLabExecution.idealRCGraph(projectId:"rc-repeat-run",projectRevision:1)
+        let adapters=try NativeWorldLabExecution.idealRCAdapters(
+            sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5)
+        let first=try NativeWorldLabExecution.execute(graph,adapters:adapters,
+            durationSeconds:0.3,stepSeconds:0.1)
+        let repeated=try NativeWorldLabExecution.execute(graph,adapters:adapters,
+            durationSeconds:0.3,stepSeconds:0.1)
+        let firstValues=first.samples.map{$0.values["load:Vc"]!.valueSI}
+        let repeatedValues=repeated.samples.map{$0.values["load:Vc"]!.valueSI}
+        XCTAssertEqual(firstValues,repeatedValues)
+    }
+}
