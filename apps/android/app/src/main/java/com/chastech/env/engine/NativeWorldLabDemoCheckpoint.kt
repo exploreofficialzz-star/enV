@@ -21,6 +21,7 @@ object NativeWorldLabDemoCheckpointCodec {
   validate(v)
   val fields=listOf(v.wallTimeUTC,v.worldEpochUTC,v.solverInternalTimeSeconds,v.displaySampleTimeSeconds,v.playbackRate,v.playbackDirection,v.timezoneDisplay)
   require(fields.all{it==null}||fields.all{it!=null}){"Clock checkpoint fields must be all present or all absent"}
+  require(v.solverStepSeconds==null||fields.all{it!=null}){"Solver timestep requires complete clock metadata"}
   val version=if(fields.all{it!=null}){if(v.solverStepSeconds!=null)3 else 2}else 1
   val o=JSONObject().put("format",FORMAT).put("schemaVersion",version).put("modelVersion",MODEL_VERSION)
    .put("modelId",v.modelId).put("timeSeconds",v.timeSeconds).put("massKg",v.massKg)
