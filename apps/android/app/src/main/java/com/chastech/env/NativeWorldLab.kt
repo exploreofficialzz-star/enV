@@ -762,10 +762,13 @@ fun NativeWorldLabForm() {
             demoClock=null;time=0f;playing=false
         }else{
             runCatching{
-                NativeWorldLabRecordedTime.start(recording.clockRun,
+                val started=NativeWorldLabRecordedTime.start(recording.clockRun,
                     java.time.Instant.now().toString(),java.time.ZoneId.systemDefault().id)
+                NativeWorldLabRecordedTime.seek(recording.clockRun,started,
+                    time.toDouble()).copy(solverInternalTimeSeconds=
+                        recording.samples[NativeWorldLabRecordedTime.nearestIndex(recording.clockRun,time.toDouble())].timeSeconds)
             }.onSuccess{
-                demoClock=it;time=0f;playing=false;reversePlayback=false
+                demoClock=it;time=it.simulationTimeSeconds.toFloat();playing=false
             }.onFailure{
                 demoClock=null;playing=false;warning=it.message?:"Recorded model timeline could not be initialized."
             }
@@ -791,7 +794,9 @@ fun NativeWorldLabForm() {
                 playing=false
                 continue
             }
-            val next=transition.getOrThrow()
+            val transitioned=transition.getOrThrow()
+            val next=transitioned.copy(solverInternalTimeSeconds=
+                recording.samples[transitioned.sampleIndex].timeSeconds)
             demoClock=next;time=next.simulationTimeSeconds.toFloat()
             if(playing && ((reversePlayback&&next.simulationTimeSeconds<=1e-9)||
                 (!reversePlayback&&next.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9))){
