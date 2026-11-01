@@ -48,6 +48,8 @@ workerScope.onmessage = async (event) => {
       case "merge":
         value = await mergePdfs(request.files);
         break;
+      default:
+        throw new Error("Unsupported local PDF operation.");
     }
 
     if (value instanceof Uint8Array) {
