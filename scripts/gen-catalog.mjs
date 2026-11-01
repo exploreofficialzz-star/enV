@@ -5,7 +5,7 @@
 import { writeFileSync, readFileSync } from "node:fs";
 import { IMAGE_DESCRIPTIONS } from "./image-descriptions.mjs";
 import mathExpansion from "../src/data/math-expansion.json" with { type: "json" };
-import { describeExpansion } from "../src/lib/calc/expansion-rows.mjs";
+import { describeExpansion, expansionCalculatorName, expansionCalculatorDescription, expansionCalculatorKeywords } from "../src/lib/calc/expansion-rows.mjs";
 import { parseMathExerciseCatalog, mathExercisePresentation } from "./math-exercise-catalog.mjs";
 
 /** @typedef {[string, string, string, string, string, string, string, number, number, string?]} Tuple */
@@ -1173,16 +1173,15 @@ for (const [family, rows] of Object.entries(expansionData)) {
     const info = describeExpansion(family, row);
     for (const target of ["a", "b", "c"]) {
       const op = `exp-${family}-${info.key}-${target}`;
-      const targetLabel = info.labels[target];
-      const equationTitle = `${info.relation} — Solve for ${targetLabel}`;
+      const equationTitle = expansionCalculatorName(info, target);
       RAW.push([
         `math-${op}`,
         info.title ? `${info.title}: ${equationTitle}` : equationTitle,
         "calculators",
-        `Formula exercise calculator: ${info.relation}. Solve for ${targetLabel}. Enter the other two values to calculate the missing value.`,
+        `${expansionCalculatorDescription(info, target)} Enter the other two values to calculate the missing value.`,
         "calculator",
         op,
-        `math exercise formula ${family} ${info.key} solve ${target}${info.title ? ` ${info.title.toLowerCase()}` : ""}`,
+        expansionCalculatorKeywords(family, info, target),
         0,
         58,
         "n",
