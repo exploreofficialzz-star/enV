@@ -14104,7 +14104,7 @@ private final class ABookAttachmentEntity: NSManagedObject {
 }
 
 
-private func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[Int]] {
+func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[Int]] {
     guard pageCount > 0 else { throw NSError(domain: "ABookPDF", code: 30, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."]) }
     let groups = value.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
     guard groups.count >= 2, groups.count <= 100 else { throw NSError(domain: "ABookPDF", code: 31, userInfo: [NSLocalizedDescriptionKey: "Enter two or more page groups, for example 1-3;4-6. Create up to 100 parts."]) }
@@ -14127,7 +14127,7 @@ private func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[I
     }
 }
 
-private func parseABookPageSelection(_ value: String, pageCount: Int) throws -> [Int] {
+func parseABookPageSelection(_ value: String, pageCount: Int) throws -> [Int] {
     guard pageCount > 0 else {
         throw NSError(domain: "ABookPDF", code: 36, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."])
     }
