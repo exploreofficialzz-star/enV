@@ -784,3 +784,8 @@ release-candidate evidence bundle are unfinished.
 - Replaced the observer viewport's unavailable Compose key-event type property with the Android native key action constant; arrow/PageUp/PageDown camera controls now use the supported Android event API.
 - Replaced an unsupported JSONObject.similar call in CAD material interchange with the existing recursive, insertion-order-independent NativeWorldLabJsonEquality.same helper. Numeric JSON representations remain value-compared, arrays remain ordered, and object keys are exact.
 - These changes address the two compiler diagnostics reported by the Android Kotlin/lint job. The rerun is required to confirm the exact branch head; no Android pass is claimed yet.
+
+## iOS C/D compile blockers found by exact-head CI — 2026-11-01
+- Marked the multi-part snapping coordinate map as throwing so invalid/out-of-world coordinates propagate through Swift's error boundary.
+- Extracted the SwiftUI snap and two-part measurement controls from the main CAD VStack into typed subviews, and replaced fragile multi-line string concatenation with bounded formatted measurement rows.
+- These edits address the Swift compiler errors identified in NativeWorldLabEditor.swift and NativeWorldLabView.swift. The iOS build and simulator/accessibility reruns are still required.
