@@ -201,12 +201,13 @@ enum NativeWorldLabActuator {
                 abs(current)<1e7,abs(v)<1e5,h<1e5 else {
                 throw NativeWorldLabError.invalid("Actuator exceeded stability envelope")
             }
+            let sourceVoltage=i.powerOffAtSeconds != nil && Double(n)*dt>=i.powerOffAtSeconds! ? 0:i.supplyVoltageV
             output.append(NativeActuatorSample(
                 timeSeconds:Double(n)*dt,heightM:h,velocityMps:v,currentA:current,
                 motorForceN:i.forceConstantNPerA*current,
                 backEmfV:i.forceConstantNPerA*v,
                 resistiveHeatW:heat,
-                sourcePowerW:i.supplyVoltageV*current,
+                sourcePowerW:sourceVoltage*current,sourceVoltageV:sourceVoltage,
                 kineticEnergyJ:ke,gravityEnergyJ:pe,magneticEnergyJ:magnetic,
                 energyResidualJ:supplied+initial-ke-pe-magnetic-stored-dissipated,
                 suppliedEnergyJ:supplied,dissipatedEnergyJ:dissipated,
@@ -214,24 +215,26 @@ enum NativeWorldLabActuator {
                 coilResistanceOhm:i.thermal == nil ? nil : r,
                 thermalEnergyJ:stored,coolingPowerW:cooling))
             if n==steps {break}
-            let next=step(state,i,dt,clamp:true)
-            let current2=next[2];let velocity2=next[1]
-            supplied+=0.5*dt*i.supplyVoltageV*(current+current2)
-            let t2=next[3]
-            let heat2=resistance(i,t2)*current2*current2
-            let cooling2=i.thermal.map{$0.coolingWPerK*(t2-$0.ambientTemperatureK)} ?? 0
-            let loss1=i.dampingNsPerM*v*v+(i.thermal == nil ? heat : cooling)
-            let loss2=i.dampingNsPerM*velocity2*velocity2+(i.thermal == nil ? heat2 : cooling2)
-            dissipated+=0.5*dt*(loss1+loss2)
-            if next[0]==0 && velocity2==0 && (h>0 || v<0) {
-                let raw=step(state,i,dt,clamp:false)
-                if raw[1]<0 {dissipated+=0.5*i.massKg*raw[1]*raw[1]}
+            let integrated=advance(state,i,dt,Double(n)*dt)
+            for segment in integrated.segments {
+                let v0=segment.before[1],c0=segment.before[2],temperature0=segment.before[3]
+                let v1=segment.after[1],c1=segment.after[2],temperature1=segment.after[3]
+                let heat0=resistance(i,temperature0)*c0*c0
+                let heat1=resistance(i,temperature1)*c1*c1
+                let cooling0=i.thermal.map{$0.coolingWPerK*(temperature0-$0.ambientTemperatureK)} ?? 0
+                let cooling1=i.thermal.map{$0.coolingWPerK*(temperature1-$0.ambientTemperatureK)} ?? 0
+                supplied+=0.5*segment.stepSeconds*segment.sourceVoltageV*(c0+c1)
+                let loss0=i.dampingNsPerM*v0*v0+(i.thermal == nil ? heat0 : cooling0)
+                let loss1=i.dampingNsPerM*v1*v1+(i.thermal == nil ? heat1 : cooling1)
+                dissipated+=0.5*segment.stepSeconds*(loss0+loss1)+segment.impactLossJ
             }
-            state=next
+            state=integrated.state
         }
         return NativeActuatorResult(samples:output,stepSeconds:dt,
-            modelVersion:i.thermal == nil ? "1.0.0" : "1.1.0",
-            validity:i.thermal == nil ?
+            modelVersion:i.powerOffAtSeconds != nil ? "1.2.0" : (i.thermal == nil ? "1.0.0" : "1.1.0"),
+            validity:i.powerOffAtSeconds != nil ?
+                "Ideal supply switch opens at the exact recorded time. Coil current remains continuous and decays through the modeled R-L path; no arc, fuse damage or contact bounce is predicted." :
+                (i.thermal == nil ?
                 "Bounded 1D R-L actuator with hypothetical parameters; not certified." :
                 "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, " + "cooling and resistance; not measured or certified.")
     }
@@ -239,7 +242,7 @@ enum NativeWorldLabActuator {
     /// Internal 1D numerical consistency only. Does not verify motor parameters.
     static func numericalAudit(_ input:NativeActuatorInput,
                                _ run:NativeActuatorResult)throws->NativeActuatorNumericalAudit {
-        guard (run.modelVersion=="1.0.0" || run.modelVersion=="1.1.0"),run.samples.count>=2,
+        guard (run.modelVersion=="1.0.0" || run.modelVersion=="1.1.0" || run.modelVersion=="1.2.0"),run.samples.count>=2,
             run.stepSeconds.isFinite,run.stepSeconds>0 else {
             throw NativeWorldLabError.invalid("Completed actuator trajectory required")
         }
