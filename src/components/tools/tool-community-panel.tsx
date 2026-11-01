@@ -80,6 +80,10 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
   }, [toolId]);
 
   useEffect(() => {
+    if (!featureEnabled) {
+      setLoading(false);
+      return;
+    }
     const id = visitorIdentity();
     setVisitorId(id);
     if (!id) {
@@ -100,7 +104,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [refresh, toolId]);
+  }, [featureEnabled, refresh, toolId]);
 
   async function post(path: string, payload: Record<string, unknown>) {
     const response = await fetch(path, {
