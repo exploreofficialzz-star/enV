@@ -130,3 +130,33 @@ class NativeWorldLabDemoRecordingTest {
   }
  }
 }
+
+
+
+class NativeWorldLabBranchCurrentTest {
+ @Test fun signedCurrentDeterminesConventionalDirectionAndPolarityReversal(){
+  val forward=NativeWorldLabBranchCurrent.resolve("supply","ground",0.25)
+  assertEquals("supply",forward.fromNodeId)
+  assertEquals("ground",forward.toNodeId)
+  assertEquals(NativeLabBranchFlowDirection.POSITIVE_TO_NEGATIVE,forward.direction)
+  assertEquals(0.25,forward.magnitudeA,1e-12)
+  val reverse=NativeWorldLabBranchCurrent.resolve("supply","ground",-0.25)
+  assertEquals("ground",reverse.fromNodeId)
+  assertEquals("supply",reverse.toNodeId)
+  assertEquals(NativeLabBranchFlowDirection.NEGATIVE_TO_POSITIVE,reverse.direction)
+ }
+ @Test fun zeroAndInvalidCurrentAreHandledWithoutInventedFlow(){
+  val zero=NativeWorldLabBranchCurrent.resolve("a","b",0.0)
+  assertEquals(NativeLabBranchFlowDirection.ZERO,zero.direction)
+  assertNull(zero.fromNodeId);assertNull(zero.toNodeId)
+  assertThrows(IllegalArgumentException::class.java){
+   NativeWorldLabBranchCurrent.resolve("a","b",Double.NaN)
+  }
+  assertThrows(IllegalArgumentException::class.java){
+   NativeWorldLabBranchCurrent.resolve("a","b",1e7)
+  }
+  assertThrows(IllegalArgumentException::class.java){
+   NativeWorldLabBranchCurrent.resolve("a","a",1.0)
+  }
+ }
+}
