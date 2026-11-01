@@ -15026,7 +15026,7 @@ private struct NativeABookView: View {
             if !errorText.isEmpty {
                 Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
-            HStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
                 Button {
                     showTrash = false
                     showArchived = false
@@ -15091,7 +15091,7 @@ private struct NativeABookView: View {
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                             .accessibilityLabel("Note content")
                             .disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil)
-                        HStack(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 8) {
                             if let selected = notes.first(where: { $0.id == selectedID }), selected.deletedAt != nil {
                                 Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
                                 Button("Delete permanently") { confirmPermanentDelete = true }.buttonStyle(.bordered)
@@ -15107,7 +15107,7 @@ private struct NativeABookView: View {
                         if !pdfAttachments.isEmpty {
                             TextField("Extract pages · 1-3,5", text: $extractPageRange).textFieldStyle(.roundedBorder)
                             TextField("Split parts · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
-                            HStack(spacing: 8) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
                                 Button("Merge PDFs") { mergeSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.count < 2)
                                 Button("Rotate batch") { rotateSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
                                 Button("Extract pages") { extractSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
