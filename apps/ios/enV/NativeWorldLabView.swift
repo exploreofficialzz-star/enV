@@ -472,11 +472,13 @@ struct NativeWorldLabView:View {
                     Button("Restore viewpoint"){restoreObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Surface"){returnObserverToSurface()}.buttonStyle(.bordered)
                 }
-                Text("Vertical observer offset: \(observerVerticalOffset) m · illustrative volume, not mapped geology")
+                Text("Observer distance: \(String(format: "%.2f", currentObserverRangeMeters())) m")
                     .font(.caption).foregroundStyle(.secondary)
-                Slider(value:$observerVerticalOffset,in:-20000...20000){_ in
-                    applyObserverVerticalOffset()
-                }.accessibilityLabel("World Lab observer vertical offset")
+                Text("Vertical observer offset: \(String(format: "%.1f",observerVerticalOffset)) m · illustrative volume, not mapped geology")
+                    .font(.caption).foregroundStyle(.secondary)
+                Slider(value:$observerVerticalOffset,in:-20000...20000)
+                    .accessibilityLabel("World Lab observer vertical offset")
+                    .onChange(of:observerVerticalOffset){_ in applyObserverVerticalOffset()}
                 Picker("Experiment",selection:$mode){
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
@@ -2490,6 +2492,11 @@ Text("Invent chemical heat").font(.headline)
         var target=project?.camera.lookingAtMeters ?? [0,1.2,0]
         target[1]=max(-20000,min(100000,target[1]+observerVerticalOffset))
         return target
+    }
+    private func currentObserverRangeMeters()->Double{
+        let target=currentObserverTarget(),position=sceneCameraNode.position
+        return max(0.25,hypot(hypot(Double(position.x)-target[0],
+            Double(position.y)-target[1]),Double(position.z)-target[2]))
     }
     private func updateObserverCameraClip(){
         let target=currentObserverTarget(),position=sceneCameraNode.position
