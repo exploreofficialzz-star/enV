@@ -82,7 +82,7 @@ data class NativeWorldLabRecordedCheckpoint(
             clock.sampleIndex==sampleIndex) {
             "Checkpoint clock does not identify its exact recorded display sample."
         }
-        clock.validate(run)
+        NativeWorldLabRecordedTime.validateClock(clock,run)
     }
 }
 
@@ -101,6 +101,10 @@ object NativeWorldLabRecordedTime {
             if(distance<delta){delta=distance;best=index}
         }
         return best
+    }
+
+    fun validateClock(clock:NativeWorldLabRecordedClock,run:NativeWorldLabRecordedRun) {
+        with(clock) { validate(run) }
     }
 
     fun NativeWorldLabRecordedClock.validate(run:NativeWorldLabRecordedRun) {
