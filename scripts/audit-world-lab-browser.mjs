@@ -387,6 +387,71 @@ try{
   await page.getByText(/Legacy import notices/).waitFor();
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Old cube"});
   assert.match(await page.getByText("Volume:").locator("..").innerText(),/8\.0000 m³/);
+  // Verify multi-part grid snapping and real centre-distance measurements.
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("0.24");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.74");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0.24");
+  await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("3.24");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("-0.24");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("2.49");
+  const cad=page.locator('[aria-label="Parametric CAD tools"]');
+  await cad.getByRole("checkbox",{name:/Old cube/}).check();
+  await cad.getByRole("checkbox",{name:/Sphere/}).check();
+  await cad.getByRole("spinbutton",{name:"CAD grid spacing (m)"}).fill("0.5");
+  await cad.getByRole("button",{name:"Snap selected to grid"}).click();
+  await cad.getByText("Centre-to-centre: 3.9370 m").waitFor();
+  await cad.getByText("Horizontal distance: 3.9051 m").waitFor();
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Old cube"});
+  assert.equal(await page.getByRole("spinbutton",{name:"Position X (m)"}).inputValue(),"0");
+  assert.equal(await page.getByRole("spinbutton",{name:"Position Y (m)"}).inputValue(),"0.5");
+  assert.equal(await page.getByRole("spinbutton",{name:"Position Z (m)"}).inputValue(),"0");
+
+  // Portable export verifies that sketch base centres and rotations move solids.
+  await cad.getByRole("spinbutton",{name:"Sketch base centre X (m)"}).fill("10");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Y (m)"}).fill("2");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Z (m)"}).fill("-3");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation X (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Y (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Z (degrees)"}).fill("90");
+  await cad.getByRole("spinbutton",{name:"Sketch rectangle width (m)"}).fill("2");
+  await cad.getByRole("spinbutton",{name:"Sketch rectangle depth (m)"}).fill("4");
+  await cad.getByRole("spinbutton",{name:"Sketch extrusion height (m)"}).fill("6");
+  const rectangleDownload=page.waitForEvent("download");
+  await cad.getByRole("button",{name:"Extrude rectangle"}).click();
+  const rectangleStream=await (await rectangleDownload).createReadStream();
+  let rectangleJson="";
+  for await(const chunk of rectangleStream)rectangleJson+=chunk.toString();
+  const rectangleProject=JSON.parse(rectangleJson);
+  const rectangle=rectangleProject.entities.find((entity)=>entity.name==="Extruded rectangular profile");
+  assert.ok(rectangle,"Positioned rectangle extrusion is present in the portable project");
+  assert.ok(Math.abs(rectangle.positionMeters[0]-7)<1e-10);
+  assert.ok(Math.abs(rectangle.positionMeters[1]-2)<1e-10);
+  assert.ok(Math.abs(rectangle.positionMeters[2]+3)<1e-10);
+  assert.ok(Math.abs(rectangle.rotationRadians[2]-Math.PI/2)<1e-10);
+
+  await cad.getByRole("spinbutton",{name:"Sketch base centre X (m)"}).fill("1");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Y (m)"}).fill("2");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Z (m)"}).fill("3");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation X (degrees)"}).fill("90");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Y (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Z (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch circle radius (m)"}).fill("0.5");
+  await cad.getByRole("spinbutton",{name:"Sketch extrusion height (m)"}).fill("2");
+  const circleDownload=page.waitForEvent("download");
+  await cad.getByRole("button",{name:"Extrude circle"}).click();
+  const circleStream=await (await circleDownload).createReadStream();
+  let circleJson="";
+  for await(const chunk of circleStream)circleJson+=chunk.toString();
+  const circleProject=JSON.parse(circleJson);
+  const circle=circleProject.entities.find((entity)=>entity.name==="Extruded circular profile");
+  assert.ok(circle,"Positioned circular extrusion is present in the portable project");
+  assert.equal(circle.shape,"cylinder");
+  assert.ok(Math.abs(circle.positionMeters[0]-1)<1e-10);
+  assert.ok(Math.abs(circle.positionMeters[1]-2)<1e-10);
+  assert.ok(Math.abs(circle.positionMeters[2]-4)<1e-10);
+  assert.ok(Math.abs(circle.rotationRadians[0]-Math.PI/2)<1e-10);
+
   assert.deepEqual(pageErrors,[],"No unhandled browser page errors");
   await page.setViewportSize({width:390,height:780});
   await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
@@ -395,7 +460,7 @@ try{
   }));
   assert.ok(viewport.documentWidth<=viewport.viewportWidth+3,
     "Mobile layout horizontally overflows: "+JSON.stringify(viewport));
-  console.log("WORLD_LAB_BROWSER_PASS: creation, inspect, experiments, see-inside, export/reload, offline, legacy import, mobile");
+  console.log("WORLD_LAB_BROWSER_PASS: creation, inspect, experiments, see-inside, multi-part CAD snap/measurement, positioned sketch extrusions, export/reload, offline, legacy import, mobile");
 }finally{
   await context.close();
   await browser.close();
