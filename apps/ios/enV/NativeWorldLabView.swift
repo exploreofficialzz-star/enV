@@ -29,6 +29,11 @@ struct NativeWorldLabView:View {
     @State private var resistance=1000.0
     @State private var diffusivity=0.02
     @State private var seeInside=false
+    @State private var inspectionMode:NativeWorldLabInspectionMode = .normal
+    @State private var inspectionOpacity=0.32
+    @State private var inspectionAxis:NativeWorldLabInspectionAxis = .x
+    @State private var inspectionCutawayFraction=0.0
+    @State private var inspectionExplodeDistance=1.0
     @State private var importing=false
     @State private var exporting=false
     @State private var exportingCAD=false
@@ -523,6 +528,38 @@ struct NativeWorldLabView:View {
                     Toggle("See inside",isOn:$seeInside).labelsHidden()
                     Text("See inside").font(.caption)
                 }
+                Picker("Inspection view",selection:$inspectionMode){
+                    ForEach(NativeWorldLabInspectionMode.allCases){item in
+                        Text(item.title).tag(item)
+                    }
+                }.pickerStyle(.menu)
+                if inspectionMode == .transparent || inspectionMode == .xray {
+                    Text("Inspection opacity \(Int(inspectionOpacity*100))%").font(.caption)
+                    Slider(value:$inspectionOpacity,in:0.05...1)
+                        .accessibilityLabel("See Inside opacity")
+                }
+                if inspectionMode == .cutaway {
+                    Picker("Cutaway axis",selection:$inspectionAxis){
+                        ForEach(NativeWorldLabInspectionAxis.allCases){axis in Text(axis.rawValue.uppercased()).tag(axis)}
+                    }.pickerStyle(.segmented)
+                    Text("Cutaway plane \(String(format:"%.2f",inspectionCutawayFraction))").font(.caption)
+                    Slider(value:$inspectionCutawayFraction,in:-1...1)
+                        .accessibilityLabel("Cutaway plane position")
+                    Text("Box, sphere and cylinder surfaces are clipped in world coordinates; the cut face is capped.").font(.caption).foregroundStyle(.secondary)
+                }
+                if inspectionMode == .exploded {
+                    Text("Assembly separation \(String(format:"%.1f",inspectionExplodeDistance)) m").font(.caption)
+                    Slider(value:$inspectionExplodeDistance,in:0...10)
+                        .accessibilityLabel("Exploded assembly separation")
+                }
+                HStack{
+                    Button(playing ? "Pause":"Play"){playing.toggle()}
+                        .buttonStyle(.borderedProminent)
+                    Button("Beginning"){playing=false;seconds=0}.buttonStyle(.bordered)
+                    Button("Previous step"){playing=false;seconds=max(0,seconds-1.0/240)}.buttonStyle(.bordered)
+                    Button("Next step"){playing=false;seconds=min(12,seconds+1.0/240)}.buttonStyle(.bordered)
+                    Button("End"){playing=false;seconds=12}.buttonStyle(.bordered)
+                }
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in
                     if editing{playing=false}
@@ -642,7 +679,19 @@ struct NativeWorldLabView:View {
         .onChange(of:dropTime){_ in applyDropPosition()}
         .onChange(of:fluidTime){_ in applyFluidPosition()}
         .onChange(of:motorTime){_ in applyMotorPosition()}
-        .onChange(of:seeInside){_ in redraw()}
+        .onChange(of:seeInside){_ in
+            if seeInside && inspectionMode == .normal {inspectionMode = .transparent}
+            else if !seeInside && inspectionMode == .transparent {inspectionMode = .normal}
+            redraw()
+        }
+        .onChange(of:inspectionMode){value in
+            seeInside = value == .transparent || value == .xray || value == .cutaway
+            redraw()
+        }
+        .onChange(of:inspectionOpacity){_ in redraw()}
+        .onChange(of:inspectionAxis){_ in redraw()}
+        .onChange(of:inspectionCutawayFraction){_ in redraw()}
+        .onChange(of:inspectionExplodeDistance){_ in redraw()}
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
@@ -2694,6 +2743,7 @@ Text("Invent chemical heat").font(.headline)
         updateObserverCameraClip()
     }
     private func redraw(){
+
         let next=SCNScene()
         let floor=SCNNode(geometry:SCNFloor())
         floor.geometry?.firstMaterial?.diffuse.contents=UIColor.systemGreen
@@ -2710,28 +2760,53 @@ Text("Invent chemical heat").font(.headline)
         next.rootNode.addChildNode(savedCamera)
         sceneCameraNode=savedCamera
         if let project {
-            for item in project.entities.prefix(200){
+            let selectedId=project.entities.indices.contains(selected) ? project.entities[selected].id : nil
+            let targetIds=NativeWorldLabInspectionGeometry.targetIds(project:project,selectedId:selectedId)
+            let planeOffset=NativeWorldLabInspectionGeometry.planeOffset(project:project,selectedId:selectedId,
+                settings:NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
+                    axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
+                    explosionDistanceMeters:inspectionExplodeDistance))
+            for item in project.entities.prefix(200) {
+                if !NativeWorldLabInspectionGeometry.isVisible(project:project,selectedId:selectedId,
+                    mode:inspectionMode,id:item.id) { continue }
                 let xyz=item.dimensionsMeters
+                let isCutTarget=inspectionMode == .cutaway && targetIds.contains(item.id) && planeOffset != nil
                 let geometry:SCNGeometry
-                switch item.shape{
-                case "sphere":geometry=SCNSphere(radius:CGFloat(xyz[0]/2))
-                case "cylinder":geometry=SCNCylinder(radius:CGFloat(xyz[0]/2),height:CGFloat(xyz[1]))
-                default:geometry=SCNBox(width:CGFloat(xyz[0]),height:CGFloat(xyz[1]),
-                                         length:CGFloat(xyz[2]),chamferRadius:0)
+                if isCutTarget,let planeOffset {
+                    geometry=NativeWorldLabInspectionGeometry.makeCutawayGeometry(item,
+                        axis:inspectionAxis.index,offset:planeOffset)
+                } else {
+                    switch item.shape {
+                    case "sphere":geometry=SCNSphere(radius:CGFloat(xyz[0]/2))
+                    case "cylinder":geometry=SCNCylinder(radius:CGFloat(xyz[0]/2),height:CGFloat(xyz[1]))
+                    default:geometry=SCNBox(width:CGFloat(xyz[0]),height:CGFloat(xyz[1]),
+                                             length:CGFloat(xyz[2]),chamferRadius:0)
+                    }
                 }
                 let node=SCNNode(geometry:geometry)
                 node.name="lab-solid-"+item.id
-                node.position=SCNVector3(Float(item.positionMeters[0]),
-                    Float(item.positionMeters[1]),Float(item.positionMeters[2]))
-                let rotation=item.effectiveRotationRadians
-                if rotation.count==3 {node.eulerAngles=SCNVector3(Float(rotation[0]),Float(rotation[1]),Float(rotation[2]))}
+                if isCutTarget {
+                    node.position=SCNVector3Zero
+                } else {
+                    let position=NativeWorldLabInspectionGeometry.renderPosition(project:project,
+                        selectedId:selectedId,settings:NativeWorldLabInspectionSettings(
+                            mode:inspectionMode,opacity:inspectionOpacity,axis:inspectionAxis,
+                            cutawayFraction:inspectionCutawayFraction,
+                            explosionDistanceMeters:inspectionExplodeDistance),id:item.id)
+                    node.position=SCNVector3(Float(position[0]),Float(position[1]),Float(position[2]))
+                    let rotation=item.effectiveRotationRadians
+                    if rotation.count==3 {node.eulerAngles=SCNVector3(Float(rotation[0]),Float(rotation[1]),Float(rotation[2]))}
+                }
                 if let hex=UInt64(item.color.dropFirst(),radix:16){
                     geometry.firstMaterial?.diffuse.contents=UIColor(
                         red:CGFloat((hex>>16)&255)/255,
                         green:CGFloat((hex>>8)&255)/255,
                         blue:CGFloat(hex&255)/255,alpha:1)
                 }
-                geometry.firstMaterial?.transparency=(seeInside ? 0.4:1)*CGFloat(item.opacity)
+                geometry.firstMaterial?.transparency=CGFloat(
+                    inspectionMode == .transparent || seeInside ? inspectionOpacity : 1)*CGFloat(item.opacity)
+                geometry.firstMaterial?.fillMode=inspectionMode == .xray ? .lines : .fill
+                geometry.firstMaterial?.isDoubleSided=inspectionMode == .xray || isCutTarget
                 next.rootNode.addChildNode(node)
             }
         }
