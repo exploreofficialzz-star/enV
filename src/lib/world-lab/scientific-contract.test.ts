@@ -14,7 +14,7 @@ test("SI quantities convert mass, length, time and power without losing physical
  assert.equal(requireQuantity(quantity(5,"V","hypothetical-user-assumed"),"V"),5);
  assert.ok(sameDimension(unitSpec("N").dimension,
    deriveDimension(unitSpec("kg").dimension,
-     deriveDimension(unitSpec("m").dimension,unitSpec("s").dimension,-1),1)===false);
+     deriveDimension(unitSpec("m").dimension,unitSpec("s").dimension,-1),1))===false);
  assert.ok(sameDimension(unitSpec("N").dimension,
    deriveDimension(unitSpec("kg").dimension,
      deriveDimension(unitSpec("m").dimension,
