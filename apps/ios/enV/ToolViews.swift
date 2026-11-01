@@ -14127,6 +14127,35 @@ private func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[I
     }
 }
 
+private func parseABookPageSelection(_ value: String, pageCount: Int) throws -> [Int] {
+    guard pageCount > 0 else {
+        throw NSError(domain: "ABookPDF", code: 36, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."])
+    }
+    let tokens = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    guard !tokens.isEmpty else {
+        throw NSError(domain: "ABookPDF", code: 37, userInfo: [NSLocalizedDescriptionKey: "Enter page numbers, for example 1-3,5."])
+    }
+    var pages: [Int] = []
+    var used = Set<Int>()
+    for token in tokens {
+        let parts = token.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count <= 2,
+              let first = Int(parts[0]),
+              let last = parts.count == 2 ? Int(parts[1]) : Int(parts[0]),
+              first >= 1, last >= first, last <= pageCount,
+              pages.count + last - first + 1 <= 5_000 else {
+            throw NSError(domain: "ABookPDF", code: 38, userInfo: [NSLocalizedDescriptionKey: "Invalid page range: " + token])
+        }
+        for page in first...last {
+            guard used.insert(page).inserted else {
+                throw NSError(domain: "ABookPDF", code: 39, userInfo: [NSLocalizedDescriptionKey: "Page " + String(page) + " is selected more than once."])
+            }
+            pages.append(page)
+        }
+    }
+    return pages
+}
+
 private func safeABookPDFName(_ value: String) -> String {
     let cleaned = value.replacingOccurrences(of: "\\.pdf$", with: "", options: [.regularExpression, .caseInsensitive])
         .replacingOccurrences(of: "[^A-Za-z0-9._-]+", with: "-", options: .regularExpression)
@@ -14974,6 +15003,7 @@ private struct NativeABookView: View {
     @State private var archiveFilename = "a-book-backup.zip"
     @State private var selectedPDFIDs: Set<UUID> = []
     @State private var splitPageGroups = "1-3;4-6"
+    @State private var extractPageRange = "1-3"
     @State private var commentText = ""
     @State private var activePDFSelection: UUID?
 
@@ -15073,11 +15103,15 @@ private struct NativeABookView: View {
                         Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
                         let pdfAttachments = attachments.filter { $0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf") }
                         if !pdfAttachments.isEmpty {
+                            TextField("Extract pages · 1-3,5", text: $extractPageRange).textFieldStyle(.roundedBorder)
+                            TextField("Split parts · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
                             HStack(spacing: 8) {
                                 Button("Merge PDFs") { mergeSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.count < 2)
                                 Button("Rotate batch") { rotateSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                                Button("Extract pages") { extractSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                                Button("Split selected PDFs") { splitSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
                             }
-                            Text("Select PDFs for batch actions").font(.caption2).foregroundStyle(Color.envMuted)
+                            Text("All selected PDF operations stay on this device").font(.caption2).foregroundStyle(Color.envMuted)
                         }
                         ForEach(attachments) { attachment in
                             HStack {
@@ -15093,7 +15127,7 @@ private struct NativeABookView: View {
                                     } label: {
                                         Image(systemName: selectedPDFIDs.contains(attachment.id) ? "checkmark.circle.fill" : "circle")
                                     }.buttonStyle(.plain).accessibilityLabel(selectedPDFIDs.contains(attachment.id) ? "Deselect PDF" : "Select PDF")
-                                    Button("PDF tools") { activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                                    Button("PDF tools") { selectedPDFIDs.insert(attachment.id); activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
                                 }
                                 Button("Remove", role: .destructive) { removeAttachment(attachment) }.buttonStyle(.bordered)
                             }
@@ -15293,8 +15327,6 @@ private struct NativeABookView: View {
                 Button("OCR scanned pages") { processPDF(attachment, operation: "ocr") }.buttonStyle(.bordered)
                 Button("Rotate 90°") { processPDF(attachment, operation: "rotate") }.buttonStyle(.bordered)
             }
-            TextField("Split pages · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
-            Button("Split into parts") { splitPDF(attachment) }.buttonStyle(.bordered)
             if !pdfText.isEmpty {
                 Text(pdfText).font(.caption).textSelection(.enabled).lineLimit(12)
                 Button("Insert extracted text into note") { bodyText += "\n\n" + pdfText }.buttonStyle(.bordered)
@@ -15446,6 +15478,177 @@ private struct NativeABookView: View {
                     archiveFilename = base + "-parts.zip"
                     exportingArchive = true
                     status = "Created " + String(groups.count) + " PDF parts locally"
+                    errorText = ""
+                }
+            } catch { await MainActor.run { showError(error) } }
+        }
+    }
+
+    private func extractSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard !selected.isEmpty else {
+            showError(NSError(domain: "ABookPDF", code: 53, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to extract pages."]))
+            return
+        }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 54, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        let pageRange = extractPageRange
+        let workItems: [(url: URL, name: String, size: Int64)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
+        } catch { showError(error); return }
+        status = "Checking selected PDFs locally…"
+        Task.detached(priority: .userInitiated) {
+            do {
+                var prepared: [(url: URL, name: String, pages: [Int])] = []
+                var totalPages = 0
+                for item in workItems {
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024 else {
+                        throw NSError(domain: "ABookPDF", code: 55, userInfo: [NSLocalizedDescriptionKey: item.name + " exceeds the 200 MB local processing limit."])
+                    }
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 56, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
+                    }
+                    let pages = try parseABookPageSelection(pageRange, pageCount: source.pageCount)
+                    totalPages += pages.count
+                    guard totalPages <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 57, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 extracted pages can be processed in one batch."])
+                    }
+                    prepared.append((url: item.url, name: item.name, pages: pages))
+                }
+
+                if prepared.count == 1, let item = prepared.first {
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 58, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
+                    }
+                    let output = PDFDocument()
+                    for number in item.pages {
+                        guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
+                            throw NSError(domain: "ABookPDF", code: 59, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                        }
+                        output.insert(copied, at: output.pageCount)
+                    }
+                    guard let data = output.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 60, userInfo: [NSLocalizedDescriptionKey: "The extracted PDF could not be created."])
+                    }
+                    await MainActor.run {
+                        pdfData = data
+                        pdfName = safeABookPDFName(item.name) + "-extracted.pdf"
+                        exportingPDF = true
+                        status = "Extracted " + String(item.pages.count) + " pages locally"
+                        errorText = ""
+                    }
+                    return
+                }
+
+                var files: [String: Data] = [:]
+                var usedNames = Set<String>()
+                for item in prepared {
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 61, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
+                    }
+                    let output = PDFDocument()
+                    for number in item.pages {
+                        guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
+                            throw NSError(domain: "ABookPDF", code: 62, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                        }
+                        output.insert(copied, at: output.pageCount)
+                    }
+                    guard let data = output.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 63, userInfo: [NSLocalizedDescriptionKey: "An extracted PDF could not be created for " + item.name + "."])
+                    }
+                    let base = safeABookPDFName(item.name)
+                    var filename = base + "-extracted.pdf"
+                    var suffix = 2
+                    while !usedNames.insert(filename.lowercased()).inserted {
+                        filename = base + "-extracted-" + String(suffix) + ".pdf"
+                        suffix += 1
+                    }
+                    files[filename] = data
+                }
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    archiveData = archive
+                    archiveFilename = "a-book-extracted-pdfs.zip"
+                    exportingArchive = true
+                    status = "Extracted pages from " + String(prepared.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch { await MainActor.run { showError(error) } }
+        }
+    }
+
+    private func splitSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard !selected.isEmpty else {
+            showError(NSError(domain: "ABookPDF", code: 64, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to split."]))
+            return
+        }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 65, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        let pageGroups = splitPageGroups
+        let workItems: [(url: URL, name: String, size: Int64)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
+        } catch { showError(error); return }
+        status = "Checking selected PDFs locally…"
+        Task.detached(priority: .userInitiated) {
+            do {
+                var prepared: [(url: URL, name: String, groups: [[Int]])] = []
+                var totalPages = 0
+                for item in workItems {
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024 else {
+                        throw NSError(domain: "ABookPDF", code: 66, userInfo: [NSLocalizedDescriptionKey: item.name + " exceeds the 200 MB local processing limit."])
+                    }
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 67, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
+                    }
+                    let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
+                    totalPages += groups.reduce(0) { $0 + $1.count }
+                    guard totalPages <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 68, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 split pages can be processed in one batch."])
+                    }
+                    prepared.append((url: item.url, name: item.name, groups: groups))
+                }
+
+                var files: [String: Data] = [:]
+                var usedNames = Set<String>()
+                for item in prepared {
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 69, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for splitting."])
+                    }
+                    let base = safeABookPDFName(item.name)
+                    for (index, pages) in item.groups.enumerated() {
+                        let part = PDFDocument()
+                        for number in pages {
+                            guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
+                                throw NSError(domain: "ABookPDF", code: 70, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                            }
+                            part.insert(copied, at: part.pageCount)
+                        }
+                        guard let data = part.dataRepresentation(), !data.isEmpty else {
+                            throw NSError(domain: "ABookPDF", code: 71, userInfo: [NSLocalizedDescriptionKey: "A PDF part could not be created for " + item.name + "."])
+                        }
+                        let partNumber = String(format: "%02d", index + 1)
+                        var filename = base + "-part-" + partNumber + ".pdf"
+                        var suffix = 2
+                        while !usedNames.insert(filename.lowercased()).inserted {
+                            filename = base + "-part-" + partNumber + "-" + String(suffix) + ".pdf"
+                            suffix += 1
+                        }
+                        files[filename] = data
+                    }
+                }
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    archiveData = archive
+                    archiveFilename = "a-book-split-pdfs.zip"
+                    exportingArchive = true
+                    status = "Created parts from " + String(prepared.count) + " PDFs locally"
                     errorText = ""
                 }
             } catch { await MainActor.run { showError(error) } }
