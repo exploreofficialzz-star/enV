@@ -7,12 +7,6 @@ import { IMAGE_DESCRIPTIONS } from "./image-descriptions.mjs";
 import mathExpansion from "../src/data/math-expansion.json" with { type: "json" };
 import { describeExpansion } from "../src/lib/calc/expansion-rows.mjs";
 
-// Preserve the additive Audio Studio records that intentionally sit outside the generated base catalogue.
-const currentCatalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const audioStudioSupplementStart = currentCatalogSource.indexOf("\nconst audioStudioTools: ToolMeta[] = [");
-const audioStudioSupplement = audioStudioSupplementStart >= 0 ? currentCatalogSource.slice(audioStudioSupplementStart) : "";
-if (!audioStudioSupplement) throw new Error("Cannot regenerate the catalogue without preserving its Audio Studio supplement.");
-
 /** @typedef {[string, string, string, string, string, string, string, number, number, string?]} Tuple */
 // id, name, cat, desc, engineType, engineKey, keywords, featured(0/1), pop, extra
 // extra: n=new, h=health, f=finance, e=earnings, m=mockup, p=planned, b=beta, s=estimate
@@ -2333,14 +2327,13 @@ for (let start = 0; start < serializedCatalog.length; start += chunkSize) {
 }
 
 const body = `import type { ToolMeta } from "@/types/tool";
-import { designToolIcon } from "@/lib/tool-icon-design";
 
 const catalogJson = [
 ${catalogChunks.join(",\n")}
 ].join("");
 
-export const originalTools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
-` + audioStudioSupplement;
+export const tools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
+`;
 
 writeFileSync(new URL("../src/data/catalog.ts", import.meta.url), body);
 const active = tools.filter((t) => t.status !== "planned").length;
