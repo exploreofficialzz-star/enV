@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createABookArchive, readABookArchive } from "./archive.ts";
+import { assertABookAttachmentSize } from "./local-store.ts";
 import type { ABookAttachment, ABookNote, ABookRevision } from "./local-store.ts";
 
 const note: ABookNote = {
@@ -84,4 +85,12 @@ test("legacy JSON import enforces record bounds", async () => {
     format: "env.abook.notes.v1",
     notes: [{ id: "bad", title: "Title", body: "Body", tags: Array.from({ length: 51 }, () => "tag") }],
   })), /invalid note record/);
+});
+
+
+test("A book local attachments stay within the portable backup limit", () => {
+  assertABookAttachmentSize({ size: 1 });
+  assertABookAttachmentSize({ size: 100 * 1024 * 1024 });
+  assert.throws(() => assertABookAttachmentSize({ size: 0 }), /non-empty attachment/);
+  assert.throws(() => assertABookAttachmentSize({ size: 100 * 1024 * 1024 + 1 }), /100 MB or smaller/);
 });
