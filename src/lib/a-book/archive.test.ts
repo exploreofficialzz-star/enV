@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createABookArchive, readABookArchive } from "./archive.ts";
-import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas, getABookLocalDatabaseName } from "./local-store.ts";
+import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas, assertABookNoteForStorage, getABookLocalDatabaseName } from "./local-store.ts";
 import type { ABookAttachment, ABookNote, ABookRevision } from "./local-store.ts";
 
 const note: ABookNote = {
@@ -163,4 +163,15 @@ test("A book keeps a separate local IndexedDB namespace for each signed-in profi
   assert.notEqual(first, guest);
   assert.equal(guest, getABookLocalDatabaseName(""));
   assert.equal(first, getABookLocalDatabaseName("account-one"));
+});
+
+
+test("A book note writes stay inside the portable local note limits", () => {
+  assertABookNoteForStorage(note);
+  assert.throws(() => assertABookNoteForStorage({ ...note, title: "x".repeat(10_001) }), /local storage limits/);
+  assert.throws(() => assertABookNoteForStorage({ ...note, body: "x".repeat(5_000_001) }), /local storage limits/);
+  assert.throws(() => assertABookNoteForStorage({ ...note, notebook: "x".repeat(501) }), /local storage limits/);
+  assert.throws(() => assertABookNoteForStorage({ ...note, tags: Array.from({ length: 51 }, () => "tag") }), /local storage limits/);
+  assert.throws(() => assertABookNoteForStorage({ ...note, tags: ["x".repeat(201)] }), /local storage limits/);
+  assert.throws(() => assertABookNoteForStorage({ ...note, revision: -1 }), /local storage limits/);
 });
