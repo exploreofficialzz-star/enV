@@ -15194,6 +15194,11 @@ private struct NativeABookView: View {
                       contentType: .zip, defaultFilename: archiveFilename) { result in
             if case .failure(let error) = result { showError(error) }
         }
+        .onDisappear {
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
+        }
         .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
             Button("Delete permanently", role: .destructive) { permanentlyDeleteSelectedNote() }
             Button("Cancel", role: .cancel) { }
@@ -15321,10 +15326,10 @@ private struct NativeABookView: View {
             try store.removeAttachment(id: attachment.id)
             attachments = try store.attachments(noteID: attachment.noteID)
             selectedPDFIDs.remove(attachment.id)
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
             if activePDFSelection == attachment.id {
-                pdfProcessingTask?.cancel()
-                pdfProcessingTask = nil
-                pdfProcessingID = nil
                 activePDFSelection = nil
                 pdfText = ""
             }
@@ -15361,21 +15366,28 @@ private struct NativeABookView: View {
             showError(NSError(domain: "ABookPDF", code: 40, userInfo: [NSLocalizedDescriptionKey: "Select at least two PDFs to merge."]))
             return
         }
+        guard let noteID = selectedID else { return }
         guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
             showError(NSError(domain: "ABookPDF", code: 41, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
             return
         }
-        let workItems: [(url: URL, name: String)] 
+        let workItems: [(url: URL, name: String, size: Int64)]
         do {
-            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name) }
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
         } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
         status = "Merging PDFs locally…"
-        Task.detached(priority: .userInitiated) {
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
             do {
-                let merged = PDFDocument()
                 var pageCount = 0
+                let merged = PDFDocument()
                 for item in workItems {
-                    guard let source = PDFDocument(url: item.url) else {
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let source = PDFDocument(url: item.url) else {
                         throw NSError(domain: "ABookPDF", code: 42, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
                     }
                     pageCount += source.pageCount
@@ -15383,43 +15395,64 @@ private struct NativeABookView: View {
                         throw NSError(domain: "ABookPDF", code: 43, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be merged at once."])
                     }
                     for index in 0..<source.pageCount {
+                        try Task.checkCancellation()
                         guard let page = source.page(at: index), let copiedPage = page.copy() as? PDFPage else { continue }
                         merged.insert(copiedPage, at: merged.pageCount)
                     }
                 }
+                try Task.checkCancellation()
                 guard let data = merged.dataRepresentation(), !data.isEmpty else {
                     throw NSError(domain: "ABookPDF", code: 44, userInfo: [NSLocalizedDescriptionKey: "The merged PDF could not be created."])
                 }
                 await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
                     pdfData = data
                     pdfName = "a-book-merged.pdf"
                     exportingPDF = true
                     status = "Merged " + String(workItems.count) + " PDFs locally"
                     errorText = ""
                 }
-            } catch { await MainActor.run { showError(error) } }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
         }
     }
 
     private func rotateSelectedPDFs() {
         let selected = selectedPDFs()
         guard !selected.isEmpty else { return }
+        guard let noteID = selectedID else { return }
         guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
             showError(NSError(domain: "ABookPDF", code: 45, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
             return
         }
-        let workItems: [(url: URL, name: String)]
+        let workItems: [(url: URL, name: String, size: Int64)]
         do {
-            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name) }
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
         } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
         status = "Rotating PDFs locally…"
-        Task.detached(priority: .userInitiated) {
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
             do {
                 var files: [String: Data] = [:]
                 var names = Set<String>()
                 var pageCount = 0
                 for item in workItems {
-                    guard let document = PDFDocument(url: item.url) else {
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let document = PDFDocument(url: item.url) else {
                         throw NSError(domain: "ABookPDF", code: 46, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
                     }
                     pageCount += document.pageCount
@@ -15427,6 +15460,7 @@ private struct NativeABookView: View {
                         throw NSError(domain: "ABookPDF", code: 47, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be processed in one batch."])
                     }
                     for index in 0..<document.pageCount {
+                        try Task.checkCancellation()
                         guard let page = document.page(at: index) else { continue }
                         page.rotation = (page.rotation + 90) % 360
                     }
@@ -15442,20 +15476,35 @@ private struct NativeABookView: View {
                     }
                     files[filename] = data
                 }
+                try Task.checkCancellation()
                 let archive = try makeABookStoredZIP(files)
                 await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
                     archiveData = archive
                     archiveFilename = "a-book-rotated-pdfs.zip"
                     exportingArchive = true
                     status = "Rotated " + String(workItems.count) + " PDFs locally"
                     errorText = ""
                 }
-            } catch { await MainActor.run { showError(error) } }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
         }
     }
 
     private func splitPDF(_ attachment: ABookNativeAttachment) {
-        guard attachment.size <= 200 * 1024 * 1024 else {
+        guard let noteID = selectedID, noteID == attachment.noteID,
+              attachments.contains(where: { $0.id == attachment.id }) else { return }
+        guard attachment.size > 0, attachment.size <= 200 * 1024 * 1024 else {
             showError(NSError(domain: "ABookPDF", code: 49, userInfo: [NSLocalizedDescriptionKey: "This PDF exceeds the 200 MB local processing limit."]))
             return
         }
@@ -15464,49 +15513,78 @@ private struct NativeABookView: View {
         do { sourceURL = try store.fileURL(for: attachment) }
         catch { showError(error); return }
         let outputBase = safeABookPDFName(attachment.name)
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
         status = "Splitting PDF locally…"
-        Task.detached(priority: .userInitiated) {
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
             do {
-                guard let source = PDFDocument(url: sourceURL) else {
+                try Task.checkCancellation()
+                guard let source = PDFDocument(url: sourceURL), source.pageCount > 0 else {
                     throw NSError(domain: "ABookPDF", code: 50, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."])
                 }
+                guard source.pageCount <= 5_000 else {
+                    throw NSError(domain: "ABookPDF", code: 51, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be split in one operation."])
+                }
                 let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
+                let totalPages = groups.reduce(0) { $0 + $1.count }
+                guard totalPages <= 5_000 else {
+                    throw NSError(domain: "ABookPDF", code: 52, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 split pages can be processed in one operation."])
+                }
                 var files: [String: Data] = [:]
                 let base = outputBase
                 for (index, pages) in groups.enumerated() {
+                    try Task.checkCancellation()
                     let part = PDFDocument()
                     for number in pages {
+                        try Task.checkCancellation()
                         guard let page = source.page(at: number - 1), let copiedPage = page.copy() as? PDFPage else {
-                            throw NSError(domain: "ABookPDF", code: 51, userInfo: [NSLocalizedDescriptionKey: "A selected PDF page could not be copied."])
+                            throw NSError(domain: "ABookPDF", code: 53, userInfo: [NSLocalizedDescriptionKey: "A selected PDF page could not be copied."])
                         }
                         part.insert(copiedPage, at: part.pageCount)
                     }
                     guard let data = part.dataRepresentation(), !data.isEmpty else {
-                        throw NSError(domain: "ABookPDF", code: 52, userInfo: [NSLocalizedDescriptionKey: "A PDF part could not be created."])
+                        throw NSError(domain: "ABookPDF", code: 54, userInfo: [NSLocalizedDescriptionKey: "A PDF part could not be created."])
                     }
                     let partNumber = String(format: "%02d", index + 1)
                     files[base + "-part-" + partNumber + ".pdf"] = data
                 }
+                try Task.checkCancellation()
                 let archive = try makeABookStoredZIP(files)
                 await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID,
+                          attachments.contains(where: { $0.id == attachment.id }) else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
                     archiveData = archive
                     archiveFilename = base + "-parts.zip"
                     exportingArchive = true
                     status = "Created " + String(groups.count) + " PDF parts locally"
                     errorText = ""
                 }
-            } catch { await MainActor.run { showError(error) } }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
         }
     }
 
     private func extractSelectedPDFs() {
         let selected = selectedPDFs()
         guard !selected.isEmpty else {
-            showError(NSError(domain: "ABookPDF", code: 53, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to extract pages."]))
+            showError(NSError(domain: "ABookPDF", code: 55, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to extract pages."]))
             return
         }
+        guard let noteID = selectedID else { return }
         guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
-            showError(NSError(domain: "ABookPDF", code: 54, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            showError(NSError(domain: "ABookPDF", code: 56, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
             return
         }
         let pageRange = extractPageRange
@@ -15514,41 +15592,50 @@ private struct NativeABookView: View {
         do {
             workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
         } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
         status = "Checking selected PDFs locally…"
-        Task.detached(priority: .userInitiated) {
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
             do {
                 var prepared: [(url: URL, name: String, pages: [Int])] = []
                 var totalPages = 0
                 for item in workItems {
-                    guard item.size > 0, item.size <= 200 * 1024 * 1024 else {
-                        throw NSError(domain: "ABookPDF", code: 55, userInfo: [NSLocalizedDescriptionKey: item.name + " exceeds the 200 MB local processing limit."])
-                    }
-                    guard let source = PDFDocument(url: item.url) else {
-                        throw NSError(domain: "ABookPDF", code: 56, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 57, userInfo: [NSLocalizedDescriptionKey: item.name + " could not be opened or exceeds 200 MB."])
                     }
                     let pages = try parseABookPageSelection(pageRange, pageCount: source.pageCount)
                     totalPages += pages.count
                     guard totalPages <= 5_000 else {
-                        throw NSError(domain: "ABookPDF", code: 57, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 extracted pages can be processed in one batch."])
+                        throw NSError(domain: "ABookPDF", code: 58, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 extracted pages can be processed in one batch."])
                     }
                     prepared.append((url: item.url, name: item.name, pages: pages))
                 }
 
                 if prepared.count == 1, let item = prepared.first {
+                    try Task.checkCancellation()
                     guard let source = PDFDocument(url: item.url) else {
-                        throw NSError(domain: "ABookPDF", code: 58, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
+                        throw NSError(domain: "ABookPDF", code: 59, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
                     }
                     let output = PDFDocument()
                     for number in item.pages {
+                        try Task.checkCancellation()
                         guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
-                            throw NSError(domain: "ABookPDF", code: 59, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                            throw NSError(domain: "ABookPDF", code: 60, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
                         }
                         output.insert(copied, at: output.pageCount)
                     }
                     guard let data = output.dataRepresentation(), !data.isEmpty else {
-                        throw NSError(domain: "ABookPDF", code: 60, userInfo: [NSLocalizedDescriptionKey: "The extracted PDF could not be created."])
+                        throw NSError(domain: "ABookPDF", code: 61, userInfo: [NSLocalizedDescriptionKey: "The extracted PDF could not be created."])
                     }
+                    try Task.checkCancellation()
                     await MainActor.run {
+                        guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                        pdfProcessingTask = nil
+                        pdfProcessingID = nil
                         pdfData = data
                         pdfName = safeABookPDFName(item.name) + "-extracted.pdf"
                         exportingPDF = true
@@ -15561,18 +15648,20 @@ private struct NativeABookView: View {
                 var files: [String: Data] = [:]
                 var usedNames = Set<String>()
                 for item in prepared {
+                    try Task.checkCancellation()
                     guard let source = PDFDocument(url: item.url) else {
-                        throw NSError(domain: "ABookPDF", code: 61, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
+                        throw NSError(domain: "ABookPDF", code: 62, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
                     }
                     let output = PDFDocument()
                     for number in item.pages {
+                        try Task.checkCancellation()
                         guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
-                            throw NSError(domain: "ABookPDF", code: 62, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                            throw NSError(domain: "ABookPDF", code: 63, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
                         }
                         output.insert(copied, at: output.pageCount)
                     }
                     guard let data = output.dataRepresentation(), !data.isEmpty else {
-                        throw NSError(domain: "ABookPDF", code: 63, userInfo: [NSLocalizedDescriptionKey: "An extracted PDF could not be created for " + item.name + "."])
+                        throw NSError(domain: "ABookPDF", code: 64, userInfo: [NSLocalizedDescriptionKey: "An extracted PDF could not be created for " + item.name + "."])
                     }
                     let base = safeABookPDFName(item.name)
                     var filename = base + "-extracted.pdf"
@@ -15583,26 +15672,40 @@ private struct NativeABookView: View {
                     }
                     files[filename] = data
                 }
+                try Task.checkCancellation()
                 let archive = try makeABookStoredZIP(files)
                 await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
                     archiveData = archive
                     archiveFilename = "a-book-extracted-pdfs.zip"
                     exportingArchive = true
                     status = "Extracted pages from " + String(prepared.count) + " PDFs locally"
                     errorText = ""
                 }
-            } catch { await MainActor.run { showError(error) } }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
         }
     }
 
     private func splitSelectedPDFs() {
         let selected = selectedPDFs()
         guard !selected.isEmpty else {
-            showError(NSError(domain: "ABookPDF", code: 64, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to split."]))
+            showError(NSError(domain: "ABookPDF", code: 65, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to split."]))
             return
         }
+        guard let noteID = selectedID else { return }
         guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
-            showError(NSError(domain: "ABookPDF", code: 65, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            showError(NSError(domain: "ABookPDF", code: 66, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
             return
         }
         let pageGroups = splitPageGroups
@@ -15610,17 +15713,20 @@ private struct NativeABookView: View {
         do {
             workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
         } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
         status = "Checking selected PDFs locally…"
-        Task.detached(priority: .userInitiated) {
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
             do {
                 var prepared: [(url: URL, name: String, groups: [[Int]])] = []
                 var totalPages = 0
                 for item in workItems {
-                    guard item.size > 0, item.size <= 200 * 1024 * 1024 else {
-                        throw NSError(domain: "ABookPDF", code: 66, userInfo: [NSLocalizedDescriptionKey: item.name + " exceeds the 200 MB local processing limit."])
-                    }
-                    guard let source = PDFDocument(url: item.url) else {
-                        throw NSError(domain: "ABookPDF", code: 67, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 67, userInfo: [NSLocalizedDescriptionKey: item.name + " could not be opened or exceeds 200 MB."])
                     }
                     let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
                     totalPages += groups.reduce(0) { $0 + $1.count }
@@ -15633,13 +15739,16 @@ private struct NativeABookView: View {
                 var files: [String: Data] = [:]
                 var usedNames = Set<String>()
                 for item in prepared {
+                    try Task.checkCancellation()
                     guard let source = PDFDocument(url: item.url) else {
                         throw NSError(domain: "ABookPDF", code: 69, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for splitting."])
                     }
                     let base = safeABookPDFName(item.name)
                     for (index, pages) in item.groups.enumerated() {
+                        try Task.checkCancellation()
                         let part = PDFDocument()
                         for number in pages {
+                            try Task.checkCancellation()
                             guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
                                 throw NSError(domain: "ABookPDF", code: 70, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
                             }
@@ -15658,15 +15767,28 @@ private struct NativeABookView: View {
                         files[filename] = data
                     }
                 }
+                try Task.checkCancellation()
                 let archive = try makeABookStoredZIP(files)
                 await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
                     archiveData = archive
                     archiveFilename = "a-book-split-pdfs.zip"
                     exportingArchive = true
                     status = "Created parts from " + String(prepared.count) + " PDFs locally"
                     errorText = ""
                 }
-            } catch { await MainActor.run { showError(error) } }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
         }
     }
 
