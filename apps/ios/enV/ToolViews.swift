@@ -8,6 +8,9 @@ import WebKit
 import CoreText
 import CoreImage
 import CoreFoundation
+import CoreData
+import PDFKit
+import Vision
 import UniformTypeIdentifiers
 import Compression
 
@@ -913,7 +916,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
+        case "custom": return tool.id == "a-book" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
         default: return false
         }
     }
@@ -958,7 +961,7 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode, initialAction: initialDeveloperAction) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if tool.id == "a-book" { NativeABookView() } else if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
@@ -14024,3 +14027,612 @@ private struct NativeMusicDataSandboxView: View {
         } catch { message = error.localizedDescription }
     }
 }
+
+
+
+private struct ABookNativeNote: Identifiable, Hashable {
+    var id: UUID
+    var title: String
+    var body: String
+    var notebook: String
+    var tags: [String]
+    var pinned: Bool
+    var archived: Bool
+    var deletedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+    var revision: Int
+}
+
+private struct ABookNativeAttachment: Identifiable, Hashable {
+    var id: UUID
+    var noteID: UUID
+    var name: String
+    var mime: String
+    var relativePath: String
+    var size: Int64
+}
+
+private struct ABookNativeRevision: Identifiable {
+    var id: UUID
+    var revision: Int
+    var createdAt: Date
+}
+
+@objc(ABookNoteEntity)
+private final class ABookNoteEntity: NSManagedObject {
+    @NSManaged var id: UUID
+    @NSManaged var title: String
+    @NSManaged var body: String
+    @NSManaged var notebook: String
+    @NSManaged var tagsData: Data
+    @NSManaged var pinned: Bool
+    @NSManaged var archived: Bool
+    @NSManaged var deletedAt: Date?
+    @NSManaged var createdAt: Date
+    @NSManaged var updatedAt: Date
+    @NSManaged var revision: Int64
+}
+
+@objc(ABookRevisionEntity)
+private final class ABookRevisionEntity: NSManagedObject {
+    @NSManaged var id: UUID
+    @NSManaged var noteID: UUID
+    @NSManaged var title: String
+    @NSManaged var body: String
+    @NSManaged var notebook: String
+    @NSManaged var tagsData: Data
+    @NSManaged var revision: Int64
+    @NSManaged var createdAt: Date
+}
+
+@objc(ABookAttachmentEntity)
+private final class ABookAttachmentEntity: NSManagedObject {
+    @NSManaged var id: UUID
+    @NSManaged var noteID: UUID
+    @NSManaged var name: String
+    @NSManaged var mime: String
+    @NSManaged var relativePath: String
+    @NSManaged var size: Int64
+    @NSManaged var createdAt: Date
+}
+
+private final class ABookLocalStore {
+    static let shared = ABookLocalStore()
+    private let context: NSManagedObjectContext?
+    private let startupError: Error?
+    private let fileManager = FileManager.default
+
+    private init() {
+        do {
+            let model = NSManagedObjectModel()
+            model.entities = [
+                Self.entity("ABookNoteEntity", className: NSStringFromClass(ABookNoteEntity.self), attributes: [
+                    Self.attribute("id", .UUIDAttributeType), Self.attribute("title", .stringAttributeType, defaultValue: ""),
+                    Self.attribute("body", .stringAttributeType, defaultValue: ""), Self.attribute("notebook", .stringAttributeType, defaultValue: "Inbox"),
+                    Self.attribute("tagsData", .binaryDataAttributeType, defaultValue: Data()), Self.attribute("pinned", .booleanAttributeType, defaultValue: false),
+                    Self.attribute("archived", .booleanAttributeType, defaultValue: false), Self.attribute("deletedAt", .dateAttributeType, optional: true),
+                    Self.attribute("createdAt", .dateAttributeType), Self.attribute("updatedAt", .dateAttributeType),
+                    Self.attribute("revision", .integer64AttributeType, defaultValue: 0)
+                ]),
+                Self.entity("ABookRevisionEntity", className: NSStringFromClass(ABookRevisionEntity.self), attributes: [
+                    Self.attribute("id", .UUIDAttributeType), Self.attribute("noteID", .UUIDAttributeType),
+                    Self.attribute("title", .stringAttributeType, defaultValue: ""), Self.attribute("body", .stringAttributeType, defaultValue: ""),
+                    Self.attribute("notebook", .stringAttributeType, defaultValue: "Inbox"), Self.attribute("tagsData", .binaryDataAttributeType, defaultValue: Data()),
+                    Self.attribute("revision", .integer64AttributeType, defaultValue: 0), Self.attribute("createdAt", .dateAttributeType)
+                ]),
+                Self.entity("ABookAttachmentEntity", className: NSStringFromClass(ABookAttachmentEntity.self), attributes: [
+                    Self.attribute("id", .UUIDAttributeType), Self.attribute("noteID", .UUIDAttributeType),
+                    Self.attribute("name", .stringAttributeType, defaultValue: ""), Self.attribute("mime", .stringAttributeType, defaultValue: "application/octet-stream"),
+                    Self.attribute("relativePath", .stringAttributeType, defaultValue: ""), Self.attribute("size", .integer64AttributeType, defaultValue: 0),
+                    Self.attribute("createdAt", .dateAttributeType)
+                ])
+            ]
+            let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+            let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            let directory = root.appendingPathComponent("Abook", isDirectory: true)
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            let storeURL = directory.appendingPathComponent("Abook.sqlite")
+            try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL, options: [
+                NSMigratePersistentStoresAutomaticallyOption: true,
+                NSInferMappingModelAutomaticallyOption: true
+            ])
+            let managedContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+            managedContext.persistentStoreCoordinator = coordinator
+            managedContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            managedContext.undoManager = nil
+            self.context = managedContext
+            self.startupError = nil
+        } catch {
+            self.context = nil
+            self.startupError = error
+        }
+    }
+
+    private static func attribute(_ name: String, _ type: NSAttributeType, optional: Bool = false, defaultValue: Any? = nil) -> NSAttributeDescription {
+        let item = NSAttributeDescription()
+        item.name = name
+        item.attributeType = type
+        item.isOptional = optional
+        item.defaultValue = defaultValue
+        return item
+    }
+
+    private static func entity(_ name: String, className: String, attributes: [NSAttributeDescription]) -> NSEntityDescription {
+        let item = NSEntityDescription()
+        item.name = name
+        item.managedObjectClassName = className
+        item.properties = attributes
+        return item
+    }
+
+    private func perform<T>(_ operation: (NSManagedObjectContext) throws -> T) throws -> T {
+        guard let context else { throw startupError ?? NSError(domain: "ABookLocalStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "A book local storage is unavailable."]) }
+        var result: Result<T, Error>!
+        context.performAndWait { result = Result { try operation(context) } }
+        return try result.get()
+    }
+
+    private func encodeTags(_ tags: [String]) -> Data {
+        (try? JSONEncoder().encode(tags)) ?? Data()
+    }
+
+    private func decodeTags(_ data: Data) -> [String] {
+        (try? JSONDecoder().decode([String].self, from: data)) ?? []
+    }
+
+    private func value(_ entity: ABookNoteEntity) -> ABookNativeNote {
+        ABookNativeNote(id: entity.id, title: entity.title, body: entity.body, notebook: entity.notebook,
+                        tags: decodeTags(entity.tagsData), pinned: entity.pinned, archived: entity.archived,
+                        deletedAt: entity.deletedAt, createdAt: entity.createdAt, updatedAt: entity.updatedAt,
+                        revision: Int(entity.revision))
+    }
+
+    func notes(includeArchived: Bool = false) throws -> [ABookNativeNote] {
+        try perform { context in
+            let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            request.predicate = includeArchived ? NSPredicate(format: "deletedAt == nil") : NSPredicate(format: "deletedAt == nil AND archived == NO")
+            request.sortDescriptors = [NSSortDescriptor(key: "pinned", ascending: false), NSSortDescriptor(key: "updatedAt", ascending: false)]
+            return try context.fetch(request).map(value)
+        }
+    }
+
+    func save(_ note: ABookNativeNote) throws -> ABookNativeNote {
+        try perform { context in
+            let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            request.predicate = NSPredicate(format: "id == %@", note.id as CVarArg)
+            let existing = try context.fetch(request).first
+            let changed = existing.map {
+                $0.title != note.title || $0.body != note.body || $0.notebook != note.notebook || decodeTags($0.tagsData) != note.tags
+            } ?? false
+            if let existing, changed {
+                let revision = ABookRevisionEntity(context: context)
+                revision.id = UUID()
+                revision.noteID = note.id
+                revision.title = existing.title
+                revision.body = existing.body
+                revision.notebook = existing.notebook
+                revision.tagsData = existing.tagsData
+                revision.revision = existing.revision + 1
+                revision.createdAt = Date()
+                let cleanup = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+                cleanup.predicate = NSPredicate(format: "noteID == %@", note.id as CVarArg)
+                cleanup.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+                cleanup.fetchOffset = 40
+                let older = try context.fetch(cleanup)
+                older.forEach(context.delete)
+            }
+            let record = existing ?? ABookNoteEntity(context: context)
+            if existing == nil { record.id = note.id; record.createdAt = note.createdAt }
+            record.title = note.title
+            record.body = note.body
+            record.notebook = note.notebook.isEmpty ? "Inbox" : note.notebook
+            record.tagsData = encodeTags(note.tags)
+            record.pinned = note.pinned
+            record.archived = note.archived
+            record.deletedAt = note.deletedAt
+            record.updatedAt = Date()
+            if existing != nil && changed { record.revision += 1 }
+            try context.save()
+            return value(record)
+        }
+    }
+
+    func revisions(noteID: UUID) throws -> [ABookNativeRevision] {
+        try perform { context in
+            let request = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+            request.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+            return try context.fetch(request).map { ABookNativeRevision(id: $0.id, revision: Int($0.revision), createdAt: $0.createdAt) }
+        }
+    }
+
+    func restore(noteID: UUID, revisionID: UUID) throws -> ABookNativeNote {
+        try perform { context in
+            let history = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+            history.predicate = NSPredicate(format: "id == %@ AND noteID == %@", revisionID as CVarArg, noteID as CVarArg)
+            guard let revision = try context.fetch(history).first else { throw NSError(domain: "ABookLocalStore", code: 2, userInfo: [NSLocalizedDescriptionKey: "That revision is no longer available."]) }
+            let query = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            query.predicate = NSPredicate(format: "id == %@", noteID as CVarArg)
+            guard let note = try context.fetch(query).first else { throw NSError(domain: "ABookLocalStore", code: 3, userInfo: [NSLocalizedDescriptionKey: "The note no longer exists."]) }
+            let current = ABookRevisionEntity(context: context)
+            current.id = UUID(); current.noteID = noteID; current.title = note.title; current.body = note.body
+            current.notebook = note.notebook; current.tagsData = note.tagsData; current.revision = note.revision + 1; current.createdAt = Date()
+            note.title = revision.title; note.body = revision.body; note.notebook = revision.notebook
+            note.tagsData = revision.tagsData; note.revision += 1; note.updatedAt = Date()
+            try context.save()
+            return value(note)
+        }
+    }
+
+    func attachments(noteID: UUID) throws -> [ABookNativeAttachment] {
+        try perform { context in
+            let request = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+            request.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+            return try context.fetch(request).map {
+                ABookNativeAttachment(id: $0.id, noteID: $0.noteID, name: $0.name, mime: $0.mime,
+                                      relativePath: $0.relativePath, size: $0.size)
+            }
+        }
+    }
+
+    func importFile(noteID: UUID, url: URL) throws -> ABookNativeAttachment {
+        let access = url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let folder = root.appendingPathComponent("Abook/Attachments/" + noteID.uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        let safeExtension = url.pathExtension.filter { $0.isLetter || $0.isNumber }.prefix(10)
+        let id = UUID()
+        let destination = folder.appendingPathComponent(id.uuidString + (safeExtension.isEmpty ? "" : "." + safeExtension))
+        try fileManager.copyItem(at: url, to: destination)
+        let size = (try fileManager.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
+        let attachment = ABookNativeAttachment(id: id, noteID: noteID, name: url.lastPathComponent,
+                                               mime: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream",
+                                               relativePath: "Attachments/" + noteID.uuidString + "/" + destination.lastPathComponent,
+                                               size: size)
+        try perform { context in
+            let entity = ABookAttachmentEntity(context: context)
+            entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
+            entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
+            entity.size = size; entity.createdAt = Date()
+            try context.save()
+        }
+        return attachment
+    }
+
+    func fileURL(for attachment: ABookNativeAttachment) throws -> URL {
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        return root.appendingPathComponent("Abook/" + attachment.relativePath)
+    }
+}
+
+private struct ABookTextDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    var text: String
+    init(text: String) { self.text = text }
+    init(configuration: ReadConfiguration) throws {
+        text = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
+
+private struct ABookPDFDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.pdf] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
+private struct NativeABookView: View {
+    private let store = ABookLocalStore.shared
+    @State private var notes: [ABookNativeNote] = []
+    @State private var selectedID: UUID?
+    @State private var title = ""
+    @State private var bodyText = ""
+    @State private var notebook = "Inbox"
+    @State private var tags = ""
+    @State private var query = ""
+    @State private var showArchived = false
+    @State private var attachments: [ABookNativeAttachment] = []
+    @State private var revisions: [ABookNativeRevision] = []
+    @State private var status = "Saved on this device"
+    @State private var errorText = ""
+    @State private var pdfText = ""
+    @State private var pdfData = Data()
+    @State private var pdfName = "a-book-edited.pdf"
+    @State private var exportingPDF = false
+    @State private var exportingNote = false
+    @State private var importingFiles = false
+    @State private var commentText = ""
+
+    private var saveKey: String {
+        (selectedID?.uuidString ?? "") + "|" + title + "|" + notebook + "|" + tags + "|" + bodyText + "|" + String(showArchived)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("A book").font(.title2.weight(.semibold))
+                    Text("Private notes and documents on this device").font(.caption).foregroundStyle(Color.envMuted)
+                }
+                Spacer()
+                Text(status).font(.caption2).foregroundStyle(Color.envMuted).multilineTextAlignment(.trailing)
+            }
+            if !errorText.isEmpty {
+                Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            }
+            HStack(spacing: 8) {
+                Button {
+                    let now = Date()
+                    let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
+                                               pinned: false, archived: false, deletedAt: nil, createdAt: now, updatedAt: now, revision: 0)
+                    do { let saved = try store.save(note); reload(preferred: saved.id) } catch { showError(error) }
+                } label: { Label("New note", systemImage: "plus") }
+                .buttonStyle(.borderedProminent)
+                Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
+                Button(showArchived ? "Active notes" : "Archive") {
+                    showArchived.toggle()
+                    do { notes = try store.notes(includeArchived: showArchived); select(notes.first) } catch { showError(error) }
+                }.buttonStyle(.bordered)
+            }
+            TextField("Search notes", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Search local notes")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !filteredNotes.isEmpty {
+                        ForEach(filteredNotes) { note in
+                            Button { select(note) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text((note.pinned ? "★ " : "") + (note.title.isEmpty ? "Untitled note" : note.title))
+                                        .font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                                    Text(note.body.isEmpty ? "No content yet" : String(note.body.prefix(120)))
+                                        .font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(selectedID == note.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("No notes yet. Create your first note.").font(.footnote).foregroundStyle(Color.envMuted)
+                    }
+                    if selectedID != nil {
+                        Divider().padding(.vertical, 4)
+                        TextField("Note title", text: $title).font(.title3.weight(.semibold))
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Notebook", text: $notebook).textFieldStyle(.roundedBorder)
+                        TextField("Tags, separated by commas", text: $tags).textFieldStyle(.roundedBorder)
+                        TextEditor(text: $bodyText)
+                            .frame(minHeight: 220)
+                            .padding(6)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                            .accessibilityLabel("Note content")
+                        HStack(spacing: 8) {
+                            Button("Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
+                            Button("Archive") { updateSelected(archived: true) }.buttonStyle(.bordered)
+                            Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
+                            Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
+                        }
+                        Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                        ForEach(attachments) { attachment in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(attachment.name).font(.caption.weight(.medium)).lineLimit(1)
+                                    Text(String(format: "%.0f KB", Double(attachment.size) / 1024)).font(.caption2).foregroundStyle(Color.envMuted)
+                                }
+                                Spacer()
+                                if attachment.mime == "application/pdf" || attachment.name.lowercased().hasSuffix(".pdf") {
+                                    Button("PDF tools") { processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                                }
+                            }
+                        }
+                        if let active = attachments.first(where: { $0.id == activePDFID }) {
+                            pdfTools(for: active)
+                        }
+                        if !revisions.isEmpty {
+                            Text("REVISION HISTORY").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                            ForEach(revisions) { revision in
+                                HStack {
+                                    Text("Revision " + String(revision.revision) + " · " + revision.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+                                    Spacer()
+                                    Button("Restore") { restore(revision) }.buttonStyle(.bordered)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .onAppear { reload() }
+        .task(id: saveKey) { await autosave() }
+        .fileImporter(isPresented: $importingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                guard let selectedID else { return }
+                do {
+                    for url in urls { _ = try store.importFile(noteID: selectedID, url: url) }
+                    attachments = try store.attachments(noteID: selectedID)
+                    status = "Files saved on this device"
+                    errorText = ""
+                } catch { showError(error) }
+            case .failure(let error): showError(error)
+            }
+        }
+        .fileExporter(isPresented: $exportingNote, document: ABookTextDocument(text: markdownText),
+                      contentType: .plainText, defaultFilename: safeFilename(title) + ".md") { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+        .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
+                      contentType: .pdf, defaultFilename: pdfName) { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+    }
+
+    private var activePDFID: UUID? { attachments.first(where: { $0.name == pdfName })?.id }
+    private var filteredNotes: [ABookNativeNote] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !term.isEmpty else { return notes }
+        return notes.filter { ($0.title + " " + $0.body + " " + $0.notebook + " " + $0.tags.joined(separator: " ")).lowercased().contains(term) }
+    }
+    private var markdownText: String {
+        "# " + (title.isEmpty ? "Untitled note" : title) + "\n\n" + bodyText + "\n\nNotebook: " + notebook + "\nTags: " + tags + "\n"
+    }
+
+    private func safeFilename(_ value: String) -> String {
+        let output = value.replacingOccurrences(of: "[^a-zA-Z0-9._-]+", with: "-", options: .regularExpression)
+        return output.isEmpty ? "a-book-note" : output
+    }
+
+    private func showError(_ error: Error) {
+        errorText = error.localizedDescription
+        status = "Not saved"
+    }
+
+    private func reload(preferred: UUID? = nil) {
+        do {
+            notes = try store.notes(includeArchived: showArchived)
+            let note = notes.first(where: { $0.id == (preferred ?? selectedID) }) ?? notes.first
+            select(note)
+            status = "Saved on this device"
+            errorText = ""
+        } catch { showError(error) }
+    }
+
+    private func select(_ note: ABookNativeNote?) {
+        selectedID = note?.id
+        title = note?.title ?? ""
+        bodyText = note?.body ?? ""
+        notebook = note?.notebook ?? "Inbox"
+        tags = note?.tags.joined(separator: ", ") ?? ""
+        do {
+            if let id = note?.id {
+                attachments = try store.attachments(noteID: id)
+                revisions = try store.revisions(noteID: id)
+            } else { attachments = []; revisions = [] }
+        } catch { showError(error) }
+    }
+
+    private func autosave() async {
+        guard let id = selectedID else { return }
+        status = "Saving on this device…"
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard !Task.isCancelled else { return }
+        let current = ABookNativeNote(id: id, title: title, body: bodyText, notebook: notebook,
+                                      tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map(String.init),
+                                      pinned: notes.first(where: { $0.id == id })?.pinned ?? false,
+                                      archived: notes.first(where: { $0.id == id })?.archived ?? false,
+                                      deletedAt: notes.first(where: { $0.id == id })?.deletedAt,
+                                      createdAt: notes.first(where: { $0.id == id })?.createdAt ?? Date(),
+                                      updatedAt: Date(), revision: notes.first(where: { $0.id == id })?.revision ?? 0)
+        do {
+            let saved = try store.save(current)
+            notes = try store.notes(includeArchived: showArchived)
+            if let index = notes.firstIndex(where: { $0.id == id }) { notes[index] = saved }
+            revisions = try store.revisions(noteID: id)
+            status = "Saved on this device"
+            errorText = ""
+        } catch { showError(error) }
+    }
+
+    private func updateSelected(pinned: Bool? = nil, archived: Bool? = nil, deleted: Bool = false) {
+        guard let id = selectedID, let original = notes.first(where: { $0.id == id }) else { return }
+        let note = ABookNativeNote(id: id, title: title, body: bodyText, notebook: notebook,
+                                   tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map(String.init),
+                                   pinned: pinned ?? original.pinned, archived: archived ?? original.archived,
+                                   deletedAt: deleted ? Date() : original.deletedAt, createdAt: original.createdAt,
+                                   updatedAt: Date(), revision: original.revision)
+        do { _ = try store.save(note); reload() } catch { showError(error) }
+    }
+
+    private func restore(_ revision: ABookNativeRevision) {
+        guard let id = selectedID else { return }
+        do {
+            let restored = try store.restore(noteID: id, revisionID: revision.id)
+            reload(preferred: restored.id)
+        } catch { showError(error) }
+    }
+
+    private func pdfTools(for attachment: ABookNativeAttachment) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PDF processing runs on this device").font(.caption.weight(.semibold))
+            Text(attachment.name).font(.caption).foregroundStyle(Color.envMuted)
+            HStack(spacing: 8) {
+                Button("Extract text") { processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                Button("OCR scanned pages") { processPDF(attachment, operation: "ocr") }.buttonStyle(.bordered)
+                Button("Rotate 90°") { processPDF(attachment, operation: "rotate") }.buttonStyle(.bordered)
+            }
+            if !pdfText.isEmpty {
+                Text(pdfText).font(.caption).textSelection(.enabled).lineLimit(12)
+                Button("Insert extracted text into note") { bodyText += "\n\n" + pdfText }.buttonStyle(.bordered)
+            }
+        }
+        .padding(10)
+        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func processPDF(_ attachment: ABookNativeAttachment, operation: String) {
+        do { activePDFSelection = attachment.id } catch { }
+        Task.detached(priority: .userInitiated) {
+            do {
+                let url = try store.fileURL(for: attachment)
+                guard let document = PDFDocument(url: url) else { throw NSError(domain: "ABookPDF", code: 1, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."]) }
+                var extracted = ""
+                if operation == "extract" {
+                    extracted = String((document.string ?? "").prefix(150_000))
+                } else if operation == "ocr" {
+                    for index in 0..<min(document.pageCount, 100) {
+                        guard let page = document.page(at: index) else { continue }
+                        let image = page.thumbnail(of: CGSize(width: 1600, height: 2200), for: .mediaBox)
+                        guard let cgImage = image.cgImage else { continue }
+                        let request = VNRecognizeTextRequest()
+                        request.recognitionLevel = .accurate
+                        request.usesLanguageCorrection = true
+                        try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+                        let rows = request.results?.compactMap { $0.topCandidates(1).first?.string } ?? []
+                        extracted += rows.joined(separator: "\n") + "\n"
+                        if extracted.count > 150_000 { break }
+                    }
+                    extracted = String(extracted.prefix(150_000))
+                } else if operation == "rotate" {
+                    for index in 0..<document.pageCount {
+                        guard let page = document.page(at: index) else { continue }
+                        page.rotation = (page.rotation + 90) % 360
+                    }
+                    guard let data = document.dataRepresentation() else { throw NSError(domain: "ABookPDF", code: 2, userInfo: [NSLocalizedDescriptionKey: "The rotated PDF could not be exported."]) }
+                    await MainActor.run {
+                        pdfData = data
+                        pdfName = attachment.name.replacingOccurrences(of: ".pdf", with: "", options: .caseInsensitive) + "-rotated.pdf"
+                        exportingPDF = true
+                        status = "PDF processed locally"
+                        activePDFSelection = attachment.id
+                        pdfText = ""
+                    }
+                    return
+                }
+                await MainActor.run {
+                    pdfText = extracted
+                    activePDFSelection = attachment.id
+                    status = operation == "ocr" ? "OCR completed on this device" : "Text extracted on this device"
+                    errorText = ""
+                }
+            } catch {
+                await MainActor.run { showError(error) }
+            }
+        }
+    }
+
+    @State private var activePDFSelection: UUID?
+    private var activePDFID: UUID? { activePDFSelection }
+}
+

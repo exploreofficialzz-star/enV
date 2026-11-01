@@ -1326,7 +1326,6 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 
 @Composable
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, startInWorkspace: Boolean = false) {
-    if (tool.id == "a-book") { NativeABookScreen(); return }
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
     if (tool.id == "song-metadata-analyzer") { NativeMusicDataSandboxScreen(startInWorkspace); return }
     when (tool.engine.type) {
