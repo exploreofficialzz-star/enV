@@ -347,3 +347,58 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.circularPatternSolids(json,listOf("a","b"),0,listOf(0.0,0.0,0.0),1)
         }
     }
+
+
+    @Test fun groupRotationAndScaleMoveSelectedPartsAroundSharedCentroid(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="b")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="outside")
+        json=NativeWorldLabEditor.positionSolid(json,"a",listOf(-2.0,0.5,0.0))
+        json=NativeWorldLabEditor.positionSolid(json,"b",listOf(2.0,0.5,0.0))
+        json=NativeWorldLabEditor.positionSolid(json,"outside",listOf(20.0,0.5,0.0))
+        val initial=NativeWorldLabProjectCodec.decode(json).revision
+
+        json=NativeWorldLabEditor.rotateGroupAroundCentroid(json,listOf("a","b"),1,90.0)
+        var project=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(initial+1,project.revision)
+        assertEquals(0.0,project.entities[0].positionMeters.x,1e-8)
+        assertEquals(2.0,project.entities[0].positionMeters.z,1e-8)
+        assertEquals(0.0,project.entities[1].positionMeters.x,1e-8)
+        assertEquals(-2.0,project.entities[1].positionMeters.z,1e-8)
+        assertEquals(kotlin.math.PI/2,project.entities[0].rotationRadians.y,1e-8)
+        assertEquals(20.0,project.entities[2].positionMeters.x,1e-8)
+
+        json=NativeWorldLabEditor.scaleGroupAroundCentroid(json,listOf("a","b"),2.0)
+        project=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(initial+2,project.revision)
+        assertEquals(4.0,project.entities[0].positionMeters.z,1e-8)
+        assertEquals(-4.0,project.entities[1].positionMeters.z,1e-8)
+        assertEquals(2.0,project.entities[0].dimensionsMeters.x,1e-8)
+        assertEquals(2.0,project.entities[1].dimensionsMeters.y,1e-8)
+        assertEquals(20.0,project.entities[2].positionMeters.x,1e-8)
+        assertEquals(listOf(1.0,1.0,1.0),listOf(
+            project.entities[2].dimensionsMeters.x,
+            project.entities[2].dimensionsMeters.y,
+            project.entities[2].dimensionsMeters.z))
+    }
+
+    @Test fun groupCadRejectsMissingMembersAndUnsafeParameters(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="b")
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.rotateGroupAroundCentroid(json,listOf("a","missing"),1,90.0)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.rotateGroupAroundCentroid(json,listOf("a","a"),1,90.0)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.rotateGroupAroundCentroid(json,listOf("a","b"),1,Double.NaN)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.scaleGroupAroundCentroid(json,listOf("a","b"),0.0)
+        }
+    }
+
+}

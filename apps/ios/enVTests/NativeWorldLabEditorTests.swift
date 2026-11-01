@@ -340,3 +340,44 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.linearPatternSolids(data,ids:["a","b"],axis:0,spacingMeters:0,copies:2))
         XCTAssertThrowsError(try NativeWorldLabEditor.circularPatternSolids(data,ids:["a","b"],axis:0,centerMeters:[0,0,0],instances:1))
     }
+
+
+    func testGroupRotationAndScaleMoveSelectedPartsAroundSharedCentroid() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"b")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"outside")
+        data=try NativeWorldLabEditor.positionSolid(data,id:"a",positionMeters:[-2,0.5,0])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"b",positionMeters:[2,0.5,0])
+        data=try NativeWorldLabEditor.positionSolid(data,id:"outside",positionMeters:[20,0.5,0])
+        let initial=try NativeWorldLabProject.decode(data).revision
+
+        data=try NativeWorldLabEditor.rotateGroupAroundCentroid(data,ids:["a","b"],axis:1,degrees:90)
+        var project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.revision,initial+1)
+        XCTAssertEqual(project.entities[0].positionMeters[0],0,accuracy:1e-8)
+        XCTAssertEqual(project.entities[0].positionMeters[2],2,accuracy:1e-8)
+        XCTAssertEqual(project.entities[1].positionMeters[0],0,accuracy:1e-8)
+        XCTAssertEqual(project.entities[1].positionMeters[2],-2,accuracy:1e-8)
+        XCTAssertEqual(project.entities[0].effectiveRotationRadians[1],Double.pi/2,accuracy:1e-8)
+        XCTAssertEqual(project.entities[2].positionMeters[0],20,accuracy:1e-8)
+
+        data=try NativeWorldLabEditor.scaleGroupAroundCentroid(data,ids:["a","b"],factor:2)
+        project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.revision,initial+2)
+        XCTAssertEqual(project.entities[0].positionMeters[2],4,accuracy:1e-8)
+        XCTAssertEqual(project.entities[1].positionMeters[2],-4,accuracy:1e-8)
+        XCTAssertEqual(project.entities[0].dimensionsMeters,[2,2,2])
+        XCTAssertEqual(project.entities[1].dimensionsMeters,[2,2,2])
+        XCTAssertEqual(project.entities[2].positionMeters[0],20,accuracy:1e-8)
+        XCTAssertEqual(project.entities[2].dimensionsMeters,[1,1,1])
+    }
+    func testGroupCADRejectsMissingMembersAndUnsafeParameters() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"b")
+        XCTAssertThrowsError(try NativeWorldLabEditor.rotateGroupAroundCentroid(data,ids:["a","missing"],axis:1,degrees:90))
+        XCTAssertThrowsError(try NativeWorldLabEditor.rotateGroupAroundCentroid(data,ids:["a","a"],axis:1,degrees:90))
+        XCTAssertThrowsError(try NativeWorldLabEditor.rotateGroupAroundCentroid(data,ids:["a","b"],axis:1,degrees:Double.nan))
+        XCTAssertThrowsError(try NativeWorldLabEditor.scaleGroupAroundCentroid(data,ids:["a","b"],factor:0))
+    }
+
+}

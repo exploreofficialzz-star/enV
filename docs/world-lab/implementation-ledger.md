@@ -754,3 +754,8 @@ release-candidate evidence bundle are unfinished.
 ## C/D group-pivot control integration — 2026-11-01
 - Web, Android and iOS multi-part CAD panels now expose distinct per-part and shared-centroid group rotation/scale actions, with matching terminology so users can choose whether selected parts spin in place or move together around a common pivot.
 - Operations remain bounded, revisioned edits; errors are presented in the native/Web panel without partial geometry changes.
+
+
+## C/D native group-transform regression coverage — 2026-11-01
+- Added Android JUnit and iOS XCTest cases for shared-centroid group rotation and scale: selected centres move on the expected world-axis arc, part orientations rotate with the group, dimensions and positions scale together, non-selected geometry remains unchanged, and each operation advances exactly one revision.
+- Added fail-closed regression cases for duplicate/missing selection IDs, non-finite rotation angles and non-positive group scale factors. These tests are pending the current exact-head native CI runs.
