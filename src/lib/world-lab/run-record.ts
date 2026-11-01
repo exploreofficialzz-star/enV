@@ -1,4 +1,4 @@
-import { validateModel, MODEL_VERSION, type LabRun, type ModelSample } from "./model.ts";
+import { validateModel, MODEL_VERSION, type ExperimentBranch, type LabRun, type ModelSample } from "./model.ts";
 
 /**
  * Read untrusted IndexedDB snapshots defensively. These are *locally computed*
@@ -9,6 +9,43 @@ export const MAX_STORED_RUNS_PER_PROJECT = 20;
 
 const validId = (s: unknown) => typeof s === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(s);
 const finite = (n: unknown) => typeof n === "number" && Number.isFinite(n);
+const modelKinds=new Set(["damped-oscillator","rc-circuit","heat-rod"]);
+const modelFields=new Set([
+  "kind","massKg","springNPerM","dampingNsPerM","initialDisplacementM",
+  "initialVelocityMPerS","resistanceOhm","capacitanceF","supplyVoltageV",
+  "initialVoltageV","thermalDiffusivityM2PerS","lengthMeters",
+  "ambientTemperatureK","centerTemperatureK",
+]);
+function parseExperimentBranch(raw:unknown,run:Partial<LabRun>):ExperimentBranch|null{
+  if(raw===undefined||raw===null)return null; // pre-branch local histories remain readable
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))
+    throw new Error("Stored experiment branch metadata is malformed.");
+  const branch=raw as Partial<ExperimentBranch>;
+  if(!validId(branch.branchId)||branch.branchId!==run.id||
+     !validId(branch.sourceRunId)||branch.sourceRunId!==run.parentRunId||
+     typeof branch.sourceModelId!=="string"||!modelKinds.has(branch.sourceModelId)||
+     typeof branch.sourceModelVersion!=="string"||
+     !/^\\d+\\.\\d+\\.\\d+$/.test(branch.sourceModelVersion)||
+     branch.targetModelId!==run.modelId||
+     branch.targetModelVersion!==run.modelVersion||
+     typeof branch.createdAtUTC!=="string"||!Number.isFinite(Date.parse(branch.createdAtUTC))||
+     branch.fidelity!=="recomputed-new-run"||
+     !Array.isArray(branch.inputDiff)||branch.inputDiff.length>modelFields.size)
+    throw new Error("Stored experiment branch has inconsistent parent, model or version provenance.");
+  const seen=new Set<string>();
+  const diff=branch.inputDiff.map(change=>{
+    if(!change||typeof change!=="object"||typeof change.field!=="string"||
+       !modelFields.has(change.field)||seen.has(change.field))
+      throw new Error("Stored experiment branch contains an invalid or duplicated input-diff field.");
+    seen.add(change.field);
+    const validValue=(value:unknown)=>value===null||typeof value==="string"||
+      (finite(value)&&Number.isFinite(value));
+    if(!validValue(change.previous)||!validValue(change.next)||change.previous===change.next)
+      throw new Error("Stored experiment branch contains an invalid or unchanged input diff.");
+    return Object.freeze({field:change.field,previous:change.previous,next:change.next});
+  });
+  return Object.freeze({...branch,inputDiff:Object.freeze(diff)}) as ExperimentBranch;
+}
 export function parseStoredWorldLabRun(input: unknown): LabRun {
   if (!input || typeof input !== "object") throw new Error("Saved scientific run is missing.");
   const run = input as Partial<LabRun>;
@@ -26,6 +63,7 @@ export function parseStoredWorldLabRun(input: unknown): LabRun {
     throw new Error("Stored World Lab run contains invalid model, evidence or time metadata.");
   }
   validateModel(run.inputs);
+  const branch=parseExperimentBranch(run.branch,run);
   const duration=run.time.simulatedDurationSeconds;
   const step=run.time.solverStepSeconds;
   if (!(duration >= 0.01 && duration <= 30 && step >= 1e-9 && step <= 0.05) ||
@@ -87,6 +125,7 @@ export function parseStoredWorldLabRun(input: unknown): LabRun {
   return Object.freeze({
     ...run,
     inputs:Object.freeze({...run.inputs}),
+    branch,
     assumedMassSource:source?Object.freeze({...source}):null,
     samples:Object.freeze(run.samples.map(s=>Object.freeze({
       ...s,
