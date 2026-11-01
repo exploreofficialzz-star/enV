@@ -22,7 +22,10 @@ test("navigation steps and clipping adapt to scale",()=>{
 });
 test("depth labels remain illustrative and bounded",()=>{
  assert.match(illustrativeLayerForDepth(0),/Surface/);
- for(const depth of [0.01,4.99,5,99,100,999,1000,9999,10000,20000])assert.match(illustrativeLayerForDepth(depth),/Illustrative/);
+ for(const depth of [0.01,1,2,99,1000,10000,35000,410000,660000,1000000,2890000,5150000,6371000])assert.match(illustrativeLayerForDepth(depth),/Illustrative/);
  assert.throws(()=>illustrativeLayerForDepth(Infinity),/Invalid/);
- assert.equal(OBSERVER_BOUNDS_METRES.minHeight,-20000);
+ assert.equal(OBSERVER_BOUNDS_METRES.minHeight,-6371000);
+ assert.match(illustrativeLayerForDepth(3000000),/outer core/);
+ assert.match(illustrativeLayerForDepth(6000000),/inner core/);
+ assert.throws(()=>illustrativeLayerForDepth(6371001),/Invalid/);
 });
