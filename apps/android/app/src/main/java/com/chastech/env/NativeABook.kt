@@ -710,7 +710,7 @@ fun NativeABookScreen(){
             }
             if(pendingPdf!=null)Button(onClick={exportPdf.launch("a-book-edited.pdf")}){Text("Save edited PDF")}
         }else Text("Create a note to start your local library.",style=MaterialTheme.typography.bodySmall)
-        Text("PDF text extraction and rotation run locally. Files are not uploaded.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("PDF text extraction, rotation and OCR run locally. Files are not uploaded.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if(confirmPermanentDelete){
         AlertDialog(
