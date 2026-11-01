@@ -4,8 +4,14 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, moveGradientStop, normalizeGradientStops, type CssGradientKind, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
+import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
+import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
+import { toHex } from "@/lib/engines/accessibility-color";
+import { inspectDesignComponentContrast } from "@/lib/engines/design-component-a11y";
+import { moveLayerItem } from "@/lib/engines/design-layer-utils";
+import { buildCssBorder } from "@/lib/engines/css-border";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +32,8 @@ const GRADIENT_PRESETS: Array<{ name: string; stops: GradientStop[]; angle: numb
 
 const BASE_FIELDS: Record<string, UiField[]> = {
   gradient: [
+    { name: "meshMode", label: "Gradient style", type: "select", defaultValue: "standard", options: [{ value: "standard", label: "Linear / radial / conic" }, { value: "yes", label: "Mesh-style blend" }] },
+    { name: "meshFade", label: "Mesh softness", type: "number", defaultValue: 72, min: 40, max: 92, suffix: "%" },
     { name: "kind", label: "Gradient type", type: "select", defaultValue: "linear", options: [{ value: "linear", label: "Linear" }, { value: "radial", label: "Radial" }, { value: "conic", label: "Conic" }] },
     { name: "angle", label: "Angle", type: "number", defaultValue: 135, min: 0, max: 360, suffix: "deg" },
     { name: "shape", label: "Radial shape", type: "select", defaultValue: "circle", options: [{ value: "circle", label: "Circle" }, { value: "ellipse", label: "Ellipse" }] },
@@ -37,27 +45,18 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "repeating", label: "Repeat gradient", type: "select", defaultValue: "no", options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
   ],
   shadow: [
-    { name: "preset", label: "Shadow preset", type: "select", defaultValue: "soft", options: [{ value: "subtle", label: "Subtle" }, { value: "soft", label: "Soft elevation" }, { value: "medium", label: "Medium" }, { value: "hard", label: "Hard" }, { value: "glow", label: "Glow" }, { value: "inset", label: "Inset" }, { value: "custom", label: "Custom" }] },
-    { name: "layers", label: "Layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }] },
-    { name: "x", label: "Horizontal offset", type: "number", defaultValue: 0, min: -80, max: 80, suffix: "px" },
-    { name: "y", label: "Vertical offset", type: "number", defaultValue: 8, min: -80, max: 80, suffix: "px" },
-    { name: "blur", label: "Blur", type: "number", defaultValue: 24, min: 0, max: 160, suffix: "px" },
-    { name: "spread", label: "Spread", type: "number", defaultValue: 0, min: -40, max: 80, suffix: "px" },
-    { name: "color", label: "Shadow color", type: "color", defaultValue: "#202a3b" },
-    { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
+    { name: "preset", label: "Start with a shadow preset", type: "select", defaultValue: "soft", options: [{ value: "subtle", label: "Subtle elevation" }, { value: "soft", label: "Soft elevation" }, { value: "medium", label: "Medium elevation" }, { value: "hard", label: "Hard shadow" }, { value: "glow", label: "Colour glow" }, { value: "inset", label: "Inset depth" }, { value: "custom", label: "Custom layer" }] },
   ],
   "text-shadow": [
-    { name: "layers", label: "Shadow layers", type: "select", defaultValue: "1", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }, { value: "4", label: "4 layers" }] },
-    { name: "x", label: "Horizontal offset", type: "number", defaultValue: 2, min: -40, max: 40, suffix: "px" },
-    { name: "y", label: "Vertical offset", type: "number", defaultValue: 3, min: -40, max: 40, suffix: "px" },
-    { name: "blur", label: "Blur", type: "number", defaultValue: 8, min: 0, max: 80, suffix: "px" },
-    { name: "opacity", label: "Shadow opacity", type: "number", defaultValue: 0.72, min: 0, max: 1, step: 0.01 },
-    { name: "color", label: "Shadow color", type: "color", defaultValue: "#202a3b" },
     { name: "textColor", label: "Text color", type: "color", defaultValue: "#ffffff" },
   ],
   border: [
     { name: "style", label: "Border style", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid" }, { value: "dashed", label: "Dashed" }, { value: "dotted", label: "Dotted" }, { value: "double", label: "Double" }] },
     { name: "width", label: "Width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "topWidth", label: "Top edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "rightWidth", label: "Right edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "bottomWidth", label: "Bottom edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
+    { name: "leftWidth", label: "Left edge width", type: "number", defaultValue: 1, min: 0, max: 24, suffix: "px" },
     { name: "radius", label: "Uniform radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "topLeft", label: "Top left radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
     { name: "topRight", label: "Top right radius", type: "number", defaultValue: 16, min: 0, max: 120, suffix: "px" },
@@ -66,7 +65,9 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "color", label: "Border color", type: "color", defaultValue: "#b9c5d5" },
   ],
   button: [
-    { name: "bg", label: "Background", type: "color", defaultValue: "#0d9f8a" },
+    { name: "variant", label: "Button style", type: "select", defaultValue: "solid", options: [{ value: "solid", label: "Solid" }, { value: "outline", label: "Outline" }, { value: "soft", label: "Soft" }, { value: "ghost", label: "Ghost" }] },
+    { name: "disabled", label: "Preview state", type: "select", defaultValue: "no", options: [{ value: "no", label: "Enabled" }, { value: "yes", label: "Disabled" }] },
+    { name: "bg", label: "Background / accent", type: "color", defaultValue: "#0d9f8a" },
     { name: "hover", label: "Hover background", type: "color", defaultValue: "#087f70" },
     { name: "focus", label: "Focus ring color", type: "color", defaultValue: "#7c4dff" },
     { name: "text", label: "Text color", type: "color", defaultValue: "#ffffff" },
@@ -75,6 +76,8 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "py", label: "Vertical padding", type: "number", defaultValue: 10, min: 0, max: 40, suffix: "px" },
   ],
   card: [
+    { name: "layout", label: "Card layout", type: "select", defaultValue: "standard", options: [{ value: "standard", label: "Standard" }, { value: "product", label: "Product" }, { value: "profile", label: "Profile" }, { value: "article", label: "Article" }, { value: "metric", label: "Metric" }] },
+    { name: "accent", label: "Accent color", type: "color", defaultValue: "#0d9f8a" },
     { name: "bg", label: "Card background", type: "color", defaultValue: "#ffffff" },
     { name: "border", label: "Border color", type: "color", defaultValue: "#e7e5e4" },
     { name: "text", label: "Heading color", type: "color", defaultValue: "#111827" },
@@ -117,7 +120,8 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "dist", label: "Shadow distance", type: "number", defaultValue: 10, min: 1, max: 40, suffix: "px" },
   ],
   pattern: [
-    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }] },
+    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }, { value: "rings", label: "Concentric rings" }, { value: "chevron", label: "Chevron" }, { value: "hexagons", label: "Hexagons" }, { value: "crosshatch", label: "Crosshatch" }, { value: "checkerboard", label: "Checkerboard" }, { value: "triangles", label: "Triangles" }, { value: "polka", label: "Polka dots" }, { value: "waves", label: "Wave lines" }, { value: "zigzag", label: "Zigzag" }] },
+    { name: "rotation", label: "Pattern rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Pattern color", type: "color", defaultValue: "#0d9f8a" },
     { name: "size", label: "Pattern size", type: "number", defaultValue: 24, min: 6, max: 160, suffix: "px" },
     { name: "opacity", label: "Opacity", type: "number", defaultValue: 0.14, min: 0, max: 1, step: 0.01 },
@@ -125,6 +129,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   blob: [
     { name: "seed", label: "Shape variation", type: "number", defaultValue: 7, min: 1, max: 999, step: 1 },
     { name: "points", label: "Shape detail", type: "select", defaultValue: "12", options: [{ value: "8", label: "Simple" }, { value: "12", label: "Balanced" }, { value: "18", label: "Detailed" }] },
+    { name: "irregularity", label: "Organic variation", type: "number", defaultValue: 0.7, min: 0, max: 1, step: 0.01 },
     { name: "rotation", label: "Rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Fill color", type: "color", defaultValue: "#0d9f8a" },
     { name: "stroke", label: "Outline color", type: "color", defaultValue: "#ffffff" },
@@ -132,7 +137,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   ],
   wave: [
     { name: "amp", label: "Wave height", type: "number", defaultValue: 24, min: 0, max: 58, suffix: "px" },
-    { name: "layers", label: "Wave layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }] },
+    { name: "layers", label: "Wave layers", type: "select", defaultValue: "2", options: [{ value: "1", label: "1 layer" }, { value: "2", label: "2 layers" }, { value: "3", label: "3 layers" }, { value: "4", label: "4 layers" }, { value: "5", label: "5 layers" }] },
     { name: "frequency", label: "Wave frequency", type: "number", defaultValue: 2, min: 1, max: 5, suffix: "cycles" },
     { name: "phase", label: "Wave phase", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "baseline", label: "Wave vertical position", type: "number", defaultValue: 76, min: 30, max: 140, suffix: "%" },
@@ -142,8 +147,11 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "background", label: "Canvas color", type: "color", defaultValue: "#ffffff" },
   ],
   noise: [
+    { name: "type", label: "Noise type", type: "select", defaultValue: "fractalNoise", options: [{ value: "fractalNoise", label: "Fractal noise · cloudy" }, { value: "turbulence", label: "Turbulence · turbulent" }] },
     { name: "opacity", label: "Grain strength", type: "number", defaultValue: 0.08, min: 0, max: 1, step: 0.01 },
     { name: "density", label: "Grain detail", type: "number", defaultValue: 1.1, min: 0.1, max: 3, step: 0.1 },
+    { name: "octaves", label: "Detail layers", type: "number", defaultValue: 2, min: 1, max: 5, step: 1 },
+    { name: "seed", label: "Noise seed", type: "number", defaultValue: 1, min: 1, max: 999, step: 1 },
     { name: "color", label: "Grain color", type: "color", defaultValue: "#111827" },
   ],
 };
@@ -157,6 +165,17 @@ function familyAndWorkflow(op: string, toolId?: string) {
 function numberValue(values: Record<string, string>, key: string, fallback: number, min: number, max: number): number {
   const parsed = Number(values[key]);
   return clamp(Number.isFinite(parsed) ? parsed : fallback, min, max);
+}
+
+function mixColor(color: string | undefined, whiteRatio: number): string {
+  const parsed = parseCssColor(color ?? "#0d9f8a") ?? { r: 13, g: 159, b: 138, a: 1 };
+  const ratio = clamp(whiteRatio, 0, 1);
+  return toHex({
+    r: parsed.r + (255 - parsed.r) * ratio,
+    g: parsed.g + (255 - parsed.g) * ratio,
+    b: parsed.b + (255 - parsed.b) * ratio,
+    a: 1,
+  }).slice(0, 7);
 }
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -202,9 +221,11 @@ function cssFor(
   values: Record<string, string>,
   gradientStops: GradientStop[] = [],
   gradientOverlay: { enabled: boolean; color: string; x: number; y: number } = { enabled: false, color: "#ffffff", x: 24, y: 20 },
+  shadowLayers: ShadowLayer[] = createShadowPreset("soft"),
+  textShadowLayers: TextShadowLayer[] = createTextShadowPreset("soft"),
 ) {
   if (family === "gradient") {
-    const kind: CssGradientKind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
+    const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
     const angle = numberValue(values, "angle", 135, 0, 360);
     const normalized = normalizeGradientStops(gradientStops);
     const position = `${numberValue(values, "centerX", 50, 0, 100)}% ${numberValue(values, "centerY", 50, 0, 100)}%`;
@@ -219,8 +240,14 @@ function cssFor(
       hueMethod: values.hueMethod as import("@/lib/engines/css-gradient").GradientHueMethod,
       stops: normalized,
     };
-    const enhanced = buildCssGradient(gradientOptions);
-    const fallbackGradient = buildCssGradient({ ...gradientOptions, colorSpace: "srgb" });
+    const meshMode = values.meshMode === "yes";
+    const meshFade = numberValue(values, "meshFade", 72, 40, 92);
+    const enhanced = meshMode
+      ? buildCssMeshGradient(normalized, { angle, colorSpace: gradientOptions.colorSpace, hueMethod: gradientOptions.hueMethod, fade: meshFade })
+      : buildCssGradient(gradientOptions);
+    const fallbackGradient = meshMode
+      ? buildCssMeshGradient(normalized, { angle, colorSpace: "srgb", fade: meshFade })
+      : buildCssGradient({ ...gradientOptions, colorSpace: "srgb" });
     const fallback = normalized[0]?.color ?? "#0d9f8a";
     const glow = gradientOverlay.enabled
       ? `radial-gradient(circle at ${gradientOverlay.x}% ${gradientOverlay.y}%, ${gradientOverlay.color} 0%, transparent 58%)`
@@ -231,80 +258,51 @@ function cssFor(
     return { css, style: { background: fallback, backgroundImage: enhancedImage } };
   }
   if (family === "shadow") {
-    const preset = values.preset ?? "soft";
-    const count = Number(values.layers ?? 2);
-    const presets: Record<string, { x: number; y: number; blur: number; spread: number; alpha: number; inset?: boolean }> = {
-      subtle: { x: 0, y: 1, blur: 3, spread: 0, alpha: 0.12 },
-      soft: { x: 0, y: 7, blur: 24, spread: -4, alpha: 0.14 },
-      medium: { x: 0, y: 12, blur: 32, spread: -5, alpha: 0.18 },
-      hard: { x: 0, y: 10, blur: 0, spread: 0, alpha: 0.24 },
-      glow: { x: 0, y: 0, blur: 28, spread: 2, alpha: 0.36 },
-      inset: { x: 0, y: 3, blur: 9, spread: -3, alpha: 0.22, inset: true },
-      custom: { x: 0, y: 8, blur: 24, spread: 0, alpha: 0.18 },
-    };
-    const presetValues = presets[preset] ?? presets.soft;
-    const opacity = numberValue(values, "opacity", presetValues.alpha, 0, 1);
-    const x = numberValue(values, "x", presetValues.x, -80, 80);
-    const y = numberValue(values, "y", presetValues.y, -80, 80);
-    const blur = numberValue(values, "blur", presetValues.blur, 0, 160);
-    const spread = numberValue(values, "spread", presetValues.spread, -40, 80);
-    const color = values.color ?? "#202a3b";
-    const parsedColor = parseCssColor(color);
-    const layers = Array.from({ length: clamp(count, 1, 3) }, (_, index) => {
-      const scale = 1 + index * 0.55;
-      const alpha = opacity / (index + 1);
-      const inset = presetValues.inset ? "inset " : "";
-      const shadowColor = parsedColor
-        ? `rgba(${Math.round(parsedColor.r)}, ${Math.round(parsedColor.g)}, ${Math.round(parsedColor.b)}, ${alpha.toFixed(3)})`
-        : color;
-      return `${inset}${x * scale}px ${y * scale}px ${blur * scale}px ${spread * scale}px ${shadowColor}`;
-    });
-    const boxShadow = layers.join(", ");
+    const boxShadow = buildBoxShadow(shadowLayers);
     return { css: `box-shadow: ${boxShadow};`, style: { boxShadow } };
   }
   if (family === "text-shadow") {
-    const x = numberValue(values, "x", 2, -40, 40);
-    const y = numberValue(values, "y", 3, -40, 40);
-    const blur = numberValue(values, "blur", 8, 0, 80);
-    const opacity = numberValue(values, "opacity", 0.72, 0, 1);
-    const color = parseCssColor(values.color ?? "#202a3b") ?? { r: 32, g: 42, b: 59, a: 1 };
-    const rgba = (alpha: number) => `rgba(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)}, ${clamp(alpha, 0, 1).toFixed(3)})`;
-    const layerCount = Math.round(numberValue(values, "layers", 1, 1, 4));
-    const shadows = Array.from({ length: layerCount }, (_, index) => {
-      const multiplier = index + 1;
-      const layerOpacity = opacity * (1 - index * 0.16);
-      const layerBlur = Math.max(0, blur * (1 - index * 0.2));
-      return `${x * multiplier}px ${y * multiplier}px ${layerBlur.toFixed(1)}px ${rgba(layerOpacity)}`;
-    });
-    const textShadow = shadows.join(", ");
+    const textShadow = buildTextShadow(textShadowLayers);
     const textColor = values.textColor ?? "#ffffff";
     return { css: `text-shadow: ${textShadow};\ncolor: ${textColor};`, style: { textShadow, color: textColor } };
   }
   if (family === "border") {
-    const width = numberValue(values, "width", 1, 0, 24);
     const radius = numberValue(values, "radius", 16, 0, 120);
-    const radii = ["topLeft", "topRight", "bottomRight", "bottomLeft"].map((key) => numberValue(values, key, radius, 0, 120));
-    const style = values.style ?? "solid";
-    const color = values.color ?? "#b9c5d5";
-    const borderRadius = radii.map((value) => `${value}px`).join(" ");
-    return {
-      css: `border: ${width}px ${style} ${color};\nborder-radius: ${borderRadius};`,
-      style: { border: `${width}px ${style} ${color}`, borderRadius },
-    };
+    const width = numberValue(values, "width", 1, 0, 24);
+    return buildCssBorder({
+      color: values.color ?? "#b9c5d5",
+      style: (values.style ?? "solid") as import("@/lib/engines/css-border").BorderStyle,
+      topWidth: numberValue(values, "topWidth", width, 0, 24),
+      rightWidth: numberValue(values, "rightWidth", width, 0, 24),
+      bottomWidth: numberValue(values, "bottomWidth", width, 0, 24),
+      leftWidth: numberValue(values, "leftWidth", width, 0, 24),
+      topLeft: numberValue(values, "topLeft", radius, 0, 120),
+      topRight: numberValue(values, "topRight", radius, 0, 120),
+      bottomRight: numberValue(values, "bottomRight", radius, 0, 120),
+      bottomLeft: numberValue(values, "bottomLeft", radius, 0, 120),
+    });
   }
   if (family === "button") {
     const radius = numberValue(values, "radius", 10, 0, 48);
     const px = numberValue(values, "px", 16, 0, 64);
     const py = numberValue(values, "py", 10, 0, 40);
-    const css = `.env-button {\n  background: ${values.bg};\n  color: ${values.text};\n  border: 0;\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n  transition: background-color 160ms ease, transform 160ms ease;\n}\n.env-button:hover { background: ${values.hover}; }\n.env-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }\n@media (prefers-reduced-motion: reduce) { .env-button { transition: none; } }`;
-    return { css, style: { background: values.bg, color: values.text, borderRadius: `${radius}px`, padding: `${py}px ${px}px` } };
+    const variant = values.variant ?? "solid";
+    const softBackground = mixColor(values.bg, 0.12);
+    const softHover = mixColor(values.bg, 0.2);
+    const background = variant === "outline" || variant === "ghost" ? "transparent" : variant === "soft" ? softBackground : values.bg;
+    const color = variant === "solid" ? values.text : values.bg;
+    const border = variant === "outline" ? "1px solid " + values.bg : "1px solid transparent";
+    const hoverBackground = variant === "outline" || variant === "ghost" ? softBackground : variant === "soft" ? softHover : values.hover;
+    const css = `.env-button {\n  background: ${background};\n  color: ${color};\n  border: ${border};\n  border-radius: ${radius}px;\n  padding: ${py}px ${px}px;\n  cursor: pointer;\n  font-weight: 600;\n  transition: background-color 160ms ease, transform 160ms ease;\n}\n.env-button:hover:not(:disabled) { background: ${hoverBackground}; }\n.env-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }\n.env-button:disabled { opacity: .52; cursor: not-allowed; }\n@media (prefers-reduced-motion: reduce) { .env-button { transition: none; } }`;
+    return { css, style: { background, color, border, borderRadius: `${radius}px`, padding: `${py}px ${px}px`, opacity: values.disabled === "yes" ? 0.52 : 1, cursor: values.disabled === "yes" ? "not-allowed" : "pointer" } };
   }
   if (family === "card") {
     const radius = numberValue(values, "radius", 20, 0, 64);
     const pad = numberValue(values, "pad", 20, 0, 80);
     const shadow = values.shadow === "none" ? "none" : values.shadow === "strong" ? "0 14px 36px rgb(22 24 29 / 0.18)" : "0 8px 24px rgb(22 24 29 / 0.08)";
-    const css = `.env-card {\n  background: ${values.bg};\n  color: ${values.text ?? "#111827"};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  padding: ${pad}px;\n  box-shadow: ${shadow};\n}\n.env-card__description { color: ${values.muted ?? "#475569"}; }`;
-    return { css, style: { background: values.bg, color: values.text ?? "#111827", border: `1px solid ${values.border}`, borderRadius: `${radius}px`, padding: `${pad}px`, boxShadow: shadow } };
+    const accent = values.accent ?? "#0d9f8a";
+    const css = `.env-card {\n  background: ${values.bg};\n  color: ${values.text ?? "#111827"};\n  border: 1px solid ${values.border};\n  border-radius: ${radius}px;\n  padding: ${pad}px;\n  box-shadow: ${shadow};\n  overflow: hidden;\n}\n.env-card__eyebrow { color: ${accent}; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }\n.env-card__title { color: ${values.text ?? "#111827"}; font-size: 1.125rem; font-weight: 700; }\n.env-card__description { color: ${values.muted ?? "#475569"}; line-height: 1.55; }\n.env-card__action { color: ${accent}; font-weight: 700; }`;
+    return { css, style: { background: values.bg, color: values.text ?? "#111827", border: "1px solid " + values.border, borderRadius: `${radius}px`, padding: `${pad}px`, boxShadow: shadow } };
   }
   if (family === "badge") {
     const radius = numberValue(values, "radius", 999, 0, 999);
@@ -334,8 +332,9 @@ function cssFor(
       ? `rgba(${Math.round(parsedTint.r)}, ${Math.round(parsedTint.g)}, ${Math.round(parsedTint.b)}, ${opacity.toFixed(3)})`
       : `rgba(255, 255, 255, ${opacity.toFixed(3)})`;
     const background = rgba(alpha);
+    const fallbackBackground = rgba(Math.max(alpha, 0.72));
     const border = `1px solid ${rgba(borderAlpha)}`;
-    const css = `background: ${background};\nbackdrop-filter: blur(${blur}px);\n-webkit-backdrop-filter: blur(${blur}px);\nborder: ${border};`;
+    const css = `.env-glass {\n  background: ${fallbackBackground};\n  border: ${border};\n  border-radius: 16px;\n}\n@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {\n  .env-glass {\n    background: ${background};\n    backdrop-filter: blur(${blur}px);\n    -webkit-backdrop-filter: blur(${blur}px);\n  }\n}`;
     return { css, style: { background, backdropFilter: `blur(${blur}px)`, border, borderRadius: "16px" } };
   }
   if (family === "neomorph") {
@@ -352,7 +351,7 @@ function cssFor(
   if (family === "pattern") {
     const size = numberValue(values, "size", 24, 6, 160);
     const opacity = numberValue(values, "opacity", 0.14, 0, 1);
-    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a", (values.pattern ?? "diagonal") as import("@/lib/engines/svg-generators").PatternStyle);
+    const svg = buildPatternSvg(size, opacity, values.color ?? "#0d9f8a", (values.pattern ?? "diagonal") as import("@/lib/engines/svg-generators").PatternStyle, numberValue(values, "rotation", 0, 0, 360));
     const backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
     return { css: `background-image: ${backgroundImage};\nbackground-size: ${size}px ${size}px;`, style: { backgroundImage, backgroundSize: `${size}px ${size}px` }, svg };
   }
@@ -364,13 +363,14 @@ function cssFor(
       rotation: numberValue(values, "rotation", 0, 0, 360),
       stroke: values.stroke ?? "#ffffff",
       strokeWidth: numberValue(values, "strokeWidth", 0, 0, 8),
+      irregularity: numberValue(values, "irregularity", 0.7, 0, 1),
     });
     return { css: svg, style: {}, svg };
   }
   if (family === "wave") {
     const svg = buildWaveSvg({
       amplitude: numberValue(values, "amp", 24, 0, 58),
-      layers: numberValue(values, "layers", 2, 1, 3),
+      layers: numberValue(values, "layers", 2, 1, 5),
       frequency: numberValue(values, "frequency", 2, 1, 5),
       phase: numberValue(values, "phase", 0, 0, 360),
       baseline: numberValue(values, "baseline", 76, 30, 140),
@@ -383,8 +383,13 @@ function cssFor(
   }
   const opacity = numberValue(values, "opacity", 0.08, 0, 1);
   const density = numberValue(values, "density", 1.1, 0.1, 3);
-  const dataUrl = buildNoiseDataUrl(values.color ?? "#111827", density);
-  const previewDataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, opacity);
+  const noiseOptions = {
+    type: values.type === "turbulence" ? "turbulence" as const : "fractalNoise" as const,
+    octaves: numberValue(values, "octaves", 2, 1, 5),
+    seed: numberValue(values, "seed", 1, 1, 999),
+  };
+  const dataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, 1, noiseOptions);
+  const previewDataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, opacity, noiseOptions);
   const css = `.env-noise {\n  position: relative;\n  isolation: isolate;\n}\n.env-noise::after {\n  content: "";\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n  opacity: ${opacity};\n  background-image: ${dataUrl};\n}`;
   return { css, style: { backgroundColor: "#e2e8f0", backgroundImage: previewDataUrl, backgroundSize: "160px 160px" } };
 }
@@ -394,13 +399,19 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   const allFields = BASE_FIELDS[family] ?? BASE_FIELDS.gradient;
   const [values, setValues] = useState(() => initialValues(allFields));
   const fields = useMemo(() => family !== "gradient" ? allFields : allFields.filter((field) => {
-    if (field.name === "angle" && values.kind === "radial") return false;
-    if ((field.name === "shape" || field.name === "radialSize") && values.kind !== "radial") return false;
-    if ((field.name === "centerX" || field.name === "centerY") && values.kind === "linear") return false;
+    const meshMode = values.meshMode === "yes";
+    if (field.name === "meshFade" && !meshMode) return false;
+    if (field.name === "kind" && meshMode) return false;
+    if (field.name === "angle" && values.kind === "radial" && !meshMode) return false;
+    if ((field.name === "shape" || field.name === "radialSize") && (values.kind !== "radial" || meshMode)) return false;
+    if ((field.name === "centerX" || field.name === "centerY") && (values.kind === "linear" || meshMode)) return false;
+    if (field.name === "repeating" && meshMode) return false;
     if (field.name === "hueMethod" && !["hsl", "hwb", "lch", "oklch"].includes(values.colorSpace ?? "srgb")) return false;
     return true;
-  }), [allFields, family, values.colorSpace, values.kind]);
+  }), [allFields, family, values.colorSpace, values.kind, values.meshMode]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
+  const [shadowLayers, setShadowLayers] = useState<ShadowLayer[]>(() => createShadowPreset("soft"));
+  const [textShadowLayers, setTextShadowLayers] = useState<TextShadowLayer[]>(() => createTextShadowPreset("soft"));
   const [gradientGlow, setGradientGlow] = useState(false);
   const [glowColor, setGlowColor] = useState("#ffffff");
   const [glowX, setGlowX] = useState(24);
@@ -409,6 +420,8 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   useEffect(() => {
     setValues(initialValues(allFields));
     setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop })));
+    setShadowLayers(createShadowPreset("soft"));
+    setTextShadowLayers(createTextShadowPreset("soft"));
     setGradientGlow(false);
     setGlowColor("#ffffff");
     setGlowX(24);
@@ -416,7 +429,8 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     setSampleText("Continue");
   }, [family, allFields]);
   const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
-  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, values]);
+  const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay, shadowLayers, textShadowLayers), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, shadowLayers, textShadowLayers, values]);
+  const componentContrast = inspectDesignComponentContrast(family, values);
   const generatedSvg = output.svg;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "text-shadow";
@@ -537,35 +551,129 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
               </section>
             </section>
           ) : null}
-          <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((previous) => {
-            const next = { ...previous, [name]: value };
-            if (family === "border" && name === "radius") {
-              next.topLeft = value;
-              next.topRight = value;
-              next.bottomRight = value;
-              next.bottomLeft = value;
-            }
-            if (name === "preset") {
-              const presets: Record<string, { x: number; y: number; blur: number; spread: number; alpha: number }> = {
-                subtle: { x: 0, y: 1, blur: 3, spread: 0, alpha: 0.12 },
-                soft: { x: 0, y: 7, blur: 24, spread: -4, alpha: 0.14 },
-                medium: { x: 0, y: 12, blur: 32, spread: -5, alpha: 0.18 },
-                hard: { x: 0, y: 10, blur: 0, spread: 0, alpha: 0.24 },
-                glow: { x: 0, y: 0, blur: 28, spread: 2, alpha: 0.36 },
-                inset: { x: 0, y: 3, blur: 9, spread: -3, alpha: 0.22 },
-                custom: { x: 0, y: 8, blur: 24, spread: 0, alpha: 0.18 },
-              };
-              const selected = presets[value];
-              if (selected) {
-                next.x = String(selected.x);
-                next.y = String(selected.y);
-                next.blur = String(selected.blur);
-                next.spread = String(selected.spread);
-                next.opacity = String(selected.alpha);
+          {family === "shadow" ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="shadow-stack-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="shadow-stack-heading" className="text-sm font-semibold text-fg">Independent shadow layers</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">Edit each layer separately. Disabled layers stay in the stack so you can compare variations.</p>
+                </div>
+                <Button type="button" size="sm" onClick={() => setShadowLayers((previous) => [...previous, { ...createShadowPreset("custom")[0], id: "shadow-" + Date.now() }])} disabled={shadowLayers.length >= 5}>Add layer ({shadowLayers.length}/5)</Button>
+              </div>
+              <div className="space-y-3">
+                {shadowLayers.map((layer, index) => (
+                  <div key={layer.id} className="space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="flex min-h-10 items-center gap-2 text-sm font-semibold text-fg">
+                        <input type="checkbox" checked={layer.enabled} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, enabled: event.target.checked } : item))} className="size-4 accent-accent" />
+                        Layer {index + 1}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className="flex min-h-10 items-center gap-2 text-xs text-muted">
+                          <input type="checkbox" checked={layer.inset} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, inset: event.target.checked } : item))} className="size-4 accent-accent" />
+                          Inset
+                        </label>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => moveLayerItem(previous, index, -1))} disabled={index === 0} aria-label={"Move shadow layer " + (index + 1) + " up"}>Up</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => moveLayerItem(previous, index, 1))} disabled={index === shadowLayers.length - 1} aria-label={"Move shadow layer " + (index + 1) + " down"}>Down</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => previous.filter((item) => item.id !== layer.id))} aria-label={"Remove shadow layer " + (index + 1)}>Remove</Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <label className="space-y-1 text-xs text-muted">Color
+                        <Input type="color" value={layer.color} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, color: event.target.value } : item))} className="h-10 w-full p-1" aria-label={"Shadow layer " + (index + 1) + " color"} />
+                      </label>
+                      {([
+                        ["x", "X offset", -100, 100],
+                        ["y", "Y offset", -100, 100],
+                        ["blur", "Blur", 0, 200],
+                        ["spread", "Spread", -100, 100],
+                        ["opacity", "Opacity", 0, 1],
+                      ] as const).map(([key, label, min, max]) => (
+                        <label key={key} className="space-y-1 text-xs text-muted">{label}
+                          <Input type="number" value={String(layer[key])} min={min} max={max} step={key === "opacity" ? 0.01 : 1} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, [key]: Number(event.target.value) } : item))} className="h-10 font-mono text-xs" aria-label={"Shadow layer " + (index + 1) + " " + label} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {shadowLayers.length === 0 ? <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted">No shadow layers. Add one to create a shadow, or keep the stack empty for <code>box-shadow: none</code>.</p> : null}
+              </div>
+            </section>
+          ) : null}
+          {family === "text-shadow" ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="text-shadow-stack-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 id="text-shadow-stack-heading" className="text-sm font-semibold text-fg">Independent text-shadow layers</h3>
+                  <p className="mt-1 text-xs leading-5 text-muted">Build soft depth, hard offset shadows or layered glow. Each layer has its own position, blur and opacity.</p>
+                </div>
+                <Button type="button" size="sm" onClick={() => setTextShadowLayers((previous) => [...previous, { ...createTextShadowPreset("custom")[0], id: "text-shadow-" + Date.now() }])} disabled={textShadowLayers.length >= 5}>Add layer ({textShadowLayers.length}/5)</Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["Soft", "soft"],
+                  ["Hard", "hard"],
+                  ["Neon", "neon"],
+                  ["Long", "long"],
+                ] as const).map(([label, preset]) => (
+                  <Button key={preset} type="button" size="sm" variant="outline" onClick={() => setTextShadowLayers(createTextShadowPreset(preset))}>{label}</Button>
+                ))}
+                <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers([])}>Clear layers</Button>
+              </div>
+              <div className="space-y-3">
+                {textShadowLayers.map((layer, index) => (
+                  <div key={layer.id} className="space-y-3 rounded-lg border border-border bg-surface-2 p-3">
+                    <div className="flex min-h-10 items-center justify-between gap-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-fg">
+                        <input type="checkbox" checked={layer.enabled} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, enabled: event.target.checked } : item))} className="size-4 accent-accent" />
+                        Layer {index + 1}
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => moveLayerItem(previous, index, -1))} disabled={index === 0} aria-label={"Move text shadow layer " + (index + 1) + " up"}>Up</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => moveLayerItem(previous, index, 1))} disabled={index === textShadowLayers.length - 1} aria-label={"Move text shadow layer " + (index + 1) + " down"}>Down</Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => previous.filter((item) => item.id !== layer.id))} aria-label={"Remove text shadow layer " + (index + 1)}>Remove</Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <label className="space-y-1 text-xs text-muted">Color
+                        <Input type="color" value={layer.color} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, color: event.target.value } : item))} className="h-10 w-full p-1" aria-label={"Text shadow layer " + (index + 1) + " color"} />
+                      </label>
+                      {([
+                        ["x", "X offset", -80, 80],
+                        ["y", "Y offset", -80, 80],
+                        ["blur", "Blur", 0, 120],
+                        ["opacity", "Opacity", 0, 1],
+                      ] as const).map(([key, label, min, max]) => (
+                        <label key={key} className="space-y-1 text-xs text-muted">{label}
+                          <Input type="number" value={String(layer[key])} min={min} max={max} step={key === "opacity" ? 0.01 : 1} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, [key]: Number(event.target.value) } : item))} className="h-10 font-mono text-xs" aria-label={"Text shadow layer " + (index + 1) + " " + label} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {textShadowLayers.length === 0 ? <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted">No shadow layers. Add one or choose a preset; the export will use <code>text-shadow: none</code>.</p> : null}
+              </div>
+            </section>
+          ) : null}
+          <FieldGrid fields={fields} values={values} onChange={(name, value) => {
+            setValues((previous) => {
+              const next = { ...previous, [name]: value };
+              if (family === "border" && name === "radius") {
+                next.topLeft = value;
+                next.topRight = value;
+                next.bottomRight = value;
+                next.bottomLeft = value;
               }
-            }
-            return next;
-          })} />
+              if (family === "border" && name === "width") {
+                next.topWidth = value;
+                next.rightWidth = value;
+                next.bottomWidth = value;
+                next.leftWidth = value;
+              }
+              return next;
+            });
+            if (family === "shadow" && name === "preset") setShadowLayers(createShadowPreset(value));
+          }} />
           {isText ? (
             <label className="block space-y-1.5">
               <Label htmlFor="design-preview-text">Preview text</Label>
@@ -576,7 +684,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
         </div>
 
         <div className="min-w-0 space-y-3 lg:sticky lg:top-4">
-          {family === "button" ? <style>{`.env-live-button:hover { background: ${values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
+          {family === "button" ? <style>{`.env-live-button:hover:not(:disabled) { background: ${values.variant === "outline" || values.variant === "ghost" ? mixColor(values.bg, 0.12) : values.variant === "soft" ? mixColor(values.bg, 0.2) : values.hover ?? values.bg}; } .env-live-button:focus-visible { outline: 3px solid ${values.focus ?? "#7c4dff"}; outline-offset: 3px; }`}</style> : null}
           {family === "input" ? <style>{`.env-live-input:focus-visible { outline: 3px solid ${values.focus ?? "#0d9f8a"}; outline-offset: 2px; }`}</style> : null}
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-fg">Live preview</p>
@@ -589,15 +697,18 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             {generatedSvg ? (
               <div className="w-full max-w-xl [&_svg]:h-auto [&_svg]:w-full" dangerouslySetInnerHTML={{ __html: generatedSvg }} />
             ) : family === "card" ? (
-              <div className="w-full max-w-xs" style={output.style}>
-                <p className="text-base font-semibold" style={{ color: values.text ?? "#111827" }}>A card preview</p>
-                <p className="env-card__description mt-2 text-sm" style={{ color: values.muted ?? "#475569" }}>See how spacing, surface and depth work together in a real component.</p>
-                <span className="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Learn more</span>
+              <div className="w-full max-w-xs space-y-3" style={output.style}>
+                {values.layout === "product" ? <div className="flex h-28 items-center justify-center rounded-lg" style={{ background: "linear-gradient(135deg, " + (values.accent ?? "#0d9f8a") + "22, " + (values.accent ?? "#0d9f8a") + "66)" }}><span className="text-3xl" aria-hidden="true">◇</span></div> : null}
+                {values.layout === "profile" ? <div className="flex items-center gap-3"><span className="flex size-12 items-center justify-center rounded-full font-bold text-white" style={{ background: values.accent ?? "#0d9f8a" }}>EN</span><div><p className="text-sm font-semibold">Alex Morgan</p><p className="text-xs" style={{ color: values.muted ?? "#475569" }}>Product designer</p></div></div> : null}
+                {values.layout === "article" ? <p className="env-card__eyebrow">Design insights · 6 min read</p> : null}
+                {values.layout === "metric" ? <><p className="env-card__eyebrow">Monthly revenue</p><p className="text-3xl font-bold">$12,480</p><p className="text-xs font-semibold" style={{ color: values.accent ?? "#0d9f8a" }}>↗ 12.4% this month</p></> : null}
+                {values.layout !== "metric" ? <><p className="env-card__eyebrow">{values.layout === "product" ? "Featured product" : values.layout === "profile" ? "Team member" : values.layout === "article" ? "Featured story" : "Workspace"}</p><p className="env-card__title">{values.layout === "product" ? "Everyday essentials" : values.layout === "profile" ? "Alex's design profile" : values.layout === "article" ? "Designing with intention" : "A card preview"}</p><p className="env-card__description text-sm">{values.layout === "product" ? "A product card with a clear image area and action." : values.layout === "profile" ? "Introduce a person, their role and what they work on." : values.layout === "article" ? "A readable article preview with a clear category and summary." : "See how spacing, surface and depth work together in a real component."}</p></> : null}
+                {values.layout !== "profile" ? <span className="env-card__action text-xs">{values.layout === "product" ? "View product →" : values.layout === "metric" ? "View report →" : "Learn more →"}</span> : null}
               </div>
             ) : family === "input" ? (
               <input readOnly value="Input field preview" className="env-live-input w-full max-w-xs px-3 py-2 text-sm text-slate-800" style={output.style} />
             ) : family === "button" ? (
-              <button type="button" className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors motion-reduce:transition-none" style={output.style}>{sampleText}</button>
+              <button type="button" disabled={values.disabled === "yes"} className="env-live-button max-w-full whitespace-normal break-words font-semibold transition-colors motion-reduce:transition-none" style={output.style}>{sampleText}</button>
             ) : family === "badge" ? (
               <span style={output.style}>{sampleText.length > 18 ? "New feature" : sampleText}</span>
             ) : family === "text-shadow" ? (
@@ -611,6 +722,28 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
             )}
           </div>
           {family === "neomorph" ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5 text-muted">Neumorphic effects can make controls and boundaries difficult to distinguish. Keep labels visible, retain clear focus indicators and verify text and control contrast before using this treatment in an interface.</p> : null}
+          {componentContrast.length > 0 ? (
+            <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="component-contrast-heading">
+              <div>
+                <h4 id="component-contrast-heading" className="text-sm font-semibold text-fg">Component contrast check</h4>
+                <p className="mt-1 text-xs leading-5 text-muted">Checks the selected text and essential UI pairs against WCAG contrast reference thresholds.</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {componentContrast.map((item) => (
+                  <div key={item.label} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border p-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-fg">{item.label}</p>
+                      <p className="mt-1 text-[10px] text-muted">{item.criterion === "text" ? "Text ·" : "Non-text ·"} {item.threshold.toFixed(1)}:1 target</p>
+                    </div>
+                    <span className={`shrink-0 font-mono text-xs font-semibold ${item.passes ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}>
+                      {item.ratio.toFixed(2)}:1 · {item.passes ? "Pass" : "Review"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] leading-4 text-muted">These checks cover the listed color pairs only. They do not certify every component state, focus context or the complete interface.</p>
+            </section>
+          ) : null}
           <p className="text-xs leading-5 text-muted">The preview shows the main visual treatment. Check the exported code in your target browser and project before shipping.</p>
         </div>
       </div>

@@ -88,3 +88,34 @@ export function buildCssGradient(options: CssGradientOptions): string {
   }
   return `${prefix}linear-gradient(${angle}deg${interpolation}, ${stopText})`;
 }
+
+
+export type CssMeshGradientOptions = {
+  angle?: number;
+  colorSpace?: GradientColorSpace;
+  hueMethod?: GradientHueMethod;
+  fade?: number;
+};
+
+/** Build a layered, CSS-native mesh-style background with an sRGB-safe base layer. */
+export function buildCssMeshGradient(stops: GradientStop[], options: CssMeshGradientOptions = {}): string {
+  const normalized = normalizeGradientStops(stops);
+  if (normalized.length < 2) throw new Error("A mesh gradient needs at least two color stops.");
+
+  const angle = clamp(Number.isFinite(options.angle) ? options.angle ?? 135 : 135, 0, 360);
+  const requestedSpace = options.colorSpace ?? "srgb";
+  const colorSpace = VALID_COLOR_SPACES.has(requestedSpace) ? requestedSpace : "srgb";
+  const hueMethod = options.hueMethod && VALID_HUE_METHODS.has(options.hueMethod) ? options.hueMethod : "shorter";
+  const interpolation = colorSpace === "srgb"
+    ? ""
+    : ` in ${colorSpace}${POLAR_COLOR_SPACES.has(colorSpace) ? ` ${hueMethod} hue` : ""}`;
+  const fade = clamp(Number.isFinite(options.fade) ? options.fade ?? 72 : 72, 40, 92);
+  const verticalAnchors = [16, 84, 38, 66, 8, 92, 48, 56];
+  const layers = normalized.map((stop, index) => {
+    const x = Number(clamp(stop.position, 0, 100).toFixed(2));
+    const y = verticalAnchors[index % verticalAnchors.length];
+    return `radial-gradient(ellipse at ${x}% ${y}%${interpolation}, ${stop.color} 0%, transparent ${fade}%)`;
+  });
+  const fallback = `linear-gradient(${angle}deg, ${normalized[0].color}, ${normalized[normalized.length - 1].color})`;
+  return [...layers, fallback].join(", ");
+}

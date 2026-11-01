@@ -200,3 +200,5 @@ test("suggested contrast corrections respect the selected canvas color", () => {
   assert.ok(suggestion);
   assert.ok(contrastRatio(suggestion, background, canvas) >= 4.5);
 });
+
+

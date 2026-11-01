@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "./css-gradient.ts";
+import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "./css-gradient.ts";
 
 const sample: GradientStop[] = [
   { id: "end", color: "#ffffff", position: 100 },
@@ -38,4 +38,16 @@ test("gradient stop ordering can be adjusted with keyboard-accessible controls",
 
 test("gradient builder rejects less than two stops", () => {
   assert.throws(() => buildCssGradient({ kind: "linear", stops: [sample[0]] }), /at least two/);
+});
+
+
+test("mesh-style gradients stack positioned radial layers and retain an sRGB base", () => {
+  const mesh = buildCssMeshGradient(sample, { angle: 135, colorSpace: "oklch", hueMethod: "longer", fade: 70 });
+  assert.equal((mesh.match(/radial-gradient\(/g) ?? []).length, 3);
+  assert.match(mesh, /radial-gradient\(ellipse at 0% 16% in oklch longer hue, #000000 0%, transparent 70%\)/);
+  assert.match(mesh, /linear-gradient\(135deg, #000000, #ffffff\)$/);
+  const safe = buildCssMeshGradient(sample, { fade: 500, angle: -30, colorSpace: "invalid" as never });
+  assert.match(safe, /transparent 92%/);
+  assert.match(safe, /linear-gradient\(0deg,/);
+  assert.throws(() => buildCssMeshGradient([sample[0]]), /at least two/);
 });
