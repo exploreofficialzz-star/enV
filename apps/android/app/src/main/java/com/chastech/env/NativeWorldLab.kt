@@ -40,6 +40,7 @@ import com.chastech.env.engine.NativeSphereImpactResult
 import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabDc
 import com.chastech.env.engine.NativeLabDcResult
+import com.chastech.env.engine.NativeWorldLabPortableArchiveStore
 import com.chastech.env.engine.NativeWorldLabProjectStore
 import com.chastech.env.engine.WorldLabSavedLocal
 import com.chastech.env.engine.NativeWorldLabScience

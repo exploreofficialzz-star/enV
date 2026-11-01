@@ -50,7 +50,7 @@ fun NativeWorldLabEvidencePanel(project:NativeWorldLabProject,onError:(String)->
     Text("Immutable hypothetical science records are private to this device. "+
         "Saving a project is required first. Nothing is uploaded automatically.",
         style=MaterialTheme.typography.bodySmall)
-    OutlinedButton(onClick={refresh}){Text("Refresh device science history")}
+    OutlinedButton(onClick={refresh()}){Text("Refresh device science history")}
     if(items.isEmpty())Text("No saved gravity or thermal records for this invention.",
         style=MaterialTheme.typography.bodySmall)
     items.forEach{record->

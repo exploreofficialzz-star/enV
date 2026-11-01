@@ -95,7 +95,7 @@ class NativeWorldLabEvidenceStore(private val root:File){
         if(checked.getString("kind") in setOf("interface-optics","optical-scene-ray")){
             val optics=NativeWorldLabOpticsEvidenceStore(root)
             if(recordId in optics.list(projectId)){
-                require(JSONObject(optics.read(projectId,recordId)).similar(checked)){
+                require(NativeWorldLabJsonEquality.same(JSONObject(optics.read(projectId,recordId)),checked)){
                     "A different immutable optical result already uses this ID"
                 }
                 return
@@ -104,7 +104,7 @@ class NativeWorldLabEvidenceStore(private val root:File){
         val dest=file(projectId,recordId)
         if(dest.isFile){
             val existing=read(projectId,checked.getString("id"))
-            require(existing.similar(record)){
+            require(NativeWorldLabJsonEquality.same(existing,record)){
                 "Immutable scientific evidence cannot replace a different record"}
             return
         }
@@ -398,5 +398,34 @@ object NativeWorldLabExtendedEvidence {
             }
             else->error("Unknown invented scientific computation")
         }
+    }
+}
+
+/** Structural JSON identity for immutable scientific records. Android's org.json
+ * has no JSONObject.similar method. Compare keys and nested values independent
+ * of field insertion order; numeric 1 and 1.0 are equivalent.
+ */
+internal object NativeWorldLabJsonEquality {
+    fun same(a:Any?,b:Any?,depth:Int=0):Boolean {
+        if(depth>40)return false
+        if(a==null||a==org.json.JSONObject.NULL)return b==null||b==org.json.JSONObject.NULL
+        if(b==null||b==org.json.JSONObject.NULL)return false
+        if(a is org.json.JSONObject&&b is org.json.JSONObject){
+            if(a.length()!=b.length())return false
+            val keys=a.keys().asSequence().toSet()
+            if(keys!=b.keys().asSequence().toSet())return false
+            return keys.all{key->same(a.opt(key),b.opt(key),depth+1)}
+        }
+        if(a is org.json.JSONArray&&b is org.json.JSONArray){
+            if(a.length()!=b.length())return false
+            return (0 until a.length()).all{i->same(a.opt(i),b.opt(i),depth+1)}
+        }
+        if(a is Number&&b is Number){
+            return runCatching{
+                java.math.BigDecimal(a.toString())
+                    .compareTo(java.math.BigDecimal(b.toString()))==0
+            }.getOrDefault(false)
+        }
+        return a==b
     }
 }

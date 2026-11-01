@@ -220,14 +220,14 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         val shared=NativeWorldLabEvidenceStore(root).list(projectId)
         val existingShared=shared.firstOrNull{it.getString("id")==id}
         if(existingShared!=null){
-            require(existingShared.similar(record)){
+            require(NativeWorldLabJsonEquality.same(existingShared,record)){
                 "A different immutable optical result already uses this ID."
             }
             return id // Same immutable content is already in complete-archive history.
         }
         val destination=file(projectId,id)
         if(destination.exists()){
-            require(JSONObject(read(projectId,id)).similar(record)){
+            require(NativeWorldLabJsonEquality.same(JSONObject(read(projectId,id)),record)){
                 "A different immutable optical result already uses this ID."
             }
             return id
