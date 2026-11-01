@@ -779,3 +779,8 @@ release-candidate evidence bundle are unfinished.
 - Fixed a functional mismatch in the Web sketch UI: rectangle and circle extrusion now consume the entered base-plane X/Y/Z centre and X/Y/Z orientation, rather than silently creating every extrusion at the origin with zero rotation.
 - Web regression coverage includes positive/negative half-grid snapping, atomic selection validation, unselected-part isolation and no mutation of source projects. CAD geometry remains bounded analytic primitives, not arbitrary B-rep or a full feature-history kernel.
 - This is source integration; exact-head Web type/build/browser, Android Gradle, iOS Xcode/simulator, accessibility and release-gate results remain unverified.
+
+## Android C/D compile blockers found by exact-head CI — 2026-11-01
+- Replaced the observer viewport's unavailable Compose key-event type property with the Android native key action constant; arrow/PageUp/PageDown camera controls now use the supported Android event API.
+- Replaced an unsupported JSONObject.similar call in CAD material interchange with the existing recursive, insertion-order-independent NativeWorldLabJsonEquality.same helper. Numeric JSON representations remain value-compared, arrays remain ordered, and object keys are exact.
+- These changes address the two compiler diagnostics reported by the Android Kotlin/lint job. The rerun is required to confirm the exact branch head; no Android pass is claimed yet.
