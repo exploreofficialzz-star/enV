@@ -13,7 +13,7 @@ test("oscillator adapter validates, initializes, advances and exposes computed r
   assert.equal(adapter.getOutputs(state).positionM,0.5);
   for(let i=0;i<100;i++) state=adapter.advance(state,{deltaSeconds:0.01,maximumInternalStepSeconds:0.002}).state;
   const output=adapter.getOutputs(state);
-  assert.equal(output.simulatedSeconds,1);
+  assert.ok(Math.abs(output.simulatedSeconds-1)<1e-12);
   assert.ok(Number.isFinite(output.mechanicalEnergyJ)&&output.mechanicalEnergyJ>=0);
   assert.ok(state.stepIndex>=500);
   assert.deepEqual(adapter.diagnostics(state).map(x=>x.severity),["info"]);
