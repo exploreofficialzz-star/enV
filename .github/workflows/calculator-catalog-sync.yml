@@ -84,7 +84,6 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch native Android and iOS build validation
-        if: steps.generated.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
