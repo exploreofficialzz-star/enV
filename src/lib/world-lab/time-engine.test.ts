@@ -60,6 +60,11 @@ test("seek snaps to an authoritative sample and checkpoint restores independent 
  assert.deepEqual(restored,sought);
  const bad=JSON.parse(JSON.stringify(cp));bad.clock.wallTimeUTC="invalid";
  assert.throws(()=>restoreTimeEngineCheckpoint(r,bad),/valid UTC/);
+ const mismatched=JSON.parse(JSON.stringify(cp));
+ mismatched.sampleIndex=0;mismatched.sample=r.samples[0];
+ assert.throws(()=>restoreTimeEngineCheckpoint(r,mismatched),/sample index/);
+ const outOfRange=JSON.parse(JSON.stringify(cp));outOfRange.sampleIndex=r.samples.length;
+ assert.throws(()=>restoreTimeEngineCheckpoint(r,outOfRange),/different run/);
 });
 test("invalid clock speeds and timezones are rejected",()=>{
  const r=run();
