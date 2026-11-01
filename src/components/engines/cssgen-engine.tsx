@@ -139,7 +139,8 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "density", label: "Texture density", type: "number", defaultValue: 12, min: 4, max: 48, step: 1 },
     { name: "softness", label: "Mesh softness", type: "number", defaultValue: 72, min: 35, max: 95, suffix: "%" },
     { name: "size", label: "Particle size", type: "number", defaultValue: 8, min: 2, max: 28, suffix: "px" },
-    { name: "opacity", label: "Artwork opacity", type: "number", defaultValue: 0.72, min: 0, max: 1, step: 0.01 },
+    { name: "scatterOpacity", label: "Particle opacity", type: "number", defaultValue: 0.72, min: 0, max: 1, step: 0.01 },
+    { name: "textureOpacity", label: "Texture opacity", type: "number", defaultValue: 0.22, min: 0, max: 1, step: 0.01 },
     { name: "rotation", label: "Rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Primary color", type: "color", defaultValue: "#0d9f8a" },
     { name: "secondary", label: "Secondary color", type: "color", defaultValue: "#7c4dff" },
@@ -387,7 +388,7 @@ function cssFor(
       svg = buildScatterSvg({
         seed, count: numberValue(values, "count", 120, 12, 400), color, secondary, background,
         style: (values.scatterStyle ?? "dots") as import("@/lib/engines/svg-backgrounds").ScatterStyle,
-        size: numberValue(values, "size", 8, 2, 28), opacity: numberValue(values, "opacity", 0.72, 0, 1),
+        size: numberValue(values, "size", 8, 2, 28), opacity: numberValue(values, "scatterOpacity", 0.72, 0, 1),
         transparent,
       });
     } else if (artStyle === "mesh-gradient") {
@@ -399,7 +400,7 @@ function cssFor(
       svg = buildTextureSvg({
         seed, style: (values.textureStyle ?? "paper") as import("@/lib/engines/svg-backgrounds").TextureStyle,
         color, background, density: numberValue(values, "density", 12, 4, 48),
-        opacity: numberValue(values, "opacity", 0.22, 0, 1), transparent,
+        opacity: numberValue(values, "textureOpacity", 0.22, 0, 1), transparent,
       });
     } else {
       svg = buildBlobSvg({
@@ -461,9 +462,9 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
       const byStyle: Record<string, string[]> = {
         organic: ["points", "irregularity", "rotation", "stroke", "strokeWidth"],
         "low-poly": ["detail", "secondary", "background", "rotation", "stroke", "strokeWidth"],
-        scatter: ["scatterStyle", "count", "secondary", "background", "size", "opacity"],
+        scatter: ["scatterStyle", "count", "secondary", "background", "size", "scatterOpacity"],
         "mesh-gradient": ["secondary", "background", "softness"],
-        texture: ["textureStyle", "background", "density", "opacity"],
+        texture: ["textureStyle", "background", "density", "textureOpacity"],
       };
       const visible = new Set([...common, ...(byStyle[style] ?? byStyle.organic)]);
       return allFields.filter((field) => visible.has(field.name));
