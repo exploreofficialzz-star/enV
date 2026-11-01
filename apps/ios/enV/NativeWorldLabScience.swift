@@ -23,6 +23,7 @@ struct NativeLabResult {
     var temperatureK:[Double]?
     var meanTemperatureK:Double?
     var peakTemperatureK:Double?
+    var solverStepSeconds:Double=1.0/240.0
 }
 enum NativeWorldLabScience {
     static let heatCells=21
@@ -61,6 +62,7 @@ enum NativeWorldLabScience {
         }
         let steps=Int(required),h=steps==0 ? 0 : t/Double(steps)
         var result=NativeLabResult(timeSeconds:t)
+        result.solverStepSeconds=steps==0 ? 1.0/240.0 : h
         switch input {
         case let .spring(m,k,c,startX,startV):
             var x=startX,v=startV

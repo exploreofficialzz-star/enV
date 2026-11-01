@@ -605,8 +605,9 @@ struct NativeWorldLabView:View {
                     .font(.caption).accessibilityLabel("Wall clock in UTC")
                 Text("World date (UTC): "+ISO8601DateFormatter().string(from:worldEpochUTC.addingTimeInterval(seconds)))
                     .font(.caption).accessibilityLabel("Simulated world date in UTC")
-                Text("Simulation "+String(format:"%.4f",seconds)+" s · solver sample "+String(format:"%.4f",seconds)+
-                    " s · display sample "+String(format:"%.4f",seconds)+" s · "+TimeZone.current.identifier)
+                Text("Simulation "+String(format:"%.4f",seconds)+" s · solver internal time "+String(format:"%.4f",values?.timeSeconds ?? seconds)+
+                    " s · display sample "+String(format:"%.4f",seconds)+" s · solver Δt "+
+                    String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)+" s · "+TimeZone.current.identifier)
                     .font(.caption)
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in if editing{playing=false} }).accessibilityLabel("Simulated elapsed time")

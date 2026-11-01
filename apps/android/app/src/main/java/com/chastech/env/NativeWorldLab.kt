@@ -1599,7 +1599,8 @@ fun NativeWorldLabForm() {
             java.time.Instant.parse(worldEpochUTC).plusNanos((time*1_000_000_000.0).toLong()).toString()
         }.getOrDefault(worldEpochUTC),style=MaterialTheme.typography.bodySmall)
         Text("Simulation "+labNumber(time.toDouble())+" s · Solver sample "+labNumber(time.toDouble())+
-            " s · Display sample "+labNumber(time.toDouble())+" s · "+java.time.ZoneId.systemDefault().id,
+            " s · Display sample "+labNumber(time.toDouble())+" s · solver Δt "+
+            labNumber(observation?.solverStepSeconds?:1.0/240.0)+" s · "+java.time.ZoneId.systemDefault().id,
             style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick={playing=false;reversePlayback=false;time=0f}) { Text("Beginning") }

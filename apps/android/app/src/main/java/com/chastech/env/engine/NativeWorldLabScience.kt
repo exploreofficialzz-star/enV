@@ -17,7 +17,8 @@ data class NativeLabResult(val timeSeconds:Double, val modelVersion:String="1.0.
     val xMeters:Double?=null,val velocityMPerS:Double?=null,val mechanicalEnergyJ:Double?=null,
     val voltageV:Double?=null,val currentA:Double?=null,val resistorHeatW:Double?=null,
     val storedEnergyJ:Double?=null,val temperatureK:List<Double>?=null,
-    val meanTemperatureK:Double?=null,val peakTemperatureK:Double?=null)
+    val meanTemperatureK:Double?=null,val peakTemperatureK:Double?=null,
+    val solverStepSeconds:Double=1.0/240.0)
 
 object NativeWorldLabScience {
     const val HEAT_CELLS=21
@@ -56,6 +57,7 @@ object NativeWorldLabScience {
         require(requested<=50000){"Model exceeds 50,000-step local scientific limit"}
         val steps=requested.toInt()
         val h=if(steps==0)0.0 else atSeconds/steps
+        val solverStepSeconds=if(steps==0)1.0/240.0 else h
         return when(input){
             is NativeLabInput.Spring->{
                 var x=input.x0;var v=input.v0
@@ -71,7 +73,8 @@ object NativeWorldLabScience {
                 }
                 require(x.isFinite()&&v.isFinite()){"Nonfinite calculated motion"}
                 NativeLabResult(atSeconds,xMeters=x,velocityMPerS=v,
-                    mechanicalEnergyJ=(input.massKg*v*v+input.springNPerM*x*x)/2)
+                    mechanicalEnergyJ=(input.massKg*v*v+input.springNPerM*x*x)/2,
+                    solverStepSeconds=solverStepSeconds)
             }
             is NativeLabInput.RC->{
                 val voltage:Double
@@ -91,7 +94,8 @@ object NativeWorldLabScience {
                 }
                 NativeLabResult(atSeconds,voltageV=voltage,currentA=current,
                     resistorHeatW=current*current*input.resistanceOhm,
-                    storedEnergyJ=input.capacitanceF*voltage*voltage/2)
+                    storedEnergyJ=input.capacitanceF*voltage*voltage/2,
+                    solverStepSeconds=solverStepSeconds)
             }
             is NativeLabInput.Heat->{
                 var cells=DoubleArray(HEAT_CELLS){i->
@@ -106,7 +110,8 @@ object NativeWorldLabScience {
                 }
                 require(cells.all{it.isFinite()&&it>=0.0&&it<=2000.0}){"Invalid temperature field"}
                 NativeLabResult(atSeconds,temperatureK=cells.toList(),
-                    meanTemperatureK=cells.average(),peakTemperatureK=cells.maxOrNull())
+                    meanTemperatureK=cells.average(),peakTemperatureK=cells.maxOrNull(),
+                    solverStepSeconds=solverStepSeconds)
             }
         }
     }
