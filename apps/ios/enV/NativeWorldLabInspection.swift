@@ -20,7 +20,7 @@ enum NativeWorldLabInspectionAxis:String,CaseIterable,Identifiable {
     var id:String { rawValue }
     var index:Int { self == .x ? 0 : self == .y ? 1 : 2 }
 }
-struct NativeWorldLabInspectionSettings {
+struct NativeWorldLabInspectionSettings:Equatable {
     var mode:NativeWorldLabInspectionMode = .normal
     var opacity:Double = 0.32
     var axis:NativeWorldLabInspectionAxis = .x
@@ -199,5 +199,40 @@ enum NativeWorldLabInspectionGeometry {
         let geometry=SCNGeometry(sources:[source,normalSource],elements:[element])
         geometry.firstMaterial?.isDoubleSided=true
         return geometry
+    }
+}
+
+
+/// Bounded reversible inspection state, separate from invention-edit history.
+struct NativeWorldLabInspectionHistory {
+    private(set) var past:[NativeWorldLabInspectionSettings]=[]
+    private(set) var present=NativeWorldLabInspectionSettings()
+    private(set) var future:[NativeWorldLabInspectionSettings]=[]
+    static let limit=50
+    init(present:NativeWorldLabInspectionSettings = NativeWorldLabInspectionSettings()) {
+        self.present=present
+    }
+    mutating func commit(_ next:NativeWorldLabInspectionSettings)throws {
+        try next.validate()
+        guard next != present else{return}
+        past.append(present)
+        if past.count>Self.limit { past.removeFirst(past.count-Self.limit) }
+        present=next
+        future.removeAll(keepingCapacity:true)
+    }
+    @discardableResult mutating func undo()->NativeWorldLabInspectionSettings? {
+        guard let previous=past.popLast() else{return nil}
+        future.insert(present,at:0)
+        if future.count>Self.limit { future.removeLast(future.count-Self.limit) }
+        present=previous
+        return present
+    }
+    @discardableResult mutating func redo()->NativeWorldLabInspectionSettings? {
+        guard !future.isEmpty else{return nil}
+        let next=future.removeFirst()
+        past.append(present)
+        if past.count>Self.limit { past.removeFirst(past.count-Self.limit) }
+        present=next
+        return present
     }
 }
