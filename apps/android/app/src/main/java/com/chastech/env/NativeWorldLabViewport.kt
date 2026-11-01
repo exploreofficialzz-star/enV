@@ -71,19 +71,16 @@ fun NativeWorldLabViewport(
     onClearGeodeticOrigin:()->Unit,
 ){
     val screenDensity=LocalDensity.current.density
-    val cameraDeltaX=project.cameraPositionMeters.x-project.cameraLookingAtMeters.x
-    val cameraDeltaY=project.cameraPositionMeters.y-project.cameraLookingAtMeters.y
-    val cameraDeltaZ=project.cameraPositionMeters.z-project.cameraLookingAtMeters.z
-    val horizontal=hypot(cameraDeltaX,cameraDeltaZ).coerceAtLeast(0.25)
+    val savedCameraPose=remember(project.id,project.revision){
+        NativeWorldLabCamera.poseFromPosition(project.cameraPositionMeters,project.cameraLookingAtMeters)
+    }
+    val horizontal=(savedCameraPose.distanceMeters*cos(Math.toRadians(savedCameraPose.elevationDegrees)))
+        .coerceAtLeast(0.25)
     var zoom by remember(project.id,project.revision){
         mutableFloatStateOf((45.0*8.0/horizontal).toFloat().coerceIn(0.1f,160f))
     }
-    var yaw by remember(project.id,project.revision){
-        mutableFloatStateOf(atan2(cameraDeltaX,-cameraDeltaZ).toFloat())
-    }
-    var elevation by remember(project.id,project.revision){
-        mutableFloatStateOf(Math.toDegrees(atan2(cameraDeltaY,horizontal)).toFloat().coerceIn(-85f,85f))
-    }
+    var yaw by remember(project.id,project.revision){mutableFloatStateOf(savedCameraPose.yawRadians.toFloat())}
+    var elevation by remember(project.id,project.revision){mutableFloatStateOf(savedCameraPose.elevationDegrees.toFloat().coerceIn(-85f,85f))}
     var observerDepthMeters by remember(project.id,project.revision){mutableFloatStateOf(0f)}
     var pan by remember(project.id,project.revision){mutableStateOf(Offset.Zero)}
     val focus=NativeLabVector(project.cameraLookingAtMeters.x,
@@ -365,11 +362,11 @@ fun NativeWorldLabViewport(
         OutlinedButton(onClick={
             val saved=project.cameraPositionMeters
             val target=project.cameraLookingAtMeters
-            val dx=saved.x-target.x;val dz=saved.z-target.z
-            val h=hypot(dx,dz).coerceAtLeast(0.25)
+            val pose=NativeWorldLabCamera.poseFromPosition(saved,target)
+            val h=(pose.distanceMeters*cos(Math.toRadians(pose.elevationDegrees))).coerceAtLeast(0.25)
             zoom=(45.0*8.0/h).toFloat().coerceIn(0.1f,160f)
-            yaw=atan2(-dx,-dz).toFloat()
-            elevation=Math.toDegrees(atan2(saved.y-target.y,h)).toFloat().coerceIn(5f,80f)
+            yaw=pose.yawRadians.toFloat()
+            elevation=pose.elevationDegrees.toFloat().coerceIn(-85f,85f)
             observerDepthMeters=0f;pan=Offset.Zero
         }){Text("Restore saved view")}
         OutlinedButton(onClick={

@@ -34,3 +34,25 @@ class NativeWorldLabCameraTest {
             NativeLabVector(0.0,0.0,0.0),NativeLabVector(0.0,0.0,0.0),0.0,0.0,0.0,400.0,0.0,0.0,800.0,600.0)}
     }
 }
+
+    @Test fun savedObserverPositionRoundTripsToSamePerspectivePose(){
+        val targets=listOf(NativeLabVector(0.0,0.0,0.0),NativeLabVector(125.0,-20.0,640.0))
+        val desired=listOf(NativeWorldLabCameraPose(0.7,35.0,12.0),
+            NativeWorldLabCameraPose(-2.1,-42.0,4500.0))
+        for(i in targets.indices){
+            val position=NativeWorldLabCamera.positionFromPose(targets[i],desired[i])
+            val recovered=NativeWorldLabCamera.poseFromPosition(position,targets[i])
+            assertEquals(desired[i].yawRadians,recovered.yawRadians,1e-12)
+            assertEquals(desired[i].elevationDegrees,recovered.elevationDegrees,1e-10)
+            assertEquals(desired[i].distanceMeters,recovered.distanceMeters,1e-9)
+        }
+    }
+    @Test fun savedObserverPoseRejectsDegenerateAndInvalidPositions(){
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabCamera.poseFromPosition(NativeLabVector(0.0,0.0,0.0),NativeLabVector(0.0,0.0,0.0))
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabCamera.positionFromPose(NativeLabVector(0.0,0.0,0.0),
+                NativeWorldLabCameraPose(0.0,90.0,10.0))
+        }
+    }
