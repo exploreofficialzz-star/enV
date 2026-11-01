@@ -133,6 +133,14 @@ for (const [browserName, browserType] of browserEntries) {
   await page.setViewportSize({ width: 1280, height: 900 });
   const paletteResponse = await page.goto(baseUrl + "/tools/design/palette-generator", { waitUntil: "domcontentloaded", timeout: 60000 });
   assert.ok(paletteResponse && paletteResponse.ok(), "Palette Generator route should respond successfully");
+  const swatchExport = page.locator('[aria-labelledby="palette-swatch-export-heading"]');
+  await swatchExport.waitFor({ state: "visible" });
+  const [pngDownload] = await Promise.all([
+    page.waitForEvent("download", { timeout: 15000 }),
+    page.getByRole("button", { name: "Download PNG", exact: true }).click(),
+  ]);
+  assert.match(pngDownload.suggestedFilename(), /\\.png$/i, "Palette PNG export should produce a PNG file");
+
   const layoutSelect = page.getByLabel("Page preview layout");
   await layoutSelect.waitFor({ state: "visible" });
   for (const layout of ["landing", "dashboard", "forms", "content"]) {
