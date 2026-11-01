@@ -1110,7 +1110,7 @@ object NativeWorldLabEditor {
         val position=listOf(
             solid.positionMeters.x,solid.positionMeters.y,solid.positionMeters.z
         ).map{value->
-            val snapped=kotlin.math.round(value/gridMeters)*gridMeters
+            val snapped=kotlin.math.floor(value/gridMeters+0.5)*gridMeters
             val rounded=kotlin.math.round(snapped*1e6)/1e6
             require(rounded.isFinite() && rounded in -100000.0..100000.0){
                 "Snapped coordinate is outside the local world"
@@ -1118,6 +1118,26 @@ object NativeWorldLabEditor {
             rounded
         }
         return positionSolid(source,id,position)
+    }
+    /** Snap every selected part in one validated edit and one revision. */
+    fun snapSolids(source:String,ids:List<String>,gridMeters:Double):String=edit(source){project->
+        require(gridMeters.isFinite()&&gridMeters in 0.001..100.0){
+            "Grid spacing must be 0.001 to 100 metres"
+        }
+        val (_,selected)=selectedCadRows(project,ids)
+        selected.forEach{solid->
+            val original=solid.getJSONArray("positionMeters")
+            require(original.length()==3){"Selected CAD coordinates are invalid"}
+            val snapped=(0..2).map{axis->
+                val raw=kotlin.math.floor(original.getDouble(axis)/gridMeters+0.5)*gridMeters
+                val rounded=kotlin.math.round(raw*1e6)/1e6
+                require(rounded.isFinite()&&rounded in -100000.0..100000.0){
+                    "Snapped position exceeds the local-world coordinate envelope"
+                }
+                if(rounded==0.0)0.0 else rounded
+            }
+            solid.put("positionMeters",JSONArray(snapped))
+        }
     }
     data class GeometryMeasurement(
         val fromId:String,val toId:String,
