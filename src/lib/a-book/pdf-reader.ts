@@ -119,7 +119,6 @@ export async function extractPdfTextLocally(
 
     const loadingTask = pdfjs.getDocument({
       data: bytes,
-      isEvalSupported: false,
       useSystemFonts: true,
       enableXfa: false,
       verbosity: 0,
