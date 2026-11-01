@@ -241,13 +241,13 @@ class NativeWorldLabEditorTest {
     @Test fun mirrorAndCircularPatternPreserveGeometryAndPortableIdentity(){
         var json=NativeWorldLabEditor.blank()
         json=NativeWorldLabEditor.addSolid(json,"box",id="base")
-        json=NativeWorldLabEditor.mirrorSolid(json,"base",0,0.0)
+        json=NativeWorldLabEditor.mirrorSolid(json,"base",0,1.0)
         var p=NativeWorldLabProjectCodec.decode(json)
-        assertEquals(-2.0,p.entities.single().positionMeters.x,0.0)
-        json=NativeWorldLabEditor.circularPattern(json,"base",2,listOf(0.0,0.0,0.0),4)
+        assertEquals(2.0,p.entities.single().positionMeters.x,0.0)
+        json=NativeWorldLabEditor.circularPattern(json,"base",2,listOf(0.0,0.5,0.0),4)
         p=NativeWorldLabProjectCodec.decode(json)
         assertEquals(4,p.entities.size)
         p.entities.drop(1).forEach{e->
-            assertEquals(2.0,kotlin.math.hypot(e.positionMeters.x,e.positionMeters.y),1e-9)
+            assertEquals(2.0,kotlin.math.hypot(e.positionMeters.x,e.positionMeters.y-0.5),1e-9)
         }
     }

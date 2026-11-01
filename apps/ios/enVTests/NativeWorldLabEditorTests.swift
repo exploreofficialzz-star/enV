@@ -237,8 +237,8 @@ final class NativeWorldLabEditorTests: XCTestCase {
         data=try NativeWorldLabEditor.setGeodeticOrigin(data,
             origin:NativeGeodetic(latitudeDegrees:51.5074,longitudeDegrees:-0.1278,heightMeters:35))
         var p=try NativeWorldLabProject.decode(data)
-        XCTAssertEqual(p.world.geodeticOrigin?.latitudeDegrees,51.5074,accuracy:1e-12)
-        XCTAssertEqual(p.world.geodeticOrigin?.longitudeDegrees,-0.1278,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(p.world.geodeticOrigin?.latitudeDegrees),51.5074,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(p.world.geodeticOrigin?.longitudeDegrees),-0.1278,accuracy:1e-12)
         data=try NativeWorldLabEditor.setGeodeticOrigin(data,origin:nil)
         p=try NativeWorldLabProject.decode(data)
         XCTAssertNil(p.world.geodeticOrigin)
@@ -248,14 +248,14 @@ final class NativeWorldLabEditorTests: XCTestCase {
 
     func testNativeMirrorAndCircularPatternKeepAValidPortableProject() throws {
         var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"base")
-        data=try NativeWorldLabEditor.mirrorSolid(data,id:"base",axis:0,planeMeters:0)
+        data=try NativeWorldLabEditor.mirrorSolid(data,id:"base",axis:0,planeMeters:1)
         var p=try NativeWorldLabProject.decode(data)
-        XCTAssertEqual(p.entities[0].positionMeters[0],-2,accuracy:1e-12)
+        XCTAssertEqual(p.entities[0].positionMeters[0],2,accuracy:1e-12)
         data=try NativeWorldLabEditor.circularPattern(data,id:"base",axis:2,
-            centerMeters:[0,0,0],instances:4)
+            centerMeters:[0,0.5,0],instances:4)
         p=try NativeWorldLabProject.decode(data)
         XCTAssertEqual(p.entities.count,4)
         for e in p.entities.dropFirst(){
-            XCTAssertEqual(hypot(e.positionMeters[0],e.positionMeters[1]),2,accuracy:1e-9)
+            XCTAssertEqual(hypot(e.positionMeters[0],e.positionMeters[1]-0.5),2,accuracy:1e-9)
         }
     }

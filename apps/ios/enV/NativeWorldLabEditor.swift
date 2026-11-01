@@ -442,10 +442,7 @@ enum NativeWorldLabEditor {
             root["camera"]=camera
         }
     }
-    private static func rotationMatrix(_ angles:[Double])throws->[[Double]] {
-        guard angles.count==3,angles.allSatisfy({$0.isFinite}) else {
-            throw NativeWorldLabError.invalid("Rotation must have three finite angles")
-        }
+    private static func rotationMatrix(_ angles:[Double])->[[Double]] {
         let (x,y,z)=(angles[0],angles[1],angles[2])
         let cx=cos(x),sx=sin(x),cy=cos(y),sy=sin(y),cz=cos(z),sz=sin(z)
         return [[cy*cz+sy*sx*sz,-cy*sz+sy*sx*cz,sy*cx],
@@ -477,7 +474,7 @@ enum NativeWorldLabEditor {
             position[axis]=2*planeMeters-position[axis]
             guard position[axis].isFinite && abs(position[axis])<=100000 else{return}
             let angles=solid["rotationRadians"] as? [Double] ?? [0,0,0]
-            let r=try Self.rotationMatrix(angles)
+            let r=Self.rotationMatrix(angles)
             var signs=[1.0,1.0,1.0];signs[axis] = -1
             let local=[-1.0,1.0,1.0]
             let reflected=(0..<3).map{row in (0..<3).map{col in signs[row]*r[row][col]*local[col]}}
@@ -502,7 +499,7 @@ enum NativeWorldLabEditor {
             guard position.count==3 else {throw NativeWorldLabError.invalid("Pattern source position is invalid")}
             let a=axis,b=(a+1)%3,c=(a+2)%3
             let angles=source["rotationRadians"] as? [Double] ?? [0,0,0]
-            let sourceRotation=try Self.rotationMatrix(angles)
+            let sourceRotation=Self.rotationMatrix(angles)
             for index in 1..<instances {
                 let angle=2*Double.pi*Double(index)/Double(instances)
                 let co=cos(angle),si=sin(angle)
@@ -514,7 +511,7 @@ enum NativeWorldLabEditor {
                     throw NativeWorldLabError.invalid("Circular-pattern position overflow")
                 }
                 var world=Array(repeating:Array(repeating:0.0,count:3),count:3)
-                world[a][a]=1;world[b][b]=co;world[b][c = c] = -si
+                world[a][a]=1;world[b][b]=co;world[b][c] = -si
                 world[c][b]=si;world[c][c]=co
                 var clone=source
                 clone["id"]=UUID().uuidString
