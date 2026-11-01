@@ -405,6 +405,8 @@ export function ABookEngine() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(file.blob));
       setPreviewFileName(file.name);
+      setPdfText("");
+      setPdfTextSearch("");
       setError("");
     });
   }
@@ -412,6 +414,8 @@ export function ABookEngine() {
   async function extractSelectedPdfText() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
     if (!files.length) { setError("Select at least one PDF."); return; }
+    setPdfText("");
+    setPdfTextSearch("");
     await runPdfOperation("Extracting PDF text", "The selected PDF text could not be extracted locally.", async (signal) => {
       if (files.length === 1) {
         const file = files[0];
