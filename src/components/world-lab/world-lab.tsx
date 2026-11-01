@@ -27,6 +27,7 @@ import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {WorldLabOpticsPanel} from "./optics-panel";
 import {WorldLabGravityPanel} from "./gravity-panel";
 import {WorldLabElasticWavePanel} from "./elastic-wave-panel";
+import {WorldLabCadPanel} from "./cad-panel";
 import {WorldLabRadiationPanel} from "./radiation-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
@@ -50,7 +51,8 @@ import {runFluidMotion,sampleFluidMotion,type FluidMotionRun}
 import { WorldLabFluidCutaway } from "./fluid-cutaway";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
-import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES } from "@/lib/world-lab/observer";
+import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES,
+  observerAdaptiveStepMetres,observerClippingPlanes,observerRangeMetres } from "@/lib/world-lab/observer";
 import {
   advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
   HEAT_CELLS, type AssumedMassSource, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
@@ -90,6 +92,7 @@ type WorldLabCloudReply=Readonly<{
 type SceneHandles = {
   engine: B.Engine;
   scene: B.Scene;
+  camera: B.UniversalCamera;
   device: B.Mesh;
   circuit: B.Mesh;
   deviceMaterial: B.StandardMaterial;
@@ -152,6 +155,8 @@ export default function WorldLab() {
   const [playing, setPlaying] = useState(false);
   const [seeInside, setSeeInside] = useState(false);
   const [observerDepth, setObserverDepth] = useState(0);
+  const [observerRange,setObserverRange]=useState(8);
+  const cameraRestoredProject=useRef("");
   const visualSettings = useRef({ seeInside: false, opacity: 55 });
   const [opacity, setOpacity] = useState(55);
   visualSettings.current = { seeInside, opacity };
@@ -441,6 +446,8 @@ export default function WorldLab() {
       scene.clearColor = new B.Color4(0.7, 0.83, 0.95, 1);
       const camera = new B.UniversalCamera("observer-eye-level", new B.Vector3(0, 1.65, -8), scene);
       camera.setTarget(new B.Vector3(0, 1.2, 0));
+      const loadedView=projectForEdits.current;
+      if(loadedView){camera.position.copyFromFloats(...loadedView.camera.positionMeters);camera.setTarget(new B.Vector3(...loadedView.camera.lookingAtMeters));cameraRestoredProject.current=loadedView.id;}
       camera.minZ = 0.03;
       camera.speed = 0.3;
       camera.angularSensibility = 1400;
@@ -449,9 +456,12 @@ export default function WorldLab() {
       camera.keysLeft = [65, 37];
       camera.keysRight = [68, 39];
       camera.attachControl(canvas, true);
+      const cameraRange=()=>observerRangeMetres(
+        [camera.position.x,camera.position.y,camera.position.z],
+        [camera.getTarget().x,camera.getTarget().y,camera.getTarget().z]);
       const wheelTravel = (event: WheelEvent) => {
         event.preventDefault();
-        const distance = observerTravelMetres(event.deltaY, "wheel");
+        const distance = observerTravelMetres(event.deltaY, "wheel",cameraRange());
         const candidate = camera.position.add(camera.getForwardRay().direction.scale(distance));
         if (candidate.length() <= OBSERVER_BOUNDS_METRES.maxRadius && candidate.y >= OBSERVER_BOUNDS_METRES.minHeight)
           camera.position.copyFrom(candidate);
@@ -468,7 +478,7 @@ export default function WorldLab() {
         const [a, b] = [...touches.values()];
         const distance = Math.hypot(a.x-b.x, a.y-b.y);
         if (pinchDistance > 0) {
-          const travel = observerTravelMetres(distance - pinchDistance, "pinch");
+          const travel = observerTravelMetres(distance - pinchDistance, "pinch",cameraRange());
           const candidate = camera.position.add(camera.getForwardRay().direction.scale(travel));
           if (candidate.length() <= OBSERVER_BOUNDS_METRES.maxRadius && candidate.y >= OBSERVER_BOUNDS_METRES.minHeight)
             camera.position.copyFrom(candidate);
@@ -485,7 +495,8 @@ export default function WorldLab() {
         // Accessible alternative to pointing down and pinching. No scene change.
         if (event.key !== "PageDown" && event.key !== "PageUp") return;
         event.preventDefault();
-        const nextY = camera.position.y + (event.key === "PageDown" ? -0.8 : 0.8);
+        const step=observerAdaptiveStepMetres(cameraRange());
+        const nextY = camera.position.y + (event.key === "PageDown" ? -step : step);
         if (nextY >= OBSERVER_BOUNDS_METRES.minHeight && Math.hypot(camera.position.x, nextY, camera.position.z) <= OBSERVER_BOUNDS_METRES.maxRadius)
           camera.position.y = nextY;
       };
@@ -494,7 +505,7 @@ export default function WorldLab() {
       ambient.intensity = 0.85;
       const sunlight = new B.DirectionalLight("sunlight", new B.Vector3(-0.4, -1, 0.6), scene);
       sunlight.intensity = 0.55;
-      const ground = B.MeshBuilder.CreateGround("representative-ground", { width: 160, height: 160 }, scene);
+      const ground = B.MeshBuilder.CreateGround("representative-ground", { width: 100000, height: 100000 }, scene);
       const groundMaterial = new B.StandardMaterial("ground", scene);
       groundMaterial.diffuseColor = B.Color3.FromHexString("#6D8E72");
       ground.material = groundMaterial;
@@ -502,12 +513,14 @@ export default function WorldLab() {
       // These large, layered volumes are intentionally illustrative, NOT site measurements.
       const strataMaterials: B.StandardMaterial[] = [];
       for (const layer of [
-        { center: -0.3, height: 0.6, color: "#75583C" },
-        { center: -1.4, height: 1.6, color: "#A1855F" },
-        { center: -3.5, height: 2.6, color: "#72767C" },
-        { center: -7.5, height: 5.4, color: "#535B68" },
+        { center: -2.5, height: 5, width: 2000, color: "#75583C" },
+        { center: -52.5, height: 95, width: 10000, color: "#A1855F" },
+        { center: -550, height: 900, width: 40000, color: "#72767C" },
+        { center: -5500, height: 9000, width: 100000, color: "#535B68" },
+        { center: -15000, height: 10000, width: 150000, color: "#46515C" },
+        { center: -25000, height: 10000, width: 200000, color: "#343D47" },
       ]) {
-        const rock = B.MeshBuilder.CreateBox("illustrative-earth-layer", { width: 160, height: layer.height, depth: 160 }, scene);
+        const rock = B.MeshBuilder.CreateBox("illustrative-earth-layer", { width: layer.width, height: layer.height, depth: layer.width }, scene);
         rock.position.y = layer.center;
         rock.isPickable = false;
         const material = new B.StandardMaterial("illustrative-rock", scene);
@@ -551,7 +564,12 @@ export default function WorldLab() {
         const now = performance.now();
         if (now - lastDepthLabelAt > 350) {
           lastDepthLabelAt = now;
-          setObserverDepth(old => Math.abs(old - depth) > 0.02 ? depth : old);
+          setObserverDepth(old => Math.abs(old - depth) > Math.max(0.02,depth*0.001) ? depth : old);
+          const range=cameraRange();
+          setObserverRange(old=>Math.abs(old-range)>Math.max(0.02,old*0.01)?range:old);
+          const clipping=observerClippingPlanes(range);
+          camera.minZ=clipping.minZ;camera.maxZ=clipping.maxZ;
+          camera.speed=Math.max(0.05,Math.min(400,observerAdaptiveStepMetres(range)*0.15));
         }
         scene?.render();
       });
@@ -562,7 +580,7 @@ export default function WorldLab() {
         const id = info.pickInfo?.pickedMesh?.metadata?.worldLabEntityId;
         if (typeof id === "string") setSelectedEntityId(id);
       });
-      sceneRef.current = { engine, scene, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments, groundMaterial, strataMaterials };
+      sceneRef.current = { engine, scene, camera, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments, groundMaterial, strataMaterials };
       // Callback-scoped cleanup also covers graphics initialization failures.
       observerNavigationCleanup = () => {
         canvas.removeEventListener("wheel", wheelTravel);
@@ -637,6 +655,7 @@ export default function WorldLab() {
         scene.addedShapes.set(entity.id, mesh);
       }
       mesh.position.copyFromFloats(...entity.positionMeters);
+      mesh.rotation.copyFromFloats(...(entity.rotationRadians??[0,0,0]));
       mesh.scaling.copyFromFloats(...entity.dimensionsMeters);
       if (mesh.material instanceof B.StandardMaterial) {
         mesh.material.diffuseColor = B.Color3.FromHexString(entity.color);
@@ -1013,6 +1032,36 @@ export default function WorldLab() {
     }
   }
 
+  function saveObserverViewpoint(){
+    const current=projectForEdits.current,camera=sceneRef.current?.camera;
+    if(!current||!camera)return;
+    try{
+      const target=camera.getTarget();
+      const next=parseWorldLabProject({...current,camera:{
+        positionMeters:[camera.position.x,camera.position.y,camera.position.z],
+        lookingAtMeters:[target.x,target.y,target.z],
+      }});
+      const edit=recordWorldLabEdit(editHistory.current,current,next);
+      if(edit.changed){editHistory.current=edit.history;setEditEpoch(n=>n+1);
+        setProject(edit.project);setWorkspaceDirty(true);}
+      cameraRestoredProject.current=current.id;
+      setMessage("Observer viewpoint saved inside this invention.");
+      setError("");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Viewpoint could not be saved.");}
+  }
+  function restoreObserverViewpoint(){
+    const current=projectForEdits.current,camera=sceneRef.current?.camera;
+    if(!current||!camera)return;
+    camera.position.copyFromFloats(...current.camera.positionMeters);
+    camera.setTarget(new B.Vector3(...current.camera.lookingAtMeters));
+    setMessage("Restored the saved observer viewpoint.");
+  }
+  function returnObserverToSurface(){
+    const camera=sceneRef.current?.camera;if(!camera)return;
+    camera.position.copyFromFloats(0,1.65,-8);
+    camera.setTarget(new B.Vector3(0,1.2,0));
+    setMessage("Returned to the illustrative surface starting point. Save the viewpoint to retain it.");
+  }
   function focusSelected() {
     const camera = sceneRef.current?.scene.activeCamera;
     if (!(camera instanceof B.UniversalCamera) || !selectedEntity) return;
@@ -1044,7 +1093,9 @@ export default function WorldLab() {
     if (!scene) return;
     const camera = scene.scene.activeCamera;
     if (!(camera instanceof B.UniversalCamera)) return;
-    const move = camera.getForwardRay().direction.scale(direction * 0.8);
+    const range=observerRangeMetres([camera.position.x,camera.position.y,camera.position.z],
+      [camera.getTarget().x,camera.getTarget().y,camera.getTarget().z]);
+    const move = camera.getForwardRay().direction.scale(direction * observerAdaptiveStepMetres(range));
     const next = camera.position.add(move);
     if (next.length() > OBSERVER_BOUNDS_METRES.maxRadius || next.y < OBSERVER_BOUNDS_METRES.minHeight) return;
     camera.position.copyFrom(next);
@@ -2485,7 +2536,7 @@ export default function WorldLab() {
               </div>
             )}
             <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-bg/90 px-2 py-1 text-xs text-fg">
-              {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · not measured
+              {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · {observerRange.toFixed(1)} m view scale · illustrative, not mapped
             </p>
           </div>
           <section className="mt-3 rounded-lg border border-border p-3" aria-label="Build interconnected visual assemblies">
@@ -2558,6 +2609,7 @@ export default function WorldLab() {
               </select>
             </label>
           </section>
+          <WorldLabCadPanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
               onClick={() => setSeeInside((value) => !value)}>See Inside</button>
@@ -2565,6 +2617,9 @@ export default function WorldLab() {
               aria-label="Zoom in">Zoom in</button>
             <button type="button" className={buttonClass} onClick={() => zoomView(-1)}
               aria-label="Zoom out">Zoom out</button>
+            <button type="button" className={buttonClass} onClick={saveObserverViewpoint}>Save viewpoint</button>
+            <button type="button" className={buttonClass} onClick={restoreObserverViewpoint}>Restore viewpoint</button>
+            <button type="button" className={buttonClass} onClick={returnObserverToSurface}>Return to surface</button>
             <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
               onClick={() => addShape("box")}>Add cube</button>
             <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
