@@ -78,7 +78,7 @@ const aBookTool: ToolMeta = {
   subcategory: "Notes & documents",
   keywords: ["a book", "notes", "notepad", "notebook", "local notes", "offline notes", "pdf", "document", "attachments", "markdown", "writing", "journal", "search", "folders", "tags"],
   tags: ["notes", "notebook", "documents", "pdf", "local", "offline", "productivity"],
-  icon: "NotebookPen",
+  icon: "FileText",
   iconBackground: "#24354a",
   iconAccent: "#d6e7f5",
   popularity: 950,
