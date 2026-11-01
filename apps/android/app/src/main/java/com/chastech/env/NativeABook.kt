@@ -27,7 +27,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import java.util.UUID
@@ -229,7 +228,7 @@ private fun importABookBackup(context:Context,db:ABookLocalDb,source:File):Int{
         var entry=zip.nextEntry
         while(entry!=null){
             val name=entry.name
-            require(!entry.isDirectory&&!name.startsWith("/")&&!name.contains("\\\\")&&name.split("/").none{it==".."||it=="."||it.isEmpty()}){"The backup contains an unsafe file path."}
+            require(!entry.isDirectory&&!name.startsWith("/")&&!name.contains("\\")&&name.split("/").none{it==".."||it=="."||it.isEmpty()}){"The backup contains an unsafe file path."}
             require(!entries.containsKey(name)&&entries.size<10001){"The backup contains duplicate or excessive entries."}
             val output=ByteArrayOutputStream()
             val buffer=ByteArray(8192);var count:Int
@@ -284,7 +283,7 @@ private fun importABookBackup(context:Context,db:ABookLocalDb,source:File):Int{
             val item=attachmentArray.getJSONObject(i)
             val newNoteId=idMap[item.getString("noteId")]?:throw IllegalArgumentException("An attachment refers to a missing note.")
             val archivePath=item.getString("path")
-            require(Regex("^attachments/\\\\d+\\\\.bin$").matches(archivePath)&&expectedPaths.add(archivePath)){"The backup contains an unsafe or duplicate attachment path."}
+            require(Regex("^attachments/\\d+\\.bin$").matches(archivePath)&&expectedPaths.add(archivePath)){"The backup contains an unsafe or duplicate attachment path."}
             val bytes=entries[archivePath]?:throw IllegalArgumentException("A backup attachment is missing.")
             val size=item.getLong("size")
             require(size==bytes.size.toLong()&&size<=100L*1024*1024){"A backup attachment failed its size check."}
