@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createABookArchive, readABookArchive } from "./archive.ts";
-import { assertABookAttachmentBatch, assertABookAttachmentSize } from "./local-store.ts";
+import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas } from "./local-store.ts";
 import type { ABookAttachment, ABookNote, ABookRevision } from "./local-store.ts";
 
 const note: ABookNote = {
@@ -121,4 +121,35 @@ test("A book exports stored ZIP entries accepted by the native iOS archive reade
   assert.equal(view.getUint32(centralOffset, true), 0x02014b50);
   assert.equal(view.getUint16(centralOffset + 10, true), 0);
   assert.deepEqual((await readABookArchive(archive)).attachments[0].blob.size, attachment.size);
+});
+
+
+test("A book backup restore enforces combined local note, revision and attachment quotas", () => {
+  const base = {
+    incomingNotes: 2,
+    existingNotes: 3,
+    incomingRevisions: 4,
+    existingRevisions: 5,
+    incomingAttachments: [],
+    existingAttachmentCount: 10,
+    existingAttachmentBytes: 1024,
+  };
+  assertABookImportQuotas(base);
+  assert.throws(() => assertABookImportQuotas({ ...base, incomingNotes: 10_000 }), /10,000 local notes/);
+  assert.throws(() => assertABookImportQuotas({ ...base, incomingRevisions: 100_000 }), /100,000 local revisions/);
+  assert.throws(() => assertABookImportQuotas({ ...base, existingAttachmentCount: 10_000, incomingAttachments: [{ blob: new Blob(["x"]), size: 1 }] }), /10,000 local attachments/);
+  assert.throws(() => assertABookImportQuotas({ ...base, existingAttachmentBytes: 150 * 1024 * 1024 + 1 }), /portable backup limit/);
+  assertABookImportQuotas({
+    ...base,
+    incomingAttachments: [{ blob: new Blob(["small"]), size: 5 }],
+  });
+  assert.throws(() => assertABookImportQuotas({
+    ...base,
+    incomingAttachments: [{ blob: new Blob(["different"]), size: 2 }],
+  }), /invalid recorded size/);
+  assert.throws(() => assertABookImportQuotas({
+    ...base,
+    existingAttachmentBytes: 150 * 1024 * 1024 - 1,
+    incomingAttachments: [{ blob: new Blob(["more"]), size: 4 }],
+  }), /150 MB/);
 });
