@@ -2487,6 +2487,7 @@ Text("Invent chemical heat").font(.headline)
 // MARK: - Independent native iOS elastic wave experiment
 private struct NativeWorldLabElasticWavePanel:View {
     let project:NativeWorldLabProject
+    @State private var evidenceStatus=""
     @State private var rodIndex=0
     @State private var mode="1"
     @State private var amplitude="0.00001"
@@ -2580,6 +2581,17 @@ private struct NativeWorldLabElasticWavePanel:View {
                         Text("Ideal total energy: "+String(format:"%.5g",sample.totalEnergyJ)+" J")
                             .font(.caption)
                     }
+                    Button("Keep wave with saved invention"){
+                        do {
+                            _ = try NativeWorldLabScientificEvidenceStore()
+                                .saveElasticWave(r,project:project)
+                            evidenceStatus="Wave evidence saved to private invention history."
+                            problem=""
+                        }catch {
+                            problem=error.localizedDescription
+                            evidenceStatus=""
+                        }
+                    }.buttonStyle(.bordered)
                     Button("Export elastic-wave evidence"){
                         do{
                             let frames=try (0...80).map{
@@ -2599,6 +2611,9 @@ private struct NativeWorldLabElasticWavePanel:View {
             } else {
                 Text("Invent a box or cylinder and assume density and Young's modulus.")
                     .font(.caption)
+            }
+            if !evidenceStatus.isEmpty {
+                Text(evidenceStatus).font(.caption).accessibilityAddTraits(.updatesFrequently)
             }
             if !problem.isEmpty{
                 Text(problem).font(.caption).foregroundStyle(.red)
@@ -2625,6 +2640,7 @@ private struct NativeWorldLabElasticWavePanel:View {
 // MARK: - Native inventor-driven radiative heat transfer
 private struct NativeWorldLabRadiationPanel:View {
     let project:NativeWorldLabProject
+    @State private var evidenceStatus=""
     @State private var selectedIndex=0
     @State private var initial="400"
     @State private var surrounding="300"
@@ -2723,6 +2739,17 @@ private struct NativeWorldLabRadiationPanel:View {
                          " J · energy residual "+
                          String(format:"%.5g",measured.energyResidualJ)+" J")
                         .font(.caption)
+                    Button("Keep radiative result with saved invention"){
+                        do {
+                            _ = try NativeWorldLabScientificEvidenceStore()
+                                .saveRadiation(r,project:project)
+                            evidenceStatus="Radiative evidence saved to private invention history."
+                            problem=""
+                        }catch {
+                            problem=error.localizedDescription
+                            evidenceStatus=""
+                        }
+                    }.buttonStyle(.bordered)
                     Button("Export radiation evidence"){
                         do{
                             let bytes=try JSONEncoder().encode(r)
@@ -2738,6 +2765,9 @@ private struct NativeWorldLabRadiationPanel:View {
             } else {
                 Text("Invent a solid and thermal material before radiating.")
                     .font(.caption)
+            }
+            if !evidenceStatus.isEmpty {
+                Text(evidenceStatus).font(.caption).accessibilityAddTraits(.updatesFrequently)
             }
             if !problem.isEmpty {
                 Text(problem).font(.caption).foregroundStyle(.red)

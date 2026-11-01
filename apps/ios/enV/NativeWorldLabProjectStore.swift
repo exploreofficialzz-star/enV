@@ -229,7 +229,7 @@ struct NativeWorldLabScientificEvidenceStore {
               let innerRevision=result["projectRevision"] as? Int,
               innerRevision==revision,
               result["evidence"] as? String=="physics-model-computed",
-              result["materialEvidence"] as? String=="hypothetical-user-assumed",
+              (result["materialEvidence"] as? String ?? result["inputEvidence"] as? String)=="hypothetical-user-assumed",
               let validity=result["validity"] as? String,
               validity.count>=30,validity.count<=2000,
               (expectedId == nil || expectedId == id) else {
@@ -285,6 +285,8 @@ struct NativeWorldLabScientificEvidenceStore {
                     throw NativeWorldLabError.invalid("Invalid optical ray segment")
                 }
             }
+        }else if kind=="elastic-wave" || kind=="thermal-radiation" {
+            try NativeWorldLabExtendedScienceValidation.inspect(result,kind:kind)
         }else if kind=="interface-optics" {
             guard result["format"] as? String=="env-world-lab-interface-optics",
                   result["modelVersion"] as? String=="1.0.0",
@@ -391,6 +393,14 @@ struct NativeWorldLabScientificEvidenceStore {
     @discardableResult func saveOpticalScene(_ run:NativeOpticalSceneRay,
         project:NativeWorldLabProject)throws->String {
         try store(run,kind:"optical-scene-ray",project:project)
+    }
+    @discardableResult func saveElasticWave(_ run:NativeElasticWaveRun,
+        project:NativeWorldLabProject)throws->String {
+        try store(run,kind:"elastic-wave",project:project)
+    }
+    @discardableResult func saveRadiation(_ run:NativeRadiationRun,
+        project:NativeWorldLabProject)throws->String {
+        try store(run,kind:"thermal-radiation",project:project)
     }
     func read(_ projectId:String,_ recordId:String)throws->Data {
         let url=try file(projectId,recordId)
@@ -596,5 +606,125 @@ struct NativeWorldLabPortableArchiveStore {
             try history.importRecord(item,projectId:imported.project.id)
         }
         return imported
+    }
+}
+
+
+/// Extended scientific evidence remains a strict mathematical record, not
+/// a trusted executable payload or proof of measured invented properties.
+private enum NativeWorldLabExtendedScienceValidation {
+    private static func number(_ object:[String:Any],_ key:String)throws->Double {
+        guard let value=object[key] as? NSNumber,value.doubleValue.isFinite else {
+            throw NativeWorldLabError.invalid("Invalid finite science field: "+key)
+        }
+        return value.doubleValue
+    }
+    private static func approx(_ actual:Double,_ expected:Double)->Bool {
+        actual.isFinite && expected.isFinite &&
+            abs(actual-expected)<=1e-7*max(1,abs(expected))
+    }
+    static func inspect(_ result:[String:Any],kind:String)throws {
+        guard result["modelVersion"] as? String=="1.0.0",
+              result["evidence"] as? String=="physics-model-computed",
+              result["inputEvidence"] as? String=="hypothetical-user-assumed",
+              let entityId=result["entityId"] as? String,!entityId.isEmpty,
+              let materialId=result["materialId"] as? String,!materialId.isEmpty else {
+            throw NativeWorldLabError.invalid("Unsupported inventor science provenance")
+        }
+        if kind=="elastic-wave" {
+            guard result["format"] as? String=="env-world-lab-elastic-wave",
+                  let mode=result["mode"] as? Int,(1...12).contains(mode),
+                  let cycles=result["cycles"] as? Int,(1...20).contains(cycles) else {
+                throw NativeWorldLabError.invalid("Elastic mode or model kind is invalid")
+            }
+            let length=try number(result,"lengthMeters")
+            let crossSection=try number(result,"crossSectionM2")
+            let density=try number(result,"assumedDensityKgM3")
+            let modulus=try number(result,"assumedYoungModulusPa")
+            let amplitude=try number(result,"amplitudeMeters")
+            let speed=try number(result,"waveSpeedMps")
+            let frequency=try number(result,"frequencyHz")
+            let period=try number(result,"periodSeconds")
+            let duration=try number(result,"durationSeconds")
+            let energy=try number(result,"totalEnergyJ")
+            let stress=try number(result,"maximumStressPa")
+            guard (0.001...10000).contains(length),
+                  (1e-10...1e8).contains(crossSection),
+                  (0.001...1e9).contains(density),
+                  (1...1e15).contains(modulus),
+                  amplitude>=1e-9,
+                  amplitude<=min(0.01,0.001*length/(Double.pi*Double(mode))) else {
+                throw NativeWorldLabError.invalid("Invalid elastic-wave assumptions")
+            }
+            let predictedSpeed=sqrt(modulus/density)
+            let predictedFrequency=Double(mode)*predictedSpeed/(2*length)
+            let predictedEnergy=0.25*density*crossSection*length*
+                pow(amplitude*2*Double.pi*predictedFrequency,2)
+            let predictedStress=modulus*amplitude*Double.pi*Double(mode)/length
+            guard (1e-6...1e6).contains(speed),
+                  approx(speed,predictedSpeed),approx(frequency,predictedFrequency),
+                  approx(period,1/predictedFrequency),
+                  approx(duration,Double(cycles)/predictedFrequency),
+                  approx(energy,predictedEnergy),approx(stress,predictedStress) else {
+                throw NativeWorldLabError.invalid("Elastic evidence conflicts with the assumed material model")
+            }
+        }else if kind=="thermal-radiation" {
+            guard result["format"] as? String=="env-world-lab-thermal-radiation",
+                  let steps=result["steps"] as? Int,(120...20000).contains(steps),
+                  let samples=result["samples"] as? [[String:Any]],
+                  (2...122).contains(samples.count) else {
+                throw NativeWorldLabError.invalid("Unsupported radiative trajectory shape")
+            }
+            let start=try number(result,"initialTemperatureK")
+            let ambient=try number(result,"environmentTemperatureK")
+            let emissivity=try number(result,"emissivity")
+            let duration=try number(result,"durationSeconds")
+            let mass=try number(result,"massKg")
+            let area=try number(result,"areaM2")
+            let density=try number(result,"assumedDensityKgM3")
+            let specific=try number(result,"assumedSpecificHeatJPerKgK")
+            guard (1...3000).contains(start),(1...3000).contains(ambient),
+                  (0...1).contains(emissivity),(0.01...3600).contains(duration),
+                  (1e-9...1e15).contains(mass),(1e-9...1e9).contains(area),
+                  (0.001...1e9).contains(density),
+                  (0.01...1e7).contains(specific) else {
+                throw NativeWorldLabError.invalid("Invented radiative parameters are not bounded")
+            }
+            let heatCapacity=mass*specific
+            guard heatCapacity.isFinite,(1e-9...1e20).contains(heatCapacity) else {
+                throw NativeWorldLabError.invalid("Unbounded assumed thermal capacity")
+            }
+            var previousTime = -Double.infinity
+            var previousTemperature=start
+            for sample in samples {
+                let time=try number(sample,"timeSeconds")
+                let temperature=try number(sample,"temperatureK")
+                let power=try number(sample,"netRadiatedPowerW")
+                let transferred=try number(sample,"transferredEnergyJ")
+                let stored=try number(sample,"internalThermalEnergyJ")
+                let residual=try number(sample,"energyResidualJ")
+                let expectedEnergy=heatCapacity*(start-temperature)
+                let expectedPower=emissivity*5.670374419e-8*area*
+                    (pow(temperature,4)-pow(ambient,4))
+                guard time>=0,time>=previousTime,time<=duration+1e-7,
+                      temperature>=min(start,ambient)-1e-6,
+                      temperature<=max(start,ambient)+1e-6,
+                      (start<ambient ? temperature>=previousTemperature-1e-6 :
+                        temperature<=previousTemperature+1e-6),
+                      approx(power,expectedPower),approx(stored,heatCapacity*temperature),
+                      approx(residual,expectedEnergy-transferred),
+                      abs(residual)<=1e-7*max(1,abs(expectedEnergy)) else {
+                    throw NativeWorldLabError.invalid("Radiative energy or temperature trajectory is inconsistent")
+                }
+                previousTime=time;previousTemperature=temperature
+            }
+            guard let first=samples.first,
+                  approx(try number(first,"timeSeconds"),0),
+                  approx(previousTime,duration) else {
+                throw NativeWorldLabError.invalid("Radiative trajectory does not cover its duration")
+            }
+        }else{
+            throw NativeWorldLabError.invalid("Unknown scientific material experiment")
+        }
     }
 }
