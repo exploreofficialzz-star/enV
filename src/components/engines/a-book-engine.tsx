@@ -21,7 +21,7 @@ import {
   type ABookNote,
   type ABookRevision,
 } from "@/lib/a-book/local-store";
-import { extractPdfPages, inspectPdf, mergePdfs, parsePageRanges, pdfDownload, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
+import { extractPdfPages, extractSelectedPdfs, inspectPdf, mergePdfs, parsePageRanges, pdfDownload, rotateSelectedPdfs, splitPdfIntoZip, splitSelectedPdfsIntoZip, zipDownload } from "@/lib/a-book/pdf";
 import { createABookArchive, parseABookLegacyNotesJson, readABookArchive } from "@/lib/a-book/archive";
 
 function localDownload(blob: Blob, filename: string) {
@@ -326,20 +326,26 @@ export function ABookEngine() {
   }
 
   async function exportPdf() {
-    const file = pdfAttachments.find((item) => item.id === selectedPdfs[0]);
-    if (!file) { setError("Select a PDF first."); return; }
+    const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
+    if (!files.length) { setError("Select at least one PDF."); return; }
     try {
-      const details = await inspectPdf(file.blob);
-      const pages = parsePageRanges(pageRange, details.pageCount);
-      const bytes = await extractPdfPages(file.blob, pages);
-      pdfDownload(bytes, `${safeName(file.name.replace(/\.pdf$/i, ""))}-extracted.pdf`);
-      setPdfInfo(`Extracted ${pages.length} pages from ${file.name} locally`);
+      if (files.length === 1) {
+        const file = files[0];
+        const details = await inspectPdf(file.blob);
+        const pages = parsePageRanges(pageRange, details.pageCount);
+        const bytes = await extractPdfPages(file.blob, pages);
+        pdfDownload(bytes, `${safeName(file.name.replace(/\.pdf$/i, ""))}-extracted.pdf`);
+        setPdfInfo(`Extracted ${pages.length} pages from ${file.name} locally`);
+      } else {
+        const archive = await extractSelectedPdfs(files.map((file) => ({ name: file.name, blob: file.blob })), pageRange);
+        zipDownload(archive, "a-book-extracted-pdfs.zip");
+        setPdfInfo(`Extracted pages from ${files.length} PDFs locally`);
+      }
       setError("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The PDF operation failed.");
+      setError(cause instanceof Error ? cause.message : "The selected PDFs could not be extracted locally.");
     }
   }
-
 
   async function rotateSelectedBatch() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
@@ -354,15 +360,22 @@ export function ABookEngine() {
   }
 
   async function splitSelectedPdf() {
-    const file = pdfAttachments.find((item) => item.id === selectedPdfs[0]);
-    if (!file) { setError("Select one PDF to split."); return; }
+    const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
+    if (!files.length) { setError("Select at least one PDF to split."); return; }
     try {
-      const archive = await splitPdfIntoZip(file.blob, file.name, splitRanges);
-      zipDownload(archive, `${safeName(file.name.replace(/\.pdf$/i, ""))}-parts.zip`);
-      setPdfInfo(`Created PDF parts from ${file.name} locally`);
+      if (files.length === 1) {
+        const file = files[0];
+        const archive = await splitPdfIntoZip(file.blob, file.name, splitRanges);
+        zipDownload(archive, `${safeName(file.name.replace(/\.pdf$/i, ""))}-parts.zip`);
+        setPdfInfo(`Created PDF parts from ${file.name} locally`);
+      } else {
+        const archive = await splitSelectedPdfsIntoZip(files.map((file) => ({ name: file.name, blob: file.blob })), splitRanges);
+        zipDownload(archive, "a-book-split-pdfs.zip");
+        setPdfInfo(`Created parts from ${files.length} PDFs locally`);
+      }
       setError("");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The PDF could not be split locally.");
+      setError(cause instanceof Error ? cause.message : "The selected PDFs could not be split locally.");
     }
   }
 
@@ -609,7 +622,7 @@ export function ABookEngine() {
                 <input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="PDF page numbers" placeholder="Pages e.g. 1-3,5" className="min-h-8 w-36 rounded-md border border-border bg-background px-2 text-xs" />
                 <input value={splitRanges} onChange={(event) => setSplitRanges(event.target.value)} aria-label="PDF split page groups" placeholder="Parts e.g. 1-3;4-6" className="min-h-8 w-40 rounded-md border border-border bg-background px-2 text-xs" />
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void exportPdf()}>Extract pages</Button>
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void splitSelectedPdf()}>Split into parts</Button>
+                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void splitSelectedPdf()}>Split selected PDFs</Button>
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
               {previewUrl ? <iframe title="Local PDF preview" src={previewUrl} className="h-[480px] w-full rounded-md border border-border bg-background" /> : null}
