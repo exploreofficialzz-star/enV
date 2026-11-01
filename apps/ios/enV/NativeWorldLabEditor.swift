@@ -939,10 +939,18 @@ enum NativeWorldLabEditor {
         }
     }
     static func extrudeRectangle(_ data:Data,widthMeters:Double,depthMeters:Double,
-        heightMeters:Double,id:String=UUID().uuidString)throws->Data {
+        heightMeters:Double,id:String=UUID().uuidString,
+        centerMeters:[Double]=[0,0,0],rotationRadians:[Double]=[0,0,0])throws->Data {
         guard [widthMeters,depthMeters,heightMeters].allSatisfy({$0.isFinite && (0.001...10000).contains($0)}),
+              centerMeters.count==3,centerMeters.allSatisfy({$0.isFinite&&abs($0)<=100000}),
+              rotationRadians.count==3,rotationRadians.allSatisfy({$0.isFinite&&abs($0)<=2*Double.pi}),
               id.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
-            throw NativeWorldLabError.invalid("Rectangular sketch needs bounded positive SI dimensions")
+            throw NativeWorldLabError.invalid("Rectangular sketch needs bounded dimensions, placement and orientation")
+        }
+        let matrix=Self.rotationMatrix(rotationRadians)
+        let position=(0..<3).map{centerMeters[$0]+matrix[$0][1]*heightMeters/2}
+        guard position.allSatisfy({$0.isFinite&&abs($0)<=100000}) else {
+            throw NativeWorldLabError.invalid("Extruded solid centre leaves the local world")
         }
         return try mutate(data){root in
             guard var entities=root["entities"] as? [[String:Any]],entities.count<200,
@@ -950,31 +958,36 @@ enum NativeWorldLabEditor {
                 throw NativeWorldLabError.invalid("Sketch exceeds the project solid limit or duplicates an ID")
             }
             entities.append(["id":id,"name":"Extruded rectangular profile","shape":"box",
-                "positionMeters":[0,heightMeters/2,0],
-                "dimensionsMeters":[widthMeters,heightMeters,depthMeters],
-                "rotationRadians":[0,0,0],"color":"#A4C9C6",
+                "positionMeters":position,"dimensionsMeters":[widthMeters,heightMeters,depthMeters],
+                "rotationRadians":rotationRadians,"color":"#A4C9C6",
                 "materialId":NSNull(),"scientificRole":"visual-only","opacity":1])
             root["entities"]=entities
         }
     }
     static func extrudeCircle(_ data:Data,radiusMeters:Double,heightMeters:Double,
-        id:String=UUID().uuidString)throws->Data {
+        id:String=UUID().uuidString,centerMeters:[Double]=[0,0,0],
+        rotationRadians:[Double]=[0,0,0])throws->Data {
         guard radiusMeters.isFinite,(0.0005...5000).contains(radiusMeters),
-              heightMeters.isFinite,(0.001...10000).contains(heightMeters),
-              radiusMeters*2<=10000,
+              heightMeters.isFinite,(0.001...10000).contains(heightMeters),radiusMeters*2<=10000,
+              centerMeters.count==3,centerMeters.allSatisfy({$0.isFinite&&abs($0)<=100000}),
+              rotationRadians.count==3,rotationRadians.allSatisfy({$0.isFinite&&abs($0)<=2*Double.pi}),
               id.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
-            throw NativeWorldLabError.invalid("Circular sketch needs a bounded radius and height")
+            throw NativeWorldLabError.invalid("Circular sketch needs bounded radius, height, placement and orientation")
         }
         let diameter=radiusMeters*2
+        let matrix=Self.rotationMatrix(rotationRadians)
+        let position=(0..<3).map{centerMeters[$0]+matrix[$0][1]*heightMeters/2}
+        guard position.allSatisfy({$0.isFinite&&abs($0)<=100000}) else {
+            throw NativeWorldLabError.invalid("Extruded solid centre leaves the local world")
+        }
         return try mutate(data){root in
             guard var entities=root["entities"] as? [[String:Any]],entities.count<200,
                   !entities.contains(where:{$0["id"] as? String==id}) else {
                 throw NativeWorldLabError.invalid("Sketch exceeds the project solid limit or duplicates an ID")
             }
             entities.append(["id":id,"name":"Extruded circular profile","shape":"cylinder",
-                "positionMeters":[0,heightMeters/2,0],
-                "dimensionsMeters":[diameter,heightMeters,diameter],
-                "rotationRadians":[0,0,0],"color":"#A4C9C6",
+                "positionMeters":position,"dimensionsMeters":[diameter,heightMeters,diameter],
+                "rotationRadians":rotationRadians,"color":"#A4C9C6",
                 "materialId":NSNull(),"scientificRole":"visual-only","opacity":1])
             root["entities"]=entities
         }

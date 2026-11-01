@@ -66,6 +66,12 @@ struct NativeWorldLabView:View {
     @State private var cadSketchDepth="2"
     @State private var cadSketchHeight="1"
     @State private var cadSketchRadius="0.5"
+    @State private var cadSketchX="0"
+    @State private var cadSketchY="0"
+    @State private var cadSketchZ="0"
+    @State private var cadSketchRotationX="0"
+    @State private var cadSketchRotationY="0"
+    @State private var cadSketchRotationZ="0"
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
     @State private var collisionOtherId=""
@@ -2163,6 +2169,18 @@ Text("Invent chemical heat").font(.headline)
                             TextField("Height m",text:$cadSketchHeight).keyboardType(.decimalPad)
                             TextField("Circle radius m",text:$cadSketchRadius).keyboardType(.decimalPad)
                         }.textFieldStyle(.roundedBorder)
+                        Text("Sketch centre on base plane (X/Y/Z metres)").font(.caption)
+                        HStack{
+                            TextField("X m",text:$cadSketchX).keyboardType(.decimalPad)
+                            TextField("Y m",text:$cadSketchY).keyboardType(.decimalPad)
+                            TextField("Z m",text:$cadSketchZ).keyboardType(.decimalPad)
+                        }.textFieldStyle(.roundedBorder)
+                        Text("Extrusion orientation (X/Y/Z degrees)").font(.caption)
+                        HStack{
+                            TextField("X °",text:$cadSketchRotationX).keyboardType(.decimalPad)
+                            TextField("Y °",text:$cadSketchRotationY).keyboardType(.decimalPad)
+                            TextField("Z °",text:$cadSketchRotationZ).keyboardType(.decimalPad)
+                        }.textFieldStyle(.roundedBorder)
                         HStack{
                             Button("Extrude rectangle"){
                                 do{
@@ -2170,8 +2188,15 @@ Text("Invent chemical heat").font(.headline)
                                           let height=Double(cadSketchHeight) else {
                                         throw NativeWorldLabError.invalid("Enter valid sketch dimensions")
                                     }
+                                    let base=[cadSketchX,cadSketchY,cadSketchZ].compactMap{Double($0)}
+                                    let rotation=[cadSketchRotationX,cadSketchRotationY,cadSketchRotationZ]
+                                        .compactMap{Double($0)}.map{$0*Double.pi/180}
+                                    guard base.count==3,rotation.count==3 else {
+                                        throw NativeWorldLabError.invalid("Enter three valid position and rotation values")
+                                    }
                                     applyProject{try NativeWorldLabEditor.extrudeRectangle($0,
-                                        widthMeters:width,depthMeters:depth,heightMeters:height)}
+                                        widthMeters:width,depthMeters:depth,heightMeters:height,
+                                        centerMeters:base,rotationRadians:rotation)}
                                 }catch{problem=error.localizedDescription}
                             }.disabled(project.entities.count>=200)
                             Button("Extrude circle"){
@@ -2179,8 +2204,15 @@ Text("Invent chemical heat").font(.headline)
                                     guard let radius=Double(cadSketchRadius),let height=Double(cadSketchHeight) else {
                                         throw NativeWorldLabError.invalid("Enter a valid circular sketch")
                                     }
+                                    let base=[cadSketchX,cadSketchY,cadSketchZ].compactMap{Double($0)}
+                                    let rotation=[cadSketchRotationX,cadSketchRotationY,cadSketchRotationZ]
+                                        .compactMap{Double($0)}.map{$0*Double.pi/180}
+                                    guard base.count==3,rotation.count==3 else {
+                                        throw NativeWorldLabError.invalid("Enter three valid position and rotation values")
+                                    }
                                     applyProject{try NativeWorldLabEditor.extrudeCircle($0,
-                                        radiusMeters:radius,heightMeters:height)}
+                                        radiusMeters:radius,heightMeters:height,
+                                        centerMeters:base,rotationRadians:rotation)}
                                 }catch{problem=error.localizedDescription}
                             }.disabled(project.entities.count>=200)
                         }.buttonStyle(.bordered)

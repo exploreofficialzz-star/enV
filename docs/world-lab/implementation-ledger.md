@@ -759,3 +759,9 @@ release-candidate evidence bundle are unfinished.
 ## C/D native group-transform regression coverage — 2026-11-01
 - Added Android JUnit and iOS XCTest cases for shared-centroid group rotation and scale: selected centres move on the expected world-axis arc, part orientations rotate with the group, dimensions and positions scale together, non-selected geometry remains unchanged, and each operation advances exactly one revision.
 - Added fail-closed regression cases for duplicate/missing selection IDs, non-finite rotation angles and non-positive group scale factors. These tests are pending the current exact-head native CI runs.
+
+
+## C/D parametric sketch placement and orientation — 2026-11-01
+- Rectangle and circle extrusions now use the same cross-platform contract: the entered X/Y/Z point is the 2D profile centre on its base plane, extrusion proceeds along local +Y, and the solid centre is derived by transforming the half-height vector through the entered Euler orientation.
+- Web, Android Kotlin and iOS Swift expose base-plane location and X/Y/Z orientation controls. Resulting portable solids store the computed world centre and full rotation.
+- Native and Web regression source covers ground-contact defaults, translated and 90° rotated extrusions, and invalid/out-of-world position and rotation values. The CAD subset remains analytic box/cylinder primitives rather than arbitrary B-rep, arbitrary mesh booleans or persistent feature-tree history.

@@ -381,3 +381,20 @@ final class NativeWorldLabEditorTests: XCTestCase {
     }
 
 }
+
+    func testSketchExtrusionsHonorBasePlacementAndOrientation() throws {
+        let data=try NativeWorldLabEditor.extrudeRectangle(NativeWorldLabEditor.blank(),
+            widthMeters:2,depthMeters:3,heightMeters:4,id:"placed",
+            centerMeters:[1,2,3],rotationRadians:[0,0,Double.pi/2])
+        let solid=try XCTUnwrap(NativeWorldLabProject.decode(data).entities.first)
+        XCTAssertEqual(solid.positionMeters,[-1,2,3])
+        XCTAssertEqual(solid.effectiveRotationRadians[2],Double.pi/2,accuracy:1e-12)
+    }
+    func testSketchExtrusionsRejectInvalidPlacementAndOrientation() throws {
+        XCTAssertThrowsError(try NativeWorldLabEditor.extrudeRectangle(
+            NativeWorldLabEditor.blank(),widthMeters:2,depthMeters:3,heightMeters:4,
+            centerMeters:[100000,100000,100000]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.extrudeCircle(
+            NativeWorldLabEditor.blank(),radiusMeters:0.5,heightMeters:2,
+            rotationRadians:[0,Double.nan,0]))
+    }

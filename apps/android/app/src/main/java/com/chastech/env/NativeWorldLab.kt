@@ -122,6 +122,12 @@ fun NativeWorldLabForm() {
     var cadSketchDepth by remember { mutableStateOf("2") }
     var cadSketchHeight by remember { mutableStateOf("1") }
     var cadSketchRadius by remember { mutableStateOf("0.5") }
+    var cadSketchX by remember { mutableStateOf("0") }
+    var cadSketchY by remember { mutableStateOf("0") }
+    var cadSketchZ by remember { mutableStateOf("0") }
+    var cadSketchRotationX by remember { mutableStateOf("0") }
+    var cadSketchRotationY by remember { mutableStateOf("0") }
+    var cadSketchRotationZ by remember { mutableStateOf("0") }
     var positiveWire by remember { mutableStateOf("supply") }
     var negativeWire by remember { mutableStateOf("ground") }
     var selected by remember { mutableIntStateOf(0) }
@@ -1113,17 +1119,37 @@ fun NativeWorldLabForm() {
                     OutlinedTextField(value=cadSketchRadius,onValueChange={cadSketchRadius=it},
                         label={Text("Circle radius m")},singleLine=true,modifier=Modifier.weight(1f))
                 }
+                Text("Sketch centre on base plane (X/Y/Z metres)",style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchX,onValueChange={cadSketchX=it},label={Text("X m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchY,onValueChange={cadSketchY=it},label={Text("Y m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchZ,onValueChange={cadSketchZ=it},label={Text("Z m")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Text("Extrusion orientation (X/Y/Z degrees)",style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchRotationX,onValueChange={cadSketchRotationX=it},label={Text("X °")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchRotationY,onValueChange={cadSketchRotationY=it},label={Text("Y °")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchRotationZ,onValueChange={cadSketchRotationZ=it},label={Text("Z °")},singleLine=true,modifier=Modifier.weight(1f))
+                }
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedButton(onClick={
                         runCatching{
+                            val base=listOf(cadSketchX.toDouble(),cadSketchY.toDouble(),cadSketchZ.toDouble())
+                            val rotation=listOf(cadSketchRotationX,cadSketchRotationY,cadSketchRotationZ)
+                                .map{it.toDouble()*Math.PI/180.0}
                             applyProjectEdit{NativeWorldLabEditor.extrudeRectangle(it,
-                                cadSketchWidth.toDouble(),cadSketchDepth.toDouble(),cadSketchHeight.toDouble())}
+                                cadSketchWidth.toDouble(),cadSketchDepth.toDouble(),cadSketchHeight.toDouble(),
+                                centerMeters=base,rotationRadians=rotation)}
                         }.onFailure{warning=it.message?:"Rectangle sketch could not be extruded"}
                     },enabled=project!!.entities.size<200){Text("Extrude rectangle")}
                     OutlinedButton(onClick={
                         runCatching{
+                            val base=listOf(cadSketchX.toDouble(),cadSketchY.toDouble(),cadSketchZ.toDouble())
+                            val rotation=listOf(cadSketchRotationX,cadSketchRotationY,cadSketchRotationZ)
+                                .map{it.toDouble()*Math.PI/180.0}
                             applyProjectEdit{NativeWorldLabEditor.extrudeCircle(it,
-                                cadSketchRadius.toDouble(),cadSketchHeight.toDouble())}
+                                cadSketchRadius.toDouble(),cadSketchHeight.toDouble(),
+                                centerMeters=base,rotationRadians=rotation)}
                         }.onFailure{warning=it.message?:"Circle sketch could not be extruded"}
                     },enabled=project!!.entities.size<200){Text("Extrude circle")}
                 }

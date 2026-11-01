@@ -402,3 +402,47 @@ class NativeWorldLabEditorTest {
     }
 
 }
+
+
+    @Test fun sketchExtrusionsHonorBasePlanePlacementAndWorldOrientation(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.extrudeRectangle(json,2.0,3.0,4.0,id="placed",
+            centerMeters=listOf(1.0,2.0,3.0),rotationRadians=listOf(0.0,0.0,Math.PI/2))
+        val solid=NativeWorldLabProjectCodec.decode(json).entities.single()
+        assertEquals(-1.0,solid.positionMeters.x,1e-12)
+        assertEquals(2.0,solid.positionMeters.y,1e-12)
+        assertEquals(3.0,solid.positionMeters.z,1e-12)
+        assertEquals(Math.PI/2,solid.rotationRadians.z,1e-12)
+    }
+    @Test fun sketchExtrusionRejectsOutOfWorldCentreAndInvalidRotation(){
+        val json=NativeWorldLabEditor.blank()
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.extrudeRectangle(json,2.0,3.0,4.0,
+                centerMeters=listOf(100000.0,100000.0,100000.0))
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.extrudeCircle(json,0.5,2.0,
+                rotationRadians=listOf(0.0,Double.NaN,0.0))
+        }
+    }
+
+    @Test fun sketchExtrusionsHonorBasePlacementAndOrientation(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.extrudeRectangle(json,2.0,3.0,4.0,id="placed",
+            centerMeters=listOf(1.0,2.0,3.0),rotationRadians=listOf(0.0,0.0,Math.PI/2))
+        val solid=NativeWorldLabProjectCodec.decode(json).entities.single()
+        assertEquals(-1.0,solid.positionMeters.x,1e-12)
+        assertEquals(2.0,solid.positionMeters.y,1e-12)
+        assertEquals(3.0,solid.positionMeters.z,1e-12)
+        assertEquals(Math.PI/2,solid.rotationRadians.z,1e-12)
+    }
+    @Test fun sketchExtrusionRejectsOutOfWorldPlacementAndInvalidOrientation(){
+        val json=NativeWorldLabEditor.blank()
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.extrudeRectangle(json,2.0,3.0,4.0,
+                centerMeters=listOf(100000.0,100000.0,100000.0))
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.extrudeCircle(json,0.5,2.0,rotationRadians=listOf(0.0,Double.NaN,0.0))
+        }
+    }

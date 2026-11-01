@@ -838,27 +838,44 @@ object NativeWorldLabEditor {
         }
     }
     fun extrudeRectangle(source:String,widthMeters:Double,depthMeters:Double,
-        heightMeters:Double,id:String=UUID.randomUUID().toString()):String=edit(source){project->
+        heightMeters:Double,id:String=UUID.randomUUID().toString(),
+        centerMeters:List<Double> = listOf(0.0,0.0,0.0),
+        rotationRadians:List<Double> = listOf(0.0,0.0,0.0)):String=edit(source){project->
         require(listOf(widthMeters,depthMeters,heightMeters).all{it.isFinite()&&it in 0.001..10000.0}){
             "Closed rectangular sketch needs finite positive width, depth and height"
+        }
+        require(centerMeters.size==3&&centerMeters.all{it.isFinite()&&it in -100000.0..100000.0}&&
+            rotationRadians.size==3&&rotationRadians.all{it.isFinite()&&it in -2*Math.PI..2*Math.PI}){
+            "Sketch placement needs three bounded SI coordinates and finite Euler angles"
         }
         val entities=project.getJSONArray("entities")
         require(entities.length()<200&&id.matches(Regex("[A-Za-z0-9_-]{1,120}"))&&
             (0 until entities.length()).none{entities.getJSONObject(it).getString("id")==id}){
             "Extruded sketch has an invalid identity or the 200-solid limit is reached"
         }
+        val matrix=rotationMatrix(rotationRadians)
+        val position=(0..2).map{centerMeters[it]+matrix[it][1]*heightMeters/2}
+        require(position.all{it.isFinite()&&it in -100000.0..100000.0}){
+            "Extruded solid centre leaves the local world"
+        }
         entities.put(JSONObject().put("id",id).put("name","Extruded rectangular profile")
-            .put("shape","box").put("positionMeters",JSONArray(listOf(0.0,heightMeters/2,0.0)))
+            .put("shape","box").put("positionMeters",JSONArray(position))
             .put("dimensionsMeters",JSONArray(listOf(widthMeters,heightMeters,depthMeters)))
-            .put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
+            .put("rotationRadians",JSONArray(rotationRadians))
             .put("color","#A4C9C6").put("materialId",JSONObject.NULL)
             .put("scientificRole","visual-only").put("opacity",1.0))
     }
     fun extrudeCircle(source:String,radiusMeters:Double,heightMeters:Double,
-        id:String=UUID.randomUUID().toString()):String=edit(source){project->
+        id:String=UUID.randomUUID().toString(),
+        centerMeters:List<Double> = listOf(0.0,0.0,0.0),
+        rotationRadians:List<Double> = listOf(0.0,0.0,0.0)):String=edit(source){project->
         require(radiusMeters.isFinite()&&radiusMeters in 0.0005..5000.0&&
             heightMeters.isFinite()&&heightMeters in 0.001..10000.0&&radiusMeters*2<=10000){
             "Closed circular sketch needs a bounded radius and height"
+        }
+        require(centerMeters.size==3&&centerMeters.all{it.isFinite()&&it in -100000.0..100000.0}&&
+            rotationRadians.size==3&&rotationRadians.all{it.isFinite()&&it in -2*Math.PI..2*Math.PI}){
+            "Sketch placement needs three bounded SI coordinates and finite Euler angles"
         }
         val entities=project.getJSONArray("entities")
         require(entities.length()<200&&id.matches(Regex("[A-Za-z0-9_-]{1,120}"))&&
@@ -866,10 +883,15 @@ object NativeWorldLabEditor {
             "Extruded sketch has an invalid identity or the 200-solid limit is reached"
         }
         val diameter=radiusMeters*2
+        val matrix=rotationMatrix(rotationRadians)
+        val position=(0..2).map{centerMeters[it]+matrix[it][1]*heightMeters/2}
+        require(position.all{it.isFinite()&&it in -100000.0..100000.0}){
+            "Extruded solid centre leaves the local world"
+        }
         entities.put(JSONObject().put("id",id).put("name","Extruded circular profile")
-            .put("shape","cylinder").put("positionMeters",JSONArray(listOf(0.0,heightMeters/2,0.0)))
+            .put("shape","cylinder").put("positionMeters",JSONArray(position))
             .put("dimensionsMeters",JSONArray(listOf(diameter,heightMeters,diameter)))
-            .put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
+            .put("rotationRadians",JSONArray(rotationRadians))
             .put("color","#A4C9C6").put("materialId",JSONObject.NULL)
             .put("scientificRole","visual-only").put("opacity",1.0))
     }
