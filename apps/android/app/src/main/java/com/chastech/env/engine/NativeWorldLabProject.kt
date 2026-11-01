@@ -185,8 +185,13 @@ object NativeWorldLabProjectCodec {
         require(solidArray.length()<=200 && materialsArray.length()<=100)
         val materials=(0 until materialsArray.length()).map { i ->
             val o=materialsArray.getJSONObject(i)
-            keys(o,setOf("id","name","densityKgM3","youngModulusPa",
-                "thermalConductivityWPerMK","specificHeatJPerKgK","refractiveIndex","evidence"))
+            val requiredMaterialKeys=setOf("id","name","densityKgM3","youngModulusPa","evidence")
+            val optionalMaterialKeys=setOf("thermalConductivityWPerMK",
+                "specificHeatJPerKgK","refractiveIndex")
+            val providedMaterialKeys=o.keys().asSequence().toSet()
+            require(requiredMaterialKeys.all{it in providedMaterialKeys} &&
+                providedMaterialKeys.all{it in requiredMaterialKeys||it in optionalMaterialKeys}){
+                "Invented material contains missing or unsupported portable fields"}
             require(o.getString("evidence")=="hypothetical-user-assumed")
             NativeLabMaterial(id(o,"id"),name(o,"name"),optionalNumber(o,"densityKgM3",0.001,1e9),
                 optionalNumber(o,"youngModulusPa",0.0,1e15),o.getString("evidence"),

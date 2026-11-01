@@ -125,8 +125,15 @@ class NativeWorldLabProjectStoreTest {
             val restored=NativeWorldLabPortableArchiveStore(second).import(portable)
             assertEquals(project.id,restored.project.id)
             assertEquals(1,NativeWorldLabEvidenceStore(second).list(project.id).size)
+            // Reimporting byte-identical archived evidence is intentionally idempotent
+            // for interrupted native archive restoration and cannot duplicate records.
+            val repeated=NativeWorldLabPortableArchiveStore(second).import(portable)
+            assertEquals(project.id,repeated.project.id)
+            assertEquals(1,NativeWorldLabEvidenceStore(second).list(project.id).size)
+            val divergent=org.json.JSONObject(portable)
+            divergent.getJSONObject("project").put("title","Altered invention")
             assertThrows(IllegalArgumentException::class.java){
-                NativeWorldLabPortableArchiveStore(second).import(portable)
+                NativeWorldLabPortableArchiveStore(second).import(divergent.toString())
             }
         }finally{first.deleteRecursively();second.deleteRecursively()}
     }
