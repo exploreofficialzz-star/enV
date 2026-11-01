@@ -502,7 +502,11 @@ enum NativeWorldLabExecution {
                 var inputs:[String:NativeScienceQuantity]=[:]
                 for edge in graph.connections where edge.toComponentId==id {
                     let sourceMap=edge.delayed ? previous : values
-                    guard let source=sourceMap[edge.fromComponentId+":"+edge.fromPortId] else{continue}
+                    guard let source=sourceMap[edge.fromComponentId+":"+edge.fromPortId] else {
+                        // Only a delayed feedback edge may initialize from solver-owned state.
+                        if edge.delayed && samples.isEmpty {continue}
+                        throw NativeWorldLabError.invalid("Connected scientific source did not emit its declared output port")
+                    }
                     guard let port=component.ports.first(where:{$0.id==edge.toPortId}) else {
                         throw NativeWorldLabError.invalid("Scientific edge targets an absent port")
                     }

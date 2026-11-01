@@ -97,3 +97,23 @@ test("trusted ideal RC adapters exchange real voltage/current and conserve sourc
     6*(1-Math.exp(-0.3/3)))<1e-12);
   assert.throws(()=>createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:-1,capacitanceF:0.5}),/outside the supported/);
 });
+
+
+test("connected scientific inputs fail closed when a source omits its declared output",()=>{
+  const rcGraph=validateScientificGraph({schemaVersion:1,projectId:"rc-missing-output",
+    projectRevision:1,components:[
+      {id:"source",modelId:"ideal-dc-source",ports:[
+        {id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+      {id:"load",modelId:"series-rc-load",ports:[
+        {id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical"}]},
+    ],edges:[{fromComponentId:"source",fromPortId:"V",toComponentId:"load",toPortId:"Vin",delayed:false}]});
+  const adapters=createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5});
+  const missingSource:ScientificAdapter={...adapters[0],advance:()=>({
+    outputs:{},suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null,
+  })};
+  assert.throws(()=>executeScientificGraph(rcGraph,[missingSource,adapters[1]],{
+    durationSeconds:0.3,stepSeconds:0.1
+  }),/did not emit its declared output port/);
+});

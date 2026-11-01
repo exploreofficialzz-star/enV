@@ -103,3 +103,22 @@ class NativeWorldLabSIContractTest {
         assertFails{NativeWorldLabExecution.execute(graph,listOf(base.first(),faulty),0.3,0.1)}
     }
 }
+
+
+    @Test fun connectedScientificInputFailsClosedWhenSourceOmitsItsOutput() {
+        val graph=NativeScientificGraph("rc-missing-output",1,listOf(
+            NativeScienceComponent("source","ideal-dc-source",listOf(
+                NativeSciencePort("V","output","V","SCALAR","electrical"))),
+            NativeScienceComponent("load","series-rc-load",listOf(
+                NativeSciencePort("Vin","input","V","SCALAR","electrical"),
+                NativeSciencePort("Vc","output","V","SCALAR","electrical"),
+                NativeSciencePort("I","output","A","SCALAR","electrical")))
+        ),listOf(NativeScienceConnection("source","V","load","Vin")))
+        val base=NativeWorldLabExecution.idealRcAdapters(12.0,6.0,0.5)
+        val missingSource=base.first().copy(advance={_,_,_->
+            NativeScientificStepOutput(emptyMap(),0.0,0.0,0.0)
+        })
+        assertFails{
+            NativeWorldLabExecution.execute(graph,listOf(missingSource,base.last()),0.3,0.1)
+        }
+    }

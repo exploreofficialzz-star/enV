@@ -245,7 +245,11 @@ object NativeWorldLabExecution {
                 graph.connections.filter{it.toComponentId==id}.forEach{edge->
                     val sourceValues=if(edge.delayed)previous else values
                     val source=sourceValues[edge.fromComponentId+":"+edge.fromPortId]
-                        ?:return@forEach
+                    if(source==null){
+                        // Only a delayed feedback edge may initialize from solver-owned state.
+                        if(edge.delayed&&samples.isEmpty())return@forEach
+                        error("Connected scientific source did not emit its declared output port")
+                    }
                     val port=component.ports.first{it.id==edge.toPortId}
                     val converted=source.copy(unit=port.unit)
                     NativeWorldLabSI.validate(converted)

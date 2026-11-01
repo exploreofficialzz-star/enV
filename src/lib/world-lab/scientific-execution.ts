@@ -76,7 +76,12 @@ export function executeScientificGraph(graphInput:ScientificGraph,
       for(const e of graph.edges){
         if(e.toComponentId!==id)continue;
         const source=(e.delayed?previous:values)[e.fromComponentId+":"+e.fromPortId];
-        if(!source)continue;
+        if(!source){
+          // A delayed feedback edge may initialize from the adapter's own state
+          // on the first tick. A same-step connection must never disappear silently.
+          if(e.delayed&&samples.length===0)continue;
+          throw new Error("Connected scientific source did not emit its declared output port.");
+        }
         const port=component.ports.find(p=>p.id===e.toPortId)!;
         const same=quantity(convertQuantity(source,port.unit),port.unit,
           source.evidence,source.sourceId);

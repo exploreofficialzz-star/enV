@@ -239,3 +239,27 @@ final class NativeWorldLabExecutionTests:XCTestCase {
             durationSeconds:0.3,stepSeconds:0.1))
     }
 }
+
+
+final class NativeWorldLabConnectedPortContractTests:XCTestCase {
+    func testConnectedInputFailsClosedWhenSourceOmitsItsDeclaredOutput() throws {
+        let graph=NativeScientificGraph(projectId:"rc-missing-output",projectRevision:1,
+            components:[
+                NativeScienceComponent(id:"source",modelId:"ideal-dc-source",ports:[
+                    NativeSciencePort(id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical")]),
+                NativeScienceComponent(id:"load",modelId:"series-rc-load",ports:[
+                    NativeSciencePort(id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"),
+                    NativeSciencePort(id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+                    NativeSciencePort(id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical")])
+            ],connections:[NativeScienceEdge(fromComponentId:"source",fromPortId:"V",
+                toComponentId:"load",toPortId:"Vin",delayed:false)])
+        let base=try NativeWorldLabExecution.idealRCAdapters(
+            sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5)
+        let missingSource=NativeScientificAdapter(componentId:"source",modelId:"ideal-dc-source",
+            modelVersion:"1.0.0"){_,_,_ in
+                NativeScientificStepOutput(outputs:[:],suppliedW:0,dissipatedW:0,storedRateW:0)
+            }
+        XCTAssertThrowsError(try NativeWorldLabExecution.execute(graph,
+            adapters:[missingSource,base[1]],durationSeconds:0.3,stepSeconds:0.1))
+    }
+}
