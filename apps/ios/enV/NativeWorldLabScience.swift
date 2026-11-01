@@ -48,9 +48,18 @@ enum NativeWorldLabScience {
             try domain(v,-1000,1000,"Supply")
             let voltage = try NativeWorldLabSI.declare(v,unit:"V")
             _ = try NativeWorldLabSI.convert(voltage,to:"V")
-            try NativeWorldLabSI.connect(
-                .init(id:"source",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
-                .init(id:"capacitor",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"))
+            try NativeWorldLabGraph.validate(.init(
+                projectId:"native-rc-reference",projectRevision:0,
+                components:[
+                    .init(id:"source",modelId:"ideal-dc-source",ports:[
+                        .init(id:"voltage",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical")]),
+                    .init(id:"capacitor",modelId:"ideal-rc",ports:[
+                        .init(id:"input",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical")])
+                ],
+                connections:[
+                    .init(fromComponentId:"source",fromPortId:"voltage",
+                          toComponentId:"capacitor",toPortId:"input",delayed:false)
+                ]))
             try domain(v0,-1000,1000,"Initial voltage")
         case let .heat(alpha,length,ambient,center):
             try domain(alpha,1e-7,100,"Diffusivity")

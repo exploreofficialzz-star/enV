@@ -153,4 +153,35 @@ final class NativeWorldLabRadiationTests:XCTestCase {
                 unit:"W",frame:"SCALAR",flow:"electrical")))
         XCTAssertThrowsError(try NativeWorldLabSI.connect(load,source))
     }
+    func testNativeGraphRejectsAlgebraicCyclesButAllowsDelays() throws {
+        let source=NativeScienceComponent(id:"s",modelId:"source",ports:[
+            .init(id:"out",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+            .init(id:"in",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical")
+        ])
+        let load=NativeScienceComponent(id:"l",modelId:"load",ports:[
+            .init(id:"out",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+            .init(id:"in",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical")
+        ])
+        let one=NativeScienceEdge(fromComponentId:"s",fromPortId:"out",
+            toComponentId:"l",toPortId:"in",delayed:false)
+        let two=NativeScienceEdge(fromComponentId:"l",fromPortId:"out",
+            toComponentId:"s",toPortId:"in",delayed:false)
+        let graph=NativeScientificGraph(projectId:"native-graph",projectRevision:1,
+            components:[source,load],connections:[one])
+        try NativeWorldLabGraph.validate(graph)
+        XCTAssertThrowsError(try NativeWorldLabGraph.validate(
+            NativeScientificGraph(projectId:"native-graph",projectRevision:1,
+                components:[source,load],connections:[one,two])))
+        try NativeWorldLabGraph.validate(NativeScientificGraph(
+            projectId:"native-graph",projectRevision:1,components:[source,load],
+            connections:[one,NativeScienceEdge(fromComponentId:"l",fromPortId:"out",
+                toComponentId:"s",toPortId:"in",delayed:true)]))
+        let mismatched=NativeScienceComponent(id:"l",modelId:"load",ports:[
+            .init(id:"out",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+            .init(id:"in",direction:"input",unit:"W",frame:"SCALAR",flow:"electrical")
+        ])
+        XCTAssertThrowsError(try NativeWorldLabGraph.validate(
+            NativeScientificGraph(projectId:"native-graph",projectRevision:1,
+                components:[source,mismatched],connections:[one])))
+    }
 }
