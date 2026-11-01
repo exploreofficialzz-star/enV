@@ -8,6 +8,8 @@ import {
   listAttachments,
   listNotes,
   listRevisions,
+  permanentlyDeleteNote,
+  restoreNote,
   restoreRevision,
   saveNote,
   setNoteArchived,
@@ -17,6 +19,7 @@ import {
   type ABookRevision,
 } from "@/lib/a-book/local-store";
 import { extractPdfPages, inspectPdf, mergePdfs, pdfDownload, rotatePdf, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
+import { createABookArchive, readABookArchive } from "@/lib/a-book/archive";
 
 function localDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -42,6 +45,7 @@ export function ABookEngine() {
   const [revisions, setRevisions] = useState<ABookRevision[]>([]);
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
   const [storageMessage, setStorageMessage] = useState("Saved on this device");
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
@@ -55,13 +59,26 @@ export function ABookEngine() {
   const importInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
 
-  async function refresh(preferredId?: string) {
-    const next = await listNotes({ includeArchived: showArchived });
+  async function refresh(preferredId?: string, deletedOnly = showTrash, archivedOnly = showArchived) {
+    const all = await listNotes({ includeArchived: true, includeDeleted: true });
+    const next = all.filter((note) => deletedOnly
+      ? note.deletedAt !== null
+      : note.deletedAt === null && (archivedOnly || !note.archived));
     setNotes(next);
     const selected = next.find((note) => note.id === (preferredId ?? current?.id));
     if (selected) setCurrent(selected);
-    else if (next.length) setCurrent(next[0]);
-    else setCurrent(null);
+    else setCurrent(next[0] ?? null);
+  }
+
+  async function toggleTrash(next: boolean) {
+    setShowTrash(next);
+    if (next) setShowArchived(false);
+    await refresh(undefined, next, false);
+  }
+
+  async function toggleArchived(next: boolean) {
+    setShowArchived(next);
+    await refresh(undefined, false, next);
   }
 
   useEffect(() => {
@@ -236,44 +253,63 @@ export function ABookEngine() {
   }
 
   async function exportNotesJson() {
-    const library = await listNotes({ includeArchived: true });
-    const payload = { format: "env.abook.notes.v1", exportedAt: new Date().toISOString(), notes: library };
-    localDownload(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), "a-book-notes.json");
+    try {
+      const library = await listNotes({ includeArchived: true, includeDeleted: true });
+      const [history, files] = await Promise.all([
+        Promise.all(library.map((note) => listRevisions(note.id))),
+        Promise.all(library.map((note) => listAttachments(note.id))),
+      ]);
+      const archive = await createABookArchive(library, history.flat(), files.flat());
+      localDownload(archive, "a-book-backup.abook");
+      setStorageMessage("Full local backup exported");
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The local library backup could not be exported.");
+    }
   }
 
   async function importNotes(file: File | undefined) {
     if (!file) return;
     try {
-      const payload = JSON.parse(await file.text()) as { format?: string; notes?: ABookNote[] };
-      if (payload.format !== "env.abook.notes.v1" || !Array.isArray(payload.notes)) throw new Error("This file is not a supported A book notes export.");
-      for (const raw of payload.notes) {
-        if (!raw || typeof raw.id !== "string" || typeof raw.body !== "string" || typeof raw.title !== "string" || !Array.isArray(raw.tags)) {
-          throw new Error("The import contains an invalid note record.");
+      if (!file.name.toLowerCase().endsWith(".json")) {
+        const archive = await readABookArchive(file);
+        const count = await importLocalLibrary(archive);
+        await refresh();
+        setError("");
+        setStorageMessage(`Imported ${count} notes, revisions and attachments locally`);
+      } else {
+        const payload = JSON.parse(await file.text()) as { format?: string; notes?: ABookNote[] };
+        if (payload.format !== "env.abook.notes.v1" || !Array.isArray(payload.notes)) {
+          throw new Error("This file is not a supported A book notes export.");
         }
-        const now = Date.now();
-        const imported: ABookNote = {
-          ...raw,
-          id: crypto.randomUUID(),
-          notebook: typeof raw.notebook === "string" ? raw.notebook : "Imported",
-          tags: raw.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 50),
-          pinned: Boolean(raw.pinned),
-          archived: Boolean(raw.archived),
-          deletedAt: null,
-          createdAt: now,
-          updatedAt: now,
-          revision: 0,
-        };
-        await saveNote(imported);
+        for (const raw of payload.notes) {
+          if (!raw || typeof raw.id !== "string" || typeof raw.body !== "string" || typeof raw.title !== "string" || !Array.isArray(raw.tags)) {
+            throw new Error("The import contains an invalid note record.");
+          }
+          const now = Date.now();
+          const imported: ABookNote = {
+            ...raw,
+            id: crypto.randomUUID(),
+            notebook: typeof raw.notebook === "string" ? raw.notebook : "Imported",
+            tags: raw.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 50),
+            pinned: Boolean(raw.pinned),
+            archived: Boolean(raw.archived),
+            deletedAt: null,
+            createdAt: now,
+            updatedAt: now,
+            revision: 0,
+          };
+          await saveNote(imported);
+        }
+        await refresh();
+        setError("");
+        setStorageMessage(`Imported ${payload.notes.length} legacy notes locally`);
       }
-      await refresh();
-      setError("");
-      setStorageMessage(`Imported ${payload.notes.length} notes locally`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The A book export could not be imported.");
+      setError(cause instanceof Error ? cause.message : "The A book backup could not be imported.");
     }
     if (importInput.current) importInput.current.value = "";
   }
-
   async function removeFile(file: ABookAttachment) {
     try {
       await deleteAttachment(file.id);
@@ -289,6 +325,29 @@ export function ABookEngine() {
     const saved = await saveNote({ ...current, pinned: !current.pinned });
     setCurrent(saved);
     await refresh(saved.id);
+  }
+
+  async function restoreCurrentNote() {
+    if (!current) return;
+    try {
+      await restoreNote(current.id);
+      await refresh(current.id, false, showArchived);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not restore this note.");
+    }
+  }
+
+  async function permanentlyDeleteCurrentNote() {
+    if (!current || !window.confirm("Permanently delete this note and its local attachments? This cannot be undone.")) return;
+    try {
+      await permanentlyDeleteNote(current.id);
+      setCurrent(null);
+      await refresh(undefined, true, false);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not permanently delete this note.");
+    }
   }
 
   async function archiveNote() {
@@ -317,7 +376,7 @@ export function ABookEngine() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not restore this revision."); }
   }
 
-  return <section className="space-y-4" aria-label="A book local notes workspace">
+  return <section className="space-y-4" aria-label="A book local notes workspace" data-local-only="true">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">Private local workspace</p>
@@ -325,9 +384,9 @@ export function ABookEngine() {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted" role="status">{storageMessage}</span>
-        <Button type="button" variant="outline" onClick={exportNotesJson}>Export notes</Button>
-        <Button type="button" variant="outline" onClick={() => importInput.current?.click()}>Import notes</Button>
-        <input ref={importInput} type="file" accept="application/json,.json" className="hidden" onChange={(event) => void importNotes(event.target.files?.[0])} />
+        <Button type="button" variant="outline" onClick={exportNotesJson}>Export backup</Button>
+        <Button type="button" variant="outline" onClick={() => importInput.current?.click()}>Import backup</Button>
+        <input ref={importInput} type="file" accept=".abook,.zip,application/zip,application/json,.json" className="hidden" onChange={(event) => void importNotes(event.target.files?.[0])} />
       </div>
     </div>
 
@@ -339,10 +398,10 @@ export function ABookEngine() {
         <div className="border-b border-border p-3">
           <Button type="button" className="w-full" onClick={() => void createNewNote()}>New note</Button>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your notes" aria-label="Search notes" className="mt-3 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
-          <label className="mt-3 flex items-center gap-2 text-xs text-muted">
-            <input type="checkbox" checked={showArchived} onChange={(event) => { setShowArchived(event.target.checked); void listNotes({ includeArchived: event.target.checked }).then(setNotes); }} />
-            Show archived
-          </label>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
+            {!showTrash ? <label className="flex items-center gap-2"><input type="checkbox" checked={showArchived} onChange={(event) => void toggleArchived(event.target.checked)} />Show archived</label> : null}
+            <button type="button" className="underline" onClick={() => void toggleTrash(!showTrash)}>{showTrash ? "Back to notes" : "Trash"}</button>
+          </div>
         </div>
         <div className="max-h-[560px] flex-1 space-y-1 overflow-y-auto p-2">
           {visibleNotes.map((note) => <button key={note.id} type="button" onClick={() => setCurrent(note)} className={`w-full rounded-lg border px-3 py-3 text-left transition ${current?.id === note.id ? "border-accent bg-surface-2" : "border-transparent hover:bg-surface-2"}`}>
@@ -359,18 +418,23 @@ export function ABookEngine() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted">Notebook: {current.notebook}</span>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" variant="ghost" onClick={() => void pinNote()}>{current.pinned ? "Unpin" : "Pin"}</Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => void archiveNote()}>{current.archived ? "Unarchive" : "Archive"}</Button>
-              <Button type="button" size="sm" variant="ghost" onClick={exportCurrentMarkdown}>Export .md</Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => void moveToTrash()}>Move to trash</Button>
+              {current.deletedAt !== null ? <>
+                <Button type="button" size="sm" variant="outline" onClick={() => void restoreCurrentNote()}>Restore note</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => void permanentlyDeleteCurrentNote()}>Delete permanently</Button>
+              </> : <>
+                <Button type="button" size="sm" variant="ghost" onClick={() => void pinNote()}>{current.pinned ? "Unpin" : "Pin"}</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => void archiveNote()}>{current.archived ? "Unarchive" : "Archive"}</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={exportCurrentMarkdown}>Export .md</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => void moveToTrash()}>Move to trash</Button>
+              </>}
             </div>
           </div>
-          <input value={current.title} onChange={(event) => updateCurrent({ title: event.target.value })} placeholder="Note title" aria-label="Note title" className="min-h-12 w-full border-0 bg-transparent text-2xl font-semibold outline-none placeholder:text-muted" />
+          <input disabled={current.deletedAt !== null} value={current.title} onChange={(event) => updateCurrent({ title: event.target.value })} placeholder="Note title" aria-label="Note title" className="min-h-12 w-full border-0 bg-transparent text-2xl font-semibold outline-none placeholder:text-muted" />
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
-            <input value={current.notebook} onChange={(event) => updateCurrent({ notebook: event.target.value || "Inbox" })} placeholder="Notebook" aria-label="Notebook" className="min-h-10 rounded-md border border-border bg-background px-3 text-sm" />
-            <input value={current.tags.join(", ")} onChange={(event) => updateCurrent({ tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 50) })} placeholder="Tags, separated by commas" aria-label="Tags" className="min-h-10 rounded-md border border-border bg-background px-3 text-sm" />
+            <input disabled={current.deletedAt !== null} value={current.notebook} onChange={(event) => updateCurrent({ notebook: event.target.value || "Inbox" })} placeholder="Notebook" aria-label="Notebook" className="min-h-10 rounded-md border border-border bg-background px-3 text-sm" />
+            <input disabled={current.deletedAt !== null} value={current.tags.join(", ")} onChange={(event) => updateCurrent({ tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 50) })} placeholder="Tags, separated by commas" aria-label="Tags" className="min-h-10 rounded-md border border-border bg-background px-3 text-sm" />
           </div>
-          <textarea value={current.body} onChange={(event) => updateCurrent({ body: event.target.value })} placeholder="Start writing… Markdown is supported." aria-label="Note content" className="min-h-[290px] w-full resize-y rounded-lg border border-border bg-background p-4 text-sm leading-7 outline-none focus:ring-2 focus:ring-ring" />
+          <textarea disabled={current.deletedAt !== null} value={current.body} onChange={(event) => updateCurrent({ body: event.target.value })} placeholder="Start writing… Markdown is supported." aria-label="Note content" className="min-h-[290px] w-full resize-y rounded-lg border border-border bg-background p-4 text-sm leading-7 outline-none focus:ring-2 focus:ring-ring" />
           <p className="text-[11px] text-muted">Local revision {current.revision} · Last edited {formatDate(current.updatedAt)}</p>
 
           <section className="space-y-3 rounded-lg border border-border p-3">
