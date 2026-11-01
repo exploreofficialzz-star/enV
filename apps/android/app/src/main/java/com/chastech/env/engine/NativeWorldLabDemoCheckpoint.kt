@@ -62,6 +62,7 @@ object NativeWorldLabDemoCheckpointCodec {
   require(v.diffusivityM2PerS.isFinite()&&v.diffusivityM2PerS in 0.001..0.08)
   val fields=listOf(v.wallTimeUTC,v.worldEpochUTC,v.solverInternalTimeSeconds,v.displaySampleTimeSeconds,v.playbackRate,v.playbackDirection,v.timezoneDisplay)
   require(fields.all{it==null}||fields.all{it!=null}){"Clock checkpoint fields must be all present or all absent"}
+  require(v.solverStepSeconds==null||fields.all{it!=null}){"Solver timestep requires complete clock metadata"}
   if(fields.all{it!=null}){
    require(v.wallTimeUTC!!.endsWith("Z")&&v.worldEpochUTC!!.endsWith("Z")){"Clock timestamps must be UTC"}
    Instant.parse(v.wallTimeUTC);Instant.parse(v.worldEpochUTC)
