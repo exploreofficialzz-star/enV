@@ -127,6 +127,7 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
     let cancelled = false;
     let page: PdfPageProxy | null = null;
     let renderTask: { promise: Promise<void>; cancel(): void } | null = null;
+    let renderTimeout: number | undefined;
     setRendering(true);
     setError("");
     setPageText("");
@@ -136,11 +137,21 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         page = await document.getPage(pageNumber);
         if (cancelled) return;
         const base = page.getViewport({ scale: 1 });
+        if (!Number.isFinite(base.width) || !Number.isFinite(base.height) || base.width <= 0 || base.height <= 0) {
+          throw new Error("This PDF page has invalid dimensions.");
+        }
         const fitScale = Math.min(1, Math.max(0.2, (containerWidth - 24) / base.width));
-        const scale = Math.min(2.5, Math.max(0.35, fitScale * zoom));
-        const cssViewport = page.getViewport({ scale });
+        const desiredScale = Math.min(2.5, Math.max(0.35, fitScale * zoom));
         const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-        const renderViewport = page.getViewport({ scale: scale * pixelRatio });
+        // Bound each backing canvas to ~48 MB of RGBA pixel memory.
+        const maxBackingScale = Math.sqrt(12_000_000 / (base.width * base.height));
+        const backingScale = Math.min(desiredScale * pixelRatio, maxBackingScale, 2);
+        if (!Number.isFinite(backingScale) || backingScale <= 0) {
+          throw new Error("This PDF page is too large to render safely on this device.");
+        }
+        const scale = backingScale / pixelRatio;
+        const cssViewport = page.getViewport({ scale });
+        const renderViewport = page.getViewport({ scale: backingScale });
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) throw new Error("This browser could not create a local PDF canvas.");
         canvas.width = Math.ceil(renderViewport.width);
@@ -152,6 +163,11 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
 
         const contentPromise = page.getTextContent();
         renderTask = page.render({ canvasContext: context, viewport: renderViewport });
+        renderTimeout = window.setTimeout(() => {
+          if (cancelled) return;
+          renderTask?.cancel();
+          setError("Local PDF page rendering exceeded the 45-second safety limit.");
+        }, 45_000);
         const [content] = await Promise.all([contentPromise, renderTask.promise]);
         if (!cancelled) setPageText(extractPageText(content.items));
       } catch (cause) {
@@ -159,6 +175,7 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
           setError(cause instanceof Error ? cause.message : "This PDF page could not be rendered locally.");
         }
       } finally {
+        if (renderTimeout !== undefined) window.clearTimeout(renderTimeout);
         page?.cleanup();
         if (!cancelled) setRendering(false);
       }
@@ -166,6 +183,7 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
 
     return () => {
       cancelled = true;
+      if (renderTimeout !== undefined) window.clearTimeout(renderTimeout);
       renderTask?.cancel();
       page?.cleanup();
     };
