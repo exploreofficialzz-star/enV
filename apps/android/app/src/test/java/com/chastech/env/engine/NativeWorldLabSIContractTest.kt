@@ -56,4 +56,42 @@ class NativeWorldLabSIContractTest {
         catch(_:IllegalArgumentException) { /* validated bad input */ }
         catch(_:IllegalStateException) { /* unknown unit */ }
     }
+
+
+    @Test fun trustedSchedulerRunsRealRcAndBalancesPower() {
+        val graph=NativeScientificGraph("rc-contract",2,listOf(
+            NativeScienceComponent("source","ideal-dc-source",listOf(NativeSciencePort("V","output","V","SCALAR","electrical"))),
+            NativeScienceComponent("load","series-rc-load",listOf(
+                NativeSciencePort("Vin","input","V","SCALAR","electrical"),
+                NativeSciencePort("Vc","output","V","SCALAR","electrical"),
+                NativeSciencePort("I","output","A","SCALAR","electrical")))
+        ),listOf(NativeScienceConnection("source","V","load","Vin")))
+        val run=NativeWorldLabExecution.execute(graph,
+            NativeWorldLabExecution.idealRcAdapters(12.0,6.0,0.5),0.3,0.1)
+        val last=run.samples.last()
+        assertEquals(12.0*(1.0-kotlin.math.exp(-0.3/3.0)),last.values.getValue("load:Vc").valueSI,1e-12)
+        assertTrue(last.values.getValue("load:I").valueSI>0.0)
+        assertTrue(run.samples.all{kotlin.math.abs(it.residualW)<1e-10&&it.dissipatedW>=0.0})
+    }
+    @Test fun schedulerHonoursFutureEventsAndRejectsFalsePower() {
+        val graph=NativeScientificGraph("rc-events",1,listOf(
+            NativeScienceComponent("source","ideal-dc-source",listOf(NativeSciencePort("V","output","V","SCALAR","electrical"))),
+            NativeScienceComponent("load","series-rc-load",listOf(
+                NativeSciencePort("Vin","input","V","SCALAR","electrical"),
+                NativeSciencePort("Vc","output","V","SCALAR","electrical"),
+                NativeSciencePort("I","output","A","SCALAR","electrical")))
+        ),listOf(NativeScienceConnection("source","V","load","Vin")))
+        val base=NativeWorldLabExecution.idealRcAdapters(12.0,6.0,0.5)
+        val eventSource=base.first().copy(advance={time,_,_->
+            NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(12.0,"V")),
+                0.0,0.0,0.0,if(time<0.11)0.15 else null)
+        })
+        val run=NativeWorldLabExecution.execute(graph,listOf(eventSource,base.last()),0.3,0.1)
+        assertTrue(run.samples.any{it.eventBoundary&&kotlin.math.abs(it.timeSeconds-0.15)<1e-10})
+        val faulty=base.last().copy(advance={time,delta,inputs->
+            val value=base.last().advance(time,delta,inputs)
+            value.copy(suppliedW=value.suppliedW-1.0)
+        })
+        assertFails{NativeWorldLabExecution.execute(graph,listOf(base.first(),faulty),0.3,0.1)}
+    }
 }
