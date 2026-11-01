@@ -145,10 +145,24 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
   </div>;
  }
  if(layer.kind==="network"){
-  return <div className="pointer-events-none absolute right-2 top-2 rounded-lg border border-border bg-bg/90 p-2 text-xs shadow"
-   role="img" aria-label={layer.legend.accessibleDescription}>
-   <p className="font-semibold">{layer.legend.title}</p>
-   <p>{layer.network?.nodes.length??0} nodes · {layer.network?.edges.length??0} links</p>
+  const nodes=layer.network?.nodes??[],edges=layer.network?.edges??[];
+  const xs=nodes.map(node=>node.positionMeters[0]),ys=nodes.map(node=>node.positionMeters[1]);
+  const minX=xs.length?Math.min(...xs):0,maxX=xs.length?Math.max(...xs):1;
+  const minY=ys.length?Math.min(...ys):0,maxY=ys.length?Math.max(...ys):1;
+  const project=(x:number,y:number)=>[24+(x-minX)/Math.max(1e-9,maxX-minX)*252,132-(y-minY)/Math.max(1e-9,maxY-minY)*112] as const;
+  const positions=new Map(nodes.map(node=>[node.id,project(node.positionMeters[0],node.positionMeters[1])]));
+  return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
+   role="img" aria-label={layer.legend.accessibleDescription+"; "+nodes.length+" nodes and "+edges.length+" links"}>
+   <p className="text-xs font-semibold">{layer.legend.title} · {nodes.length} nodes · {edges.length} links</p>
+   <svg viewBox="0 0 300 150" width="100%" height="118" role="presentation">
+    {edges.map(edge=>{const a=positions.get(edge.from),b=positions.get(edge.to);if(!a||!b)return null;
+     return <line key={edge.id} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="currentColor" opacity=".48" strokeWidth="1.5"><title>{edge.label}</title></line>;})}
+    {nodes.map(node=>{const point=positions.get(node.id)!;return <g key={node.id}>
+     <circle cx={point[0]} cy={point[1]} r="4" fill="currentColor"/>
+     <text x={point[0]+6} y={point[1]-6} fontSize="7" fill="currentColor">{node.label.slice(0,18)}</text>
+    </g>;})}
+   </svg>
+   <p className="text-[10px] text-muted-foreground">XY projection of recorded node positions; links follow stored graph connections</p>
   </div>;
  }
  if(layer.kind==="tensor"&&layer.renderer.kind==="slice"){
