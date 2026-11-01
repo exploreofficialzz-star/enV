@@ -4,12 +4,14 @@ import { PDFDocument } from "pdf-lib";
 import {
   A_BOOK_PDF_LIMITS,
   extractPdfPages,
+  extractSelectedPdfs,
   inspectPdf,
   mergePdfs,
   parsePageRanges,
   rotatePdf,
   rotateSelectedPdfs,
   splitPdfIntoZip,
+  splitSelectedPdfsIntoZip,
 } from "./pdf.ts";
 
 async function samplePdf(pageCount: number, title = "A book test"): Promise<Blob> {
@@ -76,4 +78,57 @@ test("rotates selected PDFs as a bounded local batch archive", async () => {
   assert.equal(Object.keys(entries).length, 2);
   assert.equal((await PDFDocument.load(entries["one-rotated.pdf"])).getPage(0).getRotation().angle, 180);
   assert.equal(A_BOOK_PDF_LIMITS.maxBatchFiles, 25);
+});
+
+
+test("extracts the same page range from a PDF batch into distinct local ZIP entries", async () => {
+  const { unzipSync } = await import("fflate");
+  const files = [
+    { name: "Research.pdf", blob: await samplePdf(4) },
+    { name: "research.PDF", blob: await samplePdf(3) },
+  ];
+  const archive = await extractSelectedPdfs(files, "1,3");
+  const entries = unzipSync(archive);
+  assert.deepEqual(Object.keys(entries).sort(), ["Research-extracted-2.pdf", "Research-extracted.pdf"]);
+  assert.equal((await PDFDocument.load(entries["Research-extracted.pdf"])).getPageCount(), 2);
+  assert.equal((await PDFDocument.load(entries["Research-extracted-2.pdf"])).getPageCount(), 2);
+});
+
+test("batch extraction validates every source before producing an archive", async () => {
+  await assert.rejects(
+    () => extractSelectedPdfs([
+      { name: "valid.pdf", blob: samplePdf(4) },
+      { name: "too-short.pdf", blob: samplePdf(2) },
+    ], "1-3"),
+    /Choose page numbers from 1 to 2/,
+  );
+  await assert.rejects(() => extractSelectedPdfs([], "1"), /Choose at least one PDF/);
+});
+
+test("splits several PDFs locally with unique entries and independent part contents", async () => {
+  const { unzipSync } = await import("fflate");
+  const archive = await splitSelectedPdfsIntoZip([
+    { name: "chapter.pdf", blob: await samplePdf(4) },
+    { name: "chapter.pdf", blob: await samplePdf(5) },
+  ], "1-2;3-4");
+  const entries = unzipSync(archive);
+  assert.deepEqual(Object.keys(entries).sort(), [
+    "chapter-part-01-2.pdf",
+    "chapter-part-01.pdf",
+    "chapter-part-02-2.pdf",
+    "chapter-part-02.pdf",
+  ]);
+  assert.equal((await PDFDocument.load(entries["chapter-part-01.pdf"])).getPageCount(), 2);
+  assert.equal((await PDFDocument.load(entries["chapter-part-02-2.pdf"])).getPageCount(), 2);
+});
+
+test("batch split validates all source page groups before constructing the ZIP", async () => {
+  await assert.rejects(
+    () => splitSelectedPdfsIntoZip([
+      { name: "valid.pdf", blob: samplePdf(6) },
+      { name: "too-short.pdf", blob: samplePdf(2) },
+    ], "1-2;3-4"),
+    /Choose page numbers from 1 to 2/,
+  );
+  await assert.rejects(() => splitSelectedPdfsIntoZip([], "1-2;3-4"), /Choose at least one PDF/);
 });
