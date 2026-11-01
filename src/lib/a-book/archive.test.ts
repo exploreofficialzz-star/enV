@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createABookArchive, readABookArchive } from "./archive.ts";
-import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas } from "./local-store.ts";
+import { assertABookAttachmentBatch, assertABookAttachmentSize, assertABookImportQuotas, getABookLocalDatabaseName } from "./local-store.ts";
 import type { ABookAttachment, ABookNote, ABookRevision } from "./local-store.ts";
 
 const note: ABookNote = {
@@ -152,4 +152,15 @@ test("A book backup restore enforces combined local note, revision and attachmen
     existingAttachmentBytes: 150 * 1024 * 1024 - 1,
     incomingAttachments: [{ blob: new Blob(["more"]), size: 4 }],
   }), /150 MB/);
+});
+
+
+test("A book keeps a separate local IndexedDB namespace for each signed-in profile", () => {
+  const first = getABookLocalDatabaseName("account-one");
+  const second = getABookLocalDatabaseName("account-two");
+  const guest = getABookLocalDatabaseName(null);
+  assert.notEqual(first, second);
+  assert.notEqual(first, guest);
+  assert.equal(guest, getABookLocalDatabaseName(""));
+  assert.equal(first, getABookLocalDatabaseName("account-one"));
 });
