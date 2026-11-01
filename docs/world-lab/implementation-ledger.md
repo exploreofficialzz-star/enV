@@ -806,3 +806,9 @@ release-candidate evidence bundle are unfinished.
 - The Web CAD panel's grid and sketch fields now have explicit accessible names. The rendered Chromium acceptance has been extended to select two actual parts, snap them to a 0.5 m grid, verify the computed 3D/horizontal centre measurements, then export and inspect rectangle/circle extrusions using non-origin base centres and non-zero orientations.
 - The sketch browser cases validate the actual portable project coordinates/rotation arrays, not only the displayed labels. They do not imply a general B-rep CAD kernel or physical assembly joints.
 - These edits are source integration and require fresh exact-head World Lab browser, Web typecheck/build, Android unit/lint, Android game-preview, iOS simulator and native accessibility results before any acceptance status is upgraded.
+
+## C/D rendered browser acceptance result — 2026-11-01
+- The corrected World Lab reference-model workflow **41331169005** passed on code head `503a32a6ac3f0376b0a6d3e852617dd4bb774a6e`. Its Chromium log records the expanded `WORLD_LAB_BROWSER_PASS`.
+- The passing rendered flow covers multi-part 0.5 m grid snapping, selected-solid 3D and horizontal centre measurements, and exported-project checks for rectangle and circle extrusion using non-origin base centres and non-zero orientations.
+- Existing browser checks also passed in that run for creation, inspection, bounded experiments, see-inside transparency, export/reload, offline behavior, legacy import and narrow mobile layout.
+- This verifies those specific Web/Chromium interactions only. It does not certify the remaining native device/accessibility gates, universal CAD/B-rep capability, mapped terrain, or the broader scientific production mandate.
