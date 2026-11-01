@@ -376,7 +376,7 @@ try{
   await page.getByRole("button",{name:"Reset group impact"}).click();
   // Persist newly authored spheres before requesting a destructive legacy import.
   await page.getByRole("button",{name:"Save on device"}).click();
-  await page.getByText(/scientific runs saved on this device/).waitFor();
+  await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
   const legacy={format:"env-3d-game",version:1,id:"old",name:"Old",assets:[],objects:[{
     id:"old-cube",name:"Old cube",kind:"box",position:{x:0,y:0.5,z:0},rotation:{x:0,y:0,z:0},
     scale:{x:2,y:2,z:2},color:"#778899",visible:true,locked:false,collider:true,player:false,speed:3,
