@@ -14525,6 +14525,217 @@ private final class ABookLocalStore {
         return attachment
     }
 
+
+    func exportBackupArchive() throws -> Data {
+        let allNotes = try notes(includeArchived: true, includeDeleted: true)
+        var noteJSON: [[String: Any]] = []
+        var revisionJSON: [[String: Any]] = []
+        var attachmentJSON: [[String: Any]] = []
+        var files: [String: Data] = [:]
+        var totalBytes = 0
+        var attachmentIndex = 0
+
+        for note in allNotes {
+            var item: [String: Any] = [
+                "id": note.id.uuidString, "title": note.title, "body": note.body,
+                "notebook": note.notebook, "tags": note.tags, "pinned": note.pinned,
+                "archived": note.archived, "createdAt": note.createdAt.timeIntervalSince1970 * 1000,
+                "updatedAt": note.updatedAt.timeIntervalSince1970 * 1000, "revision": note.revision
+            ]
+            item["deletedAt"] = note.deletedAt.map { $0.timeIntervalSince1970 * 1000 } ?? NSNull()
+            noteJSON.append(item)
+
+            for revision in try revisions(noteID: note.id) {
+                revisionJSON.append([
+                    "id": revision.id.uuidString, "noteId": note.id.uuidString,
+                    "revision": revision.revision, "title": revision.title, "body": revision.body,
+                    "notebook": revision.notebook, "tags": revision.tags,
+                    "createdAt": revision.createdAt.timeIntervalSince1970 * 1000
+                ])
+            }
+            for attachment in try attachments(noteID: note.id) {
+                let data = try Data(contentsOf: fileURL(for: attachment))
+                guard data.count <= 100 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 20, userInfo: [NSLocalizedDescriptionKey: "An attachment exceeds the 100 MB backup limit."])
+                }
+                totalBytes += data.count
+                guard totalBytes <= 150 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 21, userInfo: [NSLocalizedDescriptionKey: "The local library exceeds the 150 MB backup limit."])
+                }
+                let filePath = "attachments/" + String(attachmentIndex) + ".bin"
+                files[filePath] = data
+                attachmentJSON.append([
+                    "id": attachment.id.uuidString, "noteId": note.id.uuidString,
+                    "name": attachment.name, "type": attachment.mime,
+                    "size": data.count, "createdAt": attachment.createdAt.timeIntervalSince1970 * 1000,
+                    "path": filePath
+                ])
+                attachmentIndex += 1
+            }
+        }
+
+        let manifest: [String: Any] = [
+            "format": "env.abook.archive.v1",
+            "createdAt": ISO8601DateFormatter().string(from: Date()),
+            "notes": noteJSON, "revisions": revisionJSON, "attachments": attachmentJSON
+        ]
+        let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+        guard manifestData.count + totalBytes <= 150 * 1024 * 1024 else {
+            throw NSError(domain: "ABookArchive", code: 22, userInfo: [NSLocalizedDescriptionKey: "The complete backup exceeds A book's 150 MB safety limit."])
+        }
+        files["manifest.json"] = manifestData
+        return try makeABookStoredZIP(files)
+    }
+
+    func importBackupArchive(_ archive: Data) throws -> Int {
+        let files = try readABookStoredZIP(archive)
+        guard let manifestData = files["manifest.json"],
+              let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any],
+              manifest["format"] as? String == "env.abook.archive.v1",
+              let rawNotes = manifest["notes"] as? [[String: Any]],
+              let rawRevisions = manifest["revisions"] as? [[String: Any]],
+              let rawAttachments = manifest["attachments"] as? [[String: Any]],
+              rawNotes.count <= 10_000, rawRevisions.count <= 100_000, rawAttachments.count <= 10_000 else {
+            throw NSError(domain: "ABookArchive", code: 23, userInfo: [NSLocalizedDescriptionKey: "This is not a supported A book backup or it contains too many records."])
+        }
+
+        func requiredString(_ item: [String: Any], _ key: String) throws -> String {
+            guard let value = item[key] as? String, !value.isEmpty, value.count <= 5_000_000 else {
+                throw NSError(domain: "ABookArchive", code: 24, userInfo: [NSLocalizedDescriptionKey: "The backup contains invalid " + key + " data."])
+            }
+            return value
+        }
+        func timestamp(_ item: [String: Any], _ key: String) throws -> Date {
+            guard let value = item[key] as? NSNumber, value.doubleValue.isFinite,
+                  abs(value.doubleValue) < 100_000_000_000_000 else {
+                throw NSError(domain: "ABookArchive", code: 25, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid date."])
+            }
+            return Date(timeIntervalSince1970: value.doubleValue / 1000)
+        }
+
+        var noteIDs: [String: UUID] = [:]
+        var importedNotes: [ABookNativeNote] = []
+        for item in rawNotes {
+            let oldID = try requiredString(item, "id")
+            guard noteIDs[oldID] == nil,
+                  let title = item["title"] as? String, title.count <= 10_000,
+                  let body = item["body"] as? String, body.count <= 5_000_000,
+                  let notebook = item["notebook"] as? String, notebook.count <= 500,
+                  let tags = item["tags"] as? [String], tags.count <= 50,
+                  tags.allSatisfy({ $0.count <= 200 }),
+                  let pinned = item["pinned"] as? Bool, let archived = item["archived"] as? Bool,
+                  let revision = item["revision"] as? Int, revision >= 0 else {
+                throw NSError(domain: "ABookArchive", code: 26, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid note."])
+            }
+            let newID = UUID()
+            noteIDs[oldID] = newID
+            let deletedAt = (item["deletedAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) }
+            importedNotes.append(ABookNativeNote(
+                id: newID, title: title, body: body, notebook: notebook, tags: tags,
+                pinned: pinned, archived: archived, deletedAt: deletedAt,
+                createdAt: try timestamp(item, "createdAt"),
+                updatedAt: try timestamp(item, "updatedAt"), revision: revision
+            ))
+        }
+
+        var importedRevisions: [ABookNativeRevision] = []
+        for item in rawRevisions {
+            let oldNoteID = try requiredString(item, "noteId")
+            guard let newNoteID = noteIDs[oldNoteID],
+                  let title = item["title"] as? String, title.count <= 10_000,
+                  let body = item["body"] as? String, body.count <= 5_000_000,
+                  let notebook = item["notebook"] as? String, notebook.count <= 500,
+                  let tags = item["tags"] as? [String], tags.count <= 50,
+                  let revision = item["revision"] as? Int, revision >= 0 else {
+                throw NSError(domain: "ABookArchive", code: 27, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid revision."])
+            }
+            importedRevisions.append(ABookNativeRevision(
+                id: UUID(), noteID: newNoteID, title: title, body: body,
+                notebook: notebook, tags: tags, revision: revision,
+                createdAt: try timestamp(item, "createdAt")
+            ))
+        }
+
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("Abook", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        var copiedFiles: [URL] = []
+        var importedAttachments: [ABookNativeAttachment] = []
+        var expectedPaths: Set<String> = ["manifest.json"]
+        var totalBytes = 0
+        do {
+            for item in rawAttachments {
+                let oldNoteID = try requiredString(item, "noteId")
+                guard let newNoteID = noteIDs[oldNoteID],
+                      let filePath = item["path"] as? String,
+                      filePath.range(of: #"^attachments/\d+\.bin$"#, options: .regularExpression) != nil,
+                      !expectedPaths.contains(filePath),
+                      let data = files[filePath],
+                      let name = item["name"] as? String, !name.isEmpty, name.count <= 500,
+                      let mime = item["type"] as? String, mime.count <= 200,
+                      let declaredSize = item["size"] as? Int, declaredSize == data.count,
+                      declaredSize <= 100 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 28, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid or damaged attachment."])
+                }
+                expectedPaths.insert(filePath)
+                totalBytes += data.count
+                guard totalBytes <= 150 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 29, userInfo: [NSLocalizedDescriptionKey: "The backup attachments exceed 150 MB."])
+                }
+                let attachmentDate = try timestamp(item, "createdAt")
+                let attachmentID = UUID()
+                let ext = String((name as NSString).pathExtension.filter { $0.isLetter || $0.isNumber }.prefix(10))
+                let filename = attachmentID.uuidString + (ext.isEmpty ? "" : "." + ext)
+                let relativePath = "Attachments/" + newNoteID.uuidString + "/" + filename
+                let folder = root.appendingPathComponent("Attachments/" + newNoteID.uuidString, isDirectory: true)
+                try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+                let destination = folder.appendingPathComponent(filename)
+                try data.write(to: destination, options: .atomic)
+                copiedFiles.append(destination)
+                importedAttachments.append(ABookNativeAttachment(
+                    id: attachmentID, noteID: newNoteID, name: name, mime: mime,
+                    relativePath: relativePath, size: Int64(data.count), createdAt: attachmentDate
+                ))
+            }
+            guard Set(files.keys) == expectedPaths else {
+                throw NSError(domain: "ABookArchive", code: 30, userInfo: [NSLocalizedDescriptionKey: "The backup contains unexpected files."])
+            }
+            try perform { context in
+                do {
+                    for note in importedNotes {
+                        let entity = ABookNoteEntity(context: context)
+                        entity.id = note.id; entity.title = note.title; entity.body = note.body
+                        entity.notebook = note.notebook; entity.tagsData = encodeTags(note.tags)
+                        entity.pinned = note.pinned; entity.archived = note.archived; entity.deletedAt = note.deletedAt
+                        entity.createdAt = note.createdAt; entity.updatedAt = note.updatedAt; entity.revision = Int64(note.revision)
+                    }
+                    for revision in importedRevisions {
+                        let entity = ABookRevisionEntity(context: context)
+                        entity.id = revision.id; entity.noteID = revision.noteID; entity.title = revision.title
+                        entity.body = revision.body; entity.notebook = revision.notebook
+                        entity.tagsData = encodeTags(revision.tags); entity.revision = Int64(revision.revision)
+                        entity.createdAt = revision.createdAt
+                    }
+                    for attachment in importedAttachments {
+                        let entity = ABookAttachmentEntity(context: context)
+                        entity.id = attachment.id; entity.noteID = attachment.noteID; entity.name = attachment.name
+                        entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
+                        entity.size = attachment.size; entity.createdAt = attachment.createdAt
+                    }
+                    try context.save()
+                } catch {
+                    context.rollback()
+                    throw error
+                }
+            }
+            return importedNotes.count
+        } catch {
+            copiedFiles.forEach { try? fileManager.removeItem(at: $0) }
+            throw error
+        }
+    }
+
+
     func fileURL(for attachment: ABookNativeAttachment) throws -> URL {
         let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         return root.appendingPathComponent("Abook/" + attachment.relativePath)
