@@ -7,6 +7,7 @@ import {
   deleteAttachment,
   listAttachments,
   listNotes,
+  importLocalLibrary,
   listRevisions,
   permanentlyDeleteNote,
   restoreNote,
