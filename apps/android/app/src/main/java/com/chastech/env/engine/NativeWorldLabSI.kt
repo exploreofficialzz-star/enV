@@ -243,8 +243,9 @@ object NativeWorldLabExecution {
                 val component=components.getValue(id)
                 val inputs=linkedMapOf<String,NativeScienceQuantity>()
                 graph.connections.filter{it.toComponentId==id}.forEach{edge->
-                    val source=(if(edge.delayed)previous else values)
-                        [edge.fromComponentId+":"+edge.fromPortId]?:return@forEach
+                    val sourceValues=if(edge.delayed)previous else values
+                    val source=sourceValues[edge.fromComponentId+":"+edge.fromPortId]
+                        ?:return@forEach
                     val port=component.ports.first{it.id==edge.toPortId}
                     val converted=source.copy(unit=port.unit)
                     NativeWorldLabSI.validate(converted)
