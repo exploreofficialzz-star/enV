@@ -81,9 +81,10 @@ fun NativeWorldLabViewport(
     var showLabels by remember(project.id){mutableStateOf(true)}
     var showViewportOverlays by remember(project.id){mutableStateOf(true)}
     val selectedEntity=project.entities.firstOrNull{it.id==selectedId}
-    val cutOffset=NativeWorldLabInspection.planeOffset(project,selectedId,inspection)
+    val cutPlane=NativeWorldLabInspection.plane(project,selectedId,inspection)
+    val cutOffset=cutPlane?.offset
     val cutTargets=NativeWorldLabInspection.targetIds(project,selectedId)
-    fun clip(vertices:List<NativeLabVector>,entityId:String)=if(cutOffset==null||entityId !in cutTargets)vertices else NativeWorldLabInspection.clipPolygon(vertices,inspection.axis,cutOffset)
+    fun clip(vertices:List<NativeLabVector>,entityId:String)=if(cutPlane==null||entityId !in cutTargets)vertices else NativeWorldLabInspection.clipPolygon(vertices,cutPlane)
     fun isInspectionTarget(entityId:String)=entityId in cutTargets
     fun alpha(entityId:String):Float{
         if(!isInspectionTarget(entityId))return 0.86f
@@ -261,11 +262,19 @@ fun NativeWorldLabViewport(
                             }
                         }
                         val cap=linkedMapOf<String,NativeLabVector>()
-                        fun planeCoordinate(point:NativeLabVector)=when(inspection.axis){
-                            NativeInspectionAxis.X->point.x
-                            NativeInspectionAxis.Y->point.y
-                            NativeInspectionAxis.Z->point.z
-                        }
+                        val sectionNormal=cutPlane?.normal?:NativeLabVector(1.0,0.0,0.0)
+                        fun planeCoordinate(point:NativeLabVector)=point.x*sectionNormal.x+
+                            point.y*sectionNormal.y+point.z*sectionNormal.z
+                        val reference=if(kotlin.math.abs(sectionNormal.x)<0.9)
+                            NativeLabVector(1.0,0.0,0.0) else NativeLabVector(0.0,1.0,0.0)
+                        var basisUX=sectionNormal.y*reference.z-sectionNormal.z*reference.y
+                        var basisUY=sectionNormal.z*reference.x-sectionNormal.x*reference.z
+                        var basisUZ=sectionNormal.x*reference.y-sectionNormal.y*reference.x
+                        val basisNorm=sqrt(basisUX*basisUX+basisUY*basisUY+basisUZ*basisUZ).coerceAtLeast(1e-12)
+                        basisUX/=basisNorm;basisUY/=basisNorm;basisUZ/=basisNorm
+                        val basisVX=sectionNormal.y*basisUZ-sectionNormal.z*basisUY
+                        val basisVY=sectionNormal.z*basisUX-sectionNormal.x*basisUZ
+                        val basisVZ=sectionNormal.x*basisUY-sectionNormal.y*basisUX
                         for(face in faces){
                             val clipped=clip(face,solid.id)
                             clipped.forEach{point->
@@ -292,10 +301,11 @@ fun NativeWorldLabViewport(
                             val section=cap.values.toList()
                             val centre=NativeLabVector(section.sumOf{it.x}/section.size,
                                 section.sumOf{it.y}/section.size,section.sumOf{it.z}/section.size)
-                            fun planeAngle(point:NativeLabVector)=when(inspection.axis){
-                                NativeInspectionAxis.X->atan2(point.z-centre.z,point.y-centre.y)
-                                NativeInspectionAxis.Y->atan2(point.x-centre.x,point.z-centre.z)
-                                NativeInspectionAxis.Z->atan2(point.y-centre.y,point.x-centre.x)
+                            fun planeAngle(point:NativeLabVector){
+                                val rx=point.x-centre.x;val ry=point.y-centre.y;val rz=point.z-centre.z
+                                val u=rx*basisUX+ry*basisUY+rz*basisUZ
+                                val v=rx*basisVX+ry*basisVY+rz*basisVZ
+                                return atan2(v,u)
                             }
                             val orderedCap=section.sortedBy(::planeAngle)
                             val projectedCap=orderedCap.map{projection(it,size.width,size.height,focalLength)}
@@ -428,8 +438,24 @@ fun NativeWorldLabViewport(
         Slider(value=inspection.opacity,onValueChange={onInspectionChange(inspection.copy(opacity=it))},valueRange=0.05f..1f)
     }
     if(inspection.mode==NativeInspectionMode.CUTAWAY){
-        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){NativeInspectionAxis.values().forEach{axis->OutlinedButton(onClick={onInspectionChange(inspection.copy(axis=axis))}){Text(axis.name)}}}
-        Text("Cut plane "+inspection.cutawayFraction)
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){NativeInspectionAxis.values().forEach{axis->
+            val normal=when(axis){NativeInspectionAxis.X->NativeLabVector(1.0,0.0,0.0);NativeInspectionAxis.Y->NativeLabVector(0.0,1.0,0.0);NativeInspectionAxis.Z->NativeLabVector(0.0,0.0,1.0)}
+            OutlinedButton(onClick={onInspectionChange(inspection.copy(axis=axis,normal=normal))}){Text(axis.name)}
+        }}
+        Text("Cut plane normal X · Y · Z")
+        listOf("X" to inspection.normal.x,"Y" to inspection.normal.y,"Z" to inspection.normal.z).forEach{(axis,value)->
+            Text("$axis · "+String.format(java.util.Locale.US,"%.2f",value))
+            Slider(value=value.toFloat(),onValueChange={next->
+                val normal=when(axis){
+                    "X"->inspection.normal.copy(x=next.toDouble())
+                    "Y"->inspection.normal.copy(y=next.toDouble())
+                    else->inspection.normal.copy(z=next.toDouble())
+                }
+                if(sqrt(normal.x*normal.x+normal.y*normal.y+normal.z*normal.z)>1e-9)
+                    onInspectionChange(inspection.copy(normal=normal))
+            },valueRange=-1f..1f)
+        }
+        Text("Cut plane position "+inspection.cutawayFraction)
         Slider(value=inspection.cutawayFraction,onValueChange={onInspectionChange(inspection.copy(cutawayFraction=it))},valueRange=-1f..1f)
         Text("Box, sphere and cylinder surfaces are clipped in world coordinates and receive a generated section face.")
     }

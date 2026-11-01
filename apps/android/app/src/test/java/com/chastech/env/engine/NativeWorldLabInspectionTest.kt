@@ -54,3 +54,23 @@ class NativeWorldLabInspectionHistoryTest{
  }
 
 }
+
+ @Test fun obliqueCutawayUsesNormalizedPlaneAndProjectedObjectBounds(){
+  val project=fixture()
+  val settings=NativeInspectionSettings(mode=NativeInspectionMode.CUTAWAY,
+   normal=NativeLabVector(1.0,1.0,0.0),cutawayFraction=0.5f)
+  val plane=NativeWorldLabInspection.plane(project,"a",settings)!!
+  assertEquals(1.0/sqrt(2.0),plane.normal.x,1e-9)
+  assertEquals(1.0/sqrt(2.0),plane.normal.y,1e-9)
+  assertEquals(-1.0/sqrt(2.0)+0.5/sqrt(2.0),plane.offset,1e-9)
+  val polygon=listOf(NativeLabVector(-2.0,0.0,0.0),NativeLabVector(0.0,0.0,0.0),
+   NativeLabVector(0.0,1.0,0.0),NativeLabVector(-2.0,1.0,0.0))
+  val clipped=NativeWorldLabInspection.clipPolygon(polygon,plane)
+  assertTrue(clipped.size>=3)
+  assertTrue(clipped.all{it.x*plane.normal.x+it.y*plane.normal.y+it.z*plane.normal.z>=plane.offset-1e-9})
+ }
+ @Test fun zeroCutawayNormalIsRejected(){
+  assertThrows(IllegalArgumentException::class.java){
+   NativeInspectionSettings(mode=NativeInspectionMode.CUTAWAY,normal=NativeLabVector(0.0,0.0,0.0))
+  }
+ }
