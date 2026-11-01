@@ -1,7 +1,14 @@
 import fs from "node:fs";
 
 const root = new URL("../", import.meta.url);
-const { tools: catalog } = await import("../src/data/catalog.ts");
+const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
+  import("../src/data/catalog.ts"),
+  import("../src/lib/datetime/catalog-tools.ts"),
+]);
+const catalog = [
+  ...baseCatalog,
+  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
+];
 const readIds = (platform, kind) => {
   const files = kind === "local"
     ? [new URL(`../apps/${platform}/native-tool-coverage.txt`, import.meta.url), new URL(`../apps/${platform}/native-family-coverage/`, import.meta.url)]

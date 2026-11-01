@@ -1,62 +1,170 @@
 {
   "schemaVersion": 1,
-  "policyVersion": "2026-10-10.3",
+  "policyVersion": "2026-10-30.1",
   "principle": "local-first; remote only when explicitly required or selected",
-  "platforms": ["web", "android", "ios"],
-  "modes": ["local", "remote-required", "unsupported"],
+  "platforms": [
+    "web",
+    "android",
+    "ios"
+  ],
+  "modes": [
+    "local",
+    "remote-required",
+    "unsupported"
+  ],
   "families": {
     "barcode": {
-      "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
-      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "check-digit-validation; QR, Code 128, Code 39, EAN-13, EAN-8, UPC-A, ITF, and Codabar raster generation"},
-      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "check-digit-validation; QR, Code 128, EAN-13, EAN-8, UPC-A, and ISBN-13 raster generation"},
+      "web": {
+        "mode": "local",
+        "implementation": "src/components/engines/qr-engine.tsx; src/components/engines/barcode-reader-engine.tsx",
+        "scope": "local 1D/2D generation, validation, camera scanning and image decoding"
+      },
+      "android": {
+        "mode": "local",
+        "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt; apps/android/app/src/main/java/com/chastech/env/NativeBarcodeReader.kt",
+        "scope": "native QR/barcode generation, check digits, CameraX live scanning and local image decoding"
+      },
+      "ios": {
+        "mode": "local",
+        "implementation": "apps/ios/enV/ToolViews.swift; apps/ios/enV/NativeQrBarcodeAndEcommerceViews.swift",
+        "scope": "native generation, validation, AVFoundation live scanning and Vision image decoding"
+      },
       "remoteFallback": false
     },
     "qr": {
-      "web": {"mode": "local", "implementation": "src/components/engines/qr-engine.tsx"},
-      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt", "scope": "local QR raster generation for catalog payload tools; scanning and exact SVG/data-URL/batch export remain unsupported"},
-      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "local QR raster generation for catalog payload tools; scanning and exact SVG/data-URL/batch export remain unsupported"},
+      "web": {
+        "mode": "local",
+        "implementation": "src/components/engines/qr-engine.tsx; src/components/engines/barcode-reader-engine.tsx",
+        "scope": "local QR payload creation, design, batch export, camera scanning and image decoding"
+      },
+      "android": {
+        "mode": "local",
+        "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeBarcodeEngine.kt; apps/android/app/src/main/java/com/chastech/env/NativeBarcodeReader.kt",
+        "scope": "native QR creation and CameraX/image scanning; unsupported export variations remain explicit"
+      },
+      "ios": {
+        "mode": "local",
+        "implementation": "apps/ios/enV/ToolViews.swift; apps/ios/enV/NativeQrBarcodeAndEcommerceViews.swift",
+        "scope": "native QR creation and AVFoundation/Vision scanning; unsupported export variations remain explicit"
+      },
       "remoteFallback": false
     },
     "image": {
-      "web": {"mode": "local", "implementation": "src/lib/image/"},
-      "android": {"mode": "local", "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeImageEngine.kt", "scope": "resize-compress-grayscale-invert-blur-sharpen-crop-rotate-flip-watermark"},
-      "ios": {"mode": "local", "implementation": "apps/ios/enV/ToolViews.swift", "scope": "resize-compress-grayscale-invert-blur-sharpen-crop-rotate-flip-watermark"},
+      "web": {
+        "mode": "local",
+        "implementation": "src/lib/image/"
+      },
+      "android": {
+        "mode": "local",
+        "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeImageEngine.kt",
+        "scope": "resize-compress-grayscale-invert-blur-sharpen-crop-rotate-flip-watermark"
+      },
+      "ios": {
+        "mode": "local",
+        "implementation": "apps/ios/enV/ToolViews.swift",
+        "scope": "resize-compress-grayscale-invert-blur-sharpen-crop-rotate-flip-watermark"
+      },
       "remoteFallback": false
     },
     "screenshots": {
-      "web": {"mode": "local", "implementation": "src/lib/screenshots/"},
-      "android": {"mode": "unsupported", "next": "Compose/Bitmap local composition module"},
-      "ios": {"mode": "unsupported", "next": "Core Graphics/UIGraphics local composition module"},
+      "web": {
+        "mode": "local",
+        "implementation": "src/lib/screenshots/"
+      },
+      "android": {
+        "mode": "unsupported",
+        "next": "Compose/Bitmap local composition module"
+      },
+      "ios": {
+        "mode": "unsupported",
+        "next": "Core Graphics/UIGraphics local composition module"
+      },
       "remoteFallback": true,
       "consent": "required"
     },
     "mockups": {
-      "web": {"mode": "local", "implementation": "src/lib/mockups/"},
-      "android": {"mode": "unsupported", "next": "Kotlin scene model and Canvas renderer"},
-      "ios": {"mode": "unsupported", "next": "Swift scene model and Core Graphics renderer"},
+      "web": {
+        "mode": "local",
+        "implementation": "src/lib/mockups/"
+      },
+      "android": {
+        "mode": "unsupported",
+        "next": "Kotlin scene model and Canvas renderer"
+      },
+      "ios": {
+        "mode": "unsupported",
+        "next": "Swift scene model and Core Graphics renderer"
+      },
       "remoteFallback": true,
       "consent": "required"
     },
     "document-backend": {
-      "web": {"mode": "remote-required", "implementation": "server/routes/api/backend/documents.post.ts", "reason": "fidelity-sensitive document conversion currently uses server processors"},
-      "android": {"mode": "remote-required", "implementation": "NativeBackendEngine document route", "reason": "no native Office conversion engine yet"},
-      "ios": {"mode": "remote-required", "implementation": "NativeBackendEngine document route", "reason": "no native Office conversion engine yet"},
+      "web": {
+        "mode": "remote-required",
+        "implementation": "server/routes/api/backend/documents.post.ts",
+        "reason": "fidelity-sensitive document conversion currently uses server processors"
+      },
+      "android": {
+        "mode": "remote-required",
+        "implementation": "NativeBackendEngine document route",
+        "reason": "no native Office conversion engine yet"
+      },
+      "ios": {
+        "mode": "remote-required",
+        "implementation": "NativeBackendEngine document route",
+        "reason": "no native Office conversion engine yet"
+      },
       "remoteFallback": false,
       "consent": "required"
     },
     "media": {
-      "web": {"mode": "local", "implementation": "src/lib/media/ and browser media engines", "scope": "operation and codec capability dependent"},
-      "android": {"mode": "unsupported", "next": "Media3 Transformer local operation registry"},
-      "ios": {"mode": "unsupported", "next": "AVFoundation/AVFAudio local operation registry"},
+      "web": {
+        "mode": "local",
+        "implementation": "src/lib/media/ and browser media engines",
+        "scope": "operation and codec capability dependent"
+      },
+      "android": {
+        "mode": "unsupported",
+        "next": "Media3 Transformer local operation registry"
+      },
+      "ios": {
+        "mode": "unsupported",
+        "next": "AVFoundation/AVFAudio local operation registry"
+      },
       "remoteFallback": true,
       "consent": "required"
     },
     "remote-url": {
-      "web": {"mode": "remote-required", "reason": "requires network access to the remote resource"},
-      "android": {"mode": "remote-required"},
-      "ios": {"mode": "remote-required"},
+      "web": {
+        "mode": "remote-required",
+        "reason": "requires network access to the remote resource"
+      },
+      "android": {
+        "mode": "remote-required"
+      },
+      "ios": {
+        "mode": "remote-required"
+      },
       "remoteFallback": false,
       "consent": "required"
+    },
+    "ecommerce": {
+      "web": {
+        "mode": "local",
+        "implementation": "src/components/engines/ecommerce-engine.tsx; src/components/engines/ecommerce-engine-utils.ts",
+        "scope": "15 families and six local workflow types with pricing, profit, order, discount, inventory and product-document operations"
+      },
+      "android": {
+        "mode": "local",
+        "implementation": "apps/android/app/src/main/java/com/chastech/env/NativeEcommerceEngine.kt; apps/android/app/src/main/java/com/chastech/env/NativeEcommerceToolForm.kt",
+        "scope": "native product/SKU/order/inventory/pricing/discount/shipping/return calculations and local workflow outputs; live store/carrier operations require an explicitly authorised integration"
+      },
+      "ios": {
+        "mode": "local",
+        "implementation": "apps/ios/enV/NativeEcommerceEngine.swift; apps/ios/enV/NativeQrBarcodeAndEcommerceViews.swift",
+        "scope": "native product/SKU/order/inventory/pricing/discount/shipping/return calculations and local workflow outputs; live store/carrier operations require an explicitly authorised integration"
+      },
+      "remoteFallback": false
     }
   },
   "rules": [

@@ -1,0 +1,157 @@
+name: Date & Time — focused cross-platform verification
+
+on:
+  push:
+    branches: [feat/datetime-production-ready-benchmark]
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/datetime-validation.yml"
+      - "src/components/engines/io-engines.tsx"
+      - "src/lib/engines/datetime.ts"
+      - "src/lib/datetime/**"
+      - "src/lib/registry.ts"
+      - "src/lib/production-notice.ts"
+      - "src/lib/production-notice.test.ts"
+      - "src/data/billing-profile-runtime-extensions.json"
+      - "scripts/check-datetime.mjs"
+      - "scripts/gen-catalog.mjs"
+      - "scripts/check-native-coverage.mjs"
+      - "scripts/check-native-related.mjs"
+      - "scripts/check-production-gating.mjs"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/export-native-execution-matrix.mjs"
+      - "scripts/generate-billing-profiles.mjs"
+      - "scripts/check-billing.mjs"
+      - "apps/android/gradle.properties"
+      - "apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/engine/NativeDateTimeEngine.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/engine/NativeDateTimeEngineTest.kt"
+      - "apps/android/native-family-coverage/datetime.txt"
+      - "apps/android/native-tool-coverage.txt"
+      - "apps/ios/enV/CatalogCore.swift"
+      - "apps/ios/enV/ToolViews.swift"
+      - "apps/ios/enV/NativeDateTimeEngine.swift"
+      - "apps/ios/enVTests/NativeDateTimeEngineTests.swift"
+      - "apps/ios/native-family-coverage/datetime.txt"
+      - "apps/ios/native-tool-coverage.txt"
+      - "apps/shared/catalog.json"
+      - "apps/shared/native-engine-inventory.json"
+      - "apps/shared/native-execution-matrix.json"
+      - "src/data/billing-profile-runtime-extensions.json"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: datetime-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-datetime:
+    name: Web Date & Time behaviour, typecheck and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run Date & Time behavioural and catalogue audit
+        run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-datetime.mjs
+      - name: Build web application
+        run: npm run build
+      - name: Typecheck web application
+        run: npm run typecheck
+      - name: Lint Date & Time implementation
+        run: npx eslint src/lib/engines/datetime.ts src/components/engines/io-engines.tsx src/lib/datetime/catalog-tools.ts src/lib/registry.ts scripts/check-datetime.mjs
+
+  android-datetime:
+    name: Android Date & Time unit tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/android
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        working-directory: ${{ github.workspace }}
+        run: npm ci --no-audit --no-fund
+      - name: Set up Java 21
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+      - name: Set up Gradle caching
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
+      - name: Run Date & Time Kotlin tests
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests "com.chastech.env.engine.NativeDateTimeEngineTest"
+      - name: Lint and assemble Android app
+        run: ./gradlew --no-daemon --max-workers=2 --stacktrace :app:lintDebug :app:assembleDebug
+
+  ios-datetime:
+    name: iOS Date & Time XCTest and build
+    runs-on: macos-15
+    timeout-minutes: 55
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Select an available iPhone Simulator
+        shell: bash
+        run: |
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/datetime-simulators.json"
+          simulator_id="$(python3 - "$RUNNER_TEMP/datetime-simulators.json" <<'PY'
+          import json, sys
+          devices = json.load(open(sys.argv[1], encoding="utf-8")).get("devices", {})
+          for runtime, entries in devices.items():
+              if "iOS" not in runtime:
+                  continue
+              for entry in entries:
+                  if entry.get("isAvailable", True) and entry.get("name", "").startswith("iPhone"):
+                      print(entry["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone Simulator found")
+          PY
+          )"
+          echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+      - name: Build and run Date & Time XCTest
+        working-directory: apps/ios
+        run: |
+          xcodebuild \
+            -project enV.xcodeproj \
+            -scheme enV \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/datetime-ios-derived-data" \
+            -only-testing:enVTests/NativeDateTimeEngineTests \
+            CODE_SIGNING_ALLOWED=NO \
+            test

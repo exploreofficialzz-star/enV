@@ -62,12 +62,14 @@ const profiles = JSON.parse(profilesText);
 const profileIndex = JSON.parse(profileIndexText);
 const runtimeExtensionProfileIndex = JSON.parse(runtimeExtensionProfileText);
 const nativeInventory = JSON.parse(nativeInventoryText);
+const { DATETIME_TOOL_EXTENSIONS } = await import("../src/lib/datetime/catalog-tools.ts");
 const baseProfileIds = new Set(profiles.profiles.map((profile) => profile.toolId));
 const runtimeExtensionProfileIds = new Set(runtimeExtensionProfileIndex.profiles.map((profile) => profile.toolId));
 const profileIds = new Set([...baseProfileIds, ...runtimeExtensionProfileIds]);
 const runtimeCatalog = parseFinalCatalog(await read("src/data/catalog.ts"));
 const expectedRuntimeToolIds = new Set(runtimeCatalog.map((tool) => tool.id));
 for (const id of nativeInventory.runtimeExtensionIds ?? []) expectedRuntimeToolIds.add(id);
+for (const tool of DATETIME_TOOL_EXTENSIONS) expectedRuntimeToolIds.add(tool.id);
 
 for (const table of ["billing_accounts", "billing_credit_ledger", "billing_reservations", "billing_purchase_intents", "billing_entitlements", "billing_entitlement_events", "billing_webhook_events", "billing_usage_events"]) {
   assert.match(migration, new RegExp(`create table if not exists ${table}\\b`, "i"), `missing table ${table}`);
@@ -137,7 +139,7 @@ assert.equal(profiles.toolCount, 10_025, "generated base-catalogue profile count
 assert.deepEqual([...expectedRuntimeToolIds].filter((id) => !profileIds.has(id)), [], "every base-catalogue and native runtime-extension tool must have an auditable billing profile");
 assert.equal(runtimeExtensionProfileIndex.toolCount, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile count must match its header");
 assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile IDs must be unique");
-const expectedExtensionIds = [...new Set(nativeInventory.runtimeExtensionIds ?? [])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
+const expectedExtensionIds = [...new Set([...(nativeInventory.runtimeExtensionIds ?? []), ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id)])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
 assert.deepEqual([...runtimeExtensionProfileIds].sort(), expectedExtensionIds, "supplemental billing profiles must exactly cover native runtime extensions missing from the catalogue");
 assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "runtime extensions require explicit, provisional, ad-free billing profiles");
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");

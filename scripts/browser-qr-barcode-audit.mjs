@@ -11,7 +11,7 @@ const reportPath = arg("report", path.join(root, "qa-results/qr-barcode-audit.js
 const concurrency = Math.max(1, Math.min(6, Number(arg("concurrency", "3")) || 3));
 const catalog = JSON.parse(fs.readFileSync(path.join(root, "apps/shared/catalog.json"), "utf8"));
 const allTools = catalog.tools ?? catalog;
-const tools = allTools.filter((tool) => tool.status === "active" && ["qr", "barcode"].includes(tool.engine?.type));
+const tools = allTools.filter((tool) => tool.status === "active" && tool.id !== "qr-payload-inspector" && ["qr", "barcode"].includes(tool.engine?.type));
 const failures = [];
 let next = 0;
 

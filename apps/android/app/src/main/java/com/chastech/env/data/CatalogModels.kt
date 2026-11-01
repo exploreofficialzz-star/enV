@@ -62,14 +62,19 @@ fun JSONObject.toToolRecord(): ToolRecord {
     val knownEngineKeys = setOf("type", "id")
     val extras = engineJson.keys().asSequence().filterNot(knownEngineKeys::contains).associateWith { engineJson.optString(it) }
     return ToolRecord(
-        id = stringOrEmpty("id"), name = stringOrEmpty("name"), slug = stringOrEmpty("slug"),
-        description = NativeCopy.text(stringOrEmpty("description")), category = stringOrEmpty("category"),
+        id = stringOrEmpty("id"),
+        name = if (stringOrEmpty("id") == "qr-payload-inspector") "QR & Barcode Reader" else stringOrEmpty("name"),
+        slug = stringOrEmpty("slug"),
+        description = NativeCopy.text(if (stringOrEmpty("id") == "qr-payload-inspector") "Scan QR codes and 1D/2D barcodes using your camera or an image file. Decode results locally on this device." else stringOrEmpty("description")),
+        category = stringOrEmpty("category"),
         subcategory = optString("subcategory").takeIf { it.isNotBlank() },
         disclaimer = optString("disclaimer").takeIf { it.isNotBlank() },
-        keywords = stringList("keywords"), tags = stringList("tags"), icon = stringOrEmpty("icon"),
+        keywords = if (stringOrEmpty("id") == "qr-payload-inspector") (stringList("keywords") + listOf("scan", "scanner", "reader", "barcode", "camera", "image", "decode")).distinct() else stringList("keywords"),
+        tags = if (stringOrEmpty("id") == "qr-payload-inspector") (stringList("tags") + listOf("scan", "reader", "barcode")).distinct() else stringList("tags"),
+        icon = stringOrEmpty("icon"),
         popularity = optInt("popularity", 0), featured = optBoolean("featured", false),
         clientSide = optBoolean("clientSide", false), requiresBackend = optBoolean("requiresBackend", false),
-        requiresAuth = optBoolean("requiresAuth", false), status = stringOrEmpty("status"),
+        requiresAuth = optBoolean("requiresAuth", false), status = if (stringOrEmpty("category") in setOf("qr", "ecommerce")) "active" else stringOrEmpty("status"),
         related = stringList("related"), engine = EngineInfo(engineJson.stringOrEmpty("type"), engineJson.stringOrEmpty("id"), extras)
     )
 }
@@ -235,3 +240,61 @@ fun ToolRecord.nativeDisclaimerText(): String? = when (disclaimer) {
 
 fun Catalog.featuredOrPopular(limit: Int = 8): List<ToolRecord> = (tools + relatedReferenceTools).asSequence()
     .filter { it.featured || it.status == "active" }.sortedWith(compareByDescending<ToolRecord> { it.featured }.thenByDescending { it.popularity }.thenBy { it.name }).take(limit).toList()
+
+/** Adds Date & Time operations implemented by the local Kotlin engine. */
+fun Catalog.withDateTimeExtensions(): Catalog {
+    val additions = listOf(
+        ToolRecord(
+            id = "age-calculator", name = "Age Calculator", slug = "age-calculator",
+            description = "Calculate your age in years, months, and days.", category = "datetime",
+            keywords = listOf("age", "calculator", "years", "months", "days", "birthday"),
+            tags = listOf("age", "calculator", "date"), icon = "Calendar", popularity = 83, featured = false,
+            clientSide = true, requiresBackend = false, requiresAuth = false, status = "active",
+            related = listOf("birthday-countdown", "date-difference", "time-until-calculator"),
+            engine = EngineInfo("datetime", "age", mapOf("op" to "age")),
+        ),
+        ToolRecord(
+            id = "date-calculator", name = "Date Calculator", slug = "date-calculator",
+            description = "Add or subtract years, months, weeks, and days from a date.", category = "datetime",
+            keywords = listOf("date", "calculator", "add", "subtract", "years", "months", "weeks", "days"),
+            tags = listOf("date", "arithmetic", "add", "subtract"), icon = "Calendar", popularity = 84, featured = false,
+            clientSide = true, requiresBackend = false, requiresAuth = false, status = "active",
+            related = listOf("date-difference", "workday-calculator", "business-day-calculator"),
+            engine = EngineInfo("datetime", "date-add", mapOf("op" to "date-add")),
+        ),
+        ToolRecord(
+            id = "duration-calculator", name = "Duration Calculator", slug = "duration-calculator",
+            description = "Calculate exact elapsed time between two date and time values.", category = "datetime",
+            keywords = listOf("duration", "elapsed", "time", "hours", "minutes", "seconds"),
+            tags = listOf("duration", "elapsed-time", "date"), icon = "Calendar", popularity = 85, featured = false,
+            clientSide = true, requiresBackend = false, requiresAuth = false, status = "active",
+            related = listOf("date-difference", "countdown", "time-until-calculator"),
+            engine = EngineInfo("datetime", "duration", mapOf("op" to "duration")),
+        ),
+        ToolRecord(
+            id = "meeting-time-planner", name = "Meeting Time Planner", slug = "meeting-time-planner",
+            description = "Find shared working-hour slots across cities and export an ICS invite.", category = "datetime",
+            keywords = listOf("meeting", "planner", "timezone", "working", "hours", "calendar", "ics"),
+            tags = listOf("meeting", "timezone", "planner", "calendar"), icon = "Calendar", popularity = 91, featured = true,
+            clientSide = true, requiresBackend = false, requiresAuth = false, status = "active",
+            related = listOf("timezone-converter", "world-clock", "countdown"),
+            engine = EngineInfo("datetime", "meeting-planner", mapOf("op" to "meeting-planner")),
+        ),
+    )
+    val existingIds = tools.mapTo(mutableSetOf()) { it.id }
+    val missing = additions.filterNot { it.id in existingIds }
+    if (missing.isEmpty()) return this
+    val updated = (tools + missing).sortedWith(
+        compareBy<ToolRecord> { it.category }
+            .thenBy { it.name.lowercase(Locale.ROOT) }
+            .thenBy { it.id }
+    )
+    return copy(
+        counts = counts.copy(
+            total = updated.size,
+            active = updated.count { it.status == "active" || it.status == "beta" },
+        ),
+        tools = updated,
+    )
+}
+

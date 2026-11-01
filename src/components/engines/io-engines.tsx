@@ -291,6 +291,25 @@ function genFieldsFor(op: string): UiField[] {
 export function GeneratorEngine({ op }: { op: string }) {
   const fields = genFieldsFor(op);
   const [opts, setOpts] = useState(() => initialValues(fields));
+
+  useEffect(() => {
+    if (op !== "timezone" && op !== "meeting-planner" && op !== "countdown") return;
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const toLocalInput = (value: Date) => {
+      const date = `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+      return `${date}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+    };
+    const date = toLocalInput(now).slice(0, 10);
+    const localDateTime = toLocalInput(now);
+    const countdownTarget = toLocalInput(new Date(now.getTime() + 60 * 60 * 1000));
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    setOpts((current) => {
+      if (op === "timezone") return { ...current, time: current.time || localDateTime, fromTz: current.fromTz || localZone };
+      if (op === "meeting-planner") return { ...current, date: current.date || date, sourceTz: current.sourceTz || localZone };
+      return { ...current, target: current.target || countdownTarget };
+    });
+  }, [op]);
   const { error, out, wrap, setOut, setError } = useRunner();
   return (
     <div className="space-y-4">
@@ -318,28 +337,42 @@ export function GeneratorEngine({ op }: { op: string }) {
 
 const DATE_FIELDS: Record<string, UiField[]> = {
   age: [{ name: "birth", label: "Birth date", type: "date" }],
+  "date-add": [
+    { name: "start", label: "Start date", type: "date" },
+    { name: "years", label: "Years", type: "number", defaultValue: 0 },
+    { name: "months", label: "Months", type: "number", defaultValue: 0 },
+    { name: "weeks", label: "Weeks", type: "number", defaultValue: 0 },
+    { name: "days", label: "Days", type: "number", defaultValue: 0 },
+    { name: "direction", label: "Direction (add or subtract)", type: "text", defaultValue: "add" },
+    { name: "repeatCount", label: "Repeat count", type: "number", defaultValue: 1 },
+  ],
   "date-diff": [
     { name: "from", label: "From", type: "date" },
     { name: "to", label: "To", type: "date" },
   ],
   workday: [
-    { name: "start", label: "Start", type: "date" },
-    { name: "days", label: "Business days to add", type: "number", defaultValue: 10 },
+    { name: "start", label: "Start date", type: "date" },
+    { name: "days", label: "Business days to add (negative to subtract)", type: "number", defaultValue: 10 },
+    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },
+    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },
   ],
   "business-days": [
     { name: "from", label: "From", type: "date" },
     { name: "to", label: "To", type: "date" },
+    { name: "includeEnd", label: "Include end date (true/false)", type: "text", defaultValue: "true" },
+    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },
+    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },
   ],
   duration: [
-    { name: "from", label: "From (ISO or date)", type: "text", placeholder: "2026-01-01 09:00" },
-    { name: "to", label: "To", type: "text", placeholder: "2026-01-02 17:30" },
+    { name: "from", label: "From (ISO date/time)", type: "text", placeholder: "2026-01-01T09:00:00Z" },
+    { name: "to", label: "To (ISO date/time)", type: "text", placeholder: "2026-01-02T17:30:00Z" },
   ],
   timezone: [
-    { name: "time", label: "Local time (ISO)", type: "text", placeholder: "2026-09-27T12:00" },
-    { name: "fromTz", label: "From time zone", type: "text", defaultValue: "UTC" },
-    { name: "toTz", label: "To time zone", type: "text", defaultValue: "America/New_York" },
+    { name: "time", label: "Source local time", type: "text", placeholder: "2026-10-30T12:00" },
+    { name: "fromTz", label: "From city / time zone", type: "text", placeholder: "Auto: your device time zone" },
+    { name: "toTz", label: "To city / time zone", type: "text", defaultValue: "America/New_York" },
   ],
-  unix: [{ name: "value", label: "Unix seconds or ISO date", type: "text" }],
+  unix: [{ name: "value", label: "Unix timestamp(s) or ISO date", type: "textarea", placeholder: "Seconds, milliseconds, microseconds, nanoseconds or ISO dates" }],
   format: [
     { name: "value", label: "Date", type: "date" },
     { name: "pattern", label: "Pattern", type: "text", defaultValue: "yyyy-MM-dd" },
@@ -350,8 +383,23 @@ const DATE_FIELDS: Record<string, UiField[]> = {
   birthday: [{ name: "birth", label: "Birth date", type: "date" }],
   "time-until": [{ name: "target", label: "Target date", type: "date" }],
   countdown: [{ name: "target", label: "Target date & time", type: "datetime-local" }],
-  "world-clock": [{ name: "zones", label: "IANA time zones (one per line)", type: "textarea", defaultValue: "Africa/Lagos\\nEurope/London\\nAmerica/New_York\\nAsia/Tokyo" }],
-  deadline: [{ name: "target", label: "Deadline", type: "date" }],
+  "world-clock": [{ name: "zones", label: "Cities or IANA time zones (one per line)", type: "textarea", defaultValue: "Lagos\nLondon\nNew York\nTokyo" }],
+  deadline: [
+    { name: "target", label: "Deadline", type: "date" },
+    { name: "includeEnd", label: "Include deadline date (true/false)", type: "text", defaultValue: "false" },
+    { name: "weekendDays", label: "Weekend days (0=Sun … 6=Sat)", type: "text", defaultValue: "0,6" },
+    { name: "excludedDates", label: "Extra holidays / excluded dates", type: "textarea", placeholder: "YYYY-MM-DD, one per line" },
+  ],
+  "meeting-planner": [
+    { name: "date", label: "Meeting date in reference city", type: "date" },
+    { name: "zones", label: "Cities or IANA time zones (2–8)", type: "textarea", defaultValue: "Lagos\nLondon\nNew York" },
+    { name: "sourceTz", label: "Reference city / time zone", type: "text", placeholder: "Auto: your device time zone" },
+    { name: "workStart", label: "Working day starts (HH:mm)", type: "text", defaultValue: "09:00" },
+    { name: "workEnd", label: "Working day ends (HH:mm)", type: "text", defaultValue: "17:00" },
+    { name: "workDays", label: "Working weekdays (0=Sun … 6=Sat)", type: "text", defaultValue: "1,2,3,4,5" },
+    { name: "durationMinutes", label: "Meeting length in minutes", type: "number", defaultValue: 30 },
+    { name: "intervalMinutes", label: "Slot interval in minutes", type: "number", defaultValue: 30 },
+  ],
 };
 
 export function DateTimeEngine({ op }: { op: string }) {
@@ -359,6 +407,30 @@ export function DateTimeEngine({ op }: { op: string }) {
   const [opts, setOpts] = useState(() => initialValues(fields));
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<{ label: string; value: string }[]>([]);
+
+  useEffect(() => {
+    if (op !== "timezone" && op !== "meeting-planner" && op !== "countdown") return;
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const localDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const localDateTime = `${localDate}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const oneHour = new Date(now.getTime() + 60 * 60 * 1000);
+    const countdownTarget = `${oneHour.getFullYear()}-${pad(oneHour.getMonth() + 1)}-${pad(oneHour.getDate())}T${pad(oneHour.getHours())}:${pad(oneHour.getMinutes())}`;
+    const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    setOpts((current) => {
+      if (op === "timezone") return {
+        ...current,
+        time: current.time || localDateTime,
+        fromTz: current.fromTz || localZone,
+      };
+      if (op === "meeting-planner") return {
+        ...current,
+        date: current.date || localDate,
+        sourceTz: current.sourceTz || localZone,
+      };
+      return { ...current, target: current.target || countdownTarget };
+    });
+  }, [op]);
 
   const live = op === "countdown" || op === "world-clock";
   useEffect(() => {

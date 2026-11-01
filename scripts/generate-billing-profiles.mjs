@@ -8,15 +8,16 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { tools: catalogTools } = await import("../src/data/catalog.ts");
 const { getAllTools } = await import("../src/lib/registry.ts");
 const nativeInventory = JSON.parse(await readFile(join(root, "apps/shared/native-engine-inventory.json"), "utf8"));
+const { DATETIME_TOOL_EXTENSIONS } = await import("../src/lib/datetime/catalog-tools.ts");
 
 // Native-only tools can live in the runtime registry without belonging to the
 // generated base catalogue. Keep the base profile artifacts deterministic and store
 // those explicit runtime extensions in a small, separately generated profile index.
 const baseToolIds = new Set(catalogTools.map((tool) => tool.id));
 const registryTools = getAllTools();
-const runtimeExtensionTools = [];
+const runtimeExtensionTools = DATETIME_TOOL_EXTENSIONS.filter((tool) => !baseToolIds.has(tool.id));
 for (const id of new Set(nativeInventory.runtimeExtensionIds ?? [])) {
-  if (baseToolIds.has(id)) continue;
+  if (baseToolIds.has(id) || runtimeExtensionTools.some((tool) => tool.id === id)) continue;
   const runtimeTool = registryTools.find((tool) => tool.id === id);
   if (!runtimeTool) throw new Error(`Native runtime extension "${id}" has no registered tool metadata.`);
   runtimeExtensionTools.push(runtimeTool);

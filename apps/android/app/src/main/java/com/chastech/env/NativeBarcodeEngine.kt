@@ -241,16 +241,48 @@ object NativeBarcodeEngine {
     }
 
     private fun normalizeForWriter(toolId: String, input: String): String {
-        var clean = input.trim().replace("-", "").replace(" ", "")
+        // Generic QR and Code 128 payloads are opaque text: preserve every character.
+        // Only symbologies with numeric data fields normalize human display separators.
+        var clean = input
         when (toolId) {
-            "ean13-barcode" -> { require(clean.length in 12..13 && clean.all(Char::isDigit)) { "EAN-13 requires 12 data digits or 13 digits with a check digit." }; if (clean.length == 13) { require(lastDigitValid(clean)) { "EAN-13 check digit is invalid." }; clean = clean.dropLast(1) } }
-            "ean8-barcode" -> { require(clean.length in 7..8 && clean.all(Char::isDigit)) { "EAN-8 requires 7 data digits or 8 digits with a check digit." }; if (clean.length == 8) { require(lastDigitValid(clean)) { "EAN-8 check digit is invalid." }; clean = clean.dropLast(1) } }
-            "upc-barcode" -> { require(clean.length in 11..12 && clean.all(Char::isDigit)) { "UPC-A requires 11 data digits or 12 digits with a check digit." }; if (clean.length == 12) { require(lastDigitValid(clean)) { "UPC-A check digit is invalid." }; clean = clean.dropLast(1) } }
-            "isbn-barcode" -> { clean = clean.replace(Regex("(?i)^ISBN(?:-13)?:?"), "").filter(Char::isDigit); require(clean.length == 13 && lastDigitValid(clean)) { "ISBN barcode requires a valid 13-digit ISBN." }; clean = clean.dropLast(1) }
-            "itf14-barcode" -> { require(clean.length in 13..14 && clean.all(Char::isDigit)) { "ITF-14 requires 13 data digits or 14 digits with a check digit." }; if (clean.length == 13) clean += gtinCheckDigit(clean) else require(lastDigitValid(clean)) { "ITF-14 check digit is invalid." } }
-            "msi-barcode" -> require(clean.isNotEmpty() && clean.all(Char::isDigit)) { "MSI accepts digits only." }
-            "pharmacode-barcode" -> { val n = clean.toIntOrNull(); require(n != null && n in 3..131070) { "Pharmacode must be an integer from 3 to 131070." } }
-            "codabar-barcode" -> require(clean.isNotEmpty() && clean.all { it in "0123456789-$:./+" }) { "Codabar accepts digits and - $ : . / + characters." }
+            "ean13-barcode" -> {
+                clean = clean.trim().filterNot { it == '-' || it.isWhitespace() }
+                require(clean.length in 12..13 && clean.all(Char::isDigit)) { "EAN-13 requires 12 data digits or 13 digits with a check digit." }
+                if (clean.length == 13) { require(lastDigitValid(clean)) { "EAN-13 check digit is invalid." }; clean = clean.dropLast(1) }
+            }
+            "ean8-barcode" -> {
+                clean = clean.trim().filterNot { it == '-' || it.isWhitespace() }
+                require(clean.length in 7..8 && clean.all(Char::isDigit)) { "EAN-8 requires 7 data digits or 8 digits with a check digit." }
+                if (clean.length == 8) { require(lastDigitValid(clean)) { "EAN-8 check digit is invalid." }; clean = clean.dropLast(1) }
+            }
+            "upc-barcode" -> {
+                clean = clean.trim().filterNot { it == '-' || it.isWhitespace() }
+                require(clean.length in 11..12 && clean.all(Char::isDigit)) { "UPC-A requires 11 data digits or 12 digits with a check digit." }
+                if (clean.length == 12) { require(lastDigitValid(clean)) { "UPC-A check digit is invalid." }; clean = clean.dropLast(1) }
+            }
+            "isbn-barcode" -> {
+                clean = clean.trim().replace(Regex("(?i)^ISBN(?:-13)?:?"), "").filter(Char::isDigit)
+                require(clean.length == 13 && lastDigitValid(clean)) { "ISBN barcode requires a valid 13-digit ISBN." }
+                clean = clean.dropLast(1)
+            }
+            "itf14-barcode" -> {
+                clean = clean.trim().filterNot { it == '-' || it.isWhitespace() }
+                require(clean.length in 13..14 && clean.all(Char::isDigit)) { "ITF-14 requires 13 data digits or 14 digits with a check digit." }
+                if (clean.length == 13) clean += gtinCheckDigit(clean) else require(lastDigitValid(clean)) { "ITF-14 check digit is invalid." }
+            }
+            "msi-barcode" -> {
+                clean = clean.trim()
+                require(clean.isNotEmpty() && clean.all(Char::isDigit)) { "MSI accepts digits only." }
+            }
+            "pharmacode-barcode" -> {
+                clean = clean.trim()
+                val n = clean.toIntOrNull()
+                require(n != null && n in 3..131070) { "Pharmacode must be an integer from 3 to 131070." }
+            }
+            "codabar-barcode" -> {
+                clean = clean.trim()
+                require(clean.isNotEmpty() && clean.all { it in "0123456789-$:./+" }) { "Codabar accepts digits and - $ : . / + characters." }
+            }
         }
         return clean
     }

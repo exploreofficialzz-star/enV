@@ -9,6 +9,7 @@ import {
   suggestContrastCorrections,
   toHex,
 } from "./accessibility-color.ts";
+import { simulateColorVision } from "./color-vision.ts";
 import { auditUxUiStudioTextContrast } from "./ux-ui-studio-qa.ts";
 import { parseUxUiStudioChartData } from "./ux-ui-studio-chart.ts";
 import { generateHtmlProject, generateKotlinProject, generateReactProject, generateSwiftProject, type UxCodegenProject } from "./ux-ui-studio-codegen.ts";
@@ -157,4 +158,45 @@ test("opacity corrections never reduce opacity below the supplied alpha", () => 
   assert.ok(suggestion);
   assert.ok(suggestion.a >= fg.a);
   assert.ok(contrastRatio(suggestion, bg) >= 4.5);
+});
+
+
+test("color vision simulations preserve neutral black and white", () => {
+  for (const mode of ["protanopia", "deuteranopia", "tritanopia", "achromatopsia"] as const) {
+    assert.equal(simulateColorVision("#000000", mode), "#000000");
+    assert.equal(simulateColorVision("#ffffff", mode), "#ffffff");
+  }
+});
+
+test("color vision simulations produce valid and distinct previews", () => {
+  const modes = ["protanopia", "deuteranopia", "tritanopia", "achromatopsia"] as const;
+  const results = modes.map((mode) => simulateColorVision("#e34b4b", mode));
+  assert.ok(results.every((value) => value && parseCssColor(value)));
+  assert.ok(new Set(results).size > 1);
+  assert.equal(simulateColorVision("not-a-color", "protanopia"), null);
+});
+
+test("contrast evaluation composites both translucent colors over a chosen canvas", () => {
+  const foreground = parseCssColor("rgba(0, 0, 0, 0.5)")!;
+  const background = parseCssColor("rgba(255, 255, 255, 0.5)")!;
+  const blueCanvas = parseCssColor("#0000ff")!;
+  const whiteCanvas = parseCssColor("#ffffff")!;
+  const bluePair = resolveRenderedPair(foreground, background, blueCanvas);
+  const whitePair = resolveRenderedPair(foreground, background, whiteCanvas);
+  assert.notEqual(toHex(bluePair.background), toHex(whitePair.background));
+  assert.notEqual(
+    Number(contrastRatio(foreground, background, blueCanvas).toFixed(3)),
+    Number(contrastRatio(foreground, background, whiteCanvas).toFixed(3)),
+  );
+  const checked = evaluateContrast(foreground, background, "normal-aa", blueCanvas);
+  assert.equal(checked.ratio, contrastRatio(foreground, background, blueCanvas));
+});
+
+test("suggested contrast corrections respect the selected canvas color", () => {
+  const foreground = parseCssColor("rgba(119, 119, 119, 0.9)")!;
+  const background = parseCssColor("rgba(255, 255, 255, 0.6)")!;
+  const canvas = parseCssColor("#102a43")!;
+  const suggestion = suggestContrastCorrections(foreground, background, "normal-aa", canvas).foreground;
+  assert.ok(suggestion);
+  assert.ok(contrastRatio(suggestion, background, canvas) >= 4.5);
 });

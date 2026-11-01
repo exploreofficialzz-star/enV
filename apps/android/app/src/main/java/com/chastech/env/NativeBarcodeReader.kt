@@ -1,0 +1,556 @@
+package com.chastech.env
+
+import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.DecodeHintType
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.multi.GenericMultipleBarcodeReader
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.net.URI
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.max
+
+data class NativeBarcodeScan(
+    val text: String,
+    val format: String,
+    val scannedAt: Long = System.currentTimeMillis(),
+)
+
+internal const val NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES = "env.barcodeReader.history"
+private const val NATIVE_BARCODE_SCAN_HISTORY_KEY = "records"
+
+internal fun loadNativeBarcodeScanHistory(context: Context): List<NativeBarcodeScan> {
+    val stored = context.getSharedPreferences(NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES, Context.MODE_PRIVATE)
+        .getString(NATIVE_BARCODE_SCAN_HISTORY_KEY, null) ?: return emptyList()
+    return runCatching {
+        val array = org.json.JSONArray(stored)
+        (0 until array.length()).mapNotNull { index ->
+            val entry = array.optJSONObject(index) ?: return@mapNotNull null
+            val text = entry.optString("text")
+            val format = entry.optString("format")
+            val scannedAt = entry.optLong("scannedAt", 0L)
+            if (text.isBlank() || format.isBlank() || scannedAt <= 0L) null
+            else NativeBarcodeScan(text, format, scannedAt)
+        }.take(50)
+    }.getOrDefault(emptyList())
+}
+
+internal fun saveNativeBarcodeScanHistory(context: Context, scans: List<NativeBarcodeScan>) {
+    val array = org.json.JSONArray()
+    scans.take(50).forEach { scan ->
+        array.put(
+            org.json.JSONObject()
+                .put("text", scan.text)
+                .put("format", scan.format)
+                .put("scannedAt", scan.scannedAt),
+        )
+    }
+    context.getSharedPreferences(NATIVE_BARCODE_SCAN_HISTORY_PREFERENCES, Context.MODE_PRIVATE)
+        .edit()
+        .putString(NATIVE_BARCODE_SCAN_HISTORY_KEY, array.toString())
+        .apply()
+}
+
+internal fun nativeBarcodeScansCsv(scans: List<NativeBarcodeScan>): String {
+    fun cell(value: String) = "\"${value.replace("\"", "\"\"")}\""
+    val timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US)
+    return buildString {
+        append("scanned_at,format,payload\r\n")
+        scans.forEach { scan ->
+            append(cell(timestamp.format(Date(scan.scannedAt))))
+            append(',')
+            append(cell(scan.format))
+            append(',')
+            append(cell(scan.text))
+            append("\r\n")
+        }
+    }
+}
+
+/** Return only explicit HTTP(S) destinations with a real host; never auto-open decoded content. */
+internal fun safeBarcodeHttpUrl(value: String): String? {
+    val parsed = runCatching { URI(value.trim()) }.getOrNull() ?: return null
+    val scheme = parsed.scheme?.lowercase(Locale.ROOT)
+    if (scheme !in setOf("http", "https") || parsed.host.isNullOrBlank()) return null
+    return parsed.toASCIIString()
+}
+
+private const val MAX_BARCODE_IMAGE_BYTES = 20 * 1024 * 1024
+
+internal fun readBarcodeImageBytes(input: InputStream, maxBytes: Int = MAX_BARCODE_IMAGE_BYTES): ByteArray {
+    require(maxBytes > 0) { "Image size limit must be positive." }
+    val output = ByteArrayOutputStream(minOf(maxBytes, 64 * 1024))
+    val buffer = ByteArray(16 * 1024)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        require(output.size() + count <= maxBytes) {
+            "Image is larger than 20 MB. Resize it before scanning."
+        }
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
+}
+
+private fun readerHints(): Map<DecodeHintType, Any> = mapOf(
+    DecodeHintType.TRY_HARDER to true,
+    DecodeHintType.POSSIBLE_FORMATS to listOf(
+        BarcodeFormat.QR_CODE, BarcodeFormat.AZTEC, BarcodeFormat.DATA_MATRIX, BarcodeFormat.PDF_417,
+        BarcodeFormat.EAN_8, BarcodeFormat.EAN_13, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_39, BarcodeFormat.CODE_93, BarcodeFormat.CODE_128, BarcodeFormat.CODABAR,
+        BarcodeFormat.ITF, BarcodeFormat.RSS_14, BarcodeFormat.RSS_EXPANDED,
+    ),
+)
+
+data class NativeBarcodeLumaFrame(val data: ByteArray, val width: Int, val height: Int)
+
+object NativeBarcodeImageDecoder {
+    internal fun rotateLumaFrame(data: ByteArray, width: Int, height: Int, degrees: Int): NativeBarcodeLumaFrame {
+        require(width > 0 && height > 0 && data.size >= width * height) { "Invalid camera luminance frame." }
+        val rotation = ((degrees % 360) + 360) % 360
+        if (rotation == 0) return NativeBarcodeLumaFrame(data.copyOf(width * height), width, height)
+        require(rotation == 90 || rotation == 180 || rotation == 270) { "Unsupported camera frame rotation: $degrees" }
+        val outputWidth = if (rotation == 180) width else height
+        val outputHeight = if (rotation == 180) height else width
+        val output = ByteArray(outputWidth * outputHeight)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val (targetX, targetY) = when (rotation) {
+                    90 -> height - 1 - y to x
+                    180 -> width - 1 - x to height - 1 - y
+                    else -> y to width - 1 - x
+                }
+                output[targetY * outputWidth + targetX] = data[y * width + x]
+            }
+        }
+        return NativeBarcodeLumaFrame(output, outputWidth, outputHeight)
+    }
+
+    fun decode(bitmap: Bitmap): NativeBarcodeScan? = decodeAll(bitmap).firstOrNull()
+
+    fun decodeAll(bitmap: Bitmap): List<NativeBarcodeScan> {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return emptyList()
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val source = RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
+        val binary = BinaryBitmap(HybridBinarizer(source))
+        val decoded = runCatching {
+            val reader = MultiFormatReader().apply { setHints(readerHints()) }
+            GenericMultipleBarcodeReader(reader).decodeMultiple(binary, readerHints()).toList()
+        }.getOrElse {
+            val reader = MultiFormatReader().apply { setHints(readerHints()) }
+            runCatching { listOf(reader.decodeWithState(binary)) }.getOrDefault(emptyList())
+        }
+        return decoded.distinctBy { "${it.barcodeFormat}\u0000${it.text}" }
+            .map { NativeBarcodeScan(it.text, it.barcodeFormat.toString()) }
+    }
+
+    fun decode(context: Context, uri: Uri): NativeBarcodeScan? = decodeAll(context, uri).firstOrNull()
+
+    fun decodeAll(context: Context, uri: Uri): List<NativeBarcodeScan> {
+        val imageBytes = context.contentResolver.openInputStream(uri)?.use { input -> readBarcodeImageBytes(input) }
+            ?: return emptyList()
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "The selected image could not be read." }
+        var sampleSize = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > 2800) sampleSize *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options) ?: return emptyList()
+        return try { decodeAll(bitmap) } finally { bitmap.recycle() }
+    }
+}
+
+private class NativeBarcodeCameraAnalyzer(
+    private val onResult: (List<NativeBarcodeScan>) -> Unit,
+) : ImageAnalysis.Analyzer {
+    private val reader = MultiFormatReader().apply { setHints(readerHints()) }
+    private val multipleReader = GenericMultipleBarcodeReader(reader)
+    private var lastBatchFrameAt = 0L
+
+    override fun analyze(image: ImageProxy) {
+        try {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastBatchFrameAt < 300L) return
+            lastBatchFrameAt = now
+            val plane = image.planes.firstOrNull() ?: return
+            val width = image.width
+            val height = image.height
+            val buffer = plane.buffer.duplicate()
+            val rowStride = plane.rowStride
+            val pixelStride = plane.pixelStride
+            val bytes = ByteArray(width * height)
+            for (row in 0 until height) {
+                for (column in 0 until width) {
+                    val index = row * rowStride + column * pixelStride
+                    if (index < buffer.limit()) bytes[row * width + column] = buffer.get(index)
+                }
+            }
+            val rotated = NativeBarcodeImageDecoder.rotateLumaFrame(bytes, width, height, image.imageInfo.rotationDegrees)
+            val source = PlanarYUVLuminanceSource(rotated.data, rotated.width, rotated.height, 0, 0, rotated.width, rotated.height, false)
+            val binary = BinaryBitmap(HybridBinarizer(source))
+            val decoded = runCatching {
+                multipleReader.decodeMultiple(binary, readerHints()).toList()
+            }.getOrElse {
+                runCatching { listOf(reader.decodeWithState(binary)) }.getOrDefault(emptyList())
+            }
+            val scans = decoded.distinctBy { "${it.barcodeFormat}\u0000${it.text}" }
+                .map { NativeBarcodeScan(it.text, it.barcodeFormat.toString()) }
+            if (scans.isNotEmpty()) onResult(scans)
+            reader.reset()
+        } catch (_: Exception) {
+            // A frame without a code is expected while the user is aiming.
+            reader.reset()
+        } finally {
+            image.close()
+        }
+    }
+}
+
+@Composable
+fun NativeBarcodeReaderTool() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
+    val scope = rememberCoroutineScope()
+    val previewView = remember(context) { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val results = remember(context) {
+        mutableStateListOf<NativeBarcodeScan>().apply {
+            addAll(loadNativeBarcodeScanHistory(context))
+        }
+    }
+    var cameraPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    var cameraActive by remember { mutableStateOf(false) }
+    var activeCamera by remember { mutableStateOf<androidx.camera.core.Camera?>(null) }
+    var cameraTorchAvailable by remember { mutableStateOf(false) }
+    var torchEnabled by remember { mutableStateOf(false) }
+    var zoomRatio by remember { mutableStateOf(1f) }
+    var maxZoomRatio by remember { mutableStateOf(1f) }
+    var status by remember { mutableStateOf("Choose Start camera or Read image. Decoding stays on this device.") }
+    var error by remember { mutableStateOf("") }
+    val recentScans = remember(context) {
+        mutableStateMapOf<String, Long>().apply {
+            results.forEach { scan ->
+                put("${scan.format}\u0000${scan.text}", scan.scannedAt)
+            }
+        }
+    }
+
+    fun accept(scan: NativeBarcodeScan) {
+        val signature = "${scan.format}\u0000${scan.text}"
+        val now = System.currentTimeMillis()
+        val previousScanAt = recentScans[signature] ?: 0L
+        if (now - previousScanAt < 1800L) return
+        recentScans[signature] = now
+        if (recentScans.size > 200) {
+            recentScans.filterValues { now - it > 10_000L }.keys.forEach { key -> recentScans.remove(key) }
+        }
+        results.add(0, scan.copy(scannedAt = now))
+        while (results.size > 50) results.removeAt(results.lastIndex)
+        saveNativeBarcodeScanHistory(context, results)
+        status = "${scan.format} detected."
+        error = ""
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraPermission = granted
+        if (granted) {
+            cameraActive = true
+            status = "Camera permission granted. Starting scanner…"
+        } else {
+            cameraActive = false
+            error = "Camera permission was denied. Allow it in Android settings or use image upload."
+        }
+    }
+    val saveResultsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri ->
+        if (uri != null) {
+            val csv = nativeBarcodeScansCsv(results.toList())
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val stream = context.contentResolver.openOutputStream(uri)
+                            ?: throw IllegalStateException("Could not open the selected CSV file.")
+                        stream.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                    }
+                }.fold(
+                    onSuccess = { status = "Scan history exported."; error = "" },
+                    onFailure = { failure -> error = failure.message ?: "Could not export scan history." },
+                )
+            }
+        }
+    }
+
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                error = ""
+                status = "Reading image locally…"
+                val decoded = withContext(Dispatchers.IO) {
+                    runCatching { NativeBarcodeImageDecoder.decodeAll(context, uri) }
+                }
+                decoded.fold(
+                    onSuccess = { scans ->
+                        if (scans.isNotEmpty()) {
+                            scans.forEach(::accept)
+                            status = if (scans.size == 1) {
+                                "${scans.size} code decoded from image."
+                            } else {
+                                "${scans.size} codes decoded from image."
+                            }
+                        } else {
+                            error = "No supported QR code or barcode was detected in that image. Try a sharper image with the full code visible."
+                        }
+                    },
+                    onFailure = { failure -> error = failure.message ?: "Could not read the selected image." },
+                )
+            }
+        }
+    }
+
+    DisposableEffect(analyzerExecutor) {
+        onDispose { analyzerExecutor.shutdown() }
+    }
+
+    DisposableEffect(cameraActive, cameraPermission, lifecycleOwner, previewView) {
+        if (!cameraActive || !cameraPermission) {
+            onDispose { }
+        } else {
+            val providerFuture = ProcessCameraProvider.getInstance(context)
+            var cameraProvider: ProcessCameraProvider? = null
+            val disposed = AtomicBoolean(false)
+            var previewUseCase: Preview? = null
+            var analysisUseCase: ImageAnalysis? = null
+            val analyzer = NativeBarcodeCameraAnalyzer { scans ->
+                mainHandler.post { scans.forEach(::accept) }
+            }
+            providerFuture.addListener({
+                if (disposed.get()) return@addListener
+                runCatching {
+                    val provider = providerFuture.get()
+                    cameraProvider = provider
+                    val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+                    val analysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { it.setAnalyzer(analyzerExecutor, analyzer) }
+                    previewUseCase = preview
+                    analysisUseCase = analysis
+                    provider.unbindAll()
+                    val boundCamera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                    activeCamera = boundCamera
+                    cameraTorchAvailable = boundCamera.cameraInfo.hasFlashUnit()
+                    torchEnabled = false
+                    boundCamera.cameraInfo.zoomState.value?.let { zoom ->
+                        zoomRatio = zoom.zoomRatio
+                        maxZoomRatio = zoom.maxZoomRatio
+                    }
+                    mainHandler.post { status = "Scanner ready. Hold the code inside the camera view."; error = "" }
+                }.onFailure { cause ->
+                    mainHandler.post {
+                        cameraActive = false
+                        error = "Could not start the camera: ${cause.message ?: "camera unavailable"}"
+                    }
+                }
+            }, ContextCompat.getMainExecutor(context))
+            onDispose {
+                disposed.set(true)
+                activeCamera?.cameraControl?.enableTorch(false)
+                activeCamera = null
+                cameraTorchAvailable = false
+                torchEnabled = false
+                zoomRatio = 1f
+                maxZoomRatio = 1f
+                runCatching { analysisUseCase?.clearAnalyzer() }
+                runCatching {
+                    val provider = cameraProvider ?: if (providerFuture.isDone) providerFuture.get() else null
+                    if (provider != null) {
+                        val useCases = listOfNotNull(previewUseCase, analysisUseCase)
+                        if (useCases.isNotEmpty()) provider.unbind(*useCases.toTypedArray())
+                    }
+                }
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("QR & barcode reader", style = MaterialTheme.typography.titleMedium)
+        Text("Scan supported 1D and 2D codes with the Android camera or read an image from this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                error = ""
+                if (cameraPermission) cameraActive = true
+                else permissionLauncher.launch(Manifest.permission.CAMERA)
+            }, enabled = !cameraActive) { Text("Start camera") }
+            OutlinedButton(onClick = { cameraActive = false; status = "Camera stopped." }, enabled = cameraActive) { Text("Stop") }
+            OutlinedButton(onClick = { imageLauncher.launch("image/*") }) { Text("Read image") }
+        }
+        if (cameraActive && cameraPermission) {
+            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxWidth().height(260.dp))
+            if (cameraTorchAvailable || maxZoomRatio > 1.01f) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (cameraTorchAvailable) {
+                        OutlinedButton(onClick = {
+                            val next = !torchEnabled
+                            val future = activeCamera?.cameraControl?.enableTorch(next)
+                            future?.addListener({
+                                runCatching { future.get() }.fold(
+                                    onSuccess = { torchEnabled = next },
+                                    onFailure = { failure -> error = failure.message ?: "Could not change the camera light." },
+                                )
+                            }, ContextCompat.getMainExecutor(context))
+                        }) { Text(if (torchEnabled) "Light on" else "Light") }
+                    }
+                    if (maxZoomRatio > 1.01f) {
+                        OutlinedButton(onClick = {
+                            val next = (zoomRatio / 1.25f).coerceAtLeast(1f)
+                            val future = activeCamera?.cameraControl?.setZoomRatio(next)
+                            future?.addListener({
+                                runCatching { future.get() }.fold(
+                                    onSuccess = {
+                                        activeCamera?.cameraInfo?.zoomState?.value?.let { zoomRatio = it.zoomRatio }
+                                    },
+                                    onFailure = { failure -> error = failure.message ?: "Could not adjust camera zoom." },
+                                )
+                            }, ContextCompat.getMainExecutor(context))
+                        }, enabled = zoomRatio > 1.01f) { Text("− Zoom") }
+                        OutlinedButton(onClick = {
+                            val next = (zoomRatio * 1.25f).coerceAtMost(maxZoomRatio)
+                            val future = activeCamera?.cameraControl?.setZoomRatio(next)
+                            future?.addListener({
+                                runCatching { future.get() }.fold(
+                                    onSuccess = {
+                                        activeCamera?.cameraInfo?.zoomState?.value?.let { zoomRatio = it.zoomRatio }
+                                    },
+                                    onFailure = { failure -> error = failure.message ?: "Could not adjust camera zoom." },
+                                )
+                            }, ContextCompat.getMainExecutor(context))
+                        }, enabled = zoomRatio < maxZoomRatio - 0.01f) { Text("+ Zoom") }
+                        Text(String.format(Locale.US, "%.1fx", zoomRatio), modifier = Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        } else {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Text("Camera is off. Camera access is requested only after you tap Start camera.", modifier = Modifier.padding(18.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (error.isNotBlank()) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Scan results · ${results.size}", style = MaterialTheme.typography.titleSmall)
+            if (results.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { saveResultsLauncher.launch("env-scan-history.csv") }) { Text("Export CSV") }
+                    TextButtonCompat(onClick = { results.clear(); recentScans.clear(); saveNativeBarcodeScanHistory(context, results); status = "Scan history cleared." }, label = "Clear")
+                }
+            }
+        }
+        if (results.isEmpty()) {
+            Text("Decoded values will appear here. Links are not opened automatically.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 460.dp)) {
+                items(results, key = { "${it.scannedAt}-${it.format}-${it.text.hashCode()}" }) { result ->
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(result.format, style = MaterialTheme.typography.labelLarge)
+                            Text(result.text, style = MaterialTheme.typography.bodyMedium)
+                            Text(SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(result.scannedAt)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Decoded code", result.text))
+                                    status = "Result copied."
+                                }) { Text("Copy result") }
+                                safeBarcodeHttpUrl(result.text)?.let { safeUrl ->
+                                    OutlinedButton(onClick = {
+                                        runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)))
+                                        }.onFailure {
+                                            error = "No installed app could open this link."
+                                        }
+                                    }) { Text("Open link") }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextButtonCompat(onClick: () -> Unit, label: String) {
+    androidx.compose.material3.TextButton(onClick = onClick) { Text(label) }
+}

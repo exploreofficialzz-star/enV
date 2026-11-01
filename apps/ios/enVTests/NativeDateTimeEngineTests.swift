@@ -3,9 +3,10 @@ import XCTest
 
 final class NativeDateTimeEngineTests: XCTestCase {
     private let allIDs: Set<String> = [
-        "birthday-countdown", "business-day-calculator", "countdown", "date-difference", "date-formatter",
-        "deadline-calculator", "leap-year-checker", "time-until-calculator", "timezone-converter",
-        "week-number-calculator", "weekday-calculator", "workday-calculator", "world-clock", "unix-timestamp-converter"
+        "age-calculator", "birthday-countdown", "business-day-calculator", "countdown", "date-calculator",
+        "date-difference", "date-formatter", "deadline-calculator", "duration-calculator", "leap-year-checker",
+        "meeting-time-planner", "time-until-calculator", "timezone-converter", "week-number-calculator",
+        "weekday-calculator", "workday-calculator", "world-clock", "unix-timestamp-converter"
     ]
     private let fixedNow = ISO8601DateFormatter().date(from: "2024-01-15T12:00:00Z")!
 
@@ -17,30 +18,232 @@ final class NativeDateTimeEngineTests: XCTestCase {
     func testCalendarFormattingWeekAndLeapOperationsMatchWebSemantics() throws {
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "date-formatter", options: ["value": "2024-02-29", "pattern": "yyyy-MM-dd EEEE"], now: fixedNow).output, "Formatted: 2024-02-29 Thursday")
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "weekday-calculator", input: "2024-02-29", now: fixedNow).output, "Weekday: Thursday")
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "week-number-calculator", input: "2024-02-29", now: fixedNow).output, "ISO week: 9")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "week-number-calculator", input: "2024-02-29", now: fixedNow).output, "ISO week: 9\nISO week-year: 2024")
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "2024"], now: fixedNow).output, "2024: Leap year")
     }
 
     func testBusinessDateDiffDurationAndBirthdayAreOffline() throws {
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "date-difference", options: ["from": "2024-01-01", "to": "2024-01-05"], now: fixedNow).output, "Days: 4\nWeeks: 0.6")
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "business-day-calculator", options: ["from": "2024-01-05", "to": "2024-01-08"], now: fixedNow).output, "Weekdays: 1")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "date-difference", options: ["from": "2024-01-01", "to": "2024-01-05"], now: fixedNow).output, "Calendar span: 0 years, 0 months, 4 days\nTotal days: 4\nWeeks: 0.57\nCalendar hours (24-hour days): 96")
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "date-difference", options: [
+            "from": "2024-01-31", "to": "2024-02-29"
+        ], now: fixedNow).output.contains("Calendar span: 0 years, 1 months, 0 days"))
+        let leapDayNow = ISO8601DateFormatter().date(from: "2025-02-28T12:00:00Z")!
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "age-calculator", options: [
+            "birth": "2000-02-29"
+        ], now: leapDayNow, localTimeZone: TimeZone(secondsFromGMT: 0)!).output.contains("Age: 25 years, 0 months, 0 days"))
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "business-day-calculator", options: ["from": "2024-01-05", "to": "2024-01-08"], now: fixedNow).output, "Working days: 1\nRange rule: Start date excluded; end date included.\nCustom excluded dates: None supplied")
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-05", "days": "1"], now: fixedNow).output, "Result: 2024-01-08 Monday")
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "date-difference", options: ["from": "2024-01-01T00:00:00Z", "to": "2024-01-02T02:30:00Z"], now: fixedNow).output, "Days: 1\nWeeks: 0.1")
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "date-difference", options: ["from": "2024-01-01", "to": "2024-01-02"], now: fixedNow).output.contains("Total days: 1"))
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "birthday-countdown", input: "1990-02-01", now: fixedNow).output, "Days until birthday: 17")
     }
 
     func testCountdownTimezoneWorldClockAndUnixAreLocal() throws {
         let countdown = try NativeDateTimeEngine.run(toolID: "countdown", options: ["target": "2024-01-16T13:00:00Z"], now: fixedNow)
         XCTAssertTrue(countdown.output.contains("Countdown: 1d 1h 0m 0s")); XCTAssertTrue(countdown.output.contains("Total seconds: 90000"))
-        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "timezone-converter", options: ["time": "2024-01-01T00:00:00Z", "toTz": "America/New_York"], now: fixedNow).output.contains("Unix: 1704067200"))
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "timezone-converter", options: ["time": "2024-01-01T00:00:00Z", "toTz": "America/New_York"], now: fixedNow).output.contains("Unix seconds: 1704067200"))
         XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "world-clock", options: ["zones": "UTC, America/New_York"], now: fixedNow).rows.count, 2)
-        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", input: "0", now: fixedNow).output.hasPrefix("ISO: 1970-01-01T00:00:00"))
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", input: "2024-01-01", now: fixedNow).output, "Unix seconds: 1704067200")
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", input: "0", now: fixedNow).output.contains("ISO UTC: 1970-01-01T00:00:00"))
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", input: "2024-01-01", now: fixedNow).output.contains("Unix seconds: 1704067200"))
     }
 
     func testRelativeToolsAndInvalidInputsAreExplicit() throws {
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "time-until-calculator", options: ["target": "2024-01-20"], now: fixedNow).output, "Calendar days: 5\nWeekdays: 4")
-        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "deadline-calculator", options: ["target": "2024-01-20"], now: fixedNow).output, "Calendar days: 5\nWeekdays: 4")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "time-until-calculator", options: ["target": "2024-01-20"], now: fixedNow).output, "Calendar span: 0 years, 0 months, 5 days\nTotal days: 5")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "deadline-calculator", options: ["target": "2024-01-20"], now: fixedNow).output, "Calendar days remaining: 5\nWorking days remaining: 4\nDeadline weekday: Saturday\nEnd-date rule: Deadline date excluded")
         XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-formatter", input: "not-a-date", now: fixedNow))
     }
+    func testSourceTimezoneIsUsedForWallClockConversionAndDayShift() throws {
+        let result = try NativeDateTimeEngine.run(
+            toolID: "timezone-converter",
+            options: ["time": "2024-01-01T09:00", "fromTz": "UTC", "toTz": "America/New_York"],
+            now: fixedNow
+        )
+        XCTAssertTrue(result.output.contains("Unix seconds: 1704099600"))
+        XCTAssertTrue(result.output.contains("Same calendar day"))
+    }
+
+    func testCalendarWorkdayDurationAndMeetingToolsAreConsistent() throws {
+        let workday = try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow)
+        XCTAssertEqual(workday.output, "Result: 2024-01-05 Friday")
+        let duration = try NativeDateTimeEngine.run(toolID: "duration-calculator", options: ["from": "2024-01-01T09:00:00Z", "to": "2024-01-02T10:30:00Z"], now: fixedNow)
+        XCTAssertTrue(duration.output.contains("Elapsed duration: 1d 1h 30m 0s"))
+        XCTAssertTrue(duration.output.contains("Total seconds: 91800.000"))
+        let meeting = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-15", "zones": "Lagos, London, New York", "sourceTz": "Lagos",
+            "workStart": "09:00", "workEnd": "17:00", "durationMinutes": "30", "intervalMinutes": "30"
+        ], now: fixedNow)
+        XCTAssertTrue(meeting.output.contains("Option 1:"))
+        XCTAssertTrue(meeting.output.contains("ICS for option 1:"))
+        XCTAssertTrue(meeting.output.contains("UID:env-"))
+        XCTAssertTrue(meeting.output.contains("DTSTAMP:"))
+    }
+
+    func testCustomHolidayRulesAndNanosecondPrecision() throws {
+        let business = try NativeDateTimeEngine.run(toolID: "business-day-calculator", options: [
+            "from": "2024-01-05", "to": "2024-01-09", "includeEnd": "true", "excludedDates": "2024-01-08"
+        ], now: fixedNow)
+        XCTAssertTrue(business.output.contains("Working days: 1"))
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "week-number-calculator", input: "2021-01-01", now: fixedNow).output.contains("ISO week-year: 2020"))
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", input: "1704067200000000", now: fixedNow).output.contains("Detected precision: microseconds"))
+    }
+
+    func testCityWorldClockAndDaylightSavingGapValidation() throws {
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "world-clock", options: ["zones": "Lagos, London"], now: fixedNow).rows.count, 2)
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "timezone-converter", options: [
+            "time": "2024-03-10T02:30", "fromTz": "America/New_York", "toTz": "UTC"
+        ], now: fixedNow))
+    }
+
+    func testInvalidDateTimeOptionsAreRejectedRatherThanSilentlyDefaulted() throws {
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: [
+            "start": "2024-01-08", "days": "1.5"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-calculator", options: [
+            "start": "2024-01-01", "days": "abc"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-calculator", options: [
+            "start": "2024-01-01", "days": "1", "direction": "ad"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-15", "zones": "Lagos, London", "sourceTz": "Lagos", "durationMinutes": "abc"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-15", "zones": "Lagos, London", "sourceTz": "Lagos",
+            "workStart": "20:00", "workEnd": "08:00"
+        ], now: fixedNow))
+    }
+
+    func testMeetingPlannerDoesNotOfferWeekendSlots() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-13", "zones": "Lagos, London", "sourceTz": "Lagos"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("No shared working-hours slots found on the selected weekdays"))
+        XCTAssertFalse(result.output.contains("Option 1:"))
+    }
+
+    func testWorldClockAcceptsUnambiguousIanaCityAliases() throws {
+        let result = try NativeDateTimeEngine.run(
+            toolID: "world-clock",
+            options: ["zones": "Stockholm, Kathmandu, Brisbane"],
+            now: fixedNow
+        )
+        XCTAssertEqual(result.rows.count, 3)
+        XCTAssertEqual(result.rows.map(\.label), ["Stockholm", "Kathmandu", "Brisbane"])
+        XCTAssertTrue(result.rows.allSatisfy { $0.value.contains("UTC") })
+    }
+
+    func testDateAdditionAgeAndNegativeWorkdayAreSupported() throws {
+        XCTAssertTrue(try NativeDateTimeEngine.run(toolID: "age-calculator", options: ["birth": "1990-02-01"], now: fixedNow).output.contains("Age: 33 years, 11 months, 14 days"))
+        let dateAdd = try NativeDateTimeEngine.run(toolID: "date-calculator", options: ["start": "2024-01-31", "months": "1"], now: fixedNow)
+        XCTAssertEqual(dateAdd.output, "Result: 2024-02-29 Thursday\nDate: 2024-02-29")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "workday-calculator", options: ["start": "2024-01-08", "days": "-1"], now: fixedNow).output, "Result: 2024-01-05 Friday")
+    }
+
+    func testLeapBirthdayReturnsToFebruary29InTheNextLeapYear() throws {
+        let utcZone = TimeZone(secondsFromGMT: 0)!
+        let before = ISO8601DateFormatter().date(from: "2023-02-27T12:00:00Z")!
+        let beforeDefault = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29"
+        ], now: before, localTimeZone: utcZone)
+        let beforeMarchFirst = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29", "leapBirthday": "mar-1"
+        ], now: before, localTimeZone: utcZone)
+        XCTAssertTrue(beforeDefault.output.contains("Days until birthday: 1"))
+        XCTAssertTrue(beforeMarchFirst.output.contains("Days until birthday: 2"))
+        let after = ISO8601DateFormatter().date(from: "2023-03-02T12:00:00Z")!
+        let afterDefault = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29"
+        ], now: after, localTimeZone: utcZone)
+        let afterMarchFirst = try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29", "leapBirthday": "mar-1"
+        ], now: after, localTimeZone: utcZone)
+        XCTAssertTrue(afterDefault.output.contains("Days until birthday: 364"))
+        XCTAssertTrue(afterMarchFirst.output.contains("Days until birthday: 364"))
+    }
+
+    func testDefaultWeekendSetTreatsSundayAndSaturdayAsWeekend() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "workday-calculator", options: [
+            "start": "2024-01-08", "days": "-1"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("2024-01-05"))
+    }
+
+    func testMeetingPlannerSupportsSundayToThursdayWorkweeks() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos",
+            "workStart": "09:00", "workEnd": "17:00", "workDays": "0,1,2,3,4"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("Option 1:"))
+        XCTAssertTrue(result.output.contains("Sunday, Monday, Tuesday, Wednesday, Thursday"))
+    }
+
+    func testMeetingPlannerRejectsInvalidWeekdayInput() throws {
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos", "workDays": "0,7"
+        ], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "meeting-time-planner", options: [
+            "date": "2024-01-14", "zones": "Lagos, Berlin", "sourceTz": "Lagos", "workDays": ""
+        ], now: fixedNow))
+    }
+
+    func testNegativeSubsecondUnixValuesUseFloorSemantics() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
+            "value": "-00000000000000001"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("ISO UTC: 1969-12-31T23:59:59.999999999Z"))
+        XCTAssertTrue(result.output.contains("Unix milliseconds: -1"))
+        XCTAssertTrue(result.output.contains("Unix microseconds: -1"))
+    }
+
+    func testUnixTimestampBatchConvertsLocallyAndEnforcesLimit() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
+            "value": "1704067200, 1704153600000"
+        ], now: fixedNow)
+        XCTAssertEqual(result.rows.count, 2)
+        XCTAssertTrue(result.output.contains("Timestamp 1:"))
+        XCTAssertTrue(result.output.contains("Timestamp 2:"))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "unix-timestamp-converter", options: [
+            "value": (1...101).map { _ in "1704067200" }.joined(separator: ",")
+        ], now: fixedNow))
+    }
+
+    func testRepeatedDaylightSavingTimeChoosesEarlierOccurrenceAndExplainsIt() throws {
+        let result = try NativeDateTimeEngine.run(toolID: "timezone-converter", options: [
+            "time": "2024-11-03T01:30", "fromTz": "America/New_York", "toTz": "UTC"
+        ], now: fixedNow)
+        XCTAssertTrue(result.output.contains("Unix seconds: 1730611800"))
+        XCTAssertTrue(result.output.contains("DST note: This local time occurs twice; the earlier occurrence was selected."))
+    }
+
+    func testInvalidCustomHolidayDateIsRejected() throws {
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "business-day-calculator", options: [
+            "from": "2024-01-05", "to": "2024-01-09", "excludedDates": "2024-02-30"
+        ], now: fixedNow))
+    }
+
+    func testGregorianCenturyLeapRulesAndLeapYearBounds() throws {
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "2000"], now: fixedNow).output, "2000: Leap year")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "1900"], now: fixedNow).output, "1900: Not a leap year")
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "0"], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "leap-year-checker", options: ["year": "10000"], now: fixedNow))
+        XCTAssertThrowsError(try NativeDateTimeEngine.run(toolID: "date-formatter", options: ["value": "2024-02-30"], now: fixedNow))
+    }
+
+    func testRelativeDateToolsUseDeviceLocalCalendarDay() throws {
+        let now = ISO8601DateFormatter().date(from: "2024-01-15T23:30:00Z")!
+        let lagos = TimeZone(secondsFromGMT: 3600)!
+        let age = try NativeDateTimeEngine.run(toolID: "age-calculator", options: ["birth": "2020-01-16"], now: now, localTimeZone: lagos)
+        XCTAssertTrue(age.output.contains("Age: 4 years, 0 months, 0 days"))
+        let until = try NativeDateTimeEngine.run(toolID: "time-until-calculator", options: ["target": "2024-01-17"], now: now, localTimeZone: lagos)
+        XCTAssertTrue(until.output.contains("Calendar span: 0 years, 0 months, 1 days"))
+        let deadline = try NativeDateTimeEngine.run(toolID: "deadline-calculator", options: ["target": "2024-01-17", "includeEnd": "true"], now: now, localTimeZone: lagos)
+        XCTAssertTrue(deadline.output.contains("Calendar days remaining: 1"))
+    }
+    func testLeapDayBirthdayDefaultsToFebruary28WithMarchFirstOption() throws {
+        let now = ISO8601DateFormatter().date(from: "2025-01-15T12:00:00Z")!
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "birthday-countdown", input: "2000-02-29", now: now).output, "Days until birthday: 44")
+        XCTAssertEqual(try NativeDateTimeEngine.run(toolID: "birthday-countdown", options: [
+            "birth": "2000-02-29", "leapBirthday": "mar-1"
+        ], now: now).output, "Days until birthday: 45")
+    }
+
 }
