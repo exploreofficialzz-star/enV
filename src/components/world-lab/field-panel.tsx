@@ -137,14 +137,27 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
   </div>;
  }
  if(layer.kind==="event"){
-  const events=layer.events.filter(e=>e.atSeconds<=p.timeSeconds);
-  return <div className="pointer-events-none absolute right-2 top-2 max-w-[min(75%,360px)] rounded-lg border border-border bg-bg/90 p-2 text-xs shadow"
-    role="img" aria-label={layer.legend.accessibleDescription+"; "+events.length+" recorded events reached"}>
-   <p className="font-semibold">{layer.legend.title} · {events.length} events</p>
-   {events.slice(-3).map(e=><p key={e.id}>{e.atSeconds.toFixed(3)} s · {e.label}</p>)}
-  </div>;
- }
- if(layer.kind==="network"){
+   const events=layer.events.filter(e=>e.atSeconds<=p.timeSeconds).slice(-24);
+   const windowStart=layer.timeReference.sampleTimesSeconds[0]??0;
+   const windowEnd=layer.timeReference.sampleTimesSeconds.at(-1)??Math.max(1,p.timeSeconds);
+   const xAt=(time:number)=>24+Math.max(0,Math.min(1,(time-windowStart)/Math.max(1e-9,windowEnd-windowStart)))*252;
+   const severityColor=(severity:string)=>severity==="critical"?"#d94848":severity==="warning"?"#d69b25":"#4b9b83";
+   return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,360px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
+     role="img" aria-label={layer.legend.accessibleDescription+"; "+events.length+" reached event markers on the recorded simulation timeline"}>
+    <p className="text-xs font-semibold">{layer.legend.title} · {events.length} reached events</p>
+    <svg viewBox="0 0 300 58" width="100%" height="50" role="presentation">
+     <path d="M24 27 H276" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".5"/>
+     {events.map(e=><g key={e.id}>
+      <line x1={xAt(e.atSeconds)} x2={xAt(e.atSeconds)} y1="18" y2="36" stroke={severityColor(e.severity)} strokeWidth="1.5"/>
+      <circle cx={xAt(e.atSeconds)} cy="27" r="4" fill={severityColor(e.severity)}><title>{e.atSeconds.toFixed(3)} s · {e.label} · {e.severity}</title></circle>
+     </g>)}
+     <text x="24" y="50" fontSize="8" fill="currentColor">{windowStart.toFixed(2)} s</text>
+     <text x="276" y="50" textAnchor="end" fontSize="8" fill="currentColor">{windowEnd.toFixed(2)} s</text>
+    </svg>
+    {events.slice(-3).map(e=><p key={e.id} className="text-[10px]">{e.atSeconds.toFixed(3)} s · {e.label} · {e.severity}</p>)}
+   </div>;
+  }
+  if(layer.kind==="network"){
   const nodes=layer.network?.nodes??[],edges=layer.network?.edges??[];
   const xs=nodes.map(node=>node.positionMeters[0]),ys=nodes.map(node=>node.positionMeters[1]);
   const minX=xs.length?Math.min(...xs):0,maxX=xs.length?Math.max(...xs):1;
