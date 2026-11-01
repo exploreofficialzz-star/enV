@@ -39,6 +39,13 @@ function formatDate(timestamp: number) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(timestamp);
 }
 
+function noteFingerprint(note: ABookNote): string {
+  return JSON.stringify([
+    note.id, note.title, note.body, note.notebook, note.tags,
+    note.pinned, note.archived, note.deletedAt,
+  ]);
+}
+
 export function ABookEngine() {
   const [notes, setNotes] = useState<ABookNote[]>([]);
   const [current, setCurrent] = useState<ABookNote | null>(null);
@@ -59,35 +66,106 @@ export function ABookEngine() {
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
+  const savedFingerprints = useRef(new Map<string, string>());
+  const pendingSave = useRef<Promise<ABookNote> | null>(null);
+  const currentRef = useRef<ABookNote | null>(current);
+
+  function setCurrentNote(note: ABookNote | null) {
+    currentRef.current = note;
+    setCurrent(note);
+  }
+
+  async function persistNote(note: ABookNote): Promise<ABookNote> {
+    const fingerprint = noteFingerprint(note);
+    while (pendingSave.current) await pendingSave.current;
+    if (savedFingerprints.current.get(note.id) === fingerprint) return note;
+
+    const operation = saveNote(note);
+    pendingSave.current = operation;
+    try {
+      const saved = await operation;
+      savedFingerprints.current.set(saved.id, noteFingerprint(saved));
+      return saved;
+    } finally {
+      if (pendingSave.current === operation) pendingSave.current = null;
+    }
+  }
+
+  function applySavedNote(saved: ABookNote) {
+    setNotes((items) => items.map((item) => item.id === saved.id ? saved : item));
+    const active = currentRef.current;
+    if (active?.id === saved.id) {
+      setCurrentNote({ ...active, updatedAt: saved.updatedAt, revision: saved.revision });
+    }
+  }
+
+  async function flushCurrentDraft(targetId = currentRef.current?.id): Promise<ABookNote | null> {
+    if (!targetId) return null;
+    window.clearTimeout(saveTimer.current);
+    let draft = currentRef.current?.id === targetId ? currentRef.current : null;
+    if (!draft) return null;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const saved = await persistNote(draft);
+      applySavedNote(saved);
+      const latest = currentRef.current;
+      if (!latest || latest.id !== targetId || noteFingerprint(latest) === noteFingerprint(saved)) {
+        return saved;
+      }
+      draft = latest;
+    }
+    throw new Error("This note is still changing. Try the action again after editing stops.");
+  }
 
   async function refresh(preferredId?: string, deletedOnly = showTrash, archivedOnly = showArchived) {
     const all = await listNotes({ includeArchived: true, includeDeleted: true });
+    all.forEach((note) => savedFingerprints.current.set(note.id, noteFingerprint(note)));
     const next = all.filter((note) => deletedOnly
       ? note.deletedAt !== null
       : note.deletedAt === null && (archivedOnly || !note.archived));
     setNotes(next);
-    const selected = next.find((note) => note.id === (preferredId ?? current?.id));
-    if (selected) setCurrent(selected);
-    else setCurrent(next[0] ?? null);
+    const selected = next.find((note) => note.id === (preferredId ?? currentRef.current?.id));
+    setCurrentNote(selected ?? next[0] ?? null);
+  }
+
+  async function selectNote(note: ABookNote) {
+    try {
+      await flushCurrentDraft();
+      setCurrentNote(note);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The current note could not be saved.");
+    }
   }
 
   async function toggleTrash(next: boolean) {
-    setShowTrash(next);
-    if (next) setShowArchived(false);
-    await refresh(undefined, next, false);
+    try {
+      await flushCurrentDraft();
+      setShowTrash(next);
+      if (next) setShowArchived(false);
+      await refresh(undefined, next, false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not change the notes view.");
+    }
   }
 
   async function toggleArchived(next: boolean) {
-    setShowArchived(next);
-    await refresh(undefined, false, next);
+    try {
+      await flushCurrentDraft();
+      setShowArchived(next);
+      await refresh(undefined, false, next);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not change the notes view.");
+    }
   }
 
   useEffect(() => {
     let mounted = true;
     listNotes().then((loaded) => {
       if (!mounted) return;
+      loaded.forEach((note) => savedFingerprints.current.set(note.id, noteFingerprint(note)));
       setNotes(loaded);
-      setCurrent(loaded[0] ?? null);
+      setCurrentNote(loaded[0] ?? null);
       setIsReady(true);
       void getLocalStorageStatus().then((status) => {
         if (mounted && !status.persistent) setStorageMessage("Saved locally · browser data may be cleared; export a backup");
@@ -102,14 +180,14 @@ export function ABookEngine() {
 
   useEffect(() => {
     if (!current || !isReady) return;
+    if (savedFingerprints.current.get(current.id) === noteFingerprint(current)) return;
+
     window.clearTimeout(saveTimer.current);
     setStorageMessage("Saving on this device…");
+    const pendingNote = current;
     saveTimer.current = window.setTimeout(() => {
-      saveNote(current).then(async (saved) => {
-        setCurrent((value) => value?.id === saved.id && value.revision !== saved.revision
-          ? { ...value, revision: saved.revision }
-          : value);
-        await refresh(saved.id);
+      void persistNote(pendingNote).then((saved) => {
+        applySavedNote(saved);
         setStorageMessage("Saved on this device");
         setError("");
       }).catch((cause: unknown) => {
@@ -118,7 +196,7 @@ export function ABookEngine() {
       });
     }, 450);
     return () => window.clearTimeout(saveTimer.current);
-  }, [current, isReady, showArchived, showTrash]);
+  }, [current, isReady]);
 
   useEffect(() => {
     if (!current) {
@@ -150,9 +228,10 @@ export function ABookEngine() {
 
   async function createNewNote() {
     try {
+      await flushCurrentDraft();
       setShowTrash(false);
       setShowArchived(false);
-      const note = await saveNote(createNote());
+      const note = await persistNote(createNote());
       await refresh(note.id, false, false);
       setError("");
     } catch (cause) {
@@ -161,7 +240,8 @@ export function ABookEngine() {
   }
 
   function updateCurrent(patch: Partial<ABookNote>) {
-    setCurrent((note) => note ? { ...note, ...patch, updatedAt: Date.now() } : note);
+    const note = currentRef.current;
+    if (note) setCurrentNote({ ...note, ...patch, updatedAt: Date.now() });
   }
 
   async function attachFiles(files: FileList | null) {
@@ -242,14 +322,20 @@ export function ABookEngine() {
     }
   }
 
-  function exportCurrentMarkdown() {
-    if (!current) return;
-    const markdown = `# ${current.title || "Untitled note"}\n\n${current.body}\n\n---\nNotebook: ${current.notebook}\nTags: ${current.tags.join(", ")}\nUpdated: ${new Date(current.updatedAt).toISOString()}\n`;
-    localDownload(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), `${safeName(current.title)}.md`);
+  async function exportCurrentMarkdown() {
+    try {
+      const note = await flushCurrentDraft();
+      if (!note) return;
+      const markdown = `# ${note.title || "Untitled note"}\n\n${note.body}\n\n---\nNotebook: ${note.notebook}\nTags: ${note.tags.join(", ")}\nUpdated: ${new Date(note.updatedAt).toISOString()}\n`;
+      localDownload(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), `${safeName(note.title)}.md`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The note could not be saved for export.");
+    }
   }
 
   async function exportNotesJson() {
     try {
+      await flushCurrentDraft();
       const library = await listNotes({ includeArchived: true, includeDeleted: true });
       const [history, files] = await Promise.all([
         Promise.all(library.map((note) => listRevisions(note.id))),
@@ -267,6 +353,7 @@ export function ABookEngine() {
   async function importNotes(file: File | undefined) {
     if (!file) return;
     try {
+      await flushCurrentDraft();
       if (!file.name.toLowerCase().endsWith(".json")) {
         const archive = await readABookArchive(file);
         const count = await importLocalLibrary(archive);
@@ -296,17 +383,21 @@ export function ABookEngine() {
   }
 
   async function pinNote() {
-    if (!current) return;
-    const saved = await saveNote({ ...current, pinned: !current.pinned });
-    setCurrent(saved);
-    await refresh(saved.id);
+    try {
+      const draft = await flushCurrentDraft();
+      if (!draft) return;
+      const saved = await persistNote({ ...draft, pinned: !draft.pinned });
+      applySavedNote(saved);
+      await refresh(saved.id);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not update the note."); }
   }
 
   async function restoreCurrentNote() {
-    if (!current) return;
     try {
-      await restoreNote(current.id);
-      await refresh(current.id, false, showArchived);
+      const draft = await flushCurrentDraft();
+      if (!draft) return;
+      await restoreNote(draft.id);
+      await refresh(draft.id, false, showArchived);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not restore this note.");
@@ -314,10 +405,13 @@ export function ABookEngine() {
   }
 
   async function permanentlyDeleteCurrentNote() {
-    if (!current || !window.confirm("Permanently delete this note and its local attachments? This cannot be undone.")) return;
+    if (!currentRef.current || !window.confirm("Permanently delete this note and its local attachments? This cannot be undone.")) return;
     try {
-      await permanentlyDeleteNote(current.id);
-      setCurrent(null);
+      const draft = await flushCurrentDraft();
+      if (!draft) return;
+      await permanentlyDeleteNote(draft.id);
+      savedFingerprints.current.delete(draft.id);
+      setCurrentNote(null);
       await refresh(undefined, true, false);
       setError("");
     } catch (cause) {
@@ -326,27 +420,32 @@ export function ABookEngine() {
   }
 
   async function archiveNote() {
-    if (!current) return;
     try {
-      await setNoteArchived(current.id, !current.archived);
+      const draft = await flushCurrentDraft();
+      if (!draft) return;
+      await setNoteArchived(draft.id, !draft.archived);
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not archive the note."); }
   }
 
   async function moveToTrash() {
-    if (!current) return;
     try {
-      await trashNote(current.id);
-      setCurrent(null);
+      const draft = await flushCurrentDraft();
+      if (!draft) return;
+      await trashNote(draft.id);
+      setCurrentNote(null);
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not move the note to trash."); }
   }
 
   async function restorePrevious(revision: ABookRevision) {
-    if (!current) return;
     try {
-      const restored = await restoreRevision(current.id, revision.id);
-      setCurrent(restored);
+      const draft = await flushCurrentDraft();
+      if (!draft) return;
+      const restored = await restoreRevision(draft.id, revision.id);
+      savedFingerprints.current.set(restored.id, noteFingerprint(restored));
+      setCurrentNote(restored);
+      setNotes((items) => items.map((item) => item.id === restored.id ? restored : item));
       setError("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not restore this revision."); }
   }
@@ -379,7 +478,7 @@ export function ABookEngine() {
           </div>
         </div>
         <div className="max-h-[560px] flex-1 space-y-1 overflow-y-auto p-2">
-          {visibleNotes.map((note) => <button key={note.id} type="button" onClick={() => setCurrent(note)} className={`w-full rounded-lg border px-3 py-3 text-left transition ${current?.id === note.id ? "border-accent bg-surface-2" : "border-transparent hover:bg-surface-2"}`}>
+          {visibleNotes.map((note) => <button key={note.id} type="button" onClick={() => void selectNote(note)} className={`w-full rounded-lg border px-3 py-3 text-left transition ${current?.id === note.id ? "border-accent bg-surface-2" : "border-transparent hover:bg-surface-2"}`}>
             <span className="flex items-center gap-2 text-sm font-medium">{note.pinned ? "★ " : ""}{note.title || "Untitled note"}</span>
             <span className="mt-1 block line-clamp-2 text-xs text-muted">{note.body || "No content yet"}</span>
             <span className="mt-2 block text-[11px] text-subtle">{formatDate(note.updatedAt)}</span>
