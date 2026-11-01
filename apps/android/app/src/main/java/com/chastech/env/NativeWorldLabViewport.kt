@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import com.chastech.env.engine.NativeLabSolid
 import com.chastech.env.engine.NativeGeodetic
 import com.chastech.env.engine.NativeEnu
@@ -34,22 +35,11 @@ private fun labPerspectivePoint(
     point:NativeLabVector,focus:NativeLabVector,yaw:Float,cameraDistance:Double,
     focalLength:Float,pan:Offset,width:Float,height:Float,elevationDegrees:Float,
 ):LabScreenPoint{
-    val dx=point.x-focus.x;val dy=point.y-focus.y;val dz=point.z-focus.z
-    val angle=yaw.toDouble()
-    val elevation=Math.toRadians(elevationDegrees.toDouble().coerceIn(5.0,85.0))
-    // Camera basis: yaw rotates around world-up; elevation looks above/below the target.
-    val rightX=cos(angle);val rightZ=-sin(angle)
-    val upX=sin(angle)*sin(elevation);val upY=cos(elevation);val upZ=cos(angle)*sin(elevation)
-    val forwardX=sin(angle)*cos(elevation);val forwardY=-sin(elevation);val forwardZ=cos(angle)*cos(elevation)
-    val cameraX=dx*rightX+dz*rightZ
-    val cameraY=dx*upX+dy*upY+dz*upZ
-    val depth=cameraDistance+dx*forwardX+dy*forwardY+dz*forwardZ
-    val visible=depth.isFinite()&&depth>0.05&&depth<50_000_000.0
-    if(!visible)return LabScreenPoint(Float.NaN,Float.NaN,0f,false)
-    val scale=focalLength/depth.toFloat()
-    val x=width/2f+pan.x+cameraX.toFloat()*scale
-    val y=height/2f+pan.y-cameraY.toFloat()*scale
-    return LabScreenPoint(x,y,scale,x.isFinite()&&y.isFinite())
+    val projected=NativeWorldLabCamera.project(point,focus,yaw.toDouble(),elevationDegrees.toDouble(),
+        cameraDistance,focalLength.toDouble(),pan.x.toDouble(),pan.y.toDouble(),
+        width.toDouble(),height.toDouble())
+    return LabScreenPoint(projected.xPixels.toFloat(),projected.yPixels.toFloat(),
+        projected.pixelsPerMeter.toFloat(),projected.visible)
 }
 private fun labRotatePoint(x:Double,y:Double,z:Double,rotation:NativeLabVector):NativeLabVector{
     val cx=cos(rotation.x);val sx=sin(rotation.x)
@@ -79,6 +69,7 @@ fun NativeWorldLabViewport(
     onSaveGeodeticOrigin:(NativeGeodetic)->Unit,
     onClearGeodeticOrigin:()->Unit,
 ){
+    val screenDensity=LocalDensity.current.density
     val cameraDeltaX=project.cameraPositionMeters.x-project.cameraLookingAtMeters.x
     val cameraDeltaY=project.cameraPositionMeters.y-project.cameraLookingAtMeters.y
     val cameraDeltaZ=project.cameraPositionMeters.z-project.cameraLookingAtMeters.z
@@ -122,7 +113,7 @@ fun NativeWorldLabViewport(
             .pointerInput(project.id,project.revision,zoom,yaw,pan){
                 detectTapGestures{touch->
                     val hit=project.entities.map{e->
-                        val p=projection(e.positionMeters,size.width.toFloat(),size.height.toFloat(),360f*density)
+                        val p=projection(e.positionMeters,size.width.toFloat(),size.height.toFloat(),360f*screenDensity)
                         e to if(p.visible)hypot(p.x-touch.x,p.y-touch.y) else Float.POSITIVE_INFINITY
                     }.filter{it.second<44f}.minByOrNull{it.second}
                     hit?.first?.let{onSelect(it.id)}
