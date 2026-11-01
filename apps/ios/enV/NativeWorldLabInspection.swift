@@ -432,6 +432,13 @@ struct NativeWorldLabFieldLayer:Equatable {
         }
         return try extractSlice(timeSeconds,plane,sliceIndex ?? (dimensions[plane.axes.normal]-1)/2)
     }
+    func vectorDisplaySlice(_ timeSeconds:Double,plane:NativeWorldLabFieldPlane = .xy,
+        sliceIndex:Int?=nil)throws->NativeWorldLabFieldSliceFrame {
+        guard kind == .vector,rendererKind=="glyphs" || rendererKind=="streamlines" else {
+            throw NativeWorldLabError.invalid("Vector slice display requires a supported vector renderer.")
+        }
+        return try extractSlice(timeSeconds,plane,sliceIndex ?? (dimensions[plane.axes.normal]-1)/2)
+    }
     func vectorStreamlines(_ timeSeconds:Double,plane:NativeWorldLabFieldPlane = .xy,
         sliceIndex:Int?=nil)throws->NativeWorldLabFieldStreamlineFrame {
         guard kind == .vector,rendererKind=="streamlines" else {
@@ -611,8 +618,14 @@ enum NativeWorldLabFieldLayerCodec {
             throw NativeWorldLabError.invalid("Field dimensions are outside the native grid limits.")
         }
         let dimensions=dimensionValues.map{Int($0)}
-        let cellCount=dimensions.reduce(1,*)
-        guard cellCount<=maxCells,(resolution["sampleCount"] as? NSNumber)?.intValue==cellCount else {
+        var cellCount=1
+        for dimension in dimensions {
+            guard cellCount<=maxCells/dimension else {
+                throw NativeWorldLabError.invalid("Field grid exceeds native cell limits.")
+            }
+            cellCount*=dimension
+        }
+        guard (resolution["sampleCount"] as? NSNumber)?.intValue==cellCount else {
             throw NativeWorldLabError.invalid("Field cell count does not match the grid dimensions.")
         }
         let spacing=try numbers(resolution["spacingMeters"],3,"grid spacing")
@@ -683,6 +696,9 @@ enum NativeWorldLabFieldLayerCodec {
               let roleArray=permissions["readRoles"] as? [String] else {
             throw NativeWorldLabError.invalid("Field permissions are invalid.")
         }
+        guard roleArray.allSatisfy({!$0.isEmpty && $0.count<=80}) else {
+            throw NativeWorldLabError.invalid("Field read roles must be bounded non-empty strings.")
+        }
         let roles=Set(roleArray)
         switch scope {
         case "private":
@@ -698,6 +714,9 @@ enum NativeWorldLabFieldLayerCodec {
         let exportAllowed=permissions["exportAllowed"] as? Bool ?? false
         let legend=try object(root["legend"],"legend")
         let legendTitle=try string(legend,"title",240)
+        guard ["cividis","viridis","magma","blue-orange"].contains(legend["palette"] as? String ?? "") else {
+            throw NativeWorldLabError.invalid("Field legend palette is unsupported.")
+        }
         let accessible=try string(legend,"accessibleDescription",1000)
         let validity=try string(root,"validity",1000)
         return NativeWorldLabFieldLayer(id:id,label:label,kind:kind,siUnits:si,displayUnits:display,
