@@ -28,6 +28,8 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
  const [sketchDepth,setSketchDepth]=useState(2);
  const [extrusionHeight,setExtrusionHeight]=useState(1);
  const [circleRadius,setCircleRadius]=useState(0.5);
+ const [sketchBaseCenter,setSketchBaseCenter]=useState<[number,number,number]>([0,0,0]);
+ const [sketchRotationDegrees,setSketchRotationDegrees]=useState<[number,number,number]>([0,0,0]);
  const [sketchShape,setSketchShape]=useState<"rectangle"|"circle">("rectangle");
  const [sketchStart,setSketchStart]=useState<{x:number;y:number}|null>(null);
  const [sketchEnd,setSketchEnd]=useState<{x:number;y:number}|null>(null);
@@ -190,6 +192,20 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
       Draw a closed profile above to set its dimensions, or enter exact values below.
       Supported v1 extrusion profiles are a rectangle and a circle.
      </p>
+     <p className="mt-2 text-xs font-medium">Sketch centre on base plane (m)</p>
+     <div className="grid grid-cols-3 gap-2">
+      {(["X","Y","Z"] as const).map((label,i)=><label className="text-xs" key={label}>{label}
+       <input className={input} type="number" step="any" value={sketchBaseCenter[i]}
+        onChange={e=>setSketchBaseCenter(old=>old.map((v,j)=>j===i?Number(e.target.value):v) as [number,number,number])}/>
+      </label>)}
+     </div>
+     <p className="mt-2 text-xs font-medium">Extrusion orientation (degrees)</p>
+     <div className="grid grid-cols-3 gap-2">
+      {(["X","Y","Z"] as const).map((label,i)=><label className="text-xs" key={label}>{label}
+       <input className={input} type="number" min={-360} max={360} step="1" value={sketchRotationDegrees[i]}
+        onChange={e=>setSketchRotationDegrees(old=>old.map((v,j)=>j===i?Number(e.target.value):v) as [number,number,number])}/>
+      </label>)}
+     </div>
      <div className="mt-2 grid grid-cols-2 gap-2">
       <label className="text-xs">Rectangle width (m)
        <input className={input} type="number" min={0.001} max={10000} step="any"

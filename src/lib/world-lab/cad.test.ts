@@ -16,10 +16,10 @@ test("closed rectangular and circular sketches extrude into valid project solids
  const rectangular=extrudeRectangle(p,{center:[2,1,3],widthMeters:4,depthMeters:2,heightMeters:5},ids("rect"));
  const box=rectangular.entities.at(-1)!;
  assert.equal(box.shape,"box");assert.deepEqual(box.dimensionsMeters,[4,5,2]);
- assert.deepEqual(box.positionMeters,[2,1,3]);
+ assert.deepEqual(box.positionMeters,[2,3.5,3]);
  const circular=extrudeCircle(rectangular,{center:[0,2,0],radiusMeters:0.5,heightMeters:3},ids("circle"));
  const cylinder=circular.entities.at(-1)!;
- assert.equal(cylinder.shape,"cylinder");assert.deepEqual(cylinder.dimensionsMeters,[1,3,1]);
+ assert.equal(cylinder.shape,"cylinder");assert.deepEqual(cylinder.dimensionsMeters,[1,3,1]);assert.deepEqual(cylinder.positionMeters,[0,3.5,0]);
  assert.ok(Math.abs(Math.PI/4*3-solidVolume(cylinder))<1e-12);
  assert.equal(p.entities.length,3);
 });
@@ -65,3 +65,14 @@ function axisRotationForTest(axis:number,r:number):number[]{
 function multiplyForTest(a:readonly number[],b:readonly number[]):number[]{
  return Array.from({length:9},(_,i)=>{const row=Math.floor(i/3),col=i%3;return a[row*3]*b[col]+a[row*3+1]*b[3+col]+a[row*3+2]*b[6+col];});
 }
+
+test("sketch extrusion applies base-plane placement and rotated extrusion axis",()=>{
+ const p=base();
+ const result=extrudeRectangle(p,{center:[1,2,3],widthMeters:2,depthMeters:3,heightMeters:4,rotationRadians:[0,0,Math.PI/2]},ids("placed"));
+ const solid=result.entities.at(-1)!;
+ assert.ok(Math.abs(solid.positionMeters[0]+1)<1e-12);
+ assert.ok(Math.abs(solid.positionMeters[1]-2)<1e-12);
+ assert.ok(Math.abs(solid.positionMeters[2]-3)<1e-12);
+ assert.ok(Math.abs((solid.rotationRadians??[0,0,0])[2]-Math.PI/2)<1e-12);
+ assert.throws(()=>extrudeCircle(p,{center:[0,0,0],radiusMeters:1,heightMeters:1,rotationRadians:[0,0,10]},ids("bad")),/Sketch rotation/);
+});

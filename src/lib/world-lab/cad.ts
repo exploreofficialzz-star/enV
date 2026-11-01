@@ -149,8 +149,10 @@ export function scaleGroupAroundCentroid(p:WorldLabProject,entityIds:readonly st
 }
 
 export type SketchExtrusionInput=Readonly<{
+  /** Centre of the 2D profile on the base plane; extrusion proceeds along local +Y. */
   center:readonly [number,number,number];
   widthMeters:number;depthMeters:number;heightMeters:number;
+  rotationRadians?:readonly [number,number,number];
 }>;
 /** Extrude a closed 2D rectangular sketch profile along local Y into a real box solid. */
 export function extrudeRectangle(p:WorldLabProject,input:SketchExtrusionInput,
@@ -161,14 +163,19 @@ export function extrudeRectangle(p:WorldLabProject,input:SketchExtrusionInput,
   const depth=bounded(input.depthMeters,0.001,10000,"Sketch depth");
   const height=bounded(input.heightMeters,0.001,10000,"Extrusion height");
   input.center.forEach(v=>bounded(v,-100000,100000,"Extrusion center"));
+  const rotation=[...(input.rotationRadians??[0,0,0])] as [number,number,number];
+  rotation.forEach(v=>bounded(v,-2*Math.PI,2*Math.PI,"Sketch rotation"));
+  const matrix=cadRotationMatrix(rotation);
+  const position:[number,number,number]=[input.center[0]+matrix[1]*height/2,input.center[1]+matrix[4]*height/2,input.center[2]+matrix[7]*height/2];
+  position.forEach(v=>bounded(v,-100000,100000,"Extruded solid position"));
   const solid=newSolid(id,"box",project.entities.length);
   return finalize(project,[...project.entities,{...solid,
-    name:"Extruded rectangular profile",positionMeters:[...input.center] as [number,number,number],
-    dimensionsMeters:[width,height,depth],rotationRadians:[0,0,0]}]);
+    name:"Extruded rectangular profile",positionMeters:position,
+    dimensionsMeters:[width,height,depth],rotationRadians:rotation}]);
 }
 /** Extrude a circular 2D sketch profile along local Y into a true cylinder solid. */
 export function extrudeCircle(p:WorldLabProject,input:{
-  center:readonly [number,number,number];radiusMeters:number;heightMeters:number;
+  center:readonly [number,number,number];radiusMeters:number;heightMeters:number;rotationRadians?:readonly [number,number,number];
 },idFactory:()=>string):WorldLabProject{
   const project=parseWorldLabProject(p);
   const id=uniqueId(idFactory,new Set(project.entities.map(e=>e.id)));
@@ -177,8 +184,13 @@ export function extrudeCircle(p:WorldLabProject,input:{
   input.center.forEach(v=>bounded(v,-100000,100000,"Extrusion center"));
   const diameter=radius*2;
   if(diameter>10000)throw new Error("Extruded circle exceeds the 10,000 m diameter limit.");
+  const rotation=[...(input.rotationRadians??[0,0,0])] as [number,number,number];
+  rotation.forEach(v=>bounded(v,-2*Math.PI,2*Math.PI,"Sketch rotation"));
+  const matrix=cadRotationMatrix(rotation);
+  const position:[number,number,number]=[input.center[0]+matrix[1]*height/2,input.center[1]+matrix[4]*height/2,input.center[2]+matrix[7]*height/2];
+  position.forEach(v=>bounded(v,-100000,100000,"Extruded solid position"));
   const solid=newSolid(id,"cylinder",project.entities.length);
   return finalize(project,[...project.entities,{...solid,
-    name:"Extruded circular profile",positionMeters:[...input.center] as [number,number,number],
-    dimensionsMeters:[diameter,height,diameter],rotationRadians:[0,0,0]}]);
+    name:"Extruded circular profile",positionMeters:position,
+    dimensionsMeters:[diameter,height,diameter],rotationRadians:rotation}]);
 }
