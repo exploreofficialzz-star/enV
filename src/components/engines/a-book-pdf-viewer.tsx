@@ -58,8 +58,15 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
 
   useEffect(() => {
     let cancelled = false;
+    let loadTimedOut = false;
     let loadingTask: PdfLoadingTask | null = null;
-    let timeout: number | undefined;
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      loadTimedOut = true;
+      setError("Local PDF viewing exceeded the two-minute safety limit. Reopen the PDF to try again.");
+      setLoading(false);
+      void loadingTask?.destroy();
+    }, 120_000);
     documentRef.current = null;
     setLoading(true);
     setRendering(false);
@@ -76,7 +83,7 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         const pdfjs = await import("pdfjs-dist");
         const workerAsset = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
         pdfjs.GlobalWorkerOptions.workerSrc = workerAsset.default;
-        if (cancelled) return;
+        if (cancelled || loadTimedOut) return;
         loadingTask = pdfjs.getDocument({
           url: src,
           isEvalSupported: false,
@@ -84,12 +91,6 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
           enableXfa: false,
           verbosity: 0,
         }) as unknown as PdfLoadingTask;
-        timeout = window.setTimeout(() => {
-          if (cancelled) return;
-          setError("Local PDF viewing exceeded the two-minute safety limit.");
-          setLoading(false);
-          void loadingTask?.destroy();
-        }, 120_000);
         const document = await loadingTask.promise;
         if (cancelled) { await document.destroy(); return; }
         if (!Number.isSafeInteger(document.numPages) || document.numPages < 1) {
@@ -101,17 +102,19 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         setError("");
       } catch (cause) {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "This PDF could not be opened locally.");
+          setError(loadTimedOut
+            ? "Local PDF viewing exceeded the two-minute safety limit. Reopen the PDF to try again."
+            : cause instanceof Error ? cause.message : "This PDF could not be opened locally.");
           setLoading(false);
         }
       } finally {
-        if (timeout !== undefined) window.clearTimeout(timeout);
+        window.clearTimeout(timeout);
       }
     })();
 
     return () => {
       cancelled = true;
-      if (timeout !== undefined) window.clearTimeout(timeout);
+      window.clearTimeout(timeout);
       const document = documentRef.current;
       documentRef.current = null;
       if (document) void document.destroy();
@@ -145,7 +148,10 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         const desiredScale = Math.min(2.5, Math.max(0.35, fitScale * zoom));
         const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
         // Bound each backing canvas to ~48 MB of RGBA pixel memory.
-        const maxBackingScale = Math.sqrt(12_000_000 / (base.width * base.height));
+        const maxBackingScale = Math.min(
+          Math.sqrt(12_000_000 / (base.width * base.height)),
+          8192 / Math.max(base.width, base.height),
+        );
         const backingScale = Math.min(desiredScale * pixelRatio, maxBackingScale, 2);
         if (!Number.isFinite(backingScale) || backingScale <= 0) {
           throw new Error("This PDF page is too large to render safely on this device.");
