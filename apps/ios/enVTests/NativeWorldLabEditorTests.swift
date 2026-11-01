@@ -398,3 +398,62 @@ final class NativeWorldLabEditorTests: XCTestCase {
             NativeWorldLabEditor.blank(),radiusMeters:0.5,heightMeters:2,
             rotationRadians:[0,Double.nan,0]))
     }
+
+
+    func testCADExchangeRoundTripsSupportedGeometryAndReferencedMaterials() throws {
+        var source=try NativeWorldLabEditor.addSolid(try NativeWorldLabEditor.blank(),shape:"box",id:"box-source")
+        source=try NativeWorldLabEditor.positionSolid(source,id:"box-source",positionMeters:[1,2,3])
+        source=try NativeWorldLabEditor.rotateSolid(source,id:"box-source",axis:2,degrees:30)
+        source=try NativeWorldLabEditor.addHypotheticalMaterial(source,name:"Assumed alloy",
+            densityKgM3:7850,youngModulusPa:2e11,id:"mat-used")
+        source=try NativeWorldLabEditor.assignMaterial(source,solidId:"box-source",materialId:"mat-used")
+        source=try NativeWorldLabEditor.addHypotheticalMaterial(source,name:"Unused",densityKgM3:nil,
+            youngModulusPa:nil,id:"mat-unused")
+        let exported=try NativeWorldLabEditor.exportCADExchange(source)
+        let bundle=try XCTUnwrap(JSONSerialization.jsonObject(with:exported) as? [String:Any])
+        XCTAssertEqual(bundle["format"] as? String,"env-world-lab-cad")
+        XCTAssertEqual(bundle["units"] as? String,"m")
+        XCTAssertEqual((bundle["entities"] as? [[String:Any]])?.count,1)
+        XCTAssertEqual((bundle["materials"] as? [[String:Any]])?.count,1)
+        let imported=try NativeWorldLabEditor.importCADExchange(try NativeWorldLabEditor.blank(),cadData:exported)
+        let project=try NativeWorldLabProject.decode(imported)
+        XCTAssertEqual(project.entities.count,1)
+        XCTAssertEqual(project.entities[0].positionMeters,[1,2,3])
+        XCTAssertEqual(project.entities[0].effectiveRotationRadians[2],Double.pi/6,accuracy:1e-12)
+        XCTAssertEqual(project.entities[0].materialId,"mat-used")
+        XCTAssertEqual(project.materials.first?.name,"Assumed alloy")
+    }
+
+    func testCADExchangeMergePreservesCameraAndRemapsConflictingIDs() throws {
+        var target=try NativeWorldLabEditor.addSolid(try NativeWorldLabEditor.blank(),shape:"box",id:"shared")
+        target=try NativeWorldLabEditor.positionSolid(target,id:"shared",positionMeters:[4,5,6])
+        let source=try NativeWorldLabEditor.addSolid(try NativeWorldLabEditor.blank(),shape:"sphere",id:"shared")
+        let targetProject=try NativeWorldLabProject.decode(target)
+        let merged=try NativeWorldLabEditor.importCADExchange(target,
+            cadData:NativeWorldLabEditor.exportCADExchange(source))
+        let result=try NativeWorldLabProject.decode(merged)
+        XCTAssertEqual(result.entities.count,2)
+        XCTAssertEqual(result.entities[0].id,"shared")
+        XCTAssertNotEqual(result.entities[1].id,"shared")
+        XCTAssertEqual(result.camera.positionMeters,targetProject.camera.positionMeters)
+        XCTAssertEqual(result.camera.lookingAtMeters,targetProject.camera.lookingAtMeters)
+        XCTAssertEqual(result.revision,targetProject.revision+1)
+    }
+
+    func testCADExchangeRejectsUnknownFieldsVersionsAndInvalidGeometry() throws {
+        let source=try NativeWorldLabEditor.addSolid(try NativeWorldLabEditor.blank(),shape:"box",id:"box")
+        let valid=try NativeWorldLabEditor.exportCADExchange(source)
+        var wrong=try XCTUnwrap(JSONSerialization.jsonObject(with:valid) as? [String:Any])
+        wrong["schemaVersion"]=99
+        XCTAssertThrowsError(try NativeWorldLabEditor.importCADExchange(source,
+            cadData:JSONSerialization.data(withJSONObject:wrong)))
+        wrong=try XCTUnwrap(JSONSerialization.jsonObject(with:valid) as? [String:Any])
+        wrong["script"]="alert(1)"
+        XCTAssertThrowsError(try NativeWorldLabEditor.importCADExchange(source,
+            cadData:JSONSerialization.data(withJSONObject:wrong)))
+        wrong=try XCTUnwrap(JSONSerialization.jsonObject(with:valid) as? [String:Any])
+        var entities=wrong["entities"] as! [[String:Any]]
+        entities[0]["dimensionsMeters"]=[0,1,1];wrong["entities"]=entities
+        XCTAssertThrowsError(try NativeWorldLabEditor.importCADExchange(source,
+            cadData:JSONSerialization.data(withJSONObject:wrong)))
+    }

@@ -992,6 +992,110 @@ enum NativeWorldLabEditor {
             root["entities"]=entities
         }
     }
+
+    private static func cadJSONString(_ value:Any)throws->Data{
+        try JSONSerialization.data(withJSONObject:value,options:[.sortedKeys])
+    }
+    static func exportCADExchange(_ data:Data)throws->Data{
+        let project=try NativeWorldLabProject.decode(data)
+        let root=try JSONSerialization.jsonObject(with:data) as? [String:Any] ?? [:]
+        guard let entities=root["entities"] as? [[String:Any]],
+              let materials=root["materials"] as? [[String:Any]] else{
+            throw NativeWorldLabError.invalid("CAD geometry could not be read from this invention")
+        }
+        let referenced=Set(entities.compactMap{$0["materialId"] as? String})
+        let usedMaterials=materials.filter{material in
+            guard let id=material["id"] as? String else{return false}
+            return referenced.contains(id)
+        }
+        let bundle:[String:Any]=[
+            "format":"env-world-lab-cad","schemaVersion":1,
+            "units":"m","coordinateFrame":"LOCAL_ENU",
+            "source":["projectId":project.id,"revision":project.revision],
+            "entities":entities,"materials":usedMaterials
+        ]
+        let result=try cadJSONString(bundle)
+        guard result.count<=NativeWorldLabProject.maxBytes else{
+            throw NativeWorldLabError.invalid("CAD geometry export exceeds the 1 MB interchange limit")
+        }
+        return result
+    }
+    static func importCADExchange(_ data:Data,cadData:Data)throws->Data{
+        guard cadData.count<=NativeWorldLabProject.maxBytes else{
+            throw NativeWorldLabError.invalid("CAD geometry files must be 1 MB or smaller")
+        }
+        guard let bundle=try JSONSerialization.jsonObject(with:cadData) as? [String:Any],
+              Set(bundle.keys)==Set(["format","schemaVersion","units","coordinateFrame","source","entities","materials"]),
+              bundle["format"] as? String=="env-world-lab-cad",
+              bundle["schemaVersion"] as? Int==1,
+              bundle["units"] as? String=="m",
+              bundle["coordinateFrame"] as? String=="LOCAL_ENU",
+              let source=bundle["source"] as? [String:Any],
+              Set(source.keys)==Set(["projectId","revision"]),
+              let sourceId=source["projectId"] as? String,
+              sourceId.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil,
+              let sourceRevision=source["revision"] as? Int,(0...1_000_000_000).contains(sourceRevision),
+              let importedEntities=bundle["entities"] as? [[String:Any]],
+              let importedMaterials=bundle["materials"] as? [[String:Any]],
+              !importedEntities.isEmpty,importedEntities.count<=200,importedMaterials.count<=100 else{
+            throw NativeWorldLabError.invalid("Unsupported, incomplete or malformed CAD geometry exchange")
+        }
+        // Reuse the native strict project decoder to validate every entity and assumed material.
+        var probe=try JSONSerialization.jsonObject(with:NativeWorldLabEditor.blank()) as? [String:Any] ?? [:]
+        probe["entities"]=importedEntities
+        probe["materials"]=importedMaterials
+        _ = try encode(probe)
+        return try mutate(data){root in
+            guard var entities=root["entities"] as? [[String:Any]],
+                  var materials=root["materials"] as? [[String:Any]],
+                  entities.count+importedEntities.count<=200 else{
+                throw NativeWorldLabError.invalid("Importing these parts exceeds the 200-solid invention limit")
+            }
+            var usedMaterials=Set(materials.compactMap{$0["id"] as? String})
+            var materialMap:[String:String]=[:]
+            for material in importedMaterials{
+                guard let originalId=material["id"] as? String else{
+                    throw NativeWorldLabError.invalid("Imported CAD material has no identity")
+                }
+                if let existing=materials.first(where:{$0["id"] as? String==originalId}),
+                   NSDictionary(dictionary:existing).isEqual(to:material){
+                    materialMap[originalId]=originalId
+                    continue
+                }
+                var nextId=originalId
+                if usedMaterials.contains(nextId){
+                    repeat{nextId=UUID().uuidString}while usedMaterials.contains(nextId)
+                }
+                usedMaterials.insert(nextId);materialMap[originalId]=nextId
+                var clone=material;clone["id"]=nextId;materials.append(clone)
+            }
+            guard materials.count<=100 else{
+                throw NativeWorldLabError.invalid("Importing these assumptions exceeds the 100-material limit")
+            }
+            var usedEntities=Set(entities.compactMap{$0["id"] as? String})
+            for original in importedEntities{
+                guard let originalId=original["id"] as? String else{
+                    throw NativeWorldLabError.invalid("Imported CAD part has no identity")
+                }
+                var nextId=originalId
+                if usedEntities.contains(nextId){
+                    repeat{nextId=UUID().uuidString}while usedEntities.contains(nextId)
+                }
+                usedEntities.insert(nextId)
+                var clone=original;clone["id"]=nextId
+                if let oldMaterial=original["materialId"] as? String{
+                    guard let newMaterial=materialMap[oldMaterial] else{
+                        throw NativeWorldLabError.invalid("CAD part refers to a missing imported material")
+                    }
+                    clone["materialId"]=newMaterial
+                }
+                entities.append(clone)
+            }
+            root["entities"]=entities
+            root["materials"]=materials
+        }
+    }
+
     static func addHypotheticalMaterial(_ data:Data,name:String,densityKgM3:Double?,
                                         youngModulusPa:Double?=nil,
                                         id:String=UUID().uuidString,

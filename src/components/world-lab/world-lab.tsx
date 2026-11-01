@@ -1787,7 +1787,7 @@ export default function WorldLab() {
     const current=projectForEdits.current;
     if(!current){setError("Create or open an invention before importing CAD geometry.");return;}
     try{
-      if(file.size>8*1024*1024)throw new Error("CAD geometry files must be 8 MB or smaller.");
+      if(file.size>1024*1024)throw new Error("CAD geometry files must be 1 MB or smaller.");
       const exchange=parseWorldLabCadExchange(await file.text());
       const merged=mergeWorldLabCadExchange(current,exchange,()=>crypto.randomUUID());
       const importedCount=exchange.entities.length;

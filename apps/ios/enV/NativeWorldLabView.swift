@@ -31,6 +31,9 @@ struct NativeWorldLabView:View {
     @State private var seeInside=false
     @State private var importing=false
     @State private var exporting=false
+    @State private var exportingCAD=false
+    @State private var importingCAD=false
+    @State private var cadExchangeFile:NativeWorldLabJsonFile?
     @State private var exportingCompleteArchive=false
     @State private var completeArchiveFile:NativeWorldLabJsonFile?
     @State private var editHistory=NativeWorldLabEditHistory()
@@ -570,11 +573,17 @@ struct NativeWorldLabView:View {
                     Button("New project"){askToReplace("new")}.buttonStyle(.borderedProminent)
                     Button("Export JSON"){exporting=true}
                         .buttonStyle(.bordered).disabled(projectData==nil)
+                    Button("Export CAD geometry"){prepareCADExchangeExport()}
+                        .buttonStyle(.bordered).disabled(projectData==nil || project?.entities.isEmpty != false)
                     Button("Export complete archive"){prepareCompleteArchiveExport()}
                         .buttonStyle(.bordered).disabled(projectData==nil)
                 }
-                Button("Import project or complete archive"){askToReplace("import")}
-                    .buttonStyle(.bordered)
+                HStack{
+                    Button("Import project or archive"){askToReplace("import")}
+                        .buttonStyle(.bordered)
+                    Button("Import CAD geometry"){importingCAD=true}
+                        .buttonStyle(.bordered).disabled(projectData==nil)
+                }
                 HStack {
                     Button("Save locally"){saveLocally()}
                         .buttonStyle(.borderedProminent).disabled(projectData==nil)
@@ -766,12 +775,26 @@ struct NativeWorldLabView:View {
             Text("Save locally or export JSON first if you want to keep the current changes.")
         }
     }
+
+    private func prepareCADExchangeExport(){
+        guard let data=projectData else{return}
+        do{
+            cadExchangeFile=NativeWorldLabJsonFile(content:try NativeWorldLabEditor.exportCADExchange(data))
+            exportingCAD=true;problem=""
+        }catch{problem=error.localizedDescription}
+    }
+
     private var importExportView:some View {
         interactionView
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
+            }
+        .fileExporter(isPresented:$exportingCAD,document:cadExchangeFile,
+            contentType:.json,defaultFilename:"world-lab-cad-geometry"){result in
+                if case .failure(let error)=result{problem=error.localizedDescription}
+                cadExchangeFile=nil
             }
         .fileExporter(isPresented:$exportingCompleteArchive,
             document:completeArchiveFile,contentType:.json,
@@ -810,6 +833,29 @@ struct NativeWorldLabView:View {
             defaultFilename:"world-lab-two-body-collision-evidence"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
+        .fileImporter(isPresented:$importingCAD,allowedContentTypes:[.json]){response in
+            do{
+                let url=try response.get()
+                let accessed=url.startAccessingSecurityScopedResource()
+                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
+                let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+                guard let count=(attributes[.size] as? NSNumber)?.intValue,
+                      count<=NativeWorldLabProject.maxBytes else{
+                    throw NativeWorldLabError.invalid("CAD geometry files must be 1 MB or smaller")
+                }
+                let cadData=try Data(contentsOf:url)
+                guard let current=projectData else{
+                    throw NativeWorldLabError.invalid("Create or open an invention before importing CAD geometry")
+                }
+                let imported=try NativeWorldLabEditor.importCADExchange(current,cadData:cadData)
+                let updated=try NativeWorldLabProject.decode(imported)
+                projectData=imported;project=updated
+                editHistory=NativeWorldLabEditHistory()
+                chosenSavedId=updated.id
+                problem=""
+                message="CAD geometry merged into the current invention. Save locally to preserve it."
+            }catch{problem=error.localizedDescription}
+        }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
             do {
                 let url=try response.get()

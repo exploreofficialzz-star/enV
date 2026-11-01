@@ -21,7 +21,6 @@ import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabEditor
 import com.chastech.env.engine.NativeWorldLabEditHistory
 import com.chastech.env.engine.NativeWorldLabProjectCodec
-import com.chastech.env.engine.NativeWorldLabImportResult
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
 import com.chastech.env.engine.NativeChemicalThermalResult
@@ -354,7 +353,7 @@ fun NativeWorldLabForm() {
                 val source=projectJson?:error("Create or open an invention first")
                 val json=NativeWorldLabEditor.exportCadExchange(source)
                 val bytes=json.toByteArray(Charsets.UTF_8)
-                require(bytes.size<=8*1024*1024){"CAD geometry file exceeds 8 MB"}
+                require(bytes.size<=NativeWorldLabProjectCodec.MAX_BYTES){"CAD geometry file exceeds the 1 MB interchange limit"}
                 context.contentResolver.openOutputStream(uri,"wt")?.use{
                     it.write(bytes);it.flush()
                 }?:error("Cannot open CAD geometry export destination")

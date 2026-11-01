@@ -5,7 +5,7 @@ import {
 
 export const WORLD_LAB_CAD_EXCHANGE_FORMAT="env-world-lab-cad" as const;
 export const WORLD_LAB_CAD_EXCHANGE_VERSION=1 as const;
-export const WORLD_LAB_CAD_EXCHANGE_MAX_BYTES=8*1024*1024;
+export const WORLD_LAB_CAD_EXCHANGE_MAX_BYTES=1024*1024;
 
 export type WorldLabCadExchange=Readonly<{
   format:typeof WORLD_LAB_CAD_EXCHANGE_FORMAT;
@@ -62,14 +62,14 @@ export function serializeWorldLabCadExchange(value:WorldLabProject):string{
   };
   const json=JSON.stringify(bundle,null,2);
   if(new TextEncoder().encode(json).byteLength>WORLD_LAB_CAD_EXCHANGE_MAX_BYTES)
-    throw new Error("CAD geometry export exceeds the 8 MB interchange limit.");
+    throw new Error("CAD geometry export exceeds the 1 MB interchange limit.");
   return json;
 }
 
 /** Strictly validate an enV CAD exchange file before its geometry can be merged. */
 export function parseWorldLabCadExchange(json:string):WorldLabCadExchange{
   if(typeof json!=="string"||new TextEncoder().encode(json).byteLength>WORLD_LAB_CAD_EXCHANGE_MAX_BYTES)
-    throw new Error("CAD geometry files must be 8 MB or smaller.");
+    throw new Error("CAD geometry files must be 1 MB or smaller.");
   let raw:unknown;
   try{raw=JSON.parse(json);}
   catch{throw new Error("The CAD geometry file is not valid JSON.");}
