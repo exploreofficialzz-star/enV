@@ -64,6 +64,13 @@ class NativeWorldLabRecordedTimeTest {
 }
 
 class NativeWorldLabRecordedTimeCheckpointCodecTest {
+ private fun run()=NativeWorldLabRecordedRun(
+  runId="run-1",modelId="spring",modelVersion="2.1.0",
+  worldEpochUTC="2026-11-01T00:00:00Z",
+  sampleTimesSeconds=listOf(0.0,0.1,0.2,0.3,0.4,0.5),
+  mandatoryEventTimesSeconds=listOf(0.2,0.4))
+ private fun state()=NativeWorldLabRecordedTime.start(run(),
+  "2026-11-01T12:00:00Z","Africa/Lagos")
  @Test fun checkpointJsonRoundTripsAndRejectsUnknownOrOversizedFields(){
   val run=run()
   val state=NativeWorldLabRecordedTime.seek(run,state(),0.3)
