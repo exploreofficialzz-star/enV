@@ -147,6 +147,7 @@ struct NativeWorldLabView:View {
     @State private var digitalSourceA="input_a"
     @State private var digitalSourceB=""
     @State private var problem=""
+    @State private var successMessage=""
     @State private var project:NativeWorldLabProject?
     @State private var dcRun:NativeLabDcResult?
     @State private var selected=0
@@ -625,6 +626,7 @@ struct NativeWorldLabView:View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if let project { projectContent(project) }
+                if !successMessage.isEmpty {Text(successMessage).font(.caption).foregroundStyle(.secondary)}
                 if !problem.isEmpty {Text(problem).foregroundStyle(.red)}
                 Text("Model 1.0.0 · computed with assumed parameters · not a safety assessment.")
                     .font(.caption2).foregroundStyle(.secondary)
@@ -780,7 +782,7 @@ struct NativeWorldLabView:View {
         guard let data=projectData else{return}
         do{
             cadExchangeFile=NativeWorldLabJsonFile(content:try NativeWorldLabEditor.exportCADExchange(data))
-            exportingCAD=true;problem=""
+            exportingCAD=true;problem="";successMessage=""
         }catch{problem=error.localizedDescription}
     }
 
@@ -793,7 +795,8 @@ struct NativeWorldLabView:View {
             }
         .fileExporter(isPresented:$exportingCAD,document:cadExchangeFile,
             contentType:.json,defaultFilename:"world-lab-cad-geometry"){result in
-                if case .failure(let error)=result{problem=error.localizedDescription}
+                if case .failure(let error)=result{problem=error.localizedDescription;successMessage=""}
+                else{successMessage="Supported CAD geometry exported in metres and LOCAL_ENU coordinates."}
                 cadExchangeFile=nil
             }
         .fileExporter(isPresented:$exportingCompleteArchive,
@@ -853,8 +856,8 @@ struct NativeWorldLabView:View {
                 editHistory=NativeWorldLabEditHistory()
                 chosenSavedId=updated.id
                 problem=""
-                message="CAD geometry merged into the current invention. Save locally to preserve it."
-            }catch{problem=error.localizedDescription}
+                successMessage="CAD geometry merged into the current invention. Save locally to preserve it."
+            }catch{problem=error.localizedDescription;successMessage=""}
         }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.json]){response in
             do {
