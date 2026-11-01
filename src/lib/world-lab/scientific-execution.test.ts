@@ -86,5 +86,14 @@ test("trusted ideal RC adapters exchange real voltage/current and conserve sourc
   assert.ok(Math.abs(last.values["load:Vc"].valueSI-12*(1-Math.exp(-0.3/3)))<1e-12);
   assert.ok(last.values["load:I"].valueSI>0);
   assert.ok(run.samples.every(s=>Math.abs(s.residualW)<1e-10&&s.dissipatedW>=0));
+  const adapters=createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5});
+  const changedSource:ScientificAdapter={...adapters[0],advance:()=>({
+    outputs:{V:quantity(6,"V","hypothetical-user-assumed")},
+    suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null,
+  })};
+  const driven=executeScientificGraph(rcGraph,[changedSource,adapters[1]],
+    {durationSeconds:0.3,stepSeconds:0.1});
+  assert.ok(Math.abs(driven.samples.at(-1)!.values["load:Vc"].valueSI-
+    6*(1-Math.exp(-0.3/3)))<1e-12);
   assert.throws(()=>createIdealRcAdapters({sourceVoltageV:12,resistanceOhm:-1,capacitanceF:0.5}),/outside the supported/);
 });
