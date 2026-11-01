@@ -53,10 +53,6 @@ import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
 
-private data class NativeWorldLabImportResult(
-    val projectJson:String,val project:NativeWorldLabProject,
-    val isArchive:Boolean=false,val isCadGeometry:Boolean=false,
-)
 import com.chastech.env.engine.NativeWorldLabDigitalMotor
 import com.chastech.env.engine.NativeDigitalMotorResult
 import com.chastech.env.engine.NativeWorldLabNetworkMotor
@@ -68,6 +64,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private data class NativeWorldLabImportResult(
+    val projectJson:String,val project:NativeWorldLabProject,
+    val isArchive:Boolean=false,val isCadGeometry:Boolean=false,
+)
 
 /** Offline bounded World Lab science. Canvas is a schematic, never a measured field. */
 @Composable
