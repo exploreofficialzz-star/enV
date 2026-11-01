@@ -332,3 +332,97 @@ final class NativeWorldLabRepeatRunStateTests:XCTestCase {
         XCTAssertEqual(firstValues,repeatedValues)
     }
 }
+
+
+final class NativeWorldLabVehicleTests:XCTestCase {
+    private func project() throws -> NativeWorldLabProject {
+        try NativeWorldLabProject.decode(NativeWorldLabEditor.blank(title:"Vehicle test"))
+    }
+
+    func testRoadVehicleComputesTractionDragAndBatteryDischarge() throws {
+        let run=try NativeWorldLabVehicle.evaluate(project(),"road-run",
+            NativeWorldLabVehicleInput())
+        XCTAssertEqual(run.outcome,"ground-run")
+        XCTAssertGreaterThan(try XCTUnwrap(run.samples.last).horizontalSpeedMps,0)
+        XCTAssertGreaterThan(try XCTUnwrap(run.samples.last).distanceMeters,0)
+        XCTAssertLessThan(try XCTUnwrap(run.samples.last).batterySOC,1)
+        for sample in run.samples {
+            XCTAssertLessThanOrEqual(sample.wheelDriveForceN,
+                run.input.tireFriction*sample.normalForceN+1e-6)
+            XCTAssertTrue(sample.terminalVoltageV.isFinite)
+            XCTAssertGreaterThan(sample.terminalVoltageV,0)
+        }
+    }
+
+    func testMotorDropoutIsRecordedAndDisablesWheelDrive() throws {
+        var input=NativeWorldLabVehicleInput()
+        input.motorFailureAtSeconds=2
+        let run=try NativeWorldLabVehicle.evaluate(project(),"motor-dropout",input)
+        XCTAssertTrue(run.events.contains(where:{$0.contains("motor dropout")}))
+        let after=try XCTUnwrap(run.samples.first(where:{$0.timeSeconds>=4}))
+        XCTAssertEqual(after.wheelDriveForceN,0,accuracy:1e-9)
+    }
+
+    func testRotorcraftComputesLiftAndReachesAirborneState() throws {
+        var input=NativeWorldLabVehicleInput()
+        input.mode = .rotorcraft
+        input.massKg=600
+        input.batteryVoltageV=800
+        input.batteryResistanceOhm=0.01
+        input.batteryMaxCurrentA=1500
+        input.batteryCapacityWh=200000
+        input.rotorDiskAreaM2=15
+        input.rotorMaxThrustN=10000
+        input.rotorThrottle=0.9
+        input.maxCruiseThrustN=1800
+        input.driveThrottle=0
+        input.durationSeconds=2
+        input.maxStructuralLoadFactor=4
+        let run=try NativeWorldLabVehicle.evaluate(project(),"rotorcraft",input)
+        XCTAssertTrue(run.samples.contains(where:{$0.airborne}))
+        XCTAssertTrue(run.samples.contains(where:{$0.rotorThrustN>600*9.80665}))
+        XCTAssertTrue(run.events.contains(where:{$0.hasPrefix("Takeoff")}))
+    }
+
+    func testFixedWingTakeoffRequiresComputedLiftAndConfiguredSpeed() throws {
+        var input=NativeWorldLabVehicleInput()
+        input.mode = .fixedWing
+        input.wingAreaM2=18
+        input.wingLiftCoefficient=1.4
+        input.takeoffSpeedMps=25
+        input.maxCruiseThrustN=4000
+        input.maxWheelForceN=10000
+        input.motorMaxPowerW=350000
+        input.batteryMaxCurrentA=700
+        input.durationSeconds=60
+        input.maxSpeedMps=100
+        let run=try NativeWorldLabVehicle.evaluate(project(),"wing-takeoff",input)
+        XCTAssertTrue(run.samples.contains(where:{$0.airborne}))
+    }
+
+    func testInsufficientWingLiftAndInvalidInputsFailClosed() throws {
+        var input=NativeWorldLabVehicleInput()
+        input.mode = .fixedWing
+        input.wingAreaM2=2
+        input.wingLiftCoefficient=1
+        input.takeoffSpeedMps=25
+        input.maxCruiseThrustN=2500
+        let run=try NativeWorldLabVehicle.evaluate(project(),"wing-blocked",input)
+        XCTAssertEqual(run.outcome,"unable-to-takeoff")
+        XCTAssertTrue(run.preflight.contains(where:{$0.contains("Wing lift at configured takeoff speed is below")}))
+        input.massKg=Double.nan
+        XCTAssertThrowsError(try NativeWorldLabVehicle.validate(input))
+    }
+
+    func testNativeEvidenceIsPortableCodableAndCarriesProjectRevision() throws {
+        let source=try project()
+        let run=try NativeWorldLabVehicle.evaluate(source,"portable-evidence",NativeWorldLabVehicleInput())
+        XCTAssertEqual(run.projectRevision,source.revision)
+        XCTAssertEqual(run.evidence,"physics-model-computed")
+        XCTAssertTrue(run.validity.contains("no suspension"))
+        let data=try JSONEncoder().encode(run)
+        let decoded=try JSONDecoder().decode(NativeWorldLabVehicleRun.self,from:data)
+        XCTAssertEqual(decoded.projectId,source.id)
+        XCTAssertEqual(decoded.samples.count,run.samples.count)
+    }
+}

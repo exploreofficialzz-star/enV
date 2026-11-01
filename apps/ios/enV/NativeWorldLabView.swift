@@ -29,11 +29,6 @@ struct NativeWorldLabView:View {
     @State private var resistance=1000.0
     @State private var diffusivity=0.02
     @State private var seeInside=false
-    @State private var inspectionMode:NativeWorldLabInspectionMode = .normal
-    @State private var inspectionOpacity=0.32
-    @State private var inspectionAxis:NativeWorldLabInspectionAxis = .x
-    @State private var inspectionCutawayFraction=0.0
-    @State private var inspectionExplodeDistance=1.0
     @State private var importing=false
     @State private var exporting=false
     @State private var exportingCAD=false
@@ -528,38 +523,6 @@ struct NativeWorldLabView:View {
                     Toggle("See inside",isOn:$seeInside).labelsHidden()
                     Text("See inside").font(.caption)
                 }
-                Picker("Inspection view",selection:$inspectionMode){
-                    ForEach(NativeWorldLabInspectionMode.allCases){item in
-                        Text(item.title).tag(item)
-                    }
-                }.pickerStyle(.menu)
-                if inspectionMode == .transparent || inspectionMode == .xray {
-                    Text("Inspection opacity \(Int(inspectionOpacity*100))%").font(.caption)
-                    Slider(value:$inspectionOpacity,in:0.05...1)
-                        .accessibilityLabel("See Inside opacity")
-                }
-                if inspectionMode == .cutaway {
-                    Picker("Cutaway axis",selection:$inspectionAxis){
-                        ForEach(NativeWorldLabInspectionAxis.allCases){axis in Text(axis.rawValue.uppercased()).tag(axis)}
-                    }.pickerStyle(.segmented)
-                    Text("Cutaway plane \(String(format:"%.2f",inspectionCutawayFraction))").font(.caption)
-                    Slider(value:$inspectionCutawayFraction,in:-1...1)
-                        .accessibilityLabel("Cutaway plane position")
-                    Text("Box, sphere and cylinder surfaces are clipped in world coordinates; the cut face is capped.").font(.caption).foregroundStyle(.secondary)
-                }
-                if inspectionMode == .exploded {
-                    Text("Assembly separation \(String(format:"%.1f",inspectionExplodeDistance)) m").font(.caption)
-                    Slider(value:$inspectionExplodeDistance,in:0...10)
-                        .accessibilityLabel("Exploded assembly separation")
-                }
-                HStack{
-                    Button(playing ? "Pause":"Play"){playing.toggle()}
-                        .buttonStyle(.borderedProminent)
-                    Button("Beginning"){playing=false;seconds=0}.buttonStyle(.bordered)
-                    Button("Previous step"){playing=false;seconds=max(0,seconds-1.0/240)}.buttonStyle(.bordered)
-                    Button("Next step"){playing=false;seconds=min(12,seconds+1.0/240)}.buttonStyle(.bordered)
-                    Button("End"){playing=false;seconds=12}.buttonStyle(.bordered)
-                }
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in
                     if editing{playing=false}
@@ -605,6 +568,7 @@ struct NativeWorldLabView:View {
                 if let project=project {
                     NativeWorldLabElasticWavePanel(project:project)
                     NativeWorldLabRadiationPanel(project:project)
+                    NativeWorldLabVehiclePanel(project:project)
                 }
                 Divider()
                 HStack {
@@ -679,19 +643,7 @@ struct NativeWorldLabView:View {
         .onChange(of:dropTime){_ in applyDropPosition()}
         .onChange(of:fluidTime){_ in applyFluidPosition()}
         .onChange(of:motorTime){_ in applyMotorPosition()}
-        .onChange(of:seeInside){_ in
-            if seeInside && inspectionMode == .normal {inspectionMode = .transparent}
-            else if !seeInside && inspectionMode == .transparent {inspectionMode = .normal}
-            redraw()
-        }
-        .onChange(of:inspectionMode){value in
-            seeInside = value == .transparent || value == .xray || value == .cutaway
-            redraw()
-        }
-        .onChange(of:inspectionOpacity){_ in redraw()}
-        .onChange(of:inspectionAxis){_ in redraw()}
-        .onChange(of:inspectionCutawayFraction){_ in redraw()}
-        .onChange(of:inspectionExplodeDistance){_ in redraw()}
+        .onChange(of:seeInside){_ in redraw()}
         .onChange(of:mass){_ in redraw()}
         .onChange(of:resistance){_ in redraw()}
         .onChange(of:diffusivity){_ in redraw()}
@@ -2743,7 +2695,6 @@ Text("Invent chemical heat").font(.headline)
         updateObserverCameraClip()
     }
     private func redraw(){
-
         let next=SCNScene()
         let floor=SCNNode(geometry:SCNFloor())
         floor.geometry?.firstMaterial?.diffuse.contents=UIColor.systemGreen
@@ -2760,53 +2711,28 @@ Text("Invent chemical heat").font(.headline)
         next.rootNode.addChildNode(savedCamera)
         sceneCameraNode=savedCamera
         if let project {
-            let selectedId=project.entities.indices.contains(selected) ? project.entities[selected].id : nil
-            let targetIds=NativeWorldLabInspectionGeometry.targetIds(project:project,selectedId:selectedId)
-            let planeOffset=NativeWorldLabInspectionGeometry.planeOffset(project:project,selectedId:selectedId,
-                settings:NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
-                    axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
-                    explosionDistanceMeters:inspectionExplodeDistance))
-            for item in project.entities.prefix(200) {
-                if !NativeWorldLabInspectionGeometry.isVisible(project:project,selectedId:selectedId,
-                    mode:inspectionMode,id:item.id) { continue }
+            for item in project.entities.prefix(200){
                 let xyz=item.dimensionsMeters
-                let isCutTarget=inspectionMode == .cutaway && targetIds.contains(item.id) && planeOffset != nil
                 let geometry:SCNGeometry
-                if isCutTarget,let planeOffset {
-                    geometry=NativeWorldLabInspectionGeometry.makeCutawayGeometry(item,
-                        axis:inspectionAxis.index,offset:planeOffset)
-                } else {
-                    switch item.shape {
-                    case "sphere":geometry=SCNSphere(radius:CGFloat(xyz[0]/2))
-                    case "cylinder":geometry=SCNCylinder(radius:CGFloat(xyz[0]/2),height:CGFloat(xyz[1]))
-                    default:geometry=SCNBox(width:CGFloat(xyz[0]),height:CGFloat(xyz[1]),
-                                             length:CGFloat(xyz[2]),chamferRadius:0)
-                    }
+                switch item.shape{
+                case "sphere":geometry=SCNSphere(radius:CGFloat(xyz[0]/2))
+                case "cylinder":geometry=SCNCylinder(radius:CGFloat(xyz[0]/2),height:CGFloat(xyz[1]))
+                default:geometry=SCNBox(width:CGFloat(xyz[0]),height:CGFloat(xyz[1]),
+                                         length:CGFloat(xyz[2]),chamferRadius:0)
                 }
                 let node=SCNNode(geometry:geometry)
                 node.name="lab-solid-"+item.id
-                if isCutTarget {
-                    node.position=SCNVector3Zero
-                } else {
-                    let position=NativeWorldLabInspectionGeometry.renderPosition(project:project,
-                        selectedId:selectedId,settings:NativeWorldLabInspectionSettings(
-                            mode:inspectionMode,opacity:inspectionOpacity,axis:inspectionAxis,
-                            cutawayFraction:inspectionCutawayFraction,
-                            explosionDistanceMeters:inspectionExplodeDistance),id:item.id)
-                    node.position=SCNVector3(Float(position[0]),Float(position[1]),Float(position[2]))
-                    let rotation=item.effectiveRotationRadians
-                    if rotation.count==3 {node.eulerAngles=SCNVector3(Float(rotation[0]),Float(rotation[1]),Float(rotation[2]))}
-                }
+                node.position=SCNVector3(Float(item.positionMeters[0]),
+                    Float(item.positionMeters[1]),Float(item.positionMeters[2]))
+                let rotation=item.effectiveRotationRadians
+                if rotation.count==3 {node.eulerAngles=SCNVector3(Float(rotation[0]),Float(rotation[1]),Float(rotation[2]))}
                 if let hex=UInt64(item.color.dropFirst(),radix:16){
                     geometry.firstMaterial?.diffuse.contents=UIColor(
                         red:CGFloat((hex>>16)&255)/255,
                         green:CGFloat((hex>>8)&255)/255,
                         blue:CGFloat(hex&255)/255,alpha:1)
                 }
-                geometry.firstMaterial?.transparency=CGFloat(
-                    inspectionMode == .transparent || seeInside ? inspectionOpacity : 1)*CGFloat(item.opacity)
-                geometry.firstMaterial?.fillMode=inspectionMode == .xray ? .lines : .fill
-                geometry.firstMaterial?.isDoubleSided=inspectionMode == .xray || isCutTarget
+                geometry.firstMaterial?.transparency=(seeInside ? 0.4:1)*CGFloat(item.opacity)
                 next.rootNode.addChildNode(node)
             }
         }
@@ -3364,3 +3290,383 @@ private struct NativeWorldLabMultiCadPanel:View {
         }
     }
 }
+
+
+// MARK: - Bounded inventor-driven road and flight vehicle reference model
+
+enum NativeWorldLabVehicleMode:String,CaseIterable,Codable,Identifiable {
+    case roadOnly="road-only"
+    case rotorcraft="rotorcraft"
+    case fixedWing="fixed-wing"
+    var id:String{rawValue}
+    var title:String {
+        switch self {case .roadOnly:return "Road";case .rotorcraft:return "Rotorcraft";case .fixedWing:return "Fixed wing"}
+    }
+}
+
+struct NativeWorldLabVehicleInput:Codable,Equatable {
+    var mode:NativeWorldLabVehicleMode = .roadOnly
+    var massKg=1200.0,frontalAreaM2=2.2,dragCoefficient=0.32,airDensityKgM3=1.225
+    var rollingResistance=0.012,tireFriction=0.9,maxWheelForceN=6500.0
+    var motorMaxPowerW=180000.0,motorEfficiency=0.9,motorForceConstantNPerA=40.0
+    var motorWindingResistanceOhm=0.08,motorMaxCurrentA=220.0
+    var batteryVoltageV=400.0,batteryResistanceOhm=0.04,batteryMaxCurrentA=500.0
+    var batteryCapacityWh=60000.0,initialSOC=1.0,batteryHeatCapacityJPerK=180000.0
+    var batteryCoolingWPerK=35.0,maxBatteryTemperatureK=370.0
+    var motorHeatCapacityJPerK=45000.0,motorCoolingWPerK=80.0,maxMotorTemperatureK=420.0
+    var ambientTemperatureK=293.15,initialMotorTemperatureK=293.15,initialBatteryTemperatureK=293.15
+    var rotorDiskAreaM2:Double? = nil,rotorMaxThrustN:Double? = nil,rotorThrottle=0.85,rotorEfficiency=0.8
+    var wingAreaM2:Double? = nil,wingLiftCoefficient:Double? = nil,takeoffSpeedMps:Double? = nil
+    var maxCruiseThrustN=1800.0,cruiseEfficiency=0.78
+    var driveThrottle=0.8,maxSpeedMps=80.0,maxStructuralLoadFactor=3.0
+    var durationSeconds=20.0,solverStepSeconds=0.02,motorFailureAtSeconds:Double? = nil
+}
+
+struct NativeWorldLabVehicleSample:Codable {
+    let timeSeconds:Double,distanceMeters:Double,altitudeMeters:Double
+    let horizontalSpeedMps:Double,verticalSpeedMps:Double
+    let wheelDriveForceN:Double,cruiseThrustN:Double,rotorThrustN:Double,wingLiftN:Double,dragN:Double,normalForceN:Double
+    let loadFactor:Double,batteryCurrentA:Double,terminalVoltageV:Double,batteryPowerW:Double,batterySOC:Double
+    let batteryTemperatureK:Double,motorTemperatureK:Double,airborne:Bool,powerLimited:Bool,motorAvailable:Bool,energyUsedWh:Double
+}
+
+struct NativeWorldLabVehicleRun:Codable {
+    let format:String
+    let projectId:String
+    let projectRevision:Int
+    let runId:String
+    let modelVersion:String
+    let evidence:String
+    let input:NativeWorldLabVehicleInput
+    let weightN:Double
+    let maximumBatteryPowerW:Double
+    let preflight:[String]
+    let samples:[NativeWorldLabVehicleSample]
+    let events:[String]
+    let outcome:String
+    let failureReasons:[String]
+    let validity:String
+}
+
+enum NativeWorldLabVehicle {
+    private static let g=9.80665
+    private struct State {
+        var x=0.0,z=0.0,vx=0.0,vz=0.0
+        var soc:Double
+        var motorK:Double
+        var batteryK:Double
+        var energyWh=0.0
+        var airborne=false
+        var motorFailed=false
+        var failure:String?=nil
+    }
+    private struct Force {
+        let wheel:Double,cruise:Double,rotor:Double,wing:Double,drag:Double,normal:Double,load:Double
+        let current:Double,voltage:Double,power:Double,motorHeat:Double,batteryHeat:Double
+        let limited:Bool,motorAvailable:Bool,airborne:Bool
+    }
+    private static func range(_ value:Double,_ label:String,_ minimum:Double,_ maximum:Double)throws {
+        guard value.isFinite,value>=minimum,value<=maximum else {
+            throw NativeWorldLabError.invalid("\(label) must be finite and between \(minimum) and \(maximum).")
+        }
+    }
+    static func validate(_ i:NativeWorldLabVehicleInput)throws {
+        let limits:[(Double,String,Double,Double)]=[
+            (i.massKg,"Mass",100,30000),(i.frontalAreaM2,"Frontal area",0.2,50),(i.dragCoefficient,"Drag coefficient",0.05,2.5),
+            (i.airDensityKgM3,"Air density",0.2,2),(i.rollingResistance,"Rolling resistance",0.001,0.2),
+            (i.tireFriction,"Tire friction",0.05,2.5),(i.maxWheelForceN,"Wheel force",10,500000),
+            (i.motorMaxPowerW,"Motor power",100,50000000),(i.motorEfficiency,"Motor efficiency",0.2,0.99),
+            (i.motorForceConstantNPerA,"Motor force constant",0.01,10000),(i.motorWindingResistanceOhm,"Motor winding resistance",0.0001,100),
+            (i.motorMaxCurrentA,"Motor current",0.1,10000),(i.batteryVoltageV,"Battery voltage",12,2000),
+            (i.batteryResistanceOhm,"Battery resistance",0,10),(i.batteryMaxCurrentA,"Battery current",0.1,20000),
+            (i.batteryCapacityWh,"Battery capacity",10,100000000),(i.initialSOC,"Initial SOC",0.01,1),
+            (i.batteryHeatCapacityJPerK,"Battery heat capacity",10,100000000),(i.batteryCoolingWPerK,"Battery cooling",0,100000),
+            (i.maxBatteryTemperatureK,"Battery temperature limit",250,600),(i.motorHeatCapacityJPerK,"Motor heat capacity",10,100000000),
+            (i.motorCoolingWPerK,"Motor cooling",0,100000),(i.maxMotorTemperatureK,"Motor temperature limit",250,800),
+            (i.ambientTemperatureK,"Ambient temperature",180,360),(i.initialMotorTemperatureK,"Initial motor temperature",180,800),
+            (i.initialBatteryTemperatureK,"Initial battery temperature",180,600),(i.rotorThrottle,"Rotor throttle",0,1),
+            (i.rotorEfficiency,"Rotor efficiency",0.2,0.95),(i.maxCruiseThrustN,"Cruise thrust",0,500000),
+            (i.cruiseEfficiency,"Cruise efficiency",0.2,0.95),(i.driveThrottle,"Drive throttle",0,1),
+            (i.maxSpeedMps,"Maximum speed",1,300),(i.maxStructuralLoadFactor,"Structural load factor",1,20),
+            (i.durationSeconds,"Duration",0.1,120),(i.solverStepSeconds,"Solver step",0.001,0.05)
+        ]
+        for item in limits { try range(item.0,item.1,item.2,item.3) }
+        guard Int(ceil(i.durationSeconds/i.solverStepSeconds))<=12000 else {
+            throw NativeWorldLabError.invalid("Vehicle run exceeds its 12,000-step local computation budget.")
+        }
+        if let value=i.rotorDiskAreaM2 { try range(value,"Rotor disk area",0.05,500) }
+        if let value=i.rotorMaxThrustN { try range(value,"Rotor maximum thrust",10,1000000) }
+        if let value=i.wingAreaM2 { try range(value,"Wing area",0.5,500) }
+        if let value=i.wingLiftCoefficient { try range(value,"Wing lift coefficient",0.05,3) }
+        if let value=i.takeoffSpeedMps { try range(value,"Takeoff speed",5,150) }
+        if let value=i.motorFailureAtSeconds { try range(value,"Motor failure time",0,i.durationSeconds) }
+        if i.mode == .rotorcraft && (i.rotorDiskAreaM2 == nil || i.rotorMaxThrustN == nil) {
+            throw NativeWorldLabError.invalid("Rotorcraft mode requires disk area and maximum rotor thrust assumptions.")
+        }
+        if i.mode == .fixedWing && (i.wingAreaM2 == nil || i.wingLiftCoefficient == nil || i.takeoffSpeedMps == nil) {
+            throw NativeWorldLabError.invalid("Fixed-wing mode requires wing area, lift coefficient and takeoff speed assumptions.")
+        }
+        if i.mode != .roadOnly && i.maxCruiseThrustN<=0 {
+            throw NativeWorldLabError.invalid("A flying vehicle needs an assumed horizontal cruise thrust.")
+        }
+        guard i.initialMotorTemperatureK<i.maxMotorTemperatureK && i.initialBatteryTemperatureK<i.maxBatteryTemperatureK else {
+            throw NativeWorldLabError.invalid("Initial temperatures must be below configured limits.")
+        }
+    }
+    private static func maxBatteryPower(_ i:NativeWorldLabVehicleInput,_ soc:Double,_ temp:Double)->Double {
+        if soc<=0 || temp>=i.maxBatteryTemperatureK{return 0}
+        let derate=temp<=i.maxBatteryTemperatureK-20 ? 1 : max(0,min(1,(i.maxBatteryTemperatureK-temp)/20))
+        let voc=i.batteryVoltageV*(0.9+0.1*max(0,min(1,soc)))
+        let current=min(i.batteryMaxCurrentA*derate,i.batteryResistanceOhm>0 ? voc/(2*i.batteryResistanceOhm):i.batteryMaxCurrentA*derate)
+        return max(0,current*(voc-current*i.batteryResistanceOhm))
+    }
+    private static func rotorPower(_ thrust:Double,_ area:Double,_ density:Double,_ efficiency:Double)->Double {
+        thrust<=0 ? 0 : pow(thrust,1.5)/sqrt(2*density*area)/efficiency
+    }
+    private static func currentForPower(_ power:Double,_ voc:Double,_ resistance:Double)throws->Double {
+        if power<=0{return 0}
+        if resistance<=1e-12{return power/voc}
+        let d=voc*voc-4*resistance*power
+        guard d >= -1e-6 else {throw NativeWorldLabError.invalid("Battery request exceeds its resistive discharge envelope.")}
+        return (voc-sqrt(max(0,d)))/(2*resistance)
+    }
+    private static func forces(_ i:NativeWorldLabVehicleInput,_ s:State,_ time:Double,_ weight:Double)throws->Force {
+        let speed=hypot(s.vx,s.vz)
+        let wing=i.mode == .fixedWing ? 0.5*i.airDensityKgM3*speed*speed*i.wingAreaM2!*i.wingLiftCoefficient!:0
+        let battery=maxBatteryPower(i,s.soc,s.batteryK)
+        let available=s.failure == nil && !s.motorFailed && (i.motorFailureAtSeconds == nil || time<i.motorFailureAtSeconds!)
+        let rotorRequest=i.mode == .rotorcraft ? i.rotorMaxThrustN!*i.rotorThrottle:0
+        let rotorRequestPower=i.mode == .rotorcraft ? rotorPower(rotorRequest,i.rotorDiskAreaM2!,i.airDensityKgM3,i.rotorEfficiency):0
+        let rotorScale=rotorRequestPower>battery && rotorRequestPower>0 ? pow(battery/rotorRequestPower,2.0/3.0):1
+        let rotor=rotorRequest*rotorScale
+        let rotorW=rotorPower(rotor,i.rotorDiskAreaM2 ?? 1,i.airDensityKgM3,i.rotorEfficiency)
+        let canLift=i.mode == .rotorcraft ? rotor+wing>=weight : i.mode == .fixedWing && speed>=i.takeoffSpeedMps! && wing>=weight
+        let airborne=s.airborne || canLift
+        let normal=airborne ? 0 : max(0,weight-wing-rotor)
+        let drag=0.5*i.airDensityKgM3*i.dragCoefficient*i.frontalAreaM2*speed*speed
+        var wheel=available && !airborne ? min(i.driveThrottle*i.maxWheelForceN,min(i.tireFriction*normal,min(i.motorMaxCurrentA*i.motorForceConstantNPerA,i.motorMaxPowerW*i.motorEfficiency/max(s.vx,0.5)))):0
+        var cruise=available && airborne && i.mode != .roadOnly ? i.maxCruiseThrustN*i.driveThrottle:0
+        let wheelP=wheel*max(s.vx,0.5),wheelI=wheel/i.motorForceConstantNPerA
+        let cruiseP=cruise*max(speed,0.5)/i.cruiseEfficiency
+        let motorP=max(wheelP/i.motorEfficiency,wheelI*wheelI*i.motorWindingResistanceOhm)+cruiseP
+        let remaining=max(0,battery-rotorW)
+        let currentLimit=max(0,min(i.motorMaxCurrentA,i.batteryMaxCurrentA)-rotorW/max(i.batteryVoltageV*0.8,1))
+        let requestedCurrent=wheelI+cruiseP/max(i.batteryVoltageV*0.8,1)
+        let currentScale=requestedCurrent>0 ? min(1,currentLimit/requestedCurrent):1
+        let powerScale=motorP>remaining && motorP>0 ? remaining/motorP:1
+        let nameplateScale=motorP>i.motorMaxPowerW && motorP>0 ? i.motorMaxPowerW/motorP:1
+        let scale=min(currentScale,min(powerScale,nameplateScale))
+        let limited=scale<0.999999 || rotorScale<0.999999
+        wheel*=scale;cruise*=scale
+        let actualWheelI=wheel/i.motorForceConstantNPerA
+        let actualWheelP=wheel*max(s.vx,0.5)
+        let actualCruiseP=cruise*max(speed,0.5)/i.cruiseEfficiency
+        let copper=actualWheelI*actualWheelI*i.motorWindingResistanceOhm
+        let actualMotorP=max(actualWheelP/i.motorEfficiency,copper)+actualCruiseP
+        let total=min(battery,rotorW+actualMotorP)
+        let voc=i.batteryVoltageV*(0.9+0.1*s.soc)
+        let current=try currentForPower(total,voc,i.batteryResistanceOhm)
+        let terminal=max(0,voc-current*i.batteryResistanceOhm)
+        let motorHeat=max(0,actualMotorP-actualWheelP-cruise*max(speed,0.5))
+        let batteryHeat=current*current*i.batteryResistanceOhm
+        return Force(wheel:wheel,cruise:cruise,rotor:rotor,wing:wing,drag:drag,normal:normal,
+            load:max(0,(wing+rotor)/weight),current:current,voltage:terminal,power:total,
+            motorHeat:motorHeat,batteryHeat:batteryHeat,limited:limited,motorAvailable:available,airborne:airborne)
+    }
+    static func evaluate(_ project:NativeWorldLabProject,_ runId:String,_ input:NativeWorldLabVehicleInput)throws->NativeWorldLabVehicleRun {
+        try validate(input)
+        guard project.revision>=0,runId.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("Vehicle run needs a valid project revision and run ID.")
+        }
+        let weight=input.massKg*g,maximumBattery=maxBatteryPower(input,input.initialSOC,input.initialBatteryTemperatureK)
+        var diagnostics:[String]=[]
+        if input.mode == .rotorcraft {
+            let hover=rotorPower(weight,input.rotorDiskAreaM2!,input.airDensityKgM3,input.rotorEfficiency)
+            if input.rotorMaxThrustN!<weight{diagnostics.append("BLOCKER: Rotor thrust is below vehicle weight.")}
+            if input.rotorMaxThrustN!<1.2*weight{diagnostics.append("WARNING: Rotor thrust margin is below 20%.")}
+            if hover>maximumBattery{diagnostics.append("BLOCKER: Ideal induced hover power exceeds battery discharge capacity.")}
+        }
+        if input.mode == .fixedWing {
+            let lift=0.5*input.airDensityKgM3*pow(input.takeoffSpeedMps!,2)*input.wingAreaM2!*input.wingLiftCoefficient!
+            if lift<weight{diagnostics.append("BLOCKER: Wing lift at configured takeoff speed is below vehicle weight.")}
+            let drag=0.5*input.airDensityKgM3*input.dragCoefficient*input.frontalAreaM2*pow(input.takeoffSpeedMps!,2)
+            if input.maxCruiseThrustN<drag{diagnostics.append("BLOCKER: Cruise thrust is below estimated takeoff drag.")}
+        }
+        diagnostics.append("INFO: Longitudinal point-mass model on a level road; no 6-DOF stability, detailed rotor aerodynamics, suspension or flight certification.")
+        let n=Int(ceil(input.durationSeconds/input.solverStepSeconds)),h=input.durationSeconds/Double(n)
+        var state=State(soc:input.initialSOC,motorK:input.initialMotorTemperatureK,batteryK:input.initialBatteryTemperatureK)
+        var samples:[NativeWorldLabVehicleSample]=[],events:[String]=[],failures:[String]=[]
+        var lastAirborne=false,limitRecorded=false
+        for step in 0...n {
+            let t=Double(step)*h
+            let f=try forces(input,state,t,weight)
+            if f.airborne && !lastAirborne{events.append(String(format:"Takeoff at %.2f s.",t))}
+            if !f.airborne && lastAirborne{events.append(String(format:"Touchdown at %.2f s.",t))}
+            if f.limited && !limitRecorded{events.append(String(format:"Battery or motor power was limited at %.2f s.",t));limitRecorded=true}
+            if !state.motorFailed,let failTime=input.motorFailureAtSeconds,t>=failTime {
+                events.append(String(format:"Injected motor dropout at %.2f s; wheel/cruise drive is disabled.",t))
+                state.motorFailed=true
+            }
+            let sample=NativeWorldLabVehicleSample(timeSeconds:t,distanceMeters:state.x,altitudeMeters:state.z,
+                horizontalSpeedMps:state.vx,verticalSpeedMps:state.vz,wheelDriveForceN:f.wheel,cruiseThrustN:f.cruise,
+                rotorThrustN:f.rotor,wingLiftN:f.wing,dragN:f.drag,normalForceN:f.normal,loadFactor:f.load,
+                batteryCurrentA:f.current,terminalVoltageV:f.voltage,batteryPowerW:f.power,batterySOC:state.soc,
+                batteryTemperatureK:state.batteryK,motorTemperatureK:state.motorK,airborne:f.airborne,
+                powerLimited:f.limited,motorAvailable:f.motorAvailable,energyUsedWh:state.energyWh)
+            samples.append(sample)
+            if step==n || state.failure != nil{break}
+            let speed=hypot(state.vx,state.vz)
+            let dragX=speed>1e-12 ? f.drag*state.vx/speed:0
+            let dragZ=speed>1e-12 ? f.drag*state.vz/speed:0
+            let rolling=f.airborne ? 0:input.rollingResistance*f.normal
+            let ax=(f.wheel+f.cruise-dragX-rolling)/input.massKg
+            let az=f.airborne ? (f.wing+f.rotor-weight-dragZ)/input.massKg:0
+            let vx=max(0,state.vx+ax*h),vz=state.vz+az*h
+            var z=state.z+(f.airborne ? max(0,vz):0)*h,varVz=vz,varAirborne=f.airborne
+            if z<=1e-6 && varAirborne && varVz<=0{z=0;varVz=0;varAirborne=false}
+            let motorTemp=state.motorK+(f.motorHeat-input.motorCoolingWPerK*(state.motorK-input.ambientTemperatureK))*h/input.motorHeatCapacityJPerK
+            let batteryTemp=state.batteryK+(f.batteryHeat-input.batteryCoolingWPerK*(state.batteryK-input.ambientTemperatureK))*h/input.batteryHeatCapacityJPerK
+            let energy=state.energyWh+f.power*h/3600
+            let soc=max(0,state.soc-f.power*h/(3600*input.batteryCapacityWh))
+            var failure:String?=nil
+            if f.load>input.maxStructuralLoadFactor{failure="Computed lift exceeded the assumed structural load-factor limit.";events.append(failure!)}
+            else if motorTemp>=input.maxMotorTemperatureK || batteryTemp>=input.maxBatteryTemperatureK{failure="Motor or battery temperature exceeded its assumed limit.";events.append(failure!)}
+            else if vx>input.maxSpeedMps{failure="Vehicle exceeded the configured maximum speed.";events.append(failure!)}
+            if let failure{failures.append(failure);state.failure=failure}
+            else{state=State(x:state.x+vx*h,z:z,vx:vx,vz:varVz,soc:soc,motorK:motorTemp,batteryK:batteryTemp,energyWh:energy,airborne:varAirborne,motorFailed:state.motorFailed)}
+            lastAirborne=f.airborne
+        }
+        let final=samples.last!
+        if input.mode != .roadOnly && !samples.contains(where:{$0.airborne}) && failures.isEmpty{
+            failures.append("The vehicle did not reach the configured takeoff/lift conditions within this recorded run.")
+        }
+        let outcome=state.failure != nil ? "failed":final.airborne ? "airborne":input.mode == .roadOnly ? "ground-run":"unable-to-takeoff"
+        let validity="Hypothetical user assumptions; level-road longitudinal point-mass model with simplified wing or actuator-disk rotor lift. No suspension, steering/yaw/roll, tire relaxation, CFD, turbulence, stall, structural FEM, flight-control safety or certification."
+        return NativeWorldLabVehicleRun(format:"env-world-lab-native-vehicle-run-v1",projectId:project.id,
+            projectRevision:project.revision,runId:runId,modelVersion:"1.0.0",evidence:"physics-model-computed",
+            input:input,weightN:weight,maximumBatteryPowerW:maximumBattery,preflight:diagnostics,
+            samples:samples,events:events,outcome:outcome,failureReasons:failures,validity:validity)
+    }
+}
+
+// MARK: - Native UI for the vehicle experiment
+
+private struct NativeWorldLabVehiclePanel:View {
+    let project:NativeWorldLabProject
+    @State private var input=NativeWorldLabVehicleInput()
+    @State private var run:NativeWorldLabVehicleRun?
+    @State private var time=0.0
+    @State private var playing=false
+    @State private var playbackRate=1.0
+    @State private var problem=""
+    @State private var exporting=false
+    @State private var evidenceFile:NativeWorldLabJsonFile?
+    private var current:NativeWorldLabVehicleRun? {
+        guard let run,run.projectId==project.id,run.projectRevision==project.revision else{return nil}
+        return run
+    }
+    private var sample:NativeWorldLabVehicleSample? {
+        guard let current else{return nil}
+        let index=Int((time/current.input.durationSeconds*Double(current.samples.count-1)).rounded())
+        return current.samples[min(current.samples.count-1,max(0,index))]
+    }
+    private func calculate(){
+        do{
+            run=try NativeWorldLabVehicle.evaluate(project,"vehicle-"+UUID().uuidString.replacingOccurrences(of:"-",with:""),input)
+            time=0;playing=false;problem=""
+        }catch{run=nil;problem=error.localizedDescription}
+    }
+    var body:some View {
+        VStack(alignment:.leading,spacing:10){
+            Text("Build, run and diagnose a vehicle").font(.headline)
+            Text("Independent native Swift model. Every vehicle, motor and battery value is an inventor assumption; results are not flight certification.")
+                .font(.caption).foregroundStyle(.secondary)
+            Picker("Vehicle mode",selection:$input.mode){
+                ForEach(NativeWorldLabVehicleMode.allCases){mode in Text(mode.title).tag(mode)}
+            }.pickerStyle(.segmented).onChange(of:input.mode){_ in run=nil;playing=false}
+            HStack{
+                TextField("Mass kg",value:$input.massKg,format:.number).keyboardType(.decimalPad)
+                TextField("Frontal area m²",value:$input.frontalAreaM2,format:.number).keyboardType(.decimalPad)
+            }
+            HStack{
+                TextField("Drag coefficient",value:$input.dragCoefficient,format:.number).keyboardType(.decimalPad)
+                TextField("Tire friction",value:$input.tireFriction,format:.number).keyboardType(.decimalPad)
+            }
+            VStack(alignment:.leading){
+                Text("Drive throttle "+String(format:"%.0f",input.driveThrottle*100)+"%").font(.caption)
+                Slider(value:$input.driveThrottle,in:0...1)
+            }
+            if input.mode == .rotorcraft {
+                HStack {
+                    TextField("Rotor disk area m²",value:Binding(get:{input.rotorDiskAreaM2 ?? 15},set:{input.rotorDiskAreaM2=$0}),format:.number)
+                    TextField("Max rotor thrust N",value:Binding(get:{input.rotorMaxThrustN ?? 10000},set:{input.rotorMaxThrustN=$0}),format:.number)
+                }
+                VStack(alignment:.leading){Text("Rotor throttle").font(.caption);Slider(value:$input.rotorThrottle,in:0...1)}
+            }
+            if input.mode == .fixedWing {
+                HStack {
+                    TextField("Wing area m²",value:Binding(get:{input.wingAreaM2 ?? 18},set:{input.wingAreaM2=$0}),format:.number)
+                    TextField("Lift coefficient",value:Binding(get:{input.wingLiftCoefficient ?? 1.4},set:{input.wingLiftCoefficient=$0}),format:.number)
+                }
+                TextField("Takeoff speed m/s",value:Binding(get:{input.takeoffSpeedMps ?? 28},set:{input.takeoffSpeedMps=$0}),format:.number)
+            }
+            if input.mode != .roadOnly {
+                TextField("Horizontal cruise thrust N",value:$input.maxCruiseThrustN,format:.number)
+            }
+            HStack {
+                TextField("Duration seconds",value:$input.durationSeconds,format:.number)
+                TextField("Maximum structural load (g)",value:$input.maxStructuralLoadFactor,format:.number)
+            }
+            Button("Run native vehicle experiment"){calculate()}.buttonStyle(.borderedProminent)
+            if !problem.isEmpty{Text(problem).font(.caption).foregroundStyle(.red)}
+            if let run=current,let sample {
+                Text("Computed vehicle state · "+run.outcome.replacingOccurrences(of:"-",with:" ")).font(.headline)
+                Grid(alignment:.leading,horizontalSpacing:15,verticalSpacing:5){
+                    GridRow{Text("Speed");Text(String(format:"%.3f m/s",sample.horizontalSpeedMps))}
+                    GridRow{Text("Altitude");Text(String(format:"%.3f m",sample.altitudeMeters))}
+                    GridRow{Text("Wheel drive");Text(String(format:"%.3f N",sample.wheelDriveForceN))}
+                    GridRow{Text("Lift");Text(String(format:"%.3f N",sample.rotorThrustN+sample.wingLiftN))}
+                    GridRow{Text("Battery");Text(String(format:"%.2f A · %.2f V · %.1f%%",sample.batteryCurrentA,sample.terminalVoltageV,sample.batterySOC*100))}
+                    GridRow{Text("Motor temperature");Text(String(format:"%.2f K",sample.motorTemperatureK))}
+                    GridRow{Text("Battery temperature");Text(String(format:"%.2f K",sample.batteryTemperatureK))}
+                }.font(.caption)
+                VStack(alignment:.leading){
+                    Text("Recorded simulation time "+String(format:"%.2f / %.2f s",time,run.samples.last?.timeSeconds ?? 0)).font(.caption)
+                    Slider(value:$time,in:0...max(0.001,run.samples.last?.timeSeconds ?? 0))
+                }
+                HStack{
+                    Button(playing ? "Pause":"Play"){playing.toggle()}.buttonStyle(.bordered)
+                    Button("Reset"){playing=false;time=0}.buttonStyle(.bordered)
+                    Button("Step"){playing=false;time=min(run.samples.last?.timeSeconds ?? 0,time+run.input.solverStepSeconds)}.buttonStyle(.bordered)
+                    Button("Speed "+String(format:"%.1f",playbackRate)+"×"){playbackRate=playbackRate==0.1 ? 1 : playbackRate==1 ? 10 : 0.1}.buttonStyle(.bordered)
+                }
+                ForEach(Array(run.preflight.enumerated()),id:\.offset){_,item in Text(item).font(.caption)}
+                ForEach(Array(run.events.enumerated()),id:\.offset){_,item in Text(item).font(.caption)}
+                ForEach(Array(run.failureReasons.enumerated()),id:\.offset){_,item in Text(item).font(.caption).foregroundStyle(.red)}
+                Button("Export native vehicle evidence"){
+                    do{
+                        let bytes=try JSONEncoder().encode(run)
+                        guard bytes.count<=1_048_576 else{throw NativeWorldLabError.invalid("Vehicle evidence exceeds 1 MB")}
+                        evidenceFile=NativeWorldLabJsonFile(content:bytes);exporting=true
+                    }catch{problem=error.localizedDescription}
+                }.buttonStyle(.bordered)
+                Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(10).background(.thinMaterial,in:RoundedRectangle(cornerRadius:12))
+        .onChange(of:input){_ in run=nil;playing=false;time=0}
+        .task(id:playing){
+            while playing {
+                try? await Task.sleep(nanoseconds:50_000_000)
+                guard let current else{break}
+                let end=current.samples.last?.timeSeconds ?? 0
+                if time>=end {playing=false;break}
+                time=min(end,time+0.05*playbackRate)
+            }
+        }
+        .fileExporter(isPresented:$exporting,document:evidenceFile,contentType:.json,defaultFilename:"world-lab-vehicle-evidence"){result in
+            if case .failure(let error)=result{problem=error.localizedDescription}
+        }
+    }
+}
+
