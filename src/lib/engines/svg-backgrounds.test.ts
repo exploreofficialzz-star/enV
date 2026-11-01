@@ -43,6 +43,14 @@ test("mesh gradients sanitize colors, cap layers and export accessible SVG", () 
   assert.doesNotMatch(svg, /<script>/);
 });
 
+test("paper grain tint responds to the selected texture color", () => {
+  const blue = buildTextureSvg({ seed: 10, style: "paper", color: "#123456", transparent: true });
+  const red = buildTextureSvg({ seed: 10, style: "paper", color: "#ff0000", transparent: true });
+  assert.notEqual(blue, red);
+  assert.match(blue, /feColorMatrix/);
+  assert.match(red, /feColorMatrix/);
+});
+
 test("texture generator exports four deterministic, safe SVG styles", () => {
   const styles = ["paper", "halftone", "topography", "woven"] as const;
   for (const style of styles) {

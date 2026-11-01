@@ -235,9 +235,17 @@ export function buildTextureSvg(options: TextureSvgOptions): string {
   const backgroundLayer = options.transparent ? "" : '<rect width="' + width + '" height="' + height + '" fill="' + background + '"/>';
   if (options.style === "paper") {
     const frequency = (0.24 + density / 80).toFixed(3);
+    const tint = toRgb(color);
+    const matrix = [
+      tint.r / 255, 0, 0, 0, 0,
+      0, tint.g / 255, 0, 0, 0,
+      0, 0, tint.b / 255, 0, 0,
+      0, 0, 0, 1, 0,
+    ].join(" ");
     const svg = '<defs><filter id="paper-grain"><feTurbulence type="fractalNoise" baseFrequency="' + frequency
-      + '" numOctaves="3" seed="' + seed + '" stitchTiles="stitch"/></filter></defs><rect width="' + width
-      + '" height="' + height + '" filter="url(#paper-grain)" opacity="' + opacity.toFixed(3) + '"/>';
+      + '" numOctaves="3" seed="' + seed + '" stitchTiles="stitch" result="grain"/><feColorMatrix in="grain" type="matrix" values="' + matrix
+      + '"/></filter></defs><rect width="' + width
+      + '" height="' + height + '" filter="url(#paper-grain)" opacity="' + opacity.toFixed(3) + '"/>'';
     return svgStart("Generated paper grain texture", width, height) + backgroundLayer + svg + "</svg>";
   }
   if (options.style === "halftone") {
