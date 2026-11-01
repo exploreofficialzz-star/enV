@@ -30,6 +30,7 @@ import {WorldLabGravityPanel} from "./gravity-panel";
 import {WorldLabElasticWavePanel} from "./elastic-wave-panel";
 import {WorldLabCadPanel} from "./cad-panel";
 import {WorldLabGeoreferencePanel} from "./georeference-panel";
+import {WorldLabReferenceLayersPanel} from "./world-layers-panel";
 import {WorldLabRadiationPanel} from "./radiation-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
@@ -2708,6 +2709,7 @@ export default function WorldLab() {
           </section>
           <WorldLabCadPanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
           <WorldLabGeoreferencePanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
+            <WorldLabReferenceLayersPanel/>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
               onClick={() => {const next=seeInside?"normal":"transparent";setSeeInside(!seeInside);setInspectionMode(next);}}>See Inside</button>
