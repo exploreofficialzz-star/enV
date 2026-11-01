@@ -102,8 +102,6 @@ class NativeWorldLabSIContractTest {
         })
         assertFails{NativeWorldLabExecution.execute(graph,listOf(base.first(),faulty),0.3,0.1)}
     }
-}
-
 
     @Test fun connectedScientificInputFailsClosedWhenSourceOmitsItsOutput() {
         val graph=NativeScientificGraph("rc-missing-output",1,listOf(
@@ -122,3 +120,4 @@ class NativeWorldLabSIContractTest {
             NativeWorldLabExecution.execute(graph,listOf(missingSource,base.last()),0.3,0.1)
         }
     }
+}
