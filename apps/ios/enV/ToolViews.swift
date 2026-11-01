@@ -14574,16 +14574,27 @@ private final class ABookLocalStore {
                 ))
             }
             try perform { context in
+                let existingRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+                let existing = try context.fetch(existingRequest)
+                let existingBytes = existing.reduce(Int64(0)) { $0 + $1.size }
+                let incomingBytes = attachments.reduce(Int64(0)) { $0 + $1.size }
+                guard existingBytes >= 0, existing.count + attachments.count <= 10_000 else {
+                    throw NSError(domain: "ABookAttachment", code: 5, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing more."])
+                }
+                guard incomingBytes <= 150 * 1024 * 1024 - existingBytes else {
+                    throw NSError(domain: "ABookAttachment", code: 6, userInfo: [NSLocalizedDescriptionKey: "The complete local library attachment limit is 150 MB. Export and remove older files before importing more."])
+                }
+                let inserted = attachments.map { attachment -> ABookAttachmentEntity in
+                    let entity = ABookAttachmentEntity(context: context)
+                    entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
+                    entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
+                    entity.size = attachment.size; entity.createdAt = attachment.createdAt
+                    return entity
+                }
                 do {
-                    for attachment in attachments {
-                        let entity = ABookAttachmentEntity(context: context)
-                        entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
-                        entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
-                        entity.size = attachment.size; entity.createdAt = attachment.createdAt
-                    }
                     try context.save()
                 } catch {
-                    context.rollback()
+                    inserted.forEach(context.delete)
                     throw error
                 }
             }
