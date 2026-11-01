@@ -1763,6 +1763,8 @@ fun NativeWorldLabForm() {
                             Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
                                 (clock.sampleIndex+1)+"/"+run.samples.size+" · world UTC "+clock.worldDateUTC,
                                 style=MaterialTheme.typography.bodySmall)
+                            Text("Wall UTC "+clock.wallTimeUTC+" · local zone "+clock.timezoneDisplay+
+                                " · cached solver output",style=MaterialTheme.typography.bodySmall)
                         }
                         Text("Hypothetical values, coupled 1D coil and lift calculation. Not measured or certified.",
                             style=MaterialTheme.typography.bodySmall)
