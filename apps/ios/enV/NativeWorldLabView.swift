@@ -715,9 +715,7 @@ struct NativeWorldLabView:View {
                     .font(.caption).accessibilityLabel("Wall clock in UTC")
                 Text("World date (UTC): "+ISO8601DateFormatter().string(from:worldEpochUTC.addingTimeInterval(seconds)))
                     .font(.caption).accessibilityLabel("Simulated world date in UTC")
-                Text("Simulation "+String(format:"%.4f",seconds)+" s · solver internal time "+String(format:"%.4f",values?.timeSeconds ?? seconds)+
-                    " s · display sample "+String(format:"%.4f",seconds)+" s · solver Δt "+
-                    String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)+" s · "+TimeZone.current.identifier)
+                Text("Simulation \(String(format:"%.4f",seconds)) s · solver internal time \(String(format:"%.4f",values?.timeSeconds ?? seconds)) s · display sample \(String(format:"%.4f",seconds)) s · solver Δt \(String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)) s · \(TimeZone.current.identifier)")
                     .font(.caption)
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in if editing{playing=false} }).accessibilityLabel("Simulated elapsed time")
@@ -767,18 +765,14 @@ struct NativeWorldLabView:View {
                                 .disabled(branchSourceInput == nil)
                         }
                         if let branchRecord {
-                            Text("Branch "+branchRecord.branchId+" · "+
-                                branchRecord.sourceModelId+" → "+branchRecord.targetModelId)
+                            Text("Branch \(branchRecord.branchId) · \(branchRecord.sourceModelId) → \(branchRecord.targetModelId)")
                                 .font(.caption).textSelection(.enabled)
-                            Text("Source run "+branchRecord.sourceRunId+" · "+
-                                String(branchRecord.inputDiff.count)+" changed inputs · "+
-                                String(format:"%.4f",branchRecord.targetTimeSeconds)+" s · "+
-                                branchRecord.fidelity)
+                            Text("Source run \(branchRecord.sourceRunId) · \(branchRecord.inputDiff.count) changed inputs · \(String(format:"%.4f",branchRecord.targetTimeSeconds)) s · \(branchRecord.fidelity)")
                                 .font(.caption).foregroundStyle(.secondary)
                             ForEach(branchRecord.inputDiff,id:\.field){change in
-                                Text(change.field+": "+
-                                    (change.previous.map{String(format:"%.6g",$0)} ?? "unset")+
-                                    " → "+(change.next.map{String(format:"%.6g",$0)} ?? "unset"))
+                                let previousValue=change.previous.map{String(format:"%.6g",$0)} ?? "unset"
+                                let nextValue=change.next.map{String(format:"%.6g",$0)} ?? "unset"
+                                Text("\(change.field): \(previousValue) → \(nextValue)")
                                     .font(.caption)
                             }
                             Button("Export branch evidence") {
