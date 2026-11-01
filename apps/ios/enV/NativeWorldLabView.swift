@@ -38,6 +38,9 @@ struct NativeWorldLabView:View {
     @State private var reversePlayback=false
     @State private var worldEpochUTC=Date()
     @State private var solarDateUTC=String(ISO8601DateFormatter().string(from:Date()).prefix(10))
+    @State private var importingIersBulletin=false
+    @State private var iersEarthOrientation:NativeWorldLabEarthOrientationSeries?
+    @State private var iersImportStatus=""
     @State private var mass=1.0
     @State private var resistance=1000.0
     @State private var diffusivity=0.02
@@ -804,6 +807,7 @@ struct NativeWorldLabView:View {
                     Text("Simulation \(String(format:"%.4f",clock.simulationTimeSeconds)) s · solver internal time \(String(format:"%.4f",clock.solverInternalTimeSeconds ?? clock.displaySampleTimeSeconds)) s · display sample \(String(format:"%.4f",clock.displaySampleTimeSeconds)) s · solver Δt \(String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)) s · cached recorded output")
                         .font(.caption)
                 }
+                timeScalesSection
                 solarEventsSection
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:Binding(get:{seconds},set:{seekDemoRecordedTime($0)}),in:0...12,
@@ -1214,6 +1218,46 @@ struct NativeWorldLabView:View {
         redraw()
         timelineStatus="Reference experiment parameters and recorded-sample clock restored."
     }
+    private var timeScalesSection:some View {
+        VStack(alignment:.leading,spacing:6) {
+            Text("Astronomical time scales · UTC / TAI / TT / UT1").font(.headline)
+            let utc=demoClock?.worldDateUTC ?? ISO8601DateFormatter().string(from:worldEpochUTC)
+            if let reading=try? NativeWorldLabTimeScales.utcToTaiTt(utc) {
+                Text("TAI · TAI−UTC \(reading.taiMinusUtcSeconds) s")
+                    .font(.caption.monospaced())
+                Text("TT · TT−UTC \(String(format:"%.3f",reading.ttMinusUtcSeconds)) s")
+                    .font(.caption.monospaced())
+            } else {
+                Text("TAI/TT unavailable outside the certified leap-second table.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Import IERS Bulletin A (ser7.dat)"){importingIersBulletin=true}
+                .buttonStyle(.bordered)
+            if let series=iersEarthOrientation {
+                if let reading=try? NativeWorldLabTimeScales.utcToUt1(utc,series:series) {
+                    Text("UT1 · \(reading.quality?.rawValue ?? "unknown")")
+                        .font(.caption)
+                    Text(reading.ut1 ?? "UT1 unavailable").font(.caption.monospaced())
+                    Text("DUT1 \(String(format:"%.6f",reading.dut1Seconds ?? 0)) s ± \(String(format:"%.6f",reading.ut1UncertaintySeconds ?? 0)) s")
+                        .font(.caption)
+                    Text("\(reading.bulletin ?? "IERS Bulletin A") · issued \(series.issuedDateUTC)")
+                        .font(.caption2).foregroundStyle(.secondary)
+                } else {
+                    Text("UT1−UTC is outside this imported Bulletin A coverage.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if !iersImportStatus.isEmpty {
+                Text(iersImportStatus).font(.caption).foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
+            Text("UTC is the civil reference. TAI/TT use the bounded IERS leap table; UT1 requires dated IERS Earth-orientation data. No value is extrapolated beyond published coverage.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.06),in:RoundedRectangle(cornerRadius:10))
+    }
+
     private func solarEventTimeLabel(_ date:Date,timezoneIdentifier:String)->String {
         let formatter=DateFormatter()
         formatter.timeZone=TimeZone(identifier:timezoneIdentifier) ?? .current
@@ -1274,6 +1318,26 @@ struct NativeWorldLabView:View {
                 if case .failure(let error)=result{problem=error.localizedDescription}
                 timelineCheckpointFile=nil
             }
+        .fileImporter(isPresented:$importingIersBulletin,allowedContentTypes:[.plainText,.data]){result in
+            do {
+                let url=try result.get()
+                let accessed=url.startAccessingSecurityScopedResource()
+                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
+                let attributes=try FileManager.default.attributesOfItem(atPath:url.path)
+                guard let size=(attributes[.size] as? NSNumber)?.intValue,size<=2*1024*1024 else {
+                    throw NativeWorldLabError.invalid("IERS Bulletin A must be 2 MB or smaller")
+                }
+                let data=try Data(contentsOf:url)
+                guard let text=String(data:data,encoding:.utf8) else {
+                    throw NativeWorldLabError.invalid("IERS Bulletin A is not valid UTF-8 plain text")
+                }
+                iersEarthOrientation=try NativeWorldLabTimeScales.parseBulletinA(text)
+                iersImportStatus="IERS Bulletin A imported · Vol. \(iersEarthOrientation?.volume ?? "") No. \(iersEarthOrientation?.number ?? 0) · issued \(iersEarthOrientation?.issuedDateUTC ?? "")"
+            } catch {
+                iersEarthOrientation=nil
+                iersImportStatus=error.localizedDescription
+            }
+        }
         .fileImporter(isPresented:$importingTimelineCheckpoint,allowedContentTypes:[.json]){result in
             do{
                 let url=try result.get()

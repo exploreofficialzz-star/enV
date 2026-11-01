@@ -520,3 +520,243 @@ struct NativeWorldLabSolarEvents:Equatable {
             validity:"Approximate apparent sunrise/sunset for 1800–2100 using a standard 0.833° horizon correction; terrain, elevation horizon, weather, pressure, measured solar data, Earth-orientation parameters, leap seconds and precision ephemerides are not included.")
     }
 }
+
+
+enum NativeWorldLabEarthOrientationQuality:String,Codable {
+    case observed
+    case predicted
+}
+struct NativeWorldLabEarthOrientationSample:Equatable,Codable {
+    let utcDay:String
+    let mjd:Int
+    let dut1Seconds:Double
+    let uncertaintySeconds:Double
+    let quality:NativeWorldLabEarthOrientationQuality
+}
+struct NativeWorldLabEarthOrientationSeries:Equatable,Codable {
+    let format:String
+    let schemaVersion:Int
+    let source:String
+    let volume:String
+    let number:Int
+    let issuedDateUTC:String
+    let algorithm:String
+    let samples:[NativeWorldLabEarthOrientationSample]
+
+    init(volume:String,number:Int,issuedDateUTC:String,algorithm:String,
+         samples:[NativeWorldLabEarthOrientationSample])throws {
+        self.format="env-iers-bulletin-a-series";self.schemaVersion=1
+        self.source="IERS Bulletin A";self.volume=volume;self.number=number
+        self.issuedDateUTC=issuedDateUTC;self.algorithm=algorithm;self.samples=samples
+        try validate()
+    }
+    func validate()throws {
+        guard format=="env-iers-bulletin-a-series",schemaVersion==1,
+              source=="IERS Bulletin A",!volume.isEmpty,volume.count<=12,
+              (1...999).contains(number),samples.count>=2,samples.count<=2000 else {
+            throw NativeWorldLabError.invalid("IERS Earth-orientation series format or bounds are invalid.")
+        }
+        for (index,row) in samples.enumerated() {
+            let date=try NativeWorldLabTimeScales.parseDay(row.utcDay)
+            let mjd=Int(floor(date.timeIntervalSince1970/86400))+40587
+            guard mjd==row.mjd,row.dut1Seconds.isFinite,abs(row.dut1Seconds)<=1,
+                  row.uncertaintySeconds.isFinite,(0...1).contains(row.uncertaintySeconds) else {
+                throw NativeWorldLabError.invalid("IERS Earth-orientation sample is invalid.")
+            }
+            if index>0, samples[index-1].mjd+1 != row.mjd {
+                throw NativeWorldLabError.invalid("IERS Earth-orientation samples must be daily and consecutive.")
+            }
+        }
+    }
+    var validFromUTC:String { (samples.first?.utcDay ?? "")+"T00:00:00Z" }
+    var validThroughUTC:String { (samples.last?.utcDay ?? "")+"T00:00:00Z" }
+}
+struct NativeWorldLabTimeScaleReading:Equatable {
+    let utc:String
+    let tai:String
+    let tt:String
+    let ut1:String?
+    let taiMinusUtcSeconds:Int
+    let ttMinusUtcSeconds:Double
+    let dut1Seconds:Double?
+    let ut1UncertaintySeconds:Double?
+    let quality:NativeWorldLabEarthOrientationQuality?
+    let source:String
+    let bulletin:String?
+    let issuedDateUTC:String?
+}
+enum NativeWorldLabTimeScales {
+    static let leapSource="USNO/IERS tai-utc.dat"
+    static let leapValidThroughUTC="2027-01-01T00:00:00Z"
+    private static let leapRows:[(String,Int)]=[
+        ("1972-01-01",10),("1972-07-01",11),("1973-01-01",12),
+        ("1974-01-01",13),("1975-01-01",14),("1976-01-01",15),
+        ("1977-01-01",16),("1978-01-01",17),("1979-01-01",18),
+        ("1980-01-01",19),("1981-07-01",20),("1982-07-01",21),
+        ("1983-07-01",22),("1985-07-01",23),("1988-01-01",24),
+        ("1990-01-01",25),("1991-01-01",26),("1992-07-01",27),
+        ("1993-07-01",28),("1994-07-01",29),("1996-01-01",30),
+        ("1997-07-01",31),("1999-01-01",32),("2006-01-01",33),
+        ("2009-01-01",34),("2012-07-01",35),("2015-07-01",36),
+        ("2017-01-01",37)
+    ]
+    static func parseUTC(_ value:String)throws->Date {
+        guard value.hasSuffix("Z"),
+              let date=ISO8601DateFormatter().date(from:value) else {
+            throw NativeWorldLabError.invalid("Time-scale input must be a valid UTC timestamp ending in Z.")
+        }
+        return date
+    }
+    static func parseDay(_ value:String)throws->Date {
+        let pattern="^\\d{4}-\\d{2}-\\d{2}$"
+        guard value.range(of:pattern,options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("UTC day must use YYYY-MM-DD.")
+        }
+        let formatter=DateFormatter()
+        formatter.calendar=Calendar(identifier:.gregorian)
+        formatter.timeZone=TimeZone(secondsFromGMT:0)
+        formatter.locale=Locale(identifier:"en_US_POSIX")
+        formatter.dateFormat="yyyy-MM-dd"
+        guard let date=formatter.date(from:value),formatter.string(from:date)==value else {
+            throw NativeWorldLabError.invalid("UTC day is not a valid Gregorian calendar date.")
+        }
+        return date
+    }
+    private static func iso(_ date:Date,_ label:String)->String {
+        let formatter=ISO8601DateFormatter()
+        formatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        return formatter.string(from:date)+" "+label
+    }
+    private static func taiOffset(_ date:Date)throws->Int {
+        let start=try parseUTC("1972-01-01T00:00:00Z")
+        let end=try parseUTC(leapValidThroughUTC)
+        guard date>=start,date<=end else {
+            throw NativeWorldLabError.invalid("TAI−UTC is not certified by the bundled IERS leap-second data for this date.")
+        }
+        for row in leapRows.reversed() {
+            if date >= (try parseDay(row.0)) {return row.1}
+        }
+        throw NativeWorldLabError.invalid("No authoritative TAI−UTC offset is available for this date.")
+    }
+    static func utcToTaiTt(_ utc:String)throws->(tai:String,tt:String,taiMinusUtcSeconds:Int,ttMinusUtcSeconds:Double) {
+        let date=try parseUTC(utc),offset=try taiOffset(date)
+        let tai=date.addingTimeInterval(Double(offset))
+        let tt=date.addingTimeInterval(Double(offset)+32.184)
+        return (iso(tai,"TAI"),iso(tt,"TT"),offset,Double(offset)+32.184)
+    }
+    static func parseBulletinA(_ raw:String)throws->NativeWorldLabEarthOrientationSeries {
+        guard raw.utf8.count>=100,raw.utf8.count<=2*1024*1024 else {
+            throw NativeWorldLabError.invalid("IERS Bulletin A import must be between 100 bytes and 2 MB.")
+        }
+        guard raw.range(of:"I\\s*E\\s*R\\s*S\\s+B\\s*U\\s*L\\s*L\\s*E\\s*T\\s*I\\s*N\\s*[-–]\\s*A",
+                        options:[.regularExpression,.caseInsensitive]) != nil else {
+            throw NativeWorldLabError.invalid("Import must be the official plain-text IERS Bulletin A product (ser7.dat).")
+        }
+        let headerPattern="(\\d{1,2})\\s+(January|February|March|April|May|June|July|August|September|October|November|December)\\s+(\\d{4})\\s+Vol\\.\\s+([IVXLCDM]+)\\s+No\\.?\\s*(\\d+)"
+        guard let regex=try? NSRegularExpression(pattern:headerPattern,options:.caseInsensitive),
+              let match=regex.firstMatch(in:raw,range:NSRange(raw.startIndex...,in:raw)) else {
+            throw NativeWorldLabError.invalid("IERS Bulletin A issue date and bulletin number could not be identified.")
+        }
+        func group(_ n:Int)->String {
+            guard let range=Range(match.range(at:n),in:raw) else{return ""}
+            return String(raw[range])
+        }
+        let months=["january","february","march","april","may","june","july","august","september","october","november","december"]
+        guard let month=months.firstIndex(of:group(2).lowercased()),
+              let day=Int(group(1)),let year=Int(group(3)),let number=Int(group(5)) else {
+            throw NativeWorldLabError.invalid("IERS Bulletin A issue date is invalid.")
+        }
+        var issueComponents=DateComponents()
+        issueComponents.calendar=Calendar(identifier:.gregorian)
+        issueComponents.timeZone=TimeZone(secondsFromGMT:0)
+        issueComponents.year=year;issueComponents.month=month+1;issueComponents.day=day
+        guard let issueDate=issueComponents.calendar?.date(from:issueComponents),
+              Calendar(identifier:.gregorian).dateComponents(in:TimeZone(secondsFromGMT:0)!,from:issueDate).day==day else {
+            throw NativeWorldLabError.invalid("IERS Bulletin A issue date is invalid.")
+        }
+        let issueFormatter=DateFormatter()
+        issueFormatter.calendar=Calendar(identifier:.gregorian);issueFormatter.timeZone=TimeZone(secondsFromGMT:0)
+        issueFormatter.locale=Locale(identifier:"en_US_POSIX");issueFormatter.dateFormat="yyyy-MM-dd"
+        var combined=false,predictions=false
+        var algorithm="IERS Rapid Service/Prediction Centre source-defined algorithm"
+        var samples:[NativeWorldLabEarthOrientationSample]=[]
+        for line in raw.components(separatedBy:.newlines) {
+            if line.localizedCaseInsensitiveContains("COMBINED EARTH ORIENTATION PARAMETERS"){combined=true}
+            if line.trimmingCharacters(in:.whitespaces).uppercased().hasPrefix("PREDICTIONS:"){predictions=true}
+            if line.localizedCaseInsensitiveContains("Kalman smoother and weighted cubic spline"){
+                algorithm="IERS Rapid Service Kalman smoother and weighted cubic spline"
+            }
+            guard combined else{continue}
+            let t=line.split(whereSeparator:{$0.isWhitespace}).map(String.init)
+            if !predictions,t.count>=10,t[0].range(of:"^\\d{2}$",options:.regularExpression) != nil,
+               let yy=Int(t[0]),let mm=Int(t[1]),let dd=Int(t[2]),let mjd=Int(t[3]),
+               let dut1=Double(t[8]),let uncertainty=Double(t[9]) {
+                let y=yy<50 ? 2000+yy : 1900+yy
+                var c=DateComponents();c.calendar=Calendar(identifier:.gregorian)
+                c.timeZone=TimeZone(secondsFromGMT:0);c.year=y;c.month=mm;c.day=dd
+                guard let date=c.calendar?.date(from:c) else{continue}
+                let day=issueFormatter.string(from:date)
+                samples.append(NativeWorldLabEarthOrientationSample(utcDay:day,mjd:mjd,
+                    dut1Seconds:dut1,uncertaintySeconds:uncertainty,quality:.observed))
+            }else if predictions,t.count>=7,t[0].range(of:"^\\d{4}$",options:.regularExpression) != nil,
+                     let y=Int(t[0]),let mm=Int(t[1]),let dd=Int(t[2]),let mjd=Int(t[3]),let dut1=Double(t[6]) {
+                var c=DateComponents();c.calendar=Calendar(identifier:.gregorian)
+                c.timeZone=TimeZone(secondsFromGMT:0);c.year=y;c.month=mm;c.day=dd
+                guard let date=c.calendar?.date(from:c) else{continue}
+                let day=issueFormatter.string(from:date)
+                let uncertainty=0.00025*pow(Double(mjd-61342),0.75)
+                samples.append(NativeWorldLabEarthOrientationSample(utcDay:day,mjd:mjd,
+                    dut1Seconds:dut1,uncertaintySeconds:uncertainty,quality:.predicted))
+            }
+        }
+        guard samples.contains(where:{$0.quality == .observed}),
+              samples.contains(where:{$0.quality == .predicted}) else {
+            throw NativeWorldLabError.invalid("Bulletin A must include both rapid-service observations and prediction rows.")
+        }
+        return try NativeWorldLabEarthOrientationSeries(volume:group(4),number:number,
+            issuedDateUTC:issueFormatter.string(from:issueDate),algorithm:algorithm,samples:samples)
+    }
+    static func utcToUt1(_ utc:String,series:NativeWorldLabEarthOrientationSeries)throws->NativeWorldLabTimeScaleReading {
+        try series.validate()
+        let date=try parseUTC(utc)
+        guard let first=series.samples.first,let last=series.samples.last else {
+            throw NativeWorldLabError.invalid("IERS Earth-orientation series is empty.")
+        }
+        let firstDate=try parseDay(first.utcDay),lastDate=try parseDay(last.utcDay)
+        guard date>=firstDate,date<=lastDate else {
+            throw NativeWorldLabError.invalid("UT1−UTC is unavailable outside the imported IERS Bulletin A coverage.")
+        }
+        var index=0
+        while index<series.samples.count-1 {
+            let next=try parseDay(series.samples[index+1].utcDay)
+            if next>date{break}
+            index+=1
+        }
+        let left=series.samples[index]
+        let dut1:Double,sigma:Double,quality:NativeWorldLabEarthOrientationQuality
+        if index==series.samples.count-1 {
+            guard date==lastDate else {
+                throw NativeWorldLabError.invalid("An adjacent IERS sample is required to interpolate UT1−UTC.")
+            }
+            dut1=left.dut1Seconds;sigma=left.uncertaintySeconds;quality=left.quality
+        } else {
+            let right=series.samples[index+1]
+            let leftDate=try parseDay(left.utcDay)
+            let fraction=date.timeIntervalSince(leftDate)/86400
+            guard (0...1).contains(fraction) else {
+                throw NativeWorldLabError.invalid("IERS interpolation interval is invalid.")
+            }
+            dut1=left.dut1Seconds+(right.dut1Seconds-left.dut1Seconds)*fraction
+            sigma=sqrt(pow(1-fraction,2)*pow(left.uncertaintySeconds,2)+
+                pow(fraction,2)*pow(right.uncertaintySeconds,2))
+            quality=(left.quality == .predicted || right.quality == .predicted) ? .predicted : .observed
+        }
+        let converted=try utcToTaiTt(utc)
+        return NativeWorldLabTimeScaleReading(utc:utc,tai:converted.tai,tt:converted.tt,
+            ut1:iso(date.addingTimeInterval(dut1),"UT1"),
+            taiMinusUtcSeconds:converted.taiMinusUtcSeconds,ttMinusUtcSeconds:converted.ttMinusUtcSeconds,
+            dut1Seconds:dut1,ut1UncertaintySeconds:sigma,quality:quality,
+            source:"IERS Bulletin A",bulletin:"Volume "+series.volume+" No. "+String(series.number),
+            issuedDateUTC:series.issuedDateUTC)
+    }
+}

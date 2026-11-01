@@ -83,7 +83,7 @@ object NativeWorldLabTimeScales {
         }
         val header=Regex("(?i)(\\d{1,2})\\s+(January|February|March|April|May|June|July|August|September|October|November|December)\\s+(\\d{4})\\s+Vol\\.\\s+([IVXLCDM]+)\\s+No\\.?\\s*(\\d+)").find(raw)
             ?:throw IllegalArgumentException("IERS Bulletin A issue date and number could not be identified.")
-        val issueDate=LocalDate.of(header.groupValues[4].toInt(),
+        val issueDate=LocalDate.of(header.groupValues[3].toInt(),
             listOf("January","February","March","April","May","June","July","August","September","October","November","December")
                 .indexOfFirst{it.equals(header.groupValues[2],true)}+1,header.groupValues[1].toInt())
         var combined=false;var predictions=false

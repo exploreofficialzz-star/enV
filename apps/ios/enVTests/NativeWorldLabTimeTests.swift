@@ -319,3 +319,47 @@ final class NativeWorldLabBranchCurrentTests:XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabSolarEvents.calculate(
             dateUTC:"2026-01-01",latitudeDegrees:0,longitudeDegrees:181))
     }
+
+
+extension NativeWorldLabTimeCheckpointTests {
+    private var testBulletinA:String {
+        """
+        I E R S   B U L L E T I N - A
+        29 October 2026                                     Vol. XXXIX No. 044
+        COMBINED EARTH ORIENTATION PARAMETERS:
+        26 10 28  61341 0.14424 .00004 0.31844 .00004 -0.051795 0.000011
+        26 10 29  61342 0.14284 .00004 0.31828 .00004 -0.052612 0.000014
+        PREDICTIONS:
+        2026 10 30 61343 0.1414 0.3181 -0.05324
+        2026 10 31 61344 0.1401 0.3179 -0.05383
+        2026 11  1 61345 0.1388 0.3179 -0.05453
+        2026 11  2 61346 0.1375 0.3180 -0.05542
+        """
+    }
+    func testNativeIersBulletinImportPreservesObservedPredictedAndProvenance() throws {
+        let series=try NativeWorldLabTimeScales.parseBulletinA(testBulletinA)
+        XCTAssertEqual(series.volume,"XXXIX")
+        XCTAssertEqual(series.number,44)
+        XCTAssertEqual(series.issuedDateUTC,"2026-10-29")
+        XCTAssertEqual(series.samples.count,6)
+        XCTAssertEqual(series.samples[0].quality,.observed)
+        XCTAssertEqual(series.samples[2].quality,.predicted)
+    }
+    func testNativeTaiTtAndUt1ConversionsRetainOffsetsAndUncertainty() throws {
+        let series=try NativeWorldLabTimeScales.parseBulletinA(testBulletinA)
+        let taiTt=try NativeWorldLabTimeScales.utcToTaiTt("2026-11-01T12:00:00Z")
+        XCTAssertEqual(taiTt.taiMinusUtcSeconds,37)
+        XCTAssertEqual(taiTt.ttMinusUtcSeconds,69.184,accuracy:1e-9)
+        let reading=try NativeWorldLabTimeScales.utcToUt1("2026-11-01T12:00:00Z",series:series)
+        XCTAssertEqual(reading.dut1Seconds ?? 0,-0.054975,accuracy:1e-9)
+        XCTAssertEqual(reading.quality,.predicted)
+        XCTAssertGreaterThan(reading.ut1UncertaintySeconds ?? 0,0)
+        XCTAssertTrue(reading.bulletin?.contains("No. 44") == true)
+    }
+    func testNativeTimeScaleConversionsFailClosedOutsideCertifiedCoverage() throws {
+        let series=try NativeWorldLabTimeScales.parseBulletinA(testBulletinA)
+        XCTAssertThrowsError(try NativeWorldLabTimeScales.utcToTaiTt("2027-01-02T00:00:00Z"))
+        XCTAssertThrowsError(try NativeWorldLabTimeScales.utcToUt1("2026-11-10T00:00:00Z",series:series))
+        XCTAssertThrowsError(try NativeWorldLabTimeScales.parseBulletinA("not IERS data"))
+    }
+}
