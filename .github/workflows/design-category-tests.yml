@@ -1,6 +1,9 @@
 name: Design category — standalone engine tests
 
 on:
+  push:
+    branches:
+      - feat/design-category-systematic-upgrade-20261031
   pull_request:
     paths:
       - "src/components/engines/color-engine.tsx"
