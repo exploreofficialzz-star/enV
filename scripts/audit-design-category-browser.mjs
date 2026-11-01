@@ -140,6 +140,11 @@ for (const [browserName, browserType] of browserEntries) {
     page.getByRole("button", { name: "Download PNG", exact: true }).click(),
   ]);
   assert.match(pngDownload.suggestedFilename(), /\\.png$/i, "Palette PNG export should produce a PNG file");
+  const [svgDownload] = await Promise.all([
+    page.waitForEvent("download", { timeout: 15000 }),
+    swatchExport.getByRole("button", { name: "Download", exact: true }).click(),
+  ]);
+  assert.equal(svgDownload.suggestedFilename(), "env-palette-swatches.svg", "Palette SVG export should retain its SVG filename");
 
   const layoutSelect = page.getByLabel("Page preview layout");
   await layoutSelect.waitFor({ state: "visible" });
