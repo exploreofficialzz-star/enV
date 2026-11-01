@@ -4,6 +4,8 @@ import {validateScientificGraph,validatePowerBalance,type ScientificGraph} from 
 /** Only trusted built-in solvers can be registered; project imports carry data, never code. */
 export type ScientificAdapter=Readonly<{
   componentId:string;modelId:string;modelVersion:string;
+  /** Explicit t=0 outputs for stateful delayed feedback edges. */
+  initialOutputs?:Readonly<Record<string,ScientificQuantity>>;
   advance:(atSeconds:number,deltaSeconds:number,
     inputs:Readonly<Record<string,ScientificQuantity>>)=>Readonly<{
       outputs:Readonly<Record<string,ScientificQuantity>>;
@@ -50,6 +52,7 @@ export function executeScientificGraph(graphInput:ScientificGraph,
     forward.get(e.fromComponentId)!.add(e.toComponentId);
     inbound.set(e.toComponentId,inbound.get(e.toComponentId)!+1);
   }
+  const incoming=new Map(graph.components.map(c=>[c.id,graph.edges.filter(e=>e.toComponentId===c.id)]));
   const ready=graph.components.filter(c=>inbound.get(c.id)===0).map(c=>c.id).sort();
   const order:string[]=[];
   while(ready.length){
@@ -63,8 +66,24 @@ export function executeScientificGraph(graphInput:ScientificGraph,
     throw new Error("Algebraic loop requires explicitly supported implicit solving.");
   const samples:ScientificExchangeSample[]=[];
   let now=0,scheduled:number|null=null;
-  let previous:Readonly<Record<string,ScientificQuantity>>={};
-  for(let index=0;index<20000&&now<duration-1e-12;index++){
+  const initialValues:Record<string,ScientificQuantity>={};
+  for(const adapter of adapters){
+    const component=parts.get(adapter.componentId)!;
+    if(adapter.initialOutputs!==undefined&&
+      (!adapter.initialOutputs||typeof adapter.initialOutputs!=="object"||Array.isArray(adapter.initialOutputs)))
+      throw new Error("Scientific adapter initial outputs must be a data object.");
+    for(const [portId,raw] of Object.entries(adapter.initialOutputs??{})){
+      const port=component.ports.find(p=>p.id===portId);
+      if(!port||port.direction==="input")
+        throw new Error("Scientific adapter initial state references an unregistered output port.");
+      const typed=parseQuantity(raw);
+      if(typed.unit!==port.unit)
+        throw new Error("Scientific adapter initial state unit differs from its declared output port.");
+      initialValues[adapter.componentId+":"+portId]=typed;
+    }
+  }
+  let previous:Readonly<Record<string,ScientificQuantity>>=Object.freeze(initialValues);
+  for(let index=0;index<50000&&now<duration-1e-12;index++){
     const end=Math.min(duration,now+dt,scheduled??duration);
     if(end<=now+1e-12)throw new Error("Solver did not advance to a valid time.");
     const values:Record<string,ScientificQuantity>={};
@@ -73,15 +92,11 @@ export function executeScientificGraph(graphInput:ScientificGraph,
     for(const id of order){
       const component=parts.get(id)!;
       const inputs:Record<string,ScientificQuantity>={};
-      for(const e of graph.edges){
-        if(e.toComponentId!==id)continue;
+      for(const e of incoming.get(id)??[]){
         const source=(e.delayed?previous:values)[e.fromComponentId+":"+e.fromPortId];
-        if(!source){
-          // A delayed feedback edge may initialize from the adapter's own state
-          // on the first tick. A same-step connection must never disappear silently.
-          if(e.delayed&&samples.length===0)continue;
-          throw new Error("Connected scientific source did not emit its declared output port.");
-        }
+        if(!source)throw new Error(e.delayed?
+          "Delayed scientific input requires a registered initial output value.":
+          "Connected scientific source did not emit its declared output port.");
         const port=component.ports.find(p=>p.id===e.toPortId)!;
         const same=quantity(convertQuantity(source,port.unit),port.unit,
           source.evidence,source.sourceId);
@@ -138,15 +153,19 @@ export function createIdealRcAdapters(input:{
     advance:()=>({outputs:{V:quantity(input.sourceVoltageV,"V","hypothetical-user-assumed")},
       suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:null}),
   };
+  let capacitorVoltage=initial;
   const load:ScientificAdapter={
     componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0",
-    advance:(atSeconds,_deltaSeconds,ports)=>{
+    advance:(_atSeconds,deltaSeconds,ports)=>{
       const connectedVoltage=ports.Vin?.valueSI;
       if(!Number.isFinite(connectedVoltage))
         throw new Error("RC load requires its connected source voltage.");
-      const voltage=connectedVoltage+(initial-connectedVoltage)*
-        Math.exp(-atSeconds/(input.resistanceOhm*input.capacitanceF));
+      if(!Number.isFinite(deltaSeconds)||deltaSeconds<=0)
+        throw new Error("RC solver requires a positive finite step.");
+      const voltage=connectedVoltage+(capacitorVoltage-connectedVoltage)*
+        Math.exp(-deltaSeconds/(input.resistanceOhm*input.capacitanceF));
       const current=(connectedVoltage-voltage)/input.resistanceOhm;
+      capacitorVoltage=voltage;
       return {outputs:{Vc:quantity(voltage,"V","physics-model-computed"),
         I:quantity(current,"A","physics-model-computed")},
         suppliedW:connectedVoltage*current,dissipatedW:current*current*input.resistanceOhm,
