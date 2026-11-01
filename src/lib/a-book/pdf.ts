@@ -35,7 +35,7 @@ async function openPdf(file: Blob): Promise<PDFDocument> {
 
 function safeArchiveName(value: string): string {
   const name = value.replace(/\.pdf$/i, "").trim().replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
-  return name.slice(0, 100) || "document";
+  return name.slice(0, 100).toLowerCase() || "document";
 }
 
 function assertBatch(files: ABookPdfInput[]): void {
