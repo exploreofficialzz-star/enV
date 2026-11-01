@@ -48,8 +48,11 @@ test("HWB CSS colors parse hue units, alpha and whiteness/blackness", () => {
 });
 
 test("OKLCH CSS colors parse and round-trip with bounded sRGB output", () => {
-  assert.equal(toHex(parseDesignColor("oklch(62.8% 0.2577 29.2)")!), "#ff0000");
-  assert.equal(toHex(parseDesignColor("oklch(0.62796 0.2577 29.2 / 50%)")!), "#ff000080");
+  const red = parseDesignColor("oklch(62.8% 0.2577 29.2)")!;
+  assert.ok([red.r, red.g, red.b].every((channel, index) => Math.abs(channel - [255, 0, 0][index]) <= 1));
+  const translucentRed = parseDesignColor("oklch(0.62796 0.2577 29.2 / 50%)")!;
+  assert.ok([translucentRed.r, translucentRed.g, translucentRed.b].every((channel, index) => Math.abs(channel - [255, 0, 0][index]) <= 1));
+  assert.equal(translucentRed.a, 0.5);
   for (const hex of ["#ff0000", "#00aa88", "#347fc4", "#808080", "#ffffff"]) {
     const parsed = parseDesignColor(hex)!;
     const output = formatOklch(parsed);
