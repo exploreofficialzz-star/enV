@@ -13,6 +13,7 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = aw
 // Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
 // runtime extensions are validated below but are not duplicated into the generated base export.
 
+// A book is a local-only native/web tool; keep this extension exported to every platform.
 const runtimeCatalogExtensions = [
   {
     id: "song-metadata-analyzer",
