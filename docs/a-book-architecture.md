@@ -21,6 +21,7 @@ This section records code that exists in the current implementation branch. It i
 **Data boundary:** notes, attachments, archives and processing remain local. No A book content API, hosted file store, cloud sync or cloud backup is part of this release.
 
 **Important implementation details:**
+- Web PDF inspection, extraction, batch extraction, splitting, batch splitting, rotation and merging execute in a dedicated same-origin module Web Worker. Worker requests have a bounded execution deadline, explicit error handling and termination; Node tests use the same operation functions through a direct local fallback.
 - The Web local database currently uses IndexedDB. OPFS is a planned enhancement, not a claimed dependency.
 - Android currently uses a SQLiteOpenHelper-backed store. Do not describe it as Room until the migration is implemented and tested.
 - The shared env.abook.archive.v1 ZIP format is used for portable local backup/restore. Import paths validate archive limits and remap imported IDs to avoid collisions.
