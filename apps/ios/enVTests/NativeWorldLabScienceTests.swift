@@ -92,3 +92,39 @@ final class NativeWorldLabElasticWaveTests:XCTestCase {
             youngModulusPa:1e15,mode:1,amplitudeMeters:1e-5,cycles:4))
     }
 }
+
+
+final class NativeWorldLabRadiationTests:XCTestCase {
+    func make(_ start:Double=400,_ ambient:Double=300,_ emissivity:Double=0.8)throws->NativeRadiationRun {
+        try NativeWorldLabRadiation.parameters(
+            projectId:"world",projectRevision:2,entityId:"object",materialId:"matter",
+            massKg:1000,areaM2:6,densityKgM3:1000,specificHeatJPerKgK:500,
+            startK:start,environmentK:ambient,emissivity:emissivity,duration:1000)
+    }
+    func testPhysicalCoolingAndEnergyLedger() throws {
+        let r=try make()
+        let initial=try XCTUnwrap(r.samples.first)
+        let expected=0.8*NativeWorldLabRadiation.sigma*6*(pow(400.0,4)-pow(300.0,4))
+        XCTAssertEqual(initial.netRadiatedPowerW,expected,accuracy:1e-8)
+        let last=try XCTUnwrap(r.samples.last)
+        XCTAssertLessThan(last.temperatureK,400)
+        XCTAssertGreaterThan(last.temperatureK,300)
+        for s in r.samples{XCTAssertLessThan(abs(s.energyResidualJ),1e-5)}
+        XCTAssertEqual(r.inputEvidence,"hypothetical-user-assumed")
+    }
+    func testInsulationAndEnvironmentHeating() throws {
+        XCTAssertEqual(try XCTUnwrap(make(400,300,0).samples.last).temperatureK,
+            400,accuracy:0)
+        let warmed=try XCTUnwrap(make(300,700).samples.last)
+        XCTAssertGreaterThan(warmed.temperatureK,300)
+        XCTAssertLessThan(warmed.transferredEnergyJ,0)
+    }
+    func testNonphysicalAssumptionsRefused() throws {
+        XCTAssertThrowsError(try make(400,300,-1))
+        XCTAssertThrowsError(try NativeWorldLabRadiation.parameters(
+            projectId:"p",projectRevision:0,entityId:"r",materialId:"m",
+            massKg:1e-5,areaM2:6,densityKgM3:0.001,specificHeatJPerKgK:0.01,
+            startK:400,environmentK:300,emissivity:0.8,duration:1000))
+        XCTAssertThrowsError(try make().sample(Double.infinity))
+    }
+}

@@ -1488,3 +1488,154 @@ enum NativeWorldLabElasticWave {
                 "acoustics in air or nonlinear material behavior.")
     }
 }
+
+
+// MARK: - Ideal Stefan-Boltzmann radiation, with independent Swift RK4 solver
+struct NativeRadiationSample:Encodable {
+    let timeSeconds:Double
+    let temperatureK:Double
+    let netRadiatedPowerW:Double
+    let transferredEnergyJ:Double
+    let internalThermalEnergyJ:Double
+    let energyResidualJ:Double
+}
+struct NativeRadiationRun:Encodable {
+    let format="env-world-lab-thermal-radiation"
+    let modelVersion="1.0.0"
+    let evidence="physics-model-computed"
+    let inputEvidence="hypothetical-user-assumed"
+    let projectId:String
+    let projectRevision:Int
+    let entityId:String
+    let materialId:String
+    let initialTemperatureK:Double
+    let environmentTemperatureK:Double
+    let emissivity:Double
+    let durationSeconds:Double
+    let massKg:Double
+    let areaM2:Double
+    let assumedDensityKgM3:Double
+    let assumedSpecificHeatJPerKgK:Double
+    let steps:Int
+    let samples:[NativeRadiationSample]
+    let validity:String
+
+    func sample(_ seconds:Double)throws->NativeRadiationSample {
+        guard seconds.isFinite && seconds>=0 && seconds<=durationSeconds else {
+            throw NativeWorldLabError.invalid("Radiation time must be in its computed interval")
+        }
+        if seconds==0{return samples[0]}
+        if seconds==durationSeconds{return samples[samples.count-1]}
+        let hi=max(1,samples.firstIndex(where:{$0.timeSeconds>=seconds}) ?? samples.count-1)
+        let a=samples[hi-1],b=samples[hi]
+        let f=(seconds-a.timeSeconds)/(b.timeSeconds-a.timeSeconds)
+        func blend(_ x:Double,_ y:Double)->Double{x+(y-x)*f}
+        return NativeRadiationSample(timeSeconds:seconds,
+            temperatureK:blend(a.temperatureK,b.temperatureK),
+            netRadiatedPowerW:blend(a.netRadiatedPowerW,b.netRadiatedPowerW),
+            transferredEnergyJ:blend(a.transferredEnergyJ,b.transferredEnergyJ),
+            internalThermalEnergyJ:blend(a.internalThermalEnergyJ,b.internalThermalEnergyJ),
+            energyResidualJ:blend(a.energyResidualJ,b.energyResidualJ))
+    }
+}
+enum NativeWorldLabRadiation {
+    static let sigma=5.670374419e-8
+    static func evaluate(_ project:NativeWorldLabProject,id:String,
+        startK:Double,environmentK:Double,
+        emissivity:Double,duration:Double)throws->NativeRadiationRun {
+        guard let solid=project.entities.first(where:{$0.id==id}) else {
+            throw NativeWorldLabError.invalid("Select a saved invented solid")
+        }
+        guard let matter=project.materials.first(where:{$0.id==solid.materialId}),
+              matter.evidence=="hypothetical-user-assumed",
+              let density=matter.densityKgM3,
+              let heat=matter.specificHeatJPerKgK else {
+            throw NativeWorldLabError.invalid("Invented solid needs assumed density and specific heat")
+        }
+        let d=solid.dimensionsMeters
+        let area:Double
+        switch solid.shape {
+        case "box":area=2*(d[0]*d[1]+d[0]*d[2]+d[1]*d[2])
+        case "sphere":area=Double.pi*d[0]*d[0]
+        case "cylinder":area=Double.pi*d[0]*(d[1]+d[0]/2)
+        default:throw NativeWorldLabError.invalid("Unknown radiating solid shape")
+        }
+        return try parameters(projectId:project.id,projectRevision:project.revision,
+            entityId:solid.id,materialId:matter.id,massKg:solid.volumeMetersCubed*density,
+            areaM2:area,densityKgM3:density,specificHeatJPerKgK:heat,
+            startK:startK,environmentK:environmentK,
+            emissivity:emissivity,duration:duration)
+    }
+    static func parameters(projectId:String,projectRevision:Int,entityId:String,
+        materialId:String,massKg:Double,areaM2:Double,densityKgM3:Double,
+        specificHeatJPerKgK:Double,startK:Double,environmentK:Double,
+        emissivity:Double,duration:Double)throws->NativeRadiationRun {
+        let heatCapacity=massKg*specificHeatJPerKgK
+        guard !projectId.isEmpty && !entityId.isEmpty && !materialId.isEmpty &&
+            projectRevision>=0 && massKg.isFinite && (1e-9...1e15).contains(massKg) &&
+            areaM2.isFinite && (1e-9...1e9).contains(areaM2) &&
+            densityKgM3.isFinite && (0.001...1e9).contains(densityKgM3) &&
+            specificHeatJPerKgK.isFinite && (0.01...1e7).contains(specificHeatJPerKgK) &&
+            heatCapacity.isFinite && (1e-9...1e20).contains(heatCapacity) &&
+            startK.isFinite && (1...3000).contains(startK) &&
+            environmentK.isFinite && (1...3000).contains(environmentK) &&
+            emissivity.isFinite && (0...1).contains(emissivity) &&
+            duration.isFinite && (0.01...3600).contains(duration) else {
+            throw NativeWorldLabError.invalid("Radiative thermal assumptions exceed safe bounds")
+        }
+        let maximum=max(startK,environmentK)
+        let coefficient=emissivity*sigma*areaM2
+        let stable=coefficient==0 ? Double.infinity :
+            0.05*heatCapacity/(4*coefficient*pow(maximum,3))
+        let required=max(120,ceil(duration/stable))
+        guard required.isFinite && required<=20000 else {
+            throw NativeWorldLabError.invalid("Radiation exceeds the 20,000-step local budget")
+        }
+        let steps=Int(required),dt=duration/required
+        let stride=max(1,Int(ceil(required/120)))
+        var temperature=startK,transferred=0.0
+        var samples:[NativeRadiationSample]=[]
+        func power(_ t:Double)->Double{
+            coefficient*(pow(t,4)-pow(environmentK,4))
+        }
+        func derivative(_ t:Double)->Double{-power(t)/heatCapacity}
+        func record(_ step:Int){
+            let actual=heatCapacity*(startK-temperature)
+            samples.append(NativeRadiationSample(timeSeconds:Double(step)*dt,
+                temperatureK:temperature,netRadiatedPowerW:power(temperature),
+                transferredEnergyJ:transferred,
+                internalThermalEnergyJ:heatCapacity*temperature,
+                energyResidualJ:actual-transferred))
+        }
+        record(0)
+        for step in 1...steps {
+            let k1=derivative(temperature)
+            let k2=derivative(temperature+dt*k1/2)
+            let k3=derivative(temperature+dt*k2/2)
+            let k4=derivative(temperature+dt*k3)
+            let delta=dt*(k1+2*k2+2*k3+k4)/6
+            temperature+=delta
+            transferred-=heatCapacity*delta
+            guard temperature.isFinite && (0.001...3500).contains(temperature) else {
+                throw NativeWorldLabError.invalid("Radiative temperature became nonphysical")
+            }
+            let tolerance=1e-7*max(1,maximum)
+            guard temperature>=min(startK,environmentK)-tolerance &&
+                temperature<=maximum+tolerance else {
+                throw NativeWorldLabError.invalid("Radiative integration escaped temperature bounds")
+            }
+            if step%stride==0 || step==steps {record(step)}
+        }
+        return NativeRadiationRun(projectId:projectId,projectRevision:projectRevision,
+            entityId:entityId,materialId:materialId,initialTemperatureK:startK,
+            environmentTemperatureK:environmentK,emissivity:emissivity,
+            durationSeconds:duration,massKg:massKg,areaM2:area,
+            assumedDensityKgM3:densityKgM3,
+            assumedSpecificHeatJPerKgK:specificHeatJPerKgK,
+            steps:steps,samples:samples,
+            validity:"Ideal lumped isothermal grey-body heat transfer to a fixed "+
+                "environment. All density, specific heat and emissivity are assumed. "+
+                "No measured atmosphere, sunlight, geometry view factors, phase "+
+                "transitions or real-life performance certification.")
+    }
+}

@@ -479,6 +479,7 @@ struct NativeWorldLabView:View {
                 }
                 if let project=project {
                     NativeWorldLabElasticWavePanel(project:project)
+                    NativeWorldLabRadiationPanel(project:project)
                 }
                 Divider()
                 HStack {
@@ -2614,6 +2615,145 @@ private struct NativeWorldLabElasticWavePanel:View {
         }
         .fileExporter(isPresented:$exporting,document:evidenceFile,
             contentType:.json,defaultFilename:"world-lab-elastic-wave"){result in
+                if case .failure(let error)=result{problem=error.localizedDescription}
+                evidenceFile=nil
+            }
+    }
+}
+
+
+// MARK: - Native inventor-driven radiative heat transfer
+private struct NativeWorldLabRadiationPanel:View {
+    let project:NativeWorldLabProject
+    @State private var selectedIndex=0
+    @State private var initial="400"
+    @State private var surrounding="300"
+    @State private var emissivity="0.8"
+    @State private var duration="1000"
+    @State private var run:NativeRadiationRun?
+    @State private var fraction=0.0
+    @State private var playing=false
+    @State private var speed=1.0
+    @State private var problem=""
+    @State private var exporting=false
+    @State private var evidenceFile:NativeWorldLabJsonFile?
+    private var current:NativeRadiationRun? {
+        guard let run=run,!project.entities.isEmpty,
+              run.projectId==project.id && run.projectRevision==project.revision &&
+              run.entityId==project.entities[selectedIndex%project.entities.count].id else {
+            return nil
+        }
+        return run
+    }
+    var body:some View {
+        VStack(alignment:.leading,spacing:8){
+            Text("Radiate heat from invented matter").font(.headline)
+            Text("Stefan–Boltzmann heating/cooling under hypothetical density, "+
+                 "specific heat, emissivity and environmental assumptions. "+
+                 "Not a measured atmosphere, sunlight or real material.")
+                .font(.caption).foregroundStyle(.secondary)
+            if !project.entities.isEmpty {
+                Button("Radiating solid: "+
+                    project.entities[selectedIndex%project.entities.count].name){
+                    selectedIndex=(selectedIndex+1)%project.entities.count
+                    run=nil;playing=false
+                }.buttonStyle(.bordered)
+                HStack{
+                    TextField("Initial K",text:$initial).keyboardType(.decimalPad)
+                        .textFieldStyle(.roundedBorder)
+                    TextField("Surroundings K",text:$surrounding)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                }
+                HStack {
+                    TextField("Emissivity 0–1",text:$emissivity)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                    TextField("Duration s",text:$duration)
+                        .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                }
+                Button("Calculate radiative heat locally"){
+                    do{
+                        guard let initialK=Double(initial),
+                              let ambientK=Double(surrounding),
+                              let e=Double(emissivity),let seconds=Double(duration) else {
+                            throw NativeWorldLabError.invalid("Enter numeric radiation inputs")
+                        }
+                        run=try NativeWorldLabRadiation.evaluate(project,
+                            id:project.entities[selectedIndex%project.entities.count].id,
+                            startK:initialK,environmentK:ambientK,
+                            emissivity:e,duration:seconds)
+                        fraction=0;playing=false;problem=""
+                    }catch{run=nil;playing=false;problem=error.localizedDescription}
+                }.buttonStyle(.borderedProminent)
+                if let r=current,let measured=try? r.sample(r.durationSeconds*fraction){
+                    Text("Computed temperature "+
+                         String(format:"%.6g",measured.temperatureK)+" K · net heat "+
+                         String(format:"%.6g",measured.netRadiatedPowerW)+" W")
+                        .font(.caption)
+                    GeometryReader{frame in
+                        Path{path in
+                            let minimum=min(r.initialTemperatureK,r.environmentTemperatureK)
+                            let maximum=max(r.initialTemperatureK,r.environmentTemperatureK)
+                            let range=max(1,maximum-minimum)
+                            for (i,s) in r.samples.enumerated(){
+                                let x=frame.size.width*CGFloat(s.timeSeconds/r.durationSeconds)
+                                let y=frame.size.height*CGFloat(0.9-
+                                    0.8*(s.temperatureK-minimum)/range)
+                                let point=CGPoint(x:x,y:y)
+                                if i==0{path.move(to:point)}
+                                else{path.addLine(to:point)}
+                            }
+                        }.stroke(.primary,lineWidth:2)
+                    }.frame(height:100)
+                        .accessibilityLabel("Computed radiative Kelvin temperature trace")
+                    Slider(value:$fraction,in:0...1,onEditingChanged:{editing in
+                        if editing{playing=false}
+                    }).accessibilityLabel("Radiation simulated time")
+                    Text("Simulated time "+
+                         String(format:"%.3f",measured.timeSeconds)+" s")
+                        .font(.caption)
+                    HStack{
+                        Button(playing ? "Pause":"Play"){playing.toggle()}
+                        Button("Reset"){playing=false;fraction=0}
+                        Button("Speed "+String(format:"%.1f",speed)+"×"){
+                            speed=speed==1 ? 4 : speed==4 ? 0.1 : 1
+                        }
+                    }.buttonStyle(.bordered)
+                    Text("Net transferred energy "+
+                         String(format:"%.6g",measured.transferredEnergyJ)+
+                         " J · energy residual "+
+                         String(format:"%.5g",measured.energyResidualJ)+" J")
+                        .font(.caption)
+                    Button("Export radiation evidence"){
+                        do{
+                            let bytes=try JSONEncoder().encode(r)
+                            guard bytes.count<=1_048_576 else {
+                                throw NativeWorldLabError.invalid("Radiation evidence exceeds 1 MB")
+                            }
+                            evidenceFile=NativeWorldLabJsonFile(content:bytes)
+                            exporting=true;problem=""
+                        }catch{problem=error.localizedDescription}
+                    }.buttonStyle(.bordered)
+                    Text(r.validity).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Text("Invent a solid and thermal material before radiating.")
+                    .font(.caption)
+            }
+            if !problem.isEmpty {
+                Text(problem).font(.caption).foregroundStyle(.red)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
+        }
+        .task(id:playing){
+            while playing && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds:40_000_000)
+                guard current != nil else {playing=false;break}
+                fraction=min(1,fraction+0.04*speed/8)
+                if fraction>=1{playing=false}
+            }
+        }
+        .fileExporter(isPresented:$exporting,document:evidenceFile,
+            contentType:.json,defaultFilename:"world-lab-radiative-heat"){result in
                 if case .failure(let error)=result{problem=error.localizedDescription}
                 evidenceFile=nil
             }
