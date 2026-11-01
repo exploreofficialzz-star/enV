@@ -26,6 +26,7 @@ import {WorldLabCircuitDiagram} from "./circuit-diagram";
 import {WorldLabDigitalLogicPanel} from "./digital-logic-panel";
 import {WorldLabOpticsPanel} from "./optics-panel";
 import {WorldLabGravityPanel} from "./gravity-panel";
+import {WorldLabElasticWavePanel} from "./elastic-wave-panel";
 import {WorldLabMaterialHeatPanel} from "./material-heat-panel";
 import type {MaterialHeatSample,MaterialHeatRun} from "@/lib/world-lab/material-heat-transfer";
 import type {GravityConfig,GravityFrame,GravityBody} from "@/lib/world-lab/gravity";
@@ -2237,6 +2238,7 @@ export default function WorldLab() {
             </div>
           </div>)}
       </section>
+      <WorldLabElasticWavePanel project={project}/>
       <WorldLabMaterialHeatPanel project={project}
         onKeepEvidence={keepScientificEvidence}
         onSample={(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>{
