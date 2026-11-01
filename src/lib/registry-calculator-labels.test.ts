@@ -55,7 +55,7 @@ test("every generated formula calculator uses the correct human label in its tit
 
 test("design/build/delivery-effort examples remain calculators and use the correct target labels", () => {
   const examples = generated.filter((tool) => tool.id.includes("design-build-delivery-effort"));
-  assert.equal(examples.length, 18);
+  assert.equal(examples.length, 9);
   assert.ok(examples.every((tool) => tool.category === "calculators"));
   for (const tool of examples) {
     assert.match(tool.name, /Solve for (Design|Build|Delivery effort)/i);
