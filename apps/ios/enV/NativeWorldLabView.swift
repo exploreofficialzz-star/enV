@@ -47,6 +47,27 @@ struct NativeWorldLabView:View {
     @State private var showInspectionLabels=true
     @State private var showInspectionOverlays=true
 
+    private var motorRecordedRun:NativeWorldLabRecordedRun? {
+        guard let run=motorRun,!motorRunIdentity.isEmpty else{return nil}
+        let epoch=ISO8601DateFormatter().string(from:worldEpochUTC)
+        let events=run.modelVersion=="1.2.0" ? [motorPowerOffAtSeconds].compactMap{$0}: []
+        let recording=NativeWorldLabRecordedRun(runId:motorRunIdentity,modelId:"native-actuator",
+            modelVersion:run.modelVersion,worldEpochUTC:epoch,
+            sampleTimesSeconds:run.samples.map{$0.timeSeconds},
+            mandatoryEventTimesSeconds:events)
+        do {try recording.validate();return recording} catch{return nil}
+    }
+    private func resetMotorRecordedClock() {
+        guard let recording=motorRecordedRun else{motorClock=nil;return}
+        let formatter=ISO8601DateFormatter()
+        do {
+            motorClock=try NativeWorldLabRecordedTime.start(run:recording,
+                wallTimeUTC:formatter.string(from:Date()),
+                timezoneDisplay:TimeZone.current.identifier,playbackRate:motorSpeed)
+            motorTime=0
+        } catch {problem=error.localizedDescription;motorClock=nil}
+    }
+
     private var currentInspectionView:NativeWorldLabInspectionSettings {
         NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
             axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
@@ -234,6 +255,9 @@ struct NativeWorldLabView:View {
     @State private var motorEntityId:String?
     @State private var motorTime=0.0
     @State private var motorPlaying=false
+    @State private var motorReversePlayback=false
+    @State private var motorRunIdentity=""
+    @State private var motorClock:NativeWorldLabRecordedClock?
     @State private var motorThermalEnabled=false
     @State private var motorPowerOffAtSeconds:Double?=nil
     @State private var motorSpeed=1.0
@@ -847,6 +871,7 @@ struct NativeWorldLabView:View {
         .onChange(of:dropTime){_ in applyDropPosition()}
         .onChange(of:fluidTime){_ in applyFluidPosition()}
         .onChange(of:motorTime){_ in applyMotorPosition()}
+        .onChange(of:motorRunIdentity){_ in resetMotorRecordedClock()}
         .onChange(of:seeInside){_ in
             if seeInside && inspectionMode == .normal {inspectionMode = .transparent}
             else if !seeInside && inspectionMode == .transparent {inspectionMode = .normal}
@@ -893,7 +918,8 @@ struct NativeWorldLabView:View {
             collisionPlaying=false;collisionRun=nil;collisionTime=0
             groupPlaying=false;groupRun=nil;groupTime=0
             dropPlaying=false;dropRun=nil;dropEntityId=nil;dropTime=0
-            motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0;redraw()
+            motorPlaying=false;motorRun=nil;digitalMotor=nil;motorEntityId=nil;motorTime=0
+            motorRunIdentity="";motorClock=nil;motorReversePlayback=false;redraw()
         }
         .confirmationDialog("Discard saved scientific evidence?",
             isPresented:$confirmingStoredScienceDelete,titleVisibility:.visible){
@@ -931,9 +957,29 @@ struct NativeWorldLabView:View {
                 seconds=reversePlayback ? max(0,seconds-dt*speed) : min(12,seconds+dt*speed)
                 if (reversePlayback && seconds<=0) || (!reversePlayback && seconds>=12){playing=false}
             }
-            if motorPlaying,let run=motorRun {
-                motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
-                if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
+            if let recording=motorRecordedRun,let previous=motorClock {
+                let direction=motorReversePlayback ? "reverse-recording":"forward"
+                let active=NativeWorldLabRecordedClock(wallTimeUTC:previous.wallTimeUTC,
+                    worldDateUTC:previous.worldDateUTC,simulationTimeSeconds:previous.simulationTimeSeconds,
+                    solverInternalTimeSeconds:previous.solverInternalTimeSeconds,
+                    displaySampleTimeSeconds:previous.displaySampleTimeSeconds,
+                    sampleIndex:previous.sampleIndex,playbackRate:motorSpeed,direction:direction,
+                    paused:!motorPlaying,timezoneDisplay:previous.timezoneDisplay,
+                    fidelity:"recorded-sample-playback")
+                if let next=try? NativeWorldLabRecordedTime.advance(run:recording,state:active,
+                    elapsedSeconds:dt,paused:!motorPlaying) {
+                    motorClock=next;motorTime=next.simulationTimeSeconds
+                    if motorPlaying {
+                        let crossedEvent=recording.mandatoryEventTimesSeconds.contains{event in
+                            abs(event-next.simulationTimeSeconds)<=1e-9 &&
+                                abs(event-previous.simulationTimeSeconds)>1e-9
+                        }
+                        if crossedEvent || (motorReversePlayback && next.simulationTimeSeconds<=1e-9) ||
+                            (!motorReversePlayback && next.simulationTimeSeconds>=recording.durationSeconds-1e-9) {
+                            motorPlaying=false
+                        }
+                    }
+                } else if motorPlaying {motorPlaying=false}
             }
             if chemicalPlaying,let run=chemicalRun {
                 chemicalTime=min(run.samples.last?.timeSeconds ?? 6,
@@ -2765,7 +2811,8 @@ Text("Invent chemical heat").font(.headline)
                                     let result=try NativeWorldLabActuator.evaluate(input)
                                     motorAudit=try NativeWorldLabActuator.numericalAudit(input,result)
                                     motorRun=result;wiredMotor=nil;digitalMotor=nil
-                                    motorEntityId=solid.id;motorTime=0;motorPlaying=true
+                                    motorRunIdentity=UUID().uuidString
+                                    motorEntityId=solid.id;motorTime=0;motorReversePlayback=false;motorPlaying=true
                                     dropPlaying=false;playing=false;problem=""
                                     applyMotorPosition()
                                 }catch{problem=error.localizedDescription}
@@ -2787,7 +2834,8 @@ Text("Invent chemical heat").font(.headline)
                                         motorAudit=try NativeWorldLabActuator.numericalAudit(
                                             input,linked.motor)
                                         wiredMotor=linked;digitalMotor=nil;motorRun=linked.motor
-                                        motorEntityId=solid.id;motorTime=0;motorPlaying=true
+                                        motorRunIdentity=UUID().uuidString
+                                        motorEntityId=solid.id;motorTime=0;motorReversePlayback=false;motorPlaying=true
                                         dropPlaying=false;playing=false;problem=""
                                         applyMotorPosition()
                                     }catch{problem=error.localizedDescription}
@@ -2806,7 +2854,8 @@ Text("Invent chemical heat").font(.headline)
                                                 linked.input,linked.motor)
                                             digitalMotor=linked;wiredMotor=nil
                                             motorRun=linked.motor;motorAudit=verified
-                                            motorEntityId=solid.id;motorTime=0;motorPlaying=true
+                                            motorRunIdentity=UUID().uuidString
+                                            motorEntityId=solid.id;motorTime=0;motorReversePlayback=false;motorPlaying=true
                                             dropPlaying=false;playing=false;problem=""
                                             applyMotorPosition()
                                         }catch {digitalMotor=nil;problem=error.localizedDescription}
@@ -2820,7 +2869,7 @@ Text("Invent chemical heat").font(.headline)
     @ViewBuilder private func solidMotorReadoutContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                             if let run=motorRun,motorEntityId==solid.id {
                                 let index=max(0,min(run.samples.count-1,
-                                    Int((motorTime/run.stepSeconds).rounded())))
+                                    motorClock?.sampleIndex ?? Int((motorTime/run.stepSeconds).rounded())))
                                 let sample=run.samples[index]
                                 if let linked=digitalMotor,
                                     linked.projectId==project.id,
@@ -2864,12 +2913,66 @@ Text("Invent chemical heat").font(.headline)
                                     Text("Numerical self-check: \(audit.status). \(audit.explanation)")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
-                                Slider(value:$motorTime,in:0...(run.samples.last?.timeSeconds ?? 4))
-                                    .accessibilityLabel("Motor simulated time")
+                                Slider(value:Binding(get:{motorTime},set:{value in
+                                    motorPlaying=false
+                                    if let recording=motorRecordedRun,let clock=motorClock,
+                                       let selected=try? NativeWorldLabRecordedTime.seek(
+                                        run:recording,state:clock,timeSeconds:value) {
+                                        motorClock=selected;motorTime=selected.simulationTimeSeconds
+                                    }else{motorTime=value}
+                                }),in:0...(run.samples.last?.timeSeconds ?? 4))
+                                    .accessibilityLabel("Motor recorded sample position")
+                                Picker("Motor playback speed",selection:$motorSpeed){
+                                    Text("0.01×").tag(0.01);Text("0.1×").tag(0.1)
+                                    Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
+                                }.pickerStyle(.segmented)
                                 HStack {
-                                    Button(motorPlaying ? "Pause motor":"Play motor"){motorPlaying.toggle()}
-                                    Button("Reset motor"){motorPlaying=false;motorTime=0}
+                                    Button("Prev"){motorPlaying=false
+                                        if let recording=motorRecordedRun,let clock=motorClock,
+                                           let selected=try? NativeWorldLabRecordedTime.step(
+                                            run:recording,state:clock,direction:-1) {
+                                            motorClock=selected;motorTime=selected.simulationTimeSeconds
+                                        }
+                                    }
+                                    Button("Next"){motorPlaying=false
+                                        if let recording=motorRecordedRun,let clock=motorClock,
+                                           let selected=try? NativeWorldLabRecordedTime.step(
+                                            run:recording,state:clock,direction:1) {
+                                            motorClock=selected;motorTime=selected.simulationTimeSeconds
+                                        }
+                                    }
+                                    Button(motorPlaying && !motorReversePlayback ? "Pause motor":"Play motor"){
+                                        motorReversePlayback=false
+                                        if let recording=motorRecordedRun,let clock=motorClock,
+                                           clock.simulationTimeSeconds>=recording.durationSeconds-1e-9,
+                                           let start=try? NativeWorldLabRecordedTime.seek(
+                                            run:recording,state:clock,timeSeconds:0) {
+                                            motorClock=start;motorTime=0
+                                        }
+                                        motorPlaying.toggle()
+                                    }
+                                    Button("Rewind recording"){
+                                        motorReversePlayback=true
+                                        if let recording=motorRecordedRun,let clock=motorClock,
+                                           clock.simulationTimeSeconds<=1e-9,
+                                           let end=try? NativeWorldLabRecordedTime.seek(
+                                            run:recording,state:clock,timeSeconds:recording.durationSeconds) {
+                                            motorClock=end;motorTime=end.simulationTimeSeconds
+                                        }
+                                        motorPlaying=true
+                                    }
+                                    Button("Beginning"){motorPlaying=false;motorReversePlayback=false
+                                        if let recording=motorRecordedRun,let clock=motorClock,
+                                           let start=try? NativeWorldLabRecordedTime.seek(
+                                            run:recording,state:clock,timeSeconds:0) {
+                                            motorClock=start;motorTime=0
+                                        }
+                                    }
                                 }.buttonStyle(.bordered)
+                                if let clock=motorClock {
+                                    Text("Simulation \(String(format:"%.4f",clock.simulationTimeSeconds)) s · display sample \(clock.sampleIndex+1)/\(run.samples.count) · world UTC \(clock.worldDateUTC)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                                 Text("Electricity and physical motion are coupled in one 1D solver. Material and actuator parameters are hypothetical, not measurements.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
@@ -2900,7 +3003,8 @@ Text("Invent chemical heat").font(.headline)
               let solid=project?.entities.first(where:{$0.id==id}),
               let node=scene.rootNode.childNode(withName:"lab-solid-"+id,recursively:false),
               !run.samples.isEmpty else{return}
-        let index=max(0,min(run.samples.count-1,Int((motorTime/run.stepSeconds).rounded())))
+        let index=max(0,min(run.samples.count-1,
+            motorClock?.sampleIndex ?? Int((motorTime/run.stepSeconds).rounded())))
         node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightM)
     }
     private func applyFluidPosition() {
