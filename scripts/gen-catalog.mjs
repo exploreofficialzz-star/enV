@@ -7,6 +7,11 @@ import { IMAGE_DESCRIPTIONS } from "./image-descriptions.mjs";
 import mathExpansion from "../src/data/math-expansion.json" with { type: "json" };
 import { describeExpansion } from "../src/lib/calc/expansion-rows.mjs";
 
+// Preserve the additive Audio Studio records that intentionally sit outside the generated base catalogue.
+const currentCatalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
+const audioStudioSupplement = currentCatalogSource.match(/\nconst audioStudioTools: ToolMeta\\[\\] = \\[([\\s\\S]*)$/)?.[0];
+if (!audioStudioSupplement) throw new Error("Cannot regenerate the catalogue without preserving its Audio Studio supplement.");
+
 /** @typedef {[string, string, string, string, string, string, string, number, number, string?]} Tuple */
 // id, name, cat, desc, engineType, engineKey, keywords, featured(0/1), pop, extra
 // extra: n=new, h=health, f=finance, e=earnings, m=mockup, p=planned, b=beta, s=estimate
@@ -2332,8 +2337,8 @@ const catalogJson = [
 ${catalogChunks.join(",\n")}
 ].join("");
 
-export const tools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
-`;
+export const originalTools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
+` + audioStudioSupplement;
 
 writeFileSync(new URL("../src/data/catalog.ts", import.meta.url), body);
 const active = tools.filter((t) => t.status !== "planned").length;
