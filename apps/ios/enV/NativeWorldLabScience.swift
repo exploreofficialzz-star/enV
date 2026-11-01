@@ -46,6 +46,11 @@ enum NativeWorldLabScience {
             try domain(r,0.001,1e9,"Resistance")
             try domain(c,1e-9,1000,"Capacitance")
             try domain(v,-1000,1000,"Supply")
+            let voltage = try NativeWorldLabSI.declare(v,unit:"V")
+            _ = try NativeWorldLabSI.convert(voltage,to:"V")
+            try NativeWorldLabSI.connect(
+                .init(id:"source",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+                .init(id:"capacitor",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"))
             try domain(v0,-1000,1000,"Initial voltage")
         case let .heat(alpha,length,ambient,center):
             try domain(alpha,1e-7,100,"Diffusivity")
@@ -195,5 +200,103 @@ enum NativeWorldLabDropScience {
             }
         }
         return NativeDropResult(samples:samples,impactCount:impacts,stepSeconds:dt)
+    }
+}
+
+
+/** Source-aware, dimension-checked SI numerical exchange. Native Swift implementation
+ * deliberately independent from Web and Kotlin to expose parity drift through tests.
+ */
+struct NativeScienceQuantity {
+    let valueSI:Double
+    let unit:String
+    let dimension:[Int]
+    let evidence:String
+    let sourceId:String?
+    let uncertaintySI:Double?
+}
+struct NativeSciencePort {
+    let id:String
+    let direction:String
+    let unit:String
+    let frame:String
+    let flow:String
+}
+enum NativeWorldLabSI {
+    private struct Spec {
+        let dimension:[Int]
+        let factor:Double
+    }
+    private static let units:[String:Spec]=[
+        "1":.init(dimension:[0,0,0,0,0,0,0],factor:1),
+        "kg":.init(dimension:[1,0,0,0,0,0,0],factor:1),
+        "g":.init(dimension:[1,0,0,0,0,0,0],factor:0.001),
+        "m":.init(dimension:[0,1,0,0,0,0,0],factor:1),
+        "cm":.init(dimension:[0,1,0,0,0,0,0],factor:0.01),
+        "mm":.init(dimension:[0,1,0,0,0,0,0],factor:0.001),
+        "km":.init(dimension:[0,1,0,0,0,0,0],factor:1000),
+        "s":.init(dimension:[0,0,1,0,0,0,0],factor:1),
+        "ms":.init(dimension:[0,0,1,0,0,0,0],factor:0.001),
+        "min":.init(dimension:[0,0,1,0,0,0,0],factor:60),
+        "h":.init(dimension:[0,0,1,0,0,0,0],factor:3600),
+        "A":.init(dimension:[0,0,0,1,0,0,0],factor:1),
+        "mA":.init(dimension:[0,0,0,1,0,0,0],factor:0.001),
+        "K":.init(dimension:[0,0,0,0,1,0,0],factor:1),
+        "mol":.init(dimension:[0,0,0,0,0,1,0],factor:1),
+        "cd":.init(dimension:[0,0,0,0,0,0,1],factor:1),
+        "m2":.init(dimension:[0,2,0,0,0,0,0],factor:1),
+        "m3":.init(dimension:[0,3,0,0,0,0,0],factor:1),
+        "m/s":.init(dimension:[0,1,-1,0,0,0,0],factor:1),
+        "m/s2":.init(dimension:[0,1,-2,0,0,0,0],factor:1),
+        "kg/m3":.init(dimension:[1,-3,0,0,0,0,0],factor:1),
+        "N":.init(dimension:[1,1,-2,0,0,0,0],factor:1),
+        "N/m":.init(dimension:[1,0,-2,0,0,0,0],factor:1),
+        "N/A":.init(dimension:[1,1,-2,-1,0,0,0],factor:1),
+        "Pa":.init(dimension:[1,-1,-2,0,0,0,0],factor:1),
+        "kPa":.init(dimension:[1,-1,-2,0,0,0,0],factor:1000),
+        "J":.init(dimension:[1,2,-2,0,0,0,0],factor:1),
+        "kJ":.init(dimension:[1,2,-2,0,0,0,0],factor:1000),
+        "W":.init(dimension:[1,2,-3,0,0,0,0],factor:1),
+        "V":.init(dimension:[1,2,-3,-1,0,0,0],factor:1),
+        "ohm":.init(dimension:[1,2,-3,-2,0,0,0],factor:1),
+        "F":.init(dimension:[-1,-2,4,2,0,0,0],factor:1),
+        "H":.init(dimension:[1,2,-2,-2,0,0,0],factor:1),
+        "C":.init(dimension:[0,0,1,1,0,0,0],factor:1),
+        "J/K":.init(dimension:[1,2,-2,0,-1,0,0],factor:1),
+        "J/(kg*K)":.init(dimension:[0,2,-2,0,-1,0,0],factor:1),
+        "W/K":.init(dimension:[1,2,-3,0,-1,0,0],factor:1),
+        "W/(m*K)":.init(dimension:[1,1,-3,0,-1,0,0],factor:1)
+    ]
+    static func declare(_ value:Double,unit:String,
+        evidence:String="hypothetical-user-assumed",sourceId:String?=nil,
+        uncertainty:Double?=nil)throws->NativeScienceQuantity {
+        guard let spec=units[unit],value.isFinite,abs(value)<=1e30,
+            ["measured-observed","hypothetical-user-assumed","physics-model-computed"].contains(evidence),
+            (sourceId==nil || sourceId?.range(of:"^[A-Za-z0-9:_-]{1,120}$",options:.regularExpression) != nil),
+            (evidence != "measured-observed" || !(sourceId ?? "").isEmpty),
+            (uncertainty==nil || (uncertainty!.isFinite && uncertainty!>=0 && uncertainty!<=1e30)),
+            (unit != "K" || value>=0) else {
+            throw NativeWorldLabError.invalid("Invalid source, physical quantity or SI unit")
+        }
+        return NativeScienceQuantity(valueSI:value*spec.factor,unit:unit,
+            dimension:spec.dimension,evidence:evidence,
+            sourceId:sourceId,uncertaintySI:uncertainty.map{$0*spec.factor})
+    }
+    static func convert(_ value:NativeScienceQuantity,to unit:String)throws->Double {
+        guard let input=units[value.unit],let output=units[unit],
+            value.valueSI.isFinite,
+            value.dimension==input.dimension && input.dimension==output.dimension else {
+            throw NativeWorldLabError.invalid("Scientific quantity dimension mismatch")
+        }
+        return value.valueSI/output.factor
+    }
+    static func connect(_ source:NativeSciencePort,_ target:NativeSciencePort)throws {
+        guard ["output","bidirectional"].contains(source.direction),
+            ["input","bidirectional"].contains(target.direction),
+            source.frame==target.frame,source.flow==target.flow,
+            let origin=units[source.unit],let destination=units[target.unit],
+            origin.dimension==destination.dimension else {
+            throw NativeWorldLabError.invalid("Scientific port unit, flow or frame mismatch")
+        }
     }
 }
