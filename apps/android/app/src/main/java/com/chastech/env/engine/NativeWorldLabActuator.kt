@@ -176,32 +176,35 @@ object NativeWorldLabActuator {
             val magnetic=0.5*i.inductanceH*a*a
             require(listOf(h,v,a,t,r,stored,ke,pe,magnetic,supplied,dissipated).all{it.isFinite()} &&
                 r>=0.01&&r<=1e6&&t>=1&&t<=2000&&abs(a)<1e7&&abs(v)<1e5&&h<1e5){"Actuator exceeded stability envelope"}
+            val sourceVoltage=if(i.powerOffAtSeconds!=null&&n*dt>=i.powerOffAtSeconds)0.0 else i.supplyVoltageV
             output.add(NativeActuatorSample(
                 n*dt,h,v,a,i.forceConstantNPerA*a,i.forceConstantNPerA*v,
-                heat,i.supplyVoltageV*a,ke,pe,magnetic,
+                heat,sourceVoltage*a,sourceVoltage,ke,pe,magnetic,
                 supplied+initialEnergy-ke-pe-magnetic-stored-dissipated,supplied,dissipated,
                 coilTemperatureK=if(i.thermal==null)null else t,
                 coilResistanceOhm=if(i.thermal==null)null else r,
                 thermalEnergyJ=stored,coolingPowerW=cooling))
             if(n==steps)break
-            val next=step(state,i,dt,true)
-            val c2=next[2];val v2=next[1]
-            supplied+=0.5*dt*i.supplyVoltageV*(a+c2)
-            val t2=next[3]
-            val heat2=resistance(i,t2)*c2*c2
-            val cooling2=i.thermal?.let{it.coolingWPerK*(t2-it.ambientTemperatureK)}?:0.0
-            val loss1=i.dampingNsPerM*v*v+(if(i.thermal==null)heat else cooling)
-            val loss2=i.dampingNsPerM*v2*v2+(if(i.thermal==null)heat2 else cooling2)
-            dissipated+=0.5*dt*(loss1+loss2)
-            if(next[0]==0.0 && v2==0.0 && (h>0||v<0)){
-                val raw=step(state,i,dt,false)
-                if(raw[1]<0)dissipated+=0.5*i.massKg*raw[1]*raw[1]
+            val integrated=advance(state,i,dt,n*dt)
+            for(segment in integrated.segments){
+                val v0=segment.before[1];val c0=segment.before[2];val tempStart=segment.before[3]
+                val v1=segment.after[1];val c1=segment.after[2];val tempEnd=segment.after[3]
+                val heatStart=resistance(i,tempStart)*c0*c0
+                val heatEnd=resistance(i,tempEnd)*c1*c1
+                val coolingStart=i.thermal?.let{it.coolingWPerK*(tempStart-it.ambientTemperatureK)}?:0.0
+                val coolingEnd=i.thermal?.let{it.coolingWPerK*(tempEnd-it.ambientTemperatureK)}?:0.0
+                supplied+=0.5*segment.stepSeconds*segment.sourceVoltageV*(c0+c1)
+                val lossStart=i.dampingNsPerM*v0*v0+(if(i.thermal==null)heatStart else coolingStart)
+                val lossEnd=i.dampingNsPerM*v1*v1+(if(i.thermal==null)heatEnd else coolingEnd)
+                dissipated+=0.5*segment.stepSeconds*(lossStart+lossEnd)+segment.impactLossJ
             }
-            state=next
+            state=integrated.state
         }
         return NativeActuatorResult(output,dt,
-            modelVersion=if(i.thermal==null)"1.0.0" else "1.1.0",
-            validity=if(i.thermal==null)"Bounded 1D R-L actuator with hypothetical inputs."
+            modelVersion=if(i.powerOffAtSeconds!=null)"1.2.0" else if(i.thermal==null)"1.0.0" else "1.1.0",
+            validity=if(i.powerOffAtSeconds!=null)
+                "Ideal supply switch opens at the exact recorded time. Coil current remains continuous and decays through the modeled R-L path; no arc, fuse damage or contact bounce is predicted."
+            else if(i.thermal==null)"Bounded 1D R-L actuator with hypothetical inputs."
                 else "Bounded 1D electrical, thermal and mechanical coupling with "+
                     "hypothetical heat capacity, cooling and resistance feedback; not certified.")
     }
