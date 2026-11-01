@@ -28,7 +28,7 @@ export function executeScientificGraph(graphInput:ScientificGraph,
   const duration=opts.durationSeconds,dt=opts.stepSeconds;
   if(!Number.isFinite(duration)||duration<0.001||duration>60||
     !Number.isFinite(dt)||dt<1e-5||dt>1||
-    Math.ceil(duration/dt)>20000)
+    Math.ceil(duration/dt)>50000)
     throw new Error("Scientific timeline exceeds bounded execution steps.");
   const tolerance=opts.powerToleranceW??1e-6;
   if(!Number.isFinite(tolerance)||tolerance<0||tolerance>1e6)
@@ -147,4 +147,22 @@ export function createIdealRcAdapters(input:{
     },
   };
   return Object.freeze([supply,load]);
+}
+
+
+/** Shared typed topology for the trusted ideal series-RC reference model. */
+export function createIdealRcGraph(projectId="local-rc-reference",projectRevision=0):ScientificGraph{
+  return validateScientificGraph({
+    schemaVersion:1,projectId,projectRevision,
+    components:[
+      {id:"source",modelId:"ideal-dc-source",ports:[
+        {id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+      {id:"load",modelId:"series-rc-load",ports:[
+        {id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"},
+        {id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical"}]},
+    ],
+    edges:[{fromComponentId:"source",fromPortId:"V",
+      toComponentId:"load",toPortId:"Vin",delayed:false}],
+  });
 }
