@@ -14240,7 +14240,7 @@ private func readABookStoredZIP(_ archive: Data) throws -> [String: Data] {
         let localOffset = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 42))
         let nameStart = cursor + 46
         let next = nameStart + nameLength + extraLength + commentLength
-        guard flags == 0, method == 0, compressed == uncompressed,
+        guard (flags & 0x0009) == 0, method == 0, compressed == uncompressed,
               uncompressed <= 100 * 1024 * 1024, next <= archive.count else {
             throw NSError(domain: "ABookArchive", code: 10, userInfo: [NSLocalizedDescriptionKey: "Encrypted, compressed or oversized backup entries are not supported by this native importer."])
         }
