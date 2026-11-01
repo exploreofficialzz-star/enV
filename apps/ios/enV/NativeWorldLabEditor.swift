@@ -409,7 +409,7 @@ enum NativeWorldLabEditor {
             entities.append([
                 "id":id,"name":shape=="box" ? "Cube":shape=="sphere" ? "Sphere":"Cylinder",
                 "shape":shape,"positionMeters":[0,0.5,0],
-                "dimensionsMeters":[1,1,1],"color":"#A4C9C6",
+                "dimensionsMeters":[1,1,1],"rotationRadians":[0,0,0],"color":"#A4C9C6",
                 "materialId":NSNull(),"scientificRole":"visual-only","opacity":1,
             ])
             root["entities"]=entities
@@ -484,6 +484,98 @@ enum NativeWorldLabEditor {
                 throw NativeWorldLabError.invalid("Selected solid no longer exists")
             }
             edit(&entities[index])
+            root["entities"]=entities
+        }
+    }
+    static func rotateSolid(_ data:Data,id:String,axis:Int,deltaDegrees:Double)throws->Data {
+        guard (0...2).contains(axis),deltaDegrees.isFinite,
+              (-3600...3600).contains(deltaDegrees) else {
+            throw NativeWorldLabError.invalid("Rotation requires an axis and finite degrees within ±3600")
+        }
+        return try editSolid(data,id:id){solid in
+            var angles=solid["rotationRadians"] as? [Double] ?? [0,0,0]
+            guard angles.count==3,angles.allSatisfy({$0.isFinite && abs($0)<=2*Double.pi}) else {return}
+            let raw=angles[axis]+deltaDegrees*Double.pi/180
+            let normalized=(raw+Double.pi).truncatingRemainder(dividingBy:2*Double.pi)
+            let result=normalized<0 ? normalized+2*Double.pi-Double.pi:normalized-Double.pi
+            angles[axis]=abs(result)<1e-12 ? 0:result
+            solid["rotationRadians"]=angles
+        }
+    }
+    static func scaleSolid(_ data:Data,id:String,factors:[Double])throws->Data {
+        guard factors.count==3,factors.allSatisfy({$0.isFinite && (0.001...1000).contains($0)}) else {
+            throw NativeWorldLabError.invalid("Scale factors must be three positive bounded values")
+        }
+        let project=try NativeWorldLabProject.decode(data)
+        guard let solid=project.entities.first(where:{$0.id==id}) else {
+            throw NativeWorldLabError.invalid("Selected solid no longer exists")
+        }
+        let old=solid.dimensionsMeters
+        let dimensions:[Double]
+        switch solid.shape {
+        case "sphere":dimensions=Array(repeating:old[0]*factors[0],count:3)
+        case "cylinder":
+            let radial=sqrt(factors[0]*factors[2])
+            dimensions=[old[0]*radial,old[1]*factors[1],old[2]*radial]
+        default:dimensions=zip(old,factors).map{$0*$1}
+        }
+        guard dimensions.allSatisfy({$0.isFinite && (0.001...10000).contains($0)}) else {
+            throw NativeWorldLabError.invalid("Scaled geometry exceeds model bounds")
+        }
+        return try resizeSolid(data,id:id,dimensionsMeters:dimensions)
+    }
+    static func duplicateSolid(_ data:Data,id:String,offsetMeters:[Double],
+        newId:String=UUID().uuidString)throws->Data {
+        guard offsetMeters.count==3,offsetMeters.allSatisfy({$0.isFinite && abs($0)<=100000}),
+              newId.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("Duplicate offset or identity is invalid")
+        }
+        return try mutate(data){root in
+            guard var entities=root["entities"] as? [[String:Any]],
+                  entities.count<200,!entities.contains(where:{$0["id"] as? String==newId}),
+                  let source=entities.first(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Duplicate source is missing or project is full")
+            }
+            var clone=source
+            let position=source["positionMeters"] as? [Double] ?? []
+            guard position.count==3 else {throw NativeWorldLabError.invalid("Source coordinates are invalid")}
+            let next=zip(position,offsetMeters).map{$0+$1}
+            guard next.allSatisfy({$0.isFinite && abs($0)<=100000}) else {
+                throw NativeWorldLabError.invalid("Duplicate position is outside local-world bounds")
+            }
+            clone["id"]=newId;clone["name"]=String(((source["name"] as? String ?? "Solid")+" copy").prefix(120))
+            clone["positionMeters"]=next
+            if clone["rotationRadians"] == nil {clone["rotationRadians"]=[0,0,0]}
+            entities.append(clone);root["entities"]=entities
+        }
+    }
+    static func linearPattern(_ data:Data,id:String,axis:Int,spacingMeters:Double,
+        copies:Int)throws->Data {
+        guard (0...2).contains(axis),spacingMeters.isFinite,spacingMeters != 0,
+              abs(spacingMeters)<=100000,(1...50).contains(copies) else {
+            throw NativeWorldLabError.invalid("Linear pattern requires a valid axis, spacing and 1–50 copies")
+        }
+        return try mutate(data){root in
+            guard var entities=root["entities"] as? [[String:Any]],
+                  entities.count+copies<=200,
+                  let source=entities.first(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Pattern source missing or 200-solid limit reached")
+            }
+            let position=source["positionMeters"] as? [Double] ?? []
+            guard position.count==3 else {throw NativeWorldLabError.invalid("Source coordinates are invalid")}
+            for n in 1...copies {
+                var clone=source
+                let value=position[axis]+spacingMeters*Double(n)
+                guard value.isFinite && abs(value)<=100000 else {
+                    throw NativeWorldLabError.invalid("Pattern position exceeds local-world bounds")
+                }
+                var next=position;next[axis]=value
+                clone["id"]=UUID().uuidString
+                clone["name"]=String(((source["name"] as? String ?? "Solid")+" \(n+1)").prefix(120))
+                clone["positionMeters"]=next
+                if clone["rotationRadians"] == nil {clone["rotationRadians"]=[0,0,0]}
+                entities.append(clone)
+            }
             root["entities"]=entities
         }
     }

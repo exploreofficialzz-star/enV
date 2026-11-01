@@ -78,6 +78,8 @@ struct NativeLabSolid: Decodable {
     let materialId: String?
     let scientificRole: String
     let opacity: Double
+    let rotationRadians:[Double]?
+    var effectiveRotationRadians:[Double]{rotationRadians ?? [0,0,0]}
     var volumeMetersCubed: Double {
         let x = dimensionsMeters[0], y = dimensionsMeters[1], z = dimensionsMeters[2]
         switch shape {
@@ -220,8 +222,16 @@ struct NativeWorldLabProject: Decodable {
         try requireKeys(world, ["frame","representation","origin","terrainSource"])
         try requireKeys(camera, ["positionMeters","lookingAtMeters"])
         for o in entities {
-            try requireKeys(o, ["id","name","shape","positionMeters","dimensionsMeters",
-                                "color","materialId","scientificRole","opacity"])
+            let required:Set<String>=["id","name","shape","positionMeters","dimensionsMeters","color","materialId","scientificRole","opacity"]
+            let supplied=Set(o.keys)
+            guard supplied==required || supplied==required.union(["rotationRadians"]) else {
+                throw NativeWorldLabError.invalid("Unexpected or missing solid fields")
+            }
+            if let angles=o["rotationRadians"] as? [Double] {
+                guard angles.count==3,angles.allSatisfy({$0.isFinite && abs($0)<=2*Double.pi}) else {
+                    throw NativeWorldLabError.invalid("Rotation angles must be finite radians within ±2π")
+                }
+            }
         }
         let requiredMaterialKeys:Set<String>=["id","name","densityKgM3","youngModulusPa","evidence"]
         let optionalMaterialKeys:Set<String>=["thermalConductivityWPerMK","specificHeatJPerKgK","refractiveIndex"]

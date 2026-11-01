@@ -344,11 +344,80 @@ object NativeWorldLabEditor {
                 .put("shape",shape)
                 .put("positionMeters",JSONArray(listOf(0,0.5,0)))
                 .put("dimensionsMeters",JSONArray(listOf(1,1,1)))
+                .put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
                 .put("color","#A4C9C6")
                 .put("materialId",JSONObject.NULL)
                 .put("scientificRole","visual-only")
                 .put("opacity",1.0))
         }
+    fun rotateSolid(source:String,id:String,axis:Int,deltaDegrees:Double):String=edit(source){project->
+        require(axis in 0..2&&deltaDegrees.isFinite()&&deltaDegrees in -3600.0..3600.0){
+            "Rotation requires an X/Y/Z axis and a finite angle within ±3600 degrees"
+        }
+        val entities=project.getJSONArray("entities")
+        val solid=(0 until entities.length()).map{entities.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}?:error("Selected solid no longer exists")
+        val values=if(solid.has("rotationRadians"))solid.getJSONArray("rotationRadians")
+            else JSONArray(listOf(0.0,0.0,0.0))
+        require(values.length()==3){"Stored rotation must contain three angles"}
+        val old=values.getDouble(axis)
+        require(old.isFinite()&&old in -Math.PI*2..Math.PI*2){"Stored rotation is invalid"}
+        val raw=old+deltaDegrees*Math.PI/180.0
+        val normalized=((raw+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI
+        values.put(axis,if(kotlin.math.abs(normalized)<1e-12)0.0 else normalized)
+        solid.put("rotationRadians",values)
+    }
+    fun scaleSolid(source:String,id:String,factors:List<Double>):String{
+        require(factors.size==3&&factors.all{it.isFinite()&&it in 0.001..1000.0}){
+            "Scale factors must be three positive bounded values"
+        }
+        val p=NativeWorldLabProjectCodec.decode(source)
+        val solid=p.entities.firstOrNull{it.id==id}?:error("Selected solid no longer exists")
+        val old=listOf(solid.dimensionsMeters.x,solid.dimensionsMeters.y,solid.dimensionsMeters.z)
+        val dims=when(solid.shape){
+            "sphere"->List(3){old[0]*factors[0]}
+            "cylinder"->{val radial=kotlin.math.sqrt(factors[0]*factors[2]);listOf(old[0]*radial,old[1]*factors[1],old[2]*radial)}
+            else->old.indices.map{old[it]*factors[it]}
+        }
+        require(dims.all{it.isFinite()&&it in 0.001..10000.0}){"Scaled geometry exceeds model bounds"}
+        return resizeSolid(source,id,dims)
+    }
+    fun duplicateSolid(source:String,id:String,offsetMeters:List<Double>,
+        newId:String=UUID.randomUUID().toString()):String=edit(source){project->
+        require(offsetMeters.size==3&&offsetMeters.all{it.isFinite()&&it in -100000.0..100000.0}){"Duplicate offset is invalid"}
+        val entities=project.getJSONArray("entities")
+        require(entities.length()<200){"Duplicate would exceed the 200-solid project limit"}
+        require(newId.matches(Regex("[A-Za-z0-9_-]{1,120}"))&&
+            (0 until entities.length()).none{entities.getJSONObject(it).getString("id")==newId}){"Duplicate solid identity is invalid"}
+        val original=(0 until entities.length()).map{entities.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}?:error("Source solid no longer exists")
+        val clone=JSONObject(original.toString())
+        val position=clone.getJSONArray("positionMeters")
+        for(i in 0..2){val next=position.getDouble(i)+offsetMeters[i];require(next.isFinite()&&next in -100000.0..100000.0);position.put(i,next)}
+        clone.put("id",newId).put("name",(original.getString("name")+" copy").take(120))
+        if(!clone.has("rotationRadians"))clone.put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
+        entities.put(clone)
+    }
+    fun linearPattern(source:String,id:String,axis:Int,spacingMeters:Double,copies:Int):String=edit(source){project->
+        require(axis in 0..2&&spacingMeters.isFinite()&&spacingMeters in -100000.0..100000.0&&spacingMeters!=0.0&&copies in 1..50){
+            "Linear pattern requires an axis, non-zero spacing and 1–50 copies"
+        }
+        val entities=project.getJSONArray("entities")
+        val original=(0 until entities.length()).map{entities.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}?:error("Pattern source no longer exists")
+        require(entities.length()+copies<=200){"Linear pattern exceeds the 200-solid project limit"}
+        for(n in 1..copies){
+            val clone=JSONObject(original.toString())
+            val pos=clone.getJSONArray("positionMeters")
+            val value=pos.getDouble(axis)+spacingMeters*n
+            require(value.isFinite()&&value in -100000.0..100000.0){"Pattern position exceeds local-world bounds"}
+            pos.put(axis,value)
+            clone.put("id",UUID.randomUUID().toString())
+                .put("name",(original.getString("name")+" "+(n+1)).take(120))
+            if(!clone.has("rotationRadians"))clone.put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
+            entities.put(clone)
+        }
+    }
     fun addHypotheticalMaterial(
         source:String,name:String,densityKgM3:Double?,youngModulusPa:Double?=null,
         id:String=UUID.randomUUID().toString(),

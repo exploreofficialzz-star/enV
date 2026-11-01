@@ -60,6 +60,7 @@ data class NativeLabSolid(
     val id: String, val name: String, val shape: String, val positionMeters: NativeLabVector,
     val dimensionsMeters: NativeLabVector, val color: String, val materialId: String?,
     val scientificRole: String, val opacity: Double,
+    val rotationRadians:NativeLabVector=NativeLabVector(0.0,0.0,0.0),
 ) {
     fun volumeMetersCubed(): Double = when (shape) {
         "box" -> dimensionsMeters.x * dimensionsMeters.y * dimensionsMeters.z
@@ -202,8 +203,11 @@ object NativeWorldLabProjectCodec {
         require(materials.map { it.id }.toSet().size==materials.size)
         val entities=(0 until solidArray.length()).map { i ->
             val o=solidArray.getJSONObject(i)
-            keys(o,setOf("id","name","shape","positionMeters","dimensionsMeters","color",
-                "materialId","scientificRole","opacity"))
+            val requiredEntityKeys=setOf("id","name","shape","positionMeters","dimensionsMeters","color","materialId","scientificRole","opacity")
+            val suppliedEntityKeys=o.keys().asSequence().toSet()
+            require(suppliedEntityKeys==requiredEntityKeys||suppliedEntityKeys==requiredEntityKeys+"rotationRadians"){
+                "Unexpected World Lab solid fields"
+            }
             val shape=name(o,"shape")
             require(shape in setOf("box","sphere","cylinder"))
             val dim=vector(o.getJSONArray("dimensionsMeters"),positive=true)
@@ -214,8 +218,12 @@ object NativeWorldLabProjectCodec {
             val materialId=if(o.isNull("materialId")) null else id(o,"materialId")
             val role=name(o,"scientificRole")
             require(role in setOf("visual-only","reference-solid"))
+            val rotation=if(o.has("rotationRadians"))vector(o.getJSONArray("rotationRadians")) else NativeLabVector(0.0,0.0,0.0)
+            require(listOf(rotation.x,rotation.y,rotation.z).all{it.isFinite()&&it in -6.283185307179586..6.283185307179586}){
+                "Rotation angles must be finite radians within ±2π"
+            }
             NativeLabSolid(id(o,"id"),name(o,"name"),shape,vector(o.getJSONArray("positionMeters")),
-                dim,color,materialId,role,number(o,"opacity",0.0,1.0))
+                dim,color,materialId,role,number(o,"opacity",0.0,1.0),rotation)
         }
         require(entities.map { it.id }.toSet().size==entities.size)
         val materialIds=materials.map { it.id }.toSet()
