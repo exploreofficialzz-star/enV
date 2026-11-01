@@ -56,3 +56,4 @@ class NativeWorldLabCameraTest {
                 NativeWorldLabCameraPose(0.0,90.0,10.0))
         }
     }
+}
