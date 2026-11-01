@@ -5,6 +5,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogModelsTest {
+    @Test fun runtimeABookAdditionIsUniqueAndSearchable() {
+        val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
+        val catalog = base.withABook()
+        assertEquals(1, catalog.tools.count { it.id == "a-book" })
+        assertEquals(1, catalog.counts.total)
+        assertEquals(1, catalog.counts.active)
+        assertEquals("a-book", catalog.search("A book").first().id)
+        assertEquals("productivity", catalog.tools.single().category)
+        assertEquals("custom", catalog.tools.single().engine.type)
+        assertEquals("a-book", catalog.tools.single().engine.id)
+        assertEquals(catalog, catalog.withABook())
+    }
+
     @Test fun runtimeMusicDownloaderAdditionIsUniqueAndSearchable() {
         val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
         val catalog = base.withMusicDownloader()

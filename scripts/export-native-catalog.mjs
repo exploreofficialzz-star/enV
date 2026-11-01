@@ -57,6 +57,7 @@ const runtimeCatalogExtensions = [
     status: "active",
     related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
     engine: { type: "custom", id: "a-book" },
+    platformRuntimeExtension: true,
   },
 ];
 const expandedTools = [
