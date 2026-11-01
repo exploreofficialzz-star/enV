@@ -2107,6 +2107,8 @@ Text("Invent chemical heat").font(.headline)
                             Button("Scale 1.1×"){applyProject{try NativeWorldLabEditor.scaleSolid($0,id:solid.id,factors:[1.1,1.1,1.1])}}
                             Button("Duplicate +X"){applyProject{try NativeWorldLabEditor.duplicateSolid($0,id:solid.id,offsetMeters:[gridSpacing,0,0])}}
                             Button("Linear pattern"){applyProject{try NativeWorldLabEditor.linearPattern($0,id:solid.id,axis:0,spacingMeters:gridSpacing,copies:2)}}
+                            Button("Mirror X"){applyProject{try NativeWorldLabEditor.mirrorSolid($0,id:solid.id,axis:0,planeMeters:0)}}
+                            Button("Circular pattern"){applyProject{try NativeWorldLabEditor.circularPattern($0,id:solid.id,axis:2,centerMeters:[0,0,0],instances:4)}}
                         }.buttonStyle(.bordered)
                         Text("Rotation: "+solid.effectiveRotationRadians.map{String(format:"%.3f",$0)}.joined(separator:" / ")+" rad")
                             .font(.caption).foregroundStyle(.secondary)

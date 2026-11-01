@@ -442,6 +442,90 @@ enum NativeWorldLabEditor {
             root["camera"]=camera
         }
     }
+    private static func rotationMatrix(_ angles:[Double])throws->[[Double]] {
+        guard angles.count==3,angles.allSatisfy({$0.isFinite}) else {
+            throw NativeWorldLabError.invalid("Rotation must have three finite angles")
+        }
+        let (x,y,z)=(angles[0],angles[1],angles[2])
+        let cx=cos(x),sx=sin(x),cy=cos(y),sy=sin(y),cz=cos(z),sz=sin(z)
+        return [[cy*cz+sy*sx*sz,-cy*sz+sy*sx*cz,sy*cx],
+                [cx*sz,cx*cz,-sx],
+                [-sy*cz+cy*sx*sz,sy*sz+cy*sx*cz,cy*cx]]
+    }
+    private static func matrixAngles(_ m:[[Double]])->[Double] {
+        let x=asin(max(-1,min(1,-m[1][2]))),cx=cos(x)
+        let y:Double,z:Double
+        if abs(cx)>1e-8 {y=atan2(m[0][2],m[2][2]);z=atan2(m[1][0],m[1][1])}
+        else {y=atan2(-m[2][0],m[0][0]);z=0}
+        func wrap(_ a:Double)->Double {
+            let value=(a+Double.pi).truncatingRemainder(dividingBy:2*Double.pi)
+            let result=value<0 ? value+2*Double.pi-Double.pi:value-Double.pi
+            return abs(result)<1e-12 ? 0:result
+        }
+        return [wrap(x),wrap(y),wrap(z)]
+    }
+    private static func multiplyRotation(_ a:[[Double]],_ b:[[Double]])->[[Double]] {
+        (0..<3).map{row in (0..<3).map{col in (0..<3).reduce(0.0){$0+a[row][$1]*b[$1][col]}}}
+    }
+    static func mirrorSolid(_ data:Data,id:String,axis:Int,planeMeters:Double)throws->Data {
+        guard (0...2).contains(axis),planeMeters.isFinite,abs(planeMeters)<=100000 else {
+            throw NativeWorldLabError.invalid("Mirror requires an axis and bounded local-world plane")
+        }
+        return try editSolid(data,id:id){solid in
+            var position=solid["positionMeters"] as? [Double] ?? []
+            guard position.count==3 else{return}
+            position[axis]=2*planeMeters-position[axis]
+            guard position[axis].isFinite && abs(position[axis])<=100000 else{return}
+            let angles=solid["rotationRadians"] as? [Double] ?? [0,0,0]
+            let r=try Self.rotationMatrix(angles)
+            var signs=[1.0,1.0,1.0];signs[axis] = -1
+            let local=[-1.0,1.0,1.0]
+            let reflected=(0..<3).map{row in (0..<3).map{col in signs[row]*r[row][col]*local[col]}}
+            solid["positionMeters"]=position
+            solid["rotationRadians"]=Self.matrixAngles(reflected)
+        }
+    }
+    static func circularPattern(_ data:Data,id:String,axis:Int,centerMeters:[Double],
+        instances:Int)throws->Data {
+        guard (0...2).contains(axis),centerMeters.count==3,
+              centerMeters.allSatisfy({$0.isFinite && abs($0)<=100000}),
+              (2...36).contains(instances) else {
+            throw NativeWorldLabError.invalid("Circular pattern needs a bounded center, axis and 2–36 instances")
+        }
+        return try mutate(data){root in
+            guard var entities=root["entities"] as? [[String:Any]],
+                  let source=entities.first(where:{$0["id"] as? String==id}),
+                  entities.count+instances-1<=200 else {
+                throw NativeWorldLabError.invalid("Circular pattern source missing or solid limit reached")
+            }
+            let position=source["positionMeters"] as? [Double] ?? []
+            guard position.count==3 else {throw NativeWorldLabError.invalid("Pattern source position is invalid")}
+            let a=axis,b=(a+1)%3,c=(a+2)%3
+            let angles=source["rotationRadians"] as? [Double] ?? [0,0,0]
+            let sourceRotation=try Self.rotationMatrix(angles)
+            for index in 1..<instances {
+                let angle=2*Double.pi*Double(index)/Double(instances)
+                let co=cos(angle),si=sin(angle)
+                let u=position[b]-centerMeters[b],v=position[c]-centerMeters[c]
+                var next=position
+                next[b]=centerMeters[b]+u*co-v*si
+                next[c]=centerMeters[c]+u*si+v*co
+                guard next.allSatisfy({$0.isFinite && abs($0)<=100000}) else {
+                    throw NativeWorldLabError.invalid("Circular-pattern position overflow")
+                }
+                var world=Array(repeating:Array(repeating:0.0,count:3),count:3)
+                world[a][a]=1;world[b][b]=co;world[b][c = c] = -si
+                world[c][b]=si;world[c][c]=co
+                var clone=source
+                clone["id"]=UUID().uuidString
+                clone["name"]=String(((source["name"] as? String ?? "Solid")+" \(index+1)").prefix(120))
+                clone["positionMeters"]=next
+                clone["rotationRadians"]=Self.matrixAngles(Self.multiplyRotation(world,sourceRotation))
+                entities.append(clone)
+            }
+            root["entities"]=entities
+        }
+    }
     static func extrudeRectangle(_ data:Data,widthMeters:Double,depthMeters:Double,
         heightMeters:Double,id:String=UUID().uuidString)throws->Data {
         guard [widthMeters,depthMeters,heightMeters].allSatisfy({$0.isFinite && (0.001...10000).contains($0)}),

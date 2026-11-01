@@ -436,6 +436,78 @@ object NativeWorldLabEditor {
         camera.put("positionMeters",JSONArray(position))
         camera.put("lookingAtMeters",JSONArray(target))
     }
+    private fun rotationMatrix(angles:List<Double>):Array<DoubleArray>{
+        require(angles.size==3&&angles.all{it.isFinite()}){"Invalid rotation"}
+        val (x,y,z)=angles
+        val cx=kotlin.math.cos(x);val sx=kotlin.math.sin(x)
+        val cy=kotlin.math.cos(y);val sy=kotlin.math.sin(y)
+        val cz=kotlin.math.cos(z);val sz=kotlin.math.sin(z)
+        return arrayOf(
+            doubleArrayOf(cy*cz+sy*sx*sz,-cy*sz+sy*sx*cz,sy*cx),
+            doubleArrayOf(cx*sz,cx*cz,-sx),
+            doubleArrayOf(-sy*cz+cy*sx*sz,sy*sz+cy*sx*cz,cy*cx))
+    }
+    private fun matrixAngles(m:Array<DoubleArray>):List<Double>{
+        val x=kotlin.math.asin((-m[1][2]).coerceIn(-1.0,1.0))
+        val cx=kotlin.math.cos(x)
+        val y:Double;val z:Double
+        if(kotlin.math.abs(cx)>1e-8){y=kotlin.math.atan2(m[0][2],m[2][2]);z=kotlin.math.atan2(m[1][0],m[1][1])}
+        else {y=kotlin.math.atan2(-m[2][0],m[0][0]);z=0.0}
+        fun wrap(a:Double):Double{val v=((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;return if(kotlin.math.abs(v)<1e-12)0.0 else v}
+        return listOf(wrap(x),wrap(y),wrap(z))
+    }
+    private fun multiplyRotation(a:Array<DoubleArray>,b:Array<DoubleArray>)=
+        Array(3){row->DoubleArray(3){col->(0..2).sumOf{k->a[row][k]*b[k][col]}}}
+    fun mirrorSolid(source:String,id:String,axis:Int,planeMeters:Double):String=edit(source){project->
+        require(axis in 0..2&&planeMeters.isFinite()&&planeMeters in -100000.0..100000.0){
+            "Mirror requires an X/Y/Z plane inside local-world bounds"
+        }
+        val entities=project.getJSONArray("entities")
+        val solid=(0 until entities.length()).map{entities.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}?:error("Selected solid no longer exists")
+        val p=solid.getJSONArray("positionMeters")
+        val coordinate=2*planeMeters-p.getDouble(axis)
+        require(coordinate.isFinite()&&coordinate in -100000.0..100000.0){"Mirrored position exceeds local-world bounds"}
+        p.put(axis,coordinate)
+        val r=rotationMatrix(if(solid.has("rotationRadians"))(0..2).map{solid.getJSONArray("rotationRadians").getDouble(it)} else listOf(0.0,0.0,0.0))
+        val signs=listOf(1.0,1.0,1.0).toMutableList();signs[axis]=-1.0
+        val localSigns=listOf(-1.0,1.0,1.0)
+        val reflected=Array(3){row->DoubleArray(3){col->signs[row]*r[row][col]*localSigns[col]}}
+        solid.put("rotationRadians",JSONArray(matrixAngles(reflected)))
+    }
+    fun circularPattern(source:String,id:String,axis:Int,centerMeters:List<Double>,
+        instances:Int):String=edit(source){project->
+        require(axis in 0..2&&centerMeters.size==3&&centerMeters.all{it.isFinite()&&it in -100000.0..100000.0}&&instances in 2..36){
+            "Circular pattern requires a valid axis, center and 2–36 total instances"
+        }
+        val entities=project.getJSONArray("entities")
+        val original=(0 until entities.length()).map{entities.getJSONObject(it)}
+            .firstOrNull{it.getString("id")==id}?:error("Pattern source no longer exists")
+        require(entities.length()+instances-1<=200){"Circular pattern exceeds the 200-solid project limit"}
+        val a=axis;val b=(a+1)%3;val c=(a+2)%3
+        val position=original.getJSONArray("positionMeters")
+        val sourceRotation=rotationMatrix(if(original.has("rotationRadians"))(0..2).map{original.getJSONArray("rotationRadians").getDouble(it)} else listOf(0.0,0.0,0.0))
+        for(n in 1 until instances){
+            val angle=2*Math.PI*n/instances
+            val co=kotlin.math.cos(angle);val si=kotlin.math.sin(angle)
+            val clone=JSONObject(original.toString())
+            val next=(0..2).map{position.getDouble(it)}
+            val u=next[b]-centerMeters[b];val v=next[c]-centerMeters[c]
+            val shifted=next.toMutableList()
+            shifted[b]=centerMeters[b]+u*co-v*si
+            shifted[c]=centerMeters[c]+u*si+v*co
+            require(shifted.all{it.isFinite()&&it in -100000.0..100000.0}){"Circular-pattern coordinate overflow"}
+            clone.put("id",UUID.randomUUID().toString())
+                .put("name",(original.getString("name")+" "+(n+1)).take(120))
+                .put("positionMeters",JSONArray(shifted))
+            val world=Array(3){row->DoubleArray(3){col->
+                if(row==col&&row==axis)1.0 else if(row==axis||col==axis)0.0 else 0.0
+            }}
+            world[ b ][ b ]=co;world[b][c]=-si;world[c][b]=si;world[c][c]=co
+            clone.put("rotationRadians",JSONArray(matrixAngles(multiplyRotation(world,sourceRotation))))
+            entities.put(clone)
+        }
+    }
     fun extrudeRectangle(source:String,widthMeters:Double,depthMeters:Double,
         heightMeters:Double,id:String=UUID.randomUUID().toString()):String=edit(source){project->
         require(listOf(widthMeters,depthMeters,heightMeters).all{it.isFinite()&&it in 0.001..10000.0}){

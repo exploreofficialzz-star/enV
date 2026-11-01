@@ -245,3 +245,17 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.setGeodeticOrigin(data,
             origin:NativeGeodetic(latitudeDegrees:91,longitudeDegrees:0,heightMeters:0)))
     }
+
+    func testNativeMirrorAndCircularPatternKeepAValidPortableProject() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"base")
+        data=try NativeWorldLabEditor.mirrorSolid(data,id:"base",axis:0,planeMeters:0)
+        var p=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(p.entities[0].positionMeters[0],-2,accuracy:1e-12)
+        data=try NativeWorldLabEditor.circularPattern(data,id:"base",axis:2,
+            centerMeters:[0,0,0],instances:4)
+        p=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(p.entities.count,4)
+        for e in p.entities.dropFirst(){
+            XCTAssertEqual(hypot(e.positionMeters[0],e.positionMeters[1]),2,accuracy:1e-9)
+        }
+    }
