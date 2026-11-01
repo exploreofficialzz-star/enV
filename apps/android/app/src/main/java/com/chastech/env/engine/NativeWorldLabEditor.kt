@@ -970,7 +970,7 @@ object NativeWorldLabEditor {
                 val originalId=original.getString("id")
                 val existing=(0 until existingMaterials.length()).map{existingMaterials.getJSONObject(it)}
                     .firstOrNull{it.getString("id")==originalId}
-                if(existing!=null&&existing.similar(original)){
+                if(existing!=null&&NativeWorldLabJsonEquality.same(existing,original)){
                     materialIdMap[originalId]=originalId
                     continue
                 }
