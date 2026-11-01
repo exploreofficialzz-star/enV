@@ -21,7 +21,16 @@ import {
   type ABookNote,
   type ABookRevision,
 } from "@/lib/a-book/local-store";
-import { extractPdfPages, extractSelectedPdfs, inspectPdf, mergePdfs, parsePageRanges, pdfDownload, rotateSelectedPdfs, splitPdfIntoZip, splitSelectedPdfsIntoZip, zipDownload } from "@/lib/a-book/pdf";
+import { parsePageRanges, pdfDownload, zipDownload } from "@/lib/a-book/pdf";
+import {
+  extractPdfPagesInWorker,
+  extractSelectedPdfsInWorker,
+  inspectPdfInWorker,
+  mergePdfsInWorker,
+  rotateSelectedPdfsInWorker,
+  splitPdfIntoZipInWorker,
+  splitSelectedPdfsIntoZipInWorker,
+} from "@/lib/a-book/pdf-worker-client";
 import { createABookArchive, parseABookLegacyNotesJson, readABookArchive } from "@/lib/a-book/archive";
 
 function localDownload(blob: Blob, filename: string) {
@@ -315,7 +324,7 @@ export function ABookEngine() {
 
   async function inspectSelectedPdf(file: ABookAttachment) {
     try {
-      const details = await inspectPdf(file.blob);
+      const details = await inspectPdfInWorker(file.blob);
       setPdfInfo(`${file.name}: ${details.pageCount} pages${details.title ? ` · ${details.title}` : ""}`);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(file.blob));
@@ -331,13 +340,13 @@ export function ABookEngine() {
     try {
       if (files.length === 1) {
         const file = files[0];
-        const details = await inspectPdf(file.blob);
+        const details = await inspectPdfInWorker(file.blob);
         const pages = parsePageRanges(pageRange, details.pageCount);
-        const bytes = await extractPdfPages(file.blob, pages);
+        const bytes = await extractPdfPagesInWorker(file.blob, pages);
         pdfDownload(bytes, `${safeName(file.name.replace(/\.pdf$/i, ""))}-extracted.pdf`);
         setPdfInfo(`Extracted ${pages.length} pages from ${file.name} locally`);
       } else {
-        const archive = await extractSelectedPdfs(files.map((file) => ({ name: file.name, blob: file.blob })), pageRange);
+        const archive = await extractSelectedPdfsInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), pageRange);
         zipDownload(archive, "a-book-extracted-pdfs.zip");
         setPdfInfo(`Extracted pages from ${files.length} PDFs locally`);
       }
@@ -350,7 +359,7 @@ export function ABookEngine() {
   async function rotateSelectedBatch() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
     try {
-      const archive = await rotateSelectedPdfs(files.map((file) => ({ name: file.name, blob: file.blob })), rotateAngle);
+      const archive = await rotateSelectedPdfsInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), rotateAngle);
       zipDownload(archive, "a-book-rotated-pdfs.zip");
       setPdfInfo(`Rotated ${files.length} PDFs locally`);
       setError("");
@@ -365,11 +374,11 @@ export function ABookEngine() {
     try {
       if (files.length === 1) {
         const file = files[0];
-        const archive = await splitPdfIntoZip(file.blob, file.name, splitRanges);
+        const archive = await splitPdfIntoZipInWorker(file.blob, file.name, splitRanges);
         zipDownload(archive, `${safeName(file.name.replace(/\.pdf$/i, ""))}-parts.zip`);
         setPdfInfo(`Created PDF parts from ${file.name} locally`);
       } else {
-        const archive = await splitSelectedPdfsIntoZip(files.map((file) => ({ name: file.name, blob: file.blob })), splitRanges);
+        const archive = await splitSelectedPdfsIntoZipInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), splitRanges);
         zipDownload(archive, "a-book-split-pdfs.zip");
         setPdfInfo(`Created parts from ${files.length} PDFs locally`);
       }
@@ -382,7 +391,7 @@ export function ABookEngine() {
   async function mergeSelectedPdfs() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
     try {
-      const bytes = await mergePdfs(files.map((file) => file.blob));
+      const bytes = await mergePdfsInWorker(files.map((file) => file.blob));
       pdfDownload(bytes, "a-book-merged.pdf");
       setPdfInfo(`Merged ${files.length} PDFs locally`);
       setError("");
