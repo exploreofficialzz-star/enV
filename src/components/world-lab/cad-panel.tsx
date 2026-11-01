@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useState,type PointerEvent as ReactPointerEvent} from "react";
 import {
   alignSolids,circularPattern,distributeSolids,duplicateSolids,extrudeCircle,
   extrudeRectangle,linearPattern,mirrorSolids,rotateSolids,scaleSolids,type CadAxis,type CadAlignment,
@@ -27,7 +27,33 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
  const [sketchDepth,setSketchDepth]=useState(2);
  const [extrusionHeight,setExtrusionHeight]=useState(1);
  const [circleRadius,setCircleRadius]=useState(0.5);
+ const [sketchShape,setSketchShape]=useState<"rectangle"|"circle">("rectangle");
+ const [sketchStart,setSketchStart]=useState<{x:number;y:number}|null>(null);
+ const [sketchEnd,setSketchEnd]=useState<{x:number;y:number}|null>(null);
  const [error,setError]=useState("");
+ function sketchPoint(event:ReactPointerEvent<SVGSVGElement>){
+   const rect=event.currentTarget.getBoundingClientRect();
+   return {x:Math.max(0,Math.min(400,(event.clientX-rect.left)/rect.width*400)),
+     y:Math.max(0,Math.min(220,(event.clientY-rect.top)/rect.height*220))};
+ }
+ function beginSketch(event:ReactPointerEvent<SVGSVGElement>){
+   event.currentTarget.setPointerCapture(event.pointerId);
+   const p=sketchPoint(event);setSketchStart(p);setSketchEnd(p);
+ }
+ function moveSketch(event:ReactPointerEvent<SVGSVGElement>){
+   if(sketchStart)setSketchEnd(sketchPoint(event));
+ }
+ function finishSketch(event:ReactPointerEvent<SVGSVGElement>){
+   if(!sketchStart)return;
+   const end=sketchPoint(event),dx=end.x-sketchStart.x,dy=end.y-sketchStart.y;
+   if(sketchShape==="rectangle"){
+     setSketchWidth(Number((Math.max(2,Math.abs(dx))/20).toFixed(3)));
+     setSketchDepth(Number((Math.max(2,Math.abs(dy))/20).toFixed(3)));
+   }else{
+     setCircleRadius(Number((Math.max(2,Math.hypot(dx,dy))/20).toFixed(3)));
+   }
+   setSketchEnd(end);setSketchStart(null);
+ }
  const entityKey=project?.entities.map(e=>e.id).join("|")??"";
  useEffect(()=>{
    if(!project){setSelection([]);return;}
@@ -128,6 +154,38 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
       Draw a bounded closed rectangle or circle in the X/Z sketch plane, then
       extrude along Y. These profile tools create portable box/cylinder solids;
       arbitrary curves and feature-tree history are not implied.
+     </p>
+     <div className="mt-2 flex gap-2">
+      <button type="button" className={button} aria-pressed={sketchShape==="rectangle"}
+       onClick={()=>setSketchShape("rectangle")}>Rectangle profile</button>
+      <button type="button" className={button} aria-pressed={sketchShape==="circle"}
+       onClick={()=>setSketchShape("circle")}>Circle profile</button>
+     </div>
+     <svg viewBox="0 0 400 220" role="img"
+      aria-label="Draw a closed sketch profile by dragging across the grid. The profile dimensions update in metres."
+      className="mt-2 h-44 w-full touch-none rounded border border-border bg-bg"
+      onPointerDown={beginSketch} onPointerMove={moveSketch} onPointerUp={finishSketch}
+      onPointerCancel={()=>setSketchStart(null)}>
+      <defs><pattern id="world-lab-sketch-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+       <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="0.8"/>
+      </pattern></defs>
+      <rect width="400" height="220" fill="url(#world-lab-sketch-grid)"/>
+      <path d="M200 0V220 M0 110H400" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1"/>
+      {sketchStart&&sketchEnd&&sketchShape==="rectangle"&&
+       <rect x={Math.min(sketchStart.x,sketchEnd.x)} y={Math.min(sketchStart.y,sketchEnd.y)}
+        width={Math.max(2,Math.abs(sketchEnd.x-sketchStart.x))}
+        height={Math.max(2,Math.abs(sketchEnd.y-sketchStart.y))}
+        fill="currentColor" fillOpacity="0.12" stroke="currentColor" strokeWidth="2"/>}
+      {sketchStart&&sketchEnd&&sketchShape==="circle"&&
+       <circle cx={sketchStart.x} cy={sketchStart.y}
+        r={Math.max(2,Math.hypot(sketchEnd.x-sketchStart.x,sketchEnd.y-sketchStart.y))}
+        fill="currentColor" fillOpacity="0.12" stroke="currentColor" strokeWidth="2"/>}
+      {!sketchStart&&sketchEnd&&<circle cx={sketchEnd.x} cy={sketchEnd.y} r="3" fill="currentColor"/>}
+      <text x="10" y="15" fontSize="10" fill="currentColor">Drag to draw · 20 px = 1 m</text>
+     </svg>
+     <p className="text-xs text-muted-foreground">
+      Draw a closed profile above to set its dimensions, or enter exact values below.
+      Supported v1 extrusion profiles are a rectangle and a circle.
      </p>
      <div className="mt-2 grid grid-cols-2 gap-2">
       <label className="text-xs">Rectangle width (m)
