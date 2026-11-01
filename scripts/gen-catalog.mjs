@@ -112,7 +112,7 @@ add([
   ["investment-calculator","Investment Calculator","calculators","Project an investment with regular deposits.","calculator","investment","investment future value",0,84,"f"],
   ["roi-calculator","ROI Calculator","calculators","Return on investment as a percentage and multiple.","calculator","roi","roi return investment",1,88,"f"],
   ["profit-calculator","Profit Calculator","calculators","Profit, margin, and markup from cost and selling price.","calculator","profit","profit margin",0,86,"f"],
-  ["break-even-calculator","Break-Even Calculator","calculators","Units needed to cover fixed and variable costs.","calculator","break-even","break even units",0,80,"f"],
+  ["break-even-calculator","Break-Even Calculator","calculators","Legacy route to the Finance Studio break-even calculation. Units needed to cover fixed and variable costs.","business","break-even","break even units finance studio",0,80,"f"],
   ["markup-calculator","Markup Calculator","calculators","Selling price from cost and markup percent.","calculator","markup","markup price",0,79,"f"],
   ["margin-calculator","Margin Calculator","calculators","Gross margin from cost and price.","calculator","margin","gross margin",0,81,"f"],
   ["discount-calculator","Discount Calculator","calculators","Sale price and amount saved from a discount percent.","calculator","discount","discount sale off",1,90,"f"],
