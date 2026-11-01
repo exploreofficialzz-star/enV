@@ -1,4 +1,4 @@
-export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal" | "rings" | "chevron" | "hexagons" | "crosshatch" | "checkerboard";
+export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal" | "rings" | "chevron" | "hexagons" | "crosshatch" | "checkerboard" | "triangles" | "polka" | "waves" | "zigzag";
 export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number };
 export type WaveSvgOptions = {
   amplitude: number;
@@ -42,6 +42,11 @@ export function buildPatternSvg(size: number, opacity: number, color: string, pa
     hexagons: `<path d="M${center} 0L${safeSize * 0.86} ${safeSize * 0.25}V${safeSize * 0.75}L${center} ${safeSize}L${safeSize * 0.14} ${safeSize * 0.75}V${safeSize * 0.25}Z M${safeSize * 1.5} ${safeSize * 0.5}L${safeSize * 1.86} ${safeSize * 0.75}V${safeSize * 1.25}L${safeSize * 1.5} ${safeSize * 1.5}L${safeSize * 1.14} ${safeSize * 1.25}V${safeSize * 0.75}Z" ${stroke} fill="none"/>`,
     crosshatch: `<path d="M0 0L${safeSize} ${safeSize}M${safeSize} 0L0 ${safeSize}M${center} 0L${center} ${safeSize}M0 ${center}H${safeSize}" ${stroke}/>`,
     checkerboard: `<rect x="0" y="0" width="${center}" height="${center}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><rect x="${center}" y="${center}" width="${center}" height="${center}" fill="${safeColor}" fill-opacity="${safeOpacity}"/>`,
+
+    triangles: `<path d="M0 0L${center} ${center}L0 ${safeSize}M${center} ${center}L${safeSize} 0L${safeSize} ${safeSize}M0 0H${safeSize}M0 ${safeSize}H${safeSize}" ${stroke} fill="none"/>`,
+    polka: `<circle cx="${center}" cy="${center}" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="0" cy="0" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="${safeSize}" cy="0" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="0" cy="${safeSize}" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/><circle cx="${safeSize}" cy="${safeSize}" r="${safeSize * 0.14}" fill="${safeColor}" fill-opacity="${safeOpacity}"/>`,
+    waves: `<path d="M0 ${safeSize * 0.28}C${safeSize * 0.25} ${safeSize * 0.02} ${safeSize * 0.25} ${safeSize * 0.54} ${center} ${safeSize * 0.28}S${safeSize * 0.75} ${safeSize * 0.54} ${safeSize} ${safeSize * 0.28}M0 ${safeSize * 0.72}C${safeSize * 0.25} ${safeSize * 0.46} ${safeSize * 0.25} ${safeSize * 0.98} ${center} ${safeSize * 0.72}S${safeSize * 0.75} ${safeSize * 0.98} ${safeSize} ${safeSize * 0.72}" ${stroke} fill="none"/>`,
+    zigzag: `<path d="M0 0L${center} ${center}L${safeSize} 0M0 ${center}L${center} ${safeSize}L${safeSize} ${center}M0 ${safeSize}L${center} ${center}" ${stroke} fill="none"/>`,
   };
   const safePattern = Object.prototype.hasOwnProperty.call(patternShapes, pattern) ? pattern : "diagonal";
   const safeRotation = clamp(rotation, 0, 360);

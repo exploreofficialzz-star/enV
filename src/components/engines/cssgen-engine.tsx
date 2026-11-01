@@ -4,7 +4,7 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
 import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
@@ -29,6 +29,8 @@ const GRADIENT_PRESETS: Array<{ name: string; stops: GradientStop[]; angle: numb
 
 const BASE_FIELDS: Record<string, UiField[]> = {
   gradient: [
+    { name: "meshMode", label: "Gradient style", type: "select", defaultValue: "standard", options: [{ value: "standard", label: "Linear / radial / conic" }, { value: "yes", label: "Mesh-style blend" }] },
+    { name: "meshFade", label: "Mesh softness", type: "number", defaultValue: 72, min: 40, max: 92, suffix: "%" },
     { name: "kind", label: "Gradient type", type: "select", defaultValue: "linear", options: [{ value: "linear", label: "Linear" }, { value: "radial", label: "Radial" }, { value: "conic", label: "Conic" }] },
     { name: "angle", label: "Angle", type: "number", defaultValue: 135, min: 0, max: 360, suffix: "deg" },
     { name: "shape", label: "Radial shape", type: "select", defaultValue: "circle", options: [{ value: "circle", label: "Circle" }, { value: "ellipse", label: "Ellipse" }] },
@@ -111,7 +113,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "dist", label: "Shadow distance", type: "number", defaultValue: 10, min: 1, max: 40, suffix: "px" },
   ],
   pattern: [
-    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }, { value: "rings", label: "Concentric rings" }, { value: "chevron", label: "Chevron" }, { value: "hexagons", label: "Hexagons" }, { value: "crosshatch", label: "Crosshatch" }, { value: "checkerboard", label: "Checkerboard" }] },
+    { name: "pattern", label: "Pattern style", type: "select", defaultValue: "diagonal", options: [{ value: "dots", label: "Dots" }, { value: "grid", label: "Grid" }, { value: "diagonal", label: "Diagonal" }, { value: "cross", label: "Cross" }, { value: "horizontal", label: "Horizontal lines" }, { value: "rings", label: "Concentric rings" }, { value: "chevron", label: "Chevron" }, { value: "hexagons", label: "Hexagons" }, { value: "crosshatch", label: "Crosshatch" }, { value: "checkerboard", label: "Checkerboard" }, { value: "triangles", label: "Triangles" }, { value: "polka", label: "Polka dots" }, { value: "waves", label: "Wave lines" }, { value: "zigzag", label: "Zigzag" }] },
     { name: "rotation", label: "Pattern rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Pattern color", type: "color", defaultValue: "#0d9f8a" },
     { name: "size", label: "Pattern size", type: "number", defaultValue: 24, min: 6, max: 160, suffix: "px" },
@@ -227,8 +229,14 @@ function cssFor(
       hueMethod: values.hueMethod as import("@/lib/engines/css-gradient").GradientHueMethod,
       stops: normalized,
     };
-    const enhanced = buildCssGradient(gradientOptions);
-    const fallbackGradient = buildCssGradient({ ...gradientOptions, colorSpace: "srgb" });
+    const meshMode = values.meshMode === "yes";
+    const meshFade = numberValue(values, "meshFade", 72, 40, 92);
+    const enhanced = meshMode
+      ? buildCssMeshGradient(normalized, { angle, colorSpace: gradientOptions.colorSpace, hueMethod: gradientOptions.hueMethod, fade: meshFade })
+      : buildCssGradient(gradientOptions);
+    const fallbackGradient = meshMode
+      ? buildCssMeshGradient(normalized, { angle, colorSpace: "srgb", fade: meshFade })
+      : buildCssGradient({ ...gradientOptions, colorSpace: "srgb" });
     const fallback = normalized[0]?.color ?? "#0d9f8a";
     const glow = gradientOverlay.enabled
       ? `radial-gradient(circle at ${gradientOverlay.x}% ${gradientOverlay.y}%, ${gradientOverlay.color} 0%, transparent 58%)`
@@ -369,12 +377,16 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   const allFields = BASE_FIELDS[family] ?? BASE_FIELDS.gradient;
   const [values, setValues] = useState(() => initialValues(allFields));
   const fields = useMemo(() => family !== "gradient" ? allFields : allFields.filter((field) => {
-    if (field.name === "angle" && values.kind === "radial") return false;
-    if ((field.name === "shape" || field.name === "radialSize") && values.kind !== "radial") return false;
-    if ((field.name === "centerX" || field.name === "centerY") && values.kind === "linear") return false;
+    const meshMode = values.meshMode === "yes";
+    if (field.name === "meshFade" && !meshMode) return false;
+    if (field.name === "kind" && meshMode) return false;
+    if (field.name === "angle" && values.kind === "radial" && !meshMode) return false;
+    if ((field.name === "shape" || field.name === "radialSize") && (values.kind !== "radial" || meshMode)) return false;
+    if ((field.name === "centerX" || field.name === "centerY") && (values.kind === "linear" || meshMode)) return false;
+    if (field.name === "repeating" && meshMode) return false;
     if (field.name === "hueMethod" && !["hsl", "hwb", "lch", "oklch"].includes(values.colorSpace ?? "srgb")) return false;
     return true;
-  }), [allFields, family, values.colorSpace, values.kind]);
+  }), [allFields, family, values.colorSpace, values.kind, values.meshMode]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
   const [shadowLayers, setShadowLayers] = useState<ShadowLayer[]>(() => createShadowPreset("soft"));
   const [textShadowLayers, setTextShadowLayers] = useState<TextShadowLayer[]>(() => createTextShadowPreset("soft"));

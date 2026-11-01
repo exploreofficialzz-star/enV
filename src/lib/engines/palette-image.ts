@@ -36,10 +36,13 @@ export function extractDominantColors(
   for (let index = 0; index + 3 < rgba.length; index += 4) {
     const alpha = Number(rgba[index + 3]);
     if (!Number.isFinite(alpha) || alpha < threshold) continue;
-    const red = Math.round(clamp(Number(rgba[index]), 0, 255));
-    const green = Math.round(clamp(Number(rgba[index + 1]), 0, 255));
-    const blue = Math.round(clamp(Number(rgba[index + 2]), 0, 255));
-    if (![red, green, blue].every(Number.isFinite)) continue;
+    const rawRed = Number(rgba[index]);
+    const rawGreen = Number(rgba[index + 1]);
+    const rawBlue = Number(rgba[index + 2]);
+    if (![rawRed, rawGreen, rawBlue].every(Number.isFinite)) continue;
+    const red = Math.round(clamp(rawRed, 0, 255));
+    const green = Math.round(clamp(rawGreen, 0, 255));
+    const blue = Math.round(clamp(rawBlue, 0, 255));
     const hex = colorHex({ r: red, g: green, b: blue });
     const previous = histogram.get(hex);
     if (previous) previous.count += 1;
