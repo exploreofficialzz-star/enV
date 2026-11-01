@@ -54,10 +54,11 @@ export function snapSolidPosition(entity:WorldLabEntity,stepMeters:number):World
   if(!Number.isFinite(stepMeters)||stepMeters<0.001||stepMeters>100)
     throw new Error("Grid spacing must be between 0.001 and 100 metres.");
   const positionMeters=entity.positionMeters.map(coordinate=>{
-    const rounded=Number((Math.round(coordinate/stepMeters)*stepMeters).toFixed(6));
+    const raw=Math.round(coordinate/stepMeters)*stepMeters;
+    const rounded=Math.floor(raw*1e6+0.5)/1e6;
     if(!Number.isFinite(rounded)||Math.abs(rounded)>100000)
       throw new Error("Snapped position exceeds the portable coordinate envelope.");
-    return Object.is(rounded,-0)?0:rounded;
+    return rounded===0?0:rounded;
   }) as [number,number,number];
   return {...entity,positionMeters};
 }
