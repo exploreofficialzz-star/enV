@@ -65,6 +65,7 @@ export function ABookEngine() {
   const [rotateAngle, setRotateAngle] = useState<90 | 180 | 270>(90);
   const [previewUrl, setPreviewUrl] = useState("");
   const [isReady, setIsReady] = useState(false);
+  const [loadedProfileId, setLoadedProfileId] = useState<string | null | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -203,7 +204,9 @@ export function ABookEngine() {
         loaded.forEach((note) => savedFingerprints.current.set(note.id, noteFingerprint(note)));
         setNotes(loaded);
         setCurrentNote(loaded[0] ?? null);
+        setLoadedProfileId(activeProfileId);
         setIsReady(true);
+        setError("");
         const storageStatus = await getLocalStorageStatus();
         if (mounted && !storageStatus.persistent) {
           setStorageMessage("Saved locally · browser data may be cleared; export a backup");
@@ -214,6 +217,7 @@ export function ABookEngine() {
         if (!mounted) return;
         setError(cause instanceof Error ? cause.message : "A book could not open local storage.");
         setStorageMessage("Local storage unavailable");
+        setLoadedProfileId(activeProfileId);
         setIsReady(true);
       }
     })();
@@ -496,7 +500,9 @@ export function ABookEngine() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not restore this revision."); }
   }
 
-  if (authPending || !isReady) {
+  // Hide the previous library on the very first render after an account switch,
+  // before the profile-loading effect gets a chance to run.
+  if (authPending || !isReady || loadedProfileId !== activeProfileId) {
     return <section className="rounded-xl border border-border bg-surface p-6 text-sm text-muted" aria-live="polite">
       Opening your private local library…
     </section>;
