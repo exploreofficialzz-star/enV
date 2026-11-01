@@ -34,7 +34,9 @@ const allowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && to
 const unexpectedEngine = nonCalculator.filter((tool) => !allowedBusinessRoute(tool));
 const planned = calculators.filter((tool) => tool.status === "planned");
 const presentationPipelineMissing = !generatorText.includes("mathExercisePresentation(mathExerciseCatalog, key, target)")
-  || !generatorText.includes("const targetLabel = info.labels[target]")
+  || !generatorText.includes("expansionCalculatorName(info, target)")
+  || !generatorText.includes("expansionCalculatorDescription(info, target)")
+  || !generatorText.includes("expansionCalculatorKeywords(family, info, target)")
   || !presentationHelperText.includes("Missing human-readable label for math exercise target");
 const legacyGeneratedTitleLogic = generatorText.includes("Solve for ${target}") || mathExerciseText.includes("formula: `${spec.formula} · solve for ${target}`");
 
