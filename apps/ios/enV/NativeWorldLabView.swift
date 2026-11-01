@@ -23,6 +23,9 @@ private struct NativeWorldLabJsonFile: FileDocument {
 struct NativeWorldLabView:View {
     @State private var mode=0
     @State private var seconds=0.0
+    @State private var demoRecordedRun:NativeWorldLabRecordedRun?
+    @State private var demoRecordedSamples:[NativeLabResult]=[]
+    @State private var demoClock:NativeWorldLabRecordedClock?
     @State private var branchSourceInput:NativeLabInput?
     @State private var branchSourceRunId=""
     @State private var branchSourceTime=0.0
@@ -499,7 +502,63 @@ struct NativeWorldLabView:View {
         return .heat(diffusivityM2S:diffusivity)
     }
     private var values:NativeLabResult? {
-        try? NativeWorldLabScience.evaluate(input,atSeconds:seconds)
+        if let clock=demoClock,demoRecordedSamples.indices.contains(clock.sampleIndex) {
+            return demoRecordedSamples[clock.sampleIndex]
+        }
+        return try? NativeWorldLabScience.evaluate(input,atSeconds:seconds)
+    }
+    private func rebuildDemoRecordedTimeline() {
+        do {
+            let samples=try (0...120).map { index in
+                try NativeWorldLabScience.evaluate(input,atSeconds:Double(index)/10.0)
+            }
+            let run=NativeWorldLabRecordedRun(runId:UUID().uuidString,
+                modelId:mode==0 ? "native-spring":mode==1 ? "native-rc":"native-heat",
+                modelVersion:"1.0.0",
+                worldEpochUTC:ISO8601DateFormatter().string(from:worldEpochUTC),
+                sampleTimesSeconds:samples.map{$0.timeSeconds})
+            try run.validate()
+            let started=try NativeWorldLabRecordedTime.start(run:run,
+                wallTimeUTC:ISO8601DateFormatter().string(from:Date()),
+                timezoneDisplay:TimeZone.current.identifier,playbackRate:speed)
+            let clock=NativeWorldLabRecordedClock(wallTimeUTC:started.wallTimeUTC,
+                worldDateUTC:started.worldDateUTC,simulationTimeSeconds:started.simulationTimeSeconds,
+                solverInternalTimeSeconds:samples[0].timeSeconds,
+                displaySampleTimeSeconds:started.displaySampleTimeSeconds,sampleIndex:started.sampleIndex,
+                playbackRate:started.playbackRate,direction:started.direction,paused:true,
+                timezoneDisplay:started.timezoneDisplay,fidelity:started.fidelity)
+            demoRecordedSamples=samples;demoRecordedRun=run;demoClock=clock
+            seconds=0;playing=false;reversePlayback=false
+        } catch {
+            demoRecordedRun=nil;demoRecordedSamples=[];demoClock=nil
+            playing=false;problem=error.localizedDescription
+        }
+    }
+    private func seekDemoRecordedTime(_ target:Double) {
+        guard let run=demoRecordedRun,let clock=demoClock else{seconds=target;playing=false;return}
+        do {
+            let selected=try NativeWorldLabRecordedTime.seek(run:run,state:clock,timeSeconds:target)
+            let value=NativeWorldLabRecordedClock(wallTimeUTC:selected.wallTimeUTC,
+                worldDateUTC:selected.worldDateUTC,simulationTimeSeconds:selected.simulationTimeSeconds,
+                solverInternalTimeSeconds:demoRecordedSamples[selected.sampleIndex].timeSeconds,
+                displaySampleTimeSeconds:selected.displaySampleTimeSeconds,sampleIndex:selected.sampleIndex,
+                playbackRate:selected.playbackRate,direction:selected.direction,paused:true,
+                timezoneDisplay:selected.timezoneDisplay,fidelity:selected.fidelity)
+            demoClock=value;seconds=value.simulationTimeSeconds;playing=false
+        } catch {problem=error.localizedDescription;playing=false}
+    }
+    private func stepDemoRecordedTime(_ direction:Int) {
+        guard let run=demoRecordedRun,let clock=demoClock else{return}
+        do {
+            let selected=try NativeWorldLabRecordedTime.step(run:run,state:clock,direction:direction)
+            let value=NativeWorldLabRecordedClock(wallTimeUTC:selected.wallTimeUTC,
+                worldDateUTC:selected.worldDateUTC,simulationTimeSeconds:selected.simulationTimeSeconds,
+                solverInternalTimeSeconds:demoRecordedSamples[selected.sampleIndex].timeSeconds,
+                displaySampleTimeSeconds:selected.displaySampleTimeSeconds,sampleIndex:selected.sampleIndex,
+                playbackRate:selected.playbackRate,direction:selected.direction,paused:true,
+                timezoneDisplay:selected.timezoneDisplay,fidelity:selected.fidelity)
+            demoClock=value;seconds=value.simulationTimeSeconds;playing=false
+        } catch {problem=error.localizedDescription;playing=false}
     }
     private var solid:NativeLabSolid? {
         guard let project,project.entities.indices.contains(selected) else{return nil}
@@ -625,17 +684,23 @@ struct NativeWorldLabView:View {
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
                 HStack(spacing:6){
-                    Button("Beginning"){playing=false;reversePlayback=false;seconds=0}
+                    Button("Beginning"){seekDemoRecordedTime(0);reversePlayback=false}
                         .buttonStyle(.bordered)
-                    Button("Prev"){playing=false;seconds=max(0,seconds-1.0/240)}
+                    Button("Prev"){stepDemoRecordedTime(-1)}
                         .buttonStyle(.bordered)
                     Button(playing && !reversePlayback ? "Pause":"Play forward"){
-                        reversePlayback=false;playing.toggle()
+                        reversePlayback=false
+                        if seconds>=12-1e-9{seekDemoRecordedTime(0)}
+                        playing.toggle()
                     }.buttonStyle(.borderedProminent)
-                    Button("Rewind recording"){reversePlayback=true;playing=true}.buttonStyle(.bordered)
-                    Button("Next"){playing=false;seconds=min(12,seconds+1.0/240)}
+                    Button("Rewind recording"){
+                        reversePlayback=true
+                        if seconds<=1e-9{seekDemoRecordedTime(12)}
+                        playing=true
+                    }.buttonStyle(.bordered)
+                    Button("Next"){stepDemoRecordedTime(1)}
                         .buttonStyle(.bordered)
-                    Button("End"){playing=false;seconds=12}
+                    Button("End"){seekDemoRecordedTime(12);reversePlayback=false}
                         .buttonStyle(.bordered)
                 }
                 HStack{
@@ -705,20 +770,27 @@ struct NativeWorldLabView:View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 HStack{
-                    Button(playing ? "Pause":"Play"){playing.toggle()}.buttonStyle(.borderedProminent)
-                    Button("Beginning"){playing=false;seconds=0}.buttonStyle(.bordered)
-                    Button("Previous step"){playing=false;seconds=max(0,seconds-1.0/240)}.buttonStyle(.bordered)
-                    Button("Next step"){playing=false;seconds=min(12,seconds+1.0/240)}.buttonStyle(.bordered)
-                    Button("End"){playing=false;seconds=12}.buttonStyle(.bordered)
+                    Button(playing ? "Pause":"Play"){
+                        reversePlayback=false
+                        if seconds>=12-1e-9{seekDemoRecordedTime(0)}
+                        playing.toggle()
+                    }.buttonStyle(.borderedProminent)
+                    Button("Beginning"){seekDemoRecordedTime(0);reversePlayback=false}.buttonStyle(.bordered)
+                    Button("Previous step"){stepDemoRecordedTime(-1)}.buttonStyle(.bordered)
+                    Button("Next step"){stepDemoRecordedTime(1)}.buttonStyle(.bordered)
+                    Button("End"){seekDemoRecordedTime(12);reversePlayback=false}.buttonStyle(.bordered)
                 }
-                Text("Wall time (UTC): "+ISO8601DateFormatter().string(from:Date()))
-                    .font(.caption).accessibilityLabel("Wall clock in UTC")
-                Text("World date (UTC): "+ISO8601DateFormatter().string(from:worldEpochUTC.addingTimeInterval(seconds)))
-                    .font(.caption).accessibilityLabel("Simulated world date in UTC")
-                Text("Simulation \(String(format:"%.4f",seconds)) s · solver internal time \(String(format:"%.4f",values?.timeSeconds ?? seconds)) s · display sample \(String(format:"%.4f",seconds)) s · solver Δt \(String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)) s · \(TimeZone.current.identifier)")
-                    .font(.caption)
+                if let clock=demoClock {
+                    Text("Wall UTC "+clock.wallTimeUTC+" · local zone "+clock.timezoneDisplay)
+                        .font(.caption).accessibilityLabel("Wall clock in UTC")
+                    Text("World UTC "+clock.worldDateUTC).font(.caption)
+                    Text("Simulation \(String(format:"%.4f",clock.simulationTimeSeconds)) s · solver internal time \(String(format:"%.4f",clock.solverInternalTimeSeconds ?? clock.displaySampleTimeSeconds)) s · display sample \(String(format:"%.4f",clock.displaySampleTimeSeconds)) s · solver Δt \(String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)) s · cached recorded output")
+                        .font(.caption)
+                }
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
-                Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in if editing{playing=false} }).accessibilityLabel("Simulated elapsed time")
+                Slider(value:Binding(get:{seconds},set:{seekDemoRecordedTime($0)}),in:0...12,
+                    onEditingChanged:{editing in if editing{playing=false}})
+                    .accessibilityLabel("Recorded simulation sample position")
                 Picker("Playback speed",selection:$speed){
                     Text("0.01×").tag(0.01);Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
                 }.pickerStyle(.segmented)
@@ -730,13 +802,19 @@ struct NativeWorldLabView:View {
 
                 if mode==0 {
                     Text("Assumed mass: "+String(format:"%.2f",mass)+" kg")
-                    Slider(value:$mass,in:0.1...100)
+                    Slider(value:$mass,in:0.1...100,onEditingChanged:{editing in
+                        if !editing{rebuildDemoRecordedTimeline()}
+                    })
                 }else if mode==1 {
                     Text("Resistance: "+String(format:"%.0f",resistance)+" Ω")
-                    Slider(value:$resistance,in:100...10000)
+                    Slider(value:$resistance,in:100...10000,onEditingChanged:{editing in
+                        if !editing{rebuildDemoRecordedTimeline()}
+                    })
                 }else{
                     Text("Thermal diffusivity: "+String(format:"%.4f",diffusivity)+" m²/s")
-                    Slider(value:$diffusivity,in:0.001...0.08)
+                    Slider(value:$diffusivity,in:0.001...0.08,onEditingChanged:{editing in
+                        if !editing{rebuildDemoRecordedTimeline()}
+                    })
                 }
                 GroupBox("Experiment branches") {
                     VStack(alignment:.leading,spacing:8) {
@@ -886,9 +964,9 @@ struct NativeWorldLabView:View {
     }
     private var sceneSettingsView:some View {
         coreView
-        .onAppear{redraw();lastTick=Date();refreshSavedProjects();
+        .onAppear{rebuildDemoRecordedTimeline();redraw();lastTick=Date();refreshSavedProjects();
             refreshRecoveryDrafts();refreshScientificEvidence()}
-        .onChange(of:mode){_ in seconds=0;playing=false;redraw()}
+        .onChange(of:mode){_ in rebuildDemoRecordedTimeline();redraw()}
         .onChange(of:seconds){_ in redraw()}
         .onChange(of:dropTime){_ in applyDropPosition()}
         .onChange(of:fluidTime){_ in applyFluidPosition()}
@@ -975,9 +1053,27 @@ struct NativeWorldLabView:View {
         .onReceive(timer){now in
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
             lastTick=now
-            if playing {
-                seconds=reversePlayback ? max(0,seconds-dt*speed) : min(12,seconds+dt*speed)
-                if (reversePlayback && seconds<=0) || (!reversePlayback && seconds>=12){playing=false}
+            if let recording=demoRecordedRun,let previous=demoClock {
+                let active=NativeWorldLabRecordedClock(wallTimeUTC:previous.wallTimeUTC,
+                    worldDateUTC:previous.worldDateUTC,simulationTimeSeconds:previous.simulationTimeSeconds,
+                    solverInternalTimeSeconds:previous.solverInternalTimeSeconds,
+                    displaySampleTimeSeconds:previous.displaySampleTimeSeconds,
+                    sampleIndex:previous.sampleIndex,playbackRate:speed,
+                    direction:reversePlayback ? "reverse-recording":"forward",paused:!playing,
+                    timezoneDisplay:previous.timezoneDisplay,fidelity:"recorded-sample-playback")
+                if let next=try? NativeWorldLabRecordedTime.advance(run:recording,state:active,
+                    elapsedSeconds:dt,paused:!playing) {
+                    let sampleTime=demoRecordedSamples[next.sampleIndex].timeSeconds
+                    demoClock=NativeWorldLabRecordedClock(wallTimeUTC:next.wallTimeUTC,
+                        worldDateUTC:next.worldDateUTC,simulationTimeSeconds:next.simulationTimeSeconds,
+                        solverInternalTimeSeconds:sampleTime,displaySampleTimeSeconds:next.displaySampleTimeSeconds,
+                        sampleIndex:next.sampleIndex,playbackRate:next.playbackRate,
+                        direction:next.direction,paused:next.paused,timezoneDisplay:next.timezoneDisplay,
+                        fidelity:next.fidelity)
+                    seconds=next.simulationTimeSeconds
+                    if playing && ((reversePlayback && seconds<=1e-9) ||
+                        (!reversePlayback && seconds>=recording.durationSeconds-1e-9)){playing=false}
+                }else if playing {playing=false}
             }
             if let recording=motorRecordedRun,let previous=motorClock {
                 let direction=motorReversePlayback ? "reverse-recording":"forward"
