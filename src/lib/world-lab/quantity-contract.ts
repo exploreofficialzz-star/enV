@@ -75,6 +75,8 @@ export function quantity(value:number,unit:ScientificUnit,evidence:EvidenceLabel
     throw new Error("Measured evidence requires an auditable source identifier.");
   if(evidence==="unknown-insufficient-evidence")
     throw new Error("Unknown physical values must remain null, not fabricated numbers.");
+  if(unit==="K"&&value<0)
+    throw new Error("Scientific absolute Kelvin temperature cannot be negative.");
   const valueSI=value*spec.factor,uncertaintySI=uncertainty===null?null:uncertainty*spec.factor;
   if(!Number.isFinite(valueSI)||uncertaintySI!==null&&!Number.isFinite(uncertaintySI))
     throw new Error("Scientific unit conversion exceeded finite bounds.");

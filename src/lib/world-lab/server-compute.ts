@@ -9,6 +9,7 @@ import {verifyDigitalTruthTablePacked} from "./digital-logic.ts";
 import {runChemicalAssumptionSweep} from "./chemical-sweep.ts";
 import {runStructuralAssumptionSweep} from "./structural-sweep.ts";
 import {runNewtonianGravity} from "./gravity.ts";
+import {worldLabModelForRemote} from "./model-registry.ts";
 
 /**
  * The authenticated HTTP layer controls access. This dispatcher only accepts
@@ -40,6 +41,7 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   kind:WorldLabRemoteOperation;
   projectId:string;
   projectRevision:number;
+  modelId:string;modelVersion:string;
   outcome:ReturnType<typeof calculateHydrostatics>|
     ReturnType<typeof solveDcNetwork>|ReturnType<typeof runNetworkMotorExperiment>|
     ReturnType<typeof runChemicalThermal>|ReturnType<typeof runMultiSphereCollisions>|ReturnType<typeof verifyDigitalTruthTablePacked>|ReturnType<typeof runChemicalAssumptionSweep>|ReturnType<typeof runStructuralAssumptionSweep>|ReturnType<typeof runNewtonianGravity>;
@@ -50,6 +52,7 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   const kind=data.kind;
   if(!["hydrostatics","dc-network","wired-motor","chemical-thermal","multi-sphere","exhaustive-logic","chemical-sweep","structural-sweep","newton-gravity"].includes(String(kind)))
     throw new Error("Requested scientific model is not available.");
+  const registeredModel=worldLabModelForRemote(String(kind));
   exactKeys(data,["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
     "velocities","restitution","durationSeconds","networkId","tipForceN",
@@ -191,6 +194,7 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   }
   return Object.freeze({
     kind:kind as WorldLabRemoteOperation,projectId:project.id,
-    projectRevision:project.revision,outcome,
+    projectRevision:project.revision,modelId:registeredModel.id,
+    modelVersion:registeredModel.version,outcome,
   });
 }

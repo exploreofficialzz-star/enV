@@ -1,5 +1,7 @@
 import {parseWorldLabProject,type WorldLabProject} from "./project.ts";
 import {solveDcNetwork,type DcNetworkResult} from "./network.ts";
+import {quantity,requireQuantity} from "./quantity-contract.ts";
+import {validateScientificGraph,type ScientificGraph,validatePowerBalance} from "./scientific-graph.ts";
 import {
   deriveActuatorInput,runActuatorExperiment,
   type ActuatorInput,type ActuatorRun,
@@ -35,6 +37,7 @@ export type NetworkMotorRun=Readonly<{
   sourceComponentId:string;
   dc:DcNetworkResult;
   motor:ActuatorRun;
+  connectionGraph:ScientificGraph;
   samples:readonly NetworkMotorSample[];
 }>;
 
@@ -50,11 +53,28 @@ export function runNetworkMotorExperiment(
   if(sources.length!==1)
     throw new Error("The reference motor wiring supports exactly one ideal source.");
   const source=sources[0];
+  // The supported ideal-source connection is an explicit typed, dimensionally
+  // checked physical port, not an arbitrary unlabelled number or scene wire.
+  const supply=quantity(source.voltageV,"V","hypothetical-user-assumed");
+  const connectionGraph=validateScientificGraph({
+    schemaVersion:1,projectId:p.id,projectRevision:p.revision,
+    components:[
+      {id:"ideal_source",modelId:"ideal_dc_source",ports:[
+        {id:"voltage",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+      {id:"motor",modelId:"rl_actuator",ports:[
+        {id:"supply",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"}]},
+    ],
+    edges:[{fromComponentId:"ideal_source",fromPortId:"voltage",
+      toComponentId:"motor",toPortId:"supply",delayed:false}],
+  });
   if(source.voltageV<0)
     throw new Error("Reverse-polarity source requires a signed motor model not yet supported.");
   const dc=solveDcNetwork(network,p);
+  // KCL/Kirchhoff balance is verified before coupling another branch.
+  validatePowerBalance(dc.sourcePowerSuppliedW,dc.resistivePowerW,0,
+    Math.max(1e-6,Math.abs(dc.sourcePowerSuppliedW)*1e-7));
   const output=deriveActuatorInput(p,entityId,{
-    ...settings,supplyVoltageV:source.voltageV,
+    ...settings,supplyVoltageV:requireQuantity(supply,"V"),
   });
   const motor=runActuatorExperiment(output.input,output.source,requestedStepSeconds);
   const baseSourceCurrent=dc.branchCurrentsA[source.id];
@@ -87,6 +107,7 @@ export function runNetworkMotorExperiment(
     format:"env-world-lab-network-motor-run" as const,modelVersion:"1.0.0" as const,
     evidence:"physics-model-computed" as const,projectId:p.id,projectRevision:p.revision,
     networkId:network.id,entityId,sourceComponentId:source.id,dc,motor,
+    connectionGraph,
     samples:Object.freeze(samples),
     validity:"Ideal 1D stiff-voltage-source network and motor branch. Source current, DC " +
       "resistor heat, back-EMF, motor heat, lift and energy are calculated together. " +
