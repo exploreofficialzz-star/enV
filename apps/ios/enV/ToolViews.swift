@@ -14920,6 +14920,14 @@ private struct NativeABookView: View {
                             }
                         }
                         Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                        let pdfAttachments = attachments.filter { $0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf") }
+                        if !pdfAttachments.isEmpty {
+                            HStack(spacing: 8) {
+                                Button("Merge PDFs") { mergeSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.count < 2)
+                                Button("Rotate batch") { rotateSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                            }
+                            Text("Select PDFs for batch actions").font(.caption2).foregroundStyle(Color.envMuted)
+                        }
                         ForEach(attachments) { attachment in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -14928,7 +14936,13 @@ private struct NativeABookView: View {
                                 }
                                 Spacer()
                                 if attachment.mime == "application/pdf" || attachment.name.lowercased().hasSuffix(".pdf") {
-                                    Button("PDF tools") { processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                                    Button {
+                                        if selectedPDFIDs.contains(attachment.id) { selectedPDFIDs.remove(attachment.id) }
+                                        else { selectedPDFIDs.insert(attachment.id) }
+                                    } label: {
+                                        Image(systemName: selectedPDFIDs.contains(attachment.id) ? "checkmark.circle.fill" : "circle")
+                                    }.buttonStyle(.plain).accessibilityLabel(selectedPDFIDs.contains(attachment.id) ? "Deselect PDF" : "Select PDF")
+                                    Button("PDF tools") { activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
                                 }
                             }
                         }
@@ -15031,6 +15045,8 @@ private struct NativeABookView: View {
     }
 
     private func select(_ note: ABookNativeNote?) {
+        selectedPDFIDs = []
+        activePDFSelection = nil
         selectedID = note?.id
         title = note?.title ?? ""
         bodyText = note?.body ?? ""
@@ -15113,7 +15129,8 @@ private struct NativeABookView: View {
                 Button("Extract text") { processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
                 Button("OCR scanned pages") { processPDF(attachment, operation: "ocr") }.buttonStyle(.bordered)
                 Button("Rotate 90°") { processPDF(attachment, operation: "rotate") }.buttonStyle(.bordered)
-            }
+            }            TextField("Split pages · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
+            Button("Split into parts") { splitPDF(attachment) }.buttonStyle(.bordered)
             if !pdfText.isEmpty {
                 Text(pdfText).font(.caption).textSelection(.enabled).lineLimit(12)
                 Button("Insert extracted text into note") { bodyText += "\n\n" + pdfText }.buttonStyle(.bordered)
