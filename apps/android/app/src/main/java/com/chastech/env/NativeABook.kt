@@ -173,22 +173,33 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
 
 private fun createABookBackup(context:Context,db:ABookLocalDb):File{
     val allNotes=db.notes(true,true)
+    require(allNotes.size<=10000){"This library contains more than 10,000 notes and cannot be exported in one backup."}
     val notesJson=JSONArray();val revisionsJson=JSONArray();val attachmentsJson=JSONArray()
     val archiveFiles=linkedMapOf<String,ByteArray>()
-    var totalBytes=0L;var attachmentIndex=0
+    var totalBytes=0L;var attachmentIndex=0;var revisionCount=0
     allNotes.forEach{note->
+        require(note.title.length<=10000&&note.body.length<=5000000&&note.notebook.length<=500){"A note exceeds the supported backup size."}
+        val noteTags=JSONArray(note.tags)
+        require(noteTags.length()<=50){"A note has too many tags to export."}
+        for(tagIndex in 0 until noteTags.length())require(noteTags.getString(tagIndex).length<=200){"A note tag exceeds the supported size."}
         notesJson.put(JSONObject().apply{
             put("id",note.id);put("title",note.title);put("body",note.body);put("notebook",note.notebook)
-            put("tags",JSONArray(note.tags));put("pinned",note.pinned);put("archived",note.archived)
+            put("tags",noteTags);put("pinned",note.pinned);put("archived",note.archived)
             put("deletedAt",note.deletedAt?:JSONObject.NULL);put("createdAt",note.createdAt);put("updatedAt",note.updatedAt);put("revision",note.revision)
         })
         db.revisions(note.id).forEach{revision->
+            revisionCount++;require(revisionCount<=100000){"This library contains more than 100,000 revisions and cannot be exported in one backup."}
+            require(revision.title.length<=10000&&revision.body.length<=5000000&&revision.notebook.length<=500&&revision.revision>=0){"A revision exceeds the supported backup size."}
+            val revisionTags=JSONArray(revision.tags);require(revisionTags.length()<=50){"A revision has too many tags to export."}
+            for(tagIndex in 0 until revisionTags.length())require(revisionTags.getString(tagIndex).length<=200){"A revision tag exceeds the supported size."}
             revisionsJson.put(JSONObject().apply{
                 put("id",revision.id);put("noteId",revision.noteId);put("title",revision.title);put("body",revision.body)
-                put("notebook",revision.notebook);put("tags",JSONArray(revision.tags));put("revision",revision.revision);put("createdAt",revision.createdAt)
+                put("notebook",revision.notebook);put("tags",revisionTags);put("revision",revision.revision);put("createdAt",revision.createdAt)
             })
         }
         db.attachments(note.id).forEach{attachment->
+            attachmentIndex++;require(attachmentIndex<=10000){"This library contains more than 10,000 attachments and cannot be exported in one backup."}
+            require(attachment.name.length<=500&&attachment.mime.length<=200){"An attachment has invalid metadata."}
             val root=context.filesDir.canonicalFile
             val file=File(context.filesDir,attachment.relativePath).canonicalFile
             require(file.path.startsWith(root.path+File.separator)&&file.isFile){"A local attachment is missing or outside A book storage."}
@@ -196,13 +207,12 @@ private fun createABookBackup(context:Context,db:ABookLocalDb):File{
             require(bytes.size<=100*1024*1024){"An attachment exceeds the 100 MB backup limit."}
             totalBytes+=bytes.size
             require(totalBytes<=150L*1024*1024){"The local library exceeds the 150 MB backup limit."}
-            val entryPath="attachments/"+attachmentIndex+".bin"
+            val entryPath="attachments/"+(attachmentIndex-1)+".bin"
             archiveFiles[entryPath]=bytes
             attachmentsJson.put(JSONObject().apply{
                 put("id",attachment.id);put("noteId",note.id);put("name",attachment.name);put("type",attachment.mime)
                 put("size",bytes.size);put("createdAt",attachment.createdAt);put("path",entryPath)
             })
-            attachmentIndex++
         }
     }
     val manifest=JSONObject().put("format","env.abook.archive.v1").put("createdAt",System.currentTimeMillis())
@@ -268,21 +278,27 @@ private fun importABookBackup(context:Context,db:ABookLocalDb,source:File):Int{
         val newId=UUID.randomUUID().toString();idMap[oldId]=newId
         importedNotes.add(ABookNoteRecord(newId,title,body,notebook,normalizedTags.toString(),pinned,archived,deleted,created,updated,revision))
     }
-    val importedRevisions=mutableListOf<ABookRevisionRecord>()
+    val importedRevisions=mutableListOf<ABookRevisionRecord>();val revisionIds=mutableSetOf<String>()
     for(i in 0 until revisionArray.length()){
-        val item=revisionArray.getJSONObject(i);val newNoteId=idMap[item.getString("noteId")]?:throw IllegalArgumentException("A revision refers to a missing note.")
+        val item=revisionArray.getJSONObject(i);val originalRevisionId=item.getString("id")
+        require(originalRevisionId.isNotBlank()&&revisionIds.add(originalRevisionId)){"The backup contains an invalid or duplicate revision ID."}
+        val newNoteId=idMap[item.getString("noteId")]?:throw IllegalArgumentException("A revision refers to a missing note.")
+        val revisionTitle=item.getString("title");val revisionBody=item.getString("body");val revisionNotebook=item.getString("notebook");val revisionNumber=item.getInt("revision")
+        require(revisionTitle.length<=10000&&revisionBody.length<=5000000&&revisionNotebook.length<=500&&revisionNumber>=0){"A revision exceeds the supported size."}
         val tags=item.optJSONArray("tags")?:JSONArray()
         require(tags.length()<=50){"A revision has too many tags."}
         val normalized=JSONArray();for(j in 0 until tags.length()){val tag=tags.getString(j);require(tag.length<=200);normalized.put(tag)}
-        importedRevisions.add(ABookRevisionRecord(UUID.randomUUID().toString(),newNoteId,item.getString("title"),item.getString("body"),item.getString("notebook"),normalized.toString(),item.getInt("revision"),item.getLong("createdAt")))
+        importedRevisions.add(ABookRevisionRecord(UUID.randomUUID().toString(),newNoteId,revisionTitle,revisionBody,revisionNotebook,normalized.toString(),revisionNumber,item.getLong("createdAt")))
     }
     val copiedFiles=mutableListOf<File>()
     val importedAttachments=mutableListOf<ABookFileRecord>()
-    val expectedPaths=mutableSetOf("manifest.json");var totalAttachmentBytes=0L
+    val expectedPaths=mutableSetOf("manifest.json");var totalAttachmentBytes=0L;val attachmentIds=mutableSetOf<String>()
     try{
         for(i in 0 until attachmentArray.length()){
             val item=attachmentArray.getJSONObject(i)
             val newNoteId=idMap[item.getString("noteId")]?:throw IllegalArgumentException("An attachment refers to a missing note.")
+            val originalAttachmentId=item.getString("id")
+            require(originalAttachmentId.isNotBlank()&&attachmentIds.add(originalAttachmentId)){"The backup contains an invalid or duplicate attachment ID."}
             val archivePath=item.getString("path")
             require(Regex("^attachments/\\d+\\.bin$").matches(archivePath)&&expectedPaths.add(archivePath)){"The backup contains an unsafe or duplicate attachment path."}
             val bytes=entries[archivePath]?:throw IllegalArgumentException("A backup attachment is missing.")
