@@ -113,6 +113,7 @@ const checks = [
   ["Glassmorphism fallback and progressive blur enhancement", cssEngine.includes("fallbackBackground") && cssEngine.includes("@supports (backdrop-filter: blur(1px)) or") && cssEngine.includes("-webkit-backdrop-filter")],
   ["Neumorphism accessibility usage guidance", cssEngine.includes("Neumorphic effects can make controls")],
   ["Editable semantic roles with pair contrast feedback", colorEngine.includes("Edit any role without regenerating") && colorEngine.includes("semanticContrast.body") && colorEngine.includes("semanticContrast.primary")],
+  ["Four role-driven page previews with light/dark switching", colorEngine.includes("Page preview layout") && ["landing", "dashboard", "forms", "content"].every((layout) => colorEngine.includes(`previewLayout === "${layout}"`) && colorEngine.includes(`data-testid="palette-preview-${layout}"`)) && colorEngine.includes("Preview color theme")],
   ["Shareable semantic role overrides", colorEngine.includes('url.searchParams.set("roles", JSON.stringify(roleOverrides))') && colorEngine.includes('params.get("roles")')],
   ["Perceptual OKLCH shade scale with gamut mapping", palette.includes("linearRgbToOklab") && palette.includes("fromOklchInSrgb") && palette.includes("upwardRoom")],
   ["Palette semantic roles and token exports", palette.includes("buildDesignPaletteExport") && ["css", "scss", "tailwind", "json", "tokens"].every((format) => palette.includes(`format === "${format}"`))],
