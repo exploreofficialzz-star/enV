@@ -99,30 +99,40 @@ export async function extractPdfTextLocally(
   }
   throwIfAborted(signal);
 
-  const pdfjs = await loadPdfJs();
-  throwIfAborted(signal);
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  throwIfAborted(signal);
-
-  const loadingTask = pdfjs.getDocument({
-    data: bytes,
-    isEvalSupported: false,
-    useSystemFonts: true,
-    enableXfa: false,
-    verbosity: 0,
-  });
-  let destroyed = false;
-  const destroy = async () => {
-    if (destroyed) return;
-    destroyed = true;
-    try { await loadingTask.destroy(); } catch { /* Abort or completed reader cleanup. */ }
-  };
-  const abort = () => { void destroy(); };
-  signal?.addEventListener("abort", abort, { once: true });
+  const operation = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => operation.abort();
+  signal?.addEventListener("abort", forwardAbort, { once: true });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    operation.abort();
+  }, 120_000);
+  let destroyLoadingTask: (() => Promise<void>) | undefined;
+  const abortLoadingTask = () => { void destroyLoadingTask?.(); };
+  operation.signal.addEventListener("abort", abortLoadingTask, { once: true });
 
   try {
+    const pdfjs = await loadPdfJs();
+    throwIfAborted(operation.signal);
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    throwIfAborted(operation.signal);
+
+    const loadingTask = pdfjs.getDocument({
+      data: bytes,
+      isEvalSupported: false,
+      useSystemFonts: true,
+      enableXfa: false,
+      verbosity: 0,
+    });
+    let destroyed = false;
+    destroyLoadingTask = async () => {
+      if (destroyed) return;
+      destroyed = true;
+      try { await loadingTask.destroy(); } catch { /* Abort or completed reader cleanup. */ }
+    };
+
     const document = await loadingTask.promise;
-    throwIfAborted(signal);
+    throwIfAborted(operation.signal);
     const pageCount = document.numPages;
     if (!Number.isSafeInteger(pageCount) || pageCount < 1) {
       throw new Error("This PDF has no readable pages.");
@@ -134,27 +144,30 @@ export async function extractPdfTextLocally(
     let truncated = pageCount > pagesToRead;
 
     for (let pageNumber = 1; pageNumber <= pagesToRead; pageNumber += 1) {
-      throwIfAborted(signal);
+      throwIfAborted(operation.signal);
       const page = await document.getPage(pageNumber);
       try {
         const content = await page.getTextContent();
-        throwIfAborted(signal);
+        throwIfAborted(operation.signal);
         const pageText = textFromItems(content.items as unknown[]);
-        const prefix = `[Page ${pageNumber}]\n`;
-        const remaining = A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf - characterCount;
-        if (remaining <= prefix.length) {
-          truncated = true;
-          break;
+        if (pageText) {
+          const prefix = \`[Page \${pageNumber}]\\n\`;
+          const remaining = A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf - characterCount;
+          if (remaining <= prefix.length) {
+            truncated = true;
+            break;
+          }
+          const pageOutput = prefix + pageText.slice(0, remaining - prefix.length);
+          output.push(pageOutput);
+          characterCount += pageOutput.length + 2;
+          if (pageText.length > pageOutput.length - prefix.length
+            || characterCount >= A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf) {
+            truncated = true;
+            pagesProcessed = pageNumber;
+            break;
+          }
         }
-        const pageOutput = prefix + pageText.slice(0, remaining - prefix.length);
-        output.push(pageOutput);
-        characterCount += pageOutput.length + 2;
         pagesProcessed = pageNumber;
-        if (pageText.length > pageOutput.length - prefix.length
-          || characterCount >= A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf) {
-          truncated = true;
-          break;
-        }
       } finally {
         page.cleanup();
       }
@@ -164,15 +177,20 @@ export async function extractPdfTextLocally(
     return {
       pageCount,
       pagesProcessed,
-      text: output.join("\n\n").slice(0, A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf),
+      text: output.join("\\n\\n").slice(0, A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf),
       truncated,
     };
   } catch (error) {
-    if (signal?.aborted) throw new DOMException("PDF text extraction was cancelled.", "AbortError");
+    if (timedOut) {
+      throw new Error("Local PDF text extraction exceeded the two-minute safety limit. Choose a smaller PDF and retry.");
+    }
+    if (operation.signal.aborted) throw new DOMException("PDF text extraction was cancelled.", "AbortError");
     throw error instanceof Error ? error : new Error("The PDF could not be read locally.");
   } finally {
-    signal?.removeEventListener("abort", abort);
-    await destroy();
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", forwardAbort);
+    operation.signal.removeEventListener("abort", abortLoadingTask);
+    await destroyLoadingTask?.();
   }
 }
 
