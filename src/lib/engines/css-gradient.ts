@@ -64,6 +64,20 @@ export function moveGradientStop(stops: GradientStop[], stopId: string, directio
   return ordered;
 }
 
+/** Move one stop to another stop's visual position while preserving all stop IDs and values. */
+export function moveGradientStopTo(stops: GradientStop[], sourceId: string, targetId: string): GradientStop[] {
+  let ordered = normalizeGradientStops(stops);
+  const sourceIndex = ordered.findIndex((stop) => stop.id === sourceId);
+  const targetIndex = ordered.findIndex((stop) => stop.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return ordered;
+  const direction: -1 | 1 = sourceIndex < targetIndex ? 1 : -1;
+  const moves = Math.abs(targetIndex - sourceIndex);
+  for (let step = 0; step < moves; step += 1) {
+    ordered = moveGradientStop(ordered, sourceId, direction);
+  }
+  return ordered;
+}
+
 /** Build a standards-based CSS gradient string with optional perceptual interpolation. */
 export function buildCssGradient(options: CssGradientOptions): string {
   const stops = normalizeGradientStops(options.stops);
