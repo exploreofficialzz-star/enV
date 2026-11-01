@@ -8920,7 +8920,7 @@
       "toolName": "Break-Even Calculator",
       "category": "calculators",
       "toolStatus": "active",
-      "engineType": "calculator",
+      "engineType": "business",
       "clientSide": true,
       "requiresBackend": false,
       "executionMode": "local-device",

@@ -1,6 +1,6 @@
 {
-  "catalogVersion": "4065c49807b4",
-  "baseCatalogVersion": "ba602ec2a0f7",
+  "catalogVersion": "c312e2fec397",
+  "baseCatalogVersion": "58f9a538e469",
   "runtimeExtensionIds": [
     "a-book"
   ],
@@ -39,21 +39,21 @@
     },
     {
       "family": "business",
-      "total": 104,
-      "active": 104,
+      "total": 105,
+      "active": 105,
       "planned": 0,
-      "androidImplemented": 104,
-      "iosImplemented": 104,
+      "androidImplemented": 105,
+      "iosImplemented": 105,
       "uniqueConfigurations": 29
     },
     {
       "family": "calculator",
-      "total": 6509,
-      "active": 6509,
+      "total": 6508,
+      "active": 6508,
       "planned": 0,
-      "androidImplemented": 6509,
-      "iosImplemented": 6509,
-      "uniqueConfigurations": 6507
+      "androidImplemented": 6508,
+      "iosImplemented": 6508,
+      "uniqueConfigurations": 6506
     },
     {
       "family": "codec",
