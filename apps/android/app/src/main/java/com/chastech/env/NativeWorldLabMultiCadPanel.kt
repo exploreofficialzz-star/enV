@@ -24,6 +24,7 @@ fun NativeWorldLabMultiCadPanel(
     var scale by remember(project.id){mutableStateOf("1.1")}
     var spacing by remember(project.id){mutableStateOf("1")}
     var gap by remember(project.id){mutableStateOf("0.25")}
+    var alignment by remember(project.id){mutableStateOf("min")}
     var gridStep by remember(project.id){mutableStateOf("0.5")}
     var plane by remember(project.id){mutableStateOf("0")}
     var patternSpacing by remember(project.id){mutableStateOf("2")}
@@ -125,10 +126,19 @@ fun NativeWorldLabMultiCadPanel(
                     }.onFailure{feedback="Enter a valid duplicate offset"}
                 }){Text("Duplicate all")}
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+        Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+            Text("Align rotated part bounds",style=MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                listOf("min" to "Minimum","center" to "Center","max" to "Maximum").forEach{(value,label)->
+                    FilterChip(selected=alignment==value,onClick={alignment=value},
+                        label={Text(label)})
+                }
+            }
             OutlinedButton(enabled=ids.size>=2,onClick={
-                apply{NativeWorldLabEditor.alignSolids(it,ids,axis,"min")}
-            }){Text("Align minimum")}
+                apply{NativeWorldLabEditor.alignSolids(it,ids,axis,alignment)}
+            }){Text("Align selected")}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             OutlinedTextField(value=gap,onValueChange={gap=it},
                 label={Text("Distribution gap m")},singleLine=true,
                 modifier=Modifier.weight(1f))
