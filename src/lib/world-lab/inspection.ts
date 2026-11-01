@@ -2,7 +2,7 @@ import type {WorldLabProject} from "./project.ts";
 export type InspectionMode="normal"|"transparent"|"xray"|"cutaway"|"isolate"|"exploded";
 export type InspectionAxis="x"|"y"|"z";
 export type InspectionNormal=readonly [number,number,number];
-export type InspectionSettings=Readonly<{mode:InspectionMode;opacity:number;axis:InspectionAxis;cutawayFraction:number;explosionDistanceM:number;selectedEntityId:string}>;
+export type InspectionSettings=Readonly<{mode:InspectionMode;opacity:number;axis:InspectionAxis;normal?:InspectionNormal;cutawayFraction:number;explosionDistanceM:number;selectedEntityId:string}>;
 export type Vec3Tuple=readonly [number,number,number];
 const finite=(n:number)=>Number.isFinite(n);
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
@@ -96,9 +96,9 @@ function validateInspectionViewState(state:InspectionViewState):InspectionViewSt
   explosionDistanceM:validated.explosionDistanceM});
 }
 function sameInspectionView(a:InspectionViewState,b:InspectionViewState):boolean{
- return a.mode===b.mode&&a.opacity===b.opacity&&a.axis===b.axis&&
-  a.normal?.every((value,index)=>value===b.normal?.[index])!==false&&
-  (a.normal===undefined&&b.normal===undefined||a.normal?.every((value,index)=>value===b.normal?.[index])===true)&&
+ const sameNormal=(a.normal===undefined&&b.normal===undefined)||
+  (a.normal!==undefined&&b.normal!==undefined&&a.normal.every((value,index)=>value===b.normal?.[index]));
+ return a.mode===b.mode&&a.opacity===b.opacity&&a.axis===b.axis&&sameNormal&&
   a.cutawayFraction===b.cutawayFraction&&a.explosionDistanceM===b.explosionDistanceM;
 }
 export function createInspectionViewHistory(initial:InspectionViewState):InspectionViewHistory{

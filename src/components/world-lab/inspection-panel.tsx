@@ -26,7 +26,10 @@ export function WorldLabInspectionPanel(p:Props){
    <div className="mt-2 grid grid-cols-3 gap-2">
     {(["X","Y","Z"] as const).map((axis,index)=><label key={axis} className="text-xs">Normal {axis}: {p.normal[index].toFixed(2)}
      <input className="w-full" type="range" min={-1} max={1} step={0.05}
-      value={p.normal[index]} onChange={e=>p.onNormalChange(p.normal.map((v,i)=>i===index?Number(e.target.value):v) as unknown as InspectionNormal)}/>
+      value={p.normal[index]} onChange={e=>{
+       const next=p.normal.map((v,i)=>i===index?Number(e.target.value):v) as unknown as InspectionNormal;
+       if(Math.hypot(...next)>1e-9)p.onNormalChange(next);
+      }}/>
     </label>)}
    </div>
    <p className="text-[11px] text-muted-foreground">The three components are normalized into one plane direction. The zero vector is not allowed.</p>
