@@ -5,7 +5,7 @@ import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessi
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
 import mathExpansion from "@/data/math-expansion.json";
-import { EXPANSION_FAMILIES, describeExpansion } from "@/lib/calc/expansion-rows.mjs";
+import { EXPANSION_FAMILIES, describeExpansion, expansionCalculatorName, expansionCalculatorDescription, expansionCalculatorKeywords } from "@/lib/calc/expansion-rows.mjs";
 import { MATH_EXERCISE_CATALOG } from "@/lib/engines/math-exercise-calculators";
 
 const musicDownloaderTool: ToolMeta = {
@@ -92,11 +92,11 @@ for (const family of EXPANSION_FAMILIES) {
   for (const row of expansionRows[family]) {
     const info = describeExpansion(family, row);
     for (const target of ["a", "b", "c"] as const) {
-      const targetLabel = info.labels[target];
-      const equationTitle = `${info.relation} — Solve for ${targetLabel}`;
+      const equationTitle = expansionCalculatorName(info, target);
       generatedCalculatorPresentation.set(`exp-${family}-${info.key}-${target}`, {
         name: info.title ? `${info.title}: ${equationTitle}` : equationTitle,
-        description: `Formula exercise calculator: ${info.relation}. Solve for ${targetLabel}. Enter the other two values to calculate the missing value.`,
+        description: `${expansionCalculatorDescription(info, target)} Enter the other two values to calculate the missing value.`,
+        keywords: expansionCalculatorKeywords(family, info, target).split(/\\s+/),
       });
     }
   }
