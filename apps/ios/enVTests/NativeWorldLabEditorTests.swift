@@ -204,8 +204,8 @@ final class NativeWorldLabEditorTests: XCTestCase {
         data=try NativeWorldLabEditor.saveCameraViewpoint(data,
             positionMeters:[10,8,-10],lookingAtMeters:[1,2,3])
         parsed=try NativeWorldLabProject.decode(data)
-        XCTAssertEqual(parsed.cameraPositionMeters,[10,8,-10])
-        XCTAssertEqual(parsed.cameraLookingAtMeters,[1,2,3])
+        XCTAssertEqual(parsed.camera.positionMeters,[10,8,-10])
+        XCTAssertEqual(parsed.camera.lookingAtMeters,[1,2,3])
     }
     func testNativeSketchExtrusionsCreatePortableBoxAndCylinderProfiles() throws {
         var data=try NativeWorldLabEditor.extrudeRectangle(
@@ -402,7 +402,7 @@ final class NativeWorldLabEditorTests: XCTestCase {
     func testCADExchangeRoundTripsSupportedGeometryAndReferencedMaterials() throws {
         var source=try NativeWorldLabEditor.addSolid(try NativeWorldLabEditor.blank(),shape:"box",id:"box-source")
         source=try NativeWorldLabEditor.positionSolid(source,id:"box-source",positionMeters:[1,2,3])
-        source=try NativeWorldLabEditor.rotateSolid(source,id:"box-source",axis:2,degrees:30)
+        source=try NativeWorldLabEditor.rotateSolid(source,id:"box-source",axis:2,deltaDegrees:30)
         source=try NativeWorldLabEditor.addHypotheticalMaterial(source,name:"Assumed alloy",
             densityKgM3:7850,youngModulusPa:2e11,id:"mat-used")
         source=try NativeWorldLabEditor.assignMaterial(source,solidId:"box-source",materialId:"mat-used")
