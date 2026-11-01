@@ -18,6 +18,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.chastech.env.engine.NativeLabSolid
+import com.chastech.env.engine.NativeGeodetic
+import com.chastech.env.engine.NativeEnu
+import com.chastech.env.engine.NativeWorldLabGeodesy
 import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabProject
 import kotlin.math.*
@@ -63,6 +66,8 @@ fun NativeWorldLabViewport(
     onSelect:(String)->Unit,
     onSaveView:(List<Double>,List<Double>)->Unit,
     onResetView:()->Unit,
+    onSaveGeodeticOrigin:(NativeGeodetic)->Unit,
+    onClearGeodeticOrigin:()->Unit,
 ){
     val cameraDeltaX=project.cameraPositionMeters.x-project.cameraLookingAtMeters.x
     val cameraDeltaY=project.cameraPositionMeters.y-project.cameraLookingAtMeters.y
@@ -76,6 +81,9 @@ fun NativeWorldLabViewport(
     }
     var pan by remember(project.id,project.revision){mutableStateOf(Offset.Zero)}
     val focus=project.cameraLookingAtMeters
+    var latitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.latitudeDegrees?.toString() ?: "0")}
+    var longitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.longitudeDegrees?.toString() ?: "0")}
+    var height by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.heightMeters?.toString() ?: "0")}
     fun projection(point:NativeLabVector,width:Float,height:Float)=
         labIsoPoint(point,focus,yaw,zoom,pan,width,height)
     Text("Explore your invention",style=MaterialTheme.typography.titleSmall)
@@ -165,6 +173,37 @@ fun NativeWorldLabViewport(
                 }
             }
         }
+    }
+    Text("Earth reference (WGS84)",style=MaterialTheme.typography.titleSmall)
+    Text("A mathematical geodetic origin for the local ENU model. This does not fetch terrain, imagery or device location.",
+        style=MaterialTheme.typography.bodySmall)
+    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+        OutlinedTextField(value=latitude,onValueChange={latitude=it},label={Text("Latitude °")},singleLine=true,modifier=Modifier.weight(1f))
+        OutlinedTextField(value=longitude,onValueChange={longitude=it},label={Text("Longitude °")},singleLine=true,modifier=Modifier.weight(1f))
+        OutlinedTextField(value=height,onValueChange={height=it},label={Text("Height m")},singleLine=true,modifier=Modifier.weight(1f))
+    }
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        OutlinedButton(onClick={
+            runCatching{
+                val g=NativeGeodetic(latitude.toDouble(),longitude.toDouble(),height.toDouble())
+                NativeWorldLabGeodesy.toEcef(g);onSaveGeodeticOrigin(g)
+            }
+        }){Text("Save Earth reference")}
+        OutlinedButton(onClick=onClearGeodeticOrigin){Text("Clear reference")}
+    }
+    project.geodeticOrigin?.let{origin->
+        runCatching{
+            val ecef=NativeWorldLabGeodesy.toEcef(origin)
+            Text("WGS84 ECEF origin: "+listOf(ecef.xMeters,ecef.yMeters,ecef.zMeters)
+                .joinToString(" / "){String.format(java.util.Locale.US,"%.3f",it)}+" m")
+            project.entities.firstOrNull{it.id==selectedId}?.let{solid->
+                val point=NativeWorldLabGeodesy.fromEnu(
+                    NativeEnu(solid.positionMeters.x,solid.positionMeters.z,solid.positionMeters.y),origin)
+                val geo=NativeWorldLabGeodesy.fromEcef(point)
+                Text("Selected part: "+String.format(java.util.Locale.US,"%.7f° / %.7f° / %.2f m",
+                    geo.latitudeDegrees,geo.longitudeDegrees,geo.heightMeters))
+            }
+        }.onFailure{}
     }
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
         OutlinedButton(onClick={zoom=(zoom*1.25f).coerceAtMost(160f)}){Text("Zoom in")}

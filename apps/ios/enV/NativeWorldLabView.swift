@@ -59,6 +59,9 @@ struct NativeWorldLabView:View {
     @State private var opticalRayDistance="10"
     @State private var opticalRayContacts="8"
     @State private var editingMaterialId:String?
+    @State private var earthLatitude="0"
+    @State private var earthLongitude="0"
+    @State private var earthHeight="0"
     @State private var cadSketchWidth="2"
     @State private var cadSketchDepth="2"
     @State private var cadSketchHeight="1"
@@ -427,6 +430,34 @@ struct NativeWorldLabView:View {
                 SceneView(scene:scene,options:[.allowsCameraControl,.autoenablesDefaultLighting])
                     .frame(height:260).clipShape(RoundedRectangle(cornerRadius:12))
                     .accessibilityLabel("Interactive native 3D invention scene; drag to orbit and pinch to zoom.")
+                Text("Earth reference (WGS84)").font(.headline)
+                Text("Set a mathematical local ENU origin. No terrain, imagery or device location is fetched.")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack{
+                    TextField("Latitude °",text:$earthLatitude).keyboardType(.decimalPad)
+                    TextField("Longitude °",text:$earthLongitude).keyboardType(.decimalPad)
+                    TextField("Height m",text:$earthHeight).keyboardType(.decimalPad)
+                }.textFieldStyle(.roundedBorder)
+                HStack{
+                    Button("Save Earth reference"){
+                        do{
+                            guard let lat=Double(earthLatitude),let lon=Double(earthLongitude),
+                                  let h=Double(earthHeight) else {
+                                throw NativeWorldLabError.invalid("Enter numeric WGS84 coordinates")
+                            }
+                            applyProject{try NativeWorldLabEditor.setGeodeticOrigin($0,
+                                origin:NativeGeodetic(latitudeDegrees:lat,longitudeDegrees:lon,heightMeters:h))}
+                        }catch{problem=error.localizedDescription}
+                    }
+                    Button("Clear reference"){
+                        applyProject{try NativeWorldLabEditor.setGeodeticOrigin($0,origin:nil)}
+                    }
+                }.buttonStyle(.bordered)
+                if let geo=project?.world.geodeticOrigin,
+                   let ecef=try? NativeWorldLabGeodesy.toEcef(geo) {
+                    Text("ECEF origin: "+String(format:"%.3f / %.3f / %.3f m",
+                        ecef.xMeters,ecef.yMeters,ecef.zMeters)).font(.caption)
+                }
                 HStack{
                     Button("Save viewpoint"){saveObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Restore viewpoint"){restoreObserverViewpoint()}.buttonStyle(.bordered)
@@ -2043,6 +2074,16 @@ Text("Invent chemical heat").font(.headline)
                                 .disabled(selected==project.entities.count-1)
                         }
                         Text("Selected: "+solid.name+" ("+solid.shape+")")
+                        if let origin=project.world.geodeticOrigin,
+                           let point=try? NativeWorldLabGeodesy.fromEnu(
+                            NativeEnu(eastMeters:solid.positionMeters[0],
+                                northMeters:solid.positionMeters[2],upMeters:solid.positionMeters[1]),
+                            origin:origin),
+                           let geo=try? NativeWorldLabGeodesy.fromEcef(point) {
+                            Text("WGS84: "+String(format:"%.7f° / %.7f° / %.2f m",
+                                geo.latitudeDegrees,geo.longitudeDegrees,geo.heightMeters))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         value("Ideal volume",solid.volumeMetersCubed,"m³")
                         HStack {
                             Button("Smaller"){

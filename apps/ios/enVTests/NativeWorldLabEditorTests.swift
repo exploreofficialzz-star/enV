@@ -231,3 +231,17 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.scaleSolid(data,id:"s",factors:[-1,1,1]))
         XCTAssertThrowsError(try NativeWorldLabEditor.linearPattern(data,id:"s",axis:0,spacingMeters:0,copies:2))
     }
+
+    func testWGS84ProjectOriginPersistsAndClears() throws {
+        var data=try NativeWorldLabEditor.blank()
+        data=try NativeWorldLabEditor.setGeodeticOrigin(data,
+            origin:NativeGeodetic(latitudeDegrees:51.5074,longitudeDegrees:-0.1278,heightMeters:35))
+        var p=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(p.world.geodeticOrigin?.latitudeDegrees,51.5074,accuracy:1e-12)
+        XCTAssertEqual(p.world.geodeticOrigin?.longitudeDegrees,-0.1278,accuracy:1e-12)
+        data=try NativeWorldLabEditor.setGeodeticOrigin(data,origin:nil)
+        p=try NativeWorldLabProject.decode(data)
+        XCTAssertNil(p.world.geodeticOrigin)
+        XCTAssertThrowsError(try NativeWorldLabEditor.setGeodeticOrigin(data,
+            origin:NativeGeodetic(latitudeDegrees:91,longitudeDegrees:0,heightMeters:0)))
+    }

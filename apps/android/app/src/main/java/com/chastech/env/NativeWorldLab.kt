@@ -716,7 +716,9 @@ fun NativeWorldLabForm() {
                 }},
                 onResetView={applyProjectEdit{
                     NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
-                }})
+                }},
+                onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
+                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}})
             Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
             Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
                 style=MaterialTheme.typography.bodySmall)

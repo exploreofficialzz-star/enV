@@ -224,3 +224,16 @@ class NativeWorldLabEditorTest {
         assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.scaleSolid(json,"s",listOf(-1.0,1.0,1.0))}
         assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.linearPattern(json,"s",0,0.0,2)}
     }
+
+    @Test fun savesAndClearsWgs84ReferenceWithoutBreakingOldWorldProjects(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.setGeodeticOrigin(json,NativeGeodetic(51.5074,-0.1278,35.0))
+        val p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(51.5074,p.geodeticOrigin!!.latitudeDegrees,0.0)
+        assertEquals(-0.1278,p.geodeticOrigin!!.longitudeDegrees,0.0)
+        json=NativeWorldLabEditor.setGeodeticOrigin(json,null)
+        assertNull(NativeWorldLabProjectCodec.decode(json).geodeticOrigin)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.setGeodeticOrigin(json,NativeGeodetic(91.0,0.0,0.0))
+        }
+    }
