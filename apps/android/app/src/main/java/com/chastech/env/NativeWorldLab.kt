@@ -80,7 +80,8 @@ import kotlinx.coroutines.withContext
 
 private data class NativeWorldLabDemoRecording(
     val clockRun:NativeWorldLabRecordedRun,
-    val samples:List<NativeLabResult>
+    val samples:List<NativeLabResult>,
+    val input:NativeLabInput
 )
 
 private data class NativeWorldLabImportResult(
@@ -256,7 +257,7 @@ fun NativeWorldLabForm() {
                 modelVersion="1.0.0",worldEpochUTC=worldEpochUTC,
                 sampleTimesSeconds=samples.map{it.timeSeconds})
             clockRun.validate()
-            NativeWorldLabDemoRecording(clockRun,samples)
+            NativeWorldLabDemoRecording(clockRun,samples,model)
         }.getOrNull()
     }
     val result=remember(model,time,demoRecording,demoClock?.sampleIndex) { runCatching {
@@ -567,8 +568,16 @@ fun NativeWorldLabForm() {
                     "spring"->"native-spring";"rc"->"native-rc";else->"native-heat"
                 }
                 val expectedEpoch=checkpoint.worldEpochUTC?:worldEpochUTC
-                val sameRecordedRun=demoRecording?.clockRun?.let{
-                    it.modelId==expectedModelId&&it.worldEpochUTC==expectedEpoch
+                val expectedInput=when(checkpoint.modelId){
+                    "spring"->NativeLabInput.Spring(massKg=checkpoint.massKg,
+                        springNPerM=checkpoint.springNPerM)
+                    "rc"->NativeLabInput.RC(resistanceOhm=checkpoint.resistanceOhm)
+                    else->NativeLabInput.Heat(diffusivityM2S=checkpoint.diffusivityM2PerS)
+                }
+                val sameRecordedRun=demoRecording?.let{recording->
+                    recording.clockRun.modelId==expectedModelId&&
+                        recording.clockRun.worldEpochUTC==expectedEpoch&&
+                        recording.input==expectedInput
                 }==true
                 pendingDemoWallTimeUTC=if(sameRecordedRun)null else checkpoint.wallTimeUTC
                 kind=checkpoint.modelId;time=checkpoint.timeSeconds.toFloat()
