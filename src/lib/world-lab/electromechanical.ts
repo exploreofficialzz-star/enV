@@ -24,6 +24,8 @@ export type ActuatorInput = Readonly<{
   dampingNsPerM: number;
   durationSeconds: number;
   thermal?: ActuatorThermalInput;
+  /** Open the ideal source switch at this exact simulated time; the coil current then decays through its R-L path. */
+  powerOffAtSeconds?: number | null;
 }>;
 export type ActuatorSource = Readonly<{
   projectId: string;
@@ -41,6 +43,7 @@ export type ActuatorSample = Readonly<{
   backEmfV: number;
   motorForceN: number;
   sourcePowerW: number;
+  sourceVoltageV: number;
   resistiveHeatW: number;
   coilResistanceOhm?: number;
   coilTemperatureK?: number | null;
@@ -80,6 +83,8 @@ export function validateActuatorInput(i: ActuatorInput): void {
   finiteRange(i.forceConstantNPerA,"Actuator constant",0,10000);
   finiteRange(i.dampingNsPerM,"Mechanical damping",0,100000);
   finiteRange(i.durationSeconds,"Duration",0.1,12);
+  if(i.powerOffAtSeconds!==undefined&&i.powerOffAtSeconds!==null)
+    finiteRange(i.powerOffAtSeconds,"Power-off event time",0,i.durationSeconds);
   if(i.thermal!==undefined){
     const t=i.thermal;
     if(!t || typeof t!=="object")throw new Error("Missing thermal parameters.");
@@ -122,25 +127,31 @@ type State=readonly [height:number,velocity:number,current:number,temperature:nu
 const resistanceAt=(input:ActuatorInput,t:number):number=>input.resistanceOhm*
   (1+(input.thermal?.resistanceTemperatureCoefficientPerK??0)*
     (t-(input.thermal?.ambientTemperatureK??293.15)));
-function derivative(s:State,i:ActuatorInput):State {
+function supplyVoltageAt(i:ActuatorInput,atSeconds:number):number {
+  return i.powerOffAtSeconds!==undefined&&i.powerOffAtSeconds!==null&&
+    atSeconds>=i.powerOffAtSeconds?0:i.supplyVoltageV;
+}
+function derivative(s:State,i:ActuatorInput,atSeconds:number):State {
   const [h,v,c,t]=s;
   const r=resistanceAt(i,t);
   const heat=r*c*c;
   const cooling=i.thermal?i.thermal.coolingWPerK*(t-i.thermal.ambientTemperatureK):0;
   const thermalRate=i.thermal?(heat-cooling)/i.thermal.heatCapacityJPerK:0;
+  const supply=supplyVoltageAt(i,atSeconds);
   if(h<=0&&v<=0&&i.forceConstantNPerA*c<=i.massKg*i.gravityMps2)
-    return [0,0,(i.supplyVoltageV-r*c)/i.inductanceH,thermalRate];
+    return [0,0,(supply-r*c)/i.inductanceH,thermalRate];
   return [v,
     (i.forceConstantNPerA*c-i.dampingNsPerM*v)/i.massKg-i.gravityMps2,
-    (i.supplyVoltageV-r*c-i.forceConstantNPerA*v)/i.inductanceH,thermalRate];
+    (supply-r*c-i.forceConstantNPerA*v)/i.inductanceH,thermalRate];
 }
-function rkAdvance(s:State,i:ActuatorInput,dt:number):State {
-  const k1=derivative(s,i);
+function rkAdvance(s:State,i:ActuatorInput,dt:number,startSeconds:number):State {
+  const k1=derivative(s,i,startSeconds);
   const mid=(k:State,f:number):State=>[
     s[0]+dt*k[0]*f,s[1]+dt*k[1]*f,s[2]+dt*k[2]*f,s[3]+dt*k[3]*f,
   ];
-  const k2=derivative(mid(k1,0.5),i),k3=derivative(mid(k2,0.5),i);
-  const k4=derivative(mid(k3,1),i);
+  const k2=derivative(mid(k1,0.5),i,startSeconds+dt/2);
+  const k3=derivative(mid(k2,0.5),i,startSeconds+dt/2);
+  const k4=derivative(mid(k3,1),i,startSeconds+dt);
   return [
     s[0]+dt*(k1[0]+2*k2[0]+2*k3[0]+k4[0])/6,
     s[1]+dt*(k1[1]+2*k2[1]+2*k3[1]+k4[1])/6,
@@ -148,10 +159,24 @@ function rkAdvance(s:State,i:ActuatorInput,dt:number):State {
     s[3]+dt*(k1[3]+2*k2[3]+2*k3[3]+k4[3])/6,
   ];
 }
-function advance(s:State,i:ActuatorInput,dt:number):State {
-  const raw=rkAdvance(s,i,dt);
-  if(raw[0]<0 || (raw[0]===0&&raw[1]<0))return [0,0,raw[2],raw[3]];
-  return raw;
+type IntegratedSegment=Readonly<{before:State;after:State;startSeconds:number;stepSeconds:number;impactLossJ:number}>;
+function oneSegment(s:State,i:ActuatorInput,dt:number,startSeconds:number):IntegratedSegment {
+  const raw=rkAdvance(s,i,dt,startSeconds);
+  const impacted=raw[0]<0||(raw[0]===0&&raw[1]<0);
+  const after:State=impacted?[0,0,raw[2],raw[3]]:raw;
+  const impactLossJ=impacted&&raw[1]<0?0.5*i.massKg*raw[1]*raw[1]:0;
+  return Object.freeze({before:s,after,startSeconds,stepSeconds:dt,impactLossJ});
+}
+/** Split a solver interval at an opening event so the discontinuity is integrated at its actual time. */
+function advance(s:State,i:ActuatorInput,dt:number,startSeconds:number):Readonly<{state:State;segments:readonly IntegratedSegment[]}> {
+  const cutoff=i.powerOffAtSeconds;
+  if(cutoff!==undefined&&cutoff!==null&&cutoff>startSeconds+1e-12&&cutoff<startSeconds+dt-1e-12){
+    const first=oneSegment(s,i,cutoff-startSeconds,startSeconds);
+    const second=oneSegment(first.after,i,startSeconds+dt-cutoff,cutoff);
+    return Object.freeze({state:second.after,segments:Object.freeze([first,second])});
+  }
+  const segment=oneSegment(s,i,dt,startSeconds);
+  return Object.freeze({state:segment.after,segments:Object.freeze([segment])});
 }
 export function runActuatorExperiment(
   input:ActuatorInput,source:ActuatorSource,requestedStepSeconds=1/240,
@@ -194,7 +219,7 @@ export function runActuatorExperiment(
     samples.push(Object.freeze({
       timeSeconds:j*dt,heightM:h,velocityMps:v,coilCurrentA:c,
       backEmfV:input.forceConstantNPerA*v,motorForceN:input.forceConstantNPerA*c,
-      sourcePowerW:sourcePower,resistiveHeatW:heat,
+      sourcePowerW:sourcePower,sourceVoltageV:supplyVoltageAt(input,t),resistiveHeatW:heat,
       ...(input.thermal?{coilResistanceOhm:r,coilTemperatureK:t,
         thermalEnergyJ:thermalEnergy,coolingPowerW:cooling}:{}),
       kineticEnergyJ:ke,gravitationalEnergyJ:pe,magneticEnergyJ:magnetic,
@@ -202,29 +227,34 @@ export function runActuatorExperiment(
       energyResidualJ:residual,grounded:h===0&&v===0,
     }));
     if(j===n)break;
-    const next=advance(state,input,dt);
-    const [h2,v2,c2,t2]=next;
-    const r2=resistanceAt(input,t2);
-    const heat2=r2*c2*c2;
-    const cooling2=input.thermal?input.thermal.coolingWPerK*(t2-input.thermal.ambientTemperatureK):0;
-    supplied+=0.5*dt*input.supplyVoltageV*(c+c2);
-    const loss1=input.dampingNsPerM*v*v+(input.thermal?cooling:heat);
-    const loss2=input.dampingNsPerM*v2*v2+(input.thermal?cooling2:heat2);
-    dissipated+=0.5*dt*(loss1+loss2);
-    if(h2===0&&v2===0&&(h>0||v<0)){
-      const raw=rkAdvance(state,input,dt);
-      if(raw[1]<0)dissipated+=0.5*input.massKg*raw[1]*raw[1];
+    const integrated=advance(state,input,dt,t);
+    for(const segment of integrated.segments){
+      const [h0,v0,c0,temp0]=segment.before;
+      const [h1,v1,c1,temp1]=segment.after;
+      const r0=resistanceAt(input,temp0),r1=resistanceAt(input,temp1);
+      const heat0=r0*c0*c0,heat1=r1*c1*c1;
+      const cooling0=input.thermal?input.thermal.coolingWPerK*(temp0-input.thermal.ambientTemperatureK):0;
+      const cooling1=input.thermal?input.thermal.coolingWPerK*(temp1-input.thermal.ambientTemperatureK):0;
+      const segmentVoltage=supplyVoltageAt(input,segment.startSeconds+segment.stepSeconds/2);
+      supplied+=0.5*segment.stepSeconds*segmentVoltage*(c0+c1);
+      const loss0=input.dampingNsPerM*v0*v0+(input.thermal?cooling0:heat0);
+      const loss1=input.dampingNsPerM*v1*v1+(input.thermal?cooling1:heat1);
+      dissipated+=0.5*segment.stepSeconds*(loss0+loss1)+segment.impactLossJ;
     }
-    state=next;
+    state=integrated.state;
   }
   return Object.freeze({
     format:"env-world-lab-actuator-run" as const,schemaVersion:1 as const,
-    modelVersion:input.thermal?"1.1.0" as const:"1.0.0" as const,
+    modelVersion:input.powerOffAtSeconds!==undefined&&input.powerOffAtSeconds!==null
+      ?"1.2.0" as const:input.thermal?"1.1.0" as const:"1.0.0" as const,
     evidence:"physics-model-computed" as const,
     source:Object.freeze({...source}),input:Object.freeze({...input,
       ...(input.thermal?{thermal:Object.freeze({...input.thermal})}:{})}),
     samples:Object.freeze(samples),solverStepSeconds:dt,
-    validity:input.thermal
+    validity:input.powerOffAtSeconds!==undefined&&input.powerOffAtSeconds!==null
+      ? "An ideal source switch opens at "+input.powerOffAtSeconds.toFixed(6)+" s. The coil current is continuous and decays through the modeled R-L/back-EMF path; no arc, fuse thermal damage or contact bounce is predicted. "
+        +(input.thermal?"Single-lumped thermal feedback is also enabled. ":"")
+      :input.thermal
       ?"Bounded 1D voltage-current-motion-temperature coupling. Coil heat raises a " +
         "single assumed thermal mass, cooling removes energy, and temperature changes " +
         "electrical resistance and therefore force. No thermal gradients, insulation " +
