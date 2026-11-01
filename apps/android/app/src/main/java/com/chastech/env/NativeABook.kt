@@ -2,13 +2,13 @@ package com.chastech.env
 
 import android.content.ContentValues
 import android.content.Context
-com.google.mlkit.vision.text.latin.TextRecognizerOptions
-com.google.mlkit.vision.text.TextRecognition
-com.google.mlkit.vision.common.InputImage
-com.google.android.gms.tasks.Tasks
-android.os.ParcelFileDescriptor
-android.graphics.pdf.PdfRenderer
-android.graphics.Bitmap
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.common.InputImage
+import com.google.android.gms.tasks.Tasks
+import android.os.ParcelFileDescriptor
+import android.graphics.pdf.PdfRenderer
+import android.graphics.Bitmap
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.provider.OpenableColumns
