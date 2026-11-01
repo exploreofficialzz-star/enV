@@ -50,37 +50,50 @@ function colorInputValue(color: RgbaColor): string {
   return toHex({ ...color, a: 1 }).slice(0, 7);
 }
 
-function downloadSvgAsPng(svg: string, filename: string): void {
-  const sourceUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-  const image = new Image();
-  image.onload = () => {
-    try {
-      const sourceWidth = image.naturalWidth || 1200;
-      const sourceHeight = image.naturalHeight || 300;
-      const scale = Math.min(2, 2048 / sourceWidth, 2048 / sourceHeight);
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(sourceWidth * scale));
-      canvas.height = Math.max(1, Math.round(sourceHeight * scale));
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((png) => {
-        if (!png) return;
-        const pngUrl = URL.createObjectURL(png);
-        const anchor = document.createElement("a");
-        anchor.href = pngUrl;
-        anchor.download = filename;
-        anchor.click();
-        window.setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
-      }, "image/png");
-    } finally {
-      URL.revokeObjectURL(sourceUrl);
-    }
-  };
-  image.onerror = () => URL.revokeObjectURL(sourceUrl);
-  image.src = sourceUrl;
-}
+function downloadPaletteAsPng(colors: RgbaColor[], filename: string): void {
+  const swatches = colors.slice(0, 8).map((color, index) => {
+    const opaque = {
+      r: color.r * color.a + 255 * (1 - color.a),
+      g: color.g * color.a + 255 * (1 - color.a),
+      b: color.b * color.a + 255 * (1 - color.a),
+      a: 1,
+    };
+    return { color: toHex(opaque).slice(0, 7), label: `Color ${index + 1}` };
+  });
+  if (swatches.length === 0) throw new Error("Generate at least one palette color before exporting PNG.");
 
+  // Keep the download synchronous with the user's click so browsers retain download activation.
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 300;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("This browser could not create a PNG canvas.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const gap = 18;
+  const left = 28;
+  const swatchWidth = (canvas.width - left * 2 - gap * (swatches.length - 1)) / swatches.length;
+  context.textBaseline = "alphabetic";
+  swatches.forEach(({ color, label }, index) => {
+    const x = left + index * (swatchWidth + gap);
+    context.fillStyle = color;
+    context.beginPath();
+    context.roundRect(x, 28, swatchWidth, 176, 16);
+    context.fill();
+    context.fillStyle = "#111827";
+    context.font = "600 17px sans-serif";
+    context.fillText(label, x + 2, 238);
+    context.fillStyle = "#475569";
+    context.font = "15px monospace";
+    context.fillText(color.toUpperCase(), x + 2, 266);
+  });
+
+  const anchor = document.createElement("a");
+  anchor.href = canvas.toDataURL("image/png");
+  anchor.download = filename;
+  anchor.click();
+}
 function extractImageColors(file: File): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -632,7 +645,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   <h3 id="palette-swatch-export-heading" className="text-sm font-semibold text-fg">Export palette swatches</h3>
                   <p className="mt-1 text-xs leading-5 text-muted">Create a clean, labeled color sheet. PNG rendering happens locally in your browser.</p>
                 </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => downloadSvgAsPng(paletteSwatchesSvg, "env-palette-swatches.png")}>Download PNG</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => downloadPaletteAsPng(palette, "env-palette-swatches.png")}>Download PNG</Button>
               </div>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {palette.map((swatch, index) => <div key={index} className="overflow-hidden rounded-lg border border-border">
