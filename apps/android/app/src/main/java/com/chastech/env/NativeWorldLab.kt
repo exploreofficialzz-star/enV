@@ -100,6 +100,7 @@ fun NativeWorldLabForm() {
     var playing by remember { mutableStateOf(false) }
     var reversePlayback by remember { mutableStateOf(false) }
     var demoClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
+    var pendingDemoWallTimeUTC by remember { mutableStateOf<String?>(null) }
     var worldEpochUTC by remember { mutableStateOf(java.time.Instant.now().toString()) }
     var mass by remember { mutableFloatStateOf(1f) }
     var spring by remember { mutableFloatStateOf(4f) }
@@ -562,25 +563,35 @@ fun NativeWorldLabForm() {
                 }?:error("Cannot read timeline checkpoint")
                 NativeWorldLabDemoCheckpointCodec.decode(bytes.toString(Charsets.UTF_8))
             }}.onSuccess{checkpoint->
+                val expectedModelId=when(checkpoint.modelId){
+                    "spring"->"native-spring";"rc"->"native-rc";else->"native-heat"
+                }
+                val expectedEpoch=checkpoint.worldEpochUTC?:worldEpochUTC
+                val sameRecordedRun=demoRecording?.clockRun?.let{
+                    it.modelId==expectedModelId&&it.worldEpochUTC==expectedEpoch
+                }==true
+                pendingDemoWallTimeUTC=if(sameRecordedRun)null else checkpoint.wallTimeUTC
                 kind=checkpoint.modelId;time=checkpoint.timeSeconds.toFloat()
                 mass=checkpoint.massKg.toFloat();spring=checkpoint.springNPerM.toFloat()
                 resistance=checkpoint.resistanceOhm.toFloat();diffusivity=checkpoint.diffusivityM2PerS.toFloat()
                 playing=false;reversePlayback=checkpoint.playbackDirection=="reverse-recording"
                 checkpoint.worldEpochUTC?.let{worldEpochUTC=it}
                 checkpoint.playbackRate?.let{speed=it.toFloat()}
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    runCatching {
-                        NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
-                            checkpoint.timeSeconds).copy(
-                            solverInternalTimeSeconds=recording.samples[
-                                NativeWorldLabRecordedTime.nearestIndex(
-                                    recording.clockRun,checkpoint.timeSeconds)].timeSeconds,
-                            playbackRate=checkpoint.playbackRate?:1.0,
-                            direction=checkpoint.playbackDirection?:"forward")
-                    }.onSuccess{selected->
-                        demoClock=selected;time=selected.simulationTimeSeconds.toFloat()
-                    }.onFailure{warning=it.message?:"Recorded timeline restore was rejected."}
-                }}
+                if(sameRecordedRun){
+                    demoRecording?.let{recording->demoClock?.let{clock->
+                        runCatching {
+                            val selected=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                                checkpoint.timeSeconds)
+                            selected.copy(
+                                wallTimeUTC=checkpoint.wallTimeUTC?:selected.wallTimeUTC,
+                                solverInternalTimeSeconds=recording.samples[selected.sampleIndex].timeSeconds,
+                                playbackRate=checkpoint.playbackRate?:selected.playbackRate,
+                                direction=checkpoint.playbackDirection?:selected.direction)
+                        }.onSuccess{selected->
+                            demoClock=selected;time=selected.simulationTimeSeconds.toFloat()
+                        }.onFailure{warning=it.message?:"Recorded timeline restore was rejected."}
+                    }}
+                }
                 timelineStatus="Reference experiment inputs and recorded-sample clock restored."
             }.onFailure{timelineStatus=it.message?:"Timeline checkpoint restore failed."}
         }
@@ -776,12 +787,15 @@ fun NativeWorldLabForm() {
         }else{
             runCatching{
                 val started=NativeWorldLabRecordedTime.start(recording.clockRun,
-                    java.time.Instant.now().toString(),java.time.ZoneId.systemDefault().id)
+                    pendingDemoWallTimeUTC?:java.time.Instant.now().toString(),
+                    java.time.ZoneId.systemDefault().id,speed.toDouble(),
+                    if(reversePlayback)"reverse-recording" else "forward")
                 val target=time.toDouble().coerceIn(0.0,recording.clockRun.durationSeconds)
                 val selected=NativeWorldLabRecordedTime.seek(recording.clockRun,started,target)
                 selected.copy(solverInternalTimeSeconds=recording.samples[selected.sampleIndex].timeSeconds)
             }.onSuccess{
                 demoClock=it;time=it.simulationTimeSeconds.toFloat();playing=false
+                pendingDemoWallTimeUTC=null
             }.onFailure{
                 demoClock=null;playing=false;warning=it.message?:"Recorded model timeline could not be initialized."
             }
