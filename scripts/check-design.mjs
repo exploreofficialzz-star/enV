@@ -42,6 +42,8 @@ const explorer = read("src/components/tools/design-category-explorer.tsx");
 const explorerUtils = read("src/lib/engines/design-explorer.ts");
 const explorerUtilsTests = read("src/lib/engines/design-explorer.test.ts");
 const designCatalogGenerator = read("scripts/gen-catalog.mjs");
+const designBrowserAudit = read("scripts/audit-design-category-browser.mjs");
+const renderedWorkflow = read(".github/workflows/accessibility-phase8.yml");
 const colorEngine = read("src/components/engines/color-engine.tsx");
 const cssEngine = read("src/components/engines/cssgen-engine.tsx");
 const colorVision = read("src/lib/engines/color-vision.ts");
@@ -91,6 +93,7 @@ const checks = [
   ["Generated Design workflow families are mapped into visible groups", designCatalogGenerator.includes('addCross("design"') && ["gradient", "shadow", "border", "glass", "neomorph", "noise", "button", "card", "badge", "input", "avatar", "pattern", "blob", "wave"].every((family) => explorerUtils.includes(family + ":")) && explorerUtils.includes('engine.type === "color"') && explorerUtilsTests.includes("every generated Design CSS family maps to one visible explorer group")],
   ["Generated tools participate in explorer filtering and result counts", explorer.includes("getGeneratedDesignTools(tools, CORE_TOOL_IDS, group.id)") && explorerUtils.includes("getGeneratedDesignTools") && explorerUtilsTests.includes("generated utilities are grouped once") && explorer.includes("uniqueTools.filter((tool) => !normalizedQuery")],
   ["Every generated Design catalog entry maps into a visible explorer group", generatedDesignTools.length === design.length - generatedCoreIds.length && unmappedGeneratedDesignTools.length === 0],
+  ["Rendered Design browser audit checks search, groups, mobile and card counts", designBrowserAudit.includes("Gradient Token Generator") && designBrowserAudit.includes("mobileOverflow") && designBrowserAudit.includes("advertisedCount") && renderedWorkflow.includes("audit:design:browser")],
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
   ["Color picker alpha control and extended CSS Color 4 outputs", colorEngine.includes("design-color-alpha") && colorEngine.includes("Opacity / alpha") && colorEngine.includes('["HWB", formatHwb(color)]') && colorEngine.includes('["OKLCH", formatOklch(color)]')],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],

@@ -103,7 +103,8 @@
     "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs",
     "check:qr-barcode": "node scripts/check-qr-barcode.mjs",
     "audit:qr-barcode:browser": "node scripts/browser-qr-barcode-reader-audit.mjs",
-    "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/css-shadow.test.ts src/lib/engines/css-text-shadow.test.ts src/lib/engines/design-component-a11y.test.ts src/lib/engines/css-border.test.ts src/lib/engines/design-layer-utils.test.ts src/lib/engines/palette-image.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/svg-backgrounds.test.ts src/lib/engines/design-contrast.test.ts src/lib/engines/design-explorer.test.ts && node scripts/check-design.mjs"
+    "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/css-shadow.test.ts src/lib/engines/css-text-shadow.test.ts src/lib/engines/design-component-a11y.test.ts src/lib/engines/css-border.test.ts src/lib/engines/design-layer-utils.test.ts src/lib/engines/palette-image.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/svg-backgrounds.test.ts src/lib/engines/design-contrast.test.ts src/lib/engines/design-explorer.test.ts && node scripts/check-design.mjs",
+    "audit:design:browser": "node scripts/audit-design-category-browser.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
