@@ -2,7 +2,8 @@
   "catalogVersion": "241bd0698214",
   "baseCatalogVersion": "e9943f7f4c1f",
   "runtimeExtensionIds": [
-    "song-metadata-analyzer"
+    "song-metadata-analyzer",
+    "a-book"
   ],
   "source": "src/data/catalog.ts",
   "platforms": {
