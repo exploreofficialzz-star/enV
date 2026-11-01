@@ -61,14 +61,15 @@ jobs:
           npm run check:native-math-exercises
           npm run check:billing
           node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/calc/expansion-rows.test.ts
-          npm run typecheck
           npm run build
+          npm run typecheck
       - name: Commit regenerated outputs when needed
         shell: bash
         run: |
           set -euo pipefail
           git add \
             src/data/catalog.ts \
+            src/routeTree.gen.ts \
             src/data/billing-profile-index.json \
             src/data/billing-profile-runtime-extensions.json \
             src/data/offline-eligible-tools.json \
