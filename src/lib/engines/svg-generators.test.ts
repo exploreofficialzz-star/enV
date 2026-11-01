@@ -50,3 +50,15 @@ test("noise generator emits a tintable data URL with adjustable grain strength",
   assert.match(decodeURIComponent(subtle), /feTurbulence/);
   assert.match(decodeURIComponent(strong), /opacity="0.8"/);
 });
+
+
+test("noise textures support turbulence modes, octave depth and deterministic seeds", () => {
+  const fractal = decodeURIComponent(buildNoiseDataUrl("#123456", 0.8, 0.6, { type: "fractalNoise", octaves: 3, seed: 42 }));
+  const turbulence = decodeURIComponent(buildNoiseDataUrl("#123456", 0.8, 0.6, { type: "turbulence", octaves: 5, seed: 90 }));
+  assert.match(fractal, /type="fractalNoise"/);
+  assert.match(fractal, /numOctaves="3"/);
+  assert.match(fractal, /seed="42"/);
+  assert.match(turbulence, /type="turbulence"/);
+  assert.match(turbulence, /numOctaves="5"/);
+  assert.match(decodeURIComponent(buildNoiseDataUrl("#123456", 0.8, 1, { octaves: 1000, seed: -1 })), /numOctaves="5"[^>]*seed="1"/);
+});

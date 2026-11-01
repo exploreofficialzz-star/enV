@@ -145,8 +145,11 @@ const BASE_FIELDS: Record<string, UiField[]> = {
     { name: "background", label: "Canvas color", type: "color", defaultValue: "#ffffff" },
   ],
   noise: [
+    { name: "type", label: "Noise type", type: "select", defaultValue: "fractalNoise", options: [{ value: "fractalNoise", label: "Fractal noise · cloudy" }, { value: "turbulence", label: "Turbulence · turbulent" }] },
     { name: "opacity", label: "Grain strength", type: "number", defaultValue: 0.08, min: 0, max: 1, step: 0.01 },
     { name: "density", label: "Grain detail", type: "number", defaultValue: 1.1, min: 0.1, max: 3, step: 0.1 },
+    { name: "octaves", label: "Detail layers", type: "number", defaultValue: 2, min: 1, max: 5, step: 1 },
+    { name: "seed", label: "Noise seed", type: "number", defaultValue: 1, min: 1, max: 999, step: 1 },
     { name: "color", label: "Grain color", type: "color", defaultValue: "#111827" },
   ],
 };
@@ -377,8 +380,13 @@ function cssFor(
   }
   const opacity = numberValue(values, "opacity", 0.08, 0, 1);
   const density = numberValue(values, "density", 1.1, 0.1, 3);
-  const dataUrl = buildNoiseDataUrl(values.color ?? "#111827", density);
-  const previewDataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, opacity);
+  const noiseOptions = {
+    type: values.type === "turbulence" ? "turbulence" as const : "fractalNoise" as const,
+    octaves: numberValue(values, "octaves", 2, 1, 5),
+    seed: numberValue(values, "seed", 1, 1, 999),
+  };
+  const dataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, 1, noiseOptions);
+  const previewDataUrl = buildNoiseDataUrl(values.color ?? "#111827", density, opacity, noiseOptions);
   const css = `.env-noise {\n  position: relative;\n  isolation: isolate;\n}\n.env-noise::after {\n  content: "";\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n  opacity: ${opacity};\n  background-image: ${dataUrl};\n}`;
   return { css, style: { backgroundColor: "#e2e8f0", backgroundImage: previewDataUrl, backgroundSize: "160px 160px" } };
 }

@@ -122,7 +122,15 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="240" viewBox="0 0 1440 240" preserveAspectRatio="none">${canvas}${paths}</svg>`;
 }
 
-export function buildNoiseDataUrl(color: string, density: number, strength = 1): string {
+export type NoiseType = "fractalNoise" | "turbulence";
+export type NoiseOptions = { type?: NoiseType; octaves?: number; seed?: number };
+
+export function buildNoiseDataUrl(
+  color: string,
+  density: number,
+  strength = 1,
+  options: NoiseOptions = {},
+): string {
   const safeColor = safeHex(color, "#111827").slice(1);
   const red = parseInt(safeColor.slice(0, 2), 16) / 255;
   const green = parseInt(safeColor.slice(2, 4), 16) / 255;
@@ -130,6 +138,9 @@ export function buildNoiseDataUrl(color: string, density: number, strength = 1):
   const matrix = `${red} 0 0 0 0 0 ${green} 0 0 0 0 0 ${blue} 0 0 0 0 0 1 0`;
   const safeDensity = clamp(density, 0.1, 3);
   const safeStrength = clamp(strength, 0, 1);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="${safeDensity}" numOctaves="2" stitchTiles="stitch" result="noise"/><feColorMatrix in="noise" type="matrix" values="${matrix}"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="${safeStrength}"/></svg>`;
+  const type: NoiseType = options.type === "turbulence" ? "turbulence" : "fractalNoise";
+  const octaves = Math.round(clamp(options.octaves ?? 2, 1, 5));
+  const seed = Math.round(clamp(options.seed ?? 1, 1, 999));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="${type}" baseFrequency="${safeDensity}" numOctaves="${octaves}" seed="${seed}" stitchTiles="stitch" result="noise"/><feColorMatrix in="noise" type="matrix" values="${matrix}"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity="${safeStrength}"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
