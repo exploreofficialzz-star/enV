@@ -521,14 +521,16 @@ struct NativeWorldLabView:View {
             let started=try NativeWorldLabRecordedTime.start(run:run,
                 wallTimeUTC:ISO8601DateFormatter().string(from:Date()),
                 timezoneDisplay:TimeZone.current.identifier,playbackRate:speed)
-            let clock=NativeWorldLabRecordedClock(wallTimeUTC:started.wallTimeUTC,
-                worldDateUTC:started.worldDateUTC,simulationTimeSeconds:started.simulationTimeSeconds,
-                solverInternalTimeSeconds:samples[0].timeSeconds,
-                displaySampleTimeSeconds:started.displaySampleTimeSeconds,sampleIndex:started.sampleIndex,
-                playbackRate:started.playbackRate,direction:started.direction,paused:true,
-                timezoneDisplay:started.timezoneDisplay,fidelity:started.fidelity)
+            let target=seconds.isFinite ? min(run.durationSeconds,max(0,seconds)):0
+            let selected=try NativeWorldLabRecordedTime.seek(run:run,state:started,timeSeconds:target)
+            let clock=NativeWorldLabRecordedClock(wallTimeUTC:selected.wallTimeUTC,
+                worldDateUTC:selected.worldDateUTC,simulationTimeSeconds:selected.simulationTimeSeconds,
+                solverInternalTimeSeconds:samples[selected.sampleIndex].timeSeconds,
+                displaySampleTimeSeconds:selected.displaySampleTimeSeconds,sampleIndex:selected.sampleIndex,
+                playbackRate:selected.playbackRate,direction:selected.direction,paused:true,
+                timezoneDisplay:selected.timezoneDisplay,fidelity:selected.fidelity)
             demoRecordedSamples=samples;demoRecordedRun=run;demoClock=clock
-            seconds=0;playing=false;reversePlayback=false
+            seconds=clock.simulationTimeSeconds;playing=false
         } catch {
             demoRecordedRun=nil;demoRecordedSamples=[];demoClock=nil
             playing=false;problem=error.localizedDescription
