@@ -133,42 +133,6 @@ function oklabToRgb(lightness: number, a: number, b: number, alpha = 1): RgbaCol
   return { r: encode(linear[0]), g: encode(linear[1]), b: encode(linear[2]), a: clamp(alpha, 0, 1) };
 }
 
-function parseOklch(input: string): RgbaColor | null {
-  const match = input.trim().match(/^oklch\\((.*)\\)$/i);
-  if (!match) return null;
-  const values = splitCssFunction(match[1]);
-  if (!values) return null;
-  const lightness = parseColorNumber(values.channels[0], 1);
-  const chroma = parseColorNumber(values.channels[1], 0.4);
-  const hue = parseColorHue(values.channels[2]);
-  if (lightness === null || chroma === null || hue === null || lightness < 0 || lightness > 1 || chroma < 0) return null;
-  const radians = hue * Math.PI / 180;
-  return oklabToRgb(lightness, chroma * Math.cos(radians), chroma * Math.sin(radians), values.alpha);
-}
-
-function parseHwb(input: string): RgbaColor | null {
-  const match = input.trim().match(/^hwb\\((.*)\\)$/i);
-  if (!match) return null;
-  const values = splitCssFunction(match[1]);
-  if (!values) return null;
-  const hue = parseColorHue(values.channels[0]);
-  const whiteness = parseColorNumber(values.channels[1], 1);
-  const blackness = parseColorNumber(values.channels[2], 1);
-  if (hue === null || whiteness === null || blackness === null || whiteness < 0 || blackness < 0 || whiteness > 1 || blackness > 1) return null;
-  if (whiteness + blackness >= 1) {
-    const gray = whiteness / (whiteness + blackness || 1) * 255;
-    return { r: gray, g: gray, b: gray, a: values.alpha };
-  }
-  const pure = hsvToRgb(hue, 1, 1);
-  const scale = 1 - whiteness - blackness;
-  return {
-    r: pure.r * scale + 255 * whiteness,
-    g: pure.g * scale + 255 * whiteness,
-    b: pure.b * scale + 255 * whiteness,
-    a: values.alpha,
-  };
-}
-
 export function parseDesignColor(input: string): RgbaColor | null {
   const cssColor = parseCssColor(input);
   if (cssColor) return cssColor;

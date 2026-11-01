@@ -13,7 +13,7 @@ test("button contrast checks follow the selected style and include hover and foc
   const ghost = inspectDesignComponentContrast("button", {
     variant: "ghost", bg: "#0d9f8a", text: "#ffffff", hover: "#087f70", focus: "#7c4dff",
   });
-  assert.notEqual(solid[0].ratio, ghost[0].ratio);
+  assert.notEqual(solid[1].ratio, ghost[1].ratio);
 });
 
 test("cards check title, muted copy and non-text border contrast", () => {

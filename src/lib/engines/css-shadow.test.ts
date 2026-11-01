@@ -20,7 +20,7 @@ test("each shadow layer retains its own geometry, opacity, color and inset state
 
 test("disabled layers are omitted and an empty stack emits none", () => {
   const layers = createShadowPreset("soft").map((layer, index) => ({ ...layer, enabled: index === 0 }));
-  assert.equal(buildBoxShadow(layers).split(", ").length, 1);
+  assert.equal((buildBoxShadow(layers).match(/rgba\(/g) ?? []).length, 1);
   assert.equal(buildBoxShadow([]), "none");
 });
 
