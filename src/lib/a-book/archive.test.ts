@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createABookArchive, readABookArchive } from "./archive.ts";
-import { assertABookAttachmentSize } from "./local-store.ts";
+import { assertABookAttachmentBatch, assertABookAttachmentSize } from "./local-store.ts";
 import type { ABookAttachment, ABookNote, ABookRevision } from "./local-store.ts";
 
 const note: ABookNote = {
@@ -93,4 +93,14 @@ test("A book local attachments stay within the portable backup limit", () => {
   assertABookAttachmentSize({ size: 100 * 1024 * 1024 });
   assert.throws(() => assertABookAttachmentSize({ size: 0 }), /non-empty attachment/);
   assert.throws(() => assertABookAttachmentSize({ size: 100 * 1024 * 1024 + 1 }), /100 MB or smaller/);
+});
+
+
+test("A book attachment batches enforce per-file, total-library and count limits", () => {
+  assertABookAttachmentBatch([{ size: 1 }, { size: 2 }], 10, 2);
+  assertABookAttachmentBatch([{ size: 100 * 1024 * 1024 }], 50 * 1024 * 1024, 0);
+  assert.throws(() => assertABookAttachmentBatch([{ size: 100 * 1024 * 1024 + 1 }]), /100 MB or smaller/);
+  assert.throws(() => assertABookAttachmentBatch([{ size: 1 }, { size: 2 }], 150 * 1024 * 1024 - 2, 0), /150 MB/);
+  assert.throws(() => assertABookAttachmentBatch([{ size: 1 }], 0, 10_000), /10,000 local attachments/);
+  assert.throws(() => assertABookAttachmentBatch([]), /at least one attachment/);
 });
