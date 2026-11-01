@@ -26,14 +26,42 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 private data class ABookNoteRecord(
     val id:String,val title:String,val body:String,val notebook:String,val tags:String,
     val pinned:Boolean,val archived:Boolean,val deletedAt:Long?,val createdAt:Long,val updatedAt:Long,val revision:Int
 )
 private data class ABookFileRecord(val id:String,val name:String,val mime:String,val relativePath:String,val size:Long)
+
+private fun parseABookPageGroups(value:String,pageCount:Int):List<List<Int>>{
+    require(pageCount>0){"This PDF has no readable pages."}
+    val groups=value.split(";").map{it.trim()}.filter{it.isNotEmpty()}
+    require(groups.size>=2){"Enter at least two page groups, for example 1-3;4-6."}
+    require(groups.size<=100){"Create up to 100 PDF parts at a time."}
+    val used=mutableSetOf<Int>()
+    return groups.map{group->
+        val pages=mutableListOf<Int>()
+        group.split(",").map{it.trim()}.forEach{token->
+            require(Regex("^\\d+(?:-\\d+)?$").matches(token)){"Invalid page range: $token"}
+            val parts=token.split("-")
+            val first=parts[0].toInt();val last=parts.getOrNull(1)?.toInt()?:first
+            require(first>=1&&last>=first&&last<=pageCount){"Choose page numbers from 1 to $pageCount."}
+            require(pages.size+last-first+1<=5000){"A maximum of 5,000 pages can be split at once."}
+            for(page in first..last){require(used.add(page)){"Page $page appears in more than one part."};pages.add(page)}
+        }
+        require(pages.isNotEmpty()){"Each PDF part must contain at least one page."}
+        pages
+    }
+}
+
+private fun safeABookPdfName(value:String):String =
+    value.substringBeforeLast(".",value).replace(Regex("[^A-Za-z0-9._-]+"),"-").trim('-').take(80).ifBlank{"document"}
+
 private data class ABookRevisionRecord(val id:String,val noteId:String,val title:String,val body:String,val notebook:String,val tags:String,val revision:Int,val createdAt:Long)
 
 private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.applicationContext,"env-a-book.db",null,1){
@@ -132,6 +160,9 @@ fun NativeABookScreen(){
     var archived by rememberSaveable{mutableStateOf(false)}
     var showTrash by rememberSaveable{mutableStateOf(false)}
     var confirmPermanentDelete by rememberSaveable{mutableStateOf(false)}
+    var selectedPdfIds by rememberSaveable{mutableStateOf(setOf<String>())}
+    var splitPageGroups by rememberSaveable{mutableStateOf("1-3;4-6")}
+    var pendingZip by remember{mutableStateOf<File?>(null)}
     var revisions by remember{mutableStateOf(emptyList<ABookRevisionRecord>())}
     var status by remember{mutableStateOf("Saved on this device")}
     var error by remember{mutableStateOf("")}
@@ -147,6 +178,100 @@ fun NativeABookScreen(){
         tags=n?.let{runCatching{JSONArray(it.tags).let{a->(0 until a.length()).joinToString(", "){i->a.getString(i)}}}.getOrDefault("")}.orEmpty()
         files=n?.let{db.attachments(it.id)}?:emptyList();revisions=n?.let{db.revisions(it.id)}?:emptyList()
     }
+
+    fun selectedPdfFiles():List<ABookFileRecord> = files.filter{it.id in selectedPdfIds && (it.mime=="application/pdf"||it.name.endsWith(".pdf",true))}
+    fun mergeSelectedPdfs(){
+        val chosen=selectedPdfFiles()
+        if(chosen.size<2){error="Select at least two PDFs to merge";return}
+        if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
+        scope.launch{
+            status="Merging PDFs locally…";error=""
+            val result=withContext(Dispatchers.IO){runCatching{
+                PDFBoxResourceLoader.init(context)
+                val merged=PDDocument()
+                try{
+                    var totalPages=0
+                    chosen.forEach{record->
+                        val source=File(context.filesDir,record.relativePath)
+                        PDDocument.load(source).use{input->
+                            totalPages+=input.numberOfPages
+                            require(totalPages<=5000){"A maximum of 5,000 pages can be merged at once."}
+                            input.pages.forEach{page->merged.importPage(page)}
+                        }
+                    }
+                    val output=File(context.cacheDir,"a-book-merged-${UUID.randomUUID()}.pdf")
+                    merged.save(output);output
+                }finally{merged.close()}
+            }}
+            result.fold({pendingPdf=it;status="Merged ${chosen.size} PDFs locally";exportPdf.launch("a-book-merged.pdf")},{error=it.message?:"PDF merge failed";status="Not saved"})
+        }
+    }
+    fun rotateSelectedPdfs(){
+        val chosen=selectedPdfFiles()
+        if(chosen.isEmpty()){error="Select at least one PDF";return}
+        if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
+        scope.launch{
+            status="Rotating PDFs locally…";error=""
+            val result=withContext(Dispatchers.IO){runCatching{
+                PDFBoxResourceLoader.init(context)
+                val zip=File(context.cacheDir,"a-book-rotated-${UUID.randomUUID()}.zip")
+                var totalPages=0
+                ZipOutputStream(FileOutputStream(zip)).use{archive->
+                    val used=mutableSetOf<String>()
+                    chosen.forEach{record->
+                        val source=File(context.filesDir,record.relativePath)
+                        val rotated=File(context.cacheDir,"a-book-rotate-${UUID.randomUUID()}.pdf")
+                        PDDocument.load(source).use{doc->
+                            totalPages+=doc.numberOfPages
+                            require(totalPages<=5000){"A maximum of 5,000 pages can be processed in one batch."}
+                            doc.pages.forEach{page->page.rotation=(page.rotation+90)%360}
+                            doc.save(rotated)
+                        }
+                        val base=safeABookPdfName(record.name)
+                        var name="$base-rotated.pdf";var suffix=2
+                        while(!used.add(name.lowercase(Locale.ROOT)))name="$base-rotated-${suffix++}.pdf"
+                        archive.putNextEntry(ZipEntry(name))
+                        rotated.inputStream().use{it.copyTo(archive)}
+                        archive.closeEntry();rotated.delete()
+                    }
+                }
+                zip
+            }}
+            result.fold({pendingZip=it;status="Rotated ${chosen.size} PDFs locally";exportZip.launch("a-book-rotated-pdfs.zip")},{error=it.message?:"PDF batch rotation failed";status="Not saved"})
+        }
+    }
+    fun splitActivePdf(){
+        val record=activePdf
+        if(record==null){error="Choose a PDF first";return}
+        scope.launch{
+            status="Splitting PDF locally…";error=""
+            val result=withContext(Dispatchers.IO){runCatching{
+                PDFBoxResourceLoader.init(context)
+                val source=File(context.filesDir,record.relativePath)
+                PDDocument.load(source).use{input->
+                    val groups=parseABookPageGroups(splitPageGroups,input.numberOfPages)
+                    val zip=File(context.cacheDir,"a-book-split-${UUID.randomUUID()}.zip")
+                    ZipOutputStream(FileOutputStream(zip)).use{archive->
+                        val base=safeABookPdfName(record.name)
+                        groups.forEachIndexed{index,pages->
+                            val part=PDDocument()
+                            try{
+                                pages.forEach{number->part.importPage(input.getPage(number-1))}
+                                val temp=File(context.cacheDir,"a-book-part-${UUID.randomUUID()}.pdf")
+                                part.save(temp)
+                                archive.putNextEntry(ZipEntry("$base-part-${(index+1).toString().padStart(2,'0')}.pdf"))
+                                temp.inputStream().use{it.copyTo(archive)}
+                                archive.closeEntry();temp.delete()
+                            }finally{part.close()}
+                        }
+                    }
+                    zip
+                }
+            }}
+            result.fold({pendingZip=it;status="Created local PDF parts";exportZip.launch("${safeABookPdfName(record.name)}-parts.zip")},{error=it.message?:"PDF split failed";status="Not saved"})
+        }
+    }
+
     val importPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){uris->
         val id=selected?:return@rememberLauncherForActivityResult
         scope.launch{
@@ -171,6 +296,13 @@ fun NativeABookScreen(){
             val text="# ${title.ifBlank{"Untitled note"}}\n\n$body\n\nNotebook: $notebook\nTags: $tags\n"
             context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use{it.write(text)}?:throw IllegalStateException("Cannot write export")
         }.onFailure{error=it.message?:"Markdown export failed"}
+    }
+    val exportZip=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")){uri->
+        val source=pendingZip
+        if(uri!=null&&source!=null)runCatching{
+            context.contentResolver.openOutputStream(uri)?.use{out->source.inputStream().use{it.copyTo(out)}}?:throw IllegalStateException("Cannot write ZIP export")
+        }.onFailure{error=it.message?:"ZIP export failed"}
+        source?.delete();pendingZip=null
     }
     val exportPdf=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")){uri->
         val source=pendingPdf
@@ -234,10 +366,19 @@ fun NativeABookScreen(){
             Button(onClick={importPicker.launch(arrayOf("*/*"))}){Text("Attach files locally")}
             Text("FILES ON THIS DEVICE",style=MaterialTheme.typography.labelMedium)
             files.forEach{f->
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+                val isPdf=f.mime=="application/pdf"||f.name.endsWith(".pdf",true)
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+                    if(isPdf)Checkbox(checked=f.id in selectedPdfIds,onCheckedChange={checked->selectedPdfIds=if(checked)selectedPdfIds+f.id else selectedPdfIds-f.id})
                     Text("${f.name} · ${f.size/1024} KB",modifier=Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
-                    if(f.mime=="application/pdf"||f.name.endsWith(".pdf",true))OutlinedButton(onClick={activePdf=f;pdfText=""}){Text("PDF tools")}
+                    if(isPdf)OutlinedButton(onClick={activePdf=f;pdfText=""}){Text("PDF tools")}
                 }
+            }
+            val selectedCount=selectedPdfFiles().size
+            OutlinedTextField(splitPageGroups,{splitPageGroups=it},label={Text("PDF split groups · e.g. 1-3;4-6")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={mergeSelectedPdfs()},enabled=selectedCount>=2){Text("Merge selected")}
+                OutlinedButton(onClick={rotateSelectedPdfs()},enabled=selectedCount>=1){Text("Rotate batch")}
+                OutlinedButton(onClick={splitActivePdf()},enabled=activePdf!=null){Text("Split PDF")}
             }
             activePdf?.let{f->
                 val local=File(context.filesDir,f.relativePath)
