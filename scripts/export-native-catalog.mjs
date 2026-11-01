@@ -2,16 +2,18 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { presentGeneratedCalculator } from "../src/lib/calc/generated-calculator-presentation.ts";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
+const [{ tools: catalogTools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
   import("../src/data/catalog.ts"),
   import("../src/data/categories.ts"),
   import("../src/lib/datetime/catalog-tools.ts"),
 ]);
 // Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
 // runtime extensions are validated below but are not duplicated into the generated base export.
+const tools = catalogTools.map(presentGeneratedCalculator);
 
 const runtimeCatalogExtensions = [
   {
