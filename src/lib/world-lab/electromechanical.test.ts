@@ -116,3 +116,35 @@ test("inventor thermal assumptions reject missing or impossible values",()=>{
   assert.throws(()=>runActuatorExperiment({...d.input,thermal:{...t,initialTemperatureK:NaN}},d.source),/Initial coil/);
   assert.throws(()=>runActuatorExperiment({...d.input,thermal:{...t,resistanceTemperatureCoefficientPerK:-0.01}},d.source),/Temperature coefficient/);
 });
+
+
+test("an opened motor supply is an exact-time event; inductive current decays instead of snapping to zero",()=>{
+  const d=deriveActuatorInput(fixture(),"item",{
+    gravityMps2:0,forceConstantNPerA:0,durationSeconds:4,
+    powerOffAtSeconds:1,
+  });
+  const run=runActuatorExperiment(d.input,d.source);
+  assert.equal(run.modelVersion,"1.2.0");
+  const before=sampleActuator(run,1-run.solverStepSeconds);
+  const at=sampleActuator(run,1);
+  const later=sampleActuator(run,2);
+  const final=sampleActuator(run,4);
+  assert.ok(before.sourceVoltageV>0&&before.sourcePowerW>0);
+  assert.equal(at.sourceVoltageV,0);
+  assert.equal(at.sourcePowerW,0);
+  assert.ok(at.coilCurrentA>0,"coil current must remain continuous at switch opening");
+  assert.ok(later.coilCurrentA<at.coilCurrentA,"R-L current must decay after isolation");
+  assert.ok(final.coilCurrentA<1e-6,"current should approach zero after sufficient decay time");
+  assert.equal(final.motorForceN,0);
+  assert.equal(final.resistiveHeatW<1e-10,true);
+  assert.ok(run.samples.every(s=>s.sourceVoltageV===0||s.sourceVoltageV===d.input.supplyVoltageV));
+  assert.ok(run.samples.every(s=>Number.isFinite(s.energyResidualJ)));
+  assert.ok(Math.abs(final.energyResidualJ)<0.02*Math.max(1,Math.abs(final.suppliedEnergyJ)));
+});
+test("power isolation event validates its time and can open at simulation start",()=>{
+  const d=deriveActuatorInput(fixture(),"item");
+  assert.throws(()=>runActuatorExperiment({...d.input,powerOffAtSeconds:5},d.source),/Power-off event time/);
+  const open=runActuatorExperiment({...d.input,powerOffAtSeconds:0},d.source);
+  assert.equal(open.samples[0].sourceVoltageV,0);
+  assert.ok(open.samples.every(s=>s.coilCurrentA===0&&s.motorForceN===0));
+});
