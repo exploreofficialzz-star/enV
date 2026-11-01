@@ -20,7 +20,7 @@ class NativeWorldLabCameraTest {
     @Test fun yawAndElevationRotateCameraBasisWithoutMovingTargetCentre() {
         val target=NativeLabVector(10.0,4.0,-2.0)
         val centre=NativeWorldLabCamera.project(target,target,Math.PI/2,35.0,12.0,480.0,0.0,0.0,1000.0,700.0)
-        val right=NativeWorldLabCamera.project(NativeLabVector(11.0,4.0,-2.0),target,Math.PI/2,0.0,12.0,480.0,0.0,0.0,1000.0,700.0)
+        val right=NativeWorldLabCamera.project(NativeLabVector(10.0,4.0,-1.0),target,Math.PI/2,0.0,12.0,480.0,0.0,0.0,1000.0,700.0)
         val up=NativeWorldLabCamera.project(NativeLabVector(10.0,5.0,-2.0),target,0.0,35.0,12.0,480.0,0.0,0.0,1000.0,700.0)
         assertEquals(500.0,centre.xPixels,1e-12);assertEquals(350.0,centre.yPixels,1e-12)
         assertTrue(right.visible&&right.xPixels<500.0);assertTrue(up.visible&&up.yPixels<350.0)

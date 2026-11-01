@@ -30,7 +30,7 @@ import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabProject
 import kotlin.math.*
 
-private data class LabScreenPoint(val x:Float,val y:Float,val scale:Float,val visible:Boolean)
+private data class LabScreenPoint(val x:Float,val y:Float,val scale:Float,val depth:Double,val visible:Boolean)
 private fun labPerspectivePoint(
     point:NativeLabVector,focus:NativeLabVector,yaw:Float,cameraDistance:Double,
     focalLength:Float,pan:Offset,width:Float,height:Float,elevationDegrees:Float,
@@ -39,7 +39,7 @@ private fun labPerspectivePoint(
         cameraDistance,focalLength.toDouble(),pan.x.toDouble(),pan.y.toDouble(),
         width.toDouble(),height.toDouble())
     return LabScreenPoint(projected.xPixels.toFloat(),projected.yPixels.toFloat(),
-        projected.pixelsPerMeter.toFloat(),projected.visible)
+        projected.pixelsPerMeter.toFloat(),projected.depthMeters,projected.visible)
 }
 private fun labRotatePoint(x:Double,y:Double,z:Double,rotation:NativeLabVector):NativeLabVector{
     val cx=cos(rotation.x);val sx=sin(rotation.x)
@@ -152,14 +152,15 @@ fun NativeWorldLabViewport(
             val pc=projection(c,size.width,size.height,focalLength);val pd=projection(d,size.width,size.height,focalLength)
             if(pc.visible&&pd.visible)drawLine(Color(0xFF3E5968),Offset(pc.x,pc.y),Offset(pd.x,pd.y),strokeWidth=1f)
         }
-        val ordered=project.entities.sortedBy{it.positionMeters.y+it.positionMeters.x+it.positionMeters.z}
-        for(solid in ordered){
+        val ordered=project.entities.map{solid->solid to projection(solid.positionMeters,size.width,size.height,focalLength)}
+            .filter{it.second.visible}.sortedByDescending{it.second.depth}
+        for((solid,centerProjection) in ordered){
             val dimensions=solid.dimensionsMeters
             val center=solid.positionMeters
             val color=runCatching{Color(android.graphics.Color.parseColor(solid.color))}.getOrDefault(Color(0xFFA4C9C6))
             val selected=solid.id==selectedId
             if(solid.shape=="sphere"){
-                val p=projection(center,size.width,size.height,focalLength)
+                val p=centerProjection
                 if(p.visible){
                     val radius=(dimensions.x.toFloat()*p.scale*0.5f).coerceIn(1f,100f)
                     drawCircle(color.copy(alpha=0.88f),radius,Offset(p.x,p.y))
@@ -171,19 +172,40 @@ fun NativeWorldLabViewport(
                         style=Stroke(1f))
                 }
             }else if(solid.shape=="cylinder"){
-                val p=projection(center,size.width,size.height,focalLength)
-                if(p.visible){
-                    val radius=(dimensions.x.toFloat()*p.scale*0.5f).coerceIn(1f,80f)
-                    val heightPx=(dimensions.y.toFloat()*p.scale*cos(Math.toRadians(elevation.toDouble())).toFloat()).coerceIn(1f,160f)
-                    val left=p.x-radius;val top=p.y-heightPx/2
-                    drawRect(color.copy(alpha=0.72f),Offset(left,top),androidx.compose.ui.geometry.Size(radius*2,heightPx))
-                    drawOval(color,topLeft=Offset(left,top-radius*0.22f),
-                        size=androidx.compose.ui.geometry.Size(radius*2,radius*0.44f))
-                    drawOval(if(selected)Color.White else color.copy(alpha=0.8f),
-                        topLeft=Offset(left,p.y+heightPx/2-radius*0.22f),
-                        size=androidx.compose.ui.geometry.Size(radius*2,radius*0.44f),
-                        style=Stroke(if(selected)3f else 1f))
+                val segments=24
+                val topRing=(0 until segments).map{index->
+                    val angle=2*PI*index/segments
+                    val local=labRotatePoint(cos(angle)*dimensions.x/2,dimensions.y/2,
+                        sin(angle)*dimensions.z/2,solid.rotationRadians)
+                    projection(NativeLabVector(center.x+local.x,center.y+local.y,center.z+local.z),
+                        size.width,size.height,focalLength)
                 }
+                val bottomRing=(0 until segments).map{index->
+                    val angle=2*PI*index/segments
+                    val local=labRotatePoint(cos(angle)*dimensions.x/2,-dimensions.y/2,
+                        sin(angle)*dimensions.z/2,solid.rotationRadians)
+                    projection(NativeLabVector(center.x+local.x,center.y+local.y,center.z+local.z),
+                        size.width,size.height,focalLength)
+                }
+                fun drawCylinderPolygon(vertices:List<LabScreenPoint>,fill:Color,outline:Boolean=false){
+                    if(vertices.all{it.visible}){
+                        val path=Path().apply{
+                            vertices.forEachIndexed{i,point->if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)}
+                            close()
+                        }
+                        drawPath(path,fill)
+                        if(selected&&outline)drawPath(path,Color.White,style=Stroke(2.5f))
+                    }
+                }
+                val sideFaces=(0 until segments).map{index->
+                    val next=(index+1)%segments
+                    listOf(bottomRing[index],bottomRing[next],topRing[next],topRing[index])
+                }.sortedByDescending{face->face.map{it.depth}.average()}
+                sideFaces.forEachIndexed{index,face->
+                    drawCylinderPolygon(face,color.copy(alpha=0.66f+(index%3)*0.07f),true)
+                }
+                drawCylinderPolygon(bottomRing,color.copy(alpha=0.78f),selected)
+                drawCylinderPolygon(topRing,color.copy(alpha=0.92f),selected)
             }else{
                 val hx=dimensions.x/2;val hy=dimensions.y/2;val hz=dimensions.z/2
                 val raw=listOf(
@@ -193,15 +215,20 @@ fun NativeWorldLabViewport(
                     val rotated=labRotatePoint(local[0],local[1],local[2],solid.rotationRadians)
                     projection(NativeLabVector(center.x+rotated.x,center.y+rotated.y,center.z+rotated.z),size.width,size.height,focalLength)
                 }
-                val faces=listOf(listOf(0,1,2,3),listOf(1,5,6,2),listOf(3,2,6,7))
-                faces.forEachIndexed{face,indices->
-                    val vertices=indices.map{points[it]}
+                val faces=listOf(
+                    listOf(0,1,2,3),listOf(4,7,6,5),
+                    listOf(0,4,5,1),listOf(3,2,6,7),
+                    listOf(0,3,7,4),listOf(1,5,6,2)
+                ).mapIndexed{index,ids->ids.map{points[it]}.let{it to index}}
+                    .sortedByDescending{(vertices,_)->vertices.map{it.depth}.average()}
+                faces.forEach{(vertices,face)->
                     if(vertices.all{it.visible}){
                         val path=Path().apply{
                             vertices.forEachIndexed{i,p->if(i==0)moveTo(p.x,p.y) else lineTo(p.x,p.y)}
                             close()
                         }
-                        drawPath(path,if(face==2)color else color.copy(alpha=if(face==0)0.6f else 0.78f))
+                        val alpha=when(face%3){0->0.62f;1->0.82f;else->0.72f}
+                        drawPath(path,color.copy(alpha=alpha))
                         if(selected)drawPath(path,Color.White,style=Stroke(2.5f))
                     }
                 }
