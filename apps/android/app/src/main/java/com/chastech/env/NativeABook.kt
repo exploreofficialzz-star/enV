@@ -199,7 +199,7 @@ private fun createABookBackup(context:Context,db:ABookLocalDb):File{
         }
         db.attachments(note.id).forEach{attachment->
             attachmentIndex++;require(attachmentIndex<=10000){"This library contains more than 10,000 attachments and cannot be exported in one backup."}
-            require(attachment.name.length<=500&&attachment.mime.length<=200){"An attachment has invalid metadata."}
+            require(attachment.id.isNotBlank()&&attachment.id.length<=180&&attachment.name.length<=500&&attachment.mime.length<=200){"An attachment has invalid metadata."}
             val root=context.filesDir.canonicalFile
             val file=File(context.filesDir,attachment.relativePath).canonicalFile
             require(file.path.startsWith(root.path+File.separator)&&file.isFile){"A local attachment is missing or outside A book storage."}
@@ -281,7 +281,7 @@ private fun importABookBackup(context:Context,db:ABookLocalDb,source:File):Int{
     val importedRevisions=mutableListOf<ABookRevisionRecord>();val revisionIds=mutableSetOf<String>()
     for(i in 0 until revisionArray.length()){
         val item=revisionArray.getJSONObject(i);val originalRevisionId=item.getString("id")
-        require(originalRevisionId.isNotBlank()&&revisionIds.add(originalRevisionId)){"The backup contains an invalid or duplicate revision ID."}
+        require(originalRevisionId.isNotBlank()&&originalRevisionId.length<=180&&revisionIds.add(originalRevisionId)){"The backup contains an invalid or duplicate revision ID."}
         val newNoteId=idMap[item.getString("noteId")]?:throw IllegalArgumentException("A revision refers to a missing note.")
         val revisionTitle=item.getString("title");val revisionBody=item.getString("body");val revisionNotebook=item.getString("notebook");val revisionNumber=item.getInt("revision")
         require(revisionTitle.length<=10000&&revisionBody.length<=5000000&&revisionNotebook.length<=500&&revisionNumber>=0){"A revision exceeds the supported size."}
@@ -298,7 +298,7 @@ private fun importABookBackup(context:Context,db:ABookLocalDb,source:File):Int{
             val item=attachmentArray.getJSONObject(i)
             val newNoteId=idMap[item.getString("noteId")]?:throw IllegalArgumentException("An attachment refers to a missing note.")
             val originalAttachmentId=item.getString("id")
-            require(originalAttachmentId.isNotBlank()&&attachmentIds.add(originalAttachmentId)){"The backup contains an invalid or duplicate attachment ID."}
+            require(originalAttachmentId.isNotBlank()&&originalAttachmentId.length<=180&&attachmentIds.add(originalAttachmentId)){"The backup contains an invalid or duplicate attachment ID."}
             val archivePath=item.getString("path")
             require(Regex("^attachments/\\d+\\.bin$").matches(archivePath)&&expectedPaths.add(archivePath)){"The backup contains an unsafe or duplicate attachment path."}
             val bytes=entries[archivePath]?:throw IllegalArgumentException("A backup attachment is missing.")
