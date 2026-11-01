@@ -32,7 +32,8 @@ const MAX_FIELD_VALUES=2_000_000;
 const finite=(x:unknown):x is number=>typeof x==="number"&&Number.isFinite(x);
 const record=(x:unknown):x is Record<string,unknown>=>!!x&&typeof x==="object"&&!Array.isArray(x);
 const nonempty=(x:unknown,max=240):x is string=>typeof x==="string"&&x.trim().length>0&&x.length<=max;
-const date=(x:unknown):x is string=>typeof x==="string"&&Number.isFinite(Date.parse(x));
+const date=(x:unknown):x is string=>typeof x==="string"&&
+ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(x)&&Number.isFinite(Date.parse(x));
 const dimensions=(x:unknown):x is [number,number,number]=>Array.isArray(x)&&x.length===3&&x.every(v=>Number.isSafeInteger(v)&&v>0);
 const vector3=(x:unknown):x is [number,number,number]=>Array.isArray(x)&&x.length===3&&x.every(finite);
 const componentCount=(kind:FieldKind)=>kind==="scalar"?1:kind==="vector"?3:kind==="tensor"?9:0;
@@ -68,6 +69,7 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
  if(!record(raw.timeReference)||!["simulation","UTC"].includes(String(raw.timeReference.kind))||
   !date(raw.timeReference.worldDateUTC)||!Array.isArray(raw.timeReference.sampleTimesSeconds)||
   !raw.timeReference.sampleTimesSeconds.every(finite)||
+  raw.timeReference.sampleTimesSeconds.length===0||
   raw.timeReference.sampleTimesSeconds.length>100000||
   !raw.timeReference.sampleTimesSeconds.every((v,i,a)=>i===0||v>a[i-1])||
   typeof raw.timeReference.timezoneDisplay!=="string"||raw.timeReference.timezoneDisplay.length>120||
@@ -117,9 +119,11 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
  }else if(raw.values.length!==0||(raw.mask!==null&&(!Array.isArray(raw.mask)||raw.mask.length!==0)))
   throw new Error("Event/network fields use event or graph records, not invented dense scalar values.");
  const events=raw.events as unknown[];
- if(!events.every(e=>record(e)&&nonempty(e.id,120)&&finite(e.atSeconds)&&e.atSeconds>=0&&
-  nonempty(e.label)&&["info","warning","critical"].includes(String(e.severity))))
-  throw new Error("Field event trace contains an invalid event.");
+ const lastSampleTime=(raw.timeReference.sampleTimesSeconds as number[]).at(-1)!;
+ if(events.length>100000||!events.every(e=>record(e)&&nonempty(e.id,120)&&finite(e.atSeconds)&&
+  e.atSeconds>=0&&e.atSeconds<=lastSampleTime+1e-9&&nonempty(e.label)&&
+  ["info","warning","critical"].includes(String(e.severity))))
+  throw new Error("Field event trace contains an invalid or out-of-timeline event.");
  if(kind==="event"&&events.length===0)throw new Error("An event field needs at least one recorded event.");
  let network:FieldNetwork|null=null;
  if(kind==="network"){
@@ -153,6 +157,10 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
   (raw.range.uncertaintyLowerSI!==null&&raw.range.uncertaintyUpperSI!==null&&raw.range.uncertaintyLowerSI>raw.range.uncertaintyUpperSI)||
   !nonempty(raw.range.uncertaintyStatement,500))
   throw new Error("Field range and uncertainty declaration is invalid.");
+ const valuesForRange=(raw.values as unknown[]).filter(finite);
+ if(valuesForRange.some(value=>value<raw.range.minimumSI||value>raw.range.maximumSI||
+  (raw.range.scale==="log"&&value<=0)))
+  throw new Error("Field values fall outside the declared SI display range.");
  if(!record(raw.permissions)||!["private","shared","public"].includes(String(raw.permissions.scope))||
   !Array.isArray(raw.permissions.readRoles)||!raw.permissions.readRoles.every(v=>nonempty(v,80))||
   typeof raw.permissions.exportAllowed!=="boolean")
