@@ -25,7 +25,7 @@ object NativeWorldLabDemoCheckpointCodec {
   val o=JSONObject().put("format",FORMAT).put("schemaVersion",version).put("modelVersion",MODEL_VERSION)
    .put("modelId",v.modelId).put("timeSeconds",v.timeSeconds).put("massKg",v.massKg)
    .put("springNPerM",v.springNPerM).put("resistanceOhm",v.resistanceOhm).put("diffusivityM2PerS",v.diffusivityM2PerS)
-  if(version==2)o.put("wallTimeUTC",v.wallTimeUTC).put("worldEpochUTC",v.worldEpochUTC)
+  if(version>=2)o.put("wallTimeUTC",v.wallTimeUTC).put("worldEpochUTC",v.worldEpochUTC)
    .put("solverInternalTimeSeconds",v.solverInternalTimeSeconds).put("displaySampleTimeSeconds",v.displaySampleTimeSeconds)
    .put("playbackRate",v.playbackRate).put("playbackDirection",v.playbackDirection).put("timezoneDisplay",v.timezoneDisplay)
   if(version==3)o.put("solverStepSeconds",v.solverStepSeconds)
@@ -39,12 +39,12 @@ object NativeWorldLabDemoCheckpointCodec {
   require(o.getString("format")==FORMAT&&o.getString("modelVersion")==MODEL_VERSION){"Unsupported timeline checkpoint format"}
   val v=NativeWorldLabDemoCheckpoint(o.getString("modelId"),number(o,"timeSeconds"),number(o,"massKg"),
    number(o,"springNPerM"),number(o,"resistanceOhm"),number(o,"diffusivityM2PerS"),
-   if(version==2)o.getString("wallTimeUTC") else null,
-   if(version==2)o.getString("worldEpochUTC") else null,
-   if(version==2)number(o,"solverInternalTimeSeconds") else null,
-   if(version==2)number(o,"displaySampleTimeSeconds") else null,
-   if(version==2)number(o,"playbackRate") else null,
-   if(version==2)o.getString("playbackDirection") else null,
+   if(version>=2)o.getString("wallTimeUTC") else null,
+   if(version>=2)o.getString("worldEpochUTC") else null,
+   if(version>=2)number(o,"solverInternalTimeSeconds") else null,
+   if(version>=2)number(o,"displaySampleTimeSeconds") else null,
+   if(version>=2)number(o,"playbackRate") else null,
+   if(version>=2)o.getString("playbackDirection") else null,
    if(version>=2)o.getString("timezoneDisplay") else null,
    if(version>=3)number(o,"solverStepSeconds") else null)
   validate(v);return v

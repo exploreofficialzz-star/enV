@@ -47,7 +47,7 @@ struct NativeWorldLabDemoCheckpoint:Codable,Equatable {
             diffusivityM2PerS.isFinite,(0.001...0.08).contains(diffusivityM2PerS) else {
             throw NativeWorldLabError.invalid("Timeline checkpoint version, model or parameter bounds are invalid")
         }
-        if schemaVersion==2 {
+        if schemaVersion>=2 {
             guard let wallTimeUTC,let worldEpochUTC,let solverInternalTimeSeconds,
                 let displaySampleTimeSeconds,let playbackRate,let playbackDirection,let timezoneDisplay,
                 wallTimeUTC.hasSuffix("Z"),worldEpochUTC.hasSuffix("Z"),

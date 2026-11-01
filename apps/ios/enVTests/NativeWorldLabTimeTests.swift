@@ -4,7 +4,9 @@ final class NativeWorldLabTimeCheckpointTests:XCTestCase {
  func testCheckpointRoundTripPreservesModeAndInputs()throws {
   let c=try NativeWorldLabDemoCheckpoint.make(modelId:"spring",timeSeconds:4.5,
    massKg:2,springNPerM:8,resistanceOhm:2200,diffusivityM2PerS:0.03)
-  XCTAssertEqual(try NativeWorldLabDemoCheckpoint.decodeBounded(c.encodeBounded()),c)
+  let restored=try NativeWorldLabDemoCheckpoint.decodeBounded(c.encodeBounded())
+  XCTAssertEqual(restored,c)
+  XCTAssertEqual(restored.solverStepSeconds,0.0025)
  }
  func testVersionTwoClockRoundTripPreservesUTCAndPlaybackState()throws {
   let c=try NativeWorldLabDemoCheckpoint.make(modelId:"heat",timeSeconds:2.5,

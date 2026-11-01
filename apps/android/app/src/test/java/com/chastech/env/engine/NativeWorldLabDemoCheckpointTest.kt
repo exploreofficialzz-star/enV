@@ -10,8 +10,11 @@ class NativeWorldLabDemoCheckpointTest {
   val v=NativeWorldLabDemoCheckpoint("heat",2.5,1.0,4.0,1000.0,0.02,
    "2026-11-01T12:00:05Z","2020-01-01T00:00:00Z",2.5,2.5,10.0,"reverse-recording","Africa/Lagos",0.0025)
   val json=NativeWorldLabDemoCheckpointCodec.encode(v)
-  assertEquals(3,NativeWorldLabDemoCheckpointCodec.decode(json).let{3})
-  assertEquals(v,NativeWorldLabDemoCheckpointCodec.decode(json))
+  assertTrue(json.contains("\\"schemaVersion\\": 3"))
+  val restored=NativeWorldLabDemoCheckpointCodec.decode(json)
+  assertEquals(v,restored)
+  assertEquals(0.0025,restored.solverStepSeconds!!,0.0)
+  assertEquals("2020-01-01T00:00:00Z",restored.worldEpochUTC)
  }
  @Test fun legacyVersionOneCheckpointRemainsReadable(){
   val json="""{"format":"env-world-lab-native-demo-checkpoint","schemaVersion":1,"modelVersion":"1.0.0","modelId":"spring","timeSeconds":4.5,"massKg":2.0,"springNPerM":8.0,"resistanceOhm":2200.0,"diffusivityM2PerS":0.03}"""
