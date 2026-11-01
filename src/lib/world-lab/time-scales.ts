@@ -179,6 +179,48 @@ export function utcToUt1(value:string,series:IersBulletinASeries):Readonly<{
   bulletin:"Volume "+series.volume+" No. "+series.number,issuedDateUTC:series.issuedDateUTC,
  });
 }
+/** IAU 2000 Resolution B1.9 rate constant: dTT/dTCG = 1 − LG. */
+export const IAU_LG=6.969290134e-10;
+/** IAU 2006 Resolution B3 defining constants for the linear TCB ↔ TDB relation. */
+export const IAU_LB=1.550519768e-8;
+export const IAU_TDB0_SECONDS=-6.55e-5;
+/** 1977-01-01 00:00:00 TAI at the geocentre, expressed as the TT/TCG MJD reference. */
+export const IAU_REFERENCE_MJD=43144.0003725;
+const MAX_EXTENDED_MJD=1_000_000_000;
+function boundedMjd(value:number,label:string):number{
+ if(!finite(value)||Math.abs(value)>MAX_EXTENDED_MJD)
+  throw new Error(label+" must be a finite MJD within ±1,000,000,000 days.");
+ return value;
+}
+export function ttMjdToTcgMjd(ttMjd:number):number{
+ const value=boundedMjd(ttMjd,"TT MJD");
+ return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD)/(1-IAU_LG);
+}
+export function tcgMjdToTtMjd(tcgMjd:number):number{
+ const value=boundedMjd(tcgMjd,"TCG MJD");
+ return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD)*(1-IAU_LG);
+}
+/** IAU 2006 Resolution B3: TDB = TCB − LB·(JD_TCB−T0)·86400 + TDB0. */
+export function tcbMjdToTdbMjd(tcbMjd:number):number{
+ const value=boundedMjd(tcbMjd,"TCB MJD");
+ return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD)*(1-IAU_LB)+IAU_TDB0_SECONDS/86_400;
+}
+export function tdbMjdToTcbMjd(tdbMjd:number):number{
+ const value=boundedMjd(tdbMjd,"TDB MJD");
+ return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD-IAU_TDB0_SECONDS/86_400)/(1-IAU_LB);
+}
+/** UTC→TCG is bounded by the validity of the bundled UTC↔TAI leap-second table. */
+export function utcToTcg(value:string):Readonly<{utc:string;tt:string;tcg:string;ttMjd:number;tcgMjd:number;source:string;referenceEvent:string}>{
+ const base=utcToTaiTt(value);
+ const ttMilliseconds=Date.parse(base.tt.replace(" TT","Z"));
+ if(!finite(ttMilliseconds))throw new Error("TT instant could not be represented for TCG conversion.");
+ const ttMjd=ttMilliseconds/DAY_MS+40587;
+ const tcgMjd=ttMjdToTcgMjd(ttMjd);
+ const tcgMilliseconds=(tcgMjd-40587)*DAY_MS;
+ return Object.freeze({utc:base.utc,tt:base.tt,tcg:isoWithScale(tcgMilliseconds,"TCG"),
+  ttMjd,tcgMjd,source:"IAU 2000 Resolution B1.9",
+  referenceEvent:"1977-01-01T00:00:00 TAI at the geocentre"});
+}
 export function convertUtcToTimeScales(value:string,series:IersBulletinASeries):TimeScaleReading{
  const base=utcToTaiTt(value),earth=utcToUt1(value,series);
  return Object.freeze({

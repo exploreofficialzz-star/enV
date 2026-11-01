@@ -3,7 +3,7 @@ import type {LabRun,ModelInput} from "@/lib/world-lab/model";
 import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepRecordedTime} from "@/lib/world-lab/timeline";
 import {createTimeEngineCheckpoint,createTimeEngineState,restoreTimeEngineCheckpoint,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
 import {WorldLabSolarEventsPanel} from "./solar-events-panel";
-import {parseIersBulletinA,utcToTaiTt,utcToUt1,type IersBulletinASeries} from "@/lib/world-lab/time-scales";
+import {parseIersBulletinA,utcToTaiTt,utcToTcg,utcToUt1,type IersBulletinASeries} from "@/lib/world-lab/time-scales";
 type Props={run:LabRun|null;timeSeconds:number;playing:boolean;rate:number;direction:TimeEngineDirection;
  onDirectionChange:(v:TimeEngineDirection)=>void;timezoneDisplay:string;onTimezoneDisplayChange:(v:string)=>void;
  wallTimeUTC:string;geodeticOrigin:Readonly<{latitudeDegrees:number;longitudeDegrees:number}>|null;
@@ -34,6 +34,11 @@ export function WorldLabTimeController(p:Props){
   if(!clock)return null;
   try{return {value:utcToTaiTt(clock.worldDateUTC),error:""};}
   catch(error){return {value:null,error:error instanceof Error?error.message:"TAI/TT conversion unavailable."};}
+ },[clock?.worldDateUTC]);
+ const tcg=useMemo(()=>{
+  if(!clock)return null;
+  try{return {value:utcToTcg(clock.worldDateUTC),error:""};}
+  catch(error){return {value:null,error:error instanceof Error?error.message:"TCG conversion unavailable."};}
  },[clock?.worldDateUTC]);
  const ut1=useMemo(()=>{
   if(!clock||!earthOrientation)return null;
@@ -87,12 +92,14 @@ export function WorldLabTimeController(p:Props){
   </p>
   <details className="mt-3 rounded-lg border border-border p-3">
    <summary className="cursor-pointer text-sm font-semibold">Astronomical time scales · UTC / TAI / TT / UT1</summary>
-   <p className="mt-2 text-xs text-muted-foreground">UTC is the stored civil reference. TAI and TT use the versioned IERS leap-second table. UT1 requires an imported IERS Bulletin A series and is marked observed or predicted with uncertainty.</p>
+   <p className="mt-2 text-xs text-muted-foreground">UTC is the stored civil reference. TAI and TT use the versioned leap-second table; TCG follows the IAU fixed-rate TT relation. UT1 requires imported IERS Earth-orientation data. TCB↔TDB is available as a defining MJD transformation; UTC↔TDB is not inferred without a barycentric ephemeris.</p>
    {taiTt?.value&&<dl className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
     <div><dt className="text-muted-foreground">TAI · TAI−UTC {taiTt.value.taiMinusUtcSeconds.toFixed(0)} s</dt><dd className="font-mono">{taiTt.value.tai}</dd></div>
     <div><dt className="text-muted-foreground">TT · TT−UTC {taiTt.value.ttMinusUtcSeconds.toFixed(3)} s</dt><dd className="font-mono">{taiTt.value.tt}</dd></div>
    </dl>}
    {taiTt?.error&&<p className="mt-2 text-xs" role="status">{taiTt.error}</p>}
+   {tcg?.value&&<div className="mt-2 text-xs"><dt className="text-muted-foreground">TCG · IAU 2000 constant-rate transform</dt><dd className="font-mono">{tcg.value.tcg}</dd></div>}
+   {tcg?.error&&<p className="mt-1 text-xs" role="status">{tcg.error}</p>}
    <div className="mt-3">
     <label className="block text-xs font-medium" htmlFor="worldlab-iers-bulletin">Import official IERS Bulletin A (ser7.dat)</label>
     <input id="worldlab-iers-bulletin" className="mt-1 block w-full text-xs" type="file" accept=".dat,.txt,text/plain"

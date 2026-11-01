@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {convertUtcToTimeScales,parseIersBulletinA,utcToTaiTt,utcToUt1} from "./time-scales.ts";
+import {convertUtcToTimeScales,IAU_LG,IAU_TDB0_SECONDS,parseIersBulletinA,tcgMjdToTtMjd,tdbMjdToTcbMjd,tcbMjdToTdbMjd,ttMjdToTcgMjd,utcToTaiTt,utcToTcg,utcToUt1} from "./time-scales.ts";
 const BULLETIN=`I E R S   B U L L E T I N - A
 29 October 2026                                     Vol. XXXIX No. 044
 COMBINED EARTH ORIENTATION PARAMETERS:
@@ -70,4 +70,25 @@ test("prediction uncertainty is measured from the final observed row, not a fixe
  const parsed=parseIersBulletinA(shifted);
  assert.equal(parsed.samples[2].uncertaintySeconds,0.00025);
  assert.ok(Math.abs(parsed.samples[3].uncertaintySeconds-0.00025*Math.pow(2,0.75))<1e-15);
+});
+
+test("IAU TT↔TCG and TCB↔TDB defining transforms are reversible over long spans",()=>{
+ const reference=43144.0003725;
+ assert.equal(ttMjdToTcgMjd(reference),reference);
+ assert.equal(tcgMjdToTtMjd(reference),reference);
+ assert.ok(Math.abs(ttMjdToTcgMjd(reference+1)-reference-1/(1-IAU_LG))<1e-12);
+ assert.ok(Math.abs(tcbMjdToTdbMjd(reference)-reference-IAU_TDB0_SECONDS/86400)<1e-15);
+ for(const value of [-1_000_000,reference,1_000_000,100_000_000]){
+  assert.ok(Math.abs(tcgMjdToTtMjd(ttMjdToTcgMjd(value))-value)<2e-8);
+  assert.ok(Math.abs(tdbMjdToTcbMjd(tcbMjdToTdbMjd(value))-value)<2e-8);
+ }
+ assert.throws(()=>ttMjdToTcgMjd(Number.NaN),/finite MJD/);
+ assert.throws(()=>tcbMjdToTdbMjd(1_000_000_001),/finite MJD/);
+});
+test("UTC→TCG applies the IAU geocentric rate after certified UTC→TT conversion",()=>{
+ const result=utcToTcg("2026-11-01T12:00:00.000Z");
+ assert.equal(result.source,"IAU 2000 Resolution B1.9");
+ assert.ok(result.tcgMjd>result.ttMjd);
+ assert.ok((result.tcgMjd-result.ttMjd)*86400>0);
+ assert.ok((result.tcgMjd-result.ttMjd)*86400<0.01);
 });
