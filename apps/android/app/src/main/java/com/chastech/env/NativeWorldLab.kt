@@ -764,9 +764,9 @@ fun NativeWorldLabForm() {
             runCatching{
                 val started=NativeWorldLabRecordedTime.start(recording.clockRun,
                     java.time.Instant.now().toString(),java.time.ZoneId.systemDefault().id)
-                NativeWorldLabRecordedTime.seek(recording.clockRun,started,
-                    time.toDouble()).copy(solverInternalTimeSeconds=
-                        recording.samples[NativeWorldLabRecordedTime.nearestIndex(recording.clockRun,time.toDouble())].timeSeconds)
+                val target=time.toDouble().coerceIn(0.0,recording.clockRun.durationSeconds)
+                val selected=NativeWorldLabRecordedTime.seek(recording.clockRun,started,target)
+                selected.copy(solverInternalTimeSeconds=recording.samples[selected.sampleIndex].timeSeconds)
             }.onSuccess{
                 demoClock=it;time=it.simulationTimeSeconds.toFloat();playing=false
             }.onFailure{
