@@ -1,7 +1,8 @@
-/** Continuous observer-eye travel; underground bands are illustrative, not mapped geology. */
-export const OBSERVER_BOUNDS_METRES = { minHeight: -20000, maxRadius: 100000 } as const;
+/** Continuous observer-eye travel; deep Earth and atmospheric bands are approximate reference layers, not mapped observations. */
+import { earthReferenceLayerAtDepth } from "./world-layers.ts";
+export const OBSERVER_BOUNDS_METRES = { minHeight: -6371000, maxRadius: 6371000 } as const;
 const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value));
-const validRange=(range:number)=>{if(!Number.isFinite(range)||range<=0)throw new Error("Invalid observer scale.");return clamp(range,0.25,100000);};
+const validRange=(range:number)=>{if(!Number.isFinite(range)||range<=0)throw new Error("Invalid observer scale.");return clamp(range,0.25,6371000);};
 export function observerRangeMetres(position:readonly [number,number,number],target:readonly [number,number,number]):number{
  if([...position,...target].some(v=>!Number.isFinite(v)||Math.abs(v)>1e8))throw new Error("Invalid observer camera coordinates.");
  return Math.max(0.25,Math.hypot(position[0]-target[0],position[1]-target[1],position[2]-target[2]));
@@ -23,10 +24,5 @@ export function observerClippingPlanes(rangeMetres:number):Readonly<{minZ:number
 }
 export function illustrativeLayerForDepth(depthMetres:number):string{
  if(!Number.isFinite(depthMetres)||depthMetres<0||depthMetres>OBSERVER_BOUNDS_METRES.maxRadius)throw new Error("Invalid depth.");
- if(depthMetres===0)return "Surface / illustrative atmosphere";
- if(depthMetres<5)return "Illustrative shallow soil";
- if(depthMetres<100)return "Illustrative sediment";
- if(depthMetres<1000)return "Illustrative upper rock";
- if(depthMetres<10000)return "Illustrative deep-rock cutaway";
- return "Illustrative deep-interior volume";
+ return "Illustrative · "+earthReferenceLayerAtDepth(depthMetres).label;
 }
