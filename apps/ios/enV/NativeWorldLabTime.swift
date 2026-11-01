@@ -141,7 +141,7 @@ struct NativeWorldLabRecordedRun:Equatable {
               zip(sampleTimesSeconds,sampleTimesSeconds.dropFirst()).allSatisfy({$0.1>$0.0}),
               mandatoryEventTimesSeconds.count<=100_000,
               mandatoryEventTimesSeconds.allSatisfy({event in
-                  event.isFinite && sampleTimesSeconds.contains(where:{abs($0-event)<=1e-9})
+                  event.isFinite && event>=0 && event<=durationSeconds
               }) else {
             throw NativeWorldLabError.invalid(
                 "Recorded run identity, UTC epoch, samples or mandatory event times are invalid.")
