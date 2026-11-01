@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertNotNull
@@ -127,8 +128,13 @@ class NativeGamePlaybackTest {
         val previewDeadline = SystemClock.elapsedRealtime() + 15_000
         var returnedToPreview = false
         while (SystemClock.elapsedRealtime() < previewDeadline) {
-            val nodes = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Play preset")
-            if (!nodes.isNullOrEmpty()) {
+            // The preview is a Compose screen. Query its semantics tree directly:
+            // Android's global accessibility root can lag behind the task switch
+            // even after the preview Activity has resumed.
+            val previewVisible = runCatching {
+                compose.onNodeWithText("Play preset").assertIsDisplayed()
+            }.isSuccess
+            if (previewVisible) {
                 returnedToPreview = true
                 break
             }
