@@ -1,5 +1,5 @@
 import type {FieldLayer,FieldPalette} from "@/lib/world-lab/field-layer";
-import {fieldFrameAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
+import {fieldFrameAtTime,fieldVectorGlyphsAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
 
 type Props={layers:readonly FieldLayer[];selectedId:string;onSelect:(id:string)=>void;
  timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void};
@@ -53,6 +53,7 @@ export function WorldLabFieldPanel(p:Props){
     </dl>
     <p className="mt-2 break-words text-xs text-muted-foreground">{source}</p>
     <p className="mt-1 text-xs">{layer.legend.accessibleDescription}</p>
+    {layer.kind==="vector"&&layer.renderer.kind==="glyphs"&&<p className="mt-1 text-xs text-muted-foreground">The viewport shows a computed XY vector projection at the centre Z slice. Arrow direction follows the recorded X/Y components; arrow length is relative within that slice. This is a 2D projection, not a rendered 3D field volume.</p>}
     <p className="mt-1 text-xs text-muted-foreground">Range: {layer.range.minimumSI.toPrecision(5)}–{layer.range.maximumSI.toPrecision(5)} {layer.units.si}; {layer.range.uncertaintyStatement}</p>
     <p className="mt-1 text-xs text-muted-foreground">World date (UTC): {layer.timeReference.worldDateUTC}; interpolation: {layer.interpolation.method} ({layer.interpolation.validated?"validated":"not validated"})</p>
     {layer.kind==="event"&&<ul className="mt-2 list-disc pl-5 text-xs">{latestEvents.map(e=><li key={e.id}>{e.atSeconds.toFixed(4)} s · {e.label} · {e.severity}</li>)}</ul>}
@@ -85,6 +86,34 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
    role="img" aria-label={layer.legend.accessibleDescription}>
    <p className="font-semibold">{layer.legend.title}</p>
    <p>{layer.network?.nodes.length??0} nodes · {layer.network?.edges.length??0} links</p>
+  </div>;
+ }
+ if(layer.kind==="vector"&&layer.renderer.kind==="glyphs"){
+  const frame=fieldVectorGlyphsAtTime(layer,p.timeSeconds,"xy");
+  const max=frame.maximumProjectedMagnitude;
+  return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
+   role="img" aria-label={layer.legend.accessibleDescription+"; projected XY vector glyphs at "+frame.sampleTimeSeconds.toFixed(4)+" seconds; Z slice "+frame.sliceIndex+" of "+layer.resolution.dimensions[2]}>
+   <p className="text-xs font-semibold">{layer.legend.title} · {frame.sampleTimeSeconds.toFixed(3)} s</p>
+   <svg viewBox="0 0 300 160" width="100%" height="132" role="presentation">
+    <defs><marker id="worldlab-vector-arrowhead" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 L5 2.5 L0 5 Z" fill="currentColor"/></marker></defs>
+    <path d="M22 12 V140 H286" fill="none" stroke="currentColor" opacity=".28"/>
+    {frame.glyphs.map((glyph,index)=>{
+     const cx=22+(glyph.uIndex/Math.max(1,frame.dimensionU-1))*256;
+     const cy=140-(glyph.vIndex/Math.max(1,frame.dimensionV-1))*116;
+     const spacing=Math.min(256/Math.max(1,frame.dimensionU-1),116/Math.max(1,frame.dimensionV-1));
+     const length=max>0?Math.max(2,Math.min(18,spacing*0.42))*glyph.projectedMagnitude/max:0;
+     const ux=glyph.projectedMagnitude>0?glyph.uComponent/glyph.projectedMagnitude:0;
+     const uy=glyph.projectedMagnitude>0?glyph.vComponent/glyph.projectedMagnitude:0;
+     return <g key={index}>
+      {length>0?<line x1={cx} y1={cy} x2={cx+ux*length} y2={cy-uy*length}
+       stroke="currentColor" strokeWidth="1.8" markerEnd="url(#worldlab-vector-arrowhead)">
+       <title>{"Vector magnitude "+glyph.magnitude.toPrecision(4)+" "+layer.units.display}</title>
+      </line>:<circle cx={cx} cy={cy} r="2.2" fill="currentColor"><title>Zero projected vector; full magnitude {glyph.magnitude.toPrecision(4)} {layer.units.display}</title></circle>}
+     </g>;
+    })}
+   </svg>
+   <p className="text-[10px]">XY projection · Z slice {frame.sliceIndex+1}/{layer.resolution.dimensions[2]} · arrow length is relative to the largest projected vector in this slice</p>
+   <p className="text-[10px] text-muted-foreground">{frame.glyphs.length} valid glyphs · no-data cells omitted · units {layer.units.display}</p>
   </div>;
  }
  const frame=fieldFrameAtTime(layer,p.timeSeconds);
