@@ -16,7 +16,7 @@ import {
   type ABookNote,
   type ABookRevision,
 } from "@/lib/a-book/local-store";
-import { extractPdfPages, inspectPdf, mergePdfs, pdfDownload, rotatePdf } from "@/lib/a-book/pdf";
+import { extractPdfPages, inspectPdf, mergePdfs, pdfDownload, rotatePdf, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
 
 function localDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -47,6 +47,7 @@ export function ABookEngine() {
   const [pdfInfo, setPdfInfo] = useState("");
   const [selectedPdfs, setSelectedPdfs] = useState<string[]>([]);
   const [pageRange, setPageRange] = useState("1");
+  const [splitRanges, setSplitRanges] = useState("1-3;4-6");
   const [rotateAngle, setRotateAngle] = useState<90 | 180 | 270>(90);
   const [previewUrl, setPreviewUrl] = useState("");
   const [isReady, setIsReady] = useState(false);
@@ -187,6 +188,32 @@ export function ABookEngine() {
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The PDF operation failed.");
+    }
+  }
+
+
+  async function rotateSelectedBatch() {
+    const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
+    try {
+      const archive = await rotateSelectedPdfs(files.map((file) => ({ name: file.name, blob: file.blob })), rotateAngle);
+      zipDownload(archive, "a-book-rotated-pdfs.zip");
+      setPdfInfo(`Rotated ${files.length} PDFs locally`);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The selected PDFs could not be rotated locally.");
+    }
+  }
+
+  async function splitSelectedPdf() {
+    const file = pdfAttachments.find((item) => item.id === selectedPdfs[0]);
+    if (!file) { setError("Select one PDF to split."); return; }
+    try {
+      const archive = await splitPdfIntoZip(file.blob, file.name, splitRanges);
+      zipDownload(archive, `${safeName(file.name.replace(/\\.pdf$/i, ""))}-parts.zip`);
+      setPdfInfo(`Created PDF parts from ${file.name} locally`);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The PDF could not be split locally.");
     }
   }
 
@@ -368,9 +395,11 @@ export function ABookEngine() {
                 <label className="flex items-center gap-1 text-xs">Rotate
                   <select value={rotateAngle} onChange={(event) => setRotateAngle(Number(event.target.value) as 90 | 180 | 270)} className="min-h-8 rounded-md border border-border bg-background px-2"><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select>
                 </label>
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void exportPdf("rotate")}>Rotate and export</Button>
+                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void rotateSelectedBatch()}>Rotate selected PDFs</Button>
                 <input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="PDF page numbers" placeholder="Pages e.g. 1-3,5" className="min-h-8 w-36 rounded-md border border-border bg-background px-2 text-xs" />
+                <input value={splitRanges} onChange={(event) => setSplitRanges(event.target.value)} aria-label="PDF split page groups" placeholder="Parts e.g. 1-3;4-6" className="min-h-8 w-40 rounded-md border border-border bg-background px-2 text-xs" />
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void exportPdf("extract")}>Extract pages</Button>
+                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void splitSelectedPdf()}>Split into parts</Button>
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
               {previewUrl ? <iframe title="Local PDF preview" src={previewUrl} className="h-[480px] w-full rounded-md border border-border bg-background" /> : null}
