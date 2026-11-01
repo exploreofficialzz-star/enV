@@ -652,9 +652,9 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 id="palette-swatch-export-heading" className="text-sm font-semibold text-fg">Export palette swatches</h3>
-                  <p className="mt-1 text-xs leading-5 text-muted">Create a clean, labeled color sheet. PNG rendering happens locally in your browser.</p>
+                  <p id="palette-export-help" className="mt-1 text-xs leading-5 text-muted">Create a clean, labeled color sheet. PNG rendering happens locally in your browser.</p>
                 </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => downloadPaletteAsPng(palette, "env-palette-swatches.png")}>Download PNG</Button>
+                <Button type="button" size="sm" variant="outline" data-testid="palette-download-png" aria-describedby="palette-export-help" onClick={() => downloadPaletteAsPng(palette, "env-palette-swatches.png")}>Download PNG</Button>
               </div>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {palette.map((swatch, index) => <div key={index} className="overflow-hidden rounded-lg border border-border">
