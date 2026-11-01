@@ -553,25 +553,43 @@ struct NativeWorldLabPortableArchiveStore {
         let imported=try decode(data)
         let local=NativeWorldLabProjectStore(directory:root)
         let target=root.appendingPathComponent(imported.project.id+".json")
-        if FileManager.default.fileExists(atPath:target.path) {
-            throw NativeWorldLabError.invalid(
-                "An invention with this ID already exists, including unreadable copies; "+
-                "portable import may not overwrite it.")
-        }
         let manager=FileManager.default
-        // Keep an original source backup first, so any interrupted multi-file
-        // import can be retried without losing the user's evidence.
         let archiveFolder=root.appendingPathComponent(
             "ImportedPortableArchives",isDirectory:true)
+        let exactBackup=archiveFolder.appendingPathComponent(imported.project.id+".json")
+        // A retry is permitted ONLY for the same immutable archive, provided
+        // the saved project has not changed in any way since the interrupted import.
+        if manager.fileExists(atPath:target.path) {
+            guard manager.fileExists(atPath:exactBackup.path),
+                try Data(contentsOf:exactBackup)==data,
+                try Data(contentsOf:target)==imported.projectData else {
+                throw NativeWorldLabError.invalid(
+                    "This invention already exists; only an identical unfinished "+
+                    "archive may resume without overwriting edits.")
+            }
+        }
         try manager.createDirectory(at:archiveFolder,withIntermediateDirectories:true)
-        try data.write(to:archiveFolder.appendingPathComponent(
-            imported.project.id+".json"),options:.atomic)
+        if manager.fileExists(atPath:exactBackup.path){
+            guard try Data(contentsOf:exactBackup)==data else{
+                throw NativeWorldLabError.invalid(
+                    "A different immutable archive already owns this recovery ID.")
+            }
+        }else{
+            try data.write(to:exactBackup,options:.atomic)
+        }
         let historical=try legacyFile(imported.project.id)
         try manager.createDirectory(at:historical.deletingLastPathComponent(),
             withIntermediateDirectories:true)
         let legacy=try JSONSerialization.data(withJSONObject:imported.legacyRuns,
             options:[.sortedKeys])
-        try legacy.write(to:historical,options:.atomic)
+        if manager.fileExists(atPath:historical.path){
+            guard try Data(contentsOf:historical)==legacy else{
+                throw NativeWorldLabError.invalid(
+                    "An existing historical run record conflicts with this archive.")
+            }
+        }else{
+            try legacy.write(to:historical,options:.atomic)
+        }
         _ = try local.save(imported.projectData)
         let history=NativeWorldLabScientificEvidenceStore(directory:root)
         for item in imported.scientificRecords {

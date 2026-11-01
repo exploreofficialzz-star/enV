@@ -689,3 +689,8 @@ release-candidate evidence bundle are unfinished.
 - Corrected Web complete-archive restore to preserve the source invention's identity, creation timestamp and revision rather than resetting a 17th-revision invention to revision zero while leaving immutable science records at revision 17.
 - A new IndexedDB project retains the imported original revision, whereas subsequent saved edits still increment optimistically against the stored revision. The three-store atomic transaction explicitly rejects scientific evidence newer than the saved project revision and compares immutable record bodies canonically so harmless JSON property order cannot reject an identical imported record.
 - Added pure source regression cases for restored revision 17, subsequent revision 18, mismatched invention identities and exhausted revision counters. Automated execution remains deferred as requested.
+
+## Interrupted native complete-archive import recovery
+- Android and iOS now retain the exact original portable archive as app-private recovery evidence **before** mutating the project or its histories. Re-importing exactly that file may resume missing immutable records after an interruption, but only when any existing destination project matches the imported project byte-for-byte.
+- Both importers refuse to overwrite an existing different original archive or different numerical-run ledger. The standard project store and scientific record store continue enforcing optimistic revisions, ownership, record quotas, and immutable-ID conflicts.
+- This is a resumable sequence of atomic file writes, not a fabricated multi-file database transaction; out-of-storage failures may still leave an incomplete new local project requiring the exact source archive to resume.

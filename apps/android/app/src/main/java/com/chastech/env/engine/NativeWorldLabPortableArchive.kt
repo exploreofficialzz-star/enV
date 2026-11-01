@@ -98,9 +98,38 @@ class NativeWorldLabPortableArchiveStore(private val root:File){
      * The original legacy runs remain byte-preserved in private app storage. */
     @Synchronized fun import(json:String):NativeWorldLabPortableContent{
         val content=decode(json)
-        require(!File(File(root,"world-lab-v1"),content.project.id+".json").exists()){
-            "An invention with this identifier already exists locally; even an "+
-            "unreadable saved file cannot be silently replaced."
+        val saved=File(File(root,"world-lab-v1"),content.project.id+".json")
+        val originalArchive=File(File(root,"ImportedPortableArchives"),
+            content.project.id+".json")
+        if(saved.exists()){
+            require(saved.isFile&&originalArchive.isFile&&
+                originalArchive.readText(StandardCharsets.UTF_8)==json&&
+                NativeWorldLabProjectStore(root).read(content.project.id).json==
+                    content.projectJson){
+                "An invention with this ID already exists; only an identical "+
+                "previously interrupted archive import may resume."
+            }
+        }
+        if(originalArchive.exists()){
+            require(originalArchive.isFile&&
+                originalArchive.readText(StandardCharsets.UTF_8)==json){
+                "A different portable archive already owns this recovery identity."
+            }
+        }else{
+            val backupDir=originalArchive.parentFile
+            require(backupDir.isDirectory||backupDir.mkdirs()){
+                "Cannot preserve the original portable archive for recovery."
+            }
+            val tmp=File.createTempFile(".world-lab-original-",".tmp",backupDir)
+            try{
+                tmp.writeText(json,StandardCharsets.UTF_8)
+                try{
+                    Files.move(tmp.toPath(),originalArchive.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE)
+                }catch(_:AtomicMoveNotSupportedException){
+                    Files.move(tmp.toPath(),originalArchive.toPath())
+                }
+            }finally{tmp.delete()}
         }
         val dir=opaque
         require(dir.isDirectory||dir.mkdirs()){"Cannot create portable archive directory"}
@@ -108,11 +137,20 @@ class NativeWorldLabPortableArchiveStore(private val root:File){
         val temp=File.createTempFile(".world-lab-numeric-", ".tmp",dir)
         val destination=file(content.project.id)
         try{
-            temp.writeText(content.numericalRuns.toString(),StandardCharsets.UTF_8)
-            try{
-                Files.move(temp.toPath(),destination.toPath(),StandardCopyOption.ATOMIC_MOVE)
-            }catch(_:AtomicMoveNotSupportedException){
-                Files.move(temp.toPath(),destination.toPath())
+            val encoded=content.numericalRuns.toString()
+            if(destination.exists()){
+                require(destination.isFile&&
+                    destination.readText(StandardCharsets.UTF_8)==encoded){
+                    "Stored historical experiments conflict with this immutable import."
+                }
+            }else{
+                temp.writeText(encoded,StandardCharsets.UTF_8)
+                try{
+                    Files.move(temp.toPath(),destination.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE)
+                }catch(_:AtomicMoveNotSupportedException){
+                    Files.move(temp.toPath(),destination.toPath())
+                }
             }
         }finally{temp.delete()}
         NativeWorldLabProjectStore(root).save(content.projectJson)
