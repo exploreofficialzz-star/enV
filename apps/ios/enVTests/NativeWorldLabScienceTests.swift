@@ -185,3 +185,47 @@ final class NativeWorldLabRadiationTests:XCTestCase {
                 components:[source,mismatched],connections:[one])))
     }
 }
+
+
+final class NativeWorldLabExecutionTests:XCTestCase {
+    func makeRCGraph()->NativeScientificGraph {
+        NativeScientificGraph(projectId:"rc-contract",projectRevision:2,components:[
+            NativeScienceComponent(id:"source",modelId:"ideal-dc-source",ports:[
+                NativeSciencePort(id:"V",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical")]),
+            NativeScienceComponent(id:"load",modelId:"series-rc-load",ports:[
+                NativeSciencePort(id:"Vin",direction:"input",unit:"V",frame:"SCALAR",flow:"electrical"),
+                NativeSciencePort(id:"Vc",direction:"output",unit:"V",frame:"SCALAR",flow:"electrical"),
+                NativeSciencePort(id:"I",direction:"output",unit:"A",frame:"SCALAR",flow:"electrical")])
+        ],connections:[NativeScienceEdge(fromComponentId:"source",fromPortId:"V",
+            toComponentId:"load",toPortId:"Vin",delayed:false)])
+    }
+    func testTrustedSchedulerRunsRealRcAndBalancesPower() throws {
+        let run=try NativeWorldLabExecution.execute(makeRCGraph(),
+            adapters:NativeWorldLabExecution.idealRCAdapters(sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5),
+            durationSeconds:0.3,stepSeconds:0.1)
+        let last=try XCTUnwrap(run.samples.last)
+        XCTAssertEqual(try XCTUnwrap(last.values["load:Vc"]?.valueSI),12*(1-exp(-0.3/3)),accuracy:1e-12)
+        XCTAssertGreaterThan(try XCTUnwrap(last.values["load:I"]?.valueSI),0)
+        XCTAssertTrue(run.samples.allSatisfy({abs($0.residualW)<1e-10&&$0.dissipatedW>=0}))
+    }
+    func testSchedulerHonoursFutureEventsAndRejectsFalsePower() throws {
+        let graph=makeRCGraph()
+        let base=try NativeWorldLabExecution.idealRCAdapters(sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5)
+        let eventSource=NativeScientificAdapter(componentId:"source",modelId:"ideal-dc-source",
+            modelVersion:"1.0.0"){time,_,_ in
+            NativeScientificStepOutput(outputs:["V":try NativeWorldLabSI.declare(12,unit:"V")],
+                suppliedW:0,dissipatedW:0,storedRateW:0,nextEventSeconds:time<0.11 ? 0.15:nil)
+        }
+        let eventRun=try NativeWorldLabExecution.execute(graph,adapters:[eventSource,base[1]],
+            durationSeconds:0.3,stepSeconds:0.1)
+        XCTAssertTrue(eventRun.samples.contains{$0.eventBoundary&&abs($0.timeSeconds-0.15)<1e-10})
+        let faulty=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",
+            modelVersion:"1.0.0"){time,delta,inputs in
+            let valid=try base[1].advance(time,delta,inputs)
+            return NativeScientificStepOutput(outputs:valid.outputs,
+                suppliedW:valid.suppliedW-1,dissipatedW:valid.dissipatedW,storedRateW:valid.storedRateW)
+        }
+        XCTAssertThrowsError(try NativeWorldLabExecution.execute(graph,adapters:[base[0],faulty],
+            durationSeconds:0.3,stepSeconds:0.1))
+    }
+}
