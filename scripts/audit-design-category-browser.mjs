@@ -142,7 +142,7 @@ for (const [browserName, browserType] of browserEntries) {
     page.waitForEvent("download", { timeout: 15000 }),
     page.getByRole("button", { name: "Download PNG", exact: true }).click(),
   ]);
-  assert.match(pngDownload.suggestedFilename(), /\\.png$/i, "Palette PNG export should produce a PNG file");
+  assert.match(pngDownload.suggestedFilename(), /\.png$/i, "Palette PNG export should produce a PNG file");
   const pngPath = resolve(outputDir, `palette-swatches-${browserName}.png`);
   await pngDownload.saveAs(pngPath);
   const pngBytes = await readFile(pngPath);
@@ -157,7 +157,7 @@ for (const [browserName, browserType] of browserEntries) {
   const svgPath = resolve(outputDir, `palette-swatches-${browserName}.svg`);
   await svgDownload.saveAs(svgPath);
   const svgContent = await readFile(svgPath, "utf8");
-  assert.match(svgContent, /<svg[^>]+xmlns="http:\/\/www\\.w3\\.org\/2000\/svg"/, "Palette SVG export should be a valid standalone SVG document");
+  assert.match(svgContent, /<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/, "Palette SVG export should be a valid standalone SVG document");
   assert.match(svgContent, /enV color palette/, "Palette SVG export should contain its accessible title");
 
   const layoutSelect = page.getByLabel("Page preview layout");
