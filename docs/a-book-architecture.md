@@ -1,12 +1,33 @@
 # A book — enV Toolkit Architecture
 
-**Status:** Architecture baseline — implementation not yet merged  
+**Status:** Cross-platform implementation in progress — not production-ready or merged  
 **Tool ID:** a-book  
 **Route slug:** a-book  
 **Catalog category:** productivity  
 **Display name:** A book  
 **Platforms:** Web, Android, iOS  
-**Architecture mode:** Online-first, local-capable, cloud-backed
+**Architecture mode:** Local-only user content; no cloud storage or sync
+
+## 0. Verified implementation snapshot — 2026-11-01
+
+This section records code that exists in the current implementation branch. It is not a release certification. The native and Web CI pipelines, device tests, accessibility checks and privacy verification must pass before the tool can be called production-ready.
+
+| Platform | Implemented in the branch | Not yet implemented or not yet verified |
+|---|---|---|
+| Web | React tool route; IndexedDB notes, attachments and revision stores; local autosave, search/filter, pin/archive/trash/restore, revision restore; local backup export/import; local PDF inspect, rotate, page extraction, merge, split and batch rotation using pdf-lib/fflate. | OPFS storage, verified offline PWA startup, rich-text AST editor, local OCR, PDF annotations and browser full-text indexing are not currently implemented. |
+| Android | Native Kotlin/Jetpack Compose screen; SQLiteOpenHelper persistence, app-private attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFBox text extraction, rotation, merge, split and batch rotation. | Current store is SQLiteOpenHelper, not Room. On-device OCR, rich-text parity, PDF annotation and production device coverage are not currently implemented or verified. |
+| iOS | Native SwiftUI screen; Core Data/SQLite persistence, app-support attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFKit extraction/rotation/merge/split/batch rotation and Vision on-device OCR. | Rich-text parity, PDF annotation, broader document editing and production device coverage are not currently implemented or verified. |
+
+**Data boundary:** notes, attachments, archives and processing remain local. No A book content API, hosted file store, cloud sync or cloud backup is part of this release.
+
+**Important implementation details:**
+- The Web local database currently uses IndexedDB. OPFS is a planned enhancement, not a claimed dependency.
+- Android currently uses a SQLiteOpenHelper-backed store. Do not describe it as Room until the migration is implemented and tested.
+- The shared env.abook.archive.v1 ZIP format is used for portable local backup/restore. Import paths validate archive limits and remap imported IDs to avoid collisions.
+- PDF capabilities differ by platform. A platform must not display an action as available unless its native/local implementation and tests support that action.
+- The product catalogue/native execution matrix records platform availability; catalogue presence is not proof of runtime correctness.
+
+**Release gate:** Web typecheck/tests/build, Android unit/lint/emulator build and launch, iOS simulator build/tests, backup interoperability, malformed-archive tests, local-only network inspection and accessibility verification must pass on the final PR head. The external Vercel build check is subject to the connected Vercel account's build quota and must be green or explicitly resolved before merging.
 
 ## 1. Product boundary
 
@@ -425,7 +446,9 @@ Users move data between devices through explicit local export/import or file tra
 
 ## Architecture decision summary
 
-A book is an enV Toolkit tool with independent Web, native Android and native iOS implementations. Its initial release is local-only for user content: notes, documents, PDFs, attachments, revisions, search indexes and processing outputs remain on the device. Web uses IndexedDB/OPFS and local workers; Android uses Room/SQLite and app-private files; iOS uses Core Data/SQLite, PDFKit and Vision. PDF/document rendering, extraction, annotation, OCR and supported transformations run locally. Users can explicitly export and restore portable local archives. There is no cloud storage provider, server-side content database, upload API, synchronization service, remote processing or cloud backup in this scope.
+A book is an enV Toolkit tool with independent Web, native Android and native iOS implementations. User content is local-only: notes, documents, PDFs, attachments, revisions and processing outputs remain on-device. The current Web implementation uses IndexedDB; Android uses a SQLiteOpenHelper-backed database and app-private files; iOS uses Core Data/SQLite and app-support files. The three platforms have local backup/restore and different levels of PDF functionality. Vision OCR currently exists on iOS; Web and Android OCR are not yet implemented. OPFS, Room, rich-text parity, broad PDF annotations and several document-studio features remain planned work, not completed features.
 
-**Implementation status:** This document establishes the revised local-only architecture baseline. It does not represent an implemented editor, local database, PDF engine, OCR pipeline or production deployment.
+There is no cloud storage provider, server-side content database, upload API, synchronization service, remote processing or cloud backup in this release.
+
+**Implementation status:** Functional code exists across all three platforms, but this branch remains under implementation and verification. Do not declare A book production-ready or merge it until the release gates in Section 0 are satisfied.
 
