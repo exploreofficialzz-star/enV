@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 struct NativeWorldLabDemoCheckpoint:Codable,Equatable {
     let format:String
     let schemaVersion:Int
@@ -813,5 +814,201 @@ enum NativeWorldLabTimeScales {
             dut1Seconds:dut1,ut1UncertaintySeconds:sigma,quality:quality,
             source:"IERS Bulletin A",bulletin:"Volume "+series.volume+" No. "+String(series.number),
             issuedDateUTC:series.issuedDateUTC)
+    }
+}
+
+
+// MARK: - Deterministic model-input replay manifest
+
+struct NativeWorldLabReplayManifest:Equatable {
+    let format:String
+    let schemaVersion:Int
+    let modelId:String
+    let modelVersion:String
+    let worldEpochUTC:String
+    let timezoneDisplay:String
+    let parameters:[String:Double]
+    let sampleTimesSeconds:[Double]
+    let mandatoryEventTimesSeconds:[Double]
+    let eventQueuePolicy:String
+    let randomStatePolicy:String
+    let solverStatePolicy:String
+    let inputFingerprint:String
+
+    static let formatName="env-world-lab-replay-manifest"
+    static let maxBytes=64*1024
+    static let version="1.0.0"
+    static let eventPolicy="empty-no-discrete-events"
+    static let randomPolicy="deterministic-no-random-state"
+    static let solverPolicy="rebuild-from-validated-inputs"
+
+    static func parameterKeys(_ modelId:String)throws->[String] {
+        switch modelId {
+        case "spring":return ["massKg","springNPerM","dampingNsPerM","initialDisplacementM","initialVelocityMPerS"]
+        case "rc":return ["resistanceOhm","capacitanceF","supplyVoltageV","initialVoltageV"]
+        case "heat":return ["diffusivityM2PerS","lengthMeters","ambientTemperatureK","centerTemperatureK"]
+        default:throw NativeWorldLabError.invalid("Unsupported deterministic reference model.")
+        }
+    }
+    private static func values(_ input:NativeLabInput)->(String,[String:Double]) {
+        switch input {
+        case let .spring(mass,spring,damping,x0,v0):
+            return ("spring",["massKg":mass,"springNPerM":spring,
+                "dampingNsPerM":damping,"initialDisplacementM":x0,"initialVelocityMPerS":v0])
+        case let .rc(resistance,capacitance,supply,initial):
+            return ("rc",["resistanceOhm":resistance,"capacitanceF":capacitance,
+                "supplyVoltageV":supply,"initialVoltageV":initial])
+        case let .heat(diffusivity,length,ambient,center):
+            return ("heat",["diffusivityM2PerS":diffusivity,"lengthMeters":length,
+                "ambientTemperatureK":ambient,"centerTemperatureK":center])
+        }
+    }
+    static func make(input:NativeLabInput,worldEpochUTC:String,timezoneDisplay:String,
+        sampleTimesSeconds:[Double]=stride(from:0.0,through:12.0,by:0.1).map{$0})throws->Self {
+        let (modelId,parameters)=values(input)
+        let base=Self(format:formatName,schemaVersion:1,modelId:modelId,modelVersion:version,
+            worldEpochUTC:worldEpochUTC,timezoneDisplay:timezoneDisplay,parameters:parameters,
+            sampleTimesSeconds:sampleTimesSeconds,mandatoryEventTimesSeconds:[],
+            eventQueuePolicy:eventPolicy,randomStatePolicy:randomPolicy,
+            solverStatePolicy:solverPolicy,inputFingerprint:"0000000000000000")
+        let value=Self(format:base.format,schemaVersion:base.schemaVersion,modelId:base.modelId,
+            modelVersion:base.modelVersion,worldEpochUTC:base.worldEpochUTC,
+            timezoneDisplay:base.timezoneDisplay,parameters:base.parameters,
+            sampleTimesSeconds:base.sampleTimesSeconds,mandatoryEventTimesSeconds:[],
+            eventQueuePolicy:base.eventQueuePolicy,randomStatePolicy:base.randomStatePolicy,
+            solverStatePolicy:base.solverStatePolicy,inputFingerprint:fingerprint(base))
+        try value.validate()
+        return value
+    }
+    private static func bits(_ value:Double)->String {
+        let raw=String(value.bitPattern,radix:16,uppercase:false)
+        return String(repeating:"0",count:max(0,16-raw.count))+raw
+    }
+    private func canonical()->String {
+        var text="env-world-lab-replay-v1\n"
+        text+=modelId+"\n"+modelVersion+"\n"+worldEpochUTC+"\n"+timezoneDisplay+"\n"
+        for key in (try? Self.parameterKeys(modelId)) ?? [] {
+            text+=key+"="+Self.bits(parameters[key] ?? .nan)+"\n"
+        }
+        for time in sampleTimesSeconds {text+="sample="+Self.bits(time)+"\n"}
+        text+=eventQueuePolicy+"\n"+randomStatePolicy+"\n"+solverStatePolicy+"\n"
+        return text
+    }
+    private static func fingerprint(_ value:Self)->String {
+        var hash:UInt64=14695981039346656037
+        for byte in value.canonical().utf8 {
+            hash=(hash ^ UInt64(byte)) &* 1099511628211
+        }
+        let raw=String(hash,radix:16,uppercase:false)
+        return String(repeating:"0",count:max(0,16-raw.count))+raw
+    }
+    func validate()throws {
+        guard format==Self.formatName,schemaVersion==1,modelVersion==Self.version else {
+            throw NativeWorldLabError.invalid("Replay manifest format or solver version is unsupported.")
+        }
+        guard worldEpochUTC.hasSuffix("Z"),ISO8601DateFormatter().date(from:worldEpochUTC) != nil else {
+            throw NativeWorldLabError.invalid("Replay world epoch must be a valid UTC-Z timestamp.")
+        }
+        guard TimeZone(identifier:timezoneDisplay) != nil else {
+            throw NativeWorldLabError.invalid("Replay display timezone is unsupported.")
+        }
+        let keys=try Self.parameterKeys(modelId)
+        guard Set(parameters.keys)==Set(keys),parameters.values.allSatisfy({$0.isFinite}) else {
+            throw NativeWorldLabError.invalid("Replay model parameters are missing, unknown or non-finite.")
+        }
+        guard sampleTimesSeconds.count>=2,sampleTimesSeconds.count<=121,
+              sampleTimesSeconds.first==0,sampleTimesSeconds.last!<=12,
+              sampleTimesSeconds.allSatisfy({$0.isFinite && $0>=0}),
+              sampleTimesSeconds.enumerated().allSatisfy({$0.offset==0 || $0.element>sampleTimesSeconds[$0.offset-1]}) else {
+            throw NativeWorldLabError.invalid("Replay sample axis must increase from zero through at most 12 seconds.")
+        }
+        guard mandatoryEventTimesSeconds.isEmpty,eventQueuePolicy==Self.eventPolicy,
+              randomStatePolicy==Self.randomPolicy,solverStatePolicy==Self.solverPolicy else {
+            throw NativeWorldLabError.invalid("Replay manifest declares unsupported event, random or solver state.")
+        }
+        guard inputFingerprint.count==16,inputFingerprint==Self.fingerprint(self) else {
+            throw NativeWorldLabError.invalid("Replay manifest input fingerprint does not match its contents.")
+        }
+    }
+    func input()throws->NativeLabInput {
+        try validate()
+        let p=parameters
+        switch modelId {
+        case "spring":return .spring(massKg:p["massKg"]!,springNPerM:p["springNPerM"]!,
+            dampingNsPerM:p["dampingNsPerM"]!,x0:p["initialDisplacementM"]!,v0:p["initialVelocityMPerS"]!)
+        case "rc":return .rc(resistanceOhm:p["resistanceOhm"]!,capacitanceF:p["capacitanceF"]!,
+            supplyV:p["supplyVoltageV"]!,initialV:p["initialVoltageV"]!)
+        default:return .heat(diffusivityM2S:p["diffusivityM2PerS"]!,lengthM:p["lengthMeters"]!,
+            backgroundK:p["ambientTemperatureK"]!,centerK:p["centerTemperatureK"]!)
+        }
+    }
+    func encodeBounded()throws->Data {
+        try validate()
+        let params=Dictionary(uniqueKeysWithValues:parameters)
+        let root:[String:Any]=[
+            "format":format,"schemaVersion":schemaVersion,"modelId":modelId,
+            "modelVersion":modelVersion,"worldEpochUTC":worldEpochUTC,
+            "timezoneDisplay":timezoneDisplay,"parameters":params,
+            "sampleTimesSeconds":sampleTimesSeconds,
+            "mandatoryEventTimesSeconds":mandatoryEventTimesSeconds,
+            "eventQueuePolicy":eventQueuePolicy,"randomStatePolicy":randomStatePolicy,
+            "solverStatePolicy":solverStatePolicy,"inputFingerprint":inputFingerprint
+        ]
+        let data=try JSONSerialization.data(withJSONObject:root,options:[.prettyPrinted,.sortedKeys,.fragmentsAllowed])
+        guard data.count<=Self.maxBytes else {
+            throw NativeWorldLabError.invalid("Deterministic replay manifest exceeds 64 KB.")
+        }
+        return data
+    }
+    static func decodeAndReplay(_ data:Data)throws->(manifest:Self,input:NativeLabInput,samples:[NativeLabResult]) {
+        guard !data.isEmpty,data.count<=maxBytes else {
+            throw NativeWorldLabError.invalid("Replay manifest must be between 1 byte and 64 KB.")
+        }
+        guard let root=try JSONSerialization.jsonObject(with:data) as? [String:Any] else {
+            throw NativeWorldLabError.invalid("Replay manifest JSON must be an object.")
+        }
+        let expected:Set<String>=["format","schemaVersion","modelId","modelVersion","worldEpochUTC",
+            "timezoneDisplay","parameters","sampleTimesSeconds","mandatoryEventTimesSeconds",
+            "eventQueuePolicy","randomStatePolicy","solverStatePolicy","inputFingerprint"]
+        guard Set(root.keys)==expected,
+              let schema=(root["schemaVersion"] as? NSNumber)?.intValue,
+              let modelId=root["modelId"] as? String,
+              let version=root["modelVersion"] as? String,
+              let epoch=root["worldEpochUTC"] as? String,
+              let timezone=root["timezoneDisplay"] as? String,
+              let rawParameters=root["parameters"] as? [String:Any],
+              let rawSamples=root["sampleTimesSeconds"] as? [Any],
+              let rawEvents=root["mandatoryEventTimesSeconds"] as? [Any],
+              let eventPolicy=root["eventQueuePolicy"] as? String,
+              let randomPolicy=root["randomStatePolicy"] as? String,
+              let solverPolicy=root["solverStatePolicy"] as? String,
+              let digest=root["inputFingerprint"] as? String else {
+            throw NativeWorldLabError.invalid("Replay manifest has unknown, missing or mistyped fields.")
+        }
+        let keys=try parameterKeys(modelId)
+        guard Set(rawParameters.keys)==Set(keys) else {
+            throw NativeWorldLabError.invalid("Replay parameter set has unknown or missing fields.")
+        }
+        func number(_ value:Any?,_ label:String)throws->Double {
+            guard let value=value as? NSNumber,CFGetTypeID(value) != CFBooleanGetTypeID(),
+                  value.doubleValue.isFinite else {
+                throw NativeWorldLabError.invalid("Replay \(label) must be a finite number.")
+            }
+            return value.doubleValue
+        }
+        let params=try Dictionary(uniqueKeysWithValues:keys.map{key in
+            (key,try number(rawParameters[key],"parameter "+key))
+        })
+        let samples=try rawSamples.map{try number($0,"sample time")}
+        let events=try rawEvents.map{try number($0,"event time")}
+        let manifest=Self(format:root["format"] as? String ?? "",schemaVersion:schema,
+            modelId:modelId,modelVersion:version,worldEpochUTC:epoch,timezoneDisplay:timezone,
+            parameters:params,sampleTimesSeconds:samples,mandatoryEventTimesSeconds:events,
+            eventQueuePolicy:eventPolicy,randomStatePolicy:randomPolicy,
+            solverStatePolicy:solverPolicy,inputFingerprint:digest)
+        try manifest.validate()
+        let input=try manifest.input()
+        let results=try samples.map{try NativeWorldLabScience.evaluate(input,atSeconds:$0)}
+        return (manifest,input,results)
     }
 }
