@@ -187,7 +187,6 @@ final class NativeWorldLabEditorTests: XCTestCase {
             changed,id:"missing",name:"Unavailable",densityKgM3:1,youngModulusPa:1))
     }
 
-}
 
     func testNativeCADRotationScaleDuplicatePatternAndCameraRoundtrip() throws {
         var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"cad")
@@ -201,7 +200,7 @@ final class NativeWorldLabEditorTests: XCTestCase {
         data=try NativeWorldLabEditor.linearPattern(data,id:"copy",axis:0,spacingMeters:3,copies:2)
         parsed=try NativeWorldLabProject.decode(data)
         XCTAssertEqual(parsed.entities.count,4)
-        XCTAssertEqual(parsed.entities.last?.positionMeters[0],8,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(parsed.entities.last?.positionMeters[0]),8,accuracy:1e-12)
         data=try NativeWorldLabEditor.saveCameraViewpoint(data,
             positionMeters:[10,8,-10],lookingAtMeters:[1,2,3])
         parsed=try NativeWorldLabProject.decode(data)

@@ -181,7 +181,6 @@ class NativeWorldLabEditorTest {
         }
     }
 
-}
 
     @Test fun rotationScaleDuplicatePatternAndSavedCameraStayInPortableProject(){
         var json=NativeWorldLabEditor.blank()

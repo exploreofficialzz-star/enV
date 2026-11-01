@@ -28,13 +28,15 @@ private fun labIsoPoint(
     pan:Offset,width:Float,height:Float,
 ):LabScreenPoint{
     val dx=point.x-focus.x;val dy=point.y-focus.y;val dz=point.z-focus.z
-    val rightX=cos(yaw);val rightZ=sin(yaw)
-    val forwardX=sin(yaw);val forwardZ=-cos(yaw)
+    val angle=yaw.toDouble()
+    val rightX=cos(angle);val rightZ=sin(angle)
+    val forwardX=sin(angle);val forwardZ=-cos(angle)
     val horizontal=dx*rightX+dz*rightZ
     val depth=dx*forwardX+dz*forwardZ
-    val vertical=dy*cos(Math.toRadians(30.0))-depth*sin(Math.toRadians(30.0))
-    return LabScreenPoint(width/2+pan.x+horizontal*zoom,
-        height/2+pan.y-vertical*zoom)
+    val elevation=Math.toRadians(30.0)
+    val vertical=dy*cos(elevation)-depth*sin(elevation)
+    return LabScreenPoint(width/2f+pan.x+(horizontal*zoom).toFloat(),
+        height/2f+pan.y-(vertical*zoom).toFloat())
 }
 private fun labRotatePoint(x:Double,y:Double,z:Double,rotation:NativeLabVector):NativeLabVector{
     val cx=cos(rotation.x);val sx=sin(rotation.x)
@@ -87,7 +89,7 @@ fun NativeWorldLabViewport(
                 detectTransformGestures{_,panChange,zoomChange,rotationChange->
                     pan+=panChange
                     zoom=(zoom*zoomChange).coerceIn(5f,160f)
-                    yaw=(yaw+rotationChange*0.01f).let{((it+PI.toFloat())%(2*PI.toFloat())+2*PI.toFloat())%(2*PI.toFloat())-PI.toFloat()}
+                    yaw=(yaw+rotationChange*(PI.toFloat()/180f)).let{((it+PI.toFloat())%(2*PI.toFloat())+2*PI.toFloat())%(2*PI.toFloat())-PI.toFloat()}
                 }
             }
             .pointerInput(project.id,project.revision,zoom,yaw,pan){

@@ -532,7 +532,7 @@ enum NativeWorldLabEditor {
         case "cylinder":
             let radial=sqrt(factors[0]*factors[2])
             dimensions=[old[0]*radial,old[1]*factors[1],old[2]*radial]
-        default:dimensions=zip(old,factors).map{$0*$1}
+        default:dimensions=zip(old,factors).map{pair in pair.0*pair.1}
         }
         guard dimensions.allSatisfy({$0.isFinite && (0.001...10000).contains($0)}) else {
             throw NativeWorldLabError.invalid("Scaled geometry exceeds model bounds")
