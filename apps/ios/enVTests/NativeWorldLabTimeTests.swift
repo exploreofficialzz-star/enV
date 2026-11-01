@@ -136,11 +136,12 @@ final class NativeWorldLabRecordedTimeTests:XCTestCase {
         XCTAssertThrowsError(try duplicate.validate())
         let event=NativeWorldLabRecordedRun(runId:"bad",modelId:"spring",modelVersion:"1",
             worldEpochUTC:"2026-11-01T00:00:00Z",sampleTimesSeconds:[0,0.1,0.2],
-            mandatoryEventTimesSeconds:[0.15])
+            mandatoryEventTimesSeconds:[0.25])
         XCTAssertThrowsError(try event.validate())
     }
 }
 
+final class NativeWorldLabRecordedEventBoundaryTests:XCTestCase {
     func testMandatoryEventBetweenSamplesStopsAtExactSimulationTime()throws {
         let base=run()
         let recording=NativeWorldLabRecordedRun(runId:base.runId,modelId:base.modelId,
@@ -160,3 +161,4 @@ final class NativeWorldLabRecordedTimeTests:XCTestCase {
         XCTAssertEqual(try NativeWorldLabRecordedTime.restore(run:recording,checkpoint:checkpoint)
             .simulationTimeSeconds,0.15,accuracy:1e-9)
     }
+}
