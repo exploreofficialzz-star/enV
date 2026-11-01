@@ -129,8 +129,28 @@ for (const [browserName, browserType] of browserEntries) {
     }
   }
 
-  assert.deepEqual(failures, [], "Design category route should not emit uncaught browser errors");
-  console.log("PASS Design category browser audit: " + advertisedCount + " tool cards, search, five filters, desktop and mobile layouts.");
+  // Exercise the actual palette engine, not only its category-card presentation.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const paletteResponse = await page.goto(baseUrl + "/tools/design/palette-generator", { waitUntil: "domcontentloaded", timeout: 60000 });
+  assert.ok(paletteResponse && paletteResponse.ok(), "Palette Generator route should respond successfully");
+  const layoutSelect = page.getByLabel("Page preview layout");
+  await layoutSelect.waitFor({ state: "visible" });
+  for (const layout of ["landing", "dashboard", "forms", "content"]) {
+    await layoutSelect.selectOption(layout);
+    const preview = page.locator(`[data-testid="palette-preview-${layout}"]`);
+    await preview.waitFor({ state: "visible" });
+    await preview.screenshot({ path: resolve(outputDir, `palette-preview-${browserName}-${layout}-light.png`) });
+  }
+  await page.getByLabel("Preview color theme").selectOption("dark");
+  for (const layout of ["landing", "dashboard", "forms", "content"]) {
+    await layoutSelect.selectOption(layout);
+    const preview = page.locator(`[data-testid="palette-preview-${layout}"]`);
+    await preview.waitFor({ state: "visible" });
+    await preview.screenshot({ path: resolve(outputDir, `palette-preview-${browserName}-${layout}-dark.png`) });
+  }
+
+  assert.deepEqual(failures, [], "Design category and palette preview routes should not emit uncaught browser errors");
+  console.log("PASS Design browser audit: " + advertisedCount + " tools, search, keyboard filters, 3 viewport widths and 4 page previews in light/dark themes.");
   } finally {
     await browser.close();
   }
