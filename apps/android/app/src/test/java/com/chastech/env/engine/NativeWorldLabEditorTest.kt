@@ -182,3 +182,30 @@ class NativeWorldLabEditorTest {
     }
 
 }
+
+    @Test fun rotationScaleDuplicatePatternAndSavedCameraStayInPortableProject(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="cad-box")
+        json=NativeWorldLabEditor.rotateSolid(json,"cad-box",2,45.0)
+        var p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(kotlin.math.PI/4,p.entities.single().rotationRadians.z,1e-12)
+        json=NativeWorldLabEditor.scaleSolid(json,"cad-box",listOf(2.0,1.0,1.0))
+        assertEquals(2.0,NativeWorldLabProjectCodec.decode(json).entities.single().dimensionsMeters.x,1e-12)
+        json=NativeWorldLabEditor.duplicateSolid(json,"cad-box",listOf(2.0,0.0,0.0),newId="copy")
+        assertEquals(2,NativeWorldLabProjectCodec.decode(json).entities.size)
+        json=NativeWorldLabEditor.linearPattern(json,"copy",0,3.0,2)
+        p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(4,p.entities.size)
+        assertEquals(8.0,p.entities.last().positionMeters.x,1e-12)
+        json=NativeWorldLabEditor.saveCameraViewpoint(json,listOf(10.0,8.0,-10.0),listOf(1.0,2.0,3.0))
+        p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(10.0,p.cameraPositionMeters.x,0.0)
+        assertEquals(3.0,p.cameraLookingAtMeters.z,0.0)
+    }
+    @Test fun nativeCadOperationsRejectInvalidRotationPatternAndScale(){
+        val json=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"sphere",id="s")
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.rotateSolid(json,"s",5,15.0)}
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.rotateSolid(json,"s",0,Double.NaN)}
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.scaleSolid(json,"s",listOf(-1.0,1.0,1.0))}
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.linearPattern(json,"s",0,0.0,2)}
+    }

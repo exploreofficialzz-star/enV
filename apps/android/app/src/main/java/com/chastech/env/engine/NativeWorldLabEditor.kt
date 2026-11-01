@@ -418,6 +418,15 @@ object NativeWorldLabEditor {
             entities.put(clone)
         }
     }
+    fun saveCameraViewpoint(source:String,position:List<Double>,target:List<Double>):String=edit(source){project->
+        require(position.size==3&&target.size==3&&
+            (position+target).all{it.isFinite()&&it in -100000.0..100000.0}){
+            "Camera viewpoint needs six finite bounded world coordinates"
+        }
+        val camera=project.getJSONObject("camera")
+        camera.put("positionMeters",JSONArray(position))
+        camera.put("lookingAtMeters",JSONArray(target))
+    }
     fun addHypotheticalMaterial(
         source:String,name:String,densityKgM3:Double?,youngModulusPa:Double?=null,
         id:String=UUID.randomUUID().toString(),

@@ -705,6 +705,14 @@ fun NativeWorldLabForm() {
                 style=MaterialTheme.typography.bodySmall)
         if(project!=null){
             Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            NativeWorldLabViewport(project!!,project!!.entities.getOrNull(selected)?.id,
+                onSelect={id->selected=project!!.entities.indexOfFirst{it.id==id}.coerceAtLeast(0)},
+                onSaveView={position,target->applyProjectEdit{
+                    NativeWorldLabEditor.saveCameraViewpoint(it,position,target)
+                }},
+                onResetView={applyProjectEdit{
+                    NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
+                }})
             Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
             Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
                 style=MaterialTheme.typography.bodySmall)
