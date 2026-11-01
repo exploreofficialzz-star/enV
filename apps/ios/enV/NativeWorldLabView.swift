@@ -507,7 +507,7 @@ struct NativeWorldLabView:View {
         }
         return try? NativeWorldLabScience.evaluate(input,atSeconds:seconds)
     }
-    private func rebuildDemoRecordedTimeline() {
+    private func rebuildDemoRecordedTimeline(wallTimeUTC:String?=nil) {
         do {
             let samples=try (0...120).map { index in
                 try NativeWorldLabScience.evaluate(input,atSeconds:Double(index)/10.0)
@@ -519,8 +519,9 @@ struct NativeWorldLabView:View {
                 sampleTimesSeconds:samples.map{$0.timeSeconds})
             try run.validate()
             let started=try NativeWorldLabRecordedTime.start(run:run,
-                wallTimeUTC:ISO8601DateFormatter().string(from:Date()),
-                timezoneDisplay:TimeZone.current.identifier,playbackRate:speed)
+                wallTimeUTC:wallTimeUTC ?? ISO8601DateFormatter().string(from:Date()),
+                timezoneDisplay:TimeZone.current.identifier,playbackRate:speed,
+                direction:reversePlayback ? "reverse-recording":"forward")
             let target=seconds.isFinite ? min(run.durationSeconds,max(0,seconds)):0
             let selected=try NativeWorldLabRecordedTime.seek(run:run,state:started,timeSeconds:target)
             let clock=NativeWorldLabRecordedClock(wallTimeUTC:selected.wallTimeUTC,
@@ -1193,7 +1194,7 @@ struct NativeWorldLabView:View {
         speed=checkpoint.playbackRate ?? 1
         reversePlayback=checkpoint.playbackDirection=="reverse-recording"
         playing=false;lastTick=Date()
-        rebuildDemoRecordedTimeline()
+        rebuildDemoRecordedTimeline(wallTimeUTC:checkpoint.wallTimeUTC)
         redraw()
         timelineStatus="Reference experiment parameters and recorded-sample clock restored."
     }
