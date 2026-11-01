@@ -4,11 +4,13 @@ import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepR
 import {createTimeEngineCheckpoint,createTimeEngineState,restoreTimeEngineCheckpoint,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
 import {WorldLabSolarEventsPanel} from "./solar-events-panel";
 import {parseIersBulletinA,utcToTaiTt,utcToTcg,utcToUt1,type IersBulletinASeries} from "@/lib/world-lab/time-scales";
+import {createReplayManifest,decodeAndReplayManifest,REPLAY_MANIFEST_MAX_BYTES} from "@/lib/world-lab/replay-manifest";
 type Props={run:LabRun|null;timeSeconds:number;playing:boolean;rate:number;direction:TimeEngineDirection;
  onDirectionChange:(v:TimeEngineDirection)=>void;timezoneDisplay:string;onTimezoneDisplayChange:(v:string)=>void;
  wallTimeUTC:string;geodeticOrigin:Readonly<{latitudeDegrees:number;longitudeDegrees:number}>|null;
  onTimeChange:(t:number)=>void;onPlayingChange:(v:boolean)=>void;
  onRateChange:(v:number)=>void;onCheckpoint:(value:unknown)=>void;
+ onReplay:(run:LabRun)=>void;onReplayExport:(value:unknown)=>void;
  onCreateBranch:(input:ModelInput)=>void};
 const button="rounded border border-border px-3 py-2 text-sm disabled:opacity-50";
 function displayTime(value:string,timezone:string){
@@ -17,6 +19,7 @@ function displayTime(value:string,timezone:string){
 }
 export function WorldLabTimeController(p:Props){
  const [restoreStatus,setRestoreStatus]=useState("");
+ const [replayStatus,setReplayStatus]=useState("");
  const [earthOrientation,setEarthOrientation]=useState<IersBulletinASeries|null>(null);
  const [earthOrientationError,setEarthOrientationError]=useState("");
  const [branchDraft,setBranchDraft]=useState<ModelInput|null>(p.run?.inputs??null);
@@ -57,6 +60,11 @@ export function WorldLabTimeController(p:Props){
    <button className={button} disabled={!run} onClick={()=>{p.onPlayingChange(false);p.onDirectionChange("forward");p.onTimeChange(duration);}}>End</button>
    <button className={button} disabled={!run||p.timeSeconds<=0} onClick={()=>{p.onDirectionChange("reverse-recording");p.onPlayingChange(true);}}>Rewind recording</button>
    <button className={button} disabled={!run} onClick={()=>{if(run&&clock)p.onCheckpoint(createTimeEngineCheckpoint(run,clock));}}>Save checkpoint</button>
+   <button className={button} disabled={!run} onClick={()=>{
+    if(run)p.onReplayExport(createReplayManifest(run.inputs,{
+     worldEpochUTC:run.time.worldDateUTC,timezoneDisplay:p.timezoneDisplay,
+    }));
+   }}>Save deterministic replay</button>
   </div>
   <label className="mt-3 block text-sm" htmlFor="worldlab-speed">Playback speed (wall-clock rate)</label>
   <select id="worldlab-speed" className="mt-1 w-full rounded border border-border bg-bg p-2"
@@ -180,6 +188,22 @@ export function WorldLabTimeController(p:Props){
    UT1/Earth-orientation, TT/leap-second and astronomical ephemeris conversions are unavailable until versioned authoritative inputs are attached.
    Long-horizon seasonal, orbital, erosion and climate time models are not enabled in this bounded local reference engine.
   </p>
+  <label htmlFor="worldlab-replay-restore" className="mt-2 inline-block text-sm">Open & replay deterministic manifest</label>
+  <input id="worldlab-replay-restore" className="mt-1 block w-full text-sm" type="file"
+   accept=".json,application/json" onChange={event=>{
+    const file=event.currentTarget.files?.[0];event.currentTarget.value="";
+    if(!file)return;
+    if(file.size>REPLAY_MANIFEST_MAX_BYTES){setReplayStatus("Replay manifest exceeds the 64 KB limit.");return;}
+    void file.arrayBuffer().then(buffer=>{
+     const replay=decodeAndReplayManifest(new Uint8Array(buffer));
+     p.onPlayingChange(false);p.onDirectionChange("forward");p.onTimeChange(0);
+     p.onTimezoneDisplayChange(replay.manifest.timezoneDisplay);
+     p.onReplay(replay.run);
+     setReplayStatus("Validated "+replay.manifest.modelId+" "+replay.manifest.modelVersion+
+      "; recomputed "+replay.samples.length+" display samples from the fingerprinted inputs.");
+    }).catch(error=>setReplayStatus(error instanceof Error?error.message:"Replay manifest could not be restored."));
+   }}/>
+  {replayStatus&&<p className="mt-1 text-xs" role="status">{replayStatus}</p>}
   <label htmlFor="worldlab-checkpoint-restore" className="mt-2 inline-block text-sm">Restore saved time-engine checkpoint</label>
   <input id="worldlab-checkpoint-restore" className="mt-1 block w-full text-sm" type="file"
    accept=".json,application/json" disabled={!run} onChange={event=>{

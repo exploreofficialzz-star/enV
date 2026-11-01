@@ -3777,6 +3777,12 @@ export default function WorldLab() {
             onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
             onRateChange={setPlaybackRate}
             onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}
+            onReplayExport={manifest=>downloadJson("world-lab-replay-manifest.json",manifest)}
+            onReplay={replayedRun=>{
+              setRuns(previous=>[...previous.filter(run=>run.id!==replayedRun.id),replayedRun]);
+              setRunId(replayedRun.id);setComparisonRunId("");setTimeSeconds(0);
+              setPlaying(false);setDirty(false);setModelKind(replayedRun.inputs.kind);
+            }}
             onCreateBranch={branchReferenceRun}/>
           {runs.length > 0 && (
             <div className="mt-4 rounded-lg border border-border p-3 text-sm">
