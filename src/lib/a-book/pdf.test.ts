@@ -16,7 +16,8 @@ async function samplePdf(pageCount: number, title = "A book test"): Promise<Blob
   const pdf = await PDFDocument.create();
   pdf.setTitle(title);
   for (let index = 0; index < pageCount; index += 1) pdf.addPage([300 + index, 400]);
-  return new Blob([await pdf.save()], { type: "application/pdf" });
+  const bytes = await pdf.save();
+  return new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: "application/pdf" });
 }
 
 test("inspects a locally generated PDF without a network service", async () => {
