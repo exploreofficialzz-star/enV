@@ -15,6 +15,9 @@ const EVIDENCE="science-evidence";
 const validProjectId=(value:string)=>/^[A-Za-z0-9_-]{1,120}$/.test(value);
 export type WorldLabDraft=Readonly<{
   id:string;project:WorldLabProject;baseSavedRevision:number|null;savedAt:string;
+  /** Legacy project-only drafts omit these optional experiment histories. */
+  runs?:readonly LabRun[];
+  scientificEvidence?:readonly ScientificEvidenceRecord[];
 }>;
 function connect():Promise<IDBDatabase>{
   if(typeof indexedDB==="undefined") return Promise.reject(new Error("Browser project storage is unavailable."));
@@ -37,6 +40,41 @@ function connect():Promise<IDBDatabase>{
     req.onsuccess=()=>resolve(req.result);
   });
 }
+/** Validate every unsaved experiment before exposing a draft for recovery. */
+export function normalizeWorldLabDraft(input:WorldLabDraft):WorldLabDraft{
+  if(!input||!validProjectId(input.id)||input.project?.id!==input.id||
+    (input.baseSavedRevision!==null&&
+      (!Number.isSafeInteger(input.baseSavedRevision)||input.baseSavedRevision<0))||
+    typeof input.savedAt!=="string"||
+    !Number.isFinite(Date.parse(input.savedAt)))
+    throw new Error("A recovery draft has inconsistent metadata.");
+  const project=parseWorldLabProject(input.project);
+  const runs=input.runs===undefined?undefined:input.runs.map(row=>{
+    const run=parseStoredWorldLabRun(row);
+    serializeStoredWorldLabRun(run);
+    if(run.assumedMassSource&&run.assumedMassSource.projectId!==project.id)
+      throw new Error("Recovery run belongs to another invention.");
+    return run;
+  });
+  const scientificEvidence=input.scientificEvidence===undefined?undefined:
+    input.scientificEvidence.map(candidate=>{
+      const record=parseScientificEvidenceRecord(candidate);
+      if(record.projectId!==project.id||record.projectRevision>project.revision)
+        throw new Error("Recovery evidence belongs to another invention or revision.");
+      return record;
+    });
+  if((runs?.length??0)>MAX_STORED_RUNS_PER_PROJECT||
+    (scientificEvidence?.length??0)>MAX_SCIENCE_EVIDENCE_PER_PROJECT)
+    throw new Error("Recovery contains more scientific records than supported.");
+  const ids=[...(runs??[]).map(r=>r.id),
+    ...(scientificEvidence??[]).map(r=>r.id)];
+  if(ids.length!==new Set(ids).size)
+    throw new Error("Recovery contains duplicated immutable experiment IDs.");
+  const result={...input,project,runs,scientificEvidence};
+  if(new TextEncoder().encode(JSON.stringify(result)).byteLength>24*1024*1024)
+    throw new Error("Complete recovery draft exceeds 24 MB; export individual results.");
+  return result;
+}
 /** Session recovery is separate from committed projects and never restores automatically. */
 export async function listLocalWorldLabDrafts():Promise<WorldLabDraft[]>{
   const db=await connect();
@@ -48,30 +86,26 @@ export async function listLocalWorldLabDrafts():Promise<WorldLabDraft[]>{
       try{
         const rows=req.result as WorldLabDraft[];
         if(rows.length>50)throw new Error("Recovery cache exceeds its project limit.");
-        resolve(rows.map(row=>{
-          if(!validProjectId(row.id)||row.project?.id!==row.id||
-            (row.baseSavedRevision!==null&&
-              (!Number.isSafeInteger(row.baseSavedRevision)||row.baseSavedRevision<0))||
-            !Number.isFinite(Date.parse(row.savedAt)))
-            throw new Error("A recovery draft has inconsistent metadata.");
-          return {...row,project:parseWorldLabProject(row.project)};
-        }).sort((a,b)=>b.savedAt.localeCompare(a.savedAt)));
+        resolve(rows.map(normalizeWorldLabDraft)
+          .sort((a,b)=>b.savedAt.localeCompare(a.savedAt)));
       }catch(error){reject(error);}
     };
     tx.onerror=()=>{db.close();reject(new Error("Recovery history could not be read."));};
   });
 }
 export async function saveLocalWorldLabDraft(projectInput:WorldLabProject,
-  baseSavedRevision:number|null):Promise<WorldLabDraft>{
+  baseSavedRevision:number|null,
+  runs:readonly LabRun[]=[],
+  scientificEvidence:readonly ScientificEvidenceRecord[]=[]
+):Promise<WorldLabDraft>{
   const project=parseWorldLabProject(projectInput);
   if(baseSavedRevision!==null&&
     (!Number.isSafeInteger(baseSavedRevision)||baseSavedRevision<0))
     throw new Error("Invalid base project revision for recovery.");
-  const record:WorldLabDraft={
+  const record=normalizeWorldLabDraft({
     id:project.id,project,baseSavedRevision,savedAt:new Date().toISOString(),
-  };
-  if(new TextEncoder().encode(JSON.stringify(record)).byteLength>1048576)
-    throw new Error("Recovery draft exceeds the 1 MB bound; export the invention as JSON.");
+    runs,scientificEvidence,
+  });
   const db=await connect();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(DRAFTS,"readwrite");

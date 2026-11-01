@@ -381,16 +381,19 @@ export default function WorldLab() {
   useEffect(()=>{
     if(!project||!workspaceDirty)return;
     const snapshot=project;
+    const snapshotRuns=runs;
+    const snapshotScience=scientificEvidence;
     const timeout=window.setTimeout(()=>{
-      void saveLocalWorldLabDraft(snapshot,savedRevision).then(record=>{
+      void saveLocalWorldLabDraft(
+        snapshot,savedRevision,snapshotRuns,snapshotScience).then(record=>{
         setRecoveryDrafts(items=>[record,...items.filter(x=>x.id!==record.id)]
           .sort((a,b)=>b.savedAt.localeCompare(a.savedAt)));
-        setRecoveryStatus("Uncommitted invention cached on this device.");
+        setRecoveryStatus("Uncommitted invention and experiment history cached on this device.");
       }).catch(error=>setRecoveryStatus(error instanceof Error?error.message:
         "Recovery cache unavailable; export your invention before closing."));
     },700);
     return ()=>window.clearTimeout(timeout);
-  },[project,workspaceDirty,savedRevision]);
+  },[project,workspaceDirty,savedRevision,runs,scientificEvidence]);
 
   useEffect(() => {
     let active = true;
@@ -895,6 +898,7 @@ export default function WorldLab() {
         worldDateUTC: new Date().toISOString(), assumedMassSource: source,
       });
       setRuns((previous) => [...previous.slice(-19), next]);
+      setWorkspaceDirty(true);
       if (project && savedRevision !== null) {
         void saveLocalWorldLabRun(project.id,next).catch(cause=>
           setError((cause instanceof Error?cause.message:"Could not archive the experiment.")+
@@ -1805,10 +1809,15 @@ export default function WorldLab() {
       setProject(restored);clearEditHistory();
       setSavedRevision(draft.baseSavedRevision);
       setWorkspaceDirty(true);setSelectedEntityId("");
-      setRuns([]);setScientificEvidence([]);
-      setRunId("");setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
-      if(draft.baseSavedRevision!==null)restoreRunsForProject(restored.id);
-      setMessage("Recovered a cached, unsaved invention. Save or export to preserve it.");
+      setRuns(draft.runs??[]);setScientificEvidence(draft.scientificEvidence??[]);
+      setRunId(draft.runs?.at(-1)?.id??"");
+      setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
+      if(draft.runs===undefined&&draft.scientificEvidence===undefined&&
+        draft.baseSavedRevision!==null)restoreRunsForProject(restored.id);
+      setMessage("Recovered the unsaved invention and "+
+        (draft.runs?.length??0)+" numerical and "+
+        (draft.scientificEvidence?.length??0)+" scientific records. "+
+        "Save or export to preserve this draft.");
     }catch(error){setError(error instanceof Error?error.message:"Recovery draft is invalid.");}
   }
   async function discardRecoveryDraft(draft:WorldLabDraft){

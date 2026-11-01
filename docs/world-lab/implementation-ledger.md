@@ -694,3 +694,8 @@ release-candidate evidence bundle are unfinished.
 - Android and iOS now retain the exact original portable archive as app-private recovery evidence **before** mutating the project or its histories. Re-importing exactly that file may resume missing immutable records after an interruption, but only when any existing destination project matches the imported project byte-for-byte.
 - Both importers refuse to overwrite an existing different original archive or different numerical-run ledger. The standard project store and scientific record store continue enforcing optimistic revisions, ownership, record quotas, and immutable-ID conflicts.
 - This is a resumable sequence of atomic file writes, not a fabricated multi-file database transaction; out-of-storage failures may still leave an incomplete new local project requiring the exact source archive to resume.
+
+## Full Web recovery drafts
+- Browser recovery drafts now include bounded, individually verified numerical runs and scientific evidence as well as the invented project. The explicit restore action brings back those session results without overwriting a saved version; legacy project-only recovery drafts remain readable.
+- Adding a numerical run now marks the session for recovery, rather than relying only on geometry edits. IndexedDB debounces the combined snapshot and enforces a 24 MB per-draft cap, 20 numerical records, 20 scientific records, ownership and unique IDs.
+- Added pure source regressions covering unsaved RC experiment recovery, legacy drafts and duplicated immutable record IDs. No build or test execution has been claimed.
