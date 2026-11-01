@@ -189,8 +189,7 @@ enum NativeWorldLabActuator {
             modelVersion:i.thermal == nil ? "1.0.0" : "1.1.0",
             validity:i.thermal == nil ?
                 "Bounded 1D R-L actuator with hypothetical parameters; not certified." :
-                "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, " +
-                "cooling and resistance; not measured or certified.")
+                "Bounded 1D electrical-thermal-mechanical feedback with hypothetical heat capacity, " + "cooling and resistance; not measured or certified.")
     }
 
     /// Internal 1D numerical consistency only. Does not verify motor parameters.
@@ -1109,8 +1108,7 @@ enum NativeWorldLabGravity {
         ids:[String],velocities:[String:[Double]],
         durationSeconds:Double=30,integrationSteps:Int=480)throws->NativeGravityRun {
         guard ids.count>=2 && ids.count<=8 && Set(ids).count==ids.count,
-              durationSeconds.isFinite && durationSeconds>=0.1 &&
-              durationSeconds<=3600 && integrationSteps>=2 && integrationSteps<=1200,
+              durationSeconds.isFinite && durationSeconds>=0.1 && durationSeconds<=3600 && integrationSteps>=2 && integrationSteps<=1200,
               velocities.keys.allSatisfy({ids.contains($0)}) else {
             throw NativeWorldLabError.invalid("Native gravity requires 2–8 spheres and valid step limits")
         }
@@ -1168,8 +1166,7 @@ enum NativeWorldLabGravity {
             bodies:bodies,durationSeconds:durationSeconds,integrationSteps:integrationSteps,
             frames:frames,initialEnergyJ:start.1,finalEnergyJ:final.1,
             energyDriftFraction:drift,
-            validity:"Newtonian point-mass gravity with invented density, Verlet integration "+
-                "and conservation audit. No measurements, relativistic dynamics, impacts or tides.")
+            validity:"Newtonian point-mass gravity with invented density, Verlet integration "+ "and conservation audit. No measurements, relativistic dynamics, impacts or tides.")
     }
 }
 
@@ -1294,9 +1291,7 @@ enum NativeWorldLabHeatTransfer {
             firstCapacityJPerK:ca,secondCapacityJPerK:cb,conductanceWPerK:g,
             equilibriumTemperatureK:equilibrium,durationSeconds:durationSeconds,
             samples:samples,
-            validity:"Insulated two-slab, invented homogeneous thermal property "+
-                "reference only. No spatial gradients, phase change, convection, "+
-                "radiation, safety certification or measured matter.")
+            validity:"Insulated two-slab, invented homogeneous thermal property "+ "reference only. No spatial gradients, phase change, convection, "+ "radiation, safety certification or measured matter.")
     }
 }
 
@@ -1399,8 +1394,7 @@ struct NativeElasticWaveRun:Encodable {
     let validity:String
 
     func sample(_ seconds:Double,points:Int=41)throws->NativeElasticWaveSample {
-        guard seconds.isFinite && seconds>=0 && seconds<=durationSeconds &&
-              (3...101).contains(points) else {
+        guard seconds.isFinite && seconds>=0 && seconds<=durationSeconds && (3...101).contains(points) else {
             throw NativeWorldLabError.invalid("Wave playback time or sample grid is invalid")
         }
         let phase=2*Double.pi*frequencyHz*seconds
@@ -1409,8 +1403,7 @@ struct NativeElasticWaveRun:Encodable {
         let positions=(0..<points).map{Double($0)*lengthMeters/Double(points-1)}
         let displacement=positions.map{amplitudeMeters*cos(k*$0)*cos(phase)}
         let velocity=positions.map{-amplitudeMeters*omega*cos(k*$0)*sin(phase)}
-        let stress=positions.map{-assumedYoungModulusPa*amplitudeMeters*k*
-            sin(k*$0)*cos(phase)}
+        let stress=positions.map{-assumedYoungModulusPa*amplitudeMeters*k* sin(k*$0)*cos(phase)}
         let kinetic=totalEnergyJ*pow(sin(phase),2)
         let strain=totalEnergyJ*pow(cos(phase),2)
         return NativeElasticWaveSample(timeSeconds:seconds,positionsMeters:positions,
@@ -1448,18 +1441,11 @@ enum NativeWorldLabElasticWave {
         materialId:String,lengthMeters:Double,crossSectionM2:Double,
         densityKgM3:Double,youngModulusPa:Double,
         mode:Int,amplitudeMeters:Double,cycles:Int)throws->NativeElasticWaveRun {
-        guard !projectId.isEmpty && !entityId.isEmpty && !materialId.isEmpty &&
-              projectRevision>=0 && lengthMeters.isFinite &&
-              (0.001...10000).contains(lengthMeters) && crossSectionM2.isFinite &&
-              (1e-10...1e8).contains(crossSectionM2) && densityKgM3.isFinite &&
-              (0.001...1e9).contains(densityKgM3) && youngModulusPa.isFinite &&
-              (1...1e15).contains(youngModulusPa) && (1...12).contains(mode) &&
-              (1...20).contains(cycles) else {
+        guard !projectId.isEmpty && !entityId.isEmpty && !materialId.isEmpty && projectRevision>=0 && lengthMeters.isFinite && (0.001...10000).contains(lengthMeters) && crossSectionM2.isFinite && (1e-10...1e8).contains(crossSectionM2) && densityKgM3.isFinite && (0.001...1e9).contains(densityKgM3) && youngModulusPa.isFinite && (1...1e15).contains(youngModulusPa) && (1...12).contains(mode) && (1...20).contains(cycles) else {
             throw NativeWorldLabError.invalid("Elastic-wave material, geometry or mode is outside the bounded model")
         }
         let maximumAmplitude=min(0.01,0.001*lengthMeters/(Double.pi*Double(mode)))
-        guard amplitudeMeters.isFinite && amplitudeMeters>=1e-9 &&
-              amplitudeMeters<=maximumAmplitude else {
+        guard amplitudeMeters.isFinite && amplitudeMeters>=1e-9 && amplitudeMeters<=maximumAmplitude else {
             throw NativeWorldLabError.invalid("Wave amplitude violates the small-strain model")
         }
         let speed=sqrt(youngModulusPa/densityKgM3)
@@ -1469,12 +1455,9 @@ enum NativeWorldLabElasticWave {
         let frequency=Double(mode)*speed/(2*lengthMeters)
         let period=1/frequency, duration=Double(cycles)*period
         let omega=2*Double.pi*frequency
-        let energy=0.25*densityKgM3*crossSectionM2*lengthMeters*
-            pow(amplitudeMeters*omega,2)
+        let energy=0.25*densityKgM3*crossSectionM2*lengthMeters* pow(amplitudeMeters*omega,2)
         let stress=youngModulusPa*amplitudeMeters*Double.pi*Double(mode)/lengthMeters
-        guard duration.isFinite && (1e-9...1e7).contains(duration) &&
-              energy.isFinite && (0...1e40).contains(energy) &&
-              stress.isFinite && (0...1e16).contains(stress) else {
+        guard duration.isFinite && (1e-9...1e7).contains(duration) && energy.isFinite && (0...1e40).contains(energy) && stress.isFinite && (0...1e16).contains(stress) else {
             throw NativeWorldLabError.invalid("Nonfinite or unsupported wave energy/stress")
         }
         return NativeElasticWaveRun(projectId:projectId,projectRevision:projectRevision,
@@ -1483,9 +1466,7 @@ enum NativeWorldLabElasticWave {
             assumedDensityKgM3:densityKgM3,assumedYoungModulusPa:youngModulusPa,
             waveSpeedMps:speed,frequencyHz:frequency,periodSeconds:period,
             durationSeconds:duration,maximumStressPa:stress,totalEnergyJ:energy,
-            validity:"Ideal linear free-free axial standing mode in a uniform invented bar. "+
-                "Assumed, unmeasured density/modulus; no bending, fracture, damping, "+
-                "acoustics in air or nonlinear material behavior.")
+            validity:"Ideal linear free-free axial standing mode in a uniform invented bar. "+ "Assumed, unmeasured density/modulus; no bending, fracture, damping, "+ "acoustics in air or nonlinear material behavior.")
     }
 }
 
@@ -1571,16 +1552,7 @@ enum NativeWorldLabRadiation {
         specificHeatJPerKgK:Double,startK:Double,environmentK:Double,
         emissivity:Double,duration:Double)throws->NativeRadiationRun {
         let heatCapacity=massKg*specificHeatJPerKgK
-        guard !projectId.isEmpty && !entityId.isEmpty && !materialId.isEmpty &&
-            projectRevision>=0 && massKg.isFinite && (1e-9...1e15).contains(massKg) &&
-            areaM2.isFinite && (1e-9...1e9).contains(areaM2) &&
-            densityKgM3.isFinite && (0.001...1e9).contains(densityKgM3) &&
-            specificHeatJPerKgK.isFinite && (0.01...1e7).contains(specificHeatJPerKgK) &&
-            heatCapacity.isFinite && (1e-9...1e20).contains(heatCapacity) &&
-            startK.isFinite && (1...3000).contains(startK) &&
-            environmentK.isFinite && (1...3000).contains(environmentK) &&
-            emissivity.isFinite && (0...1).contains(emissivity) &&
-            duration.isFinite && (0.01...3600).contains(duration) else {
+        guard !projectId.isEmpty && !entityId.isEmpty && !materialId.isEmpty && projectRevision>=0 && massKg.isFinite && (1e-9...1e15).contains(massKg) && areaM2.isFinite && (1e-9...1e9).contains(areaM2) && densityKgM3.isFinite && (0.001...1e9).contains(densityKgM3) && specificHeatJPerKgK.isFinite && (0.01...1e7).contains(specificHeatJPerKgK) && heatCapacity.isFinite && (1e-9...1e20).contains(heatCapacity) && startK.isFinite && (1...3000).contains(startK) && environmentK.isFinite && (1...3000).contains(environmentK) && emissivity.isFinite && (0...1).contains(emissivity) && duration.isFinite && (0.01...3600).contains(duration) else {
             throw NativeWorldLabError.invalid("Radiative thermal assumptions exceed safe bounds")
         }
         let maximum=max(startK,environmentK)
@@ -1620,8 +1592,7 @@ enum NativeWorldLabRadiation {
                 throw NativeWorldLabError.invalid("Radiative temperature became nonphysical")
             }
             let tolerance=1e-7*max(1,maximum)
-            guard temperature>=min(startK,environmentK)-tolerance &&
-                temperature<=maximum+tolerance else {
+            guard temperature>=min(startK,environmentK)-tolerance && temperature<=maximum+tolerance else {
                 throw NativeWorldLabError.invalid("Radiative integration escaped temperature bounds")
             }
             if step%stride==0 || step==steps {record(step)}
@@ -1629,13 +1600,10 @@ enum NativeWorldLabRadiation {
         return NativeRadiationRun(projectId:projectId,projectRevision:projectRevision,
             entityId:entityId,materialId:materialId,initialTemperatureK:startK,
             environmentTemperatureK:environmentK,emissivity:emissivity,
-            durationSeconds:duration,massKg:massKg,areaM2:area,
+            durationSeconds:duration,massKg:massKg,areaM2:areaM2,
             assumedDensityKgM3:densityKgM3,
             assumedSpecificHeatJPerKgK:specificHeatJPerKgK,
             steps:steps,samples:samples,
-            validity:"Ideal lumped isothermal grey-body heat transfer to a fixed "+
-                "environment. All density, specific heat and emissivity are assumed. "+
-                "No measured atmosphere, sunlight, geometry view factors, phase "+
-                "transitions or real-life performance certification.")
+            validity:"Ideal lumped isothermal grey-body heat transfer to a fixed "+ "environment. All density, specific heat and emissivity are assumed. "+ "No measured atmosphere, sunlight, geometry view factors, phase "+ "transitions or real-life performance certification.")
     }
 }
