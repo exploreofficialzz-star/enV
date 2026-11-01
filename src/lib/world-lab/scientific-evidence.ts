@@ -125,6 +125,35 @@ function optics(value:Record<string,unknown>){
       (value.transmittedAngleDegrees!==null||
         value.unpolarizedTransmittance!==0)))
     throw new Error("Stored optical interface evidence is invalid.");
+  const n1=Number(value.firstIndex),n2=Number(value.secondIndex);
+  const incident=Number(value.incidentAngleDegrees)*Math.PI/180;
+  const sine=n1/n2*Math.sin(incident);
+  const total=sine>1;
+  const expectedCritical=n1>n2?Math.asin(n2/n1)*180/Math.PI:null;
+  const expectedTransmitted=total?null:Math.asin(Math.min(1,sine))*180/Math.PI;
+  if(value.totalInternalReflection!==total||
+    (expectedCritical===null?value.criticalAngleDegrees!==null:
+      value.criticalAngleDegrees===null||
+        Math.abs(Number(value.criticalAngleDegrees)-expectedCritical)>1e-6)||
+    (expectedTransmitted===null?value.transmittedAngleDegrees!==null:
+      value.transmittedAngleDegrees===null||
+        Math.abs(Number(value.transmittedAngleDegrees)-expectedTransmitted)>1e-6))
+    throw new Error("Optical evidence angles conflict with the assumed refractive indices.");
+  const cosineI=Math.cos(incident);
+  const cosineT=total?0:Math.sqrt(Math.max(0,1-sine*sine));
+  const expectedS=total?1:
+    ((n1*cosineI-n2*cosineT)/(n1*cosineI+n2*cosineT))**2;
+  const expectedP=total?1:
+    ((n2*cosineI-n1*cosineT)/(n2*cosineI+n1*cosineT))**2;
+  const expectedR=(expectedS+expectedP)/2;
+  if(Math.abs(Number(value.sReflectance)-expectedS)>1e-8||
+    Math.abs(Number(value.pReflectance)-expectedP)>1e-8||
+    Math.abs(Number(value.unpolarizedReflectance)-expectedR)>1e-8||
+    Math.abs(Number(value.unpolarizedTransmittance)-(1-expectedR))>1e-8||
+    Math.abs(Number(value.energyResidual)-
+      Math.abs(1-Number(value.unpolarizedReflectance)-
+        Number(value.unpolarizedTransmittance)))>1e-8)
+    throw new Error("Optical evidence power conflicts with the assumed model.");
 }
 function rayTrace(value:Record<string,unknown>){
   if(value.format!=="env-world-lab-optical-scene-ray"||
@@ -148,12 +177,16 @@ function rayTrace(value:Record<string,unknown>){
     value.accountedLostBranchPowerFraction<0||
     value.accountedLostBranchPowerFraction>1.000001)
     throw new Error("Stored optical scene trace is outside the accepted model envelope.");
+  if(Math.abs(Number(value.finalPrimaryRayPowerFraction)+
+      Number(value.accountedLostBranchPowerFraction)-1)>1e-6)
+    throw new Error("Optical scene trace does not account for its primary and reflected power.");
   for(const item of value.segments){
     if(!obj(item)||!vector(item.startMeters)||!vector(item.endMeters)||
       !["transmitted","total-internal-reflection","escaped","limit"].includes(
         String(item.kind))||
       (item.entityId!==null&&!uid(item.entityId))||
       !finite(item.travelMeters)||item.travelMeters<0||
+      (item.kind==="limit"&&item.travelMeters!==0)||
       !finite(item.incidentIndex)||item.incidentIndex<1||item.incidentIndex>5||
       (item.transmittedIndex!==null&&(!finite(item.transmittedIndex)||
         item.transmittedIndex<1||item.transmittedIndex>5))||

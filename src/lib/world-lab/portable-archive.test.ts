@@ -43,3 +43,23 @@ test("v2 includes typed scientific evidence and still reads legacy v1 archives",
  assert.throws(()=>parseWorldLabArchive(JSON.stringify({...old,scientificEvidence:[]})),
    /Unsupported/);
 });
+
+test("future-revision scientific records cannot be injected into an invention archive",()=>{
+ const p=project();
+ const foreign={format:"env-world-lab-interface-optics",modelVersion:"1.0.0",
+  evidence:"physics-model-computed",materialEvidence:"hypothetical-user-assumed",
+  projectId:p.id,projectRevision:p.revision+1,
+  firstMaterialId:"a",secondMaterialId:"b",
+  firstIndex:1,secondIndex:1.5,incidentAngleDegrees:0,reflectedAngleDegrees:0,
+  transmittedAngleDegrees:0,criticalAngleDegrees:null,
+  totalInternalReflection:false,sReflectance:0.04,pReflectance:0.04,
+  unpolarizedReflectance:0.04,unpolarizedTransmittance:0.96,
+  energyResidual:0,
+  validity:"Lossless invented refractive-index boundary calculated for this observation."};
+ const rec={id:"future",projectId:p.id,projectRevision:p.revision+1,
+  createdAt:"2026-10-31T00:00:00Z",kind:"interface-optics" as const,result:foreign};
+ assert.throws(()=>parseWorldLabArchive(JSON.stringify({
+  format:"env-world-lab-archive",schemaVersion:2,project:p,recordedRuns:[],
+  scientificEvidence:[rec],
+ })),/future project revision/);
+});

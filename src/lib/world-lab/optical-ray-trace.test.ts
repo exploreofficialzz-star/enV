@@ -41,17 +41,6 @@ test("ray rejects invented media without optical evidence and interior origins",
   direction:[1,0,0],maximumDistanceMeters:4,maximumInterfaces:8}),/1–40/);
 });
 
-- The Web optical panel now offers bounded source coordinates, ray
-  direction, path distance, material-boundary budget and one-click aim
-  at an invented optical solid. A true 3D primary-ray trajectory is
-  computed from authored geometry locally, rendered through Babylon.js
-  without changing the project, then retained through the same typed
-  archive/evidence path as other experiments. Editing source parameters
-  or underlying project material clears stale ray visualizations.
-- Fixed optical energy accounting for zero-transmission interface cases,
-  and fixed the interface-budget marker to report zero additional
-  travelled distance instead of inventing untraced path length.
-
 test("interface budget counts actual crossings without solving an extra interface",()=>{
  const p=source("box");
  const run=traceOpticalScene(p,{originMeters:[-4,0,0],

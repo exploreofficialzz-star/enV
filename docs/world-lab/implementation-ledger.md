@@ -679,3 +679,9 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
   archive importer accepts those optical records through a shared strict
   optical evidence validator. Imported optical records land in the standard
   native evidence library; no other saved local invention is overwritten.
+
+## Cross-platform archive integrity batch (2026-11-01)
+- Removed non-code Markdown accidentally written into the TypeScript optical ray test module; the complete scenario suite is syntactically valid source again.
+- Strengthened imported Fresnel evidence with independent expected critical/transmitted angles and polarization/power checks, against its recorded assumed indices.
+- Refused full archive interchange when a scientific result claims a future invention revision; aligned Web behavior with the existing native archive validators.
+- Added source regressions for altered optical measurements, primary-ray boundaries and future-revision provenance. Execution and CI verification remain deferred by instruction.

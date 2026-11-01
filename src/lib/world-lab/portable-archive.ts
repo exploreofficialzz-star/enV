@@ -33,6 +33,8 @@ function envelope(project:WorldLabProject,runs:readonly LabRun[],
     const record=parseScientificEvidenceRecord(input);
     if(record.projectId!==project.id)
       throw new Error("Scientific evidence belongs to another project.");
+    if(record.projectRevision>project.revision)
+      throw new Error("Scientific evidence belongs to a future project revision.");
     if(ids.has(record.id))
       throw new Error("An archive cannot contain duplicate scientific record IDs.");
     ids.add(record.id);

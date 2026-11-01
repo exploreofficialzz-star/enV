@@ -24,3 +24,25 @@ test("computed Newtonian evidence retains its project and model assumptions",()=
  tampered.result.frames[0].positionsM[0][0]=null;
  assert.throws(()=>parseScientificEvidenceRecord(tampered),/trajectory/);
 });
+
+import {calculateOpticalInterface} from "./optics.ts";
+test("portable optical observations must match their stated assumed Fresnel equations",()=>{
+ const p=blankWorldLabProject("opticsbound","2026-10-31T00:00:00Z");
+ p.materials=[
+   {id:"a",name:"Invented A",densityKgM3:null,youngModulusPa:null,
+     refractiveIndex:1,evidence:"hypothetical-user-assumed"},
+   {id:"b",name:"Invented B",densityKgM3:null,youngModulusPa:null,
+     refractiveIndex:1.5,evidence:"hypothetical-user-assumed"},
+ ];
+ const run=calculateOpticalInterface(p,"a","b",35);
+ const evidence=newScientificEvidenceRecord(run,"opticrecord","2026-10-31T00:00:00Z");
+ assert.equal(evidence.kind,"interface-optics");
+ assert.deepEqual(parseScientificEvidenceRecord(JSON.parse(JSON.stringify(evidence))),evidence);
+ const altered=JSON.parse(JSON.stringify(evidence));
+ altered.result.transmittedAngleDegrees=89;
+ assert.throws(()=>parseScientificEvidenceRecord(altered),/angles conflict/);
+ altered.result.transmittedAngleDegrees=run.transmittedAngleDegrees;
+ altered.result.unpolarizedReflectance=0.9;
+ altered.result.unpolarizedTransmittance=0.1;
+ assert.throws(()=>parseScientificEvidenceRecord(altered),/power conflicts/);
+});
