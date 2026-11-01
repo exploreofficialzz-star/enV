@@ -79,7 +79,7 @@ class NativeWorldLabRecordedTimeCheckpointCodecTest {
   val decoded=NativeWorldLabRecordedCheckpointCodec.decode(json,run)
   assertEquals(checkpoint,decoded)
   assertThrows(IllegalArgumentException::class.java){
-   NativeWorldLabRecordedCheckpointCodec.decode(json.replace("\\"sampleIndex\\"","\\"unexpected\\""),run)
+   NativeWorldLabRecordedCheckpointCodec.decode(json.replace("\"sampleIndex\"","\"unexpected\""),run)
   }
   assertThrows(IllegalArgumentException::class.java){
    NativeWorldLabRecordedCheckpointCodec.decode(" ".repeat(16*1024+1),run)
