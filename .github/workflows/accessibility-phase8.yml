@@ -70,7 +70,7 @@ jobs:
             npx playwright install --with-deps chromium
           fi
       - name: Install Firefox and WebKit for cross-browser Design QA
-        run: npx playwright install --with-deps firefox webkit
+        run: npx playwright install --with-deps chromium firefox webkit
       - name: Start local audit server
         run: |
           npm run dev -- --host 127.0.0.1 --port 8080 --strictPort > "$RUNNER_TEMP/env-preview.log" 2>&1 &
@@ -88,7 +88,7 @@ jobs:
       - name: Verify Read the full guide navigation
         run: node scripts/check-blog-guide-navigation.mjs
       - name: Verify Design catalogue, keyboard flow, filters and responsive layout across browsers
-        run: npm run audit:design:browser -- --browser=all --base-url=http://127.0.0.1:8080
+        run: env -u PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH npm run audit:design:browser -- --browser=all --base-url=http://127.0.0.1:8080
       - name: Run rendered-route accessibility audit
         run: npm run audit:accessibility:live -- --base-url=http://127.0.0.1:8080 --max-pages=40 --max-interactions=4 --fail-on-scan-errors
       - name: Upload rendered audit evidence
