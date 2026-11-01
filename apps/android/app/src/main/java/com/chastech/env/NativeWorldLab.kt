@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import com.chastech.env.engine.NativeLabInput
 import com.chastech.env.engine.NativeWorldLabBranch
 import com.chastech.env.engine.NativeWorldLabBranchRecord
@@ -31,6 +32,7 @@ import com.chastech.env.engine.advanceWorldLabEventTime
 import com.chastech.env.engine.NativeWorldLabRecordedRun
 import com.chastech.env.engine.NativeWorldLabRecordedClock
 import com.chastech.env.engine.NativeWorldLabRecordedTime
+import com.chastech.env.engine.NativeWorldLabRecordedCheckpointCodec
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
 import com.chastech.env.engine.NativeChemicalThermalResult
@@ -1741,7 +1743,7 @@ fun NativeWorldLabForm() {
                                     }
                                 }}
                                 motorPlaying=!motorPlaying
-                            }){Text(if(motorPlaying&&!motorReversePlayback)"Pause":"Play")}
+                            }){Text(if(motorPlaying&&!motorReversePlayback) "Pause" else "Play")}
                             OutlinedButton(onClick={
                                 motorReversePlayback=true
                                 motorRecordedRun?.let { recording->motorClock?.let { clock->
@@ -1903,8 +1905,8 @@ fun NativeWorldLabForm() {
         Text("Capture the current model inputs as an immutable source, edit inputs, then calculate a separate child run at the same simulation time. Rewind remains cached playback only.",
             style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            OutlinedButton(onClick={captureBranchSource}){Text("Capture source")}
-            OutlinedButton(onClick={calculateNativeBranch},
+            OutlinedButton(onClick={captureBranchSource()}){Text("Capture source")}
+            OutlinedButton(onClick={calculateNativeBranch()},
                 enabled=branchSourceInput!=null&&branchSourceInput!=model){Text("Calculate new branch")}
         }
         branchRecord?.let{branch->
