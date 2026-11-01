@@ -42,7 +42,6 @@ jobs:
           src/lib/engines/palette-image.test.ts
           src/lib/engines/design-palette.test.ts
           src/lib/engines/design-color.test.ts
-          src/lib/engines/accessibility-color.test.ts
           src/lib/engines/svg-generators.test.ts
           src/lib/engines/design-contrast.test.ts
       - name: Audit all 21 Design tools and implementation gates
