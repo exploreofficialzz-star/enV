@@ -623,3 +623,85 @@ enum NativeWorldLabExecution {
         return [source,load]
     }
 }
+
+
+struct NativeWorldLabBranchChange:Codable,Equatable {
+    let field:String
+    let previous:Double?
+    let next:Double?
+}
+struct NativeWorldLabBranchRecord:Codable,Equatable {
+    let format:String
+    let schemaVersion:Int
+    let branchId:String
+    let sourceRunId:String
+    let sourceModelId:String
+    let sourceModelVersion:String
+    let targetModelId:String
+    let targetModelVersion:String
+    let createdAtUTC:String
+    let sourceTimeSeconds:Double
+    let targetTimeSeconds:Double
+    let fidelity:String
+    let sourceParameters:[String:Double]
+    let targetParameters:[String:Double]
+    let inputDiff:[NativeWorldLabBranchChange]
+}
+enum NativeWorldLabBranch {
+    private static func parameters(_ input:NativeLabInput)->[String:Double] {
+        switch input {
+        case let .spring(mass,spring,damping,x0,v0):
+            return ["massKg":mass,"springNPerM":spring,"dampingNsPerM":damping,
+                "x0":x0,"v0":v0]
+        case let .rc(resistance,capacitance,supply,initial):
+            return ["resistanceOhm":resistance,"capacitanceF":capacitance,
+                "supplyV":supply,"initialV":initial]
+        case let .heat(diffusivity,length,background,center):
+            return ["diffusivityM2S":diffusivity,"lengthM":length,
+                "backgroundK":background,"centerK":center]
+        }
+    }
+    private static func modelId(_ input:NativeLabInput)->String {
+        switch input {
+        case .spring:return "spring"
+        case .rc:return "rc"
+        case .heat:return "heat"
+        }
+    }
+    static func make(source:NativeLabInput,target:NativeLabInput,
+        sourceTimeSeconds:Double,sourceRunId:String=UUID().uuidString,
+        createdAtUTC:String=ISO8601DateFormatter().string(from:Date()))throws->NativeWorldLabBranchRecord {
+        guard sourceRunId.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("Branch source run ID is invalid")
+        }
+        guard let created=ISO8601DateFormatter().date(from:createdAtUTC) else {
+            throw NativeWorldLabError.invalid("Branch creation time must be valid ISO-8601 UTC")
+        }
+        // Validate both old and new assumptions by actually evaluating their native models.
+        _ = try NativeWorldLabScience.evaluate(source,atSeconds:sourceTimeSeconds)
+        _ = try NativeWorldLabScience.evaluate(target,atSeconds:sourceTimeSeconds)
+        let before=parameters(source),after=parameters(target)
+        let fields=Set(before.keys).union(after.keys).sorted()
+        let diff=fields.compactMap{field->NativeWorldLabBranchChange? in
+            let old=before[field],next=after[field]
+            guard old != next else{return nil}
+            return NativeWorldLabBranchChange(field:field,previous:old,next:next)
+        }
+        return NativeWorldLabBranchRecord(format:"env-world-lab-native-branch",
+            schemaVersion:1,branchId:UUID().uuidString,sourceRunId:sourceRunId,
+            sourceModelId:modelId(source),sourceModelVersion:"1.0.0",
+            targetModelId:modelId(target),targetModelVersion:"1.0.0",
+            createdAtUTC:ISO8601DateFormatter().string(from:created),
+            sourceTimeSeconds:sourceTimeSeconds,targetTimeSeconds:sourceTimeSeconds,
+            fidelity:"recomputed-new-run",sourceParameters:before,targetParameters:after,
+            inputDiff:diff)
+    }
+    static func recompute(_ target:NativeLabInput,record:NativeWorldLabBranchRecord)throws->NativeLabResult {
+        guard record.format=="env-world-lab-native-branch",record.schemaVersion==1,
+            record.fidelity=="recomputed-new-run",record.targetModelId==modelId(target),
+            record.targetModelVersion=="1.0.0",record.targetParameters==parameters(target) else {
+            throw NativeWorldLabError.invalid("Branch record does not match the selected target inputs or model version")
+        }
+        return try NativeWorldLabScience.evaluate(target,atSeconds:record.targetTimeSeconds)
+    }
+}
