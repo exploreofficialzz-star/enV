@@ -3,10 +3,10 @@ import type {WorldLabProject} from "@/lib/world-lab/project";
 import {calculateElasticWave,sampleElasticWave,type ElasticWaveRun}
   from "@/lib/world-lab/elastic-wave";
 
-type Props={project:WorldLabProject|null};
+type Props={project:WorldLabProject|null;onKeepEvidence:(run:ElasticWaveRun)=>void};
 const field="w-full rounded border border-border bg-bg px-2 py-1 text-sm";
 const button="rounded border border-border px-3 py-2 text-sm";
-export function WorldLabElasticWavePanel({project}:Props){
+export function WorldLabElasticWavePanel({project,onKeepEvidence}:Props){
   const [entityId,setEntityId]=useState("");
   const [mode,setMode]=useState(1);
   const [amplitude,setAmplitude]=useState(1e-5);
@@ -108,6 +108,7 @@ export function WorldLabElasticWavePanel({project}:Props){
             {[0.1,1,4,10].map(v=><option key={v} value={v}>{v}×</option>)}
           </select>
           <button className={button} onClick={download}>Export wave evidence</button>
+          <button className={button} onClick={()=>onKeepEvidence(active)}>Keep wave with invention</button>
         </div>
         <p className="mt-2 text-xs">Kinetic energy: {sample.kineticEnergyJ.toPrecision(5)} J;
           stored strain energy: {sample.strainEnergyJ.toPrecision(5)} J;

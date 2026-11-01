@@ -5,7 +5,7 @@ import {calculateThermalRadiation,sampleThermalRadiation,type RadiationRun}
 
 const field="w-full rounded border border-border bg-bg px-2 py-1 text-sm";
 const button="rounded border border-border px-3 py-2 text-sm";
-export function WorldLabRadiationPanel({project}:{project:WorldLabProject|null}){
+export function WorldLabRadiationPanel({project,onKeepEvidence}:{project:WorldLabProject|null;onKeepEvidence:(run:RadiationRun)=>void}){
  const [solidId,setSolidId]=useState("");
  const [initial,setInitial]=useState(400);
  const [environment,setEnvironment]=useState(300);
@@ -107,6 +107,7 @@ export function WorldLabRadiationPanel({project}:{project:WorldLabProject|null})
           {[0.1,1,4,10].map(v=><option key={v} value={v}>{v}×</option>)}
         </select>
         <button className={button} onClick={download}>Export radiative evidence</button>
+        <button className={button} onClick={()=>onKeepEvidence(active)}>Keep heat evidence with invention</button>
       </div>
       <p className="mt-2 text-xs">Net energy transferred: {sample.transferredEnergyJ.toPrecision(6)} J;
         first-law residual: {sample.energyResidualJ.toPrecision(4)} J.</p>

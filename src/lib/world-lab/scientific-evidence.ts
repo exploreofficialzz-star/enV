@@ -1,4 +1,6 @@
 import type {GravityRun} from "./gravity.ts";
+import type {ElasticWaveRun} from "./elastic-wave.ts";
+import type {RadiationRun} from "./thermal-radiation.ts";
 import type {MaterialHeatRun} from "./material-heat-transfer.ts";
 import type {OpticalInterfaceRun} from "./optics.ts";
 import type {OpticalRayTrace} from "./optical-ray-trace.ts";
@@ -7,10 +9,10 @@ import type {OpticalRayTrace} from "./optical-ray-trace.ts";
  * source or proof of real measurement. Project and model revision are immutable. */
 export const MAX_SCIENCE_EVIDENCE_BYTES=2*1024*1024;
 export const MAX_SCIENCE_EVIDENCE_PER_PROJECT=20;
-export type ScientificEvidenceResult=GravityRun|MaterialHeatRun|OpticalInterfaceRun|OpticalRayTrace;
+export type ScientificEvidenceResult=GravityRun|MaterialHeatRun|OpticalInterfaceRun|OpticalRayTrace|ElasticWaveRun|RadiationRun;
 export type ScientificEvidenceRecord=Readonly<{
   id:string;projectId:string;projectRevision:number;
-  createdAt:string;kind:"newton-gravity"|"material-heat"|"interface-optics"|"optical-scene-ray";
+  createdAt:string;kind:"newton-gravity"|"material-heat"|"interface-optics"|"optical-scene-ray"|"elastic-wave"|"thermal-radiation";
   result:ScientificEvidenceResult;
 }>;
 const uid=(s:unknown):s is string=>typeof s==="string"&&
@@ -198,6 +200,96 @@ function rayTrace(value:Record<string,unknown>){
       throw new Error("Optical scene trace contains invalid interface evidence.");
   }
 }
+
+const close=(actual:number,expected:number,relative=1e-7)=>
+  Number.isFinite(actual)&&Number.isFinite(expected)&&
+  Math.abs(actual-expected)<=relative*Math.max(1,Math.abs(expected));
+function elasticWave(value:Record<string,unknown>){
+  if(value.format!=="env-world-lab-elastic-wave"||
+    value.modelVersion!=="1.0.0"||value.evidence!=="physics-model-computed"||
+    value.inputEvidence!=="hypothetical-user-assumed"||!label(value.validity)||
+    !uid(value.entityId)||!uid(value.materialId)||
+    !Number.isSafeInteger(value.mode)||Number(value.mode)<1||Number(value.mode)>12||
+    !Number.isSafeInteger(value.cycles)||Number(value.cycles)<1||Number(value.cycles)>20||
+    !finite(value.lengthMeters)||value.lengthMeters<0.001||value.lengthMeters>10000||
+    !finite(value.crossSectionM2)||value.crossSectionM2<1e-10||value.crossSectionM2>1e8||
+    !finite(value.assumedDensityKgM3)||value.assumedDensityKgM3<0.001||
+    value.assumedDensityKgM3>1e9||!finite(value.assumedYoungModulusPa)||
+    value.assumedYoungModulusPa<1||value.assumedYoungModulusPa>1e15||
+    !finite(value.amplitudeMeters)||value.amplitudeMeters<1e-9||
+    value.amplitudeMeters>Math.min(0.01,
+      0.001*value.lengthMeters/(Math.PI*Number(value.mode)))||
+    !finite(value.waveSpeedMps)||value.waveSpeedMps<1e-6||
+    value.waveSpeedMps>1e6||!finite(value.frequencyHz)||
+    !finite(value.periodSeconds)||!finite(value.durationSeconds)||
+    !finite(value.maximumStressPa)||!finite(value.totalEnergyJ))
+    throw new Error("Elastic-wave evidence contains invalid invented material assumptions.");
+  const speed=Math.sqrt(value.assumedYoungModulusPa/value.assumedDensityKgM3);
+  const frequency=Number(value.mode)*speed/(2*value.lengthMeters);
+  const angular=2*Math.PI*frequency;
+  const energy=0.25*value.assumedDensityKgM3*value.crossSectionM2*
+    value.lengthMeters*(value.amplitudeMeters*angular)**2;
+  const stress=value.assumedYoungModulusPa*value.amplitudeMeters*
+    Math.PI*Number(value.mode)/value.lengthMeters;
+  if(!close(value.waveSpeedMps,speed)||!close(value.frequencyHz,frequency)||
+    !close(value.periodSeconds,1/frequency)||
+    !close(value.durationSeconds,Number(value.cycles)/frequency)||
+    !close(value.maximumStressPa,stress)||!close(value.totalEnergyJ,energy))
+    throw new Error("Elastic-wave evidence conflicts with its declared analytical physical model.");
+}
+function radiation(value:Record<string,unknown>){
+  if(value.format!=="env-world-lab-thermal-radiation"||
+    value.modelVersion!=="1.0.0"||value.evidence!=="physics-model-computed"||
+    value.inputEvidence!=="hypothetical-user-assumed"||!label(value.validity)||
+    !uid(value.entityId)||!uid(value.materialId)||
+    !finite(value.initialTemperatureK)||value.initialTemperatureK<1||
+    value.initialTemperatureK>3000||
+    !finite(value.environmentTemperatureK)||value.environmentTemperatureK<1||
+    value.environmentTemperatureK>3000||
+    !finite(value.emissivity)||value.emissivity<0||value.emissivity>1||
+    !finite(value.massKg)||value.massKg<1e-9||value.massKg>1e15||
+    !finite(value.areaM2)||value.areaM2<1e-9||value.areaM2>1e9||
+    !finite(value.assumedDensityKgM3)||value.assumedDensityKgM3<0.001||
+    value.assumedDensityKgM3>1e9||
+    !finite(value.assumedSpecificHeatJPerKgK)||value.assumedSpecificHeatJPerKgK<0.01||
+    value.assumedSpecificHeatJPerKgK>1e7||
+    !finite(value.durationSeconds)||value.durationSeconds<0.01||
+    value.durationSeconds>3600||!Number.isSafeInteger(value.steps)||
+    Number(value.steps)<120||Number(value.steps)>20000||
+    !Array.isArray(value.samples)||value.samples.length<2||value.samples.length>122)
+    throw new Error("Radiative evidence has invalid thermal assumptions or sample count.");
+  const capacity=value.massKg*value.assumedSpecificHeatJPerKgK;
+  const multiplier=value.emissivity*5.670374419e-8*value.areaM2;
+  const lower=Math.min(value.initialTemperatureK,value.environmentTemperatureK);
+  const higher=Math.max(value.initialTemperatureK,value.environmentTemperatureK);
+  let previous=-Infinity,previousTemp=value.initialTemperatureK;
+  for(const raw of value.samples){
+    if(!obj(raw)||!finite(raw.timeSeconds)||raw.timeSeconds<previous||
+      raw.timeSeconds<0||raw.timeSeconds>value.durationSeconds+1e-7||
+      !finite(raw.temperatureK)||raw.temperatureK<lower-1e-6||
+      raw.temperatureK>higher+1e-6||
+      !finite(raw.netRadiatedPowerW)||!finite(raw.transferredEnergyJ)||
+      !finite(raw.internalThermalEnergyJ)||!finite(raw.energyResidualJ))
+      throw new Error("Radiative evidence trajectory contains an invalid time or thermal value.");
+    const predicted=multiplier*(raw.temperatureK**4-value.environmentTemperatureK**4);
+    const transferred=capacity*(value.initialTemperatureK-raw.temperatureK);
+    const residual=transferred-raw.transferredEnergyJ;
+    if(!close(raw.netRadiatedPowerW,predicted)||
+      !close(raw.internalThermalEnergyJ,capacity*raw.temperatureK)||
+      !close(raw.energyResidualJ,residual)||
+      Math.abs(raw.energyResidualJ)>1e-7*Math.max(1,Math.abs(transferred))||
+      (value.initialTemperatureK>=value.environmentTemperatureK&&
+        raw.temperatureK>previousTemp+1e-6)||
+      (value.initialTemperatureK<value.environmentTemperatureK&&
+        raw.temperatureK<previousTemp-1e-6))
+      throw new Error("Radiative evidence conflicts with assumed heat balance or monotonic temperatures.");
+    previous=raw.timeSeconds;previousTemp=raw.temperatureK;
+  }
+  if(!close(Number((value.samples[0] as Record<string,unknown>).timeSeconds),0)||
+    !close(previous,value.durationSeconds))
+    throw new Error("Radiative evidence does not cover the full calculated time span.");
+}
+
 export function parseScientificEvidenceRecord(data:unknown):ScientificEvidenceRecord{
   if(!obj(data)||!keys(data,["id","projectId","projectRevision","createdAt","kind","result"])||
     Object.keys(data).length!==6||!uid(data.id)||!uid(data.projectId)||
@@ -216,6 +308,8 @@ export function parseScientificEvidenceRecord(data:unknown):ScientificEvidenceRe
   else if(data.kind==="material-heat")heat(result);
   else if(data.kind==="interface-optics")optics(result);
   else if(data.kind==="optical-scene-ray")rayTrace(result);
+  else if(data.kind==="elastic-wave")elasticWave(result);
+  else if(data.kind==="thermal-radiation")radiation(result);
   else throw new Error("This scientific evidence format is not yet supported.");
   return data as unknown as ScientificEvidenceRecord;
 }
@@ -224,7 +318,9 @@ export function newScientificEvidenceRecord(result:ScientificEvidenceResult,
   const kind=result.format==="env-world-lab-newton-gravity"?
     "newton-gravity":result.format==="env-world-lab-material-heat-transfer"?
       "material-heat":result.format==="env-world-lab-interface-optics"?
-        "interface-optics":"optical-scene-ray";
+        "interface-optics":result.format==="env-world-lab-optical-scene-ray"?
+          "optical-scene-ray":result.format==="env-world-lab-elastic-wave"?
+            "elastic-wave":"thermal-radiation";
   return parseScientificEvidenceRecord({id,createdAt,
     projectId:result.projectId,projectRevision:result.projectRevision,
     kind,result});

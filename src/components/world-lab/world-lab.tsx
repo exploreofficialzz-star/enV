@@ -2239,8 +2239,8 @@ export default function WorldLab() {
             </div>
           </div>)}
       </section>
-      <WorldLabElasticWavePanel project={project}/>
-      <WorldLabRadiationPanel project={project}/>
+      <WorldLabElasticWavePanel project={project} onKeepEvidence={keepScientificEvidence}/>
+      <WorldLabRadiationPanel project={project} onKeepEvidence={keepScientificEvidence}/>
       <WorldLabMaterialHeatPanel project={project}
         onKeepEvidence={keepScientificEvidence}
         onSample={(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>{
