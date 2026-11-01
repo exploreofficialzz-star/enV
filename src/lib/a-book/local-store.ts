@@ -37,6 +37,8 @@ const DATABASE_NAME = "env-a-book-local";
 const DATABASE_VERSION = 1;
 const MAX_REVISIONS_PER_NOTE = 40;
 const MAX_LOCAL_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+const MAX_LOCAL_LIBRARY_ATTACHMENT_BYTES = 150 * 1024 * 1024;
+const MAX_LOCAL_ATTACHMENTS = 10_000;
 let databasePromise: Promise<IDBDatabase> | undefined;
 
 function createId(): string {
@@ -300,22 +302,75 @@ export function assertABookAttachmentSize(file: Pick<Blob, "size">): void {
   }
 }
 
-export async function addAttachment(noteId: string, file: File): Promise<ABookAttachment> {
-  assertABookAttachmentSize(file);
+export function assertABookAttachmentBatch(
+  files: Array<Pick<Blob, "size">>,
+  existingBytes = 0,
+  existingCount = 0,
+): void {
+  if (!files.length) throw new Error("Choose at least one attachment.");
+  if (!Number.isSafeInteger(existingBytes) || existingBytes < 0
+    || !Number.isSafeInteger(existingCount) || existingCount < 0) {
+    throw new Error("The existing local attachment index is invalid. Rebuild the local library index before importing.");
+  }
+  if (existingCount + files.length > MAX_LOCAL_ATTACHMENTS) {
+    throw new Error("A book supports up to 10,000 local attachments. Remove unused files before importing more.");
+  }
+  let totalBytes = existingBytes;
+  for (const file of files) {
+    assertABookAttachmentSize(file);
+    totalBytes += file.size;
+    if (totalBytes > MAX_LOCAL_LIBRARY_ATTACHMENT_BYTES) {
+      throw new Error("The local library attachment limit is 150 MB so it can be exported as a complete backup. Export and remove older files before importing more.");
+    }
+  }
+}
+
+export async function addAttachments(noteId: string, files: File[]): Promise<ABookAttachment[]> {
+  if (!noteId.trim()) throw new Error("Choose a note before attaching files.");
+  assertABookAttachmentBatch(files);
   const db = await openDatabase();
-  const attachment: ABookAttachment = {
-    id: createId(),
-    noteId,
-    name: file.name,
-    type: file.type || "application/octet-stream",
-    size: file.size,
-    createdAt: Date.now(),
-    blob: file.slice(0, file.size, file.type || "application/octet-stream"),
-  };
   const tx = db.transaction("attachments", "readwrite");
-  const done = transactionDone(tx, "The attachment could not be saved on this device.");
-  tx.objectStore("attachments").put(attachment);
-  await done;
+  const done = transactionDone(tx, "The attachment batch could not be saved on this device.");
+  const objectStore = tx.objectStore("attachments");
+  let attachments: ABookAttachment[] = [];
+  let validationError: Error | undefined;
+
+  const existingRequest = objectStore.getAll();
+  existingRequest.onsuccess = () => {
+    try {
+      const existing = existingRequest.result;
+      const existingBytes = existing.reduce((sum, item) => sum + Number(item.size || 0), 0);
+      assertABookAttachmentBatch(files, existingBytes, existing.length);
+      attachments = files.map((file) => ({
+        id: createId(),
+        noteId,
+        name: file.name.trim().slice(0, 500) || "attachment",
+        type: (file.type || "application/octet-stream").slice(0, 200),
+        size: file.size,
+        createdAt: Date.now(),
+        blob: file.slice(0, file.size, file.type || "application/octet-stream"),
+      }));
+      attachments.forEach((attachment) => objectStore.add(attachment));
+    } catch (cause) {
+      validationError = cause instanceof Error ? cause : new Error("The attachment batch is invalid.");
+      try { tx.abort(); } catch { /* The transaction may already have aborted. */ }
+    }
+  };
+  existingRequest.onerror = () => {
+    try { tx.abort(); } catch { /* The transaction may already have aborted. */ }
+  };
+
+  try {
+    await done;
+  } catch (cause) {
+    if (validationError) throw validationError;
+    throw cause;
+  }
+  return attachments;
+}
+
+export async function addAttachment(noteId: string, file: File): Promise<ABookAttachment> {
+  const [attachment] = await addAttachments(noteId, [file]);
   return attachment;
 }
 
