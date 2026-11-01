@@ -2,9 +2,11 @@ import {useEffect,useState} from "react";
 import type {LabRun,ModelInput} from "@/lib/world-lab/model";
 import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepRecordedTime} from "@/lib/world-lab/timeline";
 import {createTimeEngineCheckpoint,createTimeEngineState,restoreTimeEngineCheckpoint,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
+import {WorldLabSolarEventsPanel} from "./solar-events-panel";
 type Props={run:LabRun|null;timeSeconds:number;playing:boolean;rate:number;direction:TimeEngineDirection;
  onDirectionChange:(v:TimeEngineDirection)=>void;timezoneDisplay:string;onTimezoneDisplayChange:(v:string)=>void;
- wallTimeUTC:string;onTimeChange:(t:number)=>void;onPlayingChange:(v:boolean)=>void;
+ wallTimeUTC:string;geodeticOrigin:Readonly<{latitudeDegrees:number;longitudeDegrees:number}>|null;
+ onTimeChange:(t:number)=>void;onPlayingChange:(v:boolean)=>void;
  onRateChange:(v:number)=>void;onCheckpoint:(value:unknown)=>void;
  onCreateBranch:(input:ModelInput)=>void};
 const button="rounded border border-border px-3 py-2 text-sm disabled:opacity-50";
@@ -70,6 +72,9 @@ export function WorldLabTimeController(p:Props){
     :"Playback speed changes recorded-frame playback only; numerical solver steps and coefficients remain unchanged.")+
     " Sample "+Math.min(run.samples.length,sample+1)+" of "+run.samples.length+"; solver dt "+run.time.solverStepSeconds.toPrecision(4)+" s.":"Start a reference experiment to enable the recorded time engine."}
   </p>
+  <WorldLabSolarEventsPanel latitudeDegrees={p.geodeticOrigin?.latitudeDegrees??null}
+   longitudeDegrees={p.geodeticOrigin?.longitudeDegrees??null} timezone={p.timezoneDisplay}
+   worldDateUTC={clock?.worldDateUTC??run?.time.worldDateUTC??p.wallTimeUTC} runId={run?.id??""}/>
   {branch&&<div className="mt-2 rounded border border-border p-2 text-xs">
    <p className="font-medium">Branched experiment · {branch.branchId}</p>
    <p>Source run: {branch.sourceRunId} · recomputed as {branch.targetModelId} v{branch.targetModelVersion}</p>

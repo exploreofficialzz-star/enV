@@ -3768,6 +3768,7 @@ export default function WorldLab() {
             rate={playbackRate} direction={playbackDirection} onDirectionChange={setPlaybackDirection}
             timezoneDisplay={timezoneDisplay} onTimezoneDisplayChange={setTimezoneDisplay}
             wallTimeUTC={new Date().toISOString()}
+            geodeticOrigin={project?.world.geodeticOrigin??null}
             onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
             onRateChange={setPlaybackRate}
             onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}
