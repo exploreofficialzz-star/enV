@@ -19,7 +19,7 @@ import {
 } from "@/lib/engines/accessibility-color";
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
 import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony, type SemanticPaletteColors } from "@/lib/engines/design-palette";
-import { formatCmyk, formatHsv, parseDesignColor } from "@/lib/engines/design-color";
+import { formatCmyk, formatHsv, formatHwb, formatOklch, parseDesignColor } from "@/lib/engines/design-color";
 import { extractDominantColors } from "@/lib/engines/palette-image";
 
 type Harmony = PaletteHarmony;
@@ -246,8 +246,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
             <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent">Live</span>
           </div>
           <Label htmlFor="design-color-converter" className="mt-4 block">Color value</Label>
-          <Input id="design-color-converter" value={converterValue} onChange={(event) => setConverterValue(event.target.value)} placeholder="HEX, RGB, HSL, HSV or CMYK" className="mt-1.5 font-mono" />
-          {converterValue && !converted ? <p className="mt-2 text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV or CMYK value.</p> : null}
+          <Input id="design-color-converter" value={converterValue} onChange={(event) => setConverterValue(event.target.value)} placeholder="HEX, RGB, HSL, HSV, CMYK, HWB or OKLCH" className="mt-1.5 font-mono" />
+          {converterValue && !converted ? <p className="mt-2 text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV, CMYK, HWB or OKLCH value.</p> : null}
         </div>
         {converted ? (
           <>
@@ -265,6 +265,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                 ["RGB", toRgbString(converted)],
                 ["HSL", toHslString(converted)],
                 ["HSV / HSB", formatHsv(converted)],
+                ["HWB", formatHwb(converted)],
+                ["OKLCH", formatOklch(converted)],
                 ["CMYK · screen estimate", formatCmyk(converted)],
               ].map(([label, value]) => (
                 <div key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3">

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatCmyk, formatHsv, hsvToRgb, parseDesignColor, rgbToHsv } from "./design-color.ts";
+import { formatCmyk, formatHsv, formatHwb, formatOklch, hsvToRgb, parseDesignColor, rgbToHsv } from "./design-color.ts";
 import { toHex } from "./accessibility-color.ts";
 
 test("HSV and HSB accept percentages, unit fractions, commas and hue degrees", () => {
@@ -36,4 +36,32 @@ test("invalid HSV and CMYK values are rejected", () => {
   for (const value of ["hsv(0 120% 100%)", "hsv(0 0.8oops 1)", "hsx(0 1 1)", "cmyk(101%,0%,0%,0%)", "cmyk(-1,0,0,0)", "cmyk(1,2,3)"]) {
     assert.equal(parseDesignColor(value), null, value);
   }
+});
+
+
+test("HWB CSS colors parse hue units, alpha and whiteness/blackness", () => {
+  assert.equal(toHex(parseDesignColor("hwb(0 0% 0%)")!), "#ff0000");
+  assert.equal(toHex(parseDesignColor("hwb(120 0% 0% / 50%)")!), "#00ff0080");
+  assert.equal(toHex(parseDesignColor("hwb(240 20% 20%)")!), "#3333cc");
+  assert.equal(toHex(parseDesignColor("hwb(90 40% 60%)")!), "#808080");
+  assert.equal(parseDesignColor("hwb(0 110% 0%)"), null);
+});
+
+test("OKLCH CSS colors parse and round-trip with bounded sRGB output", () => {
+  assert.equal(toHex(parseDesignColor("oklch(62.8% 0.2577 29.2)")!), "#ff0000");
+  assert.equal(toHex(parseDesignColor("oklch(0.62796 0.2577 29.2 / 50%)")!), "#ff000080");
+  for (const hex of ["#ff0000", "#00aa88", "#347fc4", "#808080", "#ffffff"]) {
+    const parsed = parseDesignColor(hex)!;
+    const output = formatOklch(parsed);
+    const rebuilt = parseDesignColor(output)!;
+    const channels = [parsed.r, parsed.g, parsed.b];
+    const rebuiltChannels = [rebuilt.r, rebuilt.g, rebuilt.b];
+    assert.ok(channels.every((channel, index) => Math.abs(channel - rebuiltChannels[index]) <= 2), `${hex} -> ${output}`);
+  }
+});
+
+test("HWB and OKLCH formatters produce copyable CSS Color 4 values", () => {
+  const color = parseDesignColor("#0d9f8a")!;
+  assert.match(formatHwb(color), /^hwb\(\d+ \d+% \d+%\)$/);
+  assert.match(formatOklch(color), /^oklch\(\d+\.\d% \d+\.\d{3} \d+\.\d\)$/);
 });
