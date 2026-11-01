@@ -1176,9 +1176,9 @@ for (const [family, rows] of Object.entries(expansionData)) {
       const equationTitle = expansionCalculatorName(info, target);
       RAW.push([
         `math-${op}`,
-        info.title ? `${info.title}: ${equationTitle}` : equationTitle,
+        equationTitle,
         "calculators",
-        `${expansionCalculatorDescription(info, target)} Enter the other two values to calculate the missing value.`,
+        expansionCalculatorDescription(info, target),
         "calculator",
         op,
         expansionCalculatorKeywords(family, info, target),
