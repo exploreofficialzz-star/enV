@@ -15275,7 +15275,8 @@ private struct NativeABookView: View {
                 Button("Extract text") { processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
                 Button("OCR scanned pages") { processPDF(attachment, operation: "ocr") }.buttonStyle(.bordered)
                 Button("Rotate 90°") { processPDF(attachment, operation: "rotate") }.buttonStyle(.bordered)
-            }            TextField("Split pages · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
+            }
+            TextField("Split pages · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
             Button("Split into parts") { splitPDF(attachment) }.buttonStyle(.bordered)
             if !pdfText.isEmpty {
                 Text(pdfText).font(.caption).textSelection(.enabled).lineLimit(12)
