@@ -178,19 +178,21 @@ export default function WorldLab() {
   const [inspectionUiHidden,setInspectionUiHidden]=useState(false);
   const [inspectionMode,setInspectionMode]=useState<InspectionMode>("normal");
   const [cutawayAxis,setCutawayAxis]=useState<InspectionAxis>("x");
+  const [cutawayNormal,setCutawayNormal]=useState<readonly [number,number,number]>([1,0,0]);
   const [cutawayFraction,setCutawayFraction]=useState(0);
   const [explosionDistanceM,setExplosionDistanceM]=useState(1);
   const [observerDepth, setObserverDepth] = useState(0);
   const [observerRange,setObserverRange]=useState(8);
   const cameraRestoredProject=useRef("");
-  const visualSettings = useRef({ seeInside: false, opacity: 55,mode:"normal" as InspectionMode,axis:"x" as InspectionAxis,cutawayFraction:0,explosionDistanceM:1,selectedEntityId:"" });
+  const visualSettings = useRef({ seeInside: false, opacity: 55,mode:"normal" as InspectionMode,axis:"x" as InspectionAxis,normal:[1,0,0] as readonly [number,number,number],cutawayFraction:0,explosionDistanceM:1,selectedEntityId:"" });
   const [opacity, setOpacity] = useState(55);
   const inspectionHistory=useRef(createInspectionViewHistory({
-    mode:"normal",opacity:55,axis:"x",cutawayFraction:0,explosionDistanceM:1,
+    mode:"normal",opacity:55,axis:"x",normal:[1,0,0],cutawayFraction:0,explosionDistanceM:1,
   }));
   const [inspectionHistoryRevision,setInspectionHistoryRevision]=useState(0);
   function applyInspectionViewState(view:InspectionViewState){
     setInspectionMode(view.mode);setOpacity(view.opacity);setCutawayAxis(view.axis);
+    setCutawayNormal(view.normal??(view.axis==="x"?[1,0,0]:view.axis==="y"?[0,1,0]:[0,0,1]));
     setCutawayFraction(view.cutawayFraction);setExplosionDistanceM(view.explosionDistanceM);
     setSeeInside(["transparent","xray","cutaway"].includes(view.mode));
   }
@@ -247,7 +249,7 @@ export default function WorldLab() {
   const [recoveryDrafts,setRecoveryDrafts]=useState<WorldLabDraft[]>([]);
   const [recoveryStatus,setRecoveryStatus]=useState("");
   const [selectedEntityId, setSelectedEntityId] = useState("");
-  visualSettings.current = { seeInside,opacity,mode:inspectionMode,axis:cutawayAxis,cutawayFraction,explosionDistanceM,selectedEntityId };
+  visualSettings.current = { seeInside,opacity,mode:inspectionMode,axis:cutawayAxis,normal:cutawayNormal,cutawayFraction,explosionDistanceM,selectedEntityId };
   const [fluidRun,setFluidRun]=useState<HydrostaticResult|null>(null);
   const [chemicalInput,setChemicalInput]=useState<ReactionThermalInput>({
     initialReactantMol:1,initialTemperatureK:300,ambientTemperatureK:300,
@@ -614,7 +616,7 @@ export default function WorldLab() {
         const depth = Math.max(0, -camera.position.y);
         const inspection = visualSettings.current;
         const plane=projectForEdits.current?inspectionPlane(projectForEdits.current,{
-          mode:inspection.mode,opacity:inspection.opacity,axis:inspection.axis,
+          mode:inspection.mode,opacity:inspection.opacity,axis:inspection.axis,normal:inspection.normal,
           cutawayFraction:inspection.cutawayFraction,explosionDistanceM:inspection.explosionDistanceM,
           selectedEntityId:inspection.selectedEntityId,
         }):null;
@@ -738,7 +740,7 @@ export default function WorldLab() {
           new B.Plane(plane.normal[0],plane.normal[1],plane.normal[2],-plane.offset):null;
       }
     }
-  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity,inspectionMode,cutawayAxis,cutawayFraction,explosionDistanceM,selectedEntityId, project, currentRun, heat]);
+  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity,inspectionMode,cutawayAxis,cutawayNormal,cutawayFraction,explosionDistanceM,selectedEntityId, project, currentRun, heat]);
 
   useEffect(()=>{
     if(!collisionPlaying||!selectedCollision)return;
@@ -2815,13 +2817,14 @@ export default function WorldLab() {
           <WorldLabInspectionPanel mode={inspectionMode}
             onModeChange={mode=>updateInspectionView({mode})}
             opacity={opacity} onOpacityChange={value=>updateInspectionView({opacity:value})}
-            axis={cutawayAxis} onAxisChange={axis=>updateInspectionView({axis})}
+            axis={cutawayAxis} onAxisChange={axis=>updateInspectionView({axis,normal:axis==="x"?[1,0,0]:axis==="y"?[0,1,0]:[0,0,1]})}
+            normal={cutawayNormal} onNormalChange={normal=>updateInspectionView({normal})}
             cutawayFraction={cutawayFraction} onCutawayFractionChange={value=>updateInspectionView({cutawayFraction:value})}
             explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={value=>updateInspectionView({explosionDistanceM:value})}
             selected={selectedEntity??null} hasAssembly={!!project?.assemblies?.some(a=>a.entityIds.includes(selectedEntityId))}
             onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}
             onZoomSelected={focusSelected} onReset={()=>{
-              updateInspectionView({mode:"normal",opacity:55,axis:"x",cutawayFraction:0,explosionDistanceM:1});
+              updateInspectionView({mode:"normal",opacity:55,axis:"x",normal:[1,0,0],cutawayFraction:0,explosionDistanceM:1});
               setFieldOverlayEnabled(false);setInspectionUiHidden(false);setShowInspectionLabels(true);
             }}
             canUndoView={inspectionHistory.current.past.length>0}

@@ -1,10 +1,22 @@
 import type {WorldLabProject} from "./project.ts";
 export type InspectionMode="normal"|"transparent"|"xray"|"cutaway"|"isolate"|"exploded";
 export type InspectionAxis="x"|"y"|"z";
+export type InspectionNormal=readonly [number,number,number];
 export type InspectionSettings=Readonly<{mode:InspectionMode;opacity:number;axis:InspectionAxis;cutawayFraction:number;explosionDistanceM:number;selectedEntityId:string}>;
 export type Vec3Tuple=readonly [number,number,number];
 const finite=(n:number)=>Number.isFinite(n);
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
+function defaultPlaneNormal(axis:InspectionAxis):Vec3Tuple{
+ return axis==="x"?[1,0,0]:axis==="y"?[0,1,0]:[0,0,1];
+}
+function normalizedPlaneNormal(value:Vec3Tuple|undefined,axis:InspectionAxis):Vec3Tuple{
+ const source=value??defaultPlaneNormal(axis);
+ if(!Array.isArray(source)||source.length!==3||source.some(v=>!finite(v))||
+  Math.hypot(source[0],source[1],source[2])<1e-9)
+  throw new Error("Cutaway plane normal must be a finite, non-zero 3D vector.");
+ const length=Math.hypot(source[0],source[1],source[2]);
+ return Object.freeze([source[0]/length,source[1]/length,source[2]/length]) as unknown as Vec3Tuple;
+}
 export function validateInspectionSettings(s:InspectionSettings):InspectionSettings{
  if(!["normal","transparent","xray","cutaway","isolate","exploded"].includes(s.mode)||
  !["x","y","z"].includes(s.axis)||!finite(s.opacity)||s.opacity<0||s.opacity>100||
@@ -12,7 +24,8 @@ export function validateInspectionSettings(s:InspectionSettings):InspectionSetti
  !finite(s.explosionDistanceM)||s.explosionDistanceM<0||s.explosionDistanceM>10||
  typeof s.selectedEntityId!=="string"||s.selectedEntityId.length>120)
  throw new Error("Inspection settings are outside their safe visual bounds.");
- return Object.freeze({...s});
+ const normal=normalizedPlaneNormal(s.normal,s.axis);
+ return Object.freeze({...s,normal});
 }
 export function inspectionTargetIds(project:WorldLabProject,selectedId:string):ReadonlySet<string>{
  if(!selectedId||!project.entities.some(e=>e.id===selectedId))return new Set();
@@ -43,10 +56,14 @@ export function inspectionPlane(project:WorldLabProject,s:InspectionSettings):Re
  if(s.mode!=="cutaway")return null;
  const entity=project.entities.find(e=>e.id===s.selectedEntityId);
  if(!entity)return null;
- const axis=["x","y","z"].indexOf(s.axis);
- const normal:Vec3Tuple=[0,1,2].map(i=>i===axis?1:0) as unknown as Vec3Tuple;
- const offset=entity.positionMeters[axis]+entity.dimensionsMeters[axis]/2*s.cutawayFraction;
- const point=entity.positionMeters.map((v,i)=>i===axis?offset:v) as unknown as Vec3Tuple;
+ const normal=normalizedPlaneNormal(s.normal,s.axis);
+ const projectedHalfExtent=entity.dimensionsMeters.reduce((sum,dimension,axis)=>
+  sum+Math.abs(normal[axis])*dimension/2,0);
+ const centreProjection=entity.positionMeters.reduce((sum,value,axis)=>
+  sum+normal[axis]*value,0);
+ const offset=centreProjection+projectedHalfExtent*s.cutawayFraction;
+ const point=entity.positionMeters.map((value,axis)=>
+  value+normal[axis]*projectedHalfExtent*s.cutawayFraction) as unknown as Vec3Tuple;
  return Object.freeze({normal,offset,point});
 }
 /** Sutherland–Hodgman clipping of a face against a world-axis half-space. */
@@ -65,7 +82,7 @@ export function clipInspectionPolygon(vertices:readonly Vec3Tuple[],plane:Readon
 
 
 export type InspectionViewState=Readonly<Pick<InspectionSettings,
- "mode"|"opacity"|"axis"|"cutawayFraction"|"explosionDistanceM">>;
+ "mode"|"opacity"|"axis"|"normal"|"cutawayFraction"|"explosionDistanceM">>;
 export type InspectionViewHistory=Readonly<{
  past:readonly InspectionViewState[];
  present:InspectionViewState;
@@ -75,10 +92,13 @@ const INSPECTION_VIEW_HISTORY_LIMIT=50;
 function validateInspectionViewState(state:InspectionViewState):InspectionViewState{
  const validated=validateInspectionSettings({...state,selectedEntityId:""});
  return Object.freeze({mode:validated.mode,opacity:validated.opacity,axis:validated.axis,
-  cutawayFraction:validated.cutawayFraction,explosionDistanceM:validated.explosionDistanceM});
+  normal:validated.normal,cutawayFraction:validated.cutawayFraction,
+  explosionDistanceM:validated.explosionDistanceM});
 }
 function sameInspectionView(a:InspectionViewState,b:InspectionViewState):boolean{
  return a.mode===b.mode&&a.opacity===b.opacity&&a.axis===b.axis&&
+  a.normal?.every((value,index)=>value===b.normal?.[index])!==false&&
+  (a.normal===undefined&&b.normal===undefined||a.normal?.every((value,index)=>value===b.normal?.[index])===true)&&
   a.cutawayFraction===b.cutawayFraction&&a.explosionDistanceM===b.explosionDistanceM;
 }
 export function createInspectionViewHistory(initial:InspectionViewState):InspectionViewHistory{
