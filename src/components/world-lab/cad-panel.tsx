@@ -102,7 +102,7 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
      <p className="text-xs font-medium">Position tools</p>
      <div className="mt-2 flex flex-wrap items-end gap-2">
       <label className="text-xs">Grid spacing (m)
-       <input className={input} type="number" min={0.001} max={100} step="any"
+       <input className={input} aria-label="CAD grid spacing (m)" type="number" min={0.001} max={100} step="any"
         value={gridStep} onChange={event=>setGridStep(Number(event.target.value))}/>
       </label>
       <button type="button" className={button} disabled={!canEdit}
@@ -218,32 +218,32 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
      <p className="mt-2 text-xs font-medium">Sketch centre on base plane (m)</p>
      <div className="grid grid-cols-3 gap-2">
       {(["X","Y","Z"] as const).map((label,i)=><label className="text-xs" key={label}>{label}
-       <input className={input} type="number" step="any" value={sketchBaseCenter[i]}
+       <input className={input} aria-label={"Sketch base centre "+label+" (m)"} type="number" step="any" value={sketchBaseCenter[i]}
         onChange={e=>setSketchBaseCenter(old=>old.map((v,j)=>j===i?Number(e.target.value):v) as [number,number,number])}/>
       </label>)}
      </div>
      <p className="mt-2 text-xs font-medium">Extrusion orientation (degrees)</p>
      <div className="grid grid-cols-3 gap-2">
       {(["X","Y","Z"] as const).map((label,i)=><label className="text-xs" key={label}>{label}
-       <input className={input} type="number" min={-360} max={360} step="1" value={sketchRotationDegrees[i]}
+       <input className={input} aria-label={"Sketch orientation "+label+" (degrees)"} type="number" min={-360} max={360} step="1" value={sketchRotationDegrees[i]}
         onChange={e=>setSketchRotationDegrees(old=>old.map((v,j)=>j===i?Number(e.target.value):v) as [number,number,number])}/>
       </label>)}
      </div>
      <div className="mt-2 grid grid-cols-2 gap-2">
       <label className="text-xs">Rectangle width (m)
-       <input className={input} type="number" min={0.001} max={10000} step="any"
+       <input className={input} aria-label="Sketch rectangle width (m)" type="number" min={0.001} max={10000} step="any"
         value={sketchWidth} onChange={e=>setSketchWidth(Number(e.target.value))}/>
       </label>
       <label className="text-xs">Rectangle depth (m)
-       <input className={input} type="number" min={0.001} max={10000} step="any"
+       <input className={input} aria-label="Sketch rectangle depth (m)" type="number" min={0.001} max={10000} step="any"
         value={sketchDepth} onChange={e=>setSketchDepth(Number(e.target.value))}/>
       </label>
       <label className="text-xs">Extrusion height (m)
-       <input className={input} type="number" min={0.001} max={10000} step="any"
+       <input className={input} aria-label="Sketch extrusion height (m)" type="number" min={0.001} max={10000} step="any"
         value={extrusionHeight} onChange={e=>setExtrusionHeight(Number(e.target.value))}/>
       </label>
       <label className="text-xs">Circle radius (m)
-       <input className={input} type="number" min={0.0005} max={5000} step="any"
+       <input className={input} aria-label="Sketch circle radius (m)" type="number" min={0.0005} max={5000} step="any"
         value={circleRadius} onChange={e=>setCircleRadius(Number(e.target.value))}/>
       </label>
      </div>
