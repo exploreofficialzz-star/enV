@@ -2597,8 +2597,15 @@ private struct NativeWorldLabElasticWavePanel:View {
                             let frames=try (0...80).map{
                                 try r.sample(r.durationSeconds*Double($0)/80)
                             }
-                            let bytes=try JSONEncoder().encode(
-                                NativeElasticWaveEvidence(result:r,frames:frames))
+                            let source=try JSONEncoder().encode(r)
+                            guard var payload=try JSONSerialization.jsonObject(
+                                with:source) as? [String:Any] else {
+                                throw NativeWorldLabError.invalid("Wave evidence is not JSON")
+                            }
+                            payload["frames"]=try JSONSerialization.jsonObject(
+                                with:JSONEncoder().encode(frames))
+                            let bytes=try JSONSerialization.data(withJSONObject:payload,
+                                options:[.sortedKeys])
                             guard bytes.count<=1_048_576 else {
                                 throw NativeWorldLabError.invalid("Wave evidence exceeds 1 MB")
                             }

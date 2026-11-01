@@ -63,3 +63,34 @@ test("future-revision scientific records cannot be injected into an invention ar
   scientificEvidence:[rec],
  })),/future project revision/);
 });
+
+
+import {newSolid} from "./project.ts";
+import {calculateElasticWave} from "./elastic-wave.ts";
+import {calculateThermalRadiation} from "./thermal-radiation.ts";
+import {newScientificEvidenceRecord} from "./scientific-evidence.ts";
+test("complete archive preserves invented elastic and radiative evidence and rejects altered records",()=>{
+ const p=project();
+ p.materials=[{id:"invented",name:"New hypothetical matter",densityKgM3:1000,
+   youngModulusPa:2e9,specificHeatJPerKgK:500,
+   evidence:"hypothetical-user-assumed"}];
+ const box=newSolid("rod","box",0);box.materialId="invented";p.entities.push(box);
+ const wave=calculateElasticWave(p,{entityId:box.id,mode:2,amplitudeMeters:1e-5,cycles:3});
+ const radiation=calculateThermalRadiation(p,{entityId:box.id,
+   initialTemperatureK:400,environmentTemperatureK:300,
+   emissivity:0.8,durationSeconds:100});
+ const records=[
+   newScientificEvidenceRecord(wave,"invented_wave","2026-11-01T00:00:00Z"),
+   newScientificEvidenceRecord(radiation,"invented_radiation","2026-11-01T00:00:00Z"),
+ ];
+ const json=serializeWorldLabArchive(p,[],records);
+ const parsed=parseWorldLabArchive(json);
+ assert.equal(parsed.scientificEvidence.length,2);
+ assert.deepEqual(parsed.scientificEvidence,records);
+ const tampered=JSON.parse(json);
+ tampered.scientificEvidence[0].result.waveSpeedMps=1;
+ assert.throws(()=>parseWorldLabArchive(JSON.stringify(tampered)),/analytical physical model/);
+ const foreign=JSON.parse(json);
+ foreign.scientificEvidence[1].projectId="other";
+ assert.throws(()=>parseWorldLabArchive(JSON.stringify(foreign)),/another project/);
+});

@@ -132,3 +132,56 @@ final class NativeWorldLabProjectStoreTests:XCTestCase {
 
 }
 
+
+
+final class NativeWorldLabExtendedScientificEvidenceTests:XCTestCase {
+    func testPrivateArchivesPreserveBothInventorExperiments() throws {
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(
+            "world-lab-science-"+UUID().uuidString,isDirectory:true)
+        defer{try? FileManager.default.removeItem(at:directory)}
+        let projectStore=NativeWorldLabProjectStore(directory:directory)
+        let project=try projectStore.save(NativeWorldLabEditor.blank())
+        let science=NativeWorldLabScientificEvidenceStore(directory:directory)
+        let wave=try NativeWorldLabElasticWave.parameters(
+            projectId:project.id,projectRevision:project.revision,
+            entityId:"rod",materialId:"matter",lengthMeters:1,
+            crossSectionM2:0.06,densityKgM3:8000,youngModulusPa:200e9,
+            mode:1,amplitudeMeters:1e-5,cycles:4)
+        let heat=try NativeWorldLabRadiation.parameters(
+            projectId:project.id,projectRevision:project.revision,
+            entityId:"rod",materialId:"matter",massKg:1000,areaM2:6,
+            densityKgM3:1000,specificHeatJPerKgK:500,
+            startK:400,environmentK:300,emissivity:0.8,duration:1000)
+        let waveId=try science.saveElasticWave(wave,project:project)
+        let heatId=try science.saveRadiation(heat,project:project)
+        XCTAssertEqual(try science.list(project.id).count,2)
+        XCTAssertNotEqual(waveId,heatId)
+        let waveData=try science.read(project.id,waveId)
+        let radiationData=try science.read(project.id,heatId)
+        let archive=try NativeWorldLabPortableArchiveStore(directory:directory)
+            .export(try projectStore.read(project.id).0)
+        XCTAssertGreaterThan(archive.count,waveData.count)
+        XCTAssertGreaterThan(archive.count,radiationData.count)
+    }
+    func testAlteredPhysicsCannotBeImportedIntoNativeScienceHistory() throws {
+        let directory=FileManager.default.temporaryDirectory.appendingPathComponent(
+            "world-lab-science-"+UUID().uuidString,isDirectory:true)
+        defer{try? FileManager.default.removeItem(at:directory)}
+        let projectStore=NativeWorldLabProjectStore(directory:directory)
+        let project=try projectStore.save(NativeWorldLabEditor.blank())
+        let science=NativeWorldLabScientificEvidenceStore(directory:directory)
+        let wave=try NativeWorldLabElasticWave.parameters(
+            projectId:project.id,projectRevision:project.revision,
+            entityId:"rod",materialId:"matter",lengthMeters:1,
+            crossSectionM2:0.06,densityKgM3:8000,youngModulusPa:200e9,
+            mode:1,amplitudeMeters:1e-5,cycles:4)
+        let id=try science.saveElasticWave(wave,project:project)
+        let data=try science.read(project.id,id)
+        var row=try XCTUnwrap(JSONSerialization.jsonObject(with:data) as? [String:Any])
+        var result=try XCTUnwrap(row["result"] as? [String:Any])
+        result["frequencyHz"]=25000.0
+        row["result"]=result
+        let poisoned=try JSONSerialization.data(withJSONObject:row)
+        XCTAssertThrowsError(try science.validateEnvelope(poisoned,projectId:project.id))
+    }
+}
