@@ -4,9 +4,12 @@ on:
   push:
     branches: [feature/a-book-architecture]
     paths:
+      - ".github/workflows/a-book-catalog-sync.yml"
       - "scripts/export-native-catalog.mjs"
+      - "scripts/export-native-execution-matrix.mjs"
       - "src/data/catalog.ts"
       - "src/data/categories.ts"
+      - "src/lib/registry.ts"
       - "apps/android/native-family-coverage/**"
       - "apps/ios/native-family-coverage/**"
 
@@ -39,25 +42,34 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Regenerate catalog and execution inventory
-        run: npm run export:native-catalog
+      - name: Regenerate shared catalogue and execution matrix
+        run: |
+          npm run export:native-catalog
+          npm run export:native-execution-matrix
 
-      - name: Commit generated catalog when it changes
+      - name: Commit generated native data when it changes
         id: generated
         shell: bash
         run: |
-          if git diff --quiet -- apps/shared/catalog.json apps/shared/native-engine-inventory.json; then
+          set -euo pipefail
+          generated_files=(
+            apps/shared/catalog.json
+            apps/shared/native-engine-inventory.json
+            apps/shared/native-execution-matrix.json
+          )
+          if git diff --quiet -- "${generated_files[@]}"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/shared/catalog.json apps/shared/native-engine-inventory.json
-          git commit -m "chore(a-book): regenerate shared native catalog"
+          git add "${generated_files[@]}"
+          git commit -m "chore(a-book): regenerate shared native execution data"
           git push origin "HEAD:${GITHUB_REF_NAME}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch Android and iOS validation on the generated commit
+        if: steps.generated.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
@@ -71,5 +83,5 @@ jobs:
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              -d '{"ref":"${GH_REF_NAME}"}'
+              -d "{\"ref\":\" ${GH_REF_NAME}\"}"
           done
