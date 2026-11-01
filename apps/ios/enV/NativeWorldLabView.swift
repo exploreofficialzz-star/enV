@@ -1197,7 +1197,7 @@ struct NativeWorldLabView:View {
         redraw()
         timelineStatus="Reference experiment parameters and recorded-sample clock restored."
     }
-    private var importExportView:some View {
+    private var timelineCheckpointTransfersView:some View {
         interactionView
         .fileExporter(isPresented:$exportingTimelineCheckpoint,document:timelineCheckpointFile,
             contentType:.json,defaultFilename:"world-lab-time-checkpoint"){result in
@@ -1238,6 +1238,10 @@ struct NativeWorldLabView:View {
                 motorCheckpointStatus=error.localizedDescription
             }
         }
+    }
+
+    private var evidenceExportView:some View {
+        timelineCheckpointTransfersView
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
             contentType:.json,defaultFilename:"world-lab-project"){result in
@@ -1291,6 +1295,10 @@ struct NativeWorldLabView:View {
             defaultFilename:"world-lab-two-body-collision-evidence"){result in
                 if case .failure(let error)=result {problem=error.localizedDescription}
             }
+    }
+
+    private var importExportView:some View {
+        evidenceExportView
         .fileImporter(isPresented:$importingCAD,allowedContentTypes:[.json]){response in
             do{
                 let url=try response.get()
