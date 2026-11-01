@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { extractPdfPagesInWorker, extractSelectedPdfsInWorker, inspectPdfInWorker, mergePdfsInWorker, rotateSelectedPdfsInWorker, splitPdfIntoZipInWorker, splitSelectedPdfsIntoZipInWorker } from "./pdf-worker-client.ts";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 import {
@@ -135,4 +136,40 @@ test("batch split validates all source page groups before constructing the ZIP",
     /Choose page numbers from 1 to 2/,
   );
   await assert.rejects(() => splitSelectedPdfsIntoZip([], "1-2;3-4"), /Choose at least one PDF/);
+});
+
+
+test("A book PDF worker client preserves local processing in non-Worker test environments", async () => {
+  const one = await samplePdf(4);
+  const two = await samplePdf(3);
+  const info = await inspectPdfInWorker(one);
+  assert.equal(info.pageCount, 4);
+
+  const extracted = await extractPdfPagesInWorker(one, [1, 3]);
+  assert.equal((await PDFDocument.load(extracted)).getPageCount(), 2);
+
+  const batchExtract = await extractSelectedPdfsInWorker([
+    { name: "one.pdf", blob: one },
+    { name: "two.pdf", blob: two },
+  ], "1,2");
+  const { unzipSync } = await import("fflate");
+  assert.equal(Object.keys(unzipSync(batchExtract)).length, 2);
+
+  const split = await splitPdfIntoZipInWorker(one, "one.pdf", "1-2;3-4");
+  assert.equal(Object.keys(unzipSync(split)).length, 2);
+
+  const batchSplit = await splitSelectedPdfsIntoZipInWorker([
+    { name: "one.pdf", blob: one },
+    { name: "two.pdf", blob: two },
+  ], "1-2;3");
+  assert.equal(Object.keys(unzipSync(batchSplit)).length, 4);
+
+  const rotated = await rotateSelectedPdfsInWorker([
+    { name: "one.pdf", blob: one },
+    { name: "two.pdf", blob: two },
+  ], 90);
+  assert.equal(Object.keys(unzipSync(rotated)).length, 2);
+
+  const merged = await mergePdfsInWorker([one, two]);
+  assert.equal((await PDFDocument.load(merged)).getPageCount(), 7);
 });
