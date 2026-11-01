@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ABookPdfViewer } from "@/components/engines/a-book-pdf-viewer";
 import { extractPdfTextLocally, extractSelectedPdfTextLocally } from "@/lib/a-book/pdf-reader";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,7 @@ export function ABookEngine() {
   const [splitRanges, setSplitRanges] = useState("1-3;4-6");
   const [rotateAngle, setRotateAngle] = useState<90 | 180 | 270>(90);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [previewFileName, setPreviewFileName] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [loadedProfileId, setLoadedProfileId] = useState<string | null | undefined>(undefined);
   const [profileSwitchError, setProfileSwitchError] = useState("");
@@ -174,6 +176,8 @@ export function ABookEngine() {
       pdfAbortController.current?.abort();
       setPdfText("");
       setPdfTextSearch("");
+      setPreviewUrl("");
+      setPreviewFileName("");
       setCurrentNote(note);
       setError("");
     } catch (cause) {
@@ -240,6 +244,7 @@ export function ABookEngine() {
         setPdfText("");
         setPdfTextSearch("");
         setPreviewUrl("");
+        setPreviewFileName("");
         setQuery("");
         setShowArchived(false);
         setShowTrash(false);
@@ -399,6 +404,7 @@ export function ABookEngine() {
       setPdfInfo(`${file.name}: ${details.pageCount} pages${details.title ? ` · ${details.title}` : ""}`);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(file.blob));
+      setPreviewFileName(file.name);
       setError("");
     });
   }
@@ -546,7 +552,7 @@ export function ABookEngine() {
     try {
       await deleteAttachment(file.id);
       setAttachments(await listAttachments(file.noteId));
-      if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(""); }
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(""); setPreviewFileName(""); }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not remove the attachment.");
     }
@@ -728,7 +734,7 @@ export function ABookEngine() {
                 <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void splitSelectedPdf()}>Split selected PDFs</Button>
                 <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
-              {previewUrl ? <iframe title="Local PDF preview" src={previewUrl} className="h-[480px] w-full rounded-md border border-border bg-background" /> : null}
+              {previewUrl ? <ABookPdfViewer src={previewUrl} fileName={previewFileName || "Local PDF"} /> : null}
               {pdfText ? <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold">Extracted PDF text · local</p>
