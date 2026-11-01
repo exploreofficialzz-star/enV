@@ -18,7 +18,7 @@ test("pause advances wall time without advancing world or simulation clocks",()=
  const r=run(),state=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.2,paused:true});
  const next=advanceTimeEngine(r,state,5);
  assert.equal(next.wallTimeUTC,"2026-11-01T12:00:05.000Z");
- assert.equal(next.simulationTimeSeconds,0.203);assert.equal(next.worldDateUTC,state.worldDateUTC);
+ assert.equal(next.simulationTimeSeconds,0.2);assert.equal(next.worldDateUTC,state.worldDateUTC);
 });
 test("forward and reverse replay traverse actual stored samples only",()=>{
  const r=run(),start=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",paused:false});

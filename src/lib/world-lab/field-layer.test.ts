@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {runExperiment} from "./model.ts";
+import {runExperiment,type ModelInput} from "./model.ts";
 import {createComputedFieldLayers,fieldFrameAtTime,fieldValueToDisplay,parseFieldLayer} from "./field-layer.ts";
 const run=(kind:"damped-oscillator"|"rc-circuit"|"heat-rod")=>{
- const inputs=kind==="damped-oscillator"
+ const inputs:ModelInput=kind==="damped-oscillator"
   ?{kind,massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0}
   :kind==="rc-circuit"
    ?{kind,resistanceOhm:1000,capacitanceF:0.01,supplyVoltageV:5,initialVoltageV:0}
    :{kind,thermalDiffusivityM2PerS:0.02,lengthMeters:1,ambientTemperatureK:293.15,centerTemperatureK:373.15};
- return runExperiment(inputs as any,{durationSeconds:0.2,id:"field-run",worldDateUTC:"2026-11-01T00:00:00Z",solverStepSeconds:0.01});
+ return runExperiment(inputs,{durationSeconds:0.2,id:"field-run",worldDateUTC:"2026-11-01T00:00:00Z",startedAtUTC:"2026-11-01T12:00:00Z",solverStepSeconds:0.01});
 };
 test("computed field layers carry run provenance, units, time and explicit unknown uncertainty",()=>{
  for(const kind of ["damped-oscillator","rc-circuit","heat-rod"] as const){

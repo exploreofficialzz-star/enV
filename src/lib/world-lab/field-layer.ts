@@ -1,4 +1,4 @@
-import type {LabRun,ModelSample} from "./model.ts";
+import type {LabRun} from "./model.ts";
 
 export type FieldKind="scalar"|"vector"|"tensor"|"event"|"network";
 export type FieldRendererKind="slice"|"streamlines"|"glyphs"|"isosurface"|"heatmap"|"volume"|"line-plot"|"event-trace";
@@ -28,6 +28,7 @@ export type FieldLayer=Readonly<{
  legend:Readonly<{title:string;minimumLabel:string;maximumLabel:string;palette:FieldPalette;accessibleDescription:string}>;
  validity:string;
 }>;
+const MAX_FIELD_VALUES=2_000_000;
 const finite=(x:unknown):x is number=>typeof x==="number"&&Number.isFinite(x);
 const record=(x:unknown):x is Record<string,unknown>=>!!x&&typeof x==="object"&&!Array.isArray(x);
 const nonempty=(x:unknown,max=240):x is string=>typeof x==="string"&&x.trim().length>0&&x.length<=max;
@@ -59,6 +60,7 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
  if(!record(raw.timeReference)||!["simulation","UTC"].includes(String(raw.timeReference.kind))||
   !date(raw.timeReference.worldDateUTC)||!Array.isArray(raw.timeReference.sampleTimesSeconds)||
   !raw.timeReference.sampleTimesSeconds.every(finite)||
+  raw.timeReference.sampleTimesSeconds.length>100000||
   !raw.timeReference.sampleTimesSeconds.every((v,i,a)=>i===0||v>a[i-1])||
   typeof raw.timeReference.timezoneDisplay!=="string"||raw.timeReference.timezoneDisplay.length>120||
   (raw.timeReference.acquiredAtUTC!==null&&!date(raw.timeReference.acquiredAtUTC))||
@@ -96,6 +98,7 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
  const count=componentCount(kind);
  if(count){
   const expected=raw.timeReference.sampleTimesSeconds.length*raw.resolution.sampleCount*count;
+  if(expected>MAX_FIELD_VALUES)throw new Error("Field layer exceeds the 2,000,000-value local storage limit.");
   if(raw.values.length!==expected)throw new Error("Field value count does not match time samples, grid resolution and component count.");
   if(raw.mask!==null&&(!Array.isArray(raw.mask)||raw.mask.length!==expected||!raw.mask.every(v=>typeof v==="boolean")))
    throw new Error("Field nodata mask must match the flattened field sample array.");
@@ -184,7 +187,10 @@ export function fieldValueToDisplay(layer:FieldLayer,valueSI:number):number{
 }
 function makeBase(run:LabRun,id:string,label:string,unit:string,renderer:FieldRendererKind,
  dimensions:[number,number,number],spacing:[number,number,number],values:number[],kind:FieldKind="scalar"):FieldLayer{
- const min=Math.min(...values),max=Math.max(...values);
+ if(values.length===0||values.length>MAX_FIELD_VALUES||values.some(v=>!finite(v)))
+  throw new Error("Computed field contains no valid samples or exceeds its local value budget.");
+ const bounds=values.reduce((state,value)=>({min:Math.min(state.min,value),max:Math.max(state.max,value)}),{min:Infinity,max:-Infinity});
+ const min=bounds.min,max=bounds.max;
  return parseFieldLayer({
   schemaVersion:1,id,label,kind,
   units:{si:unit,display:unit,scaleToSI:1,offsetToSI:0},
@@ -228,6 +234,7 @@ export function createComputedFieldLayers(run:LabRun):readonly FieldLayer[]{
   ]);
  }
  const input=run.inputs;
+ if(run.samples.length*21>MAX_FIELD_VALUES)throw new Error("Heat field exceeds the local value budget.");
  const values=run.samples.flatMap(s=>s.temperaturesK??[]);
  if(values.length!==run.samples.length*21||values.some(v=>!finite(v)))
   throw new Error("Heat rod field values do not contain all 21 solver cells for every time sample.");

@@ -60,12 +60,12 @@ import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,inspectionTargetIds,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
 import { WorldLabInspectionPanel } from "./inspection-panel";
 import { WorldLabTimeController } from "./time-controller";
-import { createComputedFieldLayers,type FieldLayer } from "@/lib/world-lab/field-layer";
+import { createComputedFieldLayers } from "@/lib/world-lab/field-layer";
 import { WorldLabFieldPanel,WorldLabFieldOverlay } from "./field-panel";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES,
   observerAdaptiveStepMetres,observerClippingPlanes,observerRangeMetres } from "@/lib/world-lab/observer";
 import {
-  advancePlayback, DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
+  DEMO_DURATION_SECONDS, runExperiment, sampleRun, validateNovelMaterial,
   HEAT_CELLS, type AssumedMassSource, type DampedOscillator, type HeatRod, type LabRun, type ModelInput, type RCCircuit,
 } from "@/lib/world-lab/model";
 
@@ -921,8 +921,12 @@ export default function WorldLab() {
     return () => { cancelAnimationFrame(frame); lastFrame.current = null; };
   }, [playing, currentRun, playbackRate,playbackDirection,timezoneDisplay]);
   useEffect(() => {
-    if (currentRun && timeSeconds >= currentRun.time.simulatedDurationSeconds) setPlaying(false);
-  }, [currentRun, timeSeconds]);
+    if(!currentRun)return;
+    if(playbackDirection==="forward"&&timeSeconds>=currentRun.time.simulatedDurationSeconds)
+      setPlaying(false);
+    else if(playbackDirection==="reverse-recording"&&timeSeconds<=0)
+      setPlaying(false);
+  }, [currentRun,timeSeconds,playbackDirection]);
 
   function restoreRunsForProject(projectId: string) {
     const epoch=++restoreRunsEpoch.current;

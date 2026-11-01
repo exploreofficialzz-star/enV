@@ -83,7 +83,7 @@ export function advanceTimeEngine(run:LabRun,state:TimeEngineState,elapsedWallSe
     run.time.simulatedDurationSeconds,[]);
  }else{
   const candidate=Math.max(0,next-elapsedWallSeconds*state.playbackRate);
-  next=nearestSample(run,candidate).sample.simulatedSeconds;
+  next=candidate;
  }
  const {sample}=nearestSample(run,next);
  return Object.freeze({...state,wallTimeUTC,
