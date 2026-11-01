@@ -121,6 +121,20 @@ function openDatabase(): Promise<IDBDatabase> {
   return pending;
 }
 
+export function getABookRevisionIdsToPrune(
+  revisions: Array<Pick<ABookRevision, "id" | "createdAt">>,
+  maximum = MAX_LOCAL_REVISIONS,
+): string[] {
+  if (!Number.isSafeInteger(maximum) || maximum < 0) {
+    throw new Error("The local revision limit is invalid.");
+  }
+  if (revisions.length <= maximum) return [];
+  return [...revisions]
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    .slice(0, revisions.length - maximum)
+    .map((revision) => revision.id);
+}
+
 export function assertABookNoteForStorage(note: ABookNote): void {
   if (!note || typeof note.id !== "string" || !note.id.trim() || note.id.length > 180
     || typeof note.title !== "string" || note.title.length > 10_000
@@ -207,6 +221,18 @@ export async function saveNote(note: ABookNote): Promise<ABookNote> {
             .sort((a, b) => b.createdAt - a.createdAt)
             .slice(MAX_REVISIONS_PER_NOTE);
           for (const old of oldRows) revisions.delete(old.id);
+        };
+
+        // The archive format has a library-wide revision cap as well as a
+        // per-note cap. Prune the oldest records in the same write transaction.
+        const totalCount = revisions.count();
+        totalCount.onsuccess = () => {
+          if (totalCount.result <= MAX_LOCAL_REVISIONS) return;
+          const allRows = revisions.getAll();
+          allRows.onsuccess = () => {
+            const removeIds = getABookRevisionIdsToPrune(allRows.result as ABookRevision[]);
+            removeIds.forEach((id) => revisions.delete(id));
+          };
         };
       }
     };
