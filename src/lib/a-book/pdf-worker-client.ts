@@ -18,7 +18,8 @@ async function runDirect(task: ABookPdfWorkerTask): Promise<unknown> {
   }
 }
 
-function runInWorker(task: ABookPdfWorkerTask): Promise<unknown> {
+function runInWorker(task: ABookPdfWorkerTask, signal?: AbortSignal): Promise<unknown> {
+  if (signal?.aborted) return Promise.reject(new DOMException("PDF processing was cancelled.", "AbortError"));
   if (typeof window === "undefined" || typeof Worker === "undefined") return runDirect(task);
 
   return new Promise((resolve, reject) => {
@@ -37,14 +38,17 @@ function runInWorker(task: ABookPdfWorkerTask): Promise<unknown> {
     }
 
     let settled = false;
+    const abort = () => finish(new DOMException("PDF processing was cancelled.", "AbortError"));
     const finish = (error?: Error, value?: unknown) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
       worker.terminate();
       if (error) reject(error);
       else resolve(value);
     };
+    signal?.addEventListener("abort", abort, { once: true });
     const timer = window.setTimeout(() => {
       finish(new Error("Local PDF processing exceeded the three-minute safety limit. Choose fewer or smaller files and retry."));
     }, 180_000);
@@ -61,6 +65,10 @@ function runInWorker(task: ABookPdfWorkerTask): Promise<unknown> {
     worker.onmessageerror = () => {
       finish(new Error("The local PDF worker returned an unreadable result."));
     };
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
     try {
       worker.postMessage({ ...task, requestId });
     } catch (error) {
@@ -77,30 +85,30 @@ function outputBytes(value: unknown): Uint8Array {
   throw new Error("The local PDF worker returned an invalid file result.");
 }
 
-export async function inspectPdfInWorker(blob: Blob): Promise<ABookPdfInfo> {
-  return await runInWorker({ action: "inspect", blob }) as ABookPdfInfo;
+export async function inspectPdfInWorker(blob: Blob, signal?: AbortSignal): Promise<ABookPdfInfo> {
+  return await runInWorker({ action: "inspect", blob }, signal) as ABookPdfInfo;
 }
 
-export async function extractPdfPagesInWorker(blob: Blob, pages: number[]): Promise<Uint8Array> {
-  return outputBytes(await runInWorker({ action: "extract-one", blob, pages }));
+export async function extractPdfPagesInWorker(blob: Blob, pages: number[], signal?: AbortSignal): Promise<Uint8Array> {
+  return outputBytes(await runInWorker({ action: "extract-one", blob, pages }, signal));
 }
 
-export async function extractSelectedPdfsInWorker(files: ABookPdfInput[], pageRange: string): Promise<Uint8Array> {
-  return outputBytes(await runInWorker({ action: "extract-batch", files, pageRange }));
+export async function extractSelectedPdfsInWorker(files: ABookPdfInput[], pageRange: string, signal?: AbortSignal): Promise<Uint8Array> {
+  return outputBytes(await runInWorker({ action: "extract-batch", files, pageRange }, signal));
 }
 
-export async function splitPdfIntoZipInWorker(blob: Blob, filename: string, pageGroups: string): Promise<Uint8Array> {
-  return outputBytes(await runInWorker({ action: "split-one", blob, filename, pageGroups }));
+export async function splitPdfIntoZipInWorker(blob: Blob, filename: string, pageGroups: string, signal?: AbortSignal): Promise<Uint8Array> {
+  return outputBytes(await runInWorker({ action: "split-one", blob, filename, pageGroups }, signal));
 }
 
-export async function splitSelectedPdfsIntoZipInWorker(files: ABookPdfInput[], pageGroups: string): Promise<Uint8Array> {
-  return outputBytes(await runInWorker({ action: "split-batch", files, pageGroups }));
+export async function splitSelectedPdfsIntoZipInWorker(files: ABookPdfInput[], pageGroups: string, signal?: AbortSignal): Promise<Uint8Array> {
+  return outputBytes(await runInWorker({ action: "split-batch", files, pageGroups }, signal));
 }
 
-export async function rotateSelectedPdfsInWorker(files: ABookPdfInput[], angle: 90 | 180 | 270): Promise<Uint8Array> {
-  return outputBytes(await runInWorker({ action: "rotate-batch", files, angle }));
+export async function rotateSelectedPdfsInWorker(files: ABookPdfInput[], angle: 90 | 180 | 270, signal?: AbortSignal): Promise<Uint8Array> {
+  return outputBytes(await runInWorker({ action: "rotate-batch", files, angle }, signal));
 }
 
-export async function mergePdfsInWorker(files: Blob[]): Promise<Uint8Array> {
-  return outputBytes(await runInWorker({ action: "merge", files }));
+export async function mergePdfsInWorker(files: Blob[], signal?: AbortSignal): Promise<Uint8Array> {
+  return outputBytes(await runInWorker({ action: "merge", files }, signal));
 }
