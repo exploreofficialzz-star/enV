@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToolCard } from "@/components/tools/tool-card";
 import type { ToolMeta } from "@/types/tool";
-import { getGeneratedDesignGroup } from "@/lib/engines/design-explorer";
+import { getGeneratedDesignTools } from "@/lib/engines/design-explorer";
 
 const GROUPS = [
   {
@@ -69,9 +69,7 @@ export function DesignCategoryExplorer({ tools }: { tools: ToolMeta[] }) {
         const curatedTools = group.ids
           .map((id) => tools.find((tool) => tool.id === id))
           .filter((tool): tool is ToolMeta => Boolean(tool));
-        const generatedTools = tools.filter(
-          (tool) => !CORE_TOOL_IDS.has(tool.id) && getGeneratedDesignGroup(tool.engine) === group.id,
-        );
+        const generatedTools = getGeneratedDesignTools(tools, CORE_TOOL_IDS, group.id);
         const uniqueTools = [...curatedTools, ...generatedTools];
         return {
           ...group,

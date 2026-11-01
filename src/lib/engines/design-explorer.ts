@@ -26,3 +26,12 @@ export function getGeneratedDesignGroup(engine: EngineRef): DesignExplorerGroupI
   const family = engine.op.split(":")[0];
   return CSS_FAMILY_GROUP[family] ?? null;
 }
+
+/** Return generated entries for one group while excluding curated IDs already rendered separately. */
+export function getGeneratedDesignTools<T extends { id: string; engine: EngineRef }>(
+  tools: readonly T[],
+  coreToolIds: ReadonlySet<string>,
+  group: DesignExplorerGroupId,
+): T[] {
+  return tools.filter((tool) => !coreToolIds.has(tool.id) && getGeneratedDesignGroup(tool.engine) === group);
+}
