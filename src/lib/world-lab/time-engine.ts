@@ -28,7 +28,8 @@ function nearestSample(run:LabRun,requested:number):Readonly<{index:number;sampl
  let best=0,delta=Infinity;
  for(let i=0;i<run.samples.length;i++){
   const d=Math.abs(run.samples[i].simulatedSeconds-requested);
-  if(d<delta){best=i;delta=d;}
+  // Prefer the earlier immutable sample on a floating-point midpoint tie.
+  if(d<delta-1e-12){best=i;delta=d;}
  }
  const sample=run.samples[best];
  if(!sample||!finite(sample.simulatedSeconds))throw new Error("Recorded solver sample is missing or invalid.");
@@ -64,9 +65,10 @@ export function createTimeEngineState(run:LabRun,options:Partial<{
 }
 export function seekTimeEngine(run:LabRun,state:TimeEngineState,targetSeconds:number):TimeEngineState{
  const {sample}=nearestSample(run,targetSeconds);
- return Object.freeze({...state,simulationTimeSeconds:targetSeconds,
-  solverInternalTimeSeconds:sample.simulatedSeconds,displaySampleTimeSeconds:sample.simulatedSeconds,
-  worldDateUTC:worldDateAt(run,targetSeconds),paused:true});
+ const snappedTime=sample.simulatedSeconds;
+ return Object.freeze({...state,simulationTimeSeconds:snappedTime,
+  solverInternalTimeSeconds:snappedTime,displaySampleTimeSeconds:snappedTime,
+  worldDateUTC:worldDateAt(run,snappedTime),paused:true});
 }
 export function stepTimeEngine(run:LabRun,state:TimeEngineState,direction:-1|1):TimeEngineState{
  const next=stepRecordedTime(run,state.simulationTimeSeconds,direction);
@@ -76,18 +78,18 @@ export function stepTimeEngine(run:LabRun,state:TimeEngineState,direction:-1|1):
 export function advanceTimeEngine(run:LabRun,state:TimeEngineState,elapsedWallSeconds:number,
  mandatoryEventTimesSeconds:readonly number[]=[]):TimeEngineState{
  bounded(elapsedWallSeconds,0,60,"Elapsed wall time");
+ const events=mandatoryEventTimesSeconds.map(event=>{
+  bounded(event,0,run.time.simulatedDurationSeconds,"Mandatory event time");
+  return event;
+ });
  const wallTimeUTC=new Date(Date.parse(state.wallTimeUTC)+elapsedWallSeconds*1000).toISOString();
  if(state.paused||elapsedWallSeconds===0)return Object.freeze({...state,wallTimeUTC});
  let next=state.simulationTimeSeconds;
  if(state.direction==="forward"){
   next=advanceEventSafeTime(next,elapsedWallSeconds,state.playbackRate,
-    run.time.simulatedDurationSeconds,mandatoryEventTimesSeconds);
+    run.time.simulatedDurationSeconds,events);
  }else{
   const candidate=Math.max(0,next-elapsedWallSeconds*state.playbackRate);
-  const events=mandatoryEventTimesSeconds.map(event=>{
-   bounded(event,0,run.time.simulatedDurationSeconds,"Mandatory event time");
-   return event;
-  });
   // Reverse is cached playback, but still lands on event boundaries rather than
   // skipping over a recorded event in one wall-clock frame.
   const previous=events.filter(event=>event<next-1e-9&&event>candidate+1e-9)
