@@ -210,20 +210,100 @@ fun NativeWorldLabViewport(
                 val p=centerProjection
                 if(p.visible){
                     val radius=(dimensions.x.toFloat()*p.scale*0.5f).coerceIn(1f,100f)
-                    if(inspection.mode==NativeInspectionMode.CUTAWAY&&cutOffset!=null&&inspection.axis==NativeInspectionAxis.X){
-                        drawArc(color.copy(alpha=alpha()),270f,180f,true,
-                            topLeft=Offset(p.x-radius,p.y-radius),size=androidx.compose.ui.geometry.Size(radius*2,radius*2))
-                        drawArc(Color.White,270f,180f,false,
-                            topLeft=Offset(p.x-radius,p.y-radius),size=androidx.compose.ui.geometry.Size(radius*2,radius*2),style=Stroke(2f))
+                    if(inspection.mode==NativeInspectionMode.CUTAWAY&&cutOffset!=null&&solid.id in cutTargets){
+                        // Tessellated world-space sphere surface; clip the actual triangles,
+                        // then triangulate the generated section cap in the cut plane.
+                        val latitudeSegments=8
+                        val longitudeSegments=16
+                        val localRadius=dimensions.x/2.0
+                        fun spherePoint(phi:Double,theta:Double):NativeLabVector{
+                            val local=NativeLabVector(localRadius*sin(phi)*cos(theta),
+                                localRadius*cos(phi),localRadius*sin(phi)*sin(theta))
+                            val rotated=labRotatePoint(local.x,local.y,local.z,solid.rotationRadians)
+                            return NativeLabVector(center.x+rotated.x,center.y+rotated.y,center.z+rotated.z)
+                        }
+                        val rings=(1 until latitudeSegments).map{ring->
+                            (0 until longitudeSegments).map{segment->
+                                spherePoint(PI*ring/latitudeSegments,
+                                    2*PI*segment/longitudeSegments)
+                            }
+                        }
+                        val north=spherePoint(0.0,0.0)
+                        val south=spherePoint(PI,0.0)
+                        val faces=mutableListOf<List<NativeLabVector>>()
+                        for(segment in 0 until longitudeSegments){
+                            val next=(segment+1)%longitudeSegments
+                            faces.add(listOf(north,rings[0][segment],rings[0][next]))
+                            faces.add(listOf(rings.last()[segment],south,rings.last()[next]))
+                        }
+                        for(ring in 0 until rings.lastIndex){
+                            for(segment in 0 until longitudeSegments){
+                                val next=(segment+1)%longitudeSegments
+                                val a=rings[ring][segment]
+                                val b=rings[ring][next]
+                                val c=rings[ring+1][next]
+                                val d=rings[ring+1][segment]
+                                faces.add(listOf(a,b,c));faces.add(listOf(a,c,d))
+                            }
+                        }
+                        val cap=linkedMapOf<String,NativeLabVector>()
+                        fun planeCoordinate(point:NativeLabVector)=when(inspection.axis){
+                            NativeInspectionAxis.X->point.x
+                            NativeInspectionAxis.Y->point.y
+                            NativeInspectionAxis.Z->point.z
+                        }
+                        for(face in faces){
+                            val clipped=clip(face,solid.id)
+                            clipped.forEach{point->
+                                if(kotlin.math.abs(planeCoordinate(point)-cutOffset)<1e-6){
+                                    val key=listOf(point.x,point.y,point.z).joinToString(":"){
+                                        kotlin.math.round(it*1e6).toLong().toString()
+                                    }
+                                    cap.putIfAbsent(key,point)
+                                }
+                            }
+                            val projected=clipped.map{projection(it,size.width,size.height,focalLength)}
+                            if(projected.size>=3&&projected.all{it.visible}){
+                                val path=Path().apply{
+                                    projected.forEachIndexed{i,point->
+                                        if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)
+                                    };close()
+                                }
+                                drawPath(path,color.copy(alpha=alpha()))
+                                if(inspection.mode==NativeInspectionMode.XRAY||selected)
+                                    drawPath(path,Color.White.copy(alpha=0.8f),style=Stroke(1f))
+                            }
+                        }
+                        if(cap.size>=3){
+                            val section=cap.values.toList()
+                            val centre=NativeLabVector(section.sumOf{it.x}/section.size,
+                                section.sumOf{it.y}/section.size,section.sumOf{it.z}/section.size)
+                            fun planeAngle(point:NativeLabVector)=when(inspection.axis){
+                                NativeInspectionAxis.X->atan2(point.z-centre.z,point.y-centre.y)
+                                NativeInspectionAxis.Y->atan2(point.x-centre.x,point.z-centre.z)
+                                NativeInspectionAxis.Z->atan2(point.y-centre.y,point.x-centre.x)
+                            }
+                            val orderedCap=section.sortedBy(::planeAngle)
+                            val projectedCap=orderedCap.map{projection(it,size.width,size.height,focalLength)}
+                            if(projectedCap.all{it.visible}){
+                                val path=Path().apply{
+                                    projectedCap.forEachIndexed{i,point->
+                                        if(i==0)moveTo(point.x,point.y) else lineTo(point.x,point.y)
+                                    };close()
+                                }
+                                drawPath(path,color.copy(alpha=0.78f))
+                                drawPath(path,Color.White.copy(alpha=0.9f),style=Stroke(1.5f))
+                            }
+                        }
                     }else{
                         drawCircle(color.copy(alpha=alpha()),radius,Offset(p.x,p.y))
                         drawCircle(if(selected||inspection.mode==NativeInspectionMode.XRAY)Color.White else color.copy(alpha=0.65f),
                             radius,Offset(p.x,p.y),style=Stroke(if(selected||inspection.mode==NativeInspectionMode.XRAY)2.5f else 1.2f))
+                        drawArc(Color.White.copy(alpha=0.25f),200f,135f,false,
+                            topLeft=Offset(p.x-radius*0.72f,p.y-radius*0.72f),
+                            size=androidx.compose.ui.geometry.Size(radius*1.44f,radius*1.44f),
+                            style=Stroke(1f))
                     }
-                    drawArc(Color.White.copy(alpha=0.25f),200f,135f,false,
-                        topLeft=Offset(p.x-radius*0.72f,p.y-radius*0.72f),
-                        size=androidx.compose.ui.geometry.Size(radius*1.44f,radius*1.44f),
-                        style=Stroke(1f))
                 }
             }else if(solid.shape=="cylinder"){
                 val segments=24
