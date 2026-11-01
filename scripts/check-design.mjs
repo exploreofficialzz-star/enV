@@ -6,7 +6,7 @@ const read = (path) => readFileSync(new URL(path, root), "utf8");
 const tools = parseGeneratedCatalog(read("src/data/catalog.ts"));
 const design = tools.filter((tool) => tool.category === "design");
 const expectedIds = [
-  "color-picker", "hex-converter", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter",
+  "color-picker", "rgb-converter", "hsl-converter", "hsv-converter", "cmyk-converter",
   "palette-generator", "gradient-generator", "css-shadow-generator", "css-border-generator",
   "glassmorphism-generator", "neumorphism-generator", "css-button-generator", "css-card-generator",
   "blob-generator", "svg-wave-generator", "contrast-checker", "wcag-checker",
@@ -14,11 +14,19 @@ const expectedIds = [
 ];
 const ids = design.map((tool) => tool.id);
 const missing = expectedIds.filter((id) => !ids.includes(id));
-const unexpected = ids.filter((id) => !expectedIds.includes(id));
 const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
 const invalid = design.filter((tool) => tool.status === "planned" || !tool.engine?.type || !tool.engine?.op);
 const allowedTypes = new Set(["color", "cssgen"]);
 const badType = design.filter((tool) => !allowedTypes.has(tool.engine?.type));
+const allowedColorOps = new Set(["picker", "palette", "contrast"]);
+const allowedCssFamilies = new Set(["avatar", "badge", "blob", "border", "button", "card", "glass", "gradient", "input", "neomorph", "noise", "pattern", "shadow", "wave"]);
+const allowedCssActions = new Set(["builder", "css", "generator", "preset", "preview", "svg", "token"]);
+const unsupportedOps = design.filter((tool) => {
+  if (tool.engine?.type === "color") return !allowedColorOps.has(tool.engine?.op);
+  if (tool.engine?.type !== "cssgen") return true;
+  const [family, action, extra] = String(tool.engine?.op ?? "").split(":");
+  return Boolean(extra) || !allowedCssFamilies.has(family) || !allowedCssActions.has(action);
+});
 
 const explorer = read("src/components/tools/design-category-explorer.tsx");
 const colorEngine = read("src/components/engines/color-engine.tsx");
@@ -92,8 +100,8 @@ const checks = [
   ["Consistent SVG wave export dimensions", svgGenerators.includes('viewBox="0 0 1440 240"') && svgGenerators.includes("L1440 240 L0 240 Z") && svgGeneratorTests.includes('viewBox="0 0 1440 240"')],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);
-if (design.length !== expectedIds.length || missing.length || unexpected.length || duplicates.length || invalid.length || badType.length || failedChecks.length) {
-  console.error({ total: design.length, missing, unexpected, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), failedChecks });
+if (design.length < expectedIds.length || missing.length || duplicates.length || invalid.length || badType.length || unsupportedOps.length || failedChecks.length) {
+  console.error({ total: design.length, coreMissing: missing, duplicates, invalid: invalid.map((tool) => tool.id), badType: badType.map((tool) => tool.id), unsupportedOps: unsupportedOps.map((tool) => ({ id: tool.id, type: tool.engine?.type, op: tool.engine?.op })), failedChecks });
   process.exit(1);
 }
-console.log(`Design audit passed: ${design.length} tools, all active, all routed, ${checks.length} implementation checks passed.`);
+console.log(`Design audit passed: ${design.length} active catalogue entries, ${expectedIds.length} core tool IDs present, every engine operation supported, ${checks.length} implementation checks passed.`);

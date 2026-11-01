@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   design-engine-tests:
-    name: Design engine unit tests and 21-tool audit
+    name: Design engine unit tests and full catalogue audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -44,5 +44,5 @@ jobs:
           src/lib/engines/design-color.test.ts
           src/lib/engines/svg-generators.test.ts
           src/lib/engines/design-contrast.test.ts
-      - name: Audit all 21 Design tools and implementation gates
+      - name: Audit every Design catalogue entry and implementation gate
         run: node scripts/check-design.mjs

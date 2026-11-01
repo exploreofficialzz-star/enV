@@ -4,7 +4,7 @@
 
 ## Executive assessment
 
-The category contains 21 active browser-based tools across color, palettes, CSS effects, UI components, SVG/background artwork and color accessibility. Its largest weakness was not missing page count; it was that many different tools shared only two generic renderers. Several pages therefore appeared to be separate utilities but behaved like the same small form.
+The live catalog snapshot contains 121 active Design entries: 20 canonical tool IDs plus 101 related builder, CSS, preset, preview, SVG and token variants. They are routed through two shared engines (`color` and `cssgen`), so improvements must be applied to the shared workflows and verified against every catalog operation. HEX conversion is supported by the Color Picker rather than a separate `hex-converter` catalog ID. The original weakness was not missing page count; it was that many entries shared only two generic renderers and several looked like separate utilities while behaving like the same small form.
 
 The upgrade direction is to preserve the compact nature of enV while making every workflow feel like a focused design instrument: strong visual hierarchy, large live preview, immediately understandable controls, useful starting presets, and outputs that are ready to copy into a real project.
 
@@ -129,3 +129,19 @@ The upgrade direction is to preserve the compact nature of enV while making ever
 - [Toolradar 2026 color-tool comparison](https://toolradar.com/best/free/color-tools)
 - [Toolradar 2026 palette-generator comparison](https://toolradar.com/guides/best-free-palette-generators)
 - [Haikei Product Hunt feedback](https://www.producthunt.com/products/haikei)
+
+
+## Systematic implementation update — 1 November 2026
+
+The 20 canonical Design tools and their catalog variants now share a more capable implementation:
+
+- Color conversion accepts HEX, RGB, HSL, HSV/HSB, CMYK, HWB and OKLCH; the picker exposes copy-ready HWB and OKLCH values as well.
+- Palette generation uses perceptual OKLCH shade ramps, supports editable semantic roles and shareable role overrides, prevents duplicate harmony swatches, and extracts image colors through frequency-weighted median-cut quantization while ignoring transparent pixels.
+- Contrast workflows retain alpha compositing, separate text and non-text thresholds, offer foreground/background and opacity corrections, and show pair-level feedback for generated buttons, cards, badges and inputs. These checks do not certify an entire page.
+- Gradient generation supports linear, radial, conic, repeating, perceptual interpolation and layered mesh-style backgrounds with an sRGB fallback.
+- Box shadows and text shadows use independently editable multi-layer stacks with presets, controls and reordering. Border generation supports separate edge widths and corner radii.
+- Glass CSS now includes a solid fallback and progressive backdrop-filter enhancement. Button previews include solid, outline, soft and ghost variants, disabled states, hover/focus feedback and accent-relative soft colors. Card previews cover standard, product, profile, article and metric layouts.
+- SVG/background generation now includes 14 pattern styles, adjustable organic blob variation, seeded noise algorithms with octave and seed controls, and up to five editable wave layers. Blob and wave SVG exports include accessible names; wave viewBox and close-path geometry are aligned.
+- A Design-only GitHub Actions workflow runs the engine unit tests and catalogue/source audit without requiring the app's full npm dependency install. This isolates Design verification from the repository's existing lockfile installation problem.
+
+The remaining checks are intentionally explicit: full app typecheck/build, cross-browser Chromium/Firefox/Safari rendering, and mobile visual QA still need to complete. The standalone Design tests are the primary regression gate for this implementation branch.
