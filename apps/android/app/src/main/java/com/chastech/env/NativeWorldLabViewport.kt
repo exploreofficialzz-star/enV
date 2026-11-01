@@ -28,7 +28,7 @@ import kotlin.math.*
 private data class LabScreenPoint(val x:Float,val y:Float)
 private fun labIsoPoint(
     point:NativeLabVector,focus:NativeLabVector,yaw:Float,zoom:Float,
-    pan:Offset,width:Float,height:Float,
+    pan:Offset,width:Float,height:Float,elevationDegrees:Float=30f,
 ):LabScreenPoint{
     val dx=point.x-focus.x;val dy=point.y-focus.y;val dz=point.z-focus.z
     val angle=yaw.toDouble()
@@ -36,7 +36,7 @@ private fun labIsoPoint(
     val forwardX=sin(angle);val forwardZ=-cos(angle)
     val horizontal=dx*rightX+dz*rightZ
     val depth=dx*forwardX+dz*forwardZ
-    val elevation=Math.toRadians(30.0)
+    val elevation=Math.toRadians(elevationDegrees.toDouble().coerceIn(5.0,80.0))
     val vertical=dy*cos(elevation)-depth*sin(elevation)
     return LabScreenPoint(width/2f+pan.x+(horizontal*zoom).toFloat(),
         height/2f+pan.y-(vertical*zoom).toFloat())
@@ -74,21 +74,28 @@ fun NativeWorldLabViewport(
     val cameraDeltaZ=project.cameraPositionMeters.z-project.cameraLookingAtMeters.z
     val horizontal=hypot(cameraDeltaX,cameraDeltaZ).coerceAtLeast(0.25)
     var zoom by remember(project.id,project.revision){
-        mutableFloatStateOf((45.0*8.0/horizontal).toFloat().coerceIn(5f,120f))
+        mutableFloatStateOf((45.0*8.0/horizontal).toFloat().coerceIn(0.1f,160f))
     }
     var yaw by remember(project.id,project.revision){
         mutableFloatStateOf(atan2(cameraDeltaX,-cameraDeltaZ))
     }
+    var elevation by remember(project.id,project.revision){
+        mutableFloatStateOf(Math.toDegrees(atan2(cameraDeltaY,horizontal)).toFloat().coerceIn(5f,80f))
+    }
+    var observerDepthMeters by remember(project.id,project.revision){mutableFloatStateOf(0f)}
     var pan by remember(project.id,project.revision){mutableStateOf(Offset.Zero)}
-    val focus=project.cameraLookingAtMeters
+    val focus=NativeLabVector(project.cameraLookingAtMeters.x,
+        (project.cameraLookingAtMeters.y+observerDepthMeters).coerceIn(-20000.0,100000.0),
+        project.cameraLookingAtMeters.z)
+    val viewRangeMeters=(45.0*8.0/zoom.toDouble()).coerceIn(0.5,100000.0)
     var latitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.latitudeDegrees?.toString() ?: "0")}
     var longitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.longitudeDegrees?.toString() ?: "0")}
     var height by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.heightMeters?.toString() ?: "0")}
     fun projection(point:NativeLabVector,width:Float,height:Float)=
-        labIsoPoint(point,focus,yaw,zoom,pan,width,height)
+        labIsoPoint(point,focus,yaw,zoom,pan,width,height,elevation)
     Text("Explore your invention",style=MaterialTheme.typography.titleSmall)
     Text("Drag to pan · pinch to zoom · twist to orbit · tap a part to select. "+
-        "Illustrative isometric view; dimensions and placement stay in project metres.",
+        "Use the observer controls below to change vertical view and elevation. The environment remains illustrative.",
         style=MaterialTheme.typography.bodySmall)
     Canvas(
         Modifier.fillMaxWidth().height(250.dp)
@@ -96,7 +103,7 @@ fun NativeWorldLabViewport(
             .pointerInput(project.id,project.revision){
                 detectTransformGestures{_,panChange,zoomChange,rotationChange->
                     pan+=panChange
-                    zoom=(zoom*zoomChange).coerceIn(5f,160f)
+                    zoom=(zoom*zoomChange).coerceIn(0.1f,160f)
                     yaw=(yaw+rotationChange*(PI.toFloat()/180f)).let{((it+PI.toFloat())%(2*PI.toFloat())+2*PI.toFloat())%(2*PI.toFloat())-PI.toFloat()}
                 }
             }
@@ -112,7 +119,10 @@ fun NativeWorldLabViewport(
             .semantics{contentDescription="Interactive isometric World Lab view with drag, pinch, orbit and part selection"}
     ){
         // Ground grid follows the saved observer target and adapts to zoom.
-        val unit=when{zoom>80->0.25;zoom>35->0.5;zoom>12->2.0;zoom>6->10.0;else->50.0}
+        val unit=when{
+            zoom>80->0.25;zoom>35->0.5;zoom>12->2.0;zoom>6->10.0
+            zoom>2->50.0;zoom>0.7->100.0;zoom>0.25->500.0;else->1000.0
+        }
         val extent=12
         for(i in -extent..extent){
             val a=NativeLabVector(focus.x+i*unit,focus.y,focus.z-extent*unit)
@@ -143,7 +153,7 @@ fun NativeWorldLabViewport(
             }else if(solid.shape=="cylinder"){
                 val p=projection(center,size.width,size.height)
                 val radius=(dimensions.x*zoom*0.5f).coerceIn(2f,80f)
-                val heightPx=(dimensions.y*zoom*cos(Math.toRadians(30.0))).toFloat().coerceIn(3f,160f)
+                val heightPx=(dimensions.y*zoom*cos(Math.toRadians(elevation.toDouble()))).toFloat().coerceIn(3f,160f)
                 val left=p.x-radius;val top=p.y-heightPx/2
                 drawRect(color.copy(alpha=0.72f),Offset(left,top),androidx.compose.ui.geometry.Size(radius*2,heightPx))
                 drawOval(color,topLeft=Offset(left,top-radius*0.22f),
@@ -205,21 +215,47 @@ fun NativeWorldLabViewport(
             }
         }.onFailure{}
     }
+    Text("View scale: "+String.format(java.util.Locale.US,"%.2f",viewRangeMeters)+" m · "+
+        (if(observerDepthMeters<0)"below" else if(observerDepthMeters>0)"above" else "at")+
+        " saved target by "+String.format(java.util.Locale.US,"%.1f",abs(observerDepthMeters))+" m",
+        style=MaterialTheme.typography.bodySmall)
+    Text("Observer elevation: "+elevation.toInt()+"°")
+    Slider(value=elevation,onValueChange={elevation=it},valueRange=5f..80f,
+        modifier=Modifier.semantics{contentDescription="Observer camera elevation angle"})
+    Text("Vertical observer offset: "+String.format(java.util.Locale.US,"%.1f",observerDepthMeters)+
+        " m · illustrative volume, not mapped geology")
+    Slider(value=observerDepthMeters,onValueChange={observerDepthMeters=it},
+        valueRange=-20000f..20000f,
+        modifier=Modifier.semantics{contentDescription="Observer vertical offset from saved target"})
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
         OutlinedButton(onClick={zoom=(zoom*1.25f).coerceAtMost(160f)}){Text("Zoom in")}
-        OutlinedButton(onClick={zoom=(zoom/1.25f).coerceAtLeast(5f)}){Text("Zoom out")}
-        OutlinedButton(onClick=onResetView){Text("Surface view")}
+        OutlinedButton(onClick={zoom=(zoom/1.25f).coerceAtLeast(0.1f)}){Text("Zoom out")}
         OutlinedButton(onClick={
             val distance=(8.0*45.0/zoom).coerceIn(0.5,100000.0)
             val targetX=focus.x-pan.x/zoom*cos(yaw)
             val targetZ=focus.z-pan.x/zoom*sin(yaw)
             val targetY=focus.y+pan.y/zoom
-            val elevation=Math.toRadians(30.0)
-            val horizontal=distance*cos(elevation)
+            val angle=Math.toRadians(elevation.toDouble())
+            val horizontalDistance=distance*cos(angle)
             val target=listOf(targetX,targetY,targetZ)
-            val position=listOf(targetX+sin(yaw)*horizontal,
-                targetY+distance*sin(elevation),targetZ-cos(yaw)*horizontal)
+            val position=listOf(targetX+sin(yaw)*horizontalDistance,
+                targetY+distance*sin(angle),targetZ-cos(yaw)*horizontalDistance)
             onSaveView(position,target)
+            observerDepthMeters=0f
         }){Text("Save viewpoint")}
+        OutlinedButton(onClick={
+            val saved=project.cameraPositionMeters
+            val target=project.cameraLookingAtMeters
+            val dx=saved.x-target.x;val dz=saved.z-target.z
+            val h=hypot(dx,dz).coerceAtLeast(0.25)
+            zoom=(45.0*8.0/h).toFloat().coerceIn(0.1f,160f)
+            yaw=atan2(dx,-dz)
+            elevation=Math.toDegrees(atan2(saved.y-target.y,h)).toFloat().coerceIn(5f,80f)
+            observerDepthMeters=0f;pan=Offset.Zero
+        }){Text("Restore saved view")}
+        OutlinedButton(onClick={
+            observerDepthMeters=0f;elevation=30f;pan=Offset.Zero
+            onResetView()
+        }){Text("Surface view")}
     }
 }

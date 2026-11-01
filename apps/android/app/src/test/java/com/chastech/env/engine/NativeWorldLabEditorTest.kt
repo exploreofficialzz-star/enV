@@ -251,3 +251,54 @@ class NativeWorldLabEditorTest {
             assertEquals(2.0,kotlin.math.hypot(e.positionMeters.x,e.positionMeters.y-0.5),1e-9)
         }
     }
+
+
+    @Test fun multiSelectionCadTransformsAreAtomicAndPreservePrimitiveConstraints(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="b")
+        json=NativeWorldLabEditor.addSolid(json,"cylinder",id="c")
+        val before=NativeWorldLabProjectCodec.decode(json).revision
+        json=NativeWorldLabEditor.rotateSolids(json,listOf("a","b"),2,45.0)
+        var p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(before+1,p.revision)
+        assertEquals(kotlin.math.PI/4,p.entities[0].rotationRadians.z,1e-12)
+        assertEquals(kotlin.math.PI/4,p.entities[1].rotationRadians.z,1e-12)
+        json=NativeWorldLabEditor.scaleSolids(json,listOf("a","b","c"),listOf(2.0,3.0,4.0))
+        p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(2.0,p.entities[0].dimensionsMeters.x,1e-12)
+        assertEquals(3.0,p.entities[0].dimensionsMeters.y,1e-12)
+        assertEquals(p.entities[1].dimensionsMeters.x,p.entities[1].dimensionsMeters.z,0.0)
+        assertEquals(p.entities[2].dimensionsMeters.x,p.entities[2].dimensionsMeters.z,0.0)
+        json=NativeWorldLabEditor.alignSolids(json,listOf("a","b","c"),0,"min")
+        p=NativeWorldLabProjectCodec.decode(json)
+        val left=p.entities.map{it.positionMeters.x-it.dimensionsMeters.x/2}
+        assertTrue(left.max()-left.min()<1e-8)
+        json=NativeWorldLabEditor.distributeSolids(json,listOf("a","b","c"),0,0.5)
+        p=NativeWorldLabProjectCodec.decode(json)
+        val sorted=p.entities.sortedBy{it.positionMeters.x}
+        for(i in 0..1){
+            val gap=sorted[i+1].positionMeters.x-sorted[i+1].dimensionsMeters.x/2-
+                (sorted[i].positionMeters.x+sorted[i].dimensionsMeters.x/2)
+            assertEquals(0.5,gap,1e-8)
+        }
+        json=NativeWorldLabEditor.duplicateSolids(json,listOf("a","b"),listOf(10.0,0.0,0.0))
+        assertEquals(5,NativeWorldLabProjectCodec.decode(json).entities.size)
+    }
+    @Test fun multiSelectionCadRejectsMissingDuplicateAndOutOfBoundsSelection(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="b")
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.rotateSolids(json,listOf("a","missing"),0,10.0)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.scaleSolids(json,listOf("a","a"),listOf(1.0,1.0,1.0))
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.duplicateSolids(json,listOf("a","b"),listOf(Double.NaN,0.0,0.0))
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.distributeSolids(json,listOf("a","b"),0,1.0)
+        }
+    }

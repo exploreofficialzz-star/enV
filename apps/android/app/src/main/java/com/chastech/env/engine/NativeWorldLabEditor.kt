@@ -458,6 +458,148 @@ object NativeWorldLabEditor {
     }
     private fun multiplyRotation(a:Array<DoubleArray>,b:Array<DoubleArray>)=
         Array(3){row->DoubleArray(3){col->(0..2).sumOf{k->a[row][k]*b[k][col]}}}
+
+    private data class NativeCadBounds(
+        val center:List<Double>,val half:List<Double>,
+        val min:List<Double>,val max:List<Double>
+    )
+    private fun cadBounds(entity:JSONObject):NativeCadBounds {
+        val position=entity.getJSONArray("positionMeters")
+        val dims=entity.getJSONArray("dimensionsMeters")
+        val angles=if(entity.has("rotationRadians"))
+            (0..2).map{entity.getJSONArray("rotationRadians").getDouble(it)}
+            else listOf(0.0,0.0,0.0)
+        val matrix=rotationMatrix(angles)
+        val half=(0..2).map{axis->
+            (0..2).sumOf{local->kotlin.math.abs(matrix[axis][local])*dims.getDouble(local)/2}
+        }
+        val center=(0..2).map{position.getDouble(it)}
+        return NativeCadBounds(center,half,
+            (0..2).map{center[it]-half[it]},(0..2).map{center[it]+half[it]})
+    }
+    private fun selectedCadRows(project:JSONObject,ids:List<String>):Pair<JSONArray,List<JSONObject>> {
+        require(ids.isNotEmpty()&&ids.distinct().size==ids.size){
+            "Select one or more distinct parts"
+        }
+        val rows=project.getJSONArray("entities")
+        val lookup=(0 until rows.length()).map{rows.getJSONObject(it)}
+            .associateBy{it.getString("id")}
+        require(ids.all{lookup.containsKey(it)}){
+            "A selected part no longer exists in this invention"
+        }
+        return rows to ids.map{lookup.getValue(it)}
+    }
+    fun rotateSolids(source:String,ids:List<String>,axis:Int,degrees:Double):String=edit(source){project->
+        require(axis in 0..2&&degrees.isFinite()&&degrees in -3600.0..3600.0){
+            "Multi-part rotation needs an X/Y/Z axis and bounded finite degrees"
+        }
+        val (_,selected)=selectedCadRows(project,ids)
+        selected.forEach{solid->
+            val values=if(solid.has("rotationRadians"))solid.getJSONArray("rotationRadians")
+                else JSONArray(listOf(0.0,0.0,0.0))
+            val raw=values.getDouble(axis)+degrees*Math.PI/180.0
+            val wrapped=((raw+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI
+            values.put(axis,if(kotlin.math.abs(wrapped)<1e-12)0.0 else wrapped)
+            solid.put("rotationRadians",values)
+        }
+    }
+    fun scaleSolids(source:String,ids:List<String>,factors:List<Double>):String=edit(source){project->
+        require(factors.size==3&&factors.all{it.isFinite()&&it in 0.001..1000.0}){
+            "Multi-part scale requires three positive bounded factors"
+        }
+        val (_,selected)=selectedCadRows(project,ids)
+        selected.forEach{solid->
+            val old=solid.getJSONArray("dimensionsMeters")
+            val values=(0..2).map{old.getDouble(it)}
+            val next=when(solid.getString("shape")){
+                "sphere"->List(3){values[0]*factors[0]}
+                "cylinder"->{val radial=kotlin.math.sqrt(factors[0]*factors[2])
+                    listOf(values[0]*radial,values[1]*factors[1],values[2]*radial)}
+                else->values.indices.map{values[it]*factors[it]}
+            }
+            require(next.all{it.isFinite()&&it in 0.001..10000.0}){
+                "Scaling selected parts would exceed portable geometry bounds"
+            }
+            solid.put("dimensionsMeters",JSONArray(next))
+        }
+    }
+    fun duplicateSolids(source:String,ids:List<String>,offsetMeters:List<Double>):String=edit(source){project->
+        require(offsetMeters.size==3&&offsetMeters.all{it.isFinite()&&it in -100000.0..100000.0}){
+            "Multi-part duplicate offset is outside the local world"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        require(rows.length()+selected.size<=200){
+            "Duplicating this selection would exceed the 200-part limit"
+        }
+        val used=(0 until rows.length()).map{rows.getJSONObject(it).getString("id")}.toMutableSet()
+        selected.forEach{original->
+            val clone=JSONObject(original.toString())
+            var newId=UUID.randomUUID().toString()
+            while(newId in used)newId=UUID.randomUUID().toString()
+            used.add(newId)
+            val pos=clone.getJSONArray("positionMeters")
+            for(axis in 0..2){
+                val value=pos.getDouble(axis)+offsetMeters[axis]
+                require(value.isFinite()&&value in -100000.0..100000.0){
+                    "A duplicate part would leave the local world"
+                }
+                pos.put(axis,value)
+            }
+            clone.put("id",newId)
+                .put("name",(original.getString("name")+" copy").take(120))
+            rows.put(clone)
+        }
+    }
+    fun alignSolids(source:String,ids:List<String>,axis:Int,alignment:String):String=edit(source){project->
+        require(axis in 0..2&&alignment in setOf("min","center","max")){
+            "Alignment needs an X/Y/Z axis and min, center or max"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        require(selected.size>=2){"Alignment needs at least two parts"}
+        val bounds=selected.associate{it.getString("id") to cadBounds(it)}
+        val target=when(alignment){
+            "min"->bounds.values.minOf{it.min[axis]}
+            "max"->bounds.values.maxOf{it.max[axis]}
+            else->bounds.values.map{it.center[axis]}.average()
+        }
+        for(index in 0 until rows.length()){
+            val row=rows.getJSONObject(index);val box=bounds[row.getString("id")]?:continue
+            val position=row.getJSONArray("positionMeters")
+            val value=when(alignment){
+                "min"->target+box.half[axis]
+                "max"->target-box.half[axis]
+                else->target
+            }
+            require(value.isFinite()&&value in -100000.0..100000.0){
+                "Alignment exceeds the portable coordinate envelope"
+            }
+            position.put(axis,value)
+        }
+    }
+    fun distributeSolids(source:String,ids:List<String>,axis:Int,gapMeters:Double):String=edit(source){project->
+        require(axis in 0..2&&gapMeters.isFinite()&&gapMeters in 0.0..100000.0){
+            "Distribution requires an axis and nonnegative bounded gap"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        require(selected.size>=3){"Distribution needs at least three parts"}
+        val bounds=selected.map{it to cadBounds(it)}.sortedBy{it.second.center[axis]}
+        val target=mutableMapOf<String,Double>()
+        var cursor=bounds.first().second.max[axis]
+        for((entity,box) in bounds.drop(1)){
+            val center=cursor+gapMeters+box.half[axis]
+            require(center.isFinite()&&center in -100000.0..100000.0){
+                "Distribution exceeds the portable coordinate envelope"
+            }
+            target[entity.getString("id")]=center
+            cursor=center+box.half[axis]
+        }
+        for(index in 0 until rows.length()){
+            val row=rows.getJSONObject(index);val value=target[row.getString("id")]?:continue
+            row.getJSONArray("positionMeters").put(axis,value)
+        }
+    }
+
+
     fun mirrorSolid(source:String,id:String,axis:Int,planeMeters:Double):String=edit(source){project->
         require(axis in 0..2&&planeMeters.isFinite()&&planeMeters in -100000.0..100000.0){
             "Mirror requires an X/Y/Z plane inside local-world bounds"

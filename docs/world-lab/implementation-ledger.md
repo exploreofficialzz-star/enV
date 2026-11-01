@@ -720,3 +720,12 @@ release-candidate evidence bundle are unfinished.
 - Added migration 0018 to extend the server science-kind CHECK without rewriting historical 0017. Cloud deployment, user authorization, RLS and quotas still require release verification.
 - iOS app-private scientific store and Android scientific archive store accept the two types with native mathematical validators, preserve records with the originating saved project and export cross-platform-compatible result fields. Both native authoring panels expose explicit keep actions; storage requires an already-saved invention.
 - Added Web portable-archive regressions and native Swift XCTest source checks for normal round trips, tainted physics and ownership. Source authoring finished; no automated build, native instrumentation or end-to-end multi-device interchange pass is claimed in this batch.
+
+
+## C/D native observer and multi-part CAD implementation — 2026-11-01
+- Android's native observer viewport now provides adjustable 5–80° elevation, a bounded ±20 km vertical observer offset, a numerical view-scale readout and adaptive grid intervals from sub-metre to kilometre spacing. Saved observer positions can be restored without inventing terrain or geodetic detail.
+- Android multi-selection CAD now supports atomic rotation, shape-preserving scaling, duplication, rotated-primitive-bound alignment and minimum-gap distribution. Every operation validates the selected IDs and geometry first, then advances a single project revision.
+- The Android native editor has a reusable multi-part CAD panel with selection, axis, angle, scale, duplicate offset, alignment and distribution controls.
+- Native CAD regression tests cover multi-selection transforms, primitive dimension invariants, rotated bounds, alignment, spacing, atomic revisions, malformed IDs and invalid parameters.
+- Existing Web saved-viewpoint scale clipping, transform/pattern/extrusion CAD and rotation-aware 3D rendering are retained; no duplicate Web implementation was added.
+- The remaining iOS native observer and multi-part editor parity is a separate implementation tranche; no C/D acceptance scenario is marked verified until the exact-head browser, Android and iOS interaction/accessibility tests pass.

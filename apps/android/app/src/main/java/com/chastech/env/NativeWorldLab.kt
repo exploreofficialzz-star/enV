@@ -719,6 +719,9 @@ fun NativeWorldLabForm() {
                 }},
                 onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
                 onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}})
+            NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
+                applyProjectEdit(transform)
+            }
             Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
             Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
                 style=MaterialTheme.typography.bodySmall)
