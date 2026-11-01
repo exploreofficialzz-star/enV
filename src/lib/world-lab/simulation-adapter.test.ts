@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createDampedOscillatorAdapter, WorldLabSimulationAdapterRegistry } from "./simulation-adapter.ts";
-import type { DampedOscillator, SimulationContext } from "./simulation-adapter.ts";
+import type { SimulationContext } from "./simulation-adapter.ts";
+import type { DampedOscillator } from "./model.ts";
 
 const parameters: DampedOscillator = { kind:"damped-oscillator", massKg:1, springNPerM:4, dampingNsPerM:0.5, initialDisplacementM:0.5, initialVelocityMPerS:0 };
 const context: SimulationContext = { projectId:"project-one", projectRevision:4, runId:"run-one", worldDateUTC:"2026-10-30T00:00:00.000Z", seed:12 };
