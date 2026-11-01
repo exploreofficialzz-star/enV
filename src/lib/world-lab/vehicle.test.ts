@@ -56,7 +56,7 @@ test("fixed-wing takeoff is blocked when modeled wing lift at takeoff speed is b
 });
 
 test("fixed-wing takeoff uses computed dynamic pressure and can become airborne",()=>{
-  const input:VehicleInput={...base,mode:"fixed-wing",massKg:1200,wingAreaM2:18,wingLiftCoefficient:1.4,takeoffSpeedMps:28,maximumCruiseThrustN:4000,
+  const input:VehicleInput={...base,mode:"fixed-wing",massKg:1200,wingAreaM2:18,wingLiftCoefficient:1.4,takeoffSpeedMps:25,maximumCruiseThrustN:4000,
     maximumWheelDriveForceN:10000,motorMaximumPowerW:350000,batteryMaximumCurrentA:700,durationSeconds:60,maximumSpeedMps:100};
   const run=runWorldLabVehicle(context,"wing-takeoff",input);
   assert.ok(run.preflight.wingLiftAtTakeoffN!>run.preflight.weightN);
@@ -67,7 +67,7 @@ test("invalid project revisions, non-finite values, and unsupported flight input
   assert.throws(()=>runWorldLabVehicle({...context,revision:-1},"bad-run",base),/project ID/);
   assert.throws(()=>runWorldLabVehicle(context,"bad-run",{...base,massKg:Number.NaN}),/Vehicle mass/);
   assert.throws(()=>runWorldLabVehicle(context,"bad-run",{...base,mode:"rotorcraft",rotorDiskAreaM2:null,rotorMaximumThrustN:null}),/rotor disk area/);
-  assert.throws(()=>runWorldLabVehicle(context,"bad-run",{...base,solverStepSeconds:0.0001,durationSeconds:120}),/12,000-step/);
+  assert.throws(()=>runWorldLabVehicle(context,"bad-run",{...base,solverStepSeconds:0.001,durationSeconds:120}),/12,000-step/);
 });
 
 test("vehicle result carries immutable project revision, assumptions and named limitations",()=>{
