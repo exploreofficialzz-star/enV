@@ -19,7 +19,7 @@ import {
   type ABookNote,
   type ABookRevision,
 } from "@/lib/a-book/local-store";
-import { extractPdfPages, inspectPdf, mergePdfs, pdfDownload, rotatePdf, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
+import { extractPdfPages, inspectPdf, mergePdfs, parsePageRanges, pdfDownload, rotatePdf, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
 import { createABookArchive, parseABookLegacyNotesJson, readABookArchive } from "@/lib/a-book/archive";
 
 function localDownload(blob: Blob, filename: string) {
@@ -189,21 +189,15 @@ export function ABookEngine() {
     }
   }
 
-  async function exportPdf(action: "rotate" | "extract") {
+  async function exportPdf() {
     const file = pdfAttachments.find((item) => item.id === selectedPdfs[0]);
     if (!file) { setError("Select a PDF first."); return; }
     try {
-      const bytes = action === "rotate"
-        ? await rotatePdf(file.blob, rotateAngle)
-        : await extractPdfPages(file.blob, pageRange.split(",").flatMap((part) => {
-            const match = part.trim().match(/^(\d+)(?:-(\d+))?$/);
-            if (!match) throw new Error(`Invalid page range: ${part}`);
-            const first = Number(match[1]); const last = Number(match[2] ?? match[1]);
-            if (last < first || last - first > 500) throw new Error("Page range is invalid or too large.");
-            return Array.from({ length: last - first + 1 }, (_, index) => first + index);
-          }));
-      pdfDownload(bytes, `${safeName(file.name.replace(/\.pdf$/i, ""))}-${action}.pdf`);
-      setPdfInfo(action === "rotate" ? `Rotated ${file.name} locally` : `Extracted pages from ${file.name} locally`);
+      const details = await inspectPdf(file.blob);
+      const pages = parsePageRanges(pageRange, details.pageCount);
+      const bytes = await extractPdfPages(file.blob, pages);
+      pdfDownload(bytes, `${safeName(file.name.replace(/\.pdf$/i, ""))}-extracted.pdf`);
+      setPdfInfo(`Extracted ${pages.length} pages from ${file.name} locally`);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The PDF operation failed.");
@@ -443,7 +437,7 @@ export function ABookEngine() {
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void rotateSelectedBatch()}>Rotate selected PDFs</Button>
                 <input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="PDF page numbers" placeholder="Pages e.g. 1-3,5" className="min-h-8 w-36 rounded-md border border-border bg-background px-2 text-xs" />
                 <input value={splitRanges} onChange={(event) => setSplitRanges(event.target.value)} aria-label="PDF split page groups" placeholder="Parts e.g. 1-3;4-6" className="min-h-8 w-40 rounded-md border border-border bg-background px-2 text-xs" />
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void exportPdf("extract")}>Extract pages</Button>
+                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void exportPdf()}>Extract pages</Button>
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void splitSelectedPdf()}>Split into parts</Button>
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
