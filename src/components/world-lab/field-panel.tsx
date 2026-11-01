@@ -1,5 +1,5 @@
 import type {FieldLayer,FieldPalette} from "@/lib/world-lab/field-layer";
-import {fieldFrameAtTime} from "@/lib/world-lab/field-layer";
+import {fieldFrameAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
 
 type Props={layers:readonly FieldLayer[];selectedId:string;onSelect:(id:string)=>void;
  timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void};
@@ -65,6 +65,13 @@ export function WorldLabFieldPanel(p:Props){
 export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number;visible:boolean}){
  const layer=p.layer;
  if(!p.visible||!layer)return null;
+ if(!isFieldOverlayRendererImplemented(layer.kind,layer.renderer.kind)){
+  return <div className="pointer-events-none absolute right-2 top-2 max-w-[min(78%,340px)] rounded-lg border border-border bg-bg/90 p-2 text-xs shadow"
+   role="status" aria-label={layer.legend.accessibleDescription}>
+   <p className="font-semibold">{layer.legend.title}</p>
+   <p>This field is registered, but the {layer.renderer.kind} renderer is not implemented in this view. No substitute visualization is shown.</p>
+  </div>;
+ }
  if(layer.kind==="event"){
   const events=layer.events.filter(e=>e.atSeconds<=p.timeSeconds);
   return <div className="pointer-events-none absolute right-2 top-2 max-w-[min(75%,360px)] rounded-lg border border-border bg-bg/90 p-2 text-xs shadow"

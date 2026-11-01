@@ -37,6 +37,13 @@ const dimensions=(x:unknown):x is [number,number,number]=>Array.isArray(x)&&x.le
 const vector3=(x:unknown):x is [number,number,number]=>Array.isArray(x)&&x.length===3&&x.every(finite);
 const componentCount=(kind:FieldKind)=>kind==="scalar"?1:kind==="vector"?3:kind==="tensor"?9:0;
 const rendererKinds:readonly FieldRendererKind[]=["slice","streamlines","glyphs","isosurface","heatmap","volume","line-plot","event-trace"];
+/** True only where this client has a real renderer implementation; never fall back across data kinds. */
+export function isFieldOverlayRendererImplemented(kind:FieldKind,renderer:FieldRendererKind):boolean{
+ if(kind==="event")return renderer==="event-trace";
+ if(kind==="network")return renderer==="event-trace";
+ if(kind==="scalar")return renderer==="heatmap"||renderer==="line-plot";
+ return false;
+}
 const palettes:readonly FieldPalette[]=["cividis","viridis","magma","blue-orange"];
 const renderersFor=(kind:FieldKind):readonly FieldRendererKind[]=>{
  if(kind==="scalar")return ["slice","isosurface","heatmap","volume","line-plot"];

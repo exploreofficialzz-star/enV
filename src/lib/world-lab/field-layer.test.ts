@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {runExperiment,type ModelInput} from "./model.ts";
-import {createComputedFieldLayers,fieldFrameAtTime,fieldValueToDisplay,parseFieldLayer} from "./field-layer.ts";
+import {createComputedFieldLayers,fieldFrameAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
 const run=(kind:"damped-oscillator"|"rc-circuit"|"heat-rod")=>{
  const inputs:ModelInput=kind==="damped-oscillator"
   ?{kind,massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0}
@@ -51,4 +51,13 @@ test("unit conversion uses declared display factor and offset",()=>{
  const celsius=parseFieldLayer({...base,units:{si:"K",display:"°C",scaleToSI:1,offsetToSI:273.15}});
  assert.equal(fieldValueToDisplay(celsius,300),26.850000000000023);
  assert.throws(()=>fieldValueToDisplay(celsius,Number.NaN),/finite SI/);
+});
+
+test("renderer capability is explicit and unsupported vector or tensor renderers never masquerade as line plots",()=>{
+ assert.equal(isFieldOverlayRendererImplemented("scalar","line-plot"),true);
+ assert.equal(isFieldOverlayRendererImplemented("scalar","heatmap"),true);
+ assert.equal(isFieldOverlayRendererImplemented("vector","streamlines"),false);
+ assert.equal(isFieldOverlayRendererImplemented("tensor","isosurface"),false);
+ assert.equal(isFieldOverlayRendererImplemented("event","event-trace"),true);
+ assert.equal(isFieldOverlayRendererImplemented("network","event-trace"),true);
 });
