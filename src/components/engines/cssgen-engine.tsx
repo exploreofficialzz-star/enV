@@ -4,7 +4,7 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type CssGradientKind, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, buildCssMeshGradient, moveGradientStop, moveGradientStopTo, normalizeGradientStops, type CssGradientKind, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { buildLowPolySvg, buildMeshGradientSvg, buildScatterSvg, buildTextureSvg } from "@/lib/engines/svg-backgrounds";
 import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
@@ -472,6 +472,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
     return allFields;
   }, [allFields, family, values.artStyle, values.colorSpace, values.kind, values.meshMode]);
   const [gradientStops, setGradientStops] = useState<GradientStop[]>(DEFAULT_GRADIENT_STOPS);
+  const [draggedGradientStopId, setDraggedGradientStopId] = useState<string | null>(null);
   const [shadowLayers, setShadowLayers] = useState<ShadowLayer[]>(() => createShadowPreset("soft"));
   const [textShadowLayers, setTextShadowLayers] = useState<TextShadowLayer[]>(() => createTextShadowPreset("soft"));
   const [gradientGlow, setGradientGlow] = useState(false);
@@ -482,6 +483,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   useEffect(() => {
     setValues(initialValues(allFields));
     setGradientStops(DEFAULT_GRADIENT_STOPS.map((stop) => ({ ...stop })));
+    setDraggedGradientStopId(null);
     setShadowLayers(createShadowPreset("soft"));
     setTextShadowLayers(createTextShadowPreset("soft"));
     setGradientGlow(false);
@@ -563,14 +565,37 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 id="gradient-stops-heading" className="text-sm font-semibold text-fg">Color stops</h3>
-                  <p className="mt-1 text-xs text-muted">Add, recolor and position each stop. The preview updates instantly.</p>
+                  <p className="mt-1 text-xs text-muted">Add, recolor and position each stop. Drag to reorder, or use the move controls for keyboard and touch.</p>
                 </div>
                 <Button type="button" size="sm" onClick={addGradientStop} disabled={gradientStops.length >= 8}>Add stop ({gradientStops.length}/8)</Button>
               </div>
               <div className="h-4 rounded-full border border-border" aria-hidden="true" style={{ background: `linear-gradient(90deg, ${sortedGradientStops.map((stop) => `${stop.color} ${stop.position}%`).join(", ")})` }} />
               <div className="space-y-2">
                 {sortedGradientStops.map((stop, index) => (
-                  <div key={stop.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_5.5rem_auto] sm:items-center">
+                  <div
+                    key={stop.id}
+                    data-testid={`gradient-stop-${stop.id}`}
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", stop.id);
+                      setDraggedGradientStopId(stop.id);
+                    }}
+                    onDragEnd={() => setDraggedGradientStopId(null)}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const sourceId = event.dataTransfer.getData("text/plain") || draggedGradientStopId;
+                      if (sourceId && sourceId !== stop.id) {
+                        setGradientStops((previous) => moveGradientStopTo(previous, sourceId, stop.id));
+                      }
+                      setDraggedGradientStopId(null);
+                    }}
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-lg bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_5.5rem_auto] sm:items-center ${draggedGradientStopId === stop.id ? "opacity-50 ring-2 ring-accent" : ""}`}
+                  >
                     <label className="flex min-w-0 items-center gap-2">
                       <Input type="color" value={stop.color} onChange={(event) => setGradientStops((previous) => previous.map((item) => item.id === stop.id ? { ...item, color: event.target.value } : item))} className="h-10 w-12 shrink-0 p-1" aria-label={`Color for stop ${index + 1}`} />
                       <span className="min-w-0">
