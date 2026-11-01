@@ -187,6 +187,14 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
                     put("notebook",old.notebook);put("tags",old.tags);put("revision",rev);put("created_at",System.currentTimeMillis())
                 })
                 db.execSQL("DELETE FROM revisions WHERE note_id=? AND id NOT IN (SELECT id FROM revisions WHERE note_id=? ORDER BY created_at DESC LIMIT 40)",arrayOf(old.id,old.id))
+                val revisionCount=db.rawQuery("SELECT COUNT(*) FROM revisions",null).use{cursor->if(cursor.moveToFirst())cursor.getLong(0)else 0L}
+                if(revisionCount>100_000L){
+                    val excess=(revisionCount-100_000L).toInt()
+                    val oldest=db.rawQuery("SELECT id FROM revisions ORDER BY created_at ASC,id ASC LIMIT ?",arrayOf(excess.toString())).use{cursor->
+                        buildList{while(cursor.moveToNext())add(cursor.getString(0))}
+                    }
+                    oldest.forEach{id->db.delete("revisions","id=?",arrayOf(id))}
+                }
             }
             val saved=note.copy(updatedAt=System.currentTimeMillis(),revision=rev)
             db.insertWithOnConflict("notes",null,ContentValues().apply{
