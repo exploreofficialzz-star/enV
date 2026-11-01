@@ -19,7 +19,7 @@ import {
   type ABookNote,
   type ABookRevision,
 } from "@/lib/a-book/local-store";
-import { extractPdfPages, inspectPdf, mergePdfs, parsePageRanges, pdfDownload, rotatePdf, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
+import { extractPdfPages, inspectPdf, mergePdfs, parsePageRanges, pdfDownload, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
 import { createABookArchive, parseABookLegacyNotesJson, readABookArchive } from "@/lib/a-book/archive";
 
 function localDownload(blob: Blob, filename: string) {
