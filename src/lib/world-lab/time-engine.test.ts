@@ -26,7 +26,7 @@ test("forward and reverse replay traverse actual stored samples only",()=>{
  assert.equal(forward.simulationTimeSeconds,0.025);
  assert.equal(forward.displaySampleTimeSeconds,0.02);
  const reverseState=withTimeEngineDirection(forward,"reverse-recording");
- const reverse=advanceTimeEngine(r,reverseState,0.011);
+ const reverse=advanceTimeEngine(r,{...reverseState,paused:false},0.011);
  assert.equal(reverse.simulationTimeSeconds,0.014);
  assert.equal(reverse.displaySampleTimeSeconds,0.01);
  assert.equal(reverse.fidelity,"cached-recording-reverse");
@@ -41,7 +41,7 @@ test("forward and reverse playback stop on mandatory recorded event boundaries",
  const reverseState=withTimeEngineDirection(createTimeEngineState(r,{
   wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.5,paused:false
  }),"reverse-recording");
- const reverse=advanceTimeEngine(r,reverseState,0.4,[0.2,0.3]);
+ const reverse=advanceTimeEngine(r,{...reverseState,paused:false},0.4,[0.2,0.3]);
  assert.equal(reverse.simulationTimeSeconds,0.3);
  assert.equal(reverse.fidelity,"cached-recording-reverse");
 });
@@ -49,7 +49,8 @@ test("event playback rejects boundaries outside the immutable run",()=>{
  const r=run(),state=createTimeEngineState(r,{paused:false});
  assert.throws(()=>advanceTimeEngine(r,state,0.1,[1.1]),/Mandatory event time/);
  const reverse=withTimeEngineDirection(createTimeEngineState(r,{simulationTimeSeconds:0.5,paused:false}),"reverse-recording");
- assert.throws(()=>advanceTimeEngine(r,reverse,0.1,[-0.1]),/Mandatory event time/);
+ // Direction changes pause by design; invalid event boundaries are rejected even while paused.
+ assert.throws(()=>advanceTimeEngine(r,reverse,0,[-0.1]),/Mandatory event time/);
 });
 test("seek snaps to an authoritative sample and checkpoint restores independent clock values",()=>{
  const r=run(),base=createTimeEngineState(r,{wallTimeUTC:"2026-11-01T12:00:00Z",simulationTimeSeconds:0.5,playbackRate:100,timezoneDisplay:"Africa/Lagos"});
@@ -75,5 +76,5 @@ test("slow playback accumulates wall-time fractions instead of sticking on one f
  const r=run();let clock=createTimeEngineState(r,{playbackRate:0.1,paused:false});
  for(let i=0;i<100;i++)clock=advanceTimeEngine(r,clock,0.016);
  assert.ok(clock.simulationTimeSeconds>0.1);
- assert.equal(clock.displaySampleTimeSeconds,0.1);
+ assert.ok(Math.abs(clock.displaySampleTimeSeconds-0.16)<1e-9);
 });
