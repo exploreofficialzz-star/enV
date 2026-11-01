@@ -794,3 +794,8 @@ release-candidate evidence bundle are unfinished.
 - The authoritative Android CI run exposed a Kotlin backend bytecode failure: the accumulated native feature UI made NativeWorldLabForm exceed the JVM method-size limit. This was not a solver or CAD numerical failure; compilation stopped before unit tests and rendered-preview assertions could execute.
 - Split the largest digital/circuit panel and selected-solid workspace (including CAD, collision, material, fluid and motion controls) into independent Compose lambdas. The existing state, callbacks, view order, features and native screen remain intact; no controls or test assertions were removed.
 - The next authoritative Android run must confirm both debug/release compilation and Kotlin tests/lint. The Android preview must then repeat its real rendered/touch assertions; this source correction is not itself a CI pass.
+
+## Android C/D unit-test corrections from the post-compile run — 2026-11-01
+- The observer camera regression file contained two pose tests after its class-closing brace; they are now members of NativeWorldLabCameraTest so JUnit discovers them instead of reporting an InvalidTestClassError.
+- Corrected the CAD merge test's revision expectation to assert the target revision plus one. Importing geometry is one edit on top of the target invention's existing revision, not a reset to revision one.
+- The Compose panels compiled in the latest run; the Kotlin test suite then reported these two test-source failures. Both are corrected and require a fresh exact-head Android rerun.
