@@ -1539,6 +1539,12 @@ fun NativeWorldLabForm() {
                                 labNumber(linked.input.supplyVoltageV)+" V")
                             Text(linked.validity,style=MaterialTheme.typography.bodySmall)
                         }
+                        Text("Applied source voltage: "+labNumber(sample.sourceVoltageV)+" V")
+                        if(run.modelVersion=="1.2.0"){
+                            Text(if(sample.timeSeconds<(motorPowerOffAtSeconds?:Double.POSITIVE_INFINITY))
+                                "Supply connected" else if(abs(sample.currentA)>1e-4)
+                                "Supply isolated · coil current decaying" else "Supply isolated · current near zero")
+                        }
                         Text("Electrical current: "+labNumber(sample.currentA)+" A")
                         Text("Powered height: "+labNumber(sample.heightM)+" m")
                         Text("Upward force: "+labNumber(sample.motorForceN)+" N")
