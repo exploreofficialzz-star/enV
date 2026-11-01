@@ -684,3 +684,8 @@ release-candidate evidence bundle are unfinished.
 - Native iOS now accepts both whole-second and fractional-second valid ISO-8601 timestamps in Web/Android scientific records, without altering the signed-out original evidence string.
 - Android scientific and optical histories now enforce one combined 20-record quota and reject cross-store duplicate IDs with different immutable bodies; equivalent optical records imported from full archives are idempotent. Formatting differences alone no longer create false conflicting records.
 - Relocated an optical power-conservation source regression accidentally pasted into the documentation ledger into its real TypeScript test file. New source and revisions remain unverified until the deferred test pass.
+
+## Portable full-archive revision preservation
+- Corrected Web complete-archive restore to preserve the source invention's identity, creation timestamp and revision rather than resetting a 17th-revision invention to revision zero while leaving immutable science records at revision 17.
+- A new IndexedDB project retains the imported original revision, whereas subsequent saved edits still increment optimistically against the stored revision. The three-store atomic transaction explicitly rejects scientific evidence newer than the saved project revision and compares immutable record bodies canonically so harmless JSON property order cannot reject an identical imported record.
+- Added pure source regression cases for restored revision 17, subsequent revision 18, mismatched invention identities and exhausted revision counters. Automated execution remains deferred as requested.

@@ -159,6 +159,14 @@ export async function putLocalWorldLabProject(
  * transaction. Failure of any run, revision conflict or quota aborts all writes.
  * This is used for complete portable archive import and ordinary save alike.
  */
+export function plannedWorldLabSaveRevision(project:WorldLabProject,
+  previous:WorldLabProject|null):number{
+  if(previous&&previous.id!==project.id)
+    throw new Error("Existing saved invention identity does not match.");
+  if(previous&&previous.revision>=1000000000)
+    throw new Error("Invention revision limit reached; export an independent copy.");
+  return previous?previous.revision+1:project.revision;
+}
 export async function putLocalWorldLabArchive(source:WorldLabProject,
   expectedRevision:number|null,runs:readonly LabRun[],
   scientificRecords:readonly ScientificEvidenceRecord[]=[]):Promise<WorldLabProject>{
@@ -187,7 +195,7 @@ export async function putLocalWorldLabArchive(source:WorldLabProject,
     if(unique.has(record.id))
       throw new Error("A numerical run and a scientific record share an immutable ID.");
     unique.add(record.id);
-    return {record,serialized:JSON.stringify(record)};
+    return {record,serialized:canonicalEvidence(record)};
   });
   const db=await connect();
   return new Promise((resolve,reject)=>{
@@ -208,7 +216,10 @@ export async function putLocalWorldLabArchive(source:WorldLabProject,
         if((previous?.revision??null)!==expectedRevision)
           throw new Error("Project revision changed on this device. Neither project nor runs were overwritten.");
         saved=parseWorldLabProject({...project,
-          revision:(previous?.revision??-1)+1,updatedAt:new Date().toISOString()});
+          // A new local copy of a full scientific archive must preserve its
+          // original history/revision. Existing local edits still advance by one.
+          revision:plannedWorldLabSaveRevision(project,previous),
+          updatedAt:new Date().toISOString()});
         const existing=history.index("projectId").getAll(project.id);
         existing.onsuccess=()=>{
           try{
@@ -233,12 +244,14 @@ export async function putLocalWorldLabArchive(source:WorldLabProject,
                 const prior=evidenceRequest.result as ScientificEvidenceRecord[];
                 if(prior.length>MAX_SCIENCE_EVIDENCE_PER_PROJECT)
                   throw new Error("Saved scientific evidence history is inconsistent.");
+                if(preparedEvidence.some(item=>item.record.projectRevision>saved!.revision))
+                  throw new Error("Scientific evidence belongs to a newer invention revision; the atomic save was cancelled.");
                 const byEvidenceId=new Map(prior.map(record=>[record.id,record]));
                 let additional=0;
                 for(const item of preparedEvidence){
                   const previousEvidence=byEvidenceId.get(item.record.id);
                   if(previousEvidence){
-                    if(JSON.stringify(parseScientificEvidenceRecord(previousEvidence))!==
+                    if(canonicalEvidence(parseScientificEvidenceRecord(previousEvidence))!==
                       item.serialized)
                       throw new Error("Immutable scientific evidence cannot be overwritten.");
                   }else additional++;

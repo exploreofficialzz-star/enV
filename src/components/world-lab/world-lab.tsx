@@ -1756,7 +1756,10 @@ export default function WorldLab() {
       const now=new Date().toISOString();
       setProject(parseWorldLabProject({...imported,
         id:isCompleteArchive?imported.id:crypto.randomUUID(),
-        title:imported.title,revision:0,createdAt:now,updatedAt:now}));
+        title:imported.title,
+        revision:isCompleteArchive?imported.revision:0,
+        createdAt:isCompleteArchive?imported.createdAt:now,
+        updatedAt:isCompleteArchive?imported.updatedAt:now}));
       clearEditHistory();
       setSavedRevision(null);
       setWorkspaceDirty(true);
@@ -1766,7 +1769,7 @@ export default function WorldLab() {
       setComparisonRunId("");setPlaying(false);setTimeSeconds(0);
       setImportWarnings(warnings);
       setMessage(isCompleteArchive?
-        "Imported project and recorded scientific runs. Save locally to archive both on this device.":
+        "Imported the complete invention, original revision and scientific history. Save locally to preserve all evidence on this device.":
         "Imported a local project copy. Save it to keep it on this device.");
     }catch(cause){setError(cause instanceof Error?cause.message:"This file could not be imported.");}
   }
