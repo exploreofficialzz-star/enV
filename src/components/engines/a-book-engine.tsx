@@ -68,6 +68,8 @@ export function ABookEngine() {
   const [storageMessage, setStorageMessage] = useState("Saved on this device");
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const pdfAbortController = useRef<AbortController | null>(null);
   const [selectedPdfs, setSelectedPdfs] = useState<string[]>([]);
   const [pageRange, setPageRange] = useState("1");
   const [splitRanges, setSplitRanges] = useState("1-3;4-6");
@@ -145,6 +147,7 @@ export function ABookEngine() {
   async function selectNote(note: ABookNote) {
     try {
       await flushCurrentDraft();
+      pdfAbortController.current?.abort();
       setCurrentNote(note);
       setError("");
     } catch (cause) {
@@ -284,6 +287,14 @@ export function ABookEngine() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
 
+  useEffect(() => () => {
+    pdfAbortController.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    pdfAbortController.current?.abort();
+  }, [current?.id]);
+
   const visibleNotes = useMemo(() => notes.filter((note) => {
     const term = query.trim().toLowerCase();
     return !term || [note.title, note.body, note.notebook, ...note.tags].join(" ").toLowerCase().includes(term);
@@ -322,82 +333,106 @@ export function ABookEngine() {
     if (fileInput.current) fileInput.current.value = "";
   }
 
-  async function inspectSelectedPdf(file: ABookAttachment) {
+  async function runPdfOperation(
+    label: string,
+    fallback: string,
+    operation: (signal: AbortSignal) => Promise<void>,
+  ): Promise<void> {
+    if (pdfAbortController.current) return;
+    const controller = new AbortController();
+    pdfAbortController.current = controller;
+    setPdfBusy(true);
+    setPdfInfo(`${label} locally…`);
+    setError("");
     try {
-      const details = await inspectPdfInWorker(file.blob);
+      await operation(controller.signal);
+    } catch (cause) {
+      if (controller.signal.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
+        setPdfInfo("PDF processing cancelled.");
+      } else {
+        setPdfInfo("PDF processing failed.");
+        setError(cause instanceof Error ? cause.message : fallback);
+      }
+    } finally {
+      if (pdfAbortController.current === controller) pdfAbortController.current = null;
+      setPdfBusy(false);
+    }
+  }
+
+  function cancelPdfOperation() {
+    if (!pdfAbortController.current) return;
+    setPdfInfo("Cancelling local PDF processing…");
+    pdfAbortController.current.abort();
+  }
+
+  async function inspectSelectedPdf(file: ABookAttachment) {
+    await runPdfOperation("Inspecting PDF", "This PDF could not be inspected locally.", async (signal) => {
+      const details = await inspectPdfInWorker(file.blob, signal);
       setPdfInfo(`${file.name}: ${details.pageCount} pages${details.title ? ` · ${details.title}` : ""}`);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(file.blob));
       setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "This PDF could not be inspected locally.");
-    }
+    });
   }
 
   async function exportPdf() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
     if (!files.length) { setError("Select at least one PDF."); return; }
-    try {
+    await runPdfOperation("Extracting selected pages", "The selected PDFs could not be extracted locally.", async (signal) => {
       if (files.length === 1) {
         const file = files[0];
-        const details = await inspectPdfInWorker(file.blob);
+        const details = await inspectPdfInWorker(file.blob, signal);
         const pages = parsePageRanges(pageRange, details.pageCount);
-        const bytes = await extractPdfPagesInWorker(file.blob, pages);
+        const bytes = await extractPdfPagesInWorker(file.blob, pages, signal);
         pdfDownload(bytes, `${safeName(file.name.replace(/\.pdf$/i, ""))}-extracted.pdf`);
         setPdfInfo(`Extracted ${pages.length} pages from ${file.name} locally`);
       } else {
-        const archive = await extractSelectedPdfsInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), pageRange);
+        const archive = await extractSelectedPdfsInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), pageRange, signal);
         zipDownload(archive, "a-book-extracted-pdfs.zip");
         setPdfInfo(`Extracted pages from ${files.length} PDFs locally`);
       }
       setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The selected PDFs could not be extracted locally.");
-    }
+    });
   }
 
   async function rotateSelectedBatch() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
-    try {
-      const archive = await rotateSelectedPdfsInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), rotateAngle);
+    if (!files.length) { setError("Select at least one PDF."); return; }
+    await runPdfOperation("Rotating selected PDFs", "The selected PDFs could not be rotated locally.", async (signal) => {
+      const archive = await rotateSelectedPdfsInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), rotateAngle, signal);
       zipDownload(archive, "a-book-rotated-pdfs.zip");
       setPdfInfo(`Rotated ${files.length} PDFs locally`);
       setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The selected PDFs could not be rotated locally.");
-    }
+    });
   }
 
   async function splitSelectedPdf() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
     if (!files.length) { setError("Select at least one PDF to split."); return; }
-    try {
+    await runPdfOperation("Splitting selected PDFs", "The selected PDFs could not be split locally.", async (signal) => {
       if (files.length === 1) {
         const file = files[0];
-        const archive = await splitPdfIntoZipInWorker(file.blob, file.name, splitRanges);
+        const archive = await splitPdfIntoZipInWorker(file.blob, file.name, splitRanges, signal);
         zipDownload(archive, `${safeName(file.name.replace(/\.pdf$/i, ""))}-parts.zip`);
         setPdfInfo(`Created PDF parts from ${file.name} locally`);
       } else {
-        const archive = await splitSelectedPdfsIntoZipInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), splitRanges);
+        const archive = await splitSelectedPdfsIntoZipInWorker(files.map((file) => ({ name: file.name, blob: file.blob })), splitRanges, signal);
         zipDownload(archive, "a-book-split-pdfs.zip");
         setPdfInfo(`Created parts from ${files.length} PDFs locally`);
       }
       setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The selected PDFs could not be split locally.");
-    }
+    });
   }
 
   async function mergeSelectedPdfs() {
     const files = pdfAttachments.filter((file) => selectedPdfs.includes(file.id));
-    try {
-      const bytes = await mergePdfsInWorker(files.map((file) => file.blob));
+    if (files.length < 2) { setError("Select at least two PDFs to merge."); return; }
+    await runPdfOperation("Merging selected PDFs", "The PDFs could not be merged locally.", async (signal) => {
+      const bytes = await mergePdfsInWorker(files.map((file) => file.blob), signal);
       pdfDownload(bytes, "a-book-merged.pdf");
       setPdfInfo(`Merged ${files.length} PDFs locally`);
       setError("");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The PDFs could not be merged locally.");
-    }
+    });
   }
 
   async function exportCurrentMarkdown() {
@@ -615,7 +650,7 @@ export function ABookEngine() {
               {attachments.map((file) => <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs">
                 <span className="min-w-0 flex-1 truncate">{file.name} · {(file.size / 1024).toFixed(0)} KB</span>
                 <button type="button" className="underline" onClick={() => localDownload(file.blob, file.name)}>Download</button>
-                {file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? <button type="button" className="underline" onClick={() => void inspectSelectedPdf(file)}>Inspect PDF</button> : null}
+                {file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? <button type="button" className="underline" disabled={pdfBusy} onClick={() => void inspectSelectedPdf(file)}>Inspect PDF</button> : null}
                 <button type="button" className="text-red-600 underline" onClick={() => void removeFile(file)}>Remove</button>
               </div>)}
             </div> : <p className="text-xs text-muted">No files attached.</p>}
@@ -623,16 +658,17 @@ export function ABookEngine() {
               <p className="text-xs font-semibold">Local PDF tools</p>
               {pdfAttachments.map((file) => <label key={file.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedPdfs.includes(file.id)} onChange={(event) => setSelectedPdfs((selected) => event.target.checked ? [...selected, file.id] : selected.filter((id) => id !== file.id))} />{file.name}</label>)}
               {pdfInfo ? <p role="status" className="text-xs text-muted">{pdfInfo}</p> : null}
+              {pdfBusy ? <Button type="button" size="sm" variant="outline" onClick={cancelPdfOperation}>Cancel processing</Button> : null}
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex items-center gap-1 text-xs">Rotate
                   <select value={rotateAngle} onChange={(event) => setRotateAngle(Number(event.target.value) as 90 | 180 | 270)} className="min-h-8 rounded-md border border-border bg-background px-2"><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select>
                 </label>
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void rotateSelectedBatch()}>Rotate selected PDFs</Button>
+                <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void rotateSelectedBatch()}>Rotate selected PDFs</Button>
                 <input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="PDF page numbers" placeholder="Pages e.g. 1-3,5" className="min-h-8 w-36 rounded-md border border-border bg-background px-2 text-xs" />
                 <input value={splitRanges} onChange={(event) => setSplitRanges(event.target.value)} aria-label="PDF split page groups" placeholder="Parts e.g. 1-3;4-6" className="min-h-8 w-40 rounded-md border border-border bg-background px-2 text-xs" />
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void exportPdf()}>Extract selected pages</Button>
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void splitSelectedPdf()}>Split selected PDFs</Button>
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
+                <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void exportPdf()}>Extract selected pages</Button>
+                <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 1} onClick={() => void splitSelectedPdf()}>Split selected PDFs</Button>
+                <Button type="button" size="sm" variant="outline" disabled={pdfBusy || selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
               {previewUrl ? <iframe title="Local PDF preview" src={previewUrl} className="h-[480px] w-full rounded-md border border-border bg-background" /> : null}
             </div> : null}
