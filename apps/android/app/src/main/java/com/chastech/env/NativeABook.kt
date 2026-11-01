@@ -2,17 +2,13 @@ package com.chastech.env
 
 import android.content.ContentValues
 import android.content.Context
-import com.google.android.gms.tasks.Tasks
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.common.InputImage
-import com.google.android.gms.tasks.Tasks
 import android.os.ParcelFileDescriptor
 import android.graphics.pdf.PdfRenderer
 import android.graphics.Bitmap
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.provider.OpenableColumns
@@ -30,8 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.rendering.ImageType
-import com.tom_roush.pdfbox.rendering.PDFRenderer
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -254,41 +248,6 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
 }
 
 
-
-private fun extractABookPdfOcr(context:Context,source:File):String{
-    require(source.isFile&&source.length() in 1..(100L*1024*1024)){"Choose a PDF between 1 byte and 100 MB for local OCR."}
-    PDFBoxResourceLoader.init(context)
-    val recognizer=TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    try{
-        PDDocument.load(source).use{document->
-            require(document.numberOfPages in 1..100){"Local OCR supports up to 100 pages per run. Split the PDF into smaller parts first."}
-            val renderer=PDFRenderer(document)
-            val output=StringBuilder()
-            for(index in 0 until document.numberOfPages){
-                val box=document.getPage(index).cropBox
-                val widthPx=(box.width.toDouble()*120.0/72.0).toLong()
-                val heightPx=(box.height.toDouble()*120.0/72.0).toLong()
-                require(widthPx in 1..3000&&heightPx in 1..3000&&widthPx*heightPx<=12_000_000L){
-                    "Page ${index+1} is too large for safe local OCR. Reduce its page size or export it as an image first."
-                }
-                val bitmap=renderer.renderImageWithDPI(index,120f,ImageType.RGB)
-                val text=try{
-                    Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap,0))).text
-                }finally{
-                    bitmap.recycle()
-                }
-                if(text.isNotBlank()){
-                    if(output.isNotEmpty())output.append("\n\n")
-                    output.append(text)
-                }
-                if(output.length>=150_000)break
-            }
-            return output.take(150_000).toString()
-        }
-    }finally{
-        recognizer.close()
-    }
-}
 
 private fun createABookBackup(context:Context,db:ABookLocalDb):File{
     val allNotes=db.notes(true,true)
@@ -739,11 +698,6 @@ fun NativeABookScreen(){
                         val result=withContext(Dispatchers.IO){runCatching{PDFBoxResourceLoader.init(context);PDDocument.load(local).use{doc->"Pages: ${doc.numberOfPages}\n\n"+PDFTextStripper().getText(doc).take(150000)}}}
                         result.fold({pdfText=it;status="Text extracted on this device";error=""},{error=it.message?:"Local PDF extraction failed";status="Not saved"})
                     }}){Text("Extract text")}
-                    OutlinedButton(onClick={scope.launch{
-                        status="Running offline OCR…";error=""
-                        val result=withContext(Dispatchers.IO){runCatching{extractABookPdfOcr(context,local)}}
-                        result.fold({pdfText=it;status="OCR completed on this device (Latin script)";error=""},{error=it.message?:"Local OCR failed";status="Not saved"})
-                    }}){Text("OCR scanned pages")}
                     OutlinedButton(onClick={scope.launch{
                         val result=withContext(Dispatchers.IO){runCatching{
                             PDFBoxResourceLoader.init(context)
