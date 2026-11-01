@@ -69,6 +69,29 @@ const designHexColorConverterTool: ToolMeta = {
   engine: { type: "color", op: "picker" },
 };
 
+const aBookTool: ToolMeta = {
+  id: "a-book",
+  name: "A book",
+  slug: "a-book",
+  description: "A private local notes and document workspace. Create notes, attach files, organize and search your writing, and process PDFs on this device.",
+  category: "productivity",
+  subcategory: "Notes & documents",
+  keywords: ["a book", "notes", "notepad", "notebook", "local notes", "offline notes", "pdf", "document", "attachments", "markdown", "writing", "journal", "search", "folders", "tags"],
+  tags: ["notes", "notebook", "documents", "pdf", "local", "offline", "productivity"],
+  icon: "NotebookPen",
+  iconBackground: "#24354a",
+  iconAccent: "#d6e7f5",
+  popularity: 950,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: ["pdf-merger", "pdf-splitter", "document-editor"],
+  engine: { type: "custom", id: "a-book" },
+  isNew: true,
+};
+
 const allTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
   // shared with native clients, so expose these web-ready records as active here
@@ -78,6 +101,7 @@ const allTools: ToolMeta[] = [
       && catalogTool.status === "planned"
       ? { ...catalogTool, status: "active" }
       : catalogTool;
+    if (webTool.id === aBookTool.id) return aBookTool;
     if (webTool.id === songMetadataAnalyzerTool.id) return songMetadataAnalyzerTool;
     if (webTool.id === "qr-payload-inspector") {
       return {
@@ -97,6 +121,7 @@ const allTools: ToolMeta[] = [
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !catalogTools.some((tool) => tool.id === extension.id)),
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
 ];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));

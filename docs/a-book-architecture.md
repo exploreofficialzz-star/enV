@@ -1,0 +1,431 @@
+# A book — enV Toolkit Architecture
+
+**Status:** Architecture baseline — implementation not yet merged  
+**Tool ID:** a-book  
+**Route slug:** a-book  
+**Catalog category:** productivity  
+**Display name:** A book  
+**Platforms:** Web, Android, iOS  
+**Architecture mode:** Online-first, local-capable, cloud-backed
+
+## 1. Product boundary
+
+A book is an enV Toolkit tool. It is not a separate product, account system, cloud workspace or embedded web page inside the native apps.
+
+It uses enV's product catalog, visual design language and platform shell. It owns its note domain, editor, local persistence, local search, document-processing engines, import/export and recovery behavior.
+
+**Data boundary for the initial release: A book content stays on the user's device.** No A book notes, PDFs, images, audio, attachments, OCR text, search queries, filenames, document metadata or revision contents are uploaded to enV servers or third-party storage. No remote notes database, cloud file bucket, cloud sync, remote collaboration or cloud backup is part of this scope.
+
+The three platforms are independently implemented:
+- Web: React/TanStack UI and browser storage/processing APIs.
+- Android: Kotlin/Jetpack Compose and Android storage/document APIs.
+- iOS: SwiftUI and Apple storage/document APIs.
+
+Shared document contracts, schemas and test fixtures are allowed. Cross-platform UI/runtime embedding is not.
+
+The existing enV account may still be used by the surrounding enV platform for its ordinary account and catalog functions. A book's local note content must not depend on a login request or be sent through the account system. Signing out must not silently delete the local library.
+
+## 2. Local-only operating model
+
+For A book, local execution and local persistence are the product architecture—not a fallback mode.
+
+- The editor saves changes to the device's durable local database.
+- PDF rendering, text extraction, annotation, page operations, image processing, scanning and OCR run on the device using the platform's available local engines.
+- Search indexes and filters are local.
+- Attachments remain in app-managed device storage or a user-selected local folder.
+- The user can export a library or selected notes to a local file/location they control.
+- The product does not call a server to create, edit, search, render, annotate, import or export a note.
+- No remote synchronization, cloud backup, cloud attachment store or server-side document processor is included.
+
+“Online-first” for the wider enV platform means the enV shell/catalog can be online when available. It must not make A book's local content workflows online-dependent. After the Web tool's assets have been loaded/cached, the supported A book functionality must continue offline. Native apps must support local workflows without a network connection.
+
+Local data durability is not the same as cloud backup. Browser data can be cleared or evicted, and a device can be lost or damaged. Therefore:
+- Maintain local revisions and a trash/recovery area.
+- Provide user-controlled full export and restore from a local archive.
+- Let users choose a local destination such as Downloads, Files, a removable drive or another device.
+- Clearly warn when browser storage is unavailable, nearing quota or not persistent.
+- Do not claim that local revisions protect against device loss.
+- Do not silently copy user content into OS/cloud backup services under an enV-controlled claim. Explain that device backup behavior is governed by the operating system and user settings.
+
+No silent last-write-wins logic is required for cross-device sync because cross-device sync is out of scope. Local edit history still protects against accidental changes.
+
+## 3. High-level topology
+
+A book runs as a self-contained local data plane inside each enV platform client:
+
+Platform client
+  - Platform-native/responsive UI
+  - Editor adapter
+  - Local database and schema migrations
+  - App-managed attachment/document files
+  - Local full-text index
+  - Local revision history and trash
+  - On-device PDF/document/image processing engines
+  - Local import/export and recovery tools
+  - Platform capture and permission adapters
+
+No A book content API or cloud storage service sits behind this topology. Network access is not required for local note, document or PDF operations. If future product requirements add optional sync or remote sharing, that must be designed as a separate, explicitly opt-in feature and must not change the local-only default.
+
+## 4. Platform implementation
+
+### 4.1 Web
+
+- React/TanStack route at \`/tools/productivity/a-book\`.
+- IndexedDB for notes, notebooks, tags, revisions, settings and document metadata.
+- OPFS for larger binary files and working files where supported; use an IndexedDB Blob fallback for browsers without adequate OPFS support.
+- Request persistent browser storage when supported. Detect quota errors and show a clear warning; browsers may evict data or users may clear site data.
+- Cache the application shell and versioned static assets using a service worker/PWA so the tool can reopen offline after its first successful load. Never treat the service-worker cache as the user's data backup.
+- Use Tiptap/ProseMirror for the Web rich-text editor with a pinned, license-audited extension set.
+- Use PDF.js for local PDF rendering, navigation, text selection and text extraction. Use a local PDF manipulation library/worker such as pdf-lib for supported page operations and writing/flattening supported annotations. Keep the processing worker local; do not call a hosted PDF API.
+- Use local OCR (for example, a bundled WebAssembly OCR engine) only after verifying bundle size, language packs, licensing, worker isolation and performance on low-memory devices. No OCR service upload.
+- Use browser file picker, drag-and-drop, File System Access API when supported, camera capture where available and ordinary downloads for import/export. Do not require optional browser APIs for core editing.
+- Web Crypto may support optional local-vault encryption, but key derivation, recovery and compatibility must be designed and tested before making an encryption claim.
+- Process large PDFs in workers and bounded chunks. Do not load unbounded archives or huge document bitmaps into the main UI thread.
+
+### 4.2 Android
+
+- Native Kotlin/Jetpack Compose screens and editor; no WebView.
+- Room/SQLite as the durable local store, with explicit schema migrations.
+- App-private files for attachments, PDF working copies, thumbnails, OCR output and temporary exports.
+- Android Keystore for device-protected cryptographic keys if local database/file encryption is implemented.
+- Use Android document picker/Storage Access Framework for user-selected import and export destinations.
+- Use the existing PDFBox Android dependency for compatible local PDF text/page processing; validate support and performance for every operation before exposing it. Use Android PdfRenderer for page previews where appropriate.
+- Use CameraX/native camera flows for capture. Use on-device OCR such as ML Kit Text Recognition only when the required model is available locally; do not silently fall back to a network processor.
+- WorkManager is not needed for cloud synchronization in this release. It may run clearly identified local maintenance tasks, such as thumbnail generation or local index rebuilds, with appropriate constraints.
+- Widgets and share targets are native enhancements; core note creation must not require permissions beyond the app's normal sandbox.
+
+### 4.3 iOS
+
+- Native SwiftUI screens and editor; no WebView.
+- The current project deployment target is iOS 16.4. Do not make SwiftData (iOS 17+) a Phase 1 dependency unless the minimum supported OS is deliberately raised. Use Core Data or SQLite behind a repository interface.
+- App-private files for attachments, PDF working copies, thumbnails and exports; Keychain for local-vault keys where applicable.
+- Use PDFKit for local PDF viewing, selection, annotation and supported page manipulation.
+- Use Vision for on-device text recognition/OCR and image analysis; use VisionKit document scanning where appropriate.
+- Use FileDocument, document pickers and Files integration for user-controlled import/export.
+- Use App Groups only for data intentionally shared with an approved Share Extension or widget.
+- WidgetKit, App Intents/Shortcuts and Share Extension provide local quick capture.
+- No BGTaskScheduler or background URLSession sync pipeline is needed for A book in this local-only release.
+- Request Photos, Camera or Microphone permission only when the corresponding local feature is invoked.
+
+### Local-processing rule
+
+Every operation exposed in A book must declare its execution mode: \`local\`, \`local-with-optional-model-download\`, or \`unsupported\`. For this release, do not offer server-processing fallback. If a device/browser cannot process a format locally, explain the limitation and offer export/open-with-compatible-app rather than uploading the user's file.
+
+## 5. Shared document contract
+
+Define a versioned, platform-neutral document AST named env.abook.document.v1. Store structured JSON, not platform-rendered HTML. The schema must specify:
+- Document schema version and stable document ID.
+- Stable block IDs and deterministic ordering.
+- Supported block types: paragraph, heading, bulleted/numbered list, checklist, quote, callout, code block, table, divider, image, file attachment and link.
+- Text marks: bold, italic, underline, strike, highlight, inline code and hyperlink.
+- Block attributes with validated types and size limits.
+- Attachment references by stable attachment ID, never by a public storage URL.
+- Unknown block preservation: older clients must retain unknown data when possible and display a safe unsupported-block placeholder rather than delete content.
+
+The web editor maps this contract to/from ProseMirror JSON. Android and iOS implement native editing/rendering adapters over the same versioned AST. Markdown is an import/export format, not the canonical storage format. HTML is a sanitized import/export format, not the canonical storage format.
+
+Schema changes require versioned migrations and cross-platform fixtures. Do not ship a new block type until Web, Android and iOS can safely round-trip it or the catalog clearly gates that capability by platform.
+
+## 6. Functional domains
+
+### Phase 1 — Local notes and durable device data
+- Create, edit, rename, duplicate, pin, archive, restore and delete notes.
+- Plain text and rich text with headings, lists, checklists, quotes, links, code blocks and tables.
+- Notebooks, nested folders, tags, favorites, Inbox and saved views.
+- Quick capture with automatic local draft persistence.
+- Search titles and full text; filter by notebook, tag, updated date and status.
+- Attach images and supported documents in local app storage.
+- Local read/create/edit/search without internet access.
+- Local revision snapshots, trash/tombstones and restore.
+- Markdown, TXT, JSON and full-workspace ZIP export/import.
+- Restore a previously exported local archive.
+- Responsive Web and native Android/iOS navigation.
+- Accessible keyboard/screen-reader behavior and RTL-safe document rendering.
+
+### Phase 2 — Local document and study studio
+- PDF rendering, text extraction and search.
+- PDF highlights, underlines, freehand annotations, comments and text boxes.
+- Local PDF rotate, reorder, merge, split, extract and supported compression.
+- Scanned-document capture, crop/deskew and on-device OCR.
+- DOCX/text extraction for supported formats and local export to supported output formats.
+- Local audio recording and playback.
+- Handwriting and drawing with platform-native stylus support.
+- Local reminders, daily notes and calendar entry points.
+- Widgets, browser capture and expanded native quick-capture integrations.
+
+### Phase 3 — Local knowledge and visual workspace
+- Backlinks, related notes, graph view and block references.
+- Whiteboard, mind maps and visual boards.
+- Local templates, custom collections and advanced views.
+- Flashcards and spaced-repetition schedules stored on-device.
+
+### Phase 4 — Optional on-device intelligence
+- On-device summaries, rewriting, translation, task extraction, flashcards and semantic search only when a genuinely local engine is available and the user opts in.
+- Downloadable local language/OCR models must clearly show size, supported languages, device requirements and whether the model works offline.
+- No mandatory AI, hosted model or remote transcription provider.
+- If no supported local model exists, hide or disable the capability rather than faking a result.
+
+Real-time collaboration, server sharing, team workspaces and cloud synchronization are not part of the initial or implied scope.
+
+## 7. Local data model
+
+**No A book PostgreSQL migration is required for this release.** Notes and their relationships are stored in platform-local databases. Do not add A book content tables to the enV server database.
+
+The logical local schema must have platform-equivalent entities:
+
+### Notebook
+- id (stable UUID)
+- parent_id (nullable)
+- title, icon, color, sort_order
+- archived_at, created_at, updated_at
+
+### Note
+- id (stable UUID)
+- notebook_id (nullable)
+- title
+- document_schema_version
+- content_json
+- plain_text (locally derived search/index field)
+- excerpt
+- local_revision_number
+- pinned_at, archived_at, deleted_at
+- created_at, updated_at
+
+### Tag and NoteTag
+- stable tag ID, normalized name and display name
+- many-to-many note relationship with uniqueness constraints
+
+### Revision
+- stable revision ID, note ID, revision number, content snapshot, content hash, source and created_at
+- immutable snapshots sufficient to restore an earlier note locally
+
+### Attachment
+- stable attachment ID, note ID, relative local object path, original display filename, detected MIME, byte size, checksum, processing state and creation time
+- never store arbitrary remote URLs as attachment identity
+
+### LocalIndex
+- note ID, indexed title/body/tags and last indexed revision
+- rebuildable from canonical local note content
+
+### ImportJob / ExportJob
+- local job state, manifest path, progress and error details
+- temporary files must be cleaned up safely after completion or cancellation
+
+Platform storage:
+- Web: IndexedDB object stores with versioned migrations; OPFS for larger binary files when supported.
+- Android: Room entities/DAOs and app-private files.
+- iOS: Core Data or SQLite repositories and app-private files.
+
+Use stable identifiers and the same logical constraints on every platform. Add cross-platform document and archive fixtures to prove that export from one platform can be imported by another.
+
+Do not require user_id on local note records. Partition libraries locally by enV profile/account context when multiple accounts can use one device, but retain access to the local library after sign-out and make the user explicitly choose whether to keep or erase it. Local data must never be shown to a different signed-in profile by accident.
+
+## 8. Network and API boundary
+
+There are **no A book content APIs in this release**.
+
+Do not create server routes for note CRUD, PDF processing, OCR, attachment upload/download, search, import/export, revision history, sharing or sync. Do not send note bodies, attachments, filenames, OCR output, document metadata or search queries to the enV backend.
+
+The surrounding enV platform may continue using its existing authentication, catalog and consented aggregate analytics. Those services must not become an indirect path for sending A book content. Do not include note titles, document names, excerpts or content-derived metadata in analytics.
+
+If a future release proposes optional sync or remote sharing, it requires a separate product decision, explicit user opt-in, a new threat model and an architecture amendment. It must not silently activate.
+
+## 9. Local save and recovery algorithm
+
+1. User edits a note.
+2. The platform repository commits the content and an edit/revision record in one local transaction.
+3. The UI reports \`Saved on this device\` only after the durable local commit succeeds.
+4. The local search index is updated incrementally or queued for local rebuild.
+5. Attachments are written to app-managed local storage using temporary files and atomic rename/commit where supported.
+6. A checksum and byte size are recorded after the file is fully written.
+7. Autosave failures, disk-full conditions, permission failures and quota errors remain visible; never show a false saved state.
+8. A local trash and immutable revision snapshots allow recovery from accidental edits/deletes.
+9. User-triggered export writes a manifest, note schema version, notebooks, tags, revisions and attachments into a portable archive.
+10. Restore validates archive paths, schema, checksums, size limits and supported content types before writing data to the local library.
+
+There is no sync queue, server cursor, remote conflict resolver or background network sync in this release. For moving data between devices, use explicit export/import or the operating system's user-controlled file transfer.
+
+## 10. Local files, PDF processing and recovery
+
+### Local attachment lifecycle
+
+- Imported files are copied into app-managed local storage by default so notes do not break when the original download is moved or deleted.
+- Where supported, users may link to an externally managed file, but the interface must explain that moving/deleting that source can break the link.
+- Generate opaque local filenames and retain the original filename only as display metadata.
+- Verify file size, checksum and detected media type before linking it to a note.
+- Use atomic writes, temporary files and safe cleanup after interrupted imports.
+- Never upload user files to an enV server, Vercel Blob, Cloudflare R2 or another remote storage provider.
+- Large-file processing must use streaming/chunking and bounded memory.
+
+### PDF feature plan
+
+Implement locally, subject to per-platform acceptance tests:
+- PDF open/render, page thumbnails and navigation.
+- Text selection, text extraction and in-document search for text-based PDFs.
+- Scanned PDF OCR with on-device OCR engines and locally available language packs.
+- Highlights, underline, freehand ink, comments, sticky notes and text annotations.
+- Page rotation, extraction, reordering, duplication, deletion and merge/split.
+- Local image extraction where supported.
+- Local compression and optimization where quality can be measured.
+- Fill supported forms and add signatures/initials locally.
+- Export/share the annotated or modified PDF to a user-selected destination.
+
+Suggested implementation engines:
+- Web: PDF.js for rendering/text extraction; a bundled local PDF manipulation engine such as pdf-lib for specifically supported structural edits and annotation export; optional local WASM OCR after performance/license audit.
+- Android: existing PDFBox Android dependency for supported PDF operations; Android PdfRenderer for previews; on-device ML Kit text recognition or a verified fully local alternative for OCR.
+- iOS: PDFKit for local reading and annotation; Vision/VisionKit for on-device OCR and document scanning.
+
+Do not promise full PDF editor parity based solely on PDF rendering support. Test annotation round-tripping, fonts, forms, page geometry, embedded images, encryption/password-protected files, large files and malformed documents. If a feature cannot be completed locally on a platform, show it as unsupported on that platform until implemented.
+
+### Other local document processing
+
+- Images: decode, resize, rotate, crop, deskew and produce previews on-device.
+- DOCX: locally extract supported text/structure and create a portable export; do not imply full-fidelity editing unless a genuine local editor exists.
+- TXT/Markdown/HTML/RTF: parse and export locally with safe HTML sanitization.
+- CSV: locally preview, search and export; preserve original data.
+- Audio: locally record, play and trim where supported. Transcription is available only through a verified on-device engine/model.
+- ZIP import/export: validate paths against traversal, enforce uncompressed-size/file-count limits and process entries safely.
+
+### Local backup and restore
+
+There is no cloud backup in this release.
+
+- Maintain local note revisions and trash.
+- Provide user-controlled full-library and per-notebook exports.
+- Use a versioned archive manifest with per-file checksums and schema version.
+- Allow restore from a selected local archive.
+- Support Android Storage Access Framework, iOS Files/document picker and Web downloads/File System Access where available.
+- Explain browser-data clearing, device loss and OS backup behavior honestly. Do not label an OS-managed backup as enV cloud backup.
+- Run archive corruption, interrupted export, partial restore and duplicate-import tests.
+
+Local revision history is not a backup against device loss. An exported archive copied to a separately controlled location is the user's recovery copy.
+
+## 11. Search, privacy and security
+
+### Local search
+
+- Search title, full text, tags and notebooks with a local index.
+- Incrementally update the index after edits, imports, restores and deletes.
+- Index extracted text from PDFs and supported documents only after local processing succeeds.
+- Keep OCR text local and associate it with the source attachment.
+- Provide exact phrase, keyword, tag, notebook and updated-date filters.
+- Rebuild the index from the canonical local database if it becomes corrupt.
+- Do not send search queries or note content to a server.
+
+### Local privacy
+
+- Store content in the platform's app sandbox and protect local files using available OS file-protection mechanisms.
+- Keep encryption keys in Android Keystore or iOS Keychain when local encryption is implemented.
+- For Web local-vault encryption, define passphrase/key derivation, recovery and cross-browser portability before release.
+- Do not claim end-to-end encryption or encrypted database protection unless the implementation and recovery behavior are tested.
+- No note content, attachment bytes, filenames, OCR text, document metadata or search terms in analytics, logs or crash reports.
+- Do not use remote AI, hosted OCR, hosted transcription or server-side PDF processors.
+- Explain local data deletion, profile separation, export and storage limits clearly.
+- Permissions for camera, microphone, photos and file access are requested only when the matching local action is invoked.
+
+## 12. enV repository integration map
+
+- \`src/data/catalog.ts\` — add A book catalog record (id \`a-book\`, slug \`a-book\`, category \`productivity\`, display name \`A book\`).
+- \`src/lib/registry.ts\` — verify route discovery and aliases; do not duplicate catalog records.
+- \`src/components/tools/tool-engine.tsx\` — dispatch A book to the Web ABook engine.
+- \`src/routes/tools/$category/$slug.tsx\` — existing generic tool route hosts the Web entry point.
+- \`src/components/engines/a-book/\` — proposed Web UI/editor modules.
+- \`src/lib/a-book/\` — document schema, local repository, search, PDF/document processing and archive import/export.
+- \`apps/shared/catalog.json\` — regenerate using \`scripts/export-native-catalog.mjs\`; never hand-edit generated output.
+- \`apps/android/...\` — Kotlin/Compose UI, Room database, app-private file repository, PDFBox integration, local OCR and Android document picker integration.
+- \`apps/android/native-tool-coverage.txt\` — list \`a-book\` only when the native route is actually implemented and tested.
+- \`apps/ios/enV/\` — SwiftUI UI, Core Data/SQLite repository, PDFKit/Vision integration and Files/Share Extension entry points.
+- \`apps/ios/native-tool-coverage.txt\` — list \`a-book\` only when the native route is actually implemented and tested.
+- \`tests/\` — shared document fixtures, archive import/export fixtures, local repository tests and PDF golden fixtures.
+
+No A book backend routes, PostgreSQL migrations, object-storage credentials, cloud sync workflows or cloud backup jobs should be added for this release.
+
+The generic tool route must not be used as an excuse to embed the Web application in Android or iOS.
+
+## 13. Testing and release gates
+
+### Local data integrity
+- Create/edit/rename/delete/restore and reopen after process restart.
+- Local transaction interruption never leaves a partially committed note.
+- Disk-full/quota exceeded presents a recoverable message and never reports a false save.
+- Duplicate import handling is deterministic and user-visible.
+- Corrupt or unsupported schema is rejected without overwriting the last good note.
+- Revision restore returns exact prior content.
+- Attachment interruption/retry and checksum verification.
+- Trash retention and permanent deletion behave correctly.
+
+### PDF and document processing
+- Text PDF render, select, extract and search.
+- Scanned PDF local OCR with supported language packs.
+- Annotation persistence and exported-PDF round-trip.
+- Merge/split/reorder/rotate/extract page operations.
+- Large PDFs and memory pressure.
+- Encrypted/password-protected and malformed PDFs.
+- Font substitution and embedded media behavior.
+- DOCX/HTML/RTF/CSV import/export fidelity within documented support.
+- Malformed ZIP, path traversal, decompression bomb and archive size limits.
+- No unexpected network requests while processing any local file.
+
+### Search and scale
+- Search while editing and immediately after index update.
+- Test 10,000+ notes, large documents, many tags and attachment metadata.
+- Search index rebuild and incremental paths produce equivalent results.
+- Search remains responsive on lower-end phones and modest browsers.
+
+### Privacy and security
+- Verify by network inspection that note CRUD, PDF processing, OCR, search, import and export generate no content-bearing network requests.
+- No note titles, filenames, excerpts or contents in analytics/logs.
+- Separate local libraries across signed-in enV profiles.
+- Sign-out does not silently erase a local library.
+- Export archives validate checksums and reject malicious paths/content.
+
+### Platform
+- Web browser storage quota/eviction, cleared-site-data warning and offline PWA reopening.
+- Android process death, app upgrade migration, low storage, SAF import/export and camera permission denial.
+- iOS app termination, Core Data/SQLite migration, file protection, document picker, Share Extension and camera denial.
+- Keyboard, screen-reader, dynamic type, RTL and small-screen usability.
+- Separate web build/typecheck/tests, Android unit/instrumentation tests and iOS XCTest/UI tests.
+- Real devices required before declaring camera, microphone, widget, stylus and large-PDF performance production-ready.
+
+### Release criteria
+Do not mark the tool active or production-ready until all three platform entry points work, core mutations have durable local persistence, import/export and recovery tests pass, PDF/document processing is genuinely local on each claimed platform, privacy/network tests confirm no content upload, and Web/Android/iOS platform tests pass. A passing catalog check alone is not feature verification.
+
+## 14. Readiness blockers to resolve before implementation
+
+1. Finalize the shared versioned document AST and verify Web/Android/iOS round-trip fixtures.
+2. Pin and license-audit the Web editor, PDF renderer/manipulation and local OCR packages.
+3. Confirm PDFBox Android functionality and performance for each proposed operation.
+4. Confirm PDFKit/Vision functionality against the project's iOS 16.4 deployment target.
+5. Select local OCR language packs and define storage/performance constraints on low-end Android devices and browsers.
+6. Define local database migrations, revision retention, trash retention and archive format.
+7. Implement browser quota/persistence warnings and a clear export reminder.
+8. Implement full-library export and restore before calling local storage production-ready.
+9. Add local privacy/network-inspection tests and cross-platform import/export tests.
+10. Verify Web, Android and iOS launch/route integration and native tool coverage.
+
+No cloud provider, cloud bucket, database credential, upload token, cloud backup subscription or server-side A book infrastructure needs to be provisioned.
+
+## 15. Non-goals for Phase 1
+
+- No Cloudflare R2, Vercel Blob, S3, cloud bucket or other remote user-content storage.
+- No cloud notes database or A book PostgreSQL migration.
+- No note-content API routes.
+- No cloud synchronization or cross-device automatic sync.
+- No cloud backup or server-side recovery.
+- No attachment upload/download service.
+- No hosted OCR, transcription, PDF conversion or document-processing backend.
+- No mandatory hosted AI/model.
+- No real-time collaboration or server sharing.
+- No WebView-based native implementation.
+- No localStorage as the primary Web notes database.
+- No false success messages when local persistence or processing fails.
+- No catalog status of active merely because a route or card exists.
+
+Users move data between devices through explicit local export/import or file transfer until a separately approved future sync feature is designed.
+
+## Architecture decision summary
+
+A book is an enV Toolkit tool with independent Web, native Android and native iOS implementations. Its initial release is local-only for user content: notes, documents, PDFs, attachments, revisions, search indexes and processing outputs remain on the device. Web uses IndexedDB/OPFS and local workers; Android uses Room/SQLite and app-private files; iOS uses Core Data/SQLite, PDFKit and Vision. PDF/document rendering, extraction, annotation, OCR and supported transformations run locally. Users can explicitly export and restore portable local archives. There is no cloud storage provider, server-side content database, upload API, synchronization service, remote processing or cloud backup in this scope.
+
+**Implementation status:** This document establishes the revised local-only architecture baseline. It does not represent an implemented editor, local database, PDF engine, OCR pipeline or production deployment.
+
