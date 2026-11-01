@@ -22,35 +22,35 @@ function getExpansionInfo(formula: string) {
 
 test("every generated formula calculator uses human-readable labels in its title, description and formula caption", () => {
   const specs = new Map(MATH_EXERCISE_CATALOG.map((spec) => [spec.key, spec]));
-  assert.ok(generated.length > 1000, \`expected the large generated calculator family, got \${generated.length}\`);
+  assert.ok(generated.length > 1000, `expected the large generated calculator family, got \${generated.length}`);
 
   for (const tool of generated) {
     const formula = tool.engine.type === "calculator" ? tool.engine.formula : "";
-    assert.doesNotMatch(tool.name, /solve for [abc]\b/i, \`\${tool.id} leaked an internal key in its title\`);
-    assert.doesNotMatch(tool.description, /solve for [abc]\b/i, \`\${tool.id} leaked an internal key in its description\`);
+    assert.doesNotMatch(tool.name, /solve for [abc]\b/i, `\${tool.id} leaked an internal key in its title`);
+    assert.doesNotMatch(tool.description, /solve for [abc]\b/i, `\${tool.id} leaked an internal key in its description`);
 
     const definition = calculators[formula];
-    assert.ok(definition, \`\${tool.id} has a live calculator definition\`);
+    assert.ok(definition, `\${tool.id} has a live calculator definition`);
 
     if (formula.startsWith("exercise-")) {
       const split = formula.lastIndexOf("-");
       const key = formula.slice("exercise-".length, split);
       const target = formula.slice(split + 1);
       const label = specs.get(key)?.targetLabels[target];
-      assert.ok(label, \`\${tool.id} has a target label in the engine metadata\`);
-      assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), \`\${tool.id} title should include \${label}: \${tool.name}\`);
-      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), \`\${tool.id} description should include \${label}: \${tool.description}\`);
-      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), \`\${tool.id} formula caption should include \${label}: \${definition.formula}\`);
+      assert.ok(label, `\${tool.id} has a target label in the engine metadata`);
+      assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `\${tool.id} title should include \${label}: \${tool.name}`);
+      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `\${tool.id} description should include \${label}: \${tool.description}`);
+      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), `\${tool.id} formula caption should include \${label}: \${definition.formula}`);
     } else {
       const expansion = getExpansionInfo(formula);
-      assert.ok(expansion, \`\${tool.id} resolves to an expansion row\`);
+      assert.ok(expansion, `\${tool.id} resolves to an expansion row`);
       const label = expansion.info.labels[expansion.target as "a" | "b" | "c"];
-      assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), \`\${tool.id} title should include \${label}: \${tool.name}\`);
-      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), \`\${tool.id} description should include \${label}: \${tool.description}\`);
-      assert.ok(tool.name.includes(expansion.info.relation), \`\${tool.id} title should show its actual relationship\`);
-      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), \`\${tool.id} formula caption should include \${label}: \${definition.formula}\`);
+      assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `\${tool.id} title should include \${label}: \${tool.name}`);
+      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `\${tool.id} description should include \${label}: \${tool.description}`);
+      assert.ok(tool.name.includes(expansion.info.relation), `\${tool.id} title should show its actual relationship`);
+      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), `\${tool.id} formula caption should include \${label}: \${definition.formula}`);
     }
-    assert.doesNotMatch(definition.formula ?? "", /solve for [abc]\b/i, \`\${tool.id} leaked an internal key in its formula caption\`);
+    assert.doesNotMatch(definition.formula ?? "", /solve for [abc]\b/i, `\${tool.id} leaked an internal key in its formula caption`);
   }
 });
 
