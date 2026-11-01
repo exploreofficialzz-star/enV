@@ -1,4 +1,4 @@
-import { contrastRatio, parseCssColor } from "./accessibility-color";
+import { contrastRatio, parseCssColor } from "./accessibility-color.ts";
 
 export type DesignComponentContrast = {
   label: string;

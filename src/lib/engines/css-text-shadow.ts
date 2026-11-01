@@ -1,4 +1,4 @@
-import { parseCssColor, type RgbaColor } from "./accessibility-color";
+import { parseCssColor, type RgbaColor } from "./accessibility-color.ts";
 
 export type TextShadowLayer = {
   id: string;

@@ -1,4 +1,4 @@
-import { parseCssColor } from "./accessibility-color";
+import { parseCssColor } from "./accessibility-color.ts";
 
 export type BorderStyle = "solid" | "dashed" | "dotted" | "double";
 export type BorderSettings = {

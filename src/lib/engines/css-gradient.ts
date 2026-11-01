@@ -33,7 +33,7 @@ function clamp(value: number, min: number, max: number): number {
 function normalizePosition(position?: string): string {
   const clean = (position ?? "center").trim().toLowerCase();
   if (VALID_POSITIONS.has(clean)) return clean;
-  const coordinates = clean.match(/^(\d{1,3}(?:\.\d+)?)%\s+(\d{1,3}(?:\.\d+)?)%$/);
+  const coordinates = clean.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))%\s+([+-]?(?:\d+(?:\.\d*)?|\.\d+))%$/);
   if (!coordinates) return "center";
   const x = clamp(Number(coordinates[1]), 0, 100);
   const y = clamp(Number(coordinates[2]), 0, 100);

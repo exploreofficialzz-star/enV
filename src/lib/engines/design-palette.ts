@@ -1,4 +1,4 @@
-import { parseCssColor, rgbToHsl, toHex, type RgbaColor } from "./accessibility-color";
+import { parseCssColor, rgbToHsl, toHex, type RgbaColor } from "./accessibility-color.ts";
 
 export type PaletteExportFormat = "css" | "scss" | "tailwind" | "json" | "tokens";
 export type PaletteHarmony = "analogous" | "complementary" | "triadic" | "split" | "tetradic" | "monochromatic";
