@@ -574,7 +574,7 @@ struct NativeWorldLabPortableArchiveStore {
                 try Data(contentsOf:exactBackup)==data,
                 try Data(contentsOf:target)==imported.projectData else {
                 throw NativeWorldLabError.invalid(
-                    "This invention already exists; only an identical unfinished "+ "archive may resume without overwriting edits.")
+                    "This invention already exists; only an identical unfinished " + "archive may resume without overwriting edits.")
             }
         }
         try manager.createDirectory(at:archiveFolder,withIntermediateDirectories:true)
@@ -656,7 +656,7 @@ private enum NativeWorldLabExtendedScienceValidation {
             }
             let predictedSpeed=sqrt(modulus/density)
             let predictedFrequency=Double(mode)*predictedSpeed/(2*length)
-            let predictedEnergy=0.25*density*crossSection*length* pow(amplitude*2*Double.pi*predictedFrequency,2)
+            let predictedEnergy=0.25*density*crossSection*length * pow(amplitude*2*Double.pi*predictedFrequency,2)
             let predictedStress=modulus*amplitude*Double.pi*Double(mode)/length
             guard (1e-6...1e6).contains(speed),
                   approx(speed,predictedSpeed),approx(frequency,predictedFrequency),
@@ -701,7 +701,7 @@ private enum NativeWorldLabExtendedScienceValidation {
                 let stored=try number(sample,"internalThermalEnergyJ")
                 let residual=try number(sample,"energyResidualJ")
                 let expectedEnergy=heatCapacity*(start-temperature)
-                let expectedPower=emissivity*5.670374419e-8*area* (pow(temperature,4)-pow(ambient,4))
+                let expectedPower=emissivity*5.670374419e-8*area * (pow(temperature,4)-pow(ambient,4))
                 guard time>=0,time>=previousTime,time<=duration+1e-7,
                       temperature>=min(start,ambient)-1e-6,
                       temperature<=max(start,ambient)+1e-6,

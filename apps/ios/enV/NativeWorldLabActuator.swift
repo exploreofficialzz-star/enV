@@ -1166,7 +1166,7 @@ enum NativeWorldLabGravity {
             bodies:bodies,durationSeconds:durationSeconds,integrationSteps:integrationSteps,
             frames:frames,initialEnergyJ:start.1,finalEnergyJ:final.1,
             energyDriftFraction:drift,
-            validity:"Newtonian point-mass gravity with invented density, Verlet integration "+ "and conservation audit. No measurements, relativistic dynamics, impacts or tides.")
+            validity:"Newtonian point-mass gravity with invented density, Verlet integration " + "and conservation audit. No measurements, relativistic dynamics, impacts or tides.")
     }
 }
 
@@ -1291,7 +1291,7 @@ enum NativeWorldLabHeatTransfer {
             firstCapacityJPerK:ca,secondCapacityJPerK:cb,conductanceWPerK:g,
             equilibriumTemperatureK:equilibrium,durationSeconds:durationSeconds,
             samples:samples,
-            validity:"Insulated two-slab, invented homogeneous thermal property "+ "reference only. No spatial gradients, phase change, convection, "+ "radiation, safety certification or measured matter.")
+            validity:"Insulated two-slab, invented homogeneous thermal property " + "reference only. No spatial gradients, phase change, convection, " + "radiation, safety certification or measured matter.")
     }
 }
 
@@ -1403,7 +1403,7 @@ struct NativeElasticWaveRun:Encodable {
         let positions=(0..<points).map{Double($0)*lengthMeters/Double(points-1)}
         let displacement=positions.map{amplitudeMeters*cos(k*$0)*cos(phase)}
         let velocity=positions.map{-amplitudeMeters*omega*cos(k*$0)*sin(phase)}
-        let stress=positions.map{-assumedYoungModulusPa*amplitudeMeters*k* sin(k*$0)*cos(phase)}
+        let stress=positions.map{-assumedYoungModulusPa*amplitudeMeters*k * sin(k*$0)*cos(phase)}
         let kinetic=totalEnergyJ*pow(sin(phase),2)
         let strain=totalEnergyJ*pow(cos(phase),2)
         return NativeElasticWaveSample(timeSeconds:seconds,positionsMeters:positions,
@@ -1455,7 +1455,7 @@ enum NativeWorldLabElasticWave {
         let frequency=Double(mode)*speed/(2*lengthMeters)
         let period=1/frequency, duration=Double(cycles)*period
         let omega=2*Double.pi*frequency
-        let energy=0.25*densityKgM3*crossSectionM2*lengthMeters* pow(amplitudeMeters*omega,2)
+        let energy=0.25*densityKgM3*crossSectionM2*lengthMeters * pow(amplitudeMeters*omega,2)
         let stress=youngModulusPa*amplitudeMeters*Double.pi*Double(mode)/lengthMeters
         guard duration.isFinite && (1e-9...1e7).contains(duration) && energy.isFinite && (0...1e40).contains(energy) && stress.isFinite && (0...1e16).contains(stress) else {
             throw NativeWorldLabError.invalid("Nonfinite or unsupported wave energy/stress")
@@ -1466,7 +1466,7 @@ enum NativeWorldLabElasticWave {
             assumedDensityKgM3:densityKgM3,assumedYoungModulusPa:youngModulusPa,
             waveSpeedMps:speed,frequencyHz:frequency,periodSeconds:period,
             durationSeconds:duration,maximumStressPa:stress,totalEnergyJ:energy,
-            validity:"Ideal linear free-free axial standing mode in a uniform invented bar. "+ "Assumed, unmeasured density/modulus; no bending, fracture, damping, "+ "acoustics in air or nonlinear material behavior.")
+            validity:"Ideal linear free-free axial standing mode in a uniform invented bar. " + "Assumed, unmeasured density/modulus; no bending, fracture, damping, " + "acoustics in air or nonlinear material behavior.")
     }
 }
 
@@ -1604,6 +1604,6 @@ enum NativeWorldLabRadiation {
             assumedDensityKgM3:densityKgM3,
             assumedSpecificHeatJPerKgK:specificHeatJPerKgK,
             steps:steps,samples:samples,
-            validity:"Ideal lumped isothermal grey-body heat transfer to a fixed "+ "environment. All density, specific heat and emissivity are assumed. "+ "No measured atmosphere, sunlight, geometry view factors, phase "+ "transitions or real-life performance certification.")
+            validity:"Ideal lumped isothermal grey-body heat transfer to a fixed " + "environment. All density, specific heat and emissivity are assumed. " + "No measured atmosphere, sunlight, geometry view factors, phase " + "transitions or real-life performance certification.")
     }
 }

@@ -214,7 +214,7 @@ enum NativeWorldLabOpticalScene {
             }
         }
         guard !segments.isEmpty,segments.allSatisfy({
-            bounded($0.endMeters)&&$0.survivingRayPowerFraction.isFinite&& (0...1).contains($0.survivingRayPowerFraction)
+            bounded($0.endMeters)&&$0.survivingRayPowerFraction.isFinite && (0...1).contains($0.survivingRayPowerFraction)
         })else{
             throw NativeWorldLabError.invalid("Optical trace left the finite native domain.")
         }

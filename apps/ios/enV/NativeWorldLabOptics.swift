@@ -63,6 +63,6 @@ enum NativeWorldLabOptics {
             pReflectance:reflectP,unpolarizedReflectance:reflectance,
             unpolarizedTransmittance:transmittance,
             energyResidual:abs(1-reflectance-transmittance),
-            validity:"Lossless planar isotropic nonmagnetic Fresnel/Snell model. "+ "All refractive indices are invented assumptions, not measurements. "+ "No absorption, dispersion, interference or real material certification.")
+            validity:"Lossless planar isotropic nonmagnetic Fresnel/Snell model. " + "All refractive indices are invented assumptions, not measurements. " + "No absorption, dispersion, interference or real material certification.")
     }
 }

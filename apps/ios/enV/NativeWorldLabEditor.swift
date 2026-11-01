@@ -1,6 +1,6 @@
 import Foundation
 
-/// Portable v1 project creation and editing with strict validation on *every*
+/// Portable v1 project creation and editing with strict validation on *every *
 /// mutation. Unknown matter remains a user assumption, not observed science.
 enum NativeWorldLabEditor {
     struct GeometryMeasurement {
@@ -468,8 +468,7 @@ enum NativeWorldLabEditor {
             materials[index]["name"]=name.trimmingCharacters(in:.whitespacesAndNewlines)
             materials[index]["densityKgM3"]=densityKgM3.map{$0 as Any} ?? NSNull()
             materials[index]["youngModulusPa"]=youngModulusPa.map{$0 as Any} ?? NSNull()
-            materials[index]["thermalConductivityWPerMK"]=
-                thermalConductivityWPerMK.map{$0 as Any} ?? NSNull()
+            materials[index]["thermalConductivityWPerMK"] = thermalConductivityWPerMK.map{$0 as Any} ?? NSNull()
             materials[index]["specificHeatJPerKgK"]=specificHeatJPerKgK.map{$0 as Any} ?? NSNull()
             materials[index]["refractiveIndex"]=refractiveIndex.map{$0 as Any} ?? NSNull()
             materials[index]["evidence"]="hypothetical-user-assumed"
