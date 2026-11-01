@@ -87,7 +87,6 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         if (cancelled || loadTimedOut) return;
         loadingTask = pdfjs.getDocument({
           url: src,
-          isEvalSupported: false,
           useSystemFonts: true,
           enableXfa: false,
           verbosity: 0,
