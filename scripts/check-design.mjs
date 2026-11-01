@@ -43,7 +43,6 @@ const explorerUtils = read("src/lib/engines/design-explorer.ts");
 const explorerUtilsTests = read("src/lib/engines/design-explorer.test.ts");
 const designCatalogGenerator = read("scripts/gen-catalog.mjs");
 const designBrowserAudit = read("scripts/audit-design-category-browser.mjs");
-const renderedWorkflow = read(".github/workflows/accessibility-phase8.yml");
 const designWorkflow = read(".github/workflows/design-category-tests.yml");
 const productionNotice = read("src/lib/production-notice.ts");
 const productionNoticeTests = read("src/lib/production-notice.test.ts");
