@@ -34,7 +34,7 @@ async function openPdf(file: Blob): Promise<PDFDocument> {
 }
 
 function safeArchiveName(value: string): string {
-  const name = value.replace(/\\.pdf$/i, "").trim().replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
+  const name = value.replace(/\.pdf$/i, "").trim().replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
   return name.slice(0, 100) || "document";
 }
 
@@ -54,7 +54,7 @@ export function parsePageRanges(value: string, pageCount: number): number[] {
   const pages: number[] = [];
   const seen = new Set<number>();
   for (const token of tokens) {
-    const match = token.match(/^(\\d+)(?:-(\\d+))?$/);
+    const match = token.match(/^(\d+)(?:-(\d+))?$/);
     if (!match) throw new Error(`Invalid page range: ${token}`);
     const first = Number(match[1]);
     const last = Number(match[2] ?? match[1]);
@@ -84,6 +84,7 @@ function parsePageGroups(value: string, pageCount: number): number[][] {
       if (used.has(page)) throw new Error(`Page ${page} appears in more than one part.`);
       used.add(page);
     }
+    if (used.size > MAX_TOTAL_PAGES) throw new Error(`A maximum of ${MAX_TOTAL_PAGES} pages can be split in one operation.`);
     return pages;
   });
 }
