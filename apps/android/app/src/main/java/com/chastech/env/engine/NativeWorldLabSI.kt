@@ -198,7 +198,7 @@ object NativeWorldLabExecution {
         NativeWorldLabGraph.validate(graph)
         require(durationSeconds.isFinite()&&durationSeconds in 0.001..60.0&&
             stepSeconds.isFinite()&&stepSeconds in 1e-5..1.0&&
-            kotlin.math.ceil(durationSeconds/stepSeconds)<=20000.0){
+            kotlin.math.ceil(durationSeconds/stepSeconds)<=50000.0){
             "Scientific timeline exceeds bounded execution steps"
         }
         require(powerToleranceW.isFinite()&&powerToleranceW in 0.0..1e6){"Invalid conservation tolerance"}
@@ -233,7 +233,7 @@ object NativeWorldLabExecution {
         var now=0.0
         var scheduled:Double?=null
         var previous=emptyMap<String,NativeScienceQuantity>()
-        while(now<durationSeconds-1e-12&&samples.size<20000){
+        while(now<durationSeconds-1e-12&&samples.size<50000){
             val end=minOf(durationSeconds,now+stepSeconds,scheduled?:durationSeconds)
             require(end>now+1e-12){"Scientific solver failed to advance"}
             val values=linkedMapOf<String,NativeScienceQuantity>()
@@ -288,6 +288,16 @@ object NativeWorldLabExecution {
         }
         return NativeScientificRun(graph,samples.toList())
     }
+    fun idealRcGraph(projectId:String="native-rc-reference",projectRevision:Int=0):NativeScientificGraph =
+        NativeScientificGraph(projectId,projectRevision,listOf(
+            NativeScienceComponent("source","ideal-dc-source",listOf(
+                NativeSciencePort("V","output","V","SCALAR","electrical"))),
+            NativeScienceComponent("load","series-rc-load",listOf(
+                NativeSciencePort("Vin","input","V","SCALAR","electrical"),
+                NativeSciencePort("Vc","output","V","SCALAR","electrical"),
+                NativeSciencePort("I","output","A","SCALAR","electrical")))
+        ),listOf(NativeScienceConnection("source","V","load","Vin")))
+
     fun idealRcAdapters(sourceVoltageV:Double,resistanceOhm:Double,capacitanceF:Double,
         initialVoltageV:Double=0.0):List<NativeScientificAdapter>{
         require(sourceVoltageV.isFinite()&&kotlin.math.abs(sourceVoltageV)<=1000.0&&
