@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {quantity,parseQuantity,convertQuantity,requireQuantity,sameDimension,deriveDimension,unitSpec} from "./quantity-contract.ts";
+import {WORLD_LAB_UNITS,quantity,parseQuantity,convertQuantity,requireQuantity,sameDimension,deriveDimension,unitSpec} from "./quantity-contract.ts";
 import {validateScientificGraph,validatePowerBalance} from "./scientific-graph.ts";
 import {worldLabModelForRemote,worldLabRemoteModelCatalog,validateRunProvenance} from "./model-registry.ts";
 
@@ -93,4 +93,17 @@ test("all remote science jobs map to bounded, versioned, non-certified model des
  assert.throws(()=>validateRunProvenance(model,{modelVersion:"2.0.0",
    evidence:"physics-model-computed",validity:"Newtonian gravity bounded run"}),/version/);
  assert.throws(()=>worldLabModelForRemote("__proto__"),/not registered/);
+});
+
+
+test("canonical SI dimensions and unit registry cannot be mutated at runtime",()=>{
+ const dimension=unitSpec("kg").dimension as unknown as number[];
+ assert.equal(Reflect.set(dimension,0,99),false);
+ assert.equal(unitSpec("kg").dimension[0],1);
+ assert.equal(Reflect.set(WORLD_LAB_UNITS,"kg",{
+   dimension:[0,1,0,0,0,0,0],factor:1,
+ }),false);
+ const value=quantity(1,"kg","hypothetical-user-assumed");
+ assert.equal(Reflect.set(value.dimension as unknown as number[],0,7),false);
+ assert.equal(value.dimension[0],1);
 });
