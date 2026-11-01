@@ -621,7 +621,7 @@ export function ABookEngine() {
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void rotateSelectedBatch()}>Rotate selected PDFs</Button>
                 <input value={pageRange} onChange={(event) => setPageRange(event.target.value)} aria-label="PDF page numbers" placeholder="Pages e.g. 1-3,5" className="min-h-8 w-36 rounded-md border border-border bg-background px-2 text-xs" />
                 <input value={splitRanges} onChange={(event) => setSplitRanges(event.target.value)} aria-label="PDF split page groups" placeholder="Parts e.g. 1-3;4-6" className="min-h-8 w-40 rounded-md border border-border bg-background px-2 text-xs" />
-                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length !== 1} onClick={() => void exportPdf()}>Extract pages</Button>
+                <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void exportPdf()}>Extract selected pages</Button>
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 1} onClick={() => void splitSelectedPdf()}>Split selected PDFs</Button>
                 <Button type="button" size="sm" variant="outline" disabled={selectedPdfs.length < 2} onClick={() => void mergeSelectedPdfs()}>Merge selected PDFs</Button>
               </div>
