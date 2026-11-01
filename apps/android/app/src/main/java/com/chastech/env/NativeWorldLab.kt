@@ -66,6 +66,9 @@ import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
 import com.chastech.env.engine.NativeWorldLabSolarEvents
+import com.chastech.env.engine.NativeWorldLabTimeScales
+import com.chastech.env.engine.NativeWorldLabEarthOrientationSeries
+import com.chastech.env.engine.NativeWorldLabEarthOrientationQuality
 
 import com.chastech.env.engine.NativeWorldLabDigitalMotor
 import com.chastech.env.engine.NativeDigitalMotorResult
@@ -105,6 +108,8 @@ fun NativeWorldLabForm() {
     var pendingDemoWallTimeUTC by remember { mutableStateOf<String?>(null) }
     var worldEpochUTC by remember { mutableStateOf(java.time.Instant.now().toString()) }
     var solarDateUTC by remember { mutableStateOf(java.time.Instant.now().toString().take(10)) }
+    var earthOrientation by remember { mutableStateOf<NativeWorldLabEarthOrientationSeries?>(null) }
+    var earthOrientationStatus by remember { mutableStateOf("") }
     var mass by remember { mutableFloatStateOf(1f) }
     var spring by remember { mutableFloatStateOf(4f) }
     var resistance by remember { mutableFloatStateOf(1000f) }
@@ -552,6 +557,21 @@ fun NativeWorldLabForm() {
                 }?:error("Cannot open experiment branch export destination")
             }}.onSuccess{branchStatus="Versioned branch evidence exported."}
                 .onFailure{branchStatus=it.message?:"Branch evidence export failed."}
+        }
+    }
+    val iersBulletinPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                    val out=ByteArrayOutputStream();val buffer=ByteArray(8192)
+                    while(true){val n=input.read(buffer);if(n<0)break
+                        require(out.size()+n<=2*1024*1024){"IERS Bulletin A exceeds 2 MB"}
+                        out.write(buffer,0,n)}
+                    out.toByteArray()
+                }?:error("Cannot read IERS Bulletin A")
+                NativeWorldLabTimeScales.parseBulletinA(bytes.toString(Charsets.UTF_8))
+            }}.onSuccess{series->earthOrientation=series;earthOrientationStatus="IERS Bulletin A imported · Vol. ${series.volume} No. ${series.number} · issued ${series.issuedDateUTC}"}
+                .onFailure{earthOrientation=null;earthOrientationStatus=it.message?:"IERS Bulletin A import failed."}
         }
     }
     val timelineImportPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
@@ -1970,6 +1990,32 @@ fun NativeWorldLabForm() {
                 labNumber(clock.displaySampleTimeSeconds)+" s · cached model output",
                 style=MaterialTheme.typography.bodySmall)
         }
+        Text("Astronomical time scales · UTC / TAI / TT / UT1",style=MaterialTheme.typography.titleSmall)
+        val currentWorldUTC=demoClock?.worldDateUTC?:worldEpochUTC
+        val taiTtResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTaiTt(currentWorldUTC)}}
+        taiTtResult.fold(onSuccess={times->
+            Text("TAI ${times.first} · TT ${times.second}",style=MaterialTheme.typography.bodySmall)
+        },onFailure={error->
+            Text(error.message?: "TAI/TT unavailable.",style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.error)
+        })
+        OutlinedButton(onClick={iersBulletinPicker.launch(arrayOf("text/plain","application/octet-stream"))}){
+            Text("Import IERS Bulletin A (ser7.dat)")
+        }
+        if(earthOrientation!=null){
+            val ut1Result=remember(currentWorldUTC,earthOrientation){
+                runCatching{NativeWorldLabTimeScales.utcToUt1(currentWorldUTC,earthOrientation!!)}
+            }
+            ut1Result.fold(onSuccess={reading->
+                Text("UT1 ${reading.ut1} · DUT1 ${labNumber(reading.dut1Seconds!!)} s ± ${labNumber(reading.ut1UncertaintySeconds!!)} s · ${reading.quality}",
+                    style=MaterialTheme.typography.bodySmall)
+                Text("${reading.bulletin} · issued ${reading.issuedDateUTC}",
+                    style=MaterialTheme.typography.bodySmall)
+            },onFailure={error->
+                Text(error.message?: "UT1 is unavailable for this date.",style=MaterialTheme.typography.bodySmall)
+            })
+        }
+        if(earthOrientationStatus.isNotBlank())Text(earthOrientationStatus,style=MaterialTheme.typography.bodySmall)
         Text("Approximate sunrise and sunset",style=MaterialTheme.typography.titleSmall)
         OutlinedTextField(value=solarDateUTC,onValueChange={solarDateUTC=it.take(10)},
             label={Text("UTC date · YYYY-MM-DD")},singleLine=true,
