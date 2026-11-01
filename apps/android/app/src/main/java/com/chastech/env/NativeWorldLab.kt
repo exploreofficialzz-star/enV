@@ -183,6 +183,7 @@ fun NativeWorldLabForm() {
     var motorFrame by remember { mutableIntStateOf(0) }
     var motorPlaying by remember { mutableStateOf(false) }
     var motorThermalEnabled by remember { mutableStateOf(false) }
+    var motorPowerOffAtSeconds by remember { mutableStateOf<Double?>(null) }
     var motorSpeed by remember { mutableFloatStateOf(1f) }
     var warning by remember { mutableStateOf("") }
     var assemblyName by remember { mutableStateOf("My invention") }
@@ -1449,9 +1450,28 @@ fun NativeWorldLabForm() {
                         motorThermalEnabled=!motorThermalEnabled
                         motorResult=null;motorAudit=null;motorPlaying=false
                     }) { Text(if(motorThermalEnabled)"Coil heating: on" else "Coil heating: off") }
+                    Row {
+                        Checkbox(checked=motorPowerOffAtSeconds!=null,onCheckedChange={enabled->
+                            motorPowerOffAtSeconds=if(enabled)2.0 else null
+                            motorPlaying=false;motorResult=null;motorAudit=null
+                        })
+                        Text("Open motor supply switch during the run")
+                    }
+                    motorPowerOffAtSeconds?.let{cutoff->
+                        Text("Supply switch opens at "+labNumber(cutoff)+" s")
+                        Slider(value=cutoff.toFloat(),onValueChange={value->
+                            motorPowerOffAtSeconds=value.toDouble()
+                            motorPlaying=false;motorResult=null;motorAudit=null
+                        },valueRange=0f..4f,modifier=Modifier.semantics {
+                            contentDescription="Motor supply isolation event time"
+                        })
+                        Text("The modeled coil current remains continuous and decays after source isolation; fuse arcing and contact bounce are not modeled.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
                     OutlinedButton(onClick={
                         runCatching {
                             val input=NativeActuatorInput(massKg=derivedMass,
+                                powerOffAtSeconds=motorPowerOffAtSeconds,
                                 thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
                             val result=NativeWorldLabActuator.evaluate(input)
                             motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
