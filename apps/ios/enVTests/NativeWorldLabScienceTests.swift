@@ -207,6 +207,16 @@ final class NativeWorldLabExecutionTests:XCTestCase {
         XCTAssertEqual(try XCTUnwrap(last.values["load:Vc"]?.valueSI),12*(1-exp(-0.3/3)),accuracy:1e-12)
         XCTAssertGreaterThan(try XCTUnwrap(last.values["load:I"]?.valueSI),0)
         XCTAssertTrue(run.samples.allSatisfy({abs($0.residualW)<1e-10&&$0.dissipatedW>=0}))
+        let adapters=try NativeWorldLabExecution.idealRCAdapters(sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5)
+        let changedSource=NativeScientificAdapter(componentId:"source",modelId:"ideal-dc-source",
+            modelVersion:"1.0.0"){_,_,_ in
+            NativeScientificStepOutput(outputs:["V":try NativeWorldLabSI.declare(6,unit:"V")],
+                suppliedW:0,dissipatedW:0,storedRateW:0)
+        }
+        let connected=try NativeWorldLabExecution.execute(graph,
+            adapters:[changedSource,adapters[1]],durationSeconds:0.3,stepSeconds:0.1)
+        XCTAssertEqual(try XCTUnwrap(connected.samples.last?.values["load:Vc"]?.valueSI),
+            6*(1-exp(-0.3/3)),accuracy:1e-12)
     }
     func testSchedulerHonoursFutureEventsAndRejectsFalsePower() throws {
         let graph=makeRCGraph()
