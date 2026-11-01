@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10029,
-    "active": 10029,
+    "total": 10031,
+    "active": 10031,
     "planned": 0,
-    "offlineNative": 7786,
+    "offlineNative": 7788,
     "backendNative": 1614,
     "webOnly": 629,
     "missingActive": 629,
     "divergentActive": 0,
-    "fullyExecutable": 9400
+    "fullyExecutable": 9402
   },
   "tools": [
     {
@@ -90271,6 +90271,22 @@
       "status": "active",
       "category": "datetime",
       "engine": "datetime",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "song-metadata-analyzer",
+      "status": "active",
+      "category": "audio",
+      "engine": "audio",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "a-book",
+      "status": "active",
+      "category": "productivity",
+      "engine": "custom",
       "android": "offline-native",
       "ios": "offline-native"
     }
