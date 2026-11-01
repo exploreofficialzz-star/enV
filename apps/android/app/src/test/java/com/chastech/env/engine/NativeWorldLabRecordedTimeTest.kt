@@ -76,6 +76,7 @@ class NativeWorldLabRecordedTimeCheckpointCodecTest {
   val state=NativeWorldLabRecordedTime.seek(run,state(),0.3)
   val checkpoint=NativeWorldLabRecordedTime.checkpoint(run,state)
   val json=NativeWorldLabRecordedCheckpointCodec.encode(checkpoint,run)
+  assertTrue(json.contains("\\"solverInternalTimeSeconds\\": null"))
   val decoded=NativeWorldLabRecordedCheckpointCodec.decode(json,run)
   assertEquals(checkpoint,decoded)
   assertThrows(IllegalArgumentException::class.java){
