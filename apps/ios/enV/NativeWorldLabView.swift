@@ -37,6 +37,7 @@ struct NativeWorldLabView:View {
     @State private var playing=false
     @State private var reversePlayback=false
     @State private var worldEpochUTC=Date()
+    @State private var solarDateUTC=String(ISO8601DateFormatter().string(from:Date()).prefix(10))
     @State private var mass=1.0
     @State private var resistance=1000.0
     @State private var diffusivity=0.02
@@ -803,6 +804,7 @@ struct NativeWorldLabView:View {
                     Text("Simulation \(String(format:"%.4f",clock.simulationTimeSeconds)) s · solver internal time \(String(format:"%.4f",clock.solverInternalTimeSeconds ?? clock.displaySampleTimeSeconds)) s · display sample \(String(format:"%.4f",clock.displaySampleTimeSeconds)) s · solver Δt \(String(format:"%.6g",values?.solverStepSeconds ?? 1.0/240.0)) s · cached recorded output")
                         .font(.caption)
                 }
+                solarEventsSection
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:Binding(get:{seconds},set:{seekDemoRecordedTime($0)}),in:0...12,
                     onEditingChanged:{editing in if editing{playing=false}})
@@ -1212,6 +1214,59 @@ struct NativeWorldLabView:View {
         redraw()
         timelineStatus="Reference experiment parameters and recorded-sample clock restored."
     }
+    private func solarEventTimeLabel(_ date:Date,timezoneIdentifier:String)->String {
+        let formatter=DateFormatter()
+        formatter.timeZone=TimeZone(identifier:timezoneIdentifier) ?? .current
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from:date)
+    }
+
+    private var solarEventsSection:some View {
+        VStack(alignment:.leading,spacing:6) {
+            Text("Approximate sunrise and sunset").font(.headline)
+            TextField("UTC date · YYYY-MM-DD",text:$solarDateUTC)
+                .textInputAutocapitalization(.never)
+                .accessibilityLabel("UTC calendar date for solar estimate")
+                .textFieldStyle(.roundedBorder)
+            if let origin=project?.world.geodeticOrigin {
+                let result=Result {
+                    try NativeWorldLabSolarEvents.calculate(dateUTC:solarDateUTC,
+                        latitudeDegrees:origin.latitudeDegrees,
+                        longitudeDegrees:origin.longitudeDegrees)
+                }
+                switch result {
+                case .success(let events):
+                    let timezone=demoClock?.timezoneDisplay ?? TimeZone.current.identifier
+                    switch events.status {
+                    case .normal:
+                        if let rise=events.sunriseUTC,let set=events.sunsetUTC {
+                            Text("Sunrise \(solarEventTimeLabel(rise,timezoneIdentifier:timezone)) · Sunset \(solarEventTimeLabel(set,timezoneIdentifier:timezone))")
+                                .accessibilityLabel("Estimated sunrise and sunset in \(timezone)")
+                            Text("Solar noon \(solarEventTimeLabel(events.solarNoonUTC,timezoneIdentifier:timezone)) · Daylight \(String(format:"%.2f", (events.daylightMinutes ?? 0)/60)) h")
+                                .font(.caption)
+                        }
+                    case .polarDay:
+                        Text("Polar day · Sun remains above the model's apparent horizon for this UTC date.")
+                            .font(.subheadline)
+                    case .polarNight:
+                        Text("Polar night · Sun remains below the model's apparent horizon for this UTC date.")
+                            .font(.subheadline)
+                    }
+                    Text("NOAA general solar-position estimate · saved WGS84 project origin · local display zone \(timezone). Not an observed horizon, weather forecast or precision ephemeris.")
+                        .font(.caption).foregroundStyle(.secondary)
+                case .failure(let error):
+                    Text(error.localizedDescription).font(.caption).foregroundStyle(.red)
+                }
+            } else {
+                Text("Save a WGS84 Earth reference to calculate solar events for this project.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.06),in:RoundedRectangle(cornerRadius:10))
+    }
+
     private var timelineCheckpointTransfersView:some View {
         interactionView
         .fileExporter(isPresented:$exportingTimelineCheckpoint,document:timelineCheckpointFile,

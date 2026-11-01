@@ -270,3 +270,52 @@ final class NativeWorldLabBranchCurrentTests:XCTestCase {
             positiveNodeId:"a",negativeNodeId:"a",signedCurrentA:1))
     }
 }
+
+
+    func testLagosSolarEventsAreOrderedUTCAndHaveClearAccuracyLabel() throws {
+        let events=try NativeWorldLabSolarEvents.calculate(
+            dateUTC:"2026-11-01",latitudeDegrees:6.5244,longitudeDegrees:3.3792)
+        XCTAssertEqual(events.status,.normal)
+        let sunrise=try XCTUnwrap(events.sunriseUTC)
+        let sunset=try XCTUnwrap(events.sunsetUTC)
+        XCTAssertLessThan(sunrise,events.solarNoonUTC)
+        XCTAssertLessThan(events.solarNoonUTC,sunset)
+        XCTAssertGreaterThan(events.daylightMinutes ?? 0,700)
+        XCTAssertLessThan(events.daylightMinutes ?? 1000,730)
+        XCTAssertEqual(events.method,"NOAA-general-solar-position-equations")
+        XCTAssertTrue(events.validity.contains("Approximate"))
+    }
+
+    func testEquatorialEquinoxHasApproximatelyTwelveHoursDaylight() throws {
+        let events=try NativeWorldLabSolarEvents.calculate(
+            dateUTC:"2026-03-20",latitudeDegrees:0,longitudeDegrees:0)
+        XCTAssertEqual(events.status,.normal)
+        XCTAssertLessThan(abs((events.daylightMinutes ?? 0)-720),10)
+    }
+
+    func testPolarDayNightAndExactPolesDoNotInventSunriseOrSunset() throws {
+        let cases:[(String,Double,NativeWorldLabSolarStatus)]=[
+            ("2026-06-21",80,.polarDay),("2026-12-21",80,.polarNight),
+            ("2026-06-21",90,.polarDay),("2026-12-21",90,.polarNight),
+            ("2026-12-21",-90,.polarDay),("2026-06-21",-90,.polarNight)
+        ]
+        for (date,latitude,status) in cases {
+            let events=try NativeWorldLabSolarEvents.calculate(
+                dateUTC:date,latitudeDegrees:latitude,longitudeDegrees:0)
+            XCTAssertEqual(events.status,status)
+            XCTAssertNil(events.sunriseUTC)
+            XCTAssertNil(events.sunsetUTC)
+            XCTAssertNil(events.daylightMinutes)
+        }
+    }
+
+    func testSolarDateAndCoordinateBoundsAreValidated() {
+        XCTAssertThrowsError(try NativeWorldLabSolarEvents.calculate(
+            dateUTC:"2025-02-29",latitudeDegrees:0,longitudeDegrees:0))
+        XCTAssertThrowsError(try NativeWorldLabSolarEvents.calculate(
+            dateUTC:"1799-12-31",latitudeDegrees:0,longitudeDegrees:0))
+        XCTAssertThrowsError(try NativeWorldLabSolarEvents.calculate(
+            dateUTC:"2026-01-01",latitudeDegrees:91,longitudeDegrees:0))
+        XCTAssertThrowsError(try NativeWorldLabSolarEvents.calculate(
+            dateUTC:"2026-01-01",latitudeDegrees:0,longitudeDegrees:181))
+    }

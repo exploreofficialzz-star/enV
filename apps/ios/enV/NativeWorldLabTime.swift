@@ -408,3 +408,104 @@ enum NativeWorldLabRecordedTime {
         try validate(clock:restored,run:run);return restored
     }
 }
+
+
+enum NativeWorldLabSolarStatus:String,Codable {
+    case normal
+    case polarDay
+    case polarNight
+}
+struct NativeWorldLabSolarEvents:Equatable {
+    let dateUTC:String
+    let latitudeDegrees:Double
+    let longitudeDegrees:Double
+    let status:NativeWorldLabSolarStatus
+    let solarNoonUTC:Date
+    let sunriseUTC:Date?
+    let sunsetUTC:Date?
+    let daylightMinutes:Double?
+    let method:String
+    let horizonZenithDegrees:Double
+    let timeBasis:String
+    let validity:String
+
+    static func calculate(dateUTC:String,latitudeDegrees:Double,
+        longitudeDegrees:Double)throws->NativeWorldLabSolarEvents {
+        let parts=dateUTC.split(separator:"-",omittingEmptySubsequences:false)
+        guard parts.count==3,parts.allSatisfy({$0.count==2 || $0.count==4}),
+              let year=Int(parts[0]),let month=Int(parts[1]),let day=Int(parts[2]) else {
+            throw NativeWorldLabError.invalid("Solar date must use YYYY-MM-DD UTC form.")
+        }
+        guard (1800...2100).contains(year) else {
+            throw NativeWorldLabError.invalid("Solar approximation is supported only from 1800 through 2100.")
+        }
+        guard latitudeDegrees.isFinite,(-90...90).contains(latitudeDegrees) else {
+            throw NativeWorldLabError.invalid("Solar latitude must be finite and between -90° and 90°.")
+        }
+        guard longitudeDegrees.isFinite,(-180...180).contains(longitudeDegrees) else {
+            throw NativeWorldLabError.invalid("Solar longitude must be finite and between -180° and 180°.")
+        }
+        var calendar=Calendar(identifier:.gregorian)
+        calendar.timeZone=TimeZone(secondsFromGMT:0)!
+        var components=DateComponents()
+        components.year=year;components.month=month;components.day=day
+        components.hour=0;components.minute=0;components.second=0
+        guard let start=calendar.date(from:components),
+              calendar.component(.year,from:start)==year,
+              calendar.component(.month,from:start)==month,
+              calendar.component(.day,from:start)==day else {
+            throw NativeWorldLabError.invalid("Solar date is not a valid Gregorian calendar day.")
+        }
+        let dayOfYear=calendar.ordinality(of:.day,in:.year,for:start) ?? 1
+        let yearLength=Double(calendar.range(of:.day,in:.year,for:start)?.count ?? 365)
+        let gamma=2*Double.pi/yearLength*Double(dayOfYear-1)
+        let equationOfTime=229.18*(0.000075+0.001868*cos(gamma)-
+            0.032077*sin(gamma)-0.014615*cos(2*gamma)-
+            0.040849*sin(2*gamma))
+        let declination=0.006918-0.399912*cos(gamma)+
+            0.070257*sin(gamma)-0.006758*cos(2*gamma)+
+            0.000907*sin(2*gamma)-0.002697*cos(3*gamma)+
+            0.00148*sin(3*gamma)
+        let latitude=latitudeDegrees*Double.pi/180
+        let zenith=90.833*Double.pi/180
+        let noonMinutes=720-4*longitudeDegrees-equationOfTime
+        guard noonMinutes.isFinite,declination.isFinite else {
+            throw NativeWorldLabError.invalid("Solar position exceeded the supported numerical range.")
+        }
+        let noon=start.addingTimeInterval(noonMinutes*60)
+        var status:NativeWorldLabSolarStatus = .normal
+        var sunrise:Date?
+        var sunset:Date?
+        var daylight:Double?
+        let cosineLatitude=cos(latitude)
+        if abs(cosineLatitude)<1e-12 {
+            let declinationDegrees=declination*180/Double.pi
+            let polarAltitude=latitudeDegrees>0 ? declinationDegrees : -declinationDegrees
+            status=polarAltitude > -0.833 ? .polarDay : .polarNight
+        } else {
+            let denominator=cosineLatitude*cos(declination)
+            let cosHour=cos(zenith)/denominator-tan(latitude)*tan(declination)
+            guard cosHour.isFinite else {
+                throw NativeWorldLabError.invalid("Solar position exceeded the supported numerical range.")
+            }
+            if cosHour > 1+1e-12 {
+                status = .polarNight
+            } else if cosHour < -1-1e-12 {
+                status = .polarDay
+            } else {
+                let hourAngle=acos(min(1,max(-1,cosHour)))*180/Double.pi
+                let riseMinutes=noonMinutes-4*hourAngle
+                let setMinutes=noonMinutes+4*hourAngle
+                sunrise=start.addingTimeInterval(riseMinutes*60)
+                sunset=start.addingTimeInterval(setMinutes*60)
+                daylight=setMinutes-riseMinutes
+            }
+        }
+        return NativeWorldLabSolarEvents(dateUTC:dateUTC,latitudeDegrees:latitudeDegrees,
+            longitudeDegrees:longitudeDegrees,status:status,solarNoonUTC:noon,
+            sunriseUTC:sunrise,sunsetUTC:sunset,daylightMinutes:daylight,
+            method:"NOAA-general-solar-position-equations",horizonZenithDegrees:90.833,
+            timeBasis:"UTC civil date; no UT1/TT conversion",
+            validity:"Approximate apparent sunrise/sunset for 1800–2100 using a standard 0.833° horizon correction; terrain, elevation horizon, weather, pressure, measured solar data, Earth-orientation parameters, leap seconds and precision ephemerides are not included.")
+    }
+}
