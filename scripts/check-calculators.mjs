@@ -37,7 +37,7 @@ const presentationPipelineMissing = !generatorText.includes("mathExercisePresent
   || !generatorText.includes("expansionCalculatorName(info, target)")
   || !generatorText.includes("expansionCalculatorDescription(info, target)")
   || !generatorText.includes("expansionCalculatorKeywords(family, info, target)")
-  || !presentationHelperText.includes("Missing human-readable label for math exercise target");
+  || !presentationHelperText.includes("Missing human-readable label for math exercise target")
 const legacyGeneratedTitleLogic = generatorText.includes("Solve for ${target}") || mathExerciseText.includes("formula: `${spec.formula} · solve for ${target}`");
 
 console.log(`Calculator audit: ${calculators.length} formula-engine tools across ${categoryTools.length} category entries`);
