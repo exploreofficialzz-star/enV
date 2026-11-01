@@ -167,3 +167,43 @@ final class NativeWorldLabRecordedEventBoundaryTests:XCTestCase {
             .simulationTimeSeconds,0.15,accuracy:1e-9)
     }
 }
+
+
+final class NativeWorldLabRecordedCheckpointInteropTests:XCTestCase {
+    private func run()->NativeWorldLabRecordedRun {
+        NativeWorldLabRecordedRun(runId:"interop-run",modelId:"native-actuator",
+            modelVersion:"1.2.0",worldEpochUTC:"2026-11-01T00:00:00Z",
+            sampleTimesSeconds:[0,0.1,0.2])
+    }
+    func testCheckpointEncodesExplicitNullSolverTimeForAndroidCompatibility()throws {
+        let recording=run()
+        let clock=try NativeWorldLabRecordedTime.start(run:recording,
+            wallTimeUTC:"2026-11-01T12:00:00Z",timezoneDisplay:"Africa/Lagos")
+        let checkpoint=try NativeWorldLabRecordedTime.checkpoint(run:recording,state:clock)
+        let data=try checkpoint.encodeBounded()
+        let root=try XCTUnwrap(JSONSerialization.jsonObject(with:data) as? [String:Any])
+        let encodedClock=try XCTUnwrap(root["clock"] as? [String:Any])
+        XCTAssertTrue(encodedClock.keys.contains("solverInternalTimeSeconds"))
+        XCTAssertTrue(encodedClock["solverInternalTimeSeconds"] is NSNull)
+        XCTAssertEqual(Set(encodedClock.keys),Set([
+            "wallTimeUTC","worldDateUTC","simulationTimeSeconds","solverInternalTimeSeconds",
+            "displaySampleTimeSeconds","sampleIndex","playbackRate","direction","paused",
+            "timezoneDisplay","fidelity"
+        ]))
+    }
+    func testDecoderRejectsUnknownRootAndClockFields()throws {
+        let recording=run()
+        let clock=try NativeWorldLabRecordedTime.start(run:recording,
+            wallTimeUTC:"2026-11-01T12:00:00Z",timezoneDisplay:"Africa/Lagos")
+        let data=try NativeWorldLabRecordedTime.checkpoint(run:recording,state:clock).encodeBounded()
+        var root=try XCTUnwrap(JSONSerialization.jsonObject(with:data) as? [String:Any])
+        root["unsupported"]=true
+        let altered=try JSONSerialization.data(withJSONObject:root)
+        XCTAssertThrowsError(try NativeWorldLabRecordedCheckpoint.decodeBounded(altered))
+        root.removeValue(forKey:"unsupported")
+        var encodedClock=try XCTUnwrap(root["clock"] as? [String:Any])
+        encodedClock["unsupported"]=1;root["clock"]=encodedClock
+        let alteredClock=try JSONSerialization.data(withJSONObject:root)
+        XCTAssertThrowsError(try NativeWorldLabRecordedCheckpoint.decodeBounded(alteredClock))
+    }
+}
