@@ -25,7 +25,7 @@ function parseExperimentBranch(raw:unknown,run:Partial<LabRun>):ExperimentBranch
      !validId(branch.sourceRunId)||branch.sourceRunId!==run.parentRunId||
      typeof branch.sourceModelId!=="string"||!modelKinds.has(branch.sourceModelId)||
      typeof branch.sourceModelVersion!=="string"||
-     !/^\\d+\\.\\d+\\.\\d+$/.test(branch.sourceModelVersion)||
+     !/^\d+\.\d+\.\d+$/.test(branch.sourceModelVersion)||
      branch.targetModelId!==run.modelId||
      branch.targetModelVersion!==run.modelVersion||
      typeof branch.createdAtUTC!=="string"||!Number.isFinite(Date.parse(branch.createdAtUTC))||
