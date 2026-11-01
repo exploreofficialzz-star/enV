@@ -14810,7 +14810,7 @@ private final class ABookLocalStore {
                       let name = item["name"] as? String, !name.isEmpty, name.count <= 500,
                       let mime = item["type"] as? String, mime.count <= 200,
                       let declaredSize = item["size"] as? Int, declaredSize == data.count,
-                      declaredSize <= 100 * 1024 * 1024 else {
+                      declaredSize > 0, declaredSize <= 100 * 1024 * 1024 else {
                     throw NSError(domain: "ABookArchive", code: 28, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid or damaged attachment."])
                 }
                 expectedPaths.insert(filePath)
@@ -14858,8 +14858,10 @@ private final class ABookLocalStore {
                     guard existingAttachmentCount + importedAttachments.count <= 10_000 else {
                         throw NSError(domain: "ABookArchive", code: 38, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing this backup."])
                     }
+                    let maxLibraryAttachmentBytes = Int64(150 * 1024 * 1024)
                     guard existingAttachmentBytes >= 0,
-                          existingAttachmentBytes + Int64(totalBytes) <= 150 * 1024 * 1024 else {
+                          existingAttachmentBytes <= maxLibraryAttachmentBytes,
+                          Int64(totalBytes) <= maxLibraryAttachmentBytes - existingAttachmentBytes else {
                         throw NSError(domain: "ABookArchive", code: 39, userInfo: [NSLocalizedDescriptionKey: "The complete local library attachment limit is 150 MB. Export and remove older files before importing this backup."])
                     }
                     for note in importedNotes {
