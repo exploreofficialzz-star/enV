@@ -198,9 +198,9 @@ test("scalar slice preserves nodata and refuses invalid indices and field kinds"
  const base=createComputedFieldLayers(run("heat-rod"))[0];
  assert.throws(()=>fieldScalarSliceAtTime(base,0),/scalar field/);
 });
-test("scalar slice renderer is advertised only for the real scalar implementation",()=>{
+test("scalar and tensor slice renderers are advertised only for implemented component renderers",()=>{
  assert.equal(isFieldOverlayRendererImplemented("scalar","slice"),true);
- assert.equal(isFieldOverlayRendererImplemented("tensor","slice"),false);
+ assert.equal(isFieldOverlayRendererImplemented("tensor","slice"),true);
 });
 
 function tensorSliceLayer(){
@@ -214,9 +214,9 @@ function tensorSliceLayer(){
 test("tensor slices expose all nine ordered components from recorded cells",()=>{
  const layer=tensorSliceLayer(),xy=fieldTensorSliceAtTime(layer,0.099,"xy",1);
  assert.equal(xy.sampleTimeSeconds,0.1);assert.equal(xy.sampleIndex,10);
- assert.deepEqual(xy.cells[0].components,[1000,1001,1002,1003,1004,1005,1006,1007,1008]);
+ assert.deepEqual(xy.cells[0].components,[1036,1037,1038,1039,1040,1041,1042,1043,1044]);
  const yz=fieldTensorSliceAtTime(layer,0.1,"yz",1);
- assert.deepEqual(yz.cells[0].components,[1009,1010,1011,1012,1013,1014,1015,1016,1017]);
+ assert.deepEqual(yz.cells[0].components,[1000,1001,1002,1003,1004,1005,1006,1007,1008]);
 });
 test("tensor slices preserve masked components and reject invalid slice indices",()=>{
  const layer=tensorSliceLayer(),raw=JSON.parse(JSON.stringify(layer));

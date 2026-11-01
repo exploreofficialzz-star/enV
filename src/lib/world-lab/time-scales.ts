@@ -44,7 +44,7 @@ function utcMilliseconds(value:string):number{
  if(!finite(valueMs))throw new Error("Time-scale input is not a valid UTC timestamp.");
  return valueMs;
 }
-function isoWithScale(milliseconds:number,scale:"TAI"|"TT"|"UT1"){
+function isoWithScale(milliseconds:number,scale:"TAI"|"TT"|"UT1"|"TCG"){
  if(!finite(milliseconds))throw new Error("Converted time is outside the supported range.");
  return new Date(milliseconds).toISOString().replace("Z"," "+scale);
 }

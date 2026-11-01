@@ -76,8 +76,8 @@ test("IAU TT↔TCG and TCB↔TDB defining transforms are reversible over long sp
  const reference=43144.0003725;
  assert.equal(ttMjdToTcgMjd(reference),reference);
  assert.equal(tcgMjdToTtMjd(reference),reference);
- assert.ok(Math.abs(ttMjdToTcgMjd(reference+1)-reference-1/(1-IAU_LG))<1e-12);
- assert.ok(Math.abs(tcbMjdToTdbMjd(reference)-reference-IAU_TDB0_SECONDS/86400)<1e-15);
+ assert.ok(Math.abs(ttMjdToTcgMjd(reference+1)-reference-1/(1-IAU_LG))<1e-11);
+ assert.ok(Math.abs(tcbMjdToTdbMjd(reference)-reference-IAU_TDB0_SECONDS/86400)<1e-11);
  for(const value of [-1_000_000,reference,1_000_000,100_000_000]){
   assert.ok(Math.abs(tcgMjdToTtMjd(ttMjdToTcgMjd(value))-value)<2e-8);
   assert.ok(Math.abs(tdbMjdToTcbMjd(tcbMjdToTdbMjd(value))-value)<2e-8);

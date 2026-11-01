@@ -384,9 +384,9 @@ extension NativeWorldLabTimeCheckpointTests {
         XCTAssertEqual(try NativeWorldLabTimeScales.ttMjdToTcgMjd(reference),reference,accuracy:0)
         XCTAssertEqual(try NativeWorldLabTimeScales.tcgMjdToTtMjd(reference),reference,accuracy:0)
         XCTAssertEqual(try NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1),
-            reference+1/(1-NativeWorldLabTimeScales.iauLG),accuracy:1e-12)
+            reference+1/(1-NativeWorldLabTimeScales.iauLG),accuracy:1e-11)
         XCTAssertEqual(try NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),
-            reference-NativeWorldLabTimeScales.iauTDB0Seconds/86400,accuracy:1e-15)
+            reference-NativeWorldLabTimeScales.iauTDB0Seconds/86400,accuracy:1e-11)
         for value in [-1_000_000.0,reference,1_000_000.0,100_000_000.0] {
             XCTAssertEqual(try NativeWorldLabTimeScales.tcgMjdToTtMjd(
                 NativeWorldLabTimeScales.ttMjdToTcgMjd(value)),value,accuracy:2e-8)

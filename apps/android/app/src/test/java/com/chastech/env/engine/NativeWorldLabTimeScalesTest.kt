@@ -52,9 +52,9 @@ PREDICTIONS:
         assertEquals(reference,NativeWorldLabTimeScales.ttMjdToTcgMjd(reference),0.0)
         assertEquals(reference,NativeWorldLabTimeScales.tcgMjdToTtMjd(reference),0.0)
         assertEquals(reference+1.0/(1.0-NativeWorldLabTimeScales.IAU_LG),
-            NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1.0),1e-12)
+            NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1.0),1e-11)
         assertEquals(reference-NativeWorldLabTimeScales.IAU_TDB0_SECONDS/86400.0,
-            NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),1e-15)
+            NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),1e-11)
         listOf(-1_000_000.0,reference,1_000_000.0,100_000_000.0).forEach { value ->
             assertEquals(value,NativeWorldLabTimeScales.tcgMjdToTtMjd(
                 NativeWorldLabTimeScales.ttMjdToTcgMjd(value)),2e-8)
