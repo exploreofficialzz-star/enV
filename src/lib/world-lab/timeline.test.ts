@@ -1,0 +1,7 @@
+import test from "node:test";import assert from "node:assert/strict";
+import {runExperiment} from "./model.ts";
+import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepRecordedTime,advanceEventSafeTime} from "./timeline.ts";
+const makeRun=()=>runExperiment({kind:"damped-oscillator",massKg:1,springNPerM:4,dampingNsPerM:0.5,initialDisplacementM:0.5,initialVelocityMPerS:0},{durationSeconds:1,id:"timeline-run",worldDateUTC:"2026-11-01T00:00:00Z",solverStepSeconds:0.01});
+test("steps move to authoritative stored sample times in both directions",()=>{const r=makeRun();const next=stepRecordedTime(r,0.023,1);assert.equal(next,0.03);assert.equal(stepRecordedTime(r,next,-1),0.02);assert.equal(stepRecordedTime(r,1,1),1);assert.equal(stepRecordedTime(r,0,-1),0);});
+test("mandatory event times are visited before high-speed playback continues",()=>{assert.equal(advanceEventSafeTime(0,0.5,10,5,[1,2]),1);assert.equal(advanceEventSafeTime(1,0.5,10,5,[1,2]),2);assert.equal(advanceEventSafeTime(2,0.1,1,5,[1,2]),2.1);assert.equal(advanceEventSafeTime(0.5,0.1,0.1,5,[1,2]),0.51);});
+test("recorded checkpoints preserve run identity and exact immutable sample state",()=>{const r=makeRun(),c=createRecordedTimelineCheckpoint(r,0.5);assert.equal(restoreRecordedTimelineCheckpoint(r,JSON.parse(JSON.stringify(c))),0.5);assert.throws(()=>restoreRecordedTimelineCheckpoint({...r,id:"other"},c),/different run/);const bad=JSON.parse(JSON.stringify(c));bad.state.positionM=999;assert.throws(()=>restoreRecordedTimelineCheckpoint(r,bad),/differs/);});

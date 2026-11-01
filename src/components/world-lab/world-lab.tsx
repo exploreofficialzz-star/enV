@@ -53,6 +53,9 @@ import {runFluidMotion,sampleFluidMotion,type FluidMotionRun}
 import { WorldLabFluidCutaway } from "./fluid-cutaway";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
+import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
+import { WorldLabInspectionPanel } from "./inspection-panel";
+import { WorldLabTimeController } from "./time-controller";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES,
   observerAdaptiveStepMetres,observerClippingPlanes,observerRangeMetres } from "@/lib/world-lab/observer";
 import {
@@ -156,12 +159,15 @@ export default function WorldLab() {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [seeInside, setSeeInside] = useState(false);
+  const [inspectionMode,setInspectionMode]=useState<InspectionMode>("normal");
+  const [cutawayAxis,setCutawayAxis]=useState<InspectionAxis>("x");
+  const [cutawayFraction,setCutawayFraction]=useState(0);
+  const [explosionDistanceM,setExplosionDistanceM]=useState(1);
   const [observerDepth, setObserverDepth] = useState(0);
   const [observerRange,setObserverRange]=useState(8);
   const cameraRestoredProject=useRef("");
-  const visualSettings = useRef({ seeInside: false, opacity: 55 });
+  const visualSettings = useRef({ seeInside: false, opacity: 55,mode:"normal" as InspectionMode,axis:"x" as InspectionAxis,cutawayFraction:0,explosionDistanceM:1,selectedEntityId:"" });
   const [opacity, setOpacity] = useState(55);
-  visualSettings.current = { seeInside, opacity };
   const [project, setProjectState] = useState<WorldLabProject | null>(null);
   const projectForEdits=useRef<WorldLabProject|null>(null);
   const editHistory=useRef(emptyWorldLabEditHistory());
@@ -201,6 +207,7 @@ export default function WorldLab() {
   const [recoveryDrafts,setRecoveryDrafts]=useState<WorldLabDraft[]>([]);
   const [recoveryStatus,setRecoveryStatus]=useState("");
   const [selectedEntityId, setSelectedEntityId] = useState("");
+  visualSettings.current = { seeInside,opacity,mode:inspectionMode,axis:cutawayAxis,cutawayFraction,explosionDistanceM,selectedEntityId };
   const [fluidRun,setFluidRun]=useState<HydrostaticResult|null>(null);
   const [chemicalInput,setChemicalInput]=useState<ReactionThermalInput>({
     initialReactantMol:1,initialTemperatureK:300,ambientTemperatureK:300,
@@ -560,6 +567,12 @@ export default function WorldLab() {
         // See Inside is an optional view aid, not a navigation gate.
         const depth = Math.max(0, -camera.position.y);
         const inspection = visualSettings.current;
+        const plane=projectForEdits.current?inspectionPlane(projectForEdits.current,{
+          mode:inspection.mode,opacity:inspection.opacity,axis:inspection.axis,
+          cutawayFraction:inspection.cutawayFraction,explosionDistanceM:inspection.explosionDistanceM,
+          selectedEntityId:inspection.selectedEntityId,
+        }):null;
+        scene!.clipPlane=plane?new B.Plane(plane.normal[0],plane.normal[1],plane.normal[2],-plane.offset):null;
         groundMaterial.alpha = depth > 0 || camera.position.y < 0.75
           ? 0.12 : inspection.seeInside ? inspection.opacity / 100 : 1;
         for (const material of strataMaterials)
@@ -657,15 +670,22 @@ export default function WorldLab() {
         mesh.metadata = { worldLabEntityId: entity.id, worldLabShape: entity.shape };
         scene.addedShapes.set(entity.id, mesh);
       }
-      mesh.position.copyFromFloats(...entity.positionMeters);
+      const settings=visualSettings.current;
+      const renderPosition=inspectionRenderPosition(project,settings,entity.id);
+      mesh.position.copyFromFloats(...renderPosition);
       mesh.rotation.copyFromFloats(...(entity.rotationRadians??[0,0,0]));
       mesh.scaling.copyFromFloats(...entity.dimensionsMeters);
+      mesh.isVisible=inspectionEntityVisible(project,settings,entity.id);
       if (mesh.material instanceof B.StandardMaterial) {
         mesh.material.diffuseColor = B.Color3.FromHexString(entity.color);
-        mesh.material.alpha = (seeInside ? opacity / 100 : 1) * entity.opacity;
+        mesh.material.alpha = (settings.mode==="xray"?Math.min(0.24,settings.opacity/100):
+          settings.seeInside||settings.mode==="cutaway"?settings.opacity/100:1)*entity.opacity;
+        mesh.material.wireframe=settings.mode==="xray";
+        mesh.material.backFaceCulling=settings.mode!=="xray";
+        mesh.material.needDepthPrePass=settings.mode==="xray";
       }
     }
-  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity, project, currentRun, heat]);
+  }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity,inspectionMode,cutawayAxis,cutawayFraction,explosionDistanceM,selectedEntityId, project, currentRun, heat]);
 
   useEffect(()=>{
     if(!collisionPlaying||!selectedCollision)return;
@@ -2685,7 +2705,7 @@ export default function WorldLab() {
           <WorldLabGeoreferencePanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
-              onClick={() => setSeeInside((value) => !value)}>See Inside</button>
+              onClick={() => {const next=seeInside?"normal":"transparent";setSeeInside(!seeInside);setInspectionMode(next);}}>See Inside</button>
             <button type="button" className={buttonClass} onClick={() => zoomView(1)}
               aria-label="Zoom in">Zoom in</button>
             <button type="button" className={buttonClass} onClick={() => zoomView(-1)}
@@ -2711,17 +2731,14 @@ export default function WorldLab() {
               <button type="button" className={buttonClass} disabled={!canRedo}
                 aria-label="Redo World Lab edit" onClick={()=>travelEdit("redo")}>Redo</button>
           </div>
-          {seeInside && (
-            <div className="mt-2 rounded-lg border border-border p-3">
-              <label htmlFor="worldlab-opacity" className="block text-sm">Object opacity: {opacity}%</label>
-              <input id="worldlab-opacity" type="range" min="10" max="100" step="5" value={opacity}
-                onChange={(event) => setOpacity(Number(event.target.value))} className="w-full" />
-              <p className="text-xs text-muted-foreground">
-                This shows the display object with transparency and numerical internal state.
-                It is not X-ray measurement, volumetric imaging or a computed electromagnetic field.
-              </p>
-            </div>
-          )}
+          <WorldLabInspectionPanel mode={inspectionMode}
+            onModeChange={mode=>{setInspectionMode(mode);setSeeInside(["transparent","xray","cutaway"].includes(mode));}}
+            opacity={opacity} onOpacityChange={setOpacity}
+            axis={cutawayAxis} onAxisChange={setCutawayAxis}
+            cutawayFraction={cutawayFraction} onCutawayFractionChange={setCutawayFraction}
+            explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={setExplosionDistanceM}
+            selected={selectedEntity??null} hasAssembly={!!project?.assemblies?.some(a=>a.entityIds.includes(selectedEntityId))}
+            onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}/>
           <p className="mt-2 text-xs text-muted-foreground">
             Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
             Added solids are visual geometry with analytic volume. Without material density, mass is unknown;
@@ -3596,35 +3613,11 @@ export default function WorldLab() {
               </>
             )}
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass + " bg-foreground text-background"}
-              onClick={start}>Start / Recalculate</button>
-            <button type="button" className={buttonClass} disabled={!currentRun}
-              onClick={() => setPlaying((state) => !state)}>{playing ? "Pause" : "Play"}</button>
-            <button type="button" className={buttonClass} disabled={!currentRun}
-              onClick={() => { setPlaying(false); setTimeSeconds(0); }}>Reset time</button>
-            <button type="button" className={buttonClass} disabled={!currentRun}
-              onClick={() => { setPlaying(false); setTimeSeconds((t) =>
-                Math.min(currentRun?.time.simulatedDurationSeconds ?? 0, t + (currentRun?.time.solverStepSeconds ?? 0))); }}>
-              Step
-            </button>
-          </div>
-          <div className="mt-4">
-            <label htmlFor="worldlab-speed" className="block text-sm">Playback speed</label>
-            <select id="worldlab-speed" className={inputLabel} value={playbackRate}
-              onChange={(event) => setPlaybackRate(Number(event.target.value))}>
-              <option value={0.01}>0.01× (slow)</option><option value={0.1}>0.1×</option>
-              <option value={1}>1× (normal)</option><option value={10}>10× (fast)</option>
-            </select>
-            <label htmlFor="worldlab-time" className="mt-2 block text-sm">
-              Simulated elapsed time: {timeSeconds.toFixed(3)} s
-            </label>
-            <input id="worldlab-time" className="w-full" type="range" min={0}
-              max={currentRun?.time.simulatedDurationSeconds ?? DEMO_DURATION_SECONDS}
-              step={currentRun?.time.solverStepSeconds ?? 1 / 240}
-              value={timeSeconds} disabled={!currentRun}
-              onChange={(event) => { setPlaying(false); setTimeSeconds(Number(event.target.value)); }} />
-          </div>
+          <button type="button" className={buttonClass+" bg-foreground text-background"} onClick={start}>Start / Recalculate</button>
+          <WorldLabTimeController run={currentRun} timeSeconds={timeSeconds} playing={playing}
+            rate={playbackRate} onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
+            onRateChange={setPlaybackRate}
+            onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}/>
           {runs.length > 0 && (
             <div className="mt-4 rounded-lg border border-border p-3 text-sm">
               <label htmlFor="worldlab-run-history" className="block font-medium">
