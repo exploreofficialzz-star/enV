@@ -116,6 +116,21 @@ final class NativeWorldLabProjectTests: XCTestCase {
             XCTUnwrap(parallel.networks?.first),project:parallel)
         XCTAssertEqual(second.resistorHeatW/9,0.135,accuracy:1e-12)
     }
+
+    func testRemovingTheOnlyLoadProducesAValidZeroCurrentOpenCircuit() throws {
+        let wired=try NativeWorldLabEditor.starterCircuit(NativeWorldLabEditor.blank())
+        let open=try NativeWorldLabEditor.removeCircuitComponent(wired,id:"load")
+        let project=try NativeWorldLabProject.decode(open)
+        let network=try XCTUnwrap(project.networks?.first)
+        let result=try NativeWorldLabDc.solve(network,project:project)
+        XCTAssertEqual(try XCTUnwrap(result.branchCurrentsA["source"]),0,accuracy:1e-12)
+        XCTAssertEqual(result.deliveredPowerW,0,accuracy:1e-12)
+        XCTAssertEqual(result.resistorHeatW,0,accuracy:1e-12)
+        XCTAssertEqual(result.powerResidualW,0,accuracy:1e-12)
+        XCTAssertFalse(network.components.contains(where:{
+            $0.kind=="resistor" || $0.kind=="hypothetical-device"
+        }))
+    }
     func testNativeArchimedesFluidWithUnknownMass() throws {
         let base=try NativeWorldLabEditor.blank()
         let solid=try NativeWorldLabEditor.addSolid(base,shape:"box",id:"float")
