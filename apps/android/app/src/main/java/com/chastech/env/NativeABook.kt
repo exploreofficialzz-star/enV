@@ -216,6 +216,30 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
     fun importLibrary(importNotes:List<ABookNoteRecord>,importRevisions:List<ABookRevisionRecord>,importAttachments:List<ABookFileRecord>){
         val db=writableDatabase;db.beginTransaction()
         try{
+            fun scalarLong(sql:String):Long=db.rawQuery(sql,null).use{cursor->
+                require(cursor.moveToFirst()){ "Could not verify the current A book library limits." }
+                cursor.getLong(0)
+            }
+            val existingNotes=scalarLong("SELECT COUNT(*) FROM notes")
+            val existingRevisions=scalarLong("SELECT COUNT(*) FROM revisions")
+            val existingAttachments=scalarLong("SELECT COUNT(*) FROM attachments")
+            val existingAttachmentBytes=scalarLong("SELECT COALESCE(SUM(size),0) FROM attachments")
+            val incomingAttachmentBytes=importAttachments.sumOf{it.size}
+            require(existingNotes+importNotes.size<=10_000L){
+                "A book supports up to 10,000 local notes. Export or remove older notes before importing this backup."
+            }
+            require(existingRevisions+importRevisions.size<=100_000L){
+                "A book supports up to 100,000 local revisions. Export or remove older notes before importing this backup."
+            }
+            require(existingAttachments+importAttachments.size<=10_000L){
+                "A book supports up to 10,000 local attachments. Remove unused files before importing this backup."
+            }
+            require(existingAttachmentBytes>=0&&existingAttachmentBytes+incomingAttachmentBytes<=150L*1024*1024){
+                "The complete local library attachment limit is 150 MB. Export and remove older files before importing this backup."
+            }
+            require(importAttachments.all{it.size in 1..(100L*1024*1024)}){
+                "Each imported attachment must be between 1 byte and 100 MB."
+            }
             importNotes.forEach{note->db.insertOrThrow("notes",null,ContentValues().apply{
                 put("id",note.id);put("title",note.title);put("body",note.body);put("notebook",note.notebook);put("tags",note.tags)
                 put("pinned",if(note.pinned)1 else 0);put("archived",if(note.archived)1 else 0)
