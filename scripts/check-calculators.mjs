@@ -5,6 +5,8 @@ const catalogText = readFileSync(new URL("../src/data/catalog.ts", import.meta.u
 const formulasText = readFileSync(new URL("../src/lib/engines/formulas.ts", import.meta.url), "utf8");
 const advancedText = readFileSync(new URL("../src/lib/engines/advanced-calculators.ts", import.meta.url), "utf8");
 const mathExerciseText = readFileSync(new URL("../src/lib/engines/math-exercise-calculators.ts", import.meta.url), "utf8");
+const generatorText = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
+const presentationHelperText = readFileSync(new URL("./math-exercise-catalog.mjs", import.meta.url), "utf8");
 const stemText = readFileSync(new URL("../src/lib/engines/stem-calculators.ts", import.meta.url), "utf8");
 const regularText = readFileSync(new URL("../src/lib/engines/regular-calculators.ts", import.meta.url), "utf8");
 
@@ -31,6 +33,10 @@ const nonCalculator = categoryTools.filter((tool) => tool.engine.type !== "calcu
 const allowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine.type === "business" && tool.engine.op === "break-even";
 const unexpectedEngine = nonCalculator.filter((tool) => !allowedBusinessRoute(tool));
 const planned = calculators.filter((tool) => tool.status === "planned");
+const presentationPipelineMissing = !generatorText.includes("mathExercisePresentation(mathExerciseCatalog, key, target)")
+  || !generatorText.includes("const targetLabel = info.labels[target]")
+  || !presentationHelperText.includes("Missing human-readable label for math exercise target");
+const legacyGeneratedTitleLogic = generatorText.includes("Solve for ${target}`)");
 
 console.log(`Calculator audit: ${calculators.length} formula-engine tools across ${categoryTools.length} category entries`);
 console.log(`Executable definitions: ${keys.size}`);
@@ -38,8 +44,10 @@ console.log(`Missing definitions: ${missing.length}`);
 console.log(`Intentional break-even business routes: ${nonCalculator.filter(allowedBusinessRoute).length}`);
 console.log(`Unexpected non-calculator engines: ${unexpectedEngine.length}`);
 console.log(`Still Coming Soon: ${planned.length}`);
+console.log(`Readable generated-title pipeline: ${presentationPipelineMissing ? "missing" : "present"}`);
 if (missing.length) console.log("Missing:", missing.map((x) => `${x.id} → ${x.engine.formula}`).join(", "));
 if (unexpectedEngine.length) console.log("Wrong engine:", unexpectedEngine.map((x) => x.id).join(", "));
 if (planned.length) console.log("Planned calculators:", planned.map((x) => x.id).join(", "));
-if (missing.length || unexpectedEngine.length || planned.length) process.exit(1);
+if (missing.length || unexpectedEngine.length || planned.length || presentationPipelineMissing || legacyGeneratedTitleLogic) process.exit(1);
+if (presentationPipelineMissing || legacyGeneratedTitleLogic) console.log("Generated math calculator titles must use formula result labels, never raw variable keys.");
 console.log("Calculator catalog is fully executable.");
