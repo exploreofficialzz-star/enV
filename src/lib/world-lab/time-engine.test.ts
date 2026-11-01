@@ -27,7 +27,7 @@ test("forward and reverse replay traverse actual stored samples only",()=>{
  assert.equal(forward.displaySampleTimeSeconds,0.02);
  const reverseState=withTimeEngineDirection(forward,"reverse-recording");
  const reverse=advanceTimeEngine(r,{...reverseState,paused:false},0.011);
- assert.equal(reverse.simulationTimeSeconds,0.014);
+ assert.ok(Math.abs(reverse.simulationTimeSeconds-0.014)<1e-12);
  assert.equal(reverse.displaySampleTimeSeconds,0.01);
  assert.equal(reverse.fidelity,"cached-recording-reverse");
  assert.equal(reverse.direction,"reverse-recording");
