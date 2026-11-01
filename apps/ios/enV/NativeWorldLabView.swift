@@ -3021,6 +3021,8 @@ Text("Invent chemical heat").font(.headline)
                                 if let clock=motorClock {
                                     Text("Simulation \(String(format:"%.4f",clock.simulationTimeSeconds)) s · display sample \(clock.sampleIndex+1)/\(run.samples.count) · world UTC \(clock.worldDateUTC)")
                                         .font(.caption).foregroundStyle(.secondary)
+                                    Text("Wall UTC \(clock.wallTimeUTC) · local zone \(clock.timezoneDisplay) · cached solver output")
+                                        .font(.caption).foregroundStyle(.secondary)
                                 }
                                 HStack {
                                     Button("Save motor checkpoint",action:prepareMotorCheckpointExport)
