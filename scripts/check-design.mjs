@@ -39,6 +39,9 @@ const unsupportedOps = design.filter((tool) => {
 });
 
 const explorer = read("src/components/tools/design-category-explorer.tsx");
+const explorerUtils = read("src/lib/engines/design-explorer.ts");
+const explorerUtilsTests = read("src/lib/engines/design-explorer.test.ts");
+const designCatalogGenerator = read("scripts/gen-catalog.mjs");
 const colorEngine = read("src/components/engines/color-engine.tsx");
 const cssEngine = read("src/components/engines/cssgen-engine.tsx");
 const colorVision = read("src/lib/engines/color-vision.ts");
@@ -74,6 +77,8 @@ const checks = [
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
   ["Every core Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedIds.length],
+  ["Generated Design workflow families are mapped into visible groups", designCatalogGenerator.includes('addCross("design"') && ["gradient", "shadow", "border", "glass", "neomorph", "noise", "button", "card", "badge", "input", "avatar", "pattern", "blob", "wave"].every((family) => explorerUtils.includes(family + ":")) && explorerUtils.includes('engine.type === "color"') && explorerUtilsTests.includes("every generated Design CSS family maps to one visible explorer group")],
+  ["Generated tools participate in explorer filtering and result counts", explorer.includes("getGeneratedDesignGroup(tool.engine) === group.id") && explorer.includes("const generatedTools = tools.filter") && explorer.includes("uniqueTools.filter((tool) => !normalizedQuery")],
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
   ["Color picker alpha control and extended CSS Color 4 outputs", colorEngine.includes("design-color-alpha") && colorEngine.includes("Opacity / alpha") && colorEngine.includes('["HWB", formatHwb(color)]') && colorEngine.includes('["OKLCH", formatOklch(color)]')],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],

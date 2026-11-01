@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToolCard } from "@/components/tools/tool-card";
 import type { ToolMeta } from "@/types/tool";
+import { getGeneratedDesignGroup } from "@/lib/engines/design-explorer";
 
 const GROUPS = [
   {
@@ -50,6 +51,7 @@ const GROUPS = [
 
 type GroupId = (typeof GROUPS)[number]["id"];
 type FilterId = "all" | GroupId;
+const CORE_TOOL_IDS = new Set(GROUPS.flatMap((group) => [...group.ids]));
 
 function getSearchText(tool: ToolMeta): string {
   return [tool.name, tool.description, ...tool.keywords, ...tool.tags].join(" ").toLowerCase();
@@ -63,13 +65,19 @@ export function DesignCategoryExplorer({ tools }: { tools: ToolMeta[] }) {
     const normalizedQuery = query.trim().toLowerCase();
     return GROUPS
       .filter((group) => activeGroup === "all" || activeGroup === group.id)
-      .map((group) => ({
-        ...group,
-        tools: group.ids
+      .map((group) => {
+        const curatedTools = group.ids
           .map((id) => tools.find((tool) => tool.id === id))
-          .filter((tool): tool is ToolMeta => Boolean(tool))
-          .filter((tool) => !normalizedQuery || getSearchText(tool).includes(normalizedQuery)),
-      }))
+          .filter((tool): tool is ToolMeta => Boolean(tool));
+        const generatedTools = tools.filter(
+          (tool) => !CORE_TOOL_IDS.has(tool.id) && getGeneratedDesignGroup(tool.engine) === group.id,
+        );
+        const uniqueTools = [...curatedTools, ...generatedTools];
+        return {
+          ...group,
+          tools: uniqueTools.filter((tool) => !normalizedQuery || getSearchText(tool).includes(normalizedQuery)),
+        };
+      })
       .filter((group) => group.tools.length > 0);
   }, [activeGroup, query, tools]);
 
