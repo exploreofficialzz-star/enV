@@ -113,10 +113,11 @@ const allTools: ToolMeta[] = [
   // shared with native clients, so expose these web-ready records as active here
   // without changing the independent Android/iOS catalogues in this browser task.
   ...catalogTools.map((catalogTool) => {
-    const webTool: ToolMeta = (catalogTool.category === "qr" || (catalogTool.category === "ecommerce" && catalogTool.engine.type === "custom"))
-      && catalogTool.status === "planned"
-      ? { ...catalogTool, status: "active" }
-      : catalogTool;
+    const presentedTool = presentGeneratedCalculator(catalogTool);
+    const webTool: ToolMeta = (presentedTool.category === "qr" || (presentedTool.category === "ecommerce" && presentedTool.engine.type === "custom"))
+      && presentedTool.status === "planned"
+      ? { ...presentedTool, status: "active" }
+      : presentedTool;
     if (webTool.id === songMetadataAnalyzerTool.id) return songMetadataAnalyzerTool;
     if (webTool.id === "qr-payload-inspector") {
       return {
