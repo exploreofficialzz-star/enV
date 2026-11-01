@@ -15301,15 +15301,18 @@ private struct NativeABookView: View {
             showError(NSError(domain: "ABookPDF", code: 41, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
             return
         }
+        let workItems: [(url: URL, name: String)] 
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name) }
+        } catch { showError(error); return }
         status = "Merging PDFs locally…"
         Task.detached(priority: .userInitiated) {
             do {
                 let merged = PDFDocument()
                 var pageCount = 0
-                for attachment in selected {
-                    let url = try store.fileURL(for: attachment)
-                    guard let source = PDFDocument(url: url) else {
-                        throw NSError(domain: "ABookPDF", code: 42, userInfo: [NSLocalizedDescriptionKey: "Could not open " + attachment.name + "."])
+                for item in workItems {
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 42, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
                     }
                     pageCount += source.pageCount
                     guard pageCount <= 5_000 else {
@@ -15327,7 +15330,7 @@ private struct NativeABookView: View {
                     pdfData = data
                     pdfName = "a-book-merged.pdf"
                     exportingPDF = true
-                    status = "Merged " + String(selected.count) + " PDFs locally"
+                    status = "Merged " + String(workItems.count) + " PDFs locally"
                     errorText = ""
                 }
             } catch { await MainActor.run { showError(error) } }
@@ -15341,15 +15344,19 @@ private struct NativeABookView: View {
             showError(NSError(domain: "ABookPDF", code: 45, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
             return
         }
+        let workItems: [(url: URL, name: String)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name) }
+        } catch { showError(error); return }
         status = "Rotating PDFs locally…"
         Task.detached(priority: .userInitiated) {
             do {
                 var files: [String: Data] = [:]
                 var names = Set<String>()
                 var pageCount = 0
-                for attachment in selected {
-                    guard let document = PDFDocument(url: try store.fileURL(for: attachment)) else {
-                        throw NSError(domain: "ABookPDF", code: 46, userInfo: [NSLocalizedDescriptionKey: "Could not open " + attachment.name + "."])
+                for item in workItems {
+                    guard let document = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 46, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
                     }
                     pageCount += document.pageCount
                     guard pageCount <= 5_000 else {
@@ -15362,7 +15369,7 @@ private struct NativeABookView: View {
                     guard let data = document.dataRepresentation(), !data.isEmpty else {
                         throw NSError(domain: "ABookPDF", code: 48, userInfo: [NSLocalizedDescriptionKey: "A rotated PDF could not be exported."])
                     }
-                    let base = safeABookPDFName(attachment.name)
+                    let base = safeABookPDFName(item.name)
                     var filename = base + "-rotated.pdf"
                     var suffix = 2
                     while !names.insert(filename.lowercased()).inserted {
@@ -15376,7 +15383,7 @@ private struct NativeABookView: View {
                     archiveData = archive
                     archiveFilename = "a-book-rotated-pdfs.zip"
                     exportingArchive = true
-                    status = "Rotated " + String(selected.count) + " PDFs locally"
+                    status = "Rotated " + String(workItems.count) + " PDFs locally"
                     errorText = ""
                 }
             } catch { await MainActor.run { showError(error) } }
@@ -15389,15 +15396,19 @@ private struct NativeABookView: View {
             return
         }
         let pageGroups = splitPageGroups
+        let sourceURL: URL
+        do { sourceURL = try store.fileURL(for: attachment) }
+        catch { showError(error); return }
+        let outputBase = safeABookPDFName(attachment.name)
         status = "Splitting PDF locally…"
         Task.detached(priority: .userInitiated) {
             do {
-                guard let source = PDFDocument(url: try store.fileURL(for: attachment)) else {
+                guard let source = PDFDocument(url: sourceURL) else {
                     throw NSError(domain: "ABookPDF", code: 50, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."])
                 }
                 let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
                 var files: [String: Data] = [:]
-                let base = safeABookPDFName(attachment.name)
+                let base = outputBase
                 for (index, pages) in groups.enumerated() {
                     let part = PDFDocument()
                     for number in pages {
@@ -15425,10 +15436,14 @@ private struct NativeABookView: View {
     }
 
     private func processPDF(_ attachment: ABookNativeAttachment, operation: String) {
+        let sourceURL: URL
+        do { sourceURL = try store.fileURL(for: attachment) }
+        catch { showError(error); return }
+        let attachmentID = attachment.id
+        let attachmentName = attachment.name
         Task.detached(priority: .userInitiated) {
             do {
-                let url = try store.fileURL(for: attachment)
-                guard let document = PDFDocument(url: url) else { throw NSError(domain: "ABookPDF", code: 1, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."]) }
+                guard let document = PDFDocument(url: sourceURL) else { throw NSError(domain: "ABookPDF", code: 1, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."]) }
                 var extracted = ""
                 if operation == "extract" {
                     extracted = String((document.string ?? "").prefix(150_000))
@@ -15452,19 +15467,21 @@ private struct NativeABookView: View {
                         page.rotation = (page.rotation + 90) % 360
                     }
                     guard let data = document.dataRepresentation() else { throw NSError(domain: "ABookPDF", code: 2, userInfo: [NSLocalizedDescriptionKey: "The rotated PDF could not be exported."]) }
+                    let rotatedName = attachmentName.replacingOccurrences(of: ".pdf", with: "", options: .caseInsensitive) + "-rotated.pdf"
                     await MainActor.run {
                         pdfData = data
-                        pdfName = attachment.name.replacingOccurrences(of: ".pdf", with: "", options: .caseInsensitive) + "-rotated.pdf"
+                        pdfName = rotatedName
                         exportingPDF = true
                         status = "PDF processed locally"
-                        activePDFSelection = attachment.id
+                        activePDFSelection = attachmentID
                         pdfText = ""
                     }
                     return
                 }
+                let extractedText = extracted
                 await MainActor.run {
-                    pdfText = extracted
-                    activePDFSelection = attachment.id
+                    pdfText = extractedText
+                    activePDFSelection = attachmentID
                     status = operation == "ocr" ? "OCR completed on this device" : "Text extracted on this device"
                     errorText = ""
                 }
