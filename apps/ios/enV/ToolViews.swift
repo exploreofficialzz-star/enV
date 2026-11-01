@@ -14104,6 +14104,35 @@ private final class ABookAttachmentEntity: NSManagedObject {
 }
 
 
+private func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[Int]] {
+    guard pageCount > 0 else { throw NSError(domain: "ABookPDF", code: 30, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."]) }
+    let groups = value.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    guard groups.count >= 2, groups.count <= 100 else { throw NSError(domain: "ABookPDF", code: 31, userInfo: [NSLocalizedDescriptionKey: "Enter two or more page groups, for example 1-3;4-6. Create up to 100 parts."]) }
+    var used = Set<Int>()
+    return try groups.map { group in
+        var pages: [Int] = []
+        for token in group.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }) {
+            let parts = token.split(separator: "-", omittingEmptySubsequences: false)
+            guard parts.count <= 2, let first = Int(parts[0]), let last = parts.count == 2 ? Int(parts[1]) : Int(parts[0]), first >= 1, last >= first, last <= pageCount, pages.count + last - first + 1 <= 5_000 else {
+                throw NSError(domain: "ABookPDF", code: 32, userInfo: [NSLocalizedDescriptionKey: "Invalid page range: " + token])
+            }
+            for page in first...last {
+                guard used.insert(page).inserted else { throw NSError(domain: "ABookPDF", code: 33, userInfo: [NSLocalizedDescriptionKey: "Page " + String(page) + " appears in more than one PDF part."]) }
+                pages.append(page)
+            }
+        }
+        guard !pages.isEmpty else { throw NSError(domain: "ABookPDF", code: 34, userInfo: [NSLocalizedDescriptionKey: "Each PDF part must contain at least one page."]) }
+        return pages
+    }
+}
+
+private func safeABookPDFName(_ value: String) -> String {
+    let cleaned = value.replacingOccurrences(of: "\\.pdf$", with: "", options: [.regularExpression, .caseInsensitive])
+        .replacingOccurrences(of: "[^A-Za-z0-9._-]+", with: "-", options: .regularExpression)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    return String(cleaned.prefix(80)).isEmpty ? "document" : String(cleaned.prefix(80))
+}
+
 private func aBookCRC32(_ bytes: Data) -> UInt32 {
     var crc: UInt32 = 0xffff_ffff
     for byte in bytes {
@@ -14794,6 +14823,9 @@ private struct NativeABookView: View {
     @State private var importingArchive = false
     @State private var exportingArchive = false
     @State private var archiveData = Data()
+    @State private var archiveFilename = "a-book-backup.zip"
+    @State private var selectedPDFIDs: Set<UUID> = []
+    @State private var splitPageGroups = "1-3;4-6"
     @State private var commentText = ""
     @State private var activePDFSelection: UUID?
 
@@ -14920,7 +14952,7 @@ private struct NativeABookView: View {
         .padding(12)
         .onAppear { reload() }
         .task(id: saveKey) { await autosave() }
-        .fileImporter(isPresented: $importingArchive, allowedContentTypes: [.zip]) { result in
+        .fileImporter(isPresented: $importingArchive, allowedContentTypes: [.item]) { result in
             switch result {
             case .success(let url):
                 let access = url.startAccessingSecurityScopedResource()
@@ -14957,7 +14989,7 @@ private struct NativeABookView: View {
                       contentType: .pdf, defaultFilename: pdfName) { result in
             if case .failure(let error) = result { showError(error) }
         }        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
-                      contentType: .zip, defaultFilename: "a-book-backup.zip") { result in
+                      contentType: .zip, defaultFilename: archiveFilename) { result in
             if case .failure(let error) = result { showError(error) }
         }
         .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
