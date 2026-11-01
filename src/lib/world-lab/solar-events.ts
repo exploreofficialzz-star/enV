@@ -46,26 +46,38 @@ export function approximateSolarEvents(dateUTC:string,latitudeDegrees:number,
   0.00148*Math.sin(3*gamma);
  const latitude=radians(latitudeDegrees);
  const zenith=radians(90.833);
- const denominator=Math.cos(latitude)*Math.cos(declinationRadians);
- const cosHourAngle=Math.cos(zenith)/denominator-
-  Math.tan(latitude)*Math.tan(declinationRadians);
+ const latitudeCosine=Math.cos(latitude);
+ const cosineDeclination=Math.cos(declinationRadians);
  const solarNoonMinutes=720-4*longitudeDegrees-equationOfTimeMinutes;
  const solarNoonUTC=utcAtMinutes(dateUTC,solarNoonMinutes);
- if(!finite(cosHourAngle)||!finite(solarNoonMinutes))
+ if(!finite(solarNoonMinutes)||!finite(cosineDeclination))
   throw new Error("Solar position exceeded the supported numerical range.");
  let status:SolarEventStatus="normal";
  let sunriseUTC:string|null=null,sunsetUTC:string|null=null,daylightMinutes:number|null=null;
- if(cosHourAngle>1+1e-12){
-  status="polar-night";
- }else if(cosHourAngle < -1-1e-12){
-  status="polar-day";
+ if(Math.abs(latitudeCosine)<1e-12){
+  // At a geographic pole, solar altitude is approximately constant over the
+  // day. Avoid dividing by cos(latitude), which is zero at exactly ±90°.
+  const declinationDegrees=declinationRadians*180/Math.PI;
+  const polarAltitudeDegrees=latitudeDegrees>0?declinationDegrees:-declinationDegrees;
+  status=polarAltitudeDegrees>-0.833?"polar-day":"polar-night";
  }else{
-  const hourAngleDegrees=Math.acos(Math.max(-1,Math.min(1,cosHourAngle)))*180/Math.PI;
-  const sunriseMinutes=solarNoonMinutes-4*hourAngleDegrees;
-  const sunsetMinutes=solarNoonMinutes+4*hourAngleDegrees;
-  sunriseUTC=utcAtMinutes(dateUTC,sunriseMinutes);
-  sunsetUTC=utcAtMinutes(dateUTC,sunsetMinutes);
-  daylightMinutes=(sunsetMinutes-sunriseMinutes);
+  const denominator=latitudeCosine*cosineDeclination;
+  const cosHourAngle=Math.cos(zenith)/denominator-
+   Math.tan(latitude)*Math.tan(declinationRadians);
+  if(!finite(cosHourAngle))
+   throw new Error("Solar position exceeded the supported numerical range.");
+  if(cosHourAngle>1+1e-12){
+   status="polar-night";
+  }else if(cosHourAngle < -1-1e-12){
+   status="polar-day";
+  }else{
+   const hourAngleDegrees=Math.acos(Math.max(-1,Math.min(1,cosHourAngle)))*180/Math.PI;
+   const sunriseMinutes=solarNoonMinutes-4*hourAngleDegrees;
+   const sunsetMinutes=solarNoonMinutes+4*hourAngleDegrees;
+   sunriseUTC=utcAtMinutes(dateUTC,sunriseMinutes);
+   sunsetUTC=utcAtMinutes(dateUTC,sunsetMinutes);
+   daylightMinutes=(sunsetMinutes-sunriseMinutes);
+  }
  }
  return Object.freeze({
   dateUTC,latitudeDegrees,longitudeDegrees,status,solarNoonUTC,

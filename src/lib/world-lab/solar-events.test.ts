@@ -42,3 +42,19 @@ test("leap-year calendar handling and date/location bounds are validated",()=>{
  assert.throws(()=>approximateSolarEvents("2026-01-01",91,0),/latitude/);
  assert.throws(()=>approximateSolarEvents("2026-01-01",0,181),/longitude/);
 });
+
+test("exact geographic poles classify polar sunlight without division by zero",()=>{
+ const northSummer=approximateSolarEvents("2026-06-21",90,0);
+ const northWinter=approximateSolarEvents("2026-12-21",90,0);
+ const southSummer=approximateSolarEvents("2026-12-21",-90,0);
+ const southWinter=approximateSolarEvents("2026-06-21",-90,0);
+ assert.equal(northSummer.status,"polar-day");
+ assert.equal(northWinter.status,"polar-night");
+ assert.equal(southSummer.status,"polar-day");
+ assert.equal(southWinter.status,"polar-night");
+ for(const event of [northSummer,northWinter,southSummer,southWinter]){
+  assert.equal(event.sunriseUTC,null);
+  assert.equal(event.sunsetUTC,null);
+  assert.equal(event.daylightMinutes,null);
+ }
+});

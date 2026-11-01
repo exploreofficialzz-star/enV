@@ -7,7 +7,8 @@ type Props={
 };
 function localTime(value:string,timezone:string){
  return new Intl.DateTimeFormat(undefined,{
-  timeZone:timezone,dateStyle:"medium",timeStyle:"short",timeZoneName:"short",
+  timeZone:timezone,year:"numeric",month:"short",day:"numeric",
+  hour:"numeric",minute:"2-digit",timeZoneName:"short",
  }).format(new Date(value));
 }
 export function WorldLabSolarEventsPanel(p:Props){
