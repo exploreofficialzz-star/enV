@@ -14118,6 +14118,7 @@ private func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[I
             }
             for page in first...last {
                 guard used.insert(page).inserted else { throw NSError(domain: "ABookPDF", code: 33, userInfo: [NSLocalizedDescriptionKey: "Page " + String(page) + " appears in more than one PDF part."]) }
+                guard used.count <= 5_000 else { throw NSError(domain: "ABookPDF", code: 35, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be split in one operation."]) }
                 pages.append(page)
             }
         }
