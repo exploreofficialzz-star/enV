@@ -106,8 +106,8 @@ test("DC current direction rejects invalid numeric evidence",()=>{
 
 
 test("an unloaded ideal source is a valid open-load circuit with zero branch flow",()=>{
- const network=starterDcNetwork("open-load");
- network.components=network.components.filter(c=>c.kind==="dc-source");
+ const original=starterDcNetwork("open-load");
+ const network={...original,components:original.components.filter(c=>c.kind==="dc-source")};
  const result=solveDcNetwork(network,{id:"lab",revision:3});
  assert.equal(result.branchCurrentsA.source,0);
  assert.equal(result.sourcePowerSuppliedW,0);
