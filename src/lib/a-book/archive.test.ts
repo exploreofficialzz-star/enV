@@ -40,3 +40,8 @@ test("A book backup rejects inconsistent attachment metadata", async () => {
   const damaged = new Blob([zipSync(files)]);
   await assert.rejects(() => readABookArchive(damaged), /missing, damaged/);
 });
+test("A book backups reject duplicate note, revision and attachment IDs", async () => {
+  await assert.rejects(() => createABookArchive([note, { ...note }], [], []), /cannot be safely exported/);
+  await assert.rejects(() => createABookArchive([note], [revision, { ...revision }], []), /cannot be safely exported/);
+  await assert.rejects(() => createABookArchive([note], [], [attachment, { ...attachment }]), /cannot be safely exported/);
+});
