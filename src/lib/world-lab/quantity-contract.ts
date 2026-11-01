@@ -7,7 +7,7 @@ export type Dimension=readonly [number,number,number,number,number,number,number
 export type EvidenceLabel="measured-observed"|"physics-model-computed"|
   "hypothetical-user-assumed"|"unknown-insufficient-evidence";
 type UnitSpec=Readonly<{dimension:Dimension;factor:number}>;
-export const WORLD_LAB_UNITS={
+const WORLD_LAB_UNIT_DEFINITIONS={
   "1":{dimension:[0,0,0,0,0,0,0],factor:1},
   kg:{dimension:[1,0,0,0,0,0,0],factor:1},
   g:{dimension:[1,0,0,0,0,0,0],factor:0.001},
@@ -46,7 +46,15 @@ export const WORLD_LAB_UNITS={
   "J/(kg*K)":{dimension:[0,2,-2,0,-1,0,0],factor:1},
   "W/K":{dimension:[1,2,-3,0,-1,0,0],factor:1},
   "W/(m*K)":{dimension:[1,1,-3,0,-1,0,0],factor:1},
-} as const satisfies Record<string,UnitSpec>;
+ } as const satisfies Record<string,UnitSpec>;
+export const WORLD_LAB_UNITS=Object.freeze(Object.fromEntries(
+  Object.entries(WORLD_LAB_UNIT_DEFINITIONS).map(([name,spec])=>[
+    name,Object.freeze({
+      dimension:Object.freeze([...spec.dimension]),
+      factor:spec.factor,
+    }),
+  ]),
+)) as Readonly<{[K in keyof typeof WORLD_LAB_UNIT_DEFINITIONS]:UnitSpec}>;
 export type ScientificUnit=keyof typeof WORLD_LAB_UNITS;
 export type ScientificQuantity=Readonly<{
   valueSI:number;unit:ScientificUnit;dimension:Dimension;
