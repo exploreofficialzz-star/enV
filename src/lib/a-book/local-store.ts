@@ -50,6 +50,14 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+function transactionDone(tx: IDBTransaction, fallback: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error(fallback));
+    tx.onabort = () => reject(tx.error ?? new Error(fallback));
+  });
+}
+
 function openDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(new Error("This browser does not support the local database required by A book."));
@@ -109,7 +117,10 @@ export function createNote(): ABookNote {
 
 export async function listNotes(options: { includeArchived?: boolean; includeDeleted?: boolean } = {}): Promise<ABookNote[]> {
   const db = await openDatabase();
-  const rows = await requestResult<ABookNote[]>(db.transaction("notes", "readonly").objectStore("notes").getAll());
+  const tx = db.transaction("notes", "readonly");
+  const done = transactionDone(tx, "Could not read your local notes.");
+  const rows = await requestResult<ABookNote[]>(tx.objectStore("notes").getAll());
+  await done;
   return rows
     .filter((note) => options.includeDeleted || note.deletedAt === null)
     .filter((note) => options.includeArchived || !note.archived)
@@ -227,42 +238,56 @@ export async function restoreRevision(noteId: string, revisionId: string): Promi
   const tx = db.transaction(["notes", "revisions"], "readwrite");
   const notes = tx.objectStore("notes");
   const revisions = tx.objectStore("revisions");
-  const snapshot = await requestResult<ABookRevision | undefined>(revisions.get(revisionId));
-  if (!snapshot || snapshot.noteId !== noteId) {
-    tx.abort();
-    throw new Error("That revision is no longer available.");
-  }
-  const current = await requestResult<ABookNote | undefined>(notes.get(noteId));
-  if (!current) {
-    tx.abort();
-    throw new Error("The note could not be found.");
-  }
-  const next: ABookNote = {
-    ...current,
-    title: snapshot.title,
-    body: snapshot.body,
-    notebook: snapshot.notebook,
-    tags: snapshot.tags,
-    revision: current.revision + 1,
-    updatedAt: Date.now(),
-  };
-  revisions.put({
-    id: createId(),
-    noteId,
-    revision: current.revision,
-    title: current.title,
-    body: current.body,
-    notebook: current.notebook,
-    tags: current.tags,
-    createdAt: Date.now(),
-  } satisfies ABookRevision);
-  notes.put(next);
-  await new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+  return new Promise<ABookNote>((resolve, reject) => {
+    let restored: ABookNote | undefined;
+    const fail = (message: string) => {
+      try { tx.abort(); } catch { reject(new Error(message)); }
+    };
+    const snapshotRequest = revisions.get(revisionId);
+    snapshotRequest.onsuccess = () => {
+      const snapshot = snapshotRequest.result as ABookRevision | undefined;
+      if (!snapshot || snapshot.noteId !== noteId) {
+        fail("That revision is no longer available.");
+        return;
+      }
+      const currentRequest = notes.get(noteId);
+      currentRequest.onsuccess = () => {
+        const current = currentRequest.result as ABookNote | undefined;
+        if (!current) {
+          fail("The note could not be found.");
+          return;
+        }
+        restored = {
+          ...current,
+          title: snapshot.title,
+          body: snapshot.body,
+          notebook: snapshot.notebook,
+          tags: snapshot.tags,
+          revision: current.revision + 1,
+          updatedAt: Date.now(),
+        };
+        revisions.put({
+          id: createId(),
+          noteId,
+          revision: current.revision,
+          title: current.title,
+          body: current.body,
+          notebook: current.notebook,
+          tags: current.tags,
+          createdAt: Date.now(),
+        } satisfies ABookRevision);
+        notes.put(restored);
+      };
+      currentRequest.onerror = () => fail("Could not read the current note.");
+    };
+    snapshotRequest.onerror = () => fail("Could not read the selected revision.");
+    tx.oncomplete = () => {
+      if (restored) resolve(restored);
+      else reject(new Error("The revision was not restored."));
+    };
     tx.onerror = () => reject(tx.error ?? new Error("Could not restore this revision."));
     tx.onabort = () => reject(tx.error ?? new Error("Could not restore this revision."));
   });
-  return next;
 }
 
 export async function addAttachment(noteId: string, file: File): Promise<ABookAttachment> {
@@ -276,24 +301,34 @@ export async function addAttachment(noteId: string, file: File): Promise<ABookAt
     createdAt: Date.now(),
     blob: file.slice(0, file.size, file.type || "application/octet-stream"),
   };
-  await requestResult(db.transaction("attachments", "readwrite").objectStore("attachments").put(attachment));
+  const tx = db.transaction("attachments", "readwrite");
+  const done = transactionDone(tx, "The attachment could not be saved on this device.");
+  tx.objectStore("attachments").put(attachment);
+  await done;
   return attachment;
 }
 
 export async function listAttachments(noteId: string): Promise<ABookAttachment[]> {
   const db = await openDatabase();
+  const tx = db.transaction("attachments", "readonly");
+  const done = transactionDone(tx, "Could not read this note's attachments.");
   const rows = await requestResult<ABookAttachment[]>(
-    db.transaction("attachments", "readonly").objectStore("attachments").index("noteId").getAll(IDBKeyRange.only(noteId)),
+    tx.objectStore("attachments").index("noteId").getAll(IDBKeyRange.only(noteId)),
   );
+  await done;
   return rows.sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export async function deleteAttachment(id: string): Promise<void> {
   const db = await openDatabase();
-  await requestResult(db.transaction("attachments", "readwrite").objectStore("attachments").delete(id));
+  const tx = db.transaction("attachments", "readwrite");
+  const done = transactionDone(tx, "Could not remove the attachment.");
+  tx.objectStore("attachments").delete(id);
+  await done;
 }
 
 export async function getLocalStorageStatus(): Promise<{ persistent: boolean; quota?: number; usage?: number }> {
+  if (typeof navigator === "undefined") return { persistent: false };
   let persistent = false;
   try {
     persistent = await navigator.storage?.persist?.() ?? false;

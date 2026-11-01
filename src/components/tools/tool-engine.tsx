@@ -47,7 +47,6 @@ import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
 import { DocumentToolsEngine } from "@/components/engines/document-tools-engine";
 import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
 import { EventTemplateEngine } from "@/components/engines/event-template-engine";
-import { ABookEngine } from "@/components/engines/a-book-engine";
 import { MusicDownloaderEngine } from "@/components/engines/music-downloader-engine";
 import { AiMusicDataSandbox } from "@/components/engines/ai-music-data-sandbox";
 import { isEventTemplateTool } from "@/lib/events/event-templates";
@@ -70,7 +69,6 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
   if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
-  if (tool.id === "a-book") return <ABookEngine />;
   if (tool.id === "music-downloader") return <MusicDownloaderEngine />;
   if (tool.id === "song-metadata-analyzer") return <AiMusicDataSandbox />;
   // The reader extends the existing payload inspector route with real QR and barcode decoding.

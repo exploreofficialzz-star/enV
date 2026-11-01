@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   addAttachment,
   createNote,
+  getLocalStorageStatus,
   deleteAttachment,
   listAttachments,
   listNotes,
@@ -69,6 +70,9 @@ export function ABookEngine() {
       setNotes(loaded);
       setCurrent(loaded[0] ?? null);
       setIsReady(true);
+      void getLocalStorageStatus().then((status) => {
+        if (mounted && !status.persistent) setStorageMessage("Saved locally · browser data may be cleared; export a backup");
+      });
     }).catch((cause: unknown) => {
       if (!mounted) return;
       setError(cause instanceof Error ? cause.message : "A book could not open local storage.");
@@ -83,7 +87,9 @@ export function ABookEngine() {
     setStorageMessage("Saving on this device…");
     saveTimer.current = window.setTimeout(() => {
       saveNote(current).then(async (saved) => {
-        setCurrent((value) => value?.id === saved.id ? saved : value);
+        setCurrent((value) => value?.id === saved.id && value.revision !== saved.revision
+          ? { ...value, revision: saved.revision }
+          : value);
         setNotes(await listNotes({ includeArchived: showArchived }));
         setStorageMessage("Saved on this device");
         setError("");
