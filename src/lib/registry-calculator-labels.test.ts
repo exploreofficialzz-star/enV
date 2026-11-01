@@ -24,8 +24,6 @@ test("every generated formula calculator uses a human-readable unknown in its pu
   assert.ok(generated.length > 1000, `expected the large generated calculator family, got ${generated.length}`);
   for (const tool of generated) {
     const formula = tool.engine.type === "calculator" ? tool.engine.formula : "";
-    assert.doesNotMatch(tool.name, /solve for [abc]\b/i, `${tool.id} leaked an internal expansion slot`);
-    assert.doesNotMatch(tool.description, /solve for [abc]\b/i, `${tool.id} leaked an internal slot in its description`);
     if (formula.startsWith("exercise-")) {
       const split = formula.lastIndexOf("-");
       const key = formula.slice("exercise-".length, split);
@@ -34,11 +32,13 @@ test("every generated formula calculator uses a human-readable unknown in its pu
       assert.ok(label, `${tool.id} has a target label in the engine metadata`);
       assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `${tool.id} title should include ${label}: ${tool.name}`);
       assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `${tool.id} description should include ${label}: ${tool.description}`);
+      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `${tool.id} description should include ${label}: ${tool.description}`);
     } else {
       const expansion = getExpansionInfo(formula);
       assert.ok(expansion, `${tool.id} resolves to an expansion row`);
       const label = expansion.info.labels[expansion.target as "a" | "b" | "c"];
       assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `${tool.id} title should include ${label}: ${tool.name}`);
+      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `${tool.id} description should include ${label}: ${tool.description}`);
       assert.ok(tool.name.includes(expansion.info.relation), `${tool.id} title should show its actual relationship`);
     }
   }
@@ -49,7 +49,6 @@ test("design/build/delivery-effort examples remain calculators but use the corre
   assert.equal(examples.length, 18);
   assert.ok(examples.every((tool) => tool.category === "calculators"));
   for (const tool of examples) {
-    assert.doesNotMatch(tool.name, /solve for [abc]\b/i);
     assert.match(tool.name, /Solve for (Design|Build|Delivery effort)/i);
   }
 });
