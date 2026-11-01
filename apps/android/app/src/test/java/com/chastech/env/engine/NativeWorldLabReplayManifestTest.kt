@@ -84,3 +84,10 @@ class NativeWorldLabReplayManifestTest {
         }
     }
 }
+
+    @Test fun portableReplayFingerprintMatchesWebAndSwiftGoldenFixture(){
+        val input=NativeLabInput.Spring(2.0,8.0,0.5,0.25,-0.1)
+        val manifest=NativeWorldLabReplayCodec.create(input,"2026-11-01T00:00:00.000Z","UTC",
+            listOf(0.0,0.1,0.2,0.3,0.4))
+        assertEquals("627da37ad5c8bfe2",manifest.inputFingerprint)
+    }

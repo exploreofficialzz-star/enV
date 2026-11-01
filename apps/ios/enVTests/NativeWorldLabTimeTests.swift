@@ -487,3 +487,14 @@ final class NativeWorldLabReplayManifestTests:XCTestCase {
             Data(repeating:0,count:NativeWorldLabReplayManifest.maxBytes+1)))
     }
 }
+
+
+extension NativeWorldLabReplayManifestTests {
+    func testPortableReplayFingerprintMatchesWebAndAndroidGoldenFixture() throws {
+        let input=NativeLabInput.spring(massKg:2,springNPerM:8,dampingNsPerM:0.5,x0:0.25,v0:-0.1)
+        let manifest=try NativeWorldLabReplayManifest.make(input:input,
+            worldEpochUTC:"2026-11-01T00:00:00.000Z",timezoneDisplay:"UTC",
+            sampleTimesSeconds:[0,0.1,0.2,0.3,0.4])
+        XCTAssertEqual(manifest.inputFingerprint,"627da37ad5c8bfe2")
+    }
+}
