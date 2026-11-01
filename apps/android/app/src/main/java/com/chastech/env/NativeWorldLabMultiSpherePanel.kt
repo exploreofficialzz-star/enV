@@ -176,13 +176,17 @@ fun NativeWorldLabMultiSpherePanel(
                 Text("End")
             }
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-            OutlinedButton(onClick={rate=if(rate==0.1f)1f else if(rate==1f)4f else 0.1f}){
-                Text(String.format("%.1f",rate)+"×")
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+            listOf(0.01f,0.1f,1f,10f,100f).forEach{value->
+                OutlinedButton(onClick={rate=value},modifier=Modifier.weight(1f),
+                    contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)){
+                    Text(String.format(java.util.Locale.US,"%.2g",value)+"×",
+                        style=MaterialTheme.typography.labelSmall)
+                }
             }
-            Text("Playback stops at every computed contact event.",
-                style=MaterialTheme.typography.bodySmall)
         }
+        Text("Playback stops at every computed contact event.",
+            style=MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick={export.launch("world-lab-multi-sphere-evidence.json")}){
             Text("Export group evidence")
         }

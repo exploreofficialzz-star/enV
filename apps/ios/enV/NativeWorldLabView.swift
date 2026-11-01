@@ -2004,7 +2004,7 @@ Text("Invent chemical heat").font(.headline)
                 Button("End"){groupPlaying=false;groupTime=run.durationSeconds;updateGroupSphereScene()}
             }.buttonStyle(.bordered)
             Picker("Group impact playback speed",selection:$groupPlaybackRate) {
-                Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
+                Text("0.01×").tag(0.01);Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
             }.pickerStyle(.segmented)
             Button("Export group collision evidence"){exportingGroupEvidence=true}
                 .buttonStyle(.bordered)
@@ -2132,7 +2132,7 @@ Text("Invent chemical heat").font(.headline)
                 Button("End"){spherePlaying=false;sphereTime=run.durationSeconds;updateSphereScene()}
             }.buttonStyle(.bordered)
             Picker("3D collision playback rate",selection:$sphereSpeed){
-                Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
+                Text("0.01×").tag(0.01);Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
             }.pickerStyle(.segmented)
             Button("Export 3D impact evidence"){
                 exportingSphereImpact=true
@@ -2244,7 +2244,7 @@ Text("Invent chemical heat").font(.headline)
                 Button("End"){collisionPlaying=false;collisionTime=run.durationSeconds;updateCollisionScene()}
             }.buttonStyle(.bordered)
             Picker("Collision playback speed",selection:$collisionSpeed){
-                Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
+                Text("0.01×").tag(0.01);Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("10×").tag(10.0);Text("100×").tag(100.0)
             }.pickerStyle(.segmented)
             Button("Export collision evidence"){exportingCollision=true}
                 .buttonStyle(.bordered)

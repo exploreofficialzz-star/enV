@@ -1125,10 +1125,14 @@ fun NativeWorldLabForm() {
                         OutlinedButton(onClick={spherePlaying=false;sphereTime=0f}){
                             Text("Reset 3D impact")
                         }
-                        OutlinedButton(onClick={
-                            sphereSpeed=if(sphereSpeed==0.1f)1f
-                                else if(sphereSpeed==1f)4f else 0.1f
-                        }){Text("Time "+labNumber(sphereSpeed.toDouble())+"×")}
+}
+                    Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        listOf(0.01f,0.1f,1f,10f,100f).forEach{rate->
+                            OutlinedButton(onClick={sphereSpeed=rate},modifier=Modifier.weight(1f),
+                                contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)){
+                                Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                     OutlinedButton(onClick={
                         sphereEvidencePicker.launch("world-lab-spatial-sphere-impact.json")
@@ -1240,9 +1244,14 @@ fun NativeWorldLabForm() {
                         OutlinedButton(onClick={collisionPlaying=false;collisionTime=0f}){
                             Text("Reset collision")
                         }
-                        OutlinedButton(onClick={
-                            collisionSpeed=if(collisionSpeed==0.1f)1f else if(collisionSpeed==1f)4f else 0.1f
-                        }){Text("Time "+labNumber(collisionSpeed.toDouble())+"×")}
+}
+                    Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        listOf(0.01f,0.1f,1f,10f,100f).forEach{rate->
+                            OutlinedButton(onClick={collisionSpeed=rate},modifier=Modifier.weight(1f),
+                                contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)){
+                                Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                     OutlinedButton(onClick={
                         collisionEvidencePicker.launch("world-lab-two-body-collision-evidence.json")
