@@ -1,3 +1,5 @@
+import {executeScientificGraph,createIdealRcAdapters} from "./scientific-execution.ts";
+import {createIdealRcGraph} from "./scientific-execution.ts";
 /**
  * The World Lab local reference models. These are deliberately bounded scientific
  * experiments, not a universal physics engine or certified engineering analysis.
@@ -199,6 +201,17 @@ export function runExperiment(input: ModelInput, options: Readonly<{
   const steps = Math.ceil(duration / Math.min(h, maximumStableH));
   if (steps > 50000) throw new Error("The local reference run exceeds its 50,000-step budget; this stiff model needs a specialized solver.");
   const actualH = duration / steps;
+  const rcExchange = input.kind === "rc-circuit"
+    ? executeScientificGraph(createIdealRcGraph(),createIdealRcAdapters({
+        sourceVoltageV:input.supplyVoltageV,resistanceOhm:input.resistanceOhm,
+        capacitanceF:input.capacitanceF,initialVoltageV:input.initialVoltageV,
+      }),{durationSeconds:duration,stepSeconds:actualH,powerToleranceW:1e-6}).samples
+    : null;
+  const rcByStep = rcExchange
+    ? new Map(rcExchange.map(sample=>[Math.round(sample.timeSeconds/actualH),sample] as const))
+    : null;
+  if(rcExchange && rcExchange.length<steps)
+    throw new Error("RC graph scheduler did not produce every requested reference step.");
   const frames: ModelSample[] = [];
   let x = input.kind === "damped-oscillator" ? input.initialDisplacementM : 0;
   let v = input.kind === "damped-oscillator" ? input.initialVelocityMPerS : 0;
@@ -229,10 +242,20 @@ export function runExperiment(input: ModelInput, options: Readonly<{
           (j < fluxes.length ? fluxes[j] : 0) - (j > 0 ? fluxes[j - 1] : 0));
       }
     } else {
-      const tau = input.resistanceOhm * input.capacitanceF;
-      const capacitorVoltageV = input.supplyVoltageV +
-        (input.initialVoltageV - input.supplyVoltageV) * Math.exp(-t / tau);
-      const currentA = (input.supplyVoltageV - capacitorVoltageV) / input.resistanceOhm;
+      let capacitorVoltageV:number;
+      let currentA:number;
+      if(i===0){
+        capacitorVoltageV=input.initialVoltageV;
+        currentA=(input.supplyVoltageV-capacitorVoltageV)/input.resistanceOhm;
+      }else{
+        const exchange=rcByStep?.get(i);
+        if(!exchange)throw new Error("RC graph scheduler omitted a requested simulated step.");
+        const voltage=exchange.values["load:Vc"]?.valueSI;
+        const current=exchange.values["load:I"]?.valueSI;
+        if(!Number.isFinite(voltage)||!Number.isFinite(current))
+          throw new Error("RC graph solver returned an invalid voltage or current.");
+        capacitorVoltageV=voltage;currentA=current;
+      }
       frames.push(Object.freeze({ simulatedSeconds: t, capacitorVoltageV, currentA,
         resistorHeatW: currentA * currentA * input.resistanceOhm,
         storedEnergyJ: input.capacitanceF * capacitorVoltageV * capacitorVoltageV / 2 }));
