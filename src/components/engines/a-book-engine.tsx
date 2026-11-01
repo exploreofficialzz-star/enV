@@ -88,6 +88,7 @@ export function ABookEngine() {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"notes" | "editor">("notes");
   const [storageMessage, setStorageMessage] = useState("Saved on this device");
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
@@ -179,6 +180,7 @@ export function ABookEngine() {
       setPreviewUrl("");
       setPreviewFileName("");
       setCurrentNote(note);
+      setMobilePanel("editor");
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The current note could not be saved.");
@@ -342,6 +344,7 @@ export function ABookEngine() {
       setShowArchived(false);
       const note = await persistNote(createNote());
       await refresh(note.id, false, false);
+      setMobilePanel("editor");
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create a local note.");
@@ -663,8 +666,13 @@ export function ABookEngine() {
     {error ? <div role="alert" className="rounded-lg border border-red-500/40 bg-red-500/5 p-3 text-sm text-red-700 dark:text-red-300">{error}</div> : null}
     {typeof navigator !== "undefined" && !navigator.onLine ? <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-muted">Offline — A book remains available on this device.</p> : null}
 
-    <div className="grid min-h-[620px] gap-3 lg:grid-cols-[250px_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col rounded-xl border border-border bg-surface">
+    <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-surface-2 p-1 lg:hidden" role="group" aria-label="A book workspace view">
+      <button type="button" aria-pressed={mobilePanel === "notes"} onClick={() => setMobilePanel("notes")} className={`min-h-11 rounded-md px-3 text-sm font-medium transition ${mobilePanel === "notes" ? "bg-surface text-foreground shadow-sm" : "text-muted"}`}>Notes ({visibleNotes.length})</button>
+      <button type="button" aria-pressed={mobilePanel === "editor"} disabled={!current} onClick={() => setMobilePanel("editor")} className={`min-h-11 rounded-md px-3 text-sm font-medium transition disabled:opacity-40 ${mobilePanel === "editor" ? "bg-surface text-foreground shadow-sm" : "text-muted"}`}>Editor</button>
+    </div>
+
+    <div className="grid min-h-0 gap-3 lg:min-h-[620px] lg:grid-cols-[250px_minmax(0,1fr)]">
+      <aside className={`${mobilePanel === "notes" ? "flex" : "hidden"} min-h-0 flex-col rounded-xl border border-border bg-surface lg:flex`}>
         <div className="border-b border-border p-3">
           <Button type="button" className="w-full" onClick={() => void createNewNote()}>New note</Button>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your notes" aria-label="Search notes" className="mt-3 min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
@@ -673,7 +681,7 @@ export function ABookEngine() {
             <button type="button" className="underline" onClick={() => void toggleTrash(!showTrash)}>{showTrash ? "Back to notes" : "Trash"}</button>
           </div>
         </div>
-        <div className="max-h-[560px] flex-1 space-y-1 overflow-y-auto p-2">
+        <div className="max-h-[44vh] flex-1 space-y-1 overflow-y-auto p-2 lg:max-h-[560px]">
           {visibleNotes.map((note) => <button key={note.id} type="button" onClick={() => void selectNote(note)} className={`w-full rounded-lg border px-3 py-3 text-left transition ${current?.id === note.id ? "border-accent bg-surface-2" : "border-transparent hover:bg-surface-2"}`}>
             <span className="flex items-center gap-2 text-sm font-medium">{note.pinned ? "★ " : ""}{note.title || "Untitled note"}</span>
             <span className="mt-1 block line-clamp-2 text-xs text-muted">{note.body || "No content yet"}</span>
@@ -683,7 +691,7 @@ export function ABookEngine() {
         </div>
       </aside>
 
-      <main className="min-w-0 space-y-3 rounded-xl border border-border bg-surface p-3 sm:p-5">
+      <main className={`${mobilePanel === "editor" ? "block" : "hidden"} min-w-0 space-y-3 rounded-xl border border-border bg-surface p-3 sm:p-5 lg:block`}>
         {current ? <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted">Notebook: {current.notebook}</span>
