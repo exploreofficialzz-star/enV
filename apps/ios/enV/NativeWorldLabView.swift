@@ -200,8 +200,7 @@ struct NativeWorldLabView:View {
     @ViewBuilder private func scientificEvidenceLibrary(
         project:NativeWorldLabProject)->some View {
         Text("Recorded scientific evidence").font(.headline)
-        Text("Private gravity and thermal history. Save the invention "+
-             "first; records are never silently uploaded or overwritten.")
+        Text("Private gravity and thermal history. Save the invention "+ "first; records are never silently uploaded or overwritten.")
             .font(.caption).foregroundStyle(.secondary)
         Button("Refresh scientific history"){refreshScientificEvidence()}
             .buttonStyle(.bordered)
@@ -746,8 +745,7 @@ struct NativeWorldLabView:View {
                     project=archive.project
                     projectData=archive.projectData
                     savedSnapshot=archive.projectData
-                    problem="Imported and saved complete invention archive. "+
-                        "Older numerical experiments were preserved for re-export."
+                    problem="Imported and saved complete invention archive. "+ "Older numerical experiments were preserved for re-export."
                     refreshSavedProjects();refreshScientificEvidence()
                 }else{
                     guard data.count<=NativeWorldLabProject.maxBytes else {
@@ -913,8 +911,7 @@ struct NativeWorldLabView:View {
                         .font(.caption).foregroundStyle(.secondary)
                     if let chosen=solid {
                         let available=project.entities.filter{candidate in
-                            candidate.id != chosen.id &&
-                            !(project.assemblies ?? []).contains(where:{
+                            candidate.id != chosen.id && !(project.assemblies ?? []).contains(where:{
                                 $0.entityIds.contains(candidate.id)
                             })
                         }
@@ -1017,16 +1014,13 @@ struct NativeWorldLabView:View {
                                 in:.whitespaces).isEmpty ? nil : Double(inventedSpecificHeat)
                             let refraction=inventedRefraction.trimmingCharacters(
                                 in:.whitespaces).isEmpty ? nil : Double(inventedRefraction)
-                            if !inventedRefraction.trimmingCharacters(in:.whitespaces).isEmpty &&
-                                refraction==nil {
+                            if !inventedRefraction.trimmingCharacters(in:.whitespaces).isEmpty && refraction==nil {
                                 throw NativeWorldLabError.invalid("Optical index must be numeric")
                             }
-                            if !inventedConductivity.trimmingCharacters(in:.whitespaces).isEmpty &&
-                               conductivity==nil {
+                            if !inventedConductivity.trimmingCharacters(in:.whitespaces).isEmpty && conductivity==nil {
                                 throw NativeWorldLabError.invalid("Conductivity must be numeric")
                             }
-                            if !inventedSpecificHeat.trimmingCharacters(in:.whitespaces).isEmpty &&
-                               heatCapacity==nil {
+                            if !inventedSpecificHeat.trimmingCharacters(in:.whitespaces).isEmpty && heatCapacity==nil {
                                 throw NativeWorldLabError.invalid("Specific heat must be numeric")
                             }
                             let id=UUID().uuidString
@@ -1333,17 +1327,14 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject)->some View {
         let boxes=project.entities.filter{$0.shape=="box"}
         Text("Transfer heat between invented materials").font(.headline)
-        Text("Two face-touching boxes exchange thermal energy according to "+
-            "their assumed density, specific heat and conductivity. Native "+
-            "calculations only; no actual material identity or safety claim.")
+        Text("Two face-touching boxes exchange thermal energy according to "+ "their assumed density, specific heat and conductivity. Native "+ "calculations only; no actual material identity or safety claim.")
             .font(.caption).foregroundStyle(.secondary)
         if boxes.count<2 {
             Text("Create two box solids and invent their thermal properties.")
                 .font(.caption)
         }else {
             let first=boxes.first(where:{$0.id==heatFirstId}) ?? boxes[0]
-            let second=boxes.first(where:{$0.id==heatSecondId &&
-                $0.id != first.id}) ?? boxes.first(where:{$0.id != first.id})!
+            let second=boxes.first(where:{$0.id==heatSecondId && $0.id != first.id}) ?? boxes.first(where:{$0.id != first.id})!
             HStack {
                 Picker("First material body",selection:Binding(
                     get:{first.id},set:{heatFirstId=$0;heatTransferRun=nil})){
@@ -1428,14 +1419,11 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject)->some View {
         let materials=project.materials
         Text("Invented light and material behavior").font(.headline)
-        Text("Local planar Fresnel reflection and Snell refraction from invented, "+
-            "explicitly assumed indices. No measured optical material or "+
-            "spectral properties are implied.")
+        Text("Local planar Fresnel reflection and Snell refraction from invented, "+ "explicitly assumed indices. No measured optical material or "+ "spectral properties are implied.")
             .font(.caption).foregroundStyle(.secondary)
         if materials.count>=2 {
             let first=materials.first(where:{$0.id==opticalFirstId}) ?? materials[0]
-            let second=materials.first(where:{$0.id==opticalSecondId &&
-                $0.id != first.id}) ?? materials.first(where:{$0.id != first.id})!
+            let second=materials.first(where:{$0.id==opticalSecondId && $0.id != first.id}) ?? materials.first(where:{$0.id != first.id})!
             Picker("Light begins in",selection:Binding(
                 get:{first.id},set:{opticalFirstId=$0;opticalRun=nil})){
                 ForEach(materials,id:\.id){m in
@@ -1460,8 +1448,7 @@ Text("Invent chemical heat").font(.headline)
                     problem=""
                 }catch{opticalRun=nil;problem=error.localizedDescription}
             }.buttonStyle(.bordered)
-            if let run=opticalRun,run.projectId==project.id &&
-                run.projectRevision==project.revision,
+            if let run=opticalRun,run.projectId==project.id && run.projectRevision==project.revision,
                 run.firstMaterialId==first.id,run.secondMaterialId==second.id {
                 value("Ideal reflection",run.reflectance*100,"%")
                 value("Ideal transmission",run.transmittance*100,"%")
@@ -1495,17 +1482,12 @@ Text("Invent chemical heat").font(.headline)
     @ViewBuilder private func solidOpticalSceneContent(
         project:NativeWorldLabProject)->some View{
         let optical=project.entities.filter{item in
-            item.scientificRole=="reference-solid"&&
-            ["box","sphere"].contains(item.shape)&&
-            project.materials.contains(where:{
+            item.scientificRole=="reference-solid"&& ["box","sphere"].contains(item.shape)&& project.materials.contains(where:{
                 $0.id==item.materialId && $0.refractiveIndex != nil
             })
         }
         Text("Trace light through invented 3D solids").font(.headline)
-        Text("Native geometry-derived primary-ray optics. The actual invented "+
-             "box and sphere positions determine the intersections. "+
-             "Additional reflected branches, absorption and diffraction "+
-             "are not simulated.")
+        Text("Native geometry-derived primary-ray optics. The actual invented "+ "box and sphere positions determine the intersections. "+ "Additional reflected branches, absorption and diffraction "+ "are not simulated.")
             .font(.caption).foregroundStyle(.secondary)
         Text("Optically configured solids: "+String(optical.count)).font(.caption)
         if let target=optical.first {
@@ -1589,9 +1571,7 @@ Text("Invent chemical heat").font(.headline)
         let defaults=Set(spheres.prefix(2).map{$0.id})
         let selected=gravitySelectionTouched ? gravitySelectedIds : defaults
         Text("Explore invented gravity").font(.headline)
-        Text("Genuine local Newtonian attraction, computed from each sphere's "+
-             "invented density and starting velocity. Nothing is uploaded "+
-             "and no measured planet or impact is inferred.")
+        Text("Genuine local Newtonian attraction, computed from each sphere's "+ "invented density and starting velocity. Nothing is uploaded "+ "and no measured planet or impact is inferred.")
             .font(.caption).foregroundStyle(.secondary)
         if spheres.count<2 {
             Text("Create at least two spheres with invented material density.")
@@ -1654,16 +1634,14 @@ Text("Invent chemical heat").font(.headline)
             }.buttonStyle(.bordered)
                 .disabled(selected.count<2 || selected.count>8)
             if selected.count>8 {
-                Text("The native solver supports up to 8 bodies offline. "+
-                     "Reduce the selection; no automatic cloud upload occurs.")
+                Text("The native solver supports up to 8 bodies offline. "+ "Reduce the selection; no automatic cloud upload occurs.")
                     .font(.caption)
             }
         }
         if let run=gravityRun,run.projectId==project.id,
            run.projectRevision==project.revision {
             value("Numerical energy drift",run.energyDriftFraction*100,"%")
-            Text("Simulated gravity time: "+
-                 String(format:"%.2f",gravityTime)+" seconds")
+            Text("Simulated gravity time: "+ String(format:"%.2f",gravityTime)+" seconds")
                 .font(.caption)
             Slider(value:$gravityTime,in:0...run.durationSeconds,
                 onEditingChanged:{editing in
@@ -2505,8 +2483,7 @@ private struct NativeWorldLabElasticWavePanel:View {
     }
     private var current:NativeElasticWaveRun? {
         guard let r=run,!rods.isEmpty,
-              r.projectId==project.id && r.projectRevision==project.revision &&
-              r.entityId==rods[rodIndex%rods.count].id else {return nil}
+              r.projectId==project.id && r.projectRevision==project.revision && r.entityId==rods[rodIndex%rods.count].id else {return nil}
         return r
     }
     var body:some View {
@@ -2543,8 +2520,7 @@ private struct NativeWorldLabElasticWavePanel:View {
                 }.buttonStyle(.borderedProminent)
                 if let r=current {
                     let sample=try? r.sample(r.durationSeconds*fraction)
-                    Text("Wave speed: "+String(format:"%.5g",r.waveSpeedMps)+
-                        " m/s · frequency: "+String(format:"%.5g",r.frequencyHz)+" Hz")
+                    Text("Wave speed: "+String(format:"%.5g",r.waveSpeedMps)+ " m/s · frequency: "+String(format:"%.5g",r.frequencyHz)+" Hz")
                         .font(.caption)
                     Text("Maximum axial stress: "+String(format:"%.5g",r.maximumStressPa)+" Pa")
                         .font(.caption)
@@ -2552,10 +2528,8 @@ private struct NativeWorldLabElasticWavePanel:View {
                         GeometryReader{frame in
                             Path{path in
                                 for (i,y) in sample.displacementsMeters.enumerated(){
-                                    let x=frame.size.width*CGFloat(i)/
-                                        CGFloat(sample.displacementsMeters.count-1)
-                                    let v=frame.size.height*(0.5-
-                                        0.35*y/r.amplitudeMeters)
+                                    let x=frame.size.width*CGFloat(i)/ CGFloat(sample.displacementsMeters.count-1)
+                                    let v=frame.size.height*(0.5- 0.35*y/r.amplitudeMeters)
                                     let point=CGPoint(x:x,y:v)
                                     if i==0 {path.move(to:point)}
                                     else {path.addLine(to:point)}
@@ -2575,8 +2549,7 @@ private struct NativeWorldLabElasticWavePanel:View {
                                 speed=speed==1 ? 4 : speed==4 ? 0.1 : 1
                             }
                         }.buttonStyle(.bordered)
-                        Text("Kinetic: "+String(format:"%.5g",sample.kineticEnergyJ)+
-                            " J · stored strain: "+String(format:"%.5g",sample.strainEnergyJ)+" J")
+                        Text("Kinetic: "+String(format:"%.5g",sample.kineticEnergyJ)+ " J · stored strain: "+String(format:"%.5g",sample.strainEnergyJ)+" J")
                             .font(.caption)
                         Text("Ideal total energy: "+String(format:"%.5g",sample.totalEnergyJ)+" J")
                             .font(.caption)
@@ -2662,8 +2635,7 @@ private struct NativeWorldLabRadiationPanel:View {
     @State private var evidenceFile:NativeWorldLabJsonFile?
     private var current:NativeRadiationRun? {
         guard let run=run,!project.entities.isEmpty,
-              run.projectId==project.id && run.projectRevision==project.revision &&
-              run.entityId==project.entities[selectedIndex%project.entities.count].id else {
+              run.projectId==project.id && run.projectRevision==project.revision && run.entityId==project.entities[selectedIndex%project.entities.count].id else {
             return nil
         }
         return run
@@ -2671,13 +2643,10 @@ private struct NativeWorldLabRadiationPanel:View {
     var body:some View {
         VStack(alignment:.leading,spacing:8){
             Text("Radiate heat from invented matter").font(.headline)
-            Text("Stefan–Boltzmann heating/cooling under hypothetical density, "+
-                 "specific heat, emissivity and environmental assumptions. "+
-                 "Not a measured atmosphere, sunlight or real material.")
+            Text("Stefan–Boltzmann heating/cooling under hypothetical density, "+ "specific heat, emissivity and environmental assumptions. "+ "Not a measured atmosphere, sunlight or real material.")
                 .font(.caption).foregroundStyle(.secondary)
             if !project.entities.isEmpty {
-                Button("Radiating solid: "+
-                    project.entities[selectedIndex%project.entities.count].name){
+                Button("Radiating solid: "+ project.entities[selectedIndex%project.entities.count].name){
                     selectedIndex=(selectedIndex+1)%project.entities.count
                     run=nil;playing=false
                 }.buttonStyle(.bordered)
@@ -2708,9 +2677,7 @@ private struct NativeWorldLabRadiationPanel:View {
                     }catch{run=nil;playing=false;problem=error.localizedDescription}
                 }.buttonStyle(.borderedProminent)
                 if let r=current,let measured=try? r.sample(r.durationSeconds*fraction){
-                    Text("Computed temperature "+
-                         String(format:"%.6g",measured.temperatureK)+" K · net heat "+
-                         String(format:"%.6g",measured.netRadiatedPowerW)+" W")
+                    Text("Computed temperature "+ String(format:"%.6g",measured.temperatureK)+" K · net heat "+ String(format:"%.6g",measured.netRadiatedPowerW)+" W")
                         .font(.caption)
                     GeometryReader{frame in
                         Path{path in
@@ -2719,8 +2686,7 @@ private struct NativeWorldLabRadiationPanel:View {
                             let range=max(1,maximum-minimum)
                             for (i,s) in r.samples.enumerated(){
                                 let x=frame.size.width*CGFloat(s.timeSeconds/r.durationSeconds)
-                                let y=frame.size.height*CGFloat(0.9-
-                                    0.8*(s.temperatureK-minimum)/range)
+                                let y=frame.size.height*CGFloat(0.9- 0.8*(s.temperatureK-minimum)/range)
                                 let point=CGPoint(x:x,y:y)
                                 if i==0{path.move(to:point)}
                                 else{path.addLine(to:point)}
@@ -2731,8 +2697,7 @@ private struct NativeWorldLabRadiationPanel:View {
                     Slider(value:$fraction,in:0...1,onEditingChanged:{editing in
                         if editing{playing=false}
                     }).accessibilityLabel("Radiation simulated time")
-                    Text("Simulated time "+
-                         String(format:"%.3f",measured.timeSeconds)+" s")
+                    Text("Simulated time "+ String(format:"%.3f",measured.timeSeconds)+" s")
                         .font(.caption)
                     HStack{
                         Button(playing ? "Pause":"Play"){playing.toggle()}
@@ -2741,10 +2706,7 @@ private struct NativeWorldLabRadiationPanel:View {
                             speed=speed==1 ? 4 : speed==4 ? 0.1 : 1
                         }
                     }.buttonStyle(.bordered)
-                    Text("Net transferred energy "+
-                         String(format:"%.6g",measured.transferredEnergyJ)+
-                         " J · energy residual "+
-                         String(format:"%.5g",measured.energyResidualJ)+" J")
+                    Text("Net transferred energy "+ String(format:"%.6g",measured.transferredEnergyJ)+ " J · energy residual "+ String(format:"%.5g",measured.energyResidualJ)+" J")
                         .font(.caption)
                     Button("Keep radiative result with saved invention"){
                         do {
