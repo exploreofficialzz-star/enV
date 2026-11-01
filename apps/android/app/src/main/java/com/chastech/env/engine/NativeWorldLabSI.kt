@@ -72,11 +72,32 @@ object NativeWorldLabSI {
             "Invalid uncertainty"}
         if(unit=="K")require(value>=0){"Absolute Kelvin cannot be negative"}
         val canonical=value*spec.factor
-        require(canonical.isFinite()){"Scientific value exceeds finite SI bounds"}
-        return NativeScienceQuantity(canonical,unit,spec.dimensions.toList(),evidence,sourceId,
-            uncertainty?.times(spec.factor))
+        val sigma=uncertainty?.times(spec.factor)
+        require(canonical.isFinite()&&(sigma?.isFinite()?:true)){
+            "Scientific value or uncertainty exceeds finite SI bounds"
+        }
+        return NativeScienceQuantity(canonical,unit,spec.dimensions.toList(),evidence,sourceId,sigma)
+    }
+    fun validate(value:NativeScienceQuantity) {
+        val spec=units[value.unit]?:error("Unknown scientific source unit")
+        require(value.dimension==spec.dimensions&&value.valueSI.isFinite()&&
+            kotlin.math.abs(value.valueSI)<=1e30){"Malformed canonical scientific quantity"}
+        require(value.evidence in evidenceLabels&&value.evidence!="unknown-insufficient-evidence"){
+            "Unknown scientific values must remain unassigned"
+        }
+        require(value.sourceId==null||value.sourceId.matches(Regex("[A-Za-z0-9:_-]{1,120}"))){
+            "Invalid scientific source provenance"
+        }
+        if(value.evidence=="measured-observed")require(!value.sourceId.isNullOrBlank()){
+            "Measured values require a source ID"
+        }
+        require(value.uncertaintySI==null||value.uncertaintySI.isFinite()&&value.uncertaintySI in 0.0..1e30){
+            "Invalid canonical uncertainty"
+        }
+        if(value.unit=="K")require(value.valueSI>=0.0){"Absolute Kelvin cannot be negative"}
     }
     fun convert(quantity:NativeScienceQuantity,unit:String):Double {
+        validate(quantity)
         val original=units[quantity.unit]?:error("Unknown scientific source unit")
         val target=units[unit]?:error("Unknown scientific target unit")
         require(original.dimensions==quantity.dimension&&
@@ -150,5 +171,143 @@ object NativeWorldLabGraph {
         }
         ids.keys.forEach{if(it !in done)visit(it)}
         return g
+    }
+}
+
+
+data class NativeScientificStepOutput(
+    val outputs:Map<String,NativeScienceQuantity>,val suppliedW:Double,
+    val dissipatedW:Double,val storedRateW:Double,val nextEventSeconds:Double?=null
+)
+data class NativeScientificAdapter(
+    val componentId:String,val modelId:String,val modelVersion:String,
+    val advance:(Double,Double,Map<String,NativeScienceQuantity>)->NativeScientificStepOutput
+)
+data class NativeScientificExchangeSample(
+    val timeSeconds:Double,val stepSeconds:Double,val eventBoundary:Boolean,
+    val values:Map<String,NativeScienceQuantity>,val suppliedW:Double,
+    val dissipatedW:Double,val storedRateW:Double,val residualW:Double
+)
+data class NativeScientificRun(
+    val graph:NativeScientificGraph,val samples:List<NativeScientificExchangeSample>
+)
+/** Deterministic native SI/event scheduler. Only app-registered adapters execute; projects carry data only. */
+object NativeWorldLabExecution {
+    fun execute(graph:NativeScientificGraph,adapters:List<NativeScientificAdapter>,
+        durationSeconds:Double,stepSeconds:Double,powerToleranceW:Double=1e-6):NativeScientificRun {
+        NativeWorldLabGraph.validate(graph)
+        require(durationSeconds.isFinite()&&durationSeconds in 0.001..60.0&&
+            stepSeconds.isFinite()&&stepSeconds in 1e-5..1.0&&
+            kotlin.math.ceil(durationSeconds/stepSeconds)<=20000.0){
+            "Scientific timeline exceeds bounded execution steps"
+        }
+        require(powerToleranceW.isFinite()&&powerToleranceW in 0.0..1e6){"Invalid conservation tolerance"}
+        require(adapters.size==graph.components.size){"One trusted adapter is required for each component"}
+        val byId=adapters.associateBy{it.componentId}
+        require(byId.size==adapters.size){"Duplicate trusted component adapter"}
+        val components=graph.components.associateBy{it.id}
+        graph.components.forEach{part->
+            val adapter=byId[part.id]
+            require(adapter!=null&&adapter.modelId==part.modelId&&
+                adapter.modelVersion.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+"))){
+                "Unregistered or mismatched scientific model version"
+            }
+        }
+        val adjacency=graph.components.associate{it.id to linkedSetOf<String>()}.toMutableMap()
+        val indegree=graph.components.associate{it.id to 0}.toMutableMap()
+        graph.connections.filter{!it.delayed}.forEach{edge->
+            if(adjacency.getValue(edge.fromComponentId).add(edge.toComponentId))
+                indegree[edge.toComponentId]=indegree.getValue(edge.toComponentId)+1
+        }
+        val ready=indegree.filterValues{it==0}.keys.sorted().toMutableList()
+        val order=mutableListOf<String>()
+        while(ready.isNotEmpty()){
+            val id=ready.removeAt(0);order.add(id)
+            adjacency.getValue(id).sorted().forEach{next->
+                indegree[next]=indegree.getValue(next)-1
+                if(indegree.getValue(next)==0){ready.add(next);ready.sort()}
+            }
+        }
+        require(order.size==components.size){"Algebraic loop requires an explicitly supported implicit solver"}
+        val samples=mutableListOf<NativeScientificExchangeSample>()
+        var now=0.0
+        var scheduled:Double?=null
+        var previous=emptyMap<String,NativeScienceQuantity>()
+        while(now<durationSeconds-1e-12&&samples.size<20000){
+            val end=minOf(durationSeconds,now+stepSeconds,scheduled?:durationSeconds)
+            require(end>now+1e-12){"Scientific solver failed to advance"}
+            val values=linkedMapOf<String,NativeScienceQuantity>()
+            val newEvents=mutableListOf<Double>()
+            var supplied=0.0;var dissipated=0.0;var stored=0.0
+            for(id in order){
+                val component=components.getValue(id)
+                val inputs=linkedMapOf<String,NativeScienceQuantity>()
+                graph.connections.filter{it.toComponentId==id}.forEach{edge->
+                    val source=(if(edge.delayed)previous else values)
+                        [edge.fromComponentId+":"+edge.fromPortId]?:return@forEach
+                    val port=component.ports.first{it.id==edge.toPortId}
+                    val converted=source.copy(unit=port.unit)
+                    NativeWorldLabSI.validate(converted)
+                    inputs[port.id]=converted
+                }
+                val output=byId.getValue(id).advance(end,end-now,inputs.toMap())
+                require(output.outputs.keys.all{key->component.ports.any{it.id==key&&it.direction!="input"}}){
+                    "Solver emitted an unregistered output port"
+                }
+                output.outputs.forEach{(portId,value)->
+                    val port=component.ports.first{it.id==portId}
+                    NativeWorldLabSI.validate(value)
+                    require(value.unit==port.unit){"Solver output unit differs from its declared SI interface"}
+                    values[id+":"+portId]=value
+                }
+                require(listOf(output.suppliedW,output.dissipatedW,output.storedRateW)
+                    .all{it.isFinite()&&kotlin.math.abs(it)<=1e18}&&output.dissipatedW>=0.0){
+                    "Scientific solver emitted an invalid rate or negative dissipation"
+                }
+                supplied+=output.suppliedW;dissipated+=output.dissipatedW;stored+=output.storedRateW
+                output.nextEventSeconds?.let{event->
+                    require(event.isFinite()&&event>end+1e-10&&event<=durationSeconds){
+                        "Solver proposed an invalid future event boundary"
+                    }
+                    newEvents.add(event)
+                }
+            }
+            val residual=supplied-dissipated-stored
+            require(residual.isFinite()&&kotlin.math.abs(residual)<=powerToleranceW+
+                1e-9*maxOf(1.0,kotlin.math.abs(supplied),kotlin.math.abs(dissipated))){
+                "Power conservation residual exceeded tolerance"
+            }
+            samples.add(NativeScientificExchangeSample(end,end-now,
+                scheduled!=null&&kotlin.math.abs(end-scheduled)<1e-9,values.toMap(),
+                supplied,dissipated,stored,residual))
+            previous=values.toMap();now=end;scheduled=newEvents.minOrNull()
+        }
+        require(samples.isNotEmpty()&&kotlin.math.abs(samples.last().timeSeconds-durationSeconds)<=1e-9){
+            "Scientific simulation failed to reach its duration"
+        }
+        return NativeScientificRun(graph,samples.toList())
+    }
+    fun idealRcAdapters(sourceVoltageV:Double,resistanceOhm:Double,capacitanceF:Double,
+        initialVoltageV:Double=0.0):List<NativeScientificAdapter>{
+        require(sourceVoltageV.isFinite()&&kotlin.math.abs(sourceVoltageV)<=1000.0&&
+            initialVoltageV.isFinite()&&kotlin.math.abs(initialVoltageV)<=1000.0&&
+            resistanceOhm.isFinite()&&resistanceOhm in 0.001..1e9&&
+            capacitanceF.isFinite()&&capacitanceF in 1e-9..1000.0){
+            "Ideal RC assumptions are outside the supported physical domain"
+        }
+        val source=NativeScientificAdapter("source","ideal-dc-source","1.0.0"){_,_,_->
+            NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(sourceVoltageV,"V")),0.0,0.0,0.0)
+        }
+        val load=NativeScientificAdapter("load","series-rc-load","1.0.0"){time,_,inputs->
+            require(inputs.containsKey("Vin")){"RC load requires its connected source voltage"}
+            val voltage=sourceVoltageV+(initialVoltageV-sourceVoltageV)*
+                kotlin.math.exp(-time/(resistanceOhm*capacitanceF))
+            val current=(sourceVoltageV-voltage)/resistanceOhm
+            NativeScientificStepOutput(mapOf(
+                "Vc" to NativeWorldLabSI.declare(voltage,"V","physics-model-computed"),
+                "I" to NativeWorldLabSI.declare(current,"A","physics-model-computed")
+            ),sourceVoltageV*current,current*current*resistanceOhm,voltage*current)
+        }
+        return listOf(source,load)
     }
 }
