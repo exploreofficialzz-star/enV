@@ -241,3 +241,32 @@ final class NativeWorldLabDemoRecordingTests:XCTestCase {
         }
     }
 }
+
+
+final class NativeWorldLabBranchCurrentTests:XCTestCase {
+    func testSignedCurrentSetsConventionalDirectionAndReversesWithPolarity()throws {
+        let forward=try NativeWorldLabBranchCurrent.resolve(
+            positiveNodeId:"supply",negativeNodeId:"ground",signedCurrentA:0.25)
+        XCTAssertEqual(forward.fromNodeId,"supply")
+        XCTAssertEqual(forward.toNodeId,"ground")
+        XCTAssertEqual(forward.direction,.positiveToNegative)
+        XCTAssertEqual(forward.magnitudeA,0.25,accuracy:1e-12)
+        let reverse=try NativeWorldLabBranchCurrent.resolve(
+            positiveNodeId:"supply",negativeNodeId:"ground",signedCurrentA:-0.25)
+        XCTAssertEqual(reverse.fromNodeId,"ground")
+        XCTAssertEqual(reverse.toNodeId,"supply")
+        XCTAssertEqual(reverse.direction,.negativeToPositive)
+    }
+    func testZeroCurrentDoesNotInventDirectionAndInvalidEvidenceIsRejected()throws {
+        let zero=try NativeWorldLabBranchCurrent.resolve(
+            positiveNodeId:"a",negativeNodeId:"b",signedCurrentA:0)
+        XCTAssertEqual(zero.direction,.zero)
+        XCTAssertNil(zero.fromNodeId);XCTAssertNil(zero.toNodeId)
+        XCTAssertThrowsError(try NativeWorldLabBranchCurrent.resolve(
+            positiveNodeId:"a",negativeNodeId:"b",signedCurrentA:.nan))
+        XCTAssertThrowsError(try NativeWorldLabBranchCurrent.resolve(
+            positiveNodeId:"a",negativeNodeId:"b",signedCurrentA:1e7))
+        XCTAssertThrowsError(try NativeWorldLabBranchCurrent.resolve(
+            positiveNodeId:"a",negativeNodeId:"a",signedCurrentA:1))
+    }
+}
