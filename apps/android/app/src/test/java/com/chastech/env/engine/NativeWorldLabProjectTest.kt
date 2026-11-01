@@ -103,6 +103,20 @@ class NativeWorldLabProjectTest {
         val next=NativeWorldLabDc.solve(extended.networks.first(),extended)
         assertEquals(0.135,next.resistorHeatW/9.0,1e-12)
     }
+
+    @Test fun removingTheOnlyLoadProducesAValidZeroCurrentOpenCircuit(){
+        val wired=NativeWorldLabEditor.addStarterCircuit(NativeWorldLabEditor.blank())
+        val withoutLoad=NativeWorldLabEditor.removeCircuitComponent(wired,"load")
+        val project=NativeWorldLabProjectCodec.decode(withoutLoad)
+        val result=NativeWorldLabDc.solve(project.networks.first(),project)
+        assertEquals(0.0,result.branchCurrentsA["source"]!!,1e-12)
+        assertEquals(0.0,result.deliveredPowerW,1e-12)
+        assertEquals(0.0,result.resistorHeatW,1e-12)
+        assertEquals(0.0,result.powerResidualW,1e-12)
+        assertTrue(project.networks.first().components.none{
+            it.kind=="resistor"||it.kind=="hypothetical-device"
+        })
+    }
     @Test fun nativeHydrostaticsRespectsArchimedesAndUnknownInventions(){
         val project=NativeWorldLabEditor.addHypotheticalMaterial(
             NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="float"),
