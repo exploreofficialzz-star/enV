@@ -134,6 +134,8 @@ for (const [browserName, browserType] of browserEntries) {
   await page.setViewportSize({ width: 1280, height: 900 });
   const paletteResponse = await page.goto(baseUrl + "/tools/design/palette-generator", { waitUntil: "domcontentloaded", timeout: 60000 });
   assert.ok(paletteResponse && paletteResponse.ok(), "Palette Generator route should respond successfully");
+  // Wait for client hydration so the React click handler is attached before exercising downloads.
+  await page.waitForLoadState("networkidle", { timeout: 30000 });
   const swatchExport = page.locator('[aria-labelledby="palette-swatch-export-heading"]');
   await swatchExport.waitFor({ state: "visible" });
   const [pngDownload] = await Promise.all([
