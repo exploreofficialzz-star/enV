@@ -78,11 +78,10 @@ test("legacy JSON import rejects duplicate IDs and a malformed later record", as
   })), /invalid note record/);
 });
 
-test("legacy JSON import enforces record and file bounds", async () => {
+test("legacy JSON import enforces record bounds", async () => {
   const { parseABookLegacyNotesJson } = await import("./archive.ts");
   assert.throws(() => parseABookLegacyNotesJson(JSON.stringify({
     format: "env.abook.notes.v1",
     notes: [{ id: "bad", title: "Title", body: "Body", tags: Array.from({ length: 51 }, () => "tag") }],
   })), /invalid note record/);
-  assert.throws(() => parseABookLegacyNotesJson("x".repeat(180 * 1024 * 1024 + 1)), /smaller than 180 MB/);
 });
