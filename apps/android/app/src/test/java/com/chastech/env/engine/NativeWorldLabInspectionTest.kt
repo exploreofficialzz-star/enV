@@ -10,5 +10,17 @@ class NativeWorldLabInspectionTest{
  }
  @Test fun isolationFollowsAssemblyMembership(){val p=fixture();val s=NativeInspectionSettings(mode=NativeInspectionMode.ISOLATE);assertTrue(NativeWorldLabInspection.visible(p,"a",s,"b"));assertFalse(NativeWorldLabInspection.visible(p,"a",s,"c"));assertTrue(NativeWorldLabInspection.visible(p,null,s,"c"))}
  @Test fun explosionIsViewOnly(){val p=fixture();val before=p.entities.map{it.positionMeters};val s=NativeInspectionSettings(mode=NativeInspectionMode.EXPLODED,explosionDistanceMeters=2.0);val a=NativeWorldLabInspection.renderPosition(p,"a",s,"a");val b=NativeWorldLabInspection.renderPosition(p,"a",s,"b");assertTrue(kotlin.math.abs(a.x-b.x)>3.9);assertEquals(5.0,NativeWorldLabInspection.renderPosition(p,"a",s,"c").x,0.0);assertEquals(before,p.entities.map{it.positionMeters})}
- @Test fun cutawayPolygonClipsAtWorldPlane(){val poly=listOf(NativeLabVector(-2.0,0.0,0.0),NativeLabVector(0.0,0.0,0.0),NativeLabVector(0.0,1.0,0.0),NativeLabVector(-2.0,1.0,0.0));val clipped=NativeWorldLabInspection.clipPolygon(poly,NativeInspectionAxis.X,-1.0);assertEquals(4,clipped.size);assertTrue(clipped.all{it.x>=-1.0-1e-9});assertTrue(NativeWorldLabInspection.clipPolygon(poly,NativeInspectionAxis.X,3.0).isEmpty())}
+ @Test fun cutawayPolygonClipsAtWorldPlaneForAllAxes(){
+  val poly=listOf(NativeLabVector(-2.0,0.0,0.0),NativeLabVector(0.0,0.0,0.0),
+   NativeLabVector(0.0,1.0,0.0),NativeLabVector(-2.0,1.0,0.0))
+  val x=NativeWorldLabInspection.clipPolygon(poly,NativeInspectionAxis.X,-1.0)
+  assertEquals(4,x.size);assertTrue(x.all{it.x>=-1.0-1e-9})
+  val y=NativeWorldLabInspection.clipPolygon(poly,NativeInspectionAxis.Y,0.5)
+  assertEquals(4,y.size);assertTrue(y.all{it.y>=0.5-1e-9})
+  val zPoly=listOf(NativeLabVector(0.0,0.0,-2.0),NativeLabVector(1.0,0.0,0.0),
+   NativeLabVector(1.0,1.0,0.0),NativeLabVector(0.0,1.0,-2.0))
+  val z=NativeWorldLabInspection.clipPolygon(zPoly,NativeInspectionAxis.Z,-1.0)
+  assertEquals(4,z.size);assertTrue(z.all{it.z>=-1.0-1e-9})
+  assertTrue(NativeWorldLabInspection.clipPolygon(poly,NativeInspectionAxis.X,3.0).isEmpty())
+ }
 }

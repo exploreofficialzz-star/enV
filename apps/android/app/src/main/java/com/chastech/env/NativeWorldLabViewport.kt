@@ -259,7 +259,7 @@ fun NativeWorldLabViewport(
                                     val key=listOf(point.x,point.y,point.z).joinToString(":"){
                                         kotlin.math.round(it*1e6).toLong().toString()
                                     }
-                                    cap.putIfAbsent(key,point)
+                                    if(!cap.containsKey(key))cap[key]=point
                                 }
                             }
                             val projected=clipped.map{projection(it,size.width,size.height,focalLength)}
@@ -383,7 +383,7 @@ fun NativeWorldLabViewport(
         Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){NativeInspectionAxis.values().forEach{axis->OutlinedButton(onClick={onInspectionChange(inspection.copy(axis=axis))}){Text(axis.name)}}}
         Text("Cut plane "+inspection.cutawayFraction)
         Slider(value=inspection.cutawayFraction,onValueChange={onInspectionChange(inspection.copy(cutawayFraction=it))},valueRange=-1f..1f)
-        Text("Box and cylinder faces are clipped in world coordinates. Sphere half-view is a projected inspection aid.")
+        Text("Box, sphere and cylinder surfaces are clipped in world coordinates and receive a generated section face.")
     }
     if(inspection.mode==NativeInspectionMode.EXPLODED){
         Text("Assembly separation "+String.format(java.util.Locale.US,"%.1f",inspection.explosionDistanceMeters)+" m")
