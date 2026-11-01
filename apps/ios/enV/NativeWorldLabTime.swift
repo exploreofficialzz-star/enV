@@ -161,6 +161,28 @@ struct NativeWorldLabRecordedClock:Codable,Equatable {
     let paused:Bool
     let timezoneDisplay:String
     let fidelity:String
+    private enum CodingKeys:String,CodingKey {
+        case wallTimeUTC,worldDateUTC,simulationTimeSeconds,solverInternalTimeSeconds
+        case displaySampleTimeSeconds,sampleIndex,playbackRate,direction,paused,timezoneDisplay,fidelity
+    }
+    func encode(to encoder:Encoder)throws {
+        var container=encoder.container(keyedBy:CodingKeys.self)
+        try container.encode(wallTimeUTC,forKey:.wallTimeUTC)
+        try container.encode(worldDateUTC,forKey:.worldDateUTC)
+        try container.encode(simulationTimeSeconds,forKey:.simulationTimeSeconds)
+        if let internalTime=solverInternalTimeSeconds {
+            try container.encode(internalTime,forKey:.solverInternalTimeSeconds)
+        } else {
+            try container.encodeNil(forKey:.solverInternalTimeSeconds)
+        }
+        try container.encode(displaySampleTimeSeconds,forKey:.displaySampleTimeSeconds)
+        try container.encode(sampleIndex,forKey:.sampleIndex)
+        try container.encode(playbackRate,forKey:.playbackRate)
+        try container.encode(direction,forKey:.direction)
+        try container.encode(paused,forKey:.paused)
+        try container.encode(timezoneDisplay,forKey:.timezoneDisplay)
+        try container.encode(fidelity,forKey:.fidelity)
+    }
 }
 
 struct NativeWorldLabRecordedCheckpoint:Codable,Equatable {
@@ -206,6 +228,19 @@ struct NativeWorldLabRecordedCheckpoint:Codable,Equatable {
     static func decodeBounded(_ data:Data)throws->Self {
         guard data.count<=16*1024 else {
             throw NativeWorldLabError.invalid("Recorded timeline checkpoint exceeds 16 KB.")
+        }
+        let rootKeys:Set<String>=["format","schemaVersion","runId","modelId","modelVersion",
+            "worldEpochUTC","sampleIndex","sampleTimeSeconds","clock"]
+        let clockKeys:Set<String>=["wallTimeUTC","worldDateUTC","simulationTimeSeconds",
+            "solverInternalTimeSeconds","displaySampleTimeSeconds","sampleIndex",
+            "playbackRate","direction","paused","timezoneDisplay","fidelity"]
+        guard let root=try JSONSerialization.jsonObject(with:data) as? [String:Any],
+              Set(root.keys)==rootKeys,
+              root["format"] as? String=="env-world-lab-recorded-clock",
+              root["schemaVersion"] as? Int==1,
+              let clock=root["clock"] as? [String:Any],
+              Set(clock.keys)==clockKeys else {
+            throw NativeWorldLabError.invalid("Recorded checkpoint has missing, unknown or unsupported fields.")
         }
         return try JSONDecoder().decode(Self.self,from:data)
     }
