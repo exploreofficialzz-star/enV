@@ -14932,8 +14932,8 @@ private struct NativeABookView: View {
                                 Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
                                 Button("Delete permanently") { confirmPermanentDelete = true }.buttonStyle(.bordered)
                             } else {
-                                Button("Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
-                                Button("Archive") { updateSelected(archived: true) }.buttonStyle(.bordered)
+                                Button((notes.first(where: { $0.id == selectedID })?.pinned ?? false) ? "Unpin" : "Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
+                                Button((notes.first(where: { $0.id == selectedID })?.archived ?? false) ? "Unarchive" : "Archive") { updateSelected(archived: !(notes.first(where: { $0.id == selectedID })?.archived ?? false)) }.buttonStyle(.bordered)
                                 Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
                                 Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
                             }
