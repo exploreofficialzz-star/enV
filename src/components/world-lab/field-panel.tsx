@@ -1,5 +1,5 @@
 import type {FieldLayer,FieldPalette,FieldVectorPlane} from "@/lib/world-lab/field-layer";
-import {fieldFrameAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
+import {fieldFrameAtTime,fieldScalarSliceAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
 
 type Props={layers:readonly FieldLayer[];selectedId:string;onSelect:(id:string)=>void;
  timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void;
@@ -55,6 +55,23 @@ export function WorldLabFieldPanel(p:Props){
     </dl>
     <p className="mt-2 break-words text-xs text-muted-foreground">{source}</p>
     <p className="mt-1 text-xs">{layer.legend.accessibleDescription}</p>
+    {layer.kind==="scalar"&&layer.renderer.kind==="slice"&&(()=>{
+     const normalAxis=p.vectorPlane==="xy"?2:p.vectorPlane==="xz"?1:0;
+     const maximumSlice=layer.resolution.dimensions[normalAxis]-1;
+     const slice=Math.max(0,Math.min(maximumSlice,p.vectorSliceIndex));
+     return <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      <label className="text-xs">Scalar slice plane
+       <select className="mt-1 w-full rounded border border-border bg-bg p-2"
+        value={p.vectorPlane} onChange={e=>p.onVectorPlaneChange(e.target.value as FieldVectorPlane)}>
+        <option value="xy">XY plane</option><option value="xz">XZ plane</option><option value="yz">YZ plane</option>
+       </select>
+      </label>
+      <label className="text-xs">Slice index · {slice+1}/{maximumSlice+1}
+       <input className="mt-2 w-full" type="range" min="0" max={maximumSlice} step="1"
+        value={slice} onChange={e=>p.onVectorSliceIndexChange(Number(e.target.value))}/>
+      </label>
+     </div>;
+    })()}
     {layer.kind==="vector"&&(layer.renderer.kind==="glyphs"||layer.renderer.kind==="streamlines")&&(()=>{
      const normalAxis=p.vectorPlane==="xy"?2:p.vectorPlane==="xz"?1:0;
      const maximumSlice=layer.resolution.dimensions[normalAxis]-1;
@@ -114,6 +131,29 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
    role="img" aria-label={layer.legend.accessibleDescription}>
    <p className="font-semibold">{layer.legend.title}</p>
    <p>{layer.network?.nodes.length??0} nodes · {layer.network?.edges.length??0} links</p>
+  </div>;
+ }
+ if(layer.kind==="scalar"&&layer.renderer.kind==="slice"){
+  const frame=fieldScalarSliceAtTime(layer,p.timeSeconds,p.vectorPlane,p.vectorSliceIndex);
+  const min=layer.range.minimumSI,max=layer.range.maximumSI;
+  const cellWidth=256/frame.dimensionU,cellHeight=116/frame.dimensionV;
+  return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
+   role="img" aria-label={layer.legend.accessibleDescription+"; "+frame.plane.toUpperCase()+" scalar slice "+(frame.sliceIndex+1)+"; recorded sample "+frame.sampleTimeSeconds.toFixed(4)+" seconds"}>
+   <p className="text-xs font-semibold">{layer.legend.title} · {frame.sampleTimeSeconds.toFixed(3)} s</p>
+   <svg viewBox="0 0 300 160" width="100%" height="132" role="presentation">
+    <path d="M22 12 V140 H286" fill="none" stroke="currentColor" opacity=".28"/>
+    {frame.cells.map((cell,index)=>{
+     const x=22+cell.uIndex*cellWidth;
+     const y=140-(cell.vIndex+1)*cellHeight;
+     return <rect key={index} x={x} y={y} width={cellWidth} height={cellHeight}
+      fill={cell.value===null?"#555":colorFor(cell.value,min,max,layer.legend.palette)}
+      stroke="currentColor" strokeOpacity=".16" strokeWidth=".5">
+      <title>{cell.value===null?"No data":cell.value.toPrecision(5)+" "+layer.units.display}</title>
+     </rect>;
+    })}
+   </svg>
+   <div className="flex justify-between text-[10px]"><span>{min.toPrecision(3)} {layer.units.display}</span><span>{max.toPrecision(3)} {layer.units.display}</span></div>
+   <p className="text-[10px] text-muted-foreground">{frame.plane.toUpperCase()} · slice {frame.sliceIndex+1} · {frame.cells.filter(cell=>cell.value!==null).length} valid cells · no-data shown separately</p>
   </div>;
  }
  if(layer.kind==="vector"&&layer.renderer.kind==="streamlines"){

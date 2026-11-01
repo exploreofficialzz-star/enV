@@ -42,7 +42,7 @@ const rendererKinds:readonly FieldRendererKind[]=["slice","streamlines","glyphs"
 export function isFieldOverlayRendererImplemented(kind:FieldKind,renderer:FieldRendererKind):boolean{
  if(kind==="event")return renderer==="event-trace";
  if(kind==="network")return renderer==="event-trace";
- if(kind==="scalar")return renderer==="heatmap"||renderer==="line-plot";
+ if(kind==="scalar")return renderer==="slice"||renderer==="heatmap"||renderer==="line-plot";
  if(kind==="vector")return renderer==="glyphs"||renderer==="streamlines";
  return false;
 }
@@ -211,6 +211,36 @@ export function fieldFrameAtTime(layer:FieldLayer,timeSeconds:number):Readonly<{
  const count=layer.resolution.sampleCount*componentCount(layer.kind);
  return Object.freeze({sampleTimeSeconds:layer.timeReference.sampleTimesSeconds[index],sampleIndex:index,
   values:Object.freeze(layer.values.slice(index*count,(index+1)*count))});
+}
+export type FieldScalarSliceFrame=Readonly<{
+ sampleTimeSeconds:number;sampleIndex:number;plane:FieldVectorPlane;sliceIndex:number;
+ dimensionU:number;dimensionV:number;
+ cells:readonly Readonly<{uIndex:number;vIndex:number;value:number|null}>[];
+}>;
+/** Extracts exact scalar cells from one recorded grid plane; no spatial interpolation. */
+export function fieldScalarSliceAtTime(layer:FieldLayer,timeSeconds:number,
+ plane:FieldVectorPlane="xy",requestedSliceIndex?:number):FieldScalarSliceFrame{
+ if(layer.kind!=="scalar"||layer.renderer.kind!=="slice")
+  throw new Error("Scalar slices require a scalar field with the slice renderer.");
+ const axes=plane==="xy"?{u:0,v:1,n:2}:plane==="xz"?{u:0,v:2,n:1}:
+  plane==="yz"?{u:1,v:2,n:0}:null;
+ if(!axes)throw new Error("Scalar slice plane is unsupported.");
+ const dims=layer.resolution.dimensions;
+ const sliceCount=dims[axes.n],slice=requestedSliceIndex??Math.floor((sliceCount-1)/2);
+ if(!Number.isSafeInteger(slice)||slice<0||slice>=sliceCount)
+  throw new Error("Scalar slice index is outside the field resolution.");
+ const frame=fieldFrameAtTime(layer,timeSeconds);
+ const cells:FieldScalarSliceFrame["cells"][number][]=[];
+ for(let vIndex=0;vIndex<dims[axes.v];vIndex++)for(let uIndex=0;uIndex<dims[axes.u];uIndex++){
+  const coordinates=[0,0,0];coordinates[axes.u]=uIndex;
+  coordinates[axes.v]=vIndex;coordinates[axes.n]=slice;
+  const cellIndex=coordinates[0]+dims[0]*(coordinates[1]+dims[1]*coordinates[2]);
+  const value=frame.values[cellIndex];
+  cells.push(Object.freeze({uIndex,vIndex,value:typeof value==="number"?value:null}));
+ }
+ return Object.freeze({sampleTimeSeconds:frame.sampleTimeSeconds,sampleIndex:frame.sampleIndex,
+  plane,sliceIndex:slice,dimensionU:dims[axes.u],dimensionV:dims[axes.v],
+  cells:Object.freeze(cells)});
 }
 export type FieldVectorPlane="xy"|"xz"|"yz";
 export type FieldVectorGlyphFrame=Readonly<{

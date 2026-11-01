@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {runExperiment,type ModelInput} from "./model.ts";
-import {createComputedFieldLayers,fieldFrameAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
+import {createComputedFieldLayers,fieldFrameAtTime,fieldScalarSliceAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
 const run=(kind:"damped-oscillator"|"rc-circuit"|"heat-rod")=>{
  const inputs:ModelInput=kind==="damped-oscillator"
   ?{kind,massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0}
@@ -161,4 +161,44 @@ test("streamlines stop cleanly when the selected slice contains only nodata",()=
  const empty=parseFieldLayer(raw);
  const frame=fieldVectorStreamlinesAtTime(empty,0,"xy",0);
  assert.equal(frame.paths.length,0);
+});
+
+function scalarSliceLayer(){
+ const base=createComputedFieldLayers(run("damped-oscillator"))[0];
+ const timeSamples=base.timeReference.sampleTimesSeconds.length;
+ const values=Array.from({length:timeSamples},(_,t)=>
+  Array.from({length:8},(_,cell)=>t*100+cell));
+ return parseFieldLayer({...base,id:"scalar-volume",label:"Temperature volume",kind:"scalar",
+  resolution:{dimensions:[2,2,2],spacingMeters:[1,1,1],sampleCount:8},
+  values:values.flat(),mask:null,renderer:{kind:"slice",implementationId:"env-scalar-slice-v1"},
+  range:{...base.range,minimumSI:0,maximumSI:(timeSamples-1)*100+7}});
+}
+test("scalar slice extracts exact XYZ grid-plane cells from the nearest recorded time sample",()=>{
+ const layer=scalarSliceLayer();
+ const xy=fieldScalarSliceAtTime(layer,0.099,"xy",1);
+ assert.equal(xy.sampleTimeSeconds,0.1);
+ assert.equal(xy.sampleIndex,10);
+ assert.deepEqual(xy.cells.map(cell=>cell.value),[104,105,106,107]);
+ const xz=fieldScalarSliceAtTime(layer,0.1,"xz",1);
+ assert.deepEqual(xz.cells.map(cell=>cell.value),[102,103,106,107]);
+ const yz=fieldScalarSliceAtTime(layer,0.1,"yz",1);
+ assert.deepEqual(yz.cells.map(cell=>cell.value),[101,103,105,107]);
+ assert.equal(xy.dimensionU,2);assert.equal(xy.dimensionV,2);
+});
+test("scalar slice preserves nodata and refuses invalid indices and field kinds",()=>{
+ const layer=scalarSliceLayer();
+ const raw=JSON.parse(JSON.stringify(layer));
+ raw.mask=Array(raw.values.length).fill(true);
+ raw.mask[0]=false;raw.values[0]=null;
+ const masked=parseFieldLayer(raw);
+ const xy=fieldScalarSliceAtTime(masked,0,"xy",0);
+ assert.equal(xy.cells[0].value,null);
+ assert.equal(xy.cells.filter(cell=>cell.value!==null).length,3);
+ assert.throws(()=>fieldScalarSliceAtTime(layer,0,"xy",2),/slice index/);
+ const base=createComputedFieldLayers(run("heat-rod"))[0];
+ assert.throws(()=>fieldScalarSliceAtTime(base,0),/scalar field/);
+});
+test("scalar slice renderer is advertised only for the real scalar implementation",()=>{
+ assert.equal(isFieldOverlayRendererImplemented("scalar","slice"),true);
+ assert.equal(isFieldOverlayRendererImplemented("tensor","slice"),false);
 });
