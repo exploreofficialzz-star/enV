@@ -263,30 +263,72 @@ Never clear the outbox before server acknowledgement. Never advance a cursor bef
 
 ## 10. Attachments and cloud backup
 
-Use an ABookObjectStore interface so storage vendor decisions do not leak into note domain code.
+### Provider decision
 
-Candidate: provision a private Vercel Blob store if it matches the active enV deployment. This is not currently verified as configured. Before implementation, verify the Vercel project, provision a private store, install a compatible SDK, configure BLOB_READ_WRITE_TOKEN as a server-only secret and test authenticated delivery. If the existing deployment uses another durable object store, implement the same interface against that provider instead.
+**Primary attachment/object storage: Cloudflare R2 (private bucket, S3-compatible API).** This is the selected provider for A book's first production implementation, subject to account provisioning and a live integration test. Do not use Vercel Blob as the default A book attachment store.
 
-Attachment flow:
-1. Client requests authorization for an upload.
-2. Server authenticates owner and returns a short-lived, narrowly scoped upload authorization.
-3. Client uploads directly to private object storage for large files; small files may use a validated server route if within the deployment body limit.
-4. Client confirms upload.
-5. Server verifies object existence, size, detected media type, checksum and ownership before linking it to a note.
-6. Downloads pass through authenticated authorization or short-lived private delivery tokens.
-7. Deletion follows a retention/tombstone policy and must not race with a recoverable note revision.
+Reasons:
+- R2 implements an S3-compatible API, so the existing enV server can use standard AWS S3 SDK tooling and keep provider access behind one adapter.
+- R2 buckets are private by default; public access requires an explicit enablement.
+- R2 supports short-lived presigned GET/PUT/HEAD/DELETE URLs, allowing Web, Android and iOS to upload/download bytes directly without receiving storage credentials.
+- R2 Standard currently has no internet egress charge and includes 10 GB-month storage, 1 million Class A operations and 10 million Class B operations monthly. Current published Standard storage price is $0.015/GB-month; operation charges apply beyond included amounts. Recheck pricing before launch.
+- This suits a notes product with potentially frequent reads and large PDFs/audio attachments better than routing every private download through application functions.
 
-Reject executable/untrusted content, enforce quotas, normalize filenames, scan/process documents safely, and never trust filename extensions or client-supplied MIME alone.
+Vercel Private Blob remains a possible alternative for smaller private assets, but private delivery runs through Vercel Functions; Vercel currently advises against serving files above 100 MB through private Blob unless traffic is low. A book's long-term audio/document workload makes R2 the preferred default.
 
-Backups:
-- PostgreSQL automated backups/PITR according to the selected DB provider and plan.
-- Object storage versioning/retention or independent backup replication.
-- Immutable note revisions.
-- Documented restore of a note, attachment, full user account and full database.
-- Scheduled restore drills, with results recorded.
-- Data export remains available to users independently of enV account continuity.
+### Bucket and environment layout
 
-Local device cache is not a cloud backup. Sync is not a backup. A private object store is not a backup unless independent recovery is configured and tested.
+Provision distinct private buckets:
+- `env-abook-dev` for development.
+- `env-abook-preview` for preview/staging.
+- `env-abook-prod` for production.
+
+Do not enable R2 public bucket access or attach a public custom domain to these private user-content buckets. Configure exact-origin CORS for the approved enV Web production and preview origins, allowing only required methods and headers. Native clients use signed URLs and do not need browser CORS.
+
+Required server-only environment configuration:
+- `ABOOK_OBJECT_STORE_PROVIDER=r2`
+- `R2_ACCOUNT_ID`
+- `R2_BUCKET`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`
+- Optional region value `auto`
+
+Use separate restricted credentials per environment. Credentials must never be prefixed with `VITE_`, included in Android BuildConfig, embedded in iOS bundles, returned by APIs or logged. Restrict the production token to the required bucket/object permissions.
+
+### Object key contract
+
+The server generates opaque keys; clients never choose arbitrary object paths:
+`abook/v1/<opaque-owner-scope>/<attachment-id>/<random-object-version>`
+
+Do not include email addresses, filenames, note titles or other personal data in object keys. Persist the object key, owner, note, declared/detected MIME, size, checksum, lifecycle state and object version in `abook_attachments`.
+
+### Upload and download flow
+
+1. Client requests upload authorization for a note and attachment metadata.
+2. Server authenticates the enV session, verifies note ownership, validates quotas, file count, permitted file type and maximum size, then generates a random attachment ID and opaque object key.
+3. Server returns a short-lived presigned PUT URL scoped to that exact object and operation. Use a short expiry (normally 5–15 minutes), required content-type/checksum headers and a single-use application upload intent.
+4. Client uploads bytes directly to R2. Large files use S3 multipart upload with bounded part sizes/concurrency and resumable part retries; small files use a single PUT.
+5. Client calls the completion endpoint. Server performs HEAD/object metadata validation and verifies size, checksum, content type and that the pending upload intent belongs to the authenticated user.
+6. Only after successful verification does the server mark the attachment available and link it to the note.
+7. For downloads, server re-checks owner/share permission and returns a short-lived presigned GET URL. Treat that URL as a bearer credential; do not place it in analytics, logs or long-lived note records.
+8. For deletion, first tombstone the database record and preserve references needed by retained note revisions. Garbage-collect the object only after the recovery/retention window and after confirming no retained revision references it.
+
+Presigned URLs expire and are not user identities. Anyone possessing one can perform its scoped operation until expiry. Browser CORS must be configured for the exact enV origins and request headers; CORS is not authorization. Cloudflare documents presigned URL support for PUT/GET/HEAD/DELETE and multipart uploads for large/resumable files.
+
+Reject executable/untrusted content; enforce per-account quotas; normalize filenames for display only; inspect actual file signatures rather than trusting extensions or the client's MIME claim. Apply malware/content scanning where available and treat imported office/PDF content as untrusted.
+
+### Backup and disaster recovery
+
+- PostgreSQL: use the configured production provider's automated backups and point-in-time recovery, with documented retention and recovery objectives. Do not treat Neon replication/HA as backup.
+- R2 attachments: implement copy-based backup replication to a separate backup destination with separate credentials and access policies. Prefer a separately controlled cloud account/provider to reduce correlated account-loss risk; do not count another prefix in the same bucket as an independent backup.
+- Keep immutable note revisions and deletion tombstones in PostgreSQL.
+- Preserve the attachment-to-note manifest, object checksums and restore order so metadata and bytes can be reconciled.
+- Test restores of a single note, its attachments, a whole user's library and a full environment.
+- Schedule restore drills and record measured recovery point and recovery time.
+- Provide user-initiated full export so users retain portability independent of enV account continuity.
+
+Local device cache is not a cloud backup. Sync is not a backup. R2 storage by itself is not a backup. A separate backup copy and tested restore process are required.
 
 ## 11. Search, privacy and security
 
@@ -396,6 +438,6 @@ Do not mark the tool active or production-ready until all three platform entry p
 
 ## Architecture decision summary
 
-A book is an enV-owned, independently implemented Web/Android/iOS tool. It is online-first for account, cloud authority and synchronization, but local-capable for low-latency editing, search, capture and supported media operations. Every edit is durably stored on the device and queued; the cloud receives it promptly when online. PostgreSQL owns canonical metadata and revision history, private object storage owns attachment bytes, and independent backups provide recovery. The shared document AST and API contracts keep the three implementations interoperable without sharing their user interfaces.
+A book is an enV-owned, independently implemented Web/Android/iOS tool. It is online-first for account, cloud authority and synchronization, but local-capable for low-latency editing, search, capture and supported media operations. Every edit is durably stored on the device and queued; the cloud receives it promptly when online. PostgreSQL owns canonical metadata and revision history, Cloudflare R2 private storage owns attachment bytes, and an independent backup destination plus tested restores provide recovery. The shared document AST and API contracts keep the three implementations interoperable without sharing their user interfaces.
 
 **Implementation status:** This document establishes the architecture baseline only. It does not represent an implemented editor, database migration, object store, sync service, or production deployment.
