@@ -4,7 +4,7 @@ import { classifyObservationFreshness, observationEvidenceClass, parseWorldObser
 
 const base = {
   schemaVersion:1,id:"weather-hourly-1",layer:"weather",kind:"measured",label:"Observed near-surface temperature",
-  source:{provider:"Trusted Weather Archive",datasetId:"hourly-observations",datasetVersion:"2026-10",license:"CC-BY-4.0",retrievedAtUTC:"2026-10-30T12:00:00.000Z",validFromUTC:"2026-10-30T11:00:00.000Z",validToUTC:"2026-10-30T12:00:00.000Z",staleAfterSeconds:7200,sourceUri:"https://example.invalid/dataset",checksumSha256:"a".repeat(64)},
+  source:{provider:"Trusted Weather Archive",datasetId:"hourly-observations",datasetVersion:"2026-10",license:"CC-BY-4.0",retrievedAtUTC:"2026-10-30T12:00:00.000Z",validFromUTC:"2026-10-30T11:00:00.000Z",validToUTC:"2026-10-30T18:00:00.000Z",staleAfterSeconds:7200,sourceUri:"https://example.invalid/dataset",checksumSha256:"a".repeat(64)},
   extent:{crs:"EPSG:4326",westLongitudeDegrees:-1,southLatitudeDegrees:5,eastLongitudeDegrees:1,northLatitudeDegrees:7,minHeightMeters:null,maxHeightMeters:null,verticalDatum:null},
   modelId:null,modelVersion:null,randomSeed:null,assumptions:[],uncertainty:{lower:299,upper:301,unit:"K"},payloadRef:"sha256:weather-data",
 };
@@ -15,7 +15,7 @@ test("measured observations need licensed provenance, a spatial extent and a pay
   assert.equal(classifyObservationFreshness(value,"2026-10-30T12:30:00.000Z"),"fresh");
   assert.equal(classifyObservationFreshness(value,"2026-10-30T15:00:00.000Z"),"stale");
   assert.equal(classifyObservationFreshness(value,"2026-10-30T10:00:00.000Z"),"not-yet-valid");
-  assert.equal(classifyObservationFreshness(value,"2026-10-30T13:00:00.000Z"),"expired");
+  assert.equal(classifyObservationFreshness(value,"2026-10-30T19:00:00.000Z"),"expired");
 });
 
 test("forecast and climatology keep distinct evidence labels",()=>{
