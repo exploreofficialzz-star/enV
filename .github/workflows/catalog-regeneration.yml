@@ -7,6 +7,7 @@ on:
       - ".github/workflows/catalog-regeneration.yml"
       - "src/data/math-expansion.json"
       - "scripts/gen-catalog.mjs"
+      - "scripts/check-design.mjs"
       - "scripts/export-native-engine-data.mjs"
       - "scripts/export-native-catalog.mjs"
       - "scripts/export-native-execution-matrix.mjs"
