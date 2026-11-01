@@ -2957,6 +2957,11 @@ private struct NativeWorldLabMultiCadPanel:View {
     @State private var factor="1.1"
     @State private var offset="1"
     @State private var gap="0.25"
+    @State private var plane="0"
+    @State private var patternSpacing="2"
+    @State private var copies="2"
+    @State private var center="0,0,0"
+    @State private var instances="4"
     @State private var error=""
     private var ids:[String]{
         project.entities.map{$0.id}.filter{selected.contains($0)}
@@ -3039,6 +3044,49 @@ private struct NativeWorldLabMultiCadPanel:View {
                     apply{try NativeWorldLabEditor.distributeSolids($0,ids:ids,
                         axis:axis,gapMeters:distance)}
                 }.disabled(ids.count<3)
+            }
+            HStack{
+                TextField("Translate m",text:$offset).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Translate selection"){
+                    guard let distance=Double(offset) else{error="Enter a valid translation";return}
+                    var delta=[0.0,0.0,0.0];delta[axis]=distance
+                    apply{try NativeWorldLabEditor.translateSolids($0,ids:ids,deltaMeters:delta)}
+                }.disabled(ids.isEmpty)
+            }
+            HStack{
+                TextField("Mirror plane m",text:$plane).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Mirror all"){
+                    guard let value=Double(plane) else{error="Enter a valid mirror plane";return}
+                    apply{try NativeWorldLabEditor.mirrorSolids($0,ids:ids,axis:axis,planeMeters:value)}
+                }.disabled(ids.isEmpty)
+            }
+            HStack{
+                TextField("Pattern spacing m",text:$patternSpacing).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Copies",text:$copies).keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Linear pattern"){
+                    guard let step=Double(patternSpacing),let count=Int(copies) else{
+                        error="Enter valid spacing and copies";return
+                    }
+                    apply{try NativeWorldLabEditor.linearPatternSolids($0,ids:ids,
+                        axis:axis,spacingMeters:step,copies:count)}
+                }.disabled(ids.isEmpty)
+            }
+            HStack{
+                TextField("Centre X,Y,Z m",text:$center).textFieldStyle(.roundedBorder)
+                TextField("Instances",text:$instances).keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Circular pattern"){
+                    let coordinates=center.split(separator:",").compactMap{Double($0.trimmingCharacters(in:.whitespaces))}
+                    guard coordinates.count==3,let count=Int(instances) else{
+                        error="Enter three centre coordinates and an instance count";return
+                    }
+                    apply{try NativeWorldLabEditor.circularPatternSolids($0,ids:ids,
+                        axis:axis,centerMeters:coordinates,instances:count)}
+                }.disabled(ids.isEmpty)
             }
             if !error.isEmpty{Text(error).font(.caption).foregroundStyle(.red)}
         }

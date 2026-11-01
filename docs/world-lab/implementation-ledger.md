@@ -735,3 +735,10 @@ release-candidate evidence bundle are unfinished.
 - iOS native CAD now supports atomic multi-selection rotation, scale, duplication, alignment using rotated primitive bounds and minimum-gap distribution. All operations validate every selected part and preserve sphere/cylinder geometry invariants.
 - XCTest coverage exercises multi-selection transformations, shape-preserving scale, rotated bounds, alignment, spacing, revision increments, duplication and invalid input rejection.
 - Observer zoom/vertical-offset controls and SwiftUI multi-selection controls are being integrated separately; no native acceptance scenario is marked verified by the editor-only source change.
+
+
+## C/D multi-part CAD completion tranche — 2026-11-01
+- Android Kotlin and iOS Swift native editors now provide atomic multi-part translate, mirror, linear patterns and circular patterns in addition to rotate, scale, duplicate, align and distribute.
+- Translation and reflection retain selection identity; pattern operations clone complete source geometry/material metadata with fresh IDs, preserve rotations by composing world-axis matrices, reject non-finite/out-of-range coordinates, and enforce the 200-part and pattern-count limits.
+- Native CAD panels now expose controls for translation, mirror plane, linear spacing/copy count, circular center and instance count.
+- Added native test source for group translation/reflection/pattern growth and invalid settings. These tests are pending exact-head CI.

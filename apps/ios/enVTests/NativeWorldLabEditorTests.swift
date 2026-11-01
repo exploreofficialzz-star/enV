@@ -308,3 +308,35 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabEditor.duplicateSolids(data,ids:["a","b"],offsetMeters:[Double.nan,0,0]))
         XCTAssertThrowsError(try NativeWorldLabEditor.distributeSolids(data,ids:["a","b"],axis:0,gapMeters:1))
     }
+
+
+    func testMultiSelectionTranslateMirrorAndPatternOperations() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"sphere",id:"b")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"cylinder",id:"c")
+        let before=try NativeWorldLabProject.decode(data)
+        let beforePosition=before.entities[0].positionMeters
+        data=try NativeWorldLabEditor.translateSolids(data,ids:["a","b","c"],deltaMeters:[1,2,3])
+        var project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.entities[0].positionMeters[0],beforePosition[0]+1,accuracy:1e-12)
+        XCTAssertEqual(project.entities[1].positionMeters[1],before.entities[1].positionMeters[1]+2,accuracy:1e-12)
+        data=try NativeWorldLabEditor.mirrorSolids(data,ids:["a","b","c"],axis:0,planeMeters:0)
+        project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.entities[0].positionMeters[0],-(beforePosition[0]+1),accuracy:1e-12)
+        data=try NativeWorldLabEditor.linearPatternSolids(data,ids:["a","b"],axis:2,spacingMeters:2,copies:2)
+        project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.entities.count,7)
+        data=try NativeWorldLabEditor.circularPatternSolids(data,ids:["a","b"],axis:1,
+            centerMeters:[0,0,0],instances:4)
+        project=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(project.entities.count,13)
+        XCTAssertTrue(project.entities.allSatisfy{$0.positionMeters.allSatisfy{$0.isFinite}})
+    }
+    func testMultiSelectionTranslateAndPatternsRejectInvalidInputs() throws {
+        var data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"box",id:"a")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"b")
+        XCTAssertThrowsError(try NativeWorldLabEditor.translateSolids(data,ids:["a","b"],deltaMeters:[Double.nan,0,0]))
+        XCTAssertThrowsError(try NativeWorldLabEditor.mirrorSolids(data,ids:["a","missing"],axis:0,planeMeters:0))
+        XCTAssertThrowsError(try NativeWorldLabEditor.linearPatternSolids(data,ids:["a","b"],axis:0,spacingMeters:0,copies:2))
+        XCTAssertThrowsError(try NativeWorldLabEditor.circularPatternSolids(data,ids:["a","b"],axis:0,centerMeters:[0,0,0],instances:1))
+    }

@@ -24,6 +24,11 @@ fun NativeWorldLabMultiCadPanel(
     var scale by remember(project.id){mutableStateOf("1.1")}
     var spacing by remember(project.id){mutableStateOf("1")}
     var gap by remember(project.id){mutableStateOf("0.25")}
+    var plane by remember(project.id){mutableStateOf("0")}
+    var patternSpacing by remember(project.id){mutableStateOf("2")}
+    var copies by remember(project.id){mutableStateOf("2")}
+    var center by remember(project.id){mutableStateOf("0,0,0")}
+    var instances by remember(project.id){mutableStateOf("4")}
     var feedback by remember(project.id){mutableStateOf("")}
     LaunchedEffect(project.entities.map{it.id}.toSet()){
         selected=selected.intersect(project.entities.map{it.id}.toSet())
@@ -100,7 +105,47 @@ fun NativeWorldLabMultiCadPanel(
                 }.onFailure{feedback="Enter a valid nonnegative gap"}
             }){Text("Distribute")}
         }
-        Text("Alignment uses rotated primitive bounding extents. Distribution preserves part order and enforces the entered minimum gap.",
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                runCatching{spacing.toDouble()}.onSuccess{distance->
+                    val delta=List(3){i->if(i==axis)distance else 0.0}
+                    apply{NativeWorldLabEditor.translateSolids(it,ids,delta)}
+                }.onFailure{feedback="Enter a valid translation distance"}
+            }){Text("Translate selection")}
+            OutlinedTextField(value=plane,onValueChange={plane=it},
+                label={Text("Mirror plane m")},singleLine=true,modifier=Modifier.weight(1f))
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                runCatching{plane.toDouble()}.onSuccess{value->
+                    apply{NativeWorldLabEditor.mirrorSolids(it,ids,axis,value)}
+                }.onFailure{feedback="Enter a valid mirror plane"}
+            }){Text("Mirror all")}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+            OutlinedTextField(value=patternSpacing,onValueChange={patternSpacing=it},
+                label={Text("Pattern spacing m")},singleLine=true,modifier=Modifier.weight(1f))
+            OutlinedTextField(value=copies,onValueChange={copies=it},
+                label={Text("Copies")},singleLine=true,modifier=Modifier.weight(1f))
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                val count=copies.toIntOrNull()
+                val step=patternSpacing.toDoubleOrNull()
+                if(count==null||step==null)feedback="Enter valid pattern spacing and copy count"
+                else apply{NativeWorldLabEditor.linearPatternSolids(it,ids,axis,step,count)}
+            }){Text("Linear pattern")}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+            OutlinedTextField(value=center,onValueChange={center=it},
+                label={Text("Circular centre X,Y,Z (m)")},singleLine=true,
+                modifier=Modifier.weight(1f))
+            OutlinedTextField(value=instances,onValueChange={instances=it},
+                label={Text("Instances")},singleLine=true,modifier=Modifier.weight(1f))
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                val values=center.split(",").mapNotNull{it.trim().toDoubleOrNull()}
+                val count=instances.toIntOrNull()
+                if(values.size!=3||count==null)feedback="Enter three centre coordinates and an instance count"
+                else apply{NativeWorldLabEditor.circularPatternSolids(it,ids,axis,values,count)}
+            }){Text("Circular pattern")}
+        }
+        Text("Alignment uses rotated primitive bounding extents. Distribution preserves part order and enforces the entered minimum gap. Pattern copies retain geometry/material assumptions and receive new identities.",
             style=MaterialTheme.typography.bodySmall)
         if(feedback.isNotBlank())Text(feedback,color=MaterialTheme.colorScheme.error,
             style=MaterialTheme.typography.bodySmall)

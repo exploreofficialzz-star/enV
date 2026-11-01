@@ -307,3 +307,43 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.distributeSolids(json,listOf("a","b"),0,1.0)
         }
     }
+
+
+    @Test fun multiSelectionCadTranslateMirrorAndPatternsPreserveBounds(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="b")
+        json=NativeWorldLabEditor.addSolid(json,"cylinder",id="c")
+        val before=NativeWorldLabProjectCodec.decode(json)
+        json=NativeWorldLabEditor.translateSolids(json,listOf("a","b","c"),listOf(1.0,2.0,3.0))
+        var p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(before.entities[0].positionMeters.x+1,p.entities[0].positionMeters.x,1e-12)
+        assertEquals(before.entities[1].positionMeters.y+2,p.entities[1].positionMeters.y,1e-12)
+        json=NativeWorldLabEditor.mirrorSolids(json,listOf("a","b","c"),0,0.0)
+        p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(-(before.entities[0].positionMeters.x+1),p.entities[0].positionMeters.x,1e-12)
+        json=NativeWorldLabEditor.linearPatternSolids(json,listOf("a","b"),2,2.0,2)
+        p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(7,p.entities.size)
+        json=NativeWorldLabEditor.circularPatternSolids(json,listOf("a","b"),1,listOf(0.0,0.0,0.0),4)
+        p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(13,p.entities.size)
+        assertTrue(p.entities.all{it.positionMeters.x.isFinite()&&it.positionMeters.z.isFinite()})
+    }
+    @Test fun multiSelectionPatternsRejectBoundsAndInvalidInputs(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="b")
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.translateSolids(json,listOf("a","b"),listOf(Double.NaN,0.0,0.0))
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.mirrorSolids(json,listOf("a","missing"),0,0.0)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.linearPatternSolids(json,listOf("a","b"),0,0.0,2)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.circularPatternSolids(json,listOf("a","b"),0,listOf(0.0,0.0,0.0),1)
+        }
+    }
