@@ -52,7 +52,8 @@ function formatDate(timestamp: number) {
 }
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^\${}()|[\]\\]/g, "\\function noteFingerprint(note: ABookNote): string {");
+  const special = new Set([".", "*", "+", "?", "^", "$", "{", "}", "(", ")", "|", "[", "]", "\\"]);
+  return [...value].map((character) => special.has(character) ? "\\" + character : character).join("");
 }
 
 function countTextMatches(value: string, query: string): number {
