@@ -14414,10 +14414,26 @@ private final class ABookLocalStore {
     }
 
     func save(_ note: ABookNativeNote) throws -> ABookNativeNote {
+        guard note.title.count <= 10_000, note.body.count <= 5_000_000,
+              note.notebook.count <= 500, note.tags.count <= 50,
+              note.tags.allSatisfy({ $0.count <= 200 }),
+              note.revision >= 0,
+              note.createdAt.timeIntervalSince1970.isFinite,
+              note.updatedAt.timeIntervalSince1970.isFinite,
+              note.deletedAt == nil || note.deletedAt?.timeIntervalSince1970.isFinite == true else {
+            throw NSError(domain: "ABookLocalStore", code: 40, userInfo: [NSLocalizedDescriptionKey: "This note exceeds A book's local storage limits or contains invalid metadata."])
+        }
         try perform { context in
             let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
             request.predicate = NSPredicate(format: "id == %@", note.id as CVarArg)
             let existing = try context.fetch(request).first
+            if existing == nil {
+                let countRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookNoteEntity")
+                let noteCount = try context.count(for: countRequest)
+                guard noteCount < 10_000 else {
+                    throw NSError(domain: "ABookLocalStore", code: 41, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local notes. Export or remove older notes before creating another."])
+                }
+            }
             let changed = existing.map {
                 $0.title != note.title || $0.body != note.body || $0.notebook != note.notebook || decodeTags($0.tagsData) != note.tags
             } ?? false
