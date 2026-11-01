@@ -33,7 +33,7 @@ class NativeWorldLabCameraTest {
         assertThrows(IllegalArgumentException::class.java){NativeWorldLabCamera.project(
             NativeLabVector(0.0,0.0,0.0),NativeLabVector(0.0,0.0,0.0),0.0,0.0,0.0,400.0,0.0,0.0,800.0,600.0)}
     }
-}
+
 
     @Test fun savedObserverPositionRoundTripsToSamePerspectivePose(){
         val targets=listOf(NativeLabVector(0.0,0.0,0.0),NativeLabVector(125.0,-20.0,640.0))
