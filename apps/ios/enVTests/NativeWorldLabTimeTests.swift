@@ -376,3 +376,29 @@ extension NativeWorldLabTimeCheckpointTests {
         XCTAssertThrowsError(try NativeWorldLabTimeScales.parseBulletinA("not IERS data"))
     }
 }
+
+
+extension NativeWorldLabTimeCheckpointTests {
+    func testIauCoordinateTimeTransformsRoundTripAcrossGeologicalRanges() throws {
+        let reference=NativeWorldLabTimeScales.iauReferenceMJD
+        XCTAssertEqual(try NativeWorldLabTimeScales.ttMjdToTcgMjd(reference),reference,accuracy:0)
+        XCTAssertEqual(try NativeWorldLabTimeScales.tcgMjdToTtMjd(reference),reference,accuracy:0)
+        XCTAssertEqual(try NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1),
+            reference+1/(1-NativeWorldLabTimeScales.iauLG),accuracy:1e-12)
+        XCTAssertEqual(try NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),
+            reference-NativeWorldLabTimeScales.iauTDB0Seconds/86400,accuracy:1e-15)
+        for value in [-1_000_000.0,reference,1_000_000.0,100_000_000.0] {
+            XCTAssertEqual(try NativeWorldLabTimeScales.tcgMjdToTtMjd(
+                NativeWorldLabTimeScales.ttMjdToTcgMjd(value)),value,accuracy:2e-8)
+            XCTAssertEqual(try NativeWorldLabTimeScales.tdbMjdToTcbMjd(
+                NativeWorldLabTimeScales.tcbMjdToTdbMjd(value)),value,accuracy:2e-8)
+        }
+        XCTAssertThrowsError(try NativeWorldLabTimeScales.ttMjdToTcgMjd(.nan))
+    }
+    func testUtcToTcgUsesCertifiedTtAndIauRate() throws {
+        let result=try NativeWorldLabTimeScales.utcToTcg("2026-11-01T12:00:00Z")
+        XCTAssertEqual(result.source,"IAU 2000 Resolution B1.9")
+        XCTAssertGreaterThan(result.tcgMjd,result.ttMjd)
+        XCTAssertLessThan((result.tcgMjd-result.ttMjd)*86400,0.01)
+    }
+}

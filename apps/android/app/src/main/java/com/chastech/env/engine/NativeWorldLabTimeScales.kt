@@ -6,6 +6,7 @@ import java.time.ZoneOffset
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.math.roundToLong
 
 enum class NativeWorldLabEarthOrientationQuality { OBSERVED, PREDICTED }
 data class NativeWorldLabEarthOrientationSample(
@@ -43,7 +44,49 @@ data class NativeWorldLabTimeScaleReading(
     val quality:NativeWorldLabEarthOrientationQuality?,
     val source:String,val bulletin:String?,val issuedDateUTC:String?
 )
+data class NativeWorldLabTcgReading(
+    val utc:String,val tt:String,val tcg:String,val ttMjd:Double,val tcgMjd:Double,
+    val source:String="IAU 2000 Resolution B1.9"
+)
 object NativeWorldLabTimeScales {
+    const val IAU_LG=6.969290134e-10
+    const val IAU_LB=1.550519768e-8
+    const val IAU_TDB0_SECONDS=-6.55e-5
+    const val IAU_REFERENCE_MJD=43144.0003725
+    private const val UNIX_EPOCH_MJD=40587.0
+    private const val SECONDS_PER_DAY=86400.0
+    private const val MAX_EXTENDED_MJD=1_000_000_000.0
+    private fun boundedMjd(value:Double,label:String):Double {
+        require(value.isFinite()&&kotlin.math.abs(value)<=MAX_EXTENDED_MJD) {
+            "$label must be a finite MJD within ±1,000,000,000 days."
+        }
+        return value
+    }
+    fun ttMjdToTcgMjd(ttMjd:Double):Double {
+        val value=boundedMjd(ttMjd,"TT MJD")
+        return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD)/(1.0-IAU_LG)
+    }
+    fun tcgMjdToTtMjd(tcgMjd:Double):Double {
+        val value=boundedMjd(tcgMjd,"TCG MJD")
+        return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD)*(1.0-IAU_LG)
+    }
+    fun tcbMjdToTdbMjd(tcbMjd:Double):Double {
+        val value=boundedMjd(tcbMjd,"TCB MJD")
+        return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD)*(1.0-IAU_LB)+IAU_TDB0_SECONDS/SECONDS_PER_DAY
+    }
+    fun tdbMjdToTcbMjd(tdbMjd:Double):Double {
+        val value=boundedMjd(tdbMjd,"TDB MJD")
+        return IAU_REFERENCE_MJD+(value-IAU_REFERENCE_MJD-IAU_TDB0_SECONDS/SECONDS_PER_DAY)/(1.0-IAU_LB)
+    }
+    fun utcToTcg(utc:String):NativeWorldLabTcgReading {
+        val value=parseUtc(utc)
+        val offset=offsetAt(value)
+        val tt=value.plusNanos(((offset+32.184)*1e9).toLong())
+        val ttMjd=UNIX_EPOCH_MJD+tt.toEpochMilli()/(SECONDS_PER_DAY*1000.0)
+        val tcgMjd=ttMjdToTcgMjd(ttMjd)
+        val tcg=Instant.ofEpochMilli(((tcgMjd-UNIX_EPOCH_MJD)*SECONDS_PER_DAY*1000.0).roundToLong()).toString()+" TCG"
+        return NativeWorldLabTcgReading(value.toString(),tt.toString()+" TT",tcg,ttMjd,tcgMjd)
+    }
     private val leapRows=listOf(
         "1972-01-01" to 10,"1972-07-01" to 11,"1973-01-01" to 12,
         "1974-01-01" to 13,"1975-01-01" to 14,"1976-01-01" to 15,

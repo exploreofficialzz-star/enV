@@ -212,7 +212,7 @@ export function tdbMjdToTcbMjd(tdbMjd:number):number{
 /** UTC→TCG is bounded by the validity of the bundled UTC↔TAI leap-second table. */
 export function utcToTcg(value:string):Readonly<{utc:string;tt:string;tcg:string;ttMjd:number;tcgMjd:number;source:string;referenceEvent:string}>{
  const base=utcToTaiTt(value);
- const ttMilliseconds=Date.parse(base.tt.replace(" TT","Z"));
+ const ttMilliseconds=Date.parse(base.tt.replace(" TT",""));
  if(!finite(ttMilliseconds))throw new Error("TT instant could not be represented for TCG conversion.");
  const ttMjd=ttMilliseconds/DAY_MS+40587;
  const tcgMjd=ttMjdToTcgMjd(ttMjd);

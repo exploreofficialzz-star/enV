@@ -1231,6 +1231,15 @@ struct NativeWorldLabView:View {
                 Text("TAI/TT unavailable outside the certified leap-second table.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            if let tcg=try? NativeWorldLabTimeScales.utcToTcg(utc) {
+                Text("TCG · "+tcg.tcg+" · IAU 2000 fixed-rate relation")
+                    .font(.caption.monospaced())
+            } else {
+                Text("TCG is unavailable outside the certified UTC→TAI/TT interval.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Text("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived without a barycentric ephemeris.")
+                .font(.caption2).foregroundStyle(.secondary)
             Button("Import IERS Bulletin A (ser7.dat)"){importingIersBulletin=true}
                 .buttonStyle(.bordered)
             if let series=iersEarthOrientation {

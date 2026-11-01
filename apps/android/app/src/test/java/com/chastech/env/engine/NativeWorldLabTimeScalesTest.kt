@@ -3,6 +3,7 @@ package com.chastech.env.engine
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.math.pow
+import kotlin.math.pow
 
 class NativeWorldLabTimeScalesTest {
     private val bulletin="""I E R S   B U L L E T I N - A
@@ -45,6 +46,30 @@ PREDICTIONS:
         val parsed=NativeWorldLabTimeScales.parseBulletinA(shifted)
         assertEquals(0.00025,parsed.samples[2].uncertaintySeconds,1e-15)
         assertEquals(0.00025*2.0.pow(0.75),parsed.samples[3].uncertaintySeconds,1e-15)
+    }
+    @Test fun iauCoordinateTimeTransformsRoundTripAcrossGeologicalRanges(){
+        val reference=NativeWorldLabTimeScales.IAU_REFERENCE_MJD
+        assertEquals(reference,NativeWorldLabTimeScales.ttMjdToTcgMjd(reference),0.0)
+        assertEquals(reference,NativeWorldLabTimeScales.tcgMjdToTtMjd(reference),0.0)
+        assertEquals(reference+1.0/(1.0-NativeWorldLabTimeScales.IAU_LG),
+            NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1.0),1e-12)
+        assertEquals(reference-NativeWorldLabTimeScales.IAU_TDB0_SECONDS/86400.0,
+            NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),1e-15)
+        listOf(-1_000_000.0,reference,1_000_000.0,100_000_000.0).forEach { value ->
+            assertEquals(value,NativeWorldLabTimeScales.tcgMjdToTtMjd(
+                NativeWorldLabTimeScales.ttMjdToTcgMjd(value)),2e-8)
+            assertEquals(value,NativeWorldLabTimeScales.tdbMjdToTcbMjd(
+                NativeWorldLabTimeScales.tcbMjdToTdbMjd(value)),2e-8)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabTimeScales.ttMjdToTcgMjd(Double.NaN)
+        }
+    }
+    @Test fun utcToTcgUsesCertifiedTtInputAndIauRate(){
+        val result=NativeWorldLabTimeScales.utcToTcg("2026-11-01T12:00:00Z")
+        assertEquals("IAU 2000 Resolution B1.9",result.source)
+        assertTrue(result.tcgMjd>result.ttMjd)
+        assertTrue((result.tcgMjd-result.ttMjd)*86400.0<0.01)
     }
     @Test fun conversionsFailClosedOutsideDataValidity(){
         assertThrows(IllegalArgumentException::class.java){

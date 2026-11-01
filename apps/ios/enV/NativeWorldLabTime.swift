@@ -585,7 +585,52 @@ struct NativeWorldLabTimeScaleReading:Equatable {
     let bulletin:String?
     let issuedDateUTC:String?
 }
+struct NativeWorldLabTcgReading:Equatable {
+    let utc:String
+    let tt:String
+    let tcg:String
+    let ttMjd:Double
+    let tcgMjd:Double
+    let source:String
+}
 enum NativeWorldLabTimeScales {
+    static let iauLG=6.969290134e-10
+    static let iauLB=1.550519768e-8
+    static let iauTDB0Seconds = -6.55e-5
+    static let iauReferenceMJD=43144.0003725
+    private static let unixEpochMJD=40587.0
+    private static let secondsPerDay=86400.0
+    private static func boundedMJD(_ value:Double,_ label:String)throws->Double {
+        guard value.isFinite,abs(value)<=1_000_000_000 else {
+            throw NativeWorldLabError.invalid("\(label) must be a finite MJD within ±1,000,000,000 days.")
+        }
+        return value
+    }
+    static func ttMjdToTcgMjd(_ ttMjd:Double)throws->Double {
+        let value=try boundedMJD(ttMjd,"TT MJD")
+        return iauReferenceMJD+(value-iauReferenceMJD)/(1-iauLG)
+    }
+    static func tcgMjdToTtMjd(_ tcgMjd:Double)throws->Double {
+        let value=try boundedMJD(tcgMjd,"TCG MJD")
+        return iauReferenceMJD+(value-iauReferenceMJD)*(1-iauLG)
+    }
+    static func tcbMjdToTdbMjd(_ tcbMjd:Double)throws->Double {
+        let value=try boundedMJD(tcbMjd,"TCB MJD")
+        return iauReferenceMJD+(value-iauReferenceMJD)*(1-iauLB)+iauTDB0Seconds/secondsPerDay
+    }
+    static func tdbMjdToTcbMjd(_ tdbMjd:Double)throws->Double {
+        let value=try boundedMJD(tdbMjd,"TDB MJD")
+        return iauReferenceMJD+(value-iauReferenceMJD-iauTDB0Seconds/secondsPerDay)/(1-iauLB)
+    }
+    static func utcToTcg(_ utc:String)throws->NativeWorldLabTcgReading {
+        let date=try parseUTC(utc),offset=try taiOffset(date)
+        let ttDate=date.addingTimeInterval(Double(offset)+32.184)
+        let ttMjd=unixEpochMJD+ttDate.timeIntervalSince1970/secondsPerDay
+        let tcgMjd=try ttMjdToTcgMjd(ttMjd)
+        let tcgDate=Date(timeIntervalSince1970:(tcgMjd-unixEpochMJD)*secondsPerDay)
+        return NativeWorldLabTcgReading(utc:utc,tt:iso(ttDate,"TT"),tcg:iso(tcgDate,"TCG"),
+            ttMjd:ttMjd,tcgMjd:tcgMjd,source:"IAU 2000 Resolution B1.9")
+    }
     static let leapSource="USNO/IERS tai-utc.dat"
     static let leapValidThroughUTC="2027-01-01T00:00:00Z"
     private static let leapRows:[(String,Int)]=[

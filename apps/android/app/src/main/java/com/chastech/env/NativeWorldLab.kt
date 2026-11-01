@@ -1993,12 +1993,17 @@ fun NativeWorldLabForm() {
         Text("Astronomical time scales · UTC / TAI / TT / UT1",style=MaterialTheme.typography.titleSmall)
         val currentWorldUTC=demoClock?.worldDateUTC?:worldEpochUTC
         val taiTtResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTaiTt(currentWorldUTC)}}
+        val tcgResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTcg(currentWorldUTC)}}
         taiTtResult.fold(onSuccess={times->
             Text("TAI ${times.first} · TT ${times.second}",style=MaterialTheme.typography.bodySmall)
         },onFailure={error->
             Text(error.message?: "TAI/TT unavailable.",style=MaterialTheme.typography.bodySmall,
                 color=MaterialTheme.colorScheme.error)
         })
+        tcgResult.fold(onSuccess={tcg->Text("TCG ${tcg.tcg} · IAU 2000 fixed-rate relation",style=MaterialTheme.typography.bodySmall)},
+            onFailure={error->Text(error.message?: "TCG conversion unavailable.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)})
+        Text("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived here without a barycentric ephemeris.",
+            style=MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick={iersBulletinPicker.launch(arrayOf("text/plain","application/octet-stream"))}){
             Text("Import IERS Bulletin A (ser7.dat)")
         }
