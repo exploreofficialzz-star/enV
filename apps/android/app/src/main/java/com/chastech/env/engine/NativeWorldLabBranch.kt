@@ -77,3 +77,24 @@ object NativeWorldLabBranch {
         return NativeWorldLabScience.evaluate(target,record.targetTimeSeconds)
     }
 }
+
+
+/** Stable, explicit export for a branch record; no raw project data or credentials. */
+fun NativeWorldLabBranchRecord.toJson():String {
+    val root=org.json.JSONObject()
+        .put("format",format).put("schemaVersion",schemaVersion)
+        .put("branchId",branchId).put("sourceRunId",sourceRunId)
+        .put("sourceModelId",sourceModelId).put("sourceModelVersion",sourceModelVersion)
+        .put("targetModelId",targetModelId).put("targetModelVersion",targetModelVersion)
+        .put("createdAtUTC",createdAtUTC).put("sourceTimeSeconds",sourceTimeSeconds)
+        .put("targetTimeSeconds",targetTimeSeconds).put("fidelity",fidelity)
+        .put("sourceParameters",org.json.JSONObject(sourceParameters))
+        .put("targetParameters",org.json.JSONObject(targetParameters))
+    val changes=org.json.JSONArray()
+    inputDiff.forEach{change->changes.put(org.json.JSONObject()
+        .put("field",change.field)
+        .put("previous",change.previous?:org.json.JSONObject.NULL)
+        .put("next",change.next?:org.json.JSONObject.NULL))}
+    root.put("inputDiff",changes)
+    return root.toString(2)
+}
