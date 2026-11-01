@@ -1,8 +1,9 @@
 {
-  "catalogVersion": "56f036bc5455",
+  "catalogVersion": "241bd0698214",
   "baseCatalogVersion": "e9943f7f4c1f",
   "runtimeExtensionIds": [
-    "song-metadata-analyzer"
+    "song-metadata-analyzer",
+    "a-book"
   ],
   "source": "src/data/catalog.ts",
   "platforms": {
@@ -102,12 +103,12 @@
     },
     {
       "family": "custom",
-      "total": 1664,
-      "active": 1664,
+      "total": 1665,
+      "active": 1665,
       "planned": 0,
-      "androidImplemented": 54,
-      "iosImplemented": 54,
-      "uniqueConfigurations": 1661
+      "androidImplemented": 55,
+      "iosImplemented": 55,
+      "uniqueConfigurations": 1662
     },
     {
       "family": "datetime",
@@ -255,6 +256,7 @@
     }
   ],
   "androidToolIds": [
+    "a-book",
     "acceleration-calculator",
     "ad-copy-generator",
     "age-calculator",
@@ -8044,6 +8046,7 @@
     "z-score-calculator"
   ],
   "iosToolIds": [
+    "a-book",
     "acceleration-calculator",
     "ad-copy-generator",
     "age-calculator",
@@ -15833,11 +15836,11 @@
     "z-score-calculator"
   ],
   "summary": {
-    "totalTools": 10030,
-    "activeTools": 10030,
+    "totalTools": 10031,
+    "activeTools": 10031,
     "plannedTools": 0,
     "engineFamilies": 27,
-    "androidImplemented": 7787,
-    "iosImplemented": 7787
+    "androidImplemented": 7788,
+    "iosImplemented": 7788
   }
 }

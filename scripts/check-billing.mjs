@@ -142,6 +142,13 @@ assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profi
 const expectedExtensionIds = [...new Set([...(nativeInventory.runtimeExtensionIds ?? []), ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id)])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
 assert.deepEqual([...runtimeExtensionProfileIds].sort(), expectedExtensionIds, "supplemental billing profiles must exactly cover native runtime extensions missing from the catalogue");
 assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "runtime extensions require explicit, provisional, ad-free billing profiles");
+const aBookBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "a-book");
+assert.ok(aBookBillingProfile, "A book must have an explicit runtime billing profile.");
+assert.equal(aBookBillingProfile.executionMode, "local-device", "A book must remain a local-device operation.");
+assert.equal(aBookBillingProfile.requiresBackend, false, "A book must not require a content-processing backend.");
+assert.equal(aBookBillingProfile.adsEligible, false, "A book content must remain ad-free.");
+assert.equal(aBookBillingProfile.premiumRequired, false, "A book's local notes and document operations must not require premium entitlement.");
+
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");
 assert.equal(new Set(profiles.profiles.map((profile) => profile.toolId)).size, profiles.toolCount, "tool billing profiles must have unique IDs");
 assert.ok(profiles.profiles.every((profile) => profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "every generated row must be provisional, manually audited and ad-free");

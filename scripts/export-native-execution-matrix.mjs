@@ -5,9 +5,14 @@ const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all
   import("../src/data/catalog.ts"),
   import("../src/lib/datetime/catalog-tools.ts"),
 ]);
+const platformRuntimeExtensions = [
+  { id: "song-metadata-analyzer", status: "active", category: "audio", engine: { type: "audio" } },
+  { id: "a-book", status: "active", category: "productivity", engine: { type: "custom" } },
+];
 const catalog = [
   ...baseCatalog,
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
+  ...platformRuntimeExtensions.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
 ];
 const readIds = (platform, kind) => {
   const files = kind === "local"

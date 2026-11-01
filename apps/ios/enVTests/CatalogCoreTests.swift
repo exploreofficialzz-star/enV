@@ -103,6 +103,25 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertNil(sut.developerStudio(forLegacyTool: studios[0]))
     }
 
+    func testABookRuntimeExtensionIsUniqueAndSearchable() {
+        let base = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "test",
+            counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 1),
+            categories: [],
+            tools: [],
+            relatedReferenceTools: nil
+        )
+        let catalog = base.includingABook()
+        XCTAssertEqual(catalog.tools.filter { $0.id == "a-book" }.count, 1)
+        XCTAssertEqual(catalog.counts.total, 1)
+        XCTAssertEqual(catalog.counts.active, 1)
+        XCTAssertEqual(catalog.tools.first?.category, "productivity")
+        XCTAssertEqual(catalog.tools.first?.engine.id, "a-book")
+        XCTAssertEqual(catalog.includingABook().tools.filter { $0.id == "a-book" }.count, 1)
+        XCTAssertEqual(catalog.webSearch("A book").first?.id, "a-book")
+    }
+
     func testRelatedToolsExcludePlannedAndFillFromCategoryAlphabetically() {
         let current = Tool(id: "current", name: "Current", slug: "current", description: "", category: "text", subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: ["word-count", "future-tool"], engine: ToolEngine(type: "text", id: "current", op: nil))
         let testCatalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: catalog.tools + [current], relatedReferenceTools: nil)
@@ -155,4 +174,19 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.categories.first?.blurb, "on-device checks")
         XCTAssertTrue(NativeCopy.isWebRuntimeOnly("webcodecs-audio-checker"))
     }
+
+    func testABookPDFPageSelectionPreservesOrderAndRejectsDuplicates() throws {
+        XCTAssertEqual(try parseABookPageSelection("3,1-2", pageCount: 4), [3, 1, 2])
+        XCTAssertThrowsError(try parseABookPageSelection("1-3,3", pageCount: 4))
+        XCTAssertThrowsError(try parseABookPageSelection("1-5", pageCount: 4))
+        XCTAssertThrowsError(try parseABookPageSelection("", pageCount: 4))
+    }
+
+    func testABookPDFSplitGroupsPreservePartOrderAndRejectCrossPartDuplicates() throws {
+        XCTAssertEqual(try parseABookPageGroups("3,1;4-5", pageCount: 5), [[3, 1], [4, 5]])
+        XCTAssertThrowsError(try parseABookPageGroups("1-3;3-4", pageCount: 5))
+        XCTAssertThrowsError(try parseABookPageGroups("1-3", pageCount: 5))
+        XCTAssertThrowsError(try parseABookPageGroups("1-6;7-8", pageCount: 5))
+    }
+
 }

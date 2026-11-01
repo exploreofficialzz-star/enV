@@ -13,6 +13,7 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = aw
 // Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
 // runtime extensions are validated below but are not duplicated into the generated base export.
 
+// A book is a local-only native/web tool; keep this extension exported to every platform.
 const runtimeCatalogExtensions = [
   {
     id: "song-metadata-analyzer",
@@ -34,6 +35,28 @@ const runtimeCatalogExtensions = [
     status: "active",
     related: ["audio-file-inspector", "music-studio", "music-downloader"],
     engine: { type: "audio", op: "song-metadata-analyzer" },
+    platformRuntimeExtension: true,
+  },
+  {
+    id: "a-book",
+    name: "A book",
+    slug: "a-book",
+    description: "Private local notes and document workspace. Write, organize, search, attach files, and read, extract text from and rotate supported PDFs on this device.",
+    category: "productivity",
+    subcategory: "Notes & documents",
+    keywords: ["a book", "notes", "notepad", "notebook", "local notes", "offline notes", "pdf", "document", "attachments", "markdown", "writing", "journal", "search", "folders", "tags"],
+    tags: ["notes", "notebook", "documents", "pdf", "local", "offline", "productivity"],
+    icon: "FileText",
+    iconBackground: "#24354a",
+    iconAccent: "#d6e7f5",
+    popularity: 950,
+    featured: true,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "active",
+    related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
+    engine: { type: "custom", id: "a-book" },
     platformRuntimeExtension: true,
   },
 ];

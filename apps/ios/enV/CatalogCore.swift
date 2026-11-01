@@ -262,6 +262,49 @@ extension Catalog {
     }
 }
 
+
+extension Catalog {
+    /// Adds the native-only A book tool while older shared catalogue bundles roll forward.
+    func includingABook() -> Catalog {
+        guard !tools.contains(where: { $0.id == "a-book" }) else { return self }
+        let tool = Tool(
+            id: "a-book",
+            name: "A book",
+            slug: "a-book",
+            description: "Private local notes and document workspace. Write, organize, search, attach files, and process supported PDFs on this device.",
+            category: "productivity",
+            subcategory: "Notes & documents",
+            keywords: ["a book", "notes", "notepad", "notebook", "local notes", "offline notes", "pdf", "document", "attachments", "markdown", "writing", "journal", "search", "folders", "tags"],
+            tags: ["notes", "notebook", "documents", "pdf", "local", "offline", "productivity"],
+            icon: "FileText",
+            popularity: 950,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
+            engine: ToolEngine(type: "custom", id: "a-book", op: "a-book", configuration: [:])
+        )
+        let updated = tools + [tool]
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: updated.sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory
+                    ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
+                    : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+}
+
 extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -356,7 +399,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingDateTimeExtensions()
     }
 }
 

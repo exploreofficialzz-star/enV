@@ -84,6 +84,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    // Bundled on-device OCR model; no runtime model download or remote service.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
     // The play preview uses the native Godot runtime, not a WebView.
     implementation("org.godotengine:godot:4.6.3.stable")

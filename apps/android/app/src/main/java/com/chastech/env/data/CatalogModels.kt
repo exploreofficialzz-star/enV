@@ -166,6 +166,36 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
     )
 }
 
+
+/** Registers A book as a native runtime extension without changing the generated shared catalogue. */
+fun Catalog.withABook(): Catalog {
+    if (tools.any { it.id == "a-book" }) return this
+    val tool = ToolRecord(
+        id = "a-book",
+        name = "A book",
+        slug = "a-book",
+        description = "Private local notes and document workspace. Write, organize, search, attach files, and process supported PDFs on this device.",
+        category = "productivity",
+        keywords = listOf("a book", "notes", "notepad", "notebook", "local notes", "offline notes", "pdf", "document", "attachments", "markdown", "writing", "journal", "search", "folders", "tags"),
+        tags = listOf("notes", "notebook", "documents", "pdf", "local", "offline", "productivity"),
+        icon = "FileText",
+        popularity = 950,
+        featured = true,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = listOf("pdf-merger", "pdf-splitter", "pdf-text-extractor"),
+        engine = EngineInfo("custom", "a-book"),
+        subcategory = "Notes & documents",
+    )
+    val updated = tools + tool
+    return copy(
+        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+    )
+}
+
 private val webSearchSynonyms = mapOf(
     "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
     "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),

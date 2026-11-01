@@ -8,6 +8,9 @@ import WebKit
 import CoreText
 import CoreImage
 import CoreFoundation
+import CoreData
+import PDFKit
+import Vision
 import UniformTypeIdentifiers
 import Compression
 
@@ -913,7 +916,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
+        case "custom": return tool.id == "a-book" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
         default: return false
         }
     }
@@ -958,7 +961,7 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode, initialAction: initialDeveloperAction) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if tool.id == "a-book" { NativeABookView() } else if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
@@ -14024,3 +14027,1888 @@ private struct NativeMusicDataSandboxView: View {
         } catch { message = error.localizedDescription }
     }
 }
+
+
+
+private struct ABookNativeNote: Identifiable, Hashable {
+    var id: UUID
+    var title: String
+    var body: String
+    var notebook: String
+    var tags: [String]
+    var pinned: Bool
+    var archived: Bool
+    var deletedAt: Date?
+    var createdAt: Date
+    var updatedAt: Date
+    var revision: Int
+}
+
+private struct ABookNativeAttachment: Identifiable, Hashable {
+    var id: UUID
+    var noteID: UUID
+    var name: String
+    var mime: String
+    var relativePath: String
+    var size: Int64
+    var createdAt: Date
+}
+
+private struct ABookNativeRevision: Identifiable {
+    var id: UUID
+    var noteID: UUID
+    var title: String
+    var body: String
+    var notebook: String
+    var tags: [String]
+    var revision: Int
+    var createdAt: Date
+}
+
+@objc(ABookNoteEntity)
+private final class ABookNoteEntity: NSManagedObject {
+    @NSManaged var id: UUID
+    @NSManaged var title: String
+    @NSManaged var body: String
+    @NSManaged var notebook: String
+    @NSManaged var tagsData: Data
+    @NSManaged var pinned: Bool
+    @NSManaged var archived: Bool
+    @NSManaged var deletedAt: Date?
+    @NSManaged var createdAt: Date
+    @NSManaged var updatedAt: Date
+    @NSManaged var revision: Int64
+}
+
+@objc(ABookRevisionEntity)
+private final class ABookRevisionEntity: NSManagedObject {
+    @NSManaged var id: UUID
+    @NSManaged var noteID: UUID
+    @NSManaged var title: String
+    @NSManaged var body: String
+    @NSManaged var notebook: String
+    @NSManaged var tagsData: Data
+    @NSManaged var revision: Int64
+    @NSManaged var createdAt: Date
+}
+
+@objc(ABookAttachmentEntity)
+private final class ABookAttachmentEntity: NSManagedObject {
+    @NSManaged var id: UUID
+    @NSManaged var noteID: UUID
+    @NSManaged var name: String
+    @NSManaged var mime: String
+    @NSManaged var relativePath: String
+    @NSManaged var size: Int64
+    @NSManaged var createdAt: Date
+}
+
+
+func parseABookPageGroups(_ value: String, pageCount: Int) throws -> [[Int]] {
+    guard pageCount > 0 else { throw NSError(domain: "ABookPDF", code: 30, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."]) }
+    let groups = value.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    guard groups.count >= 2, groups.count <= 100 else { throw NSError(domain: "ABookPDF", code: 31, userInfo: [NSLocalizedDescriptionKey: "Enter two or more page groups, for example 1-3;4-6. Create up to 100 parts."]) }
+    var used = Set<Int>()
+    return try groups.map { group in
+        var pages: [Int] = []
+        for token in group.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }) {
+            let parts = token.split(separator: "-", omittingEmptySubsequences: false)
+            guard parts.count <= 2, let first = Int(parts[0]), let last = parts.count == 2 ? Int(parts[1]) : Int(parts[0]), first >= 1, last >= first, last <= pageCount, pages.count + last - first + 1 <= 5_000 else {
+                throw NSError(domain: "ABookPDF", code: 32, userInfo: [NSLocalizedDescriptionKey: "Invalid page range: " + token])
+            }
+            for page in first...last {
+                guard used.insert(page).inserted else { throw NSError(domain: "ABookPDF", code: 33, userInfo: [NSLocalizedDescriptionKey: "Page " + String(page) + " appears in more than one PDF part."]) }
+                guard used.count <= 5_000 else { throw NSError(domain: "ABookPDF", code: 35, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be split in one operation."]) }
+                pages.append(page)
+            }
+        }
+        guard !pages.isEmpty else { throw NSError(domain: "ABookPDF", code: 34, userInfo: [NSLocalizedDescriptionKey: "Each PDF part must contain at least one page."]) }
+        return pages
+    }
+}
+
+func parseABookPageSelection(_ value: String, pageCount: Int) throws -> [Int] {
+    guard pageCount > 0 else {
+        throw NSError(domain: "ABookPDF", code: 36, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."])
+    }
+    let tokens = value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    guard !tokens.isEmpty else {
+        throw NSError(domain: "ABookPDF", code: 37, userInfo: [NSLocalizedDescriptionKey: "Enter page numbers, for example 1-3,5."])
+    }
+    var pages: [Int] = []
+    var used = Set<Int>()
+    for token in tokens {
+        let parts = token.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count <= 2,
+              let first = Int(parts[0]),
+              let last = parts.count == 2 ? Int(parts[1]) : Int(parts[0]),
+              first >= 1, last >= first, last <= pageCount,
+              pages.count + last - first + 1 <= 5_000 else {
+            throw NSError(domain: "ABookPDF", code: 38, userInfo: [NSLocalizedDescriptionKey: "Invalid page range: " + token])
+        }
+        for page in first...last {
+            guard used.insert(page).inserted else {
+                throw NSError(domain: "ABookPDF", code: 39, userInfo: [NSLocalizedDescriptionKey: "Page " + String(page) + " is selected more than once."])
+            }
+            pages.append(page)
+        }
+    }
+    return pages
+}
+
+private func safeABookPDFName(_ value: String) -> String {
+    let cleaned = value.replacingOccurrences(of: "\\.pdf$", with: "", options: [.regularExpression, .caseInsensitive])
+        .replacingOccurrences(of: "[^A-Za-z0-9._-]+", with: "-", options: .regularExpression)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    return String(cleaned.prefix(80)).isEmpty ? "document" : String(cleaned.prefix(80))
+}
+
+private func aBookCRC32(_ bytes: Data) -> UInt32 {
+    var crc: UInt32 = 0xffff_ffff
+    for byte in bytes {
+        crc ^= UInt32(byte)
+        for _ in 0..<8 {
+            crc = (crc >> 1) ^ ((crc & 1) == 1 ? 0xedb8_8320 : 0)
+        }
+    }
+    return crc ^ 0xffff_ffff
+}
+
+private func appendABookZIPLE<T: FixedWidthInteger>(_ input: T, to data: inout Data) {
+    var value = input.littleEndian
+    withUnsafeBytes(of: &value) { data.append(contentsOf: $0) }
+}
+
+private func readABookZIPLE<T: FixedWidthInteger>(_ type: T.Type, from data: Data, at offset: Int) throws -> T {
+    let size = MemoryLayout<T>.size
+    guard offset >= 0, offset + size <= data.count else {
+        throw NSError(domain: "ABookArchive", code: 1, userInfo: [NSLocalizedDescriptionKey: "The backup archive is truncated."])
+    }
+    var result: T = 0
+    for index in 0..<size { result |= T(data[offset + index]) << (index * 8) }
+    return result
+}
+
+private func makeABookStoredZIP(_ files: [String: Data]) throws -> Data {
+    guard files.count <= 10_001 else {
+        throw NSError(domain: "ABookArchive", code: 2, userInfo: [NSLocalizedDescriptionKey: "This backup contains too many files."])
+    }
+    var archive = Data()
+    var directory = Data()
+    for name in files.keys.sorted() {
+        guard let payload = files[name], !name.isEmpty, !name.hasPrefix("/"),
+              !name.contains("\\"), !name.split(separator: "/", omittingEmptySubsequences: false).contains("..") else {
+            throw NSError(domain: "ABookArchive", code: 3, userInfo: [NSLocalizedDescriptionKey: "The backup contains an unsafe file path."])
+        }
+        let nameBytes = Data(name.utf8)
+        guard nameBytes.count <= Int(UInt16.max), payload.count <= Int(UInt32.max),
+              archive.count <= Int(UInt32.max), directory.count <= Int(UInt32.max) else {
+            throw NSError(domain: "ABookArchive", code: 4, userInfo: [NSLocalizedDescriptionKey: "This backup is larger than the supported ZIP format."])
+        }
+        let size = UInt32(payload.count)
+        let checksum = aBookCRC32(payload)
+        let localOffset = UInt32(archive.count)
+        appendABookZIPLE(UInt32(0x04034b50), to: &archive)
+        appendABookZIPLE(UInt16(20), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(checksum, to: &archive)
+        appendABookZIPLE(size, to: &archive)
+        appendABookZIPLE(size, to: &archive)
+        appendABookZIPLE(UInt16(nameBytes.count), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        archive.append(nameBytes)
+        archive.append(payload)
+
+        appendABookZIPLE(UInt32(0x02014b50), to: &directory)
+        appendABookZIPLE(UInt16(20), to: &directory)
+        appendABookZIPLE(UInt16(20), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(checksum, to: &directory)
+        appendABookZIPLE(size, to: &directory)
+        appendABookZIPLE(size, to: &directory)
+        appendABookZIPLE(UInt16(nameBytes.count), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt32(0), to: &directory)
+        appendABookZIPLE(localOffset, to: &directory)
+        directory.append(nameBytes)
+    }
+    guard archive.count + directory.count + 22 <= 180 * 1024 * 1024,
+          files.count <= Int(UInt16.max) else {
+        throw NSError(domain: "ABookArchive", code: 5, userInfo: [NSLocalizedDescriptionKey: "The backup exceeds A book's 180 MB limit."])
+    }
+    let centralOffset = UInt32(archive.count)
+    let centralSize = UInt32(directory.count)
+    archive.append(directory)
+    appendABookZIPLE(UInt32(0x06054b50), to: &archive)
+    appendABookZIPLE(UInt16(0), to: &archive)
+    appendABookZIPLE(UInt16(0), to: &archive)
+    appendABookZIPLE(UInt16(files.count), to: &archive)
+    appendABookZIPLE(UInt16(files.count), to: &archive)
+    appendABookZIPLE(centralSize, to: &archive)
+    appendABookZIPLE(centralOffset, to: &archive)
+    appendABookZIPLE(UInt16(0), to: &archive)
+    return archive
+}
+
+private func readABookStoredZIP(_ archive: Data) throws -> [String: Data] {
+    guard archive.count >= 22, archive.count <= 180 * 1024 * 1024 else {
+        throw NSError(domain: "ABookArchive", code: 6, userInfo: [NSLocalizedDescriptionKey: "Choose a valid A book backup smaller than 180 MB."])
+    }
+    let lowerBound = max(0, archive.count - 65_557)
+    var endOffset: Int?
+    for offset in stride(from: archive.count - 22, through: lowerBound, by: -1) {
+        if try readABookZIPLE(UInt32.self, from: archive, at: offset) == 0x06054b50 {
+            endOffset = offset
+            break
+        }
+    }
+    guard let end = endOffset else {
+        throw NSError(domain: "ABookArchive", code: 7, userInfo: [NSLocalizedDescriptionKey: "The backup ZIP directory is missing or damaged."])
+    }
+    let entries = Int(try readABookZIPLE(UInt16.self, from: archive, at: end + 10))
+    let directorySize = Int(try readABookZIPLE(UInt32.self, from: archive, at: end + 12))
+    let directoryOffset = Int(try readABookZIPLE(UInt32.self, from: archive, at: end + 16))
+    guard entries <= 10_001, directoryOffset >= 0, directorySize >= 0,
+          directoryOffset + directorySize <= end else {
+        throw NSError(domain: "ABookArchive", code: 8, userInfo: [NSLocalizedDescriptionKey: "The backup ZIP directory is invalid or too large."])
+    }
+    var result: [String: Data] = [:]
+    var cursor = directoryOffset
+    var total = 0
+    for _ in 0..<entries {
+        guard try readABookZIPLE(UInt32.self, from: archive, at: cursor) == 0x02014b50 else {
+            throw NSError(domain: "ABookArchive", code: 9, userInfo: [NSLocalizedDescriptionKey: "The backup ZIP directory is damaged."])
+        }
+        let flags = try readABookZIPLE(UInt16.self, from: archive, at: cursor + 8)
+        let method = try readABookZIPLE(UInt16.self, from: archive, at: cursor + 10)
+        let checksum = try readABookZIPLE(UInt32.self, from: archive, at: cursor + 16)
+        let compressed = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 20))
+        let uncompressed = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 24))
+        let nameLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: cursor + 28))
+        let extraLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: cursor + 30))
+        let commentLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: cursor + 32))
+        let localOffset = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 42))
+        let nameStart = cursor + 46
+        let next = nameStart + nameLength + extraLength + commentLength
+        guard (flags & 0x0009) == 0, method == 0, compressed == uncompressed,
+              uncompressed <= 100 * 1024 * 1024, next <= archive.count else {
+            throw NSError(domain: "ABookArchive", code: 10, userInfo: [NSLocalizedDescriptionKey: "Encrypted, compressed or oversized backup entries are not supported by this native importer."])
+        }
+        guard let name = String(data: archive.subdata(in: nameStart..<(nameStart + nameLength)), encoding: .utf8),
+              !name.isEmpty, !name.hasPrefix("/"), !name.contains("\\"),
+              !name.split(separator: "/", omittingEmptySubsequences: false).contains(".."),
+              result[name] == nil else {
+            throw NSError(domain: "ABookArchive", code: 11, userInfo: [NSLocalizedDescriptionKey: "The backup contains an unsafe or duplicate file path."])
+        }
+        guard try readABookZIPLE(UInt32.self, from: archive, at: localOffset) == 0x04034b50 else {
+            throw NSError(domain: "ABookArchive", code: 12, userInfo: [NSLocalizedDescriptionKey: "A backup file entry is damaged."])
+        }
+        let localNameLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: localOffset + 26))
+        let localExtraLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: localOffset + 28))
+        let payloadStart = localOffset + 30 + localNameLength + localExtraLength
+        guard payloadStart >= 0, payloadStart + uncompressed <= directoryOffset else {
+            throw NSError(domain: "ABookArchive", code: 13, userInfo: [NSLocalizedDescriptionKey: "A backup file entry has an invalid size."])
+        }
+        let payload = archive.subdata(in: payloadStart..<(payloadStart + uncompressed))
+        guard aBookCRC32(payload) == checksum else {
+            throw NSError(domain: "ABookArchive", code: 14, userInfo: [NSLocalizedDescriptionKey: "A backup file failed its integrity check."])
+        }
+        total += uncompressed
+        guard total <= 150 * 1024 * 1024 else {
+            throw NSError(domain: "ABookArchive", code: 15, userInfo: [NSLocalizedDescriptionKey: "The backup expands beyond A book's 150 MB safety limit."])
+        }
+        result[name] = payload
+        cursor = next
+    }
+    guard cursor == directoryOffset + directorySize, result["manifest.json"] != nil else {
+        throw NSError(domain: "ABookArchive", code: 16, userInfo: [NSLocalizedDescriptionKey: "The backup manifest is missing or the ZIP directory is inconsistent."])
+    }
+    return result
+}
+
+
+private final class ABookLocalStore {
+    static let shared = ABookLocalStore()
+    private let context: NSManagedObjectContext?
+    private let startupError: Error?
+    private let fileManager = FileManager.default
+
+    private init() {
+        do {
+            let model = NSManagedObjectModel()
+            model.entities = [
+                Self.entity("ABookNoteEntity", className: NSStringFromClass(ABookNoteEntity.self), attributes: [
+                    Self.attribute("id", .UUIDAttributeType), Self.attribute("title", .stringAttributeType, defaultValue: ""),
+                    Self.attribute("body", .stringAttributeType, defaultValue: ""), Self.attribute("notebook", .stringAttributeType, defaultValue: "Inbox"),
+                    Self.attribute("tagsData", .binaryDataAttributeType, defaultValue: Data()), Self.attribute("pinned", .booleanAttributeType, defaultValue: false),
+                    Self.attribute("archived", .booleanAttributeType, defaultValue: false), Self.attribute("deletedAt", .dateAttributeType, optional: true),
+                    Self.attribute("createdAt", .dateAttributeType), Self.attribute("updatedAt", .dateAttributeType),
+                    Self.attribute("revision", .integer64AttributeType, defaultValue: 0)
+                ]),
+                Self.entity("ABookRevisionEntity", className: NSStringFromClass(ABookRevisionEntity.self), attributes: [
+                    Self.attribute("id", .UUIDAttributeType), Self.attribute("noteID", .UUIDAttributeType),
+                    Self.attribute("title", .stringAttributeType, defaultValue: ""), Self.attribute("body", .stringAttributeType, defaultValue: ""),
+                    Self.attribute("notebook", .stringAttributeType, defaultValue: "Inbox"), Self.attribute("tagsData", .binaryDataAttributeType, defaultValue: Data()),
+                    Self.attribute("revision", .integer64AttributeType, defaultValue: 0), Self.attribute("createdAt", .dateAttributeType)
+                ]),
+                Self.entity("ABookAttachmentEntity", className: NSStringFromClass(ABookAttachmentEntity.self), attributes: [
+                    Self.attribute("id", .UUIDAttributeType), Self.attribute("noteID", .UUIDAttributeType),
+                    Self.attribute("name", .stringAttributeType, defaultValue: ""), Self.attribute("mime", .stringAttributeType, defaultValue: "application/octet-stream"),
+                    Self.attribute("relativePath", .stringAttributeType, defaultValue: ""), Self.attribute("size", .integer64AttributeType, defaultValue: 0),
+                    Self.attribute("createdAt", .dateAttributeType)
+                ])
+            ]
+            let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+            let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            var directory = root.appendingPathComponent("Abook", isDirectory: true)
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            var backupProtection = URLResourceValues()
+            backupProtection.isExcludedFromBackup = true
+            try directory.setResourceValues(backupProtection)
+            let storeURL = directory.appendingPathComponent("Abook.sqlite")
+            try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL, options: [
+                NSMigratePersistentStoresAutomaticallyOption: true,
+                NSInferMappingModelAutomaticallyOption: true
+            ])
+            let managedContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+            managedContext.persistentStoreCoordinator = coordinator
+            managedContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            managedContext.undoManager = nil
+            self.context = managedContext
+            self.startupError = nil
+        } catch {
+            self.context = nil
+            self.startupError = error
+        }
+    }
+
+    private static func attribute(_ name: String, _ type: NSAttributeType, optional: Bool = false, defaultValue: Any? = nil) -> NSAttributeDescription {
+        let item = NSAttributeDescription()
+        item.name = name
+        item.attributeType = type
+        item.isOptional = optional
+        item.defaultValue = defaultValue
+        return item
+    }
+
+    private static func entity(_ name: String, className: String, attributes: [NSAttributeDescription]) -> NSEntityDescription {
+        let item = NSEntityDescription()
+        item.name = name
+        item.managedObjectClassName = className
+        item.properties = attributes
+        return item
+    }
+
+    private func perform<T>(_ operation: (NSManagedObjectContext) throws -> T) throws -> T {
+        guard let context else { throw startupError ?? NSError(domain: "ABookLocalStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "A book local storage is unavailable."]) }
+        var result: Result<T, Error>!
+        context.performAndWait { result = Result { try operation(context) } }
+        return try result.get()
+    }
+
+    private func encodeTags(_ tags: [String]) -> Data {
+        (try? JSONEncoder().encode(tags)) ?? Data()
+    }
+
+    private func decodeTags(_ data: Data) -> [String] {
+        (try? JSONDecoder().decode([String].self, from: data)) ?? []
+    }
+
+    private func value(_ entity: ABookNoteEntity) -> ABookNativeNote {
+        ABookNativeNote(id: entity.id, title: entity.title, body: entity.body, notebook: entity.notebook,
+                        tags: decodeTags(entity.tagsData), pinned: entity.pinned, archived: entity.archived,
+                        deletedAt: entity.deletedAt, createdAt: entity.createdAt, updatedAt: entity.updatedAt,
+                        revision: Int(entity.revision))
+    }
+
+    func notes(includeArchived: Bool = false, includeDeleted: Bool = false) throws -> [ABookNativeNote] {
+        try perform { context in
+            let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            if includeDeleted && includeArchived { request.predicate = nil }
+            else if includeDeleted { request.predicate = NSPredicate(format: "deletedAt != nil") }
+            else if includeArchived { request.predicate = NSPredicate(format: "deletedAt == nil") }
+            else { request.predicate = NSPredicate(format: "deletedAt == nil AND archived == NO") }
+            request.sortDescriptors = [NSSortDescriptor(key: "pinned", ascending: false), NSSortDescriptor(key: "updatedAt", ascending: false)]
+            return try context.fetch(request).map(value)
+        }
+    }
+
+    func save(_ note: ABookNativeNote) throws -> ABookNativeNote {
+        guard note.title.count <= 10_000, note.body.count <= 5_000_000,
+              note.notebook.count <= 500, note.tags.count <= 50,
+              note.tags.allSatisfy({ $0.count <= 200 }),
+              note.revision >= 0,
+              note.createdAt.timeIntervalSince1970.isFinite,
+              note.updatedAt.timeIntervalSince1970.isFinite,
+              note.deletedAt == nil || note.deletedAt?.timeIntervalSince1970.isFinite == true else {
+            throw NSError(domain: "ABookLocalStore", code: 40, userInfo: [NSLocalizedDescriptionKey: "This note exceeds A book's local storage limits or contains invalid metadata."])
+        }
+        return try perform { context in
+            let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            request.predicate = NSPredicate(format: "id == %@", note.id as CVarArg)
+            let existing = try context.fetch(request).first
+            if existing == nil {
+                let countRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookNoteEntity")
+                let noteCount = try context.count(for: countRequest)
+                guard noteCount < 10_000 else {
+                    throw NSError(domain: "ABookLocalStore", code: 41, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local notes. Export or remove older notes before creating another."])
+                }
+            }
+            let changed = existing.map {
+                $0.title != note.title || $0.body != note.body || $0.notebook != note.notebook || decodeTags($0.tagsData) != note.tags
+            } ?? false
+            if let existing, changed {
+                let allRevisionsRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookRevisionEntity")
+                let allRevisionCount = try context.count(for: allRevisionsRequest)
+                if allRevisionCount >= 100_000 {
+                    let removeCount = allRevisionCount - 100_000 + 1
+                    let oldestRequest = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+                    oldestRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+                    oldestRequest.fetchLimit = removeCount
+                    try context.fetch(oldestRequest).forEach(context.delete)
+                }
+                let revision = ABookRevisionEntity(context: context)
+                revision.id = UUID()
+                revision.noteID = note.id
+                revision.title = existing.title
+                revision.body = existing.body
+                revision.notebook = existing.notebook
+                revision.tagsData = existing.tagsData
+                revision.revision = existing.revision + 1
+                revision.createdAt = Date()
+                let cleanup = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+                cleanup.predicate = NSPredicate(format: "noteID == %@", note.id as CVarArg)
+                cleanup.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+                cleanup.fetchOffset = 40
+                let older = try context.fetch(cleanup)
+                older.forEach(context.delete)
+            }
+            let record = existing ?? ABookNoteEntity(context: context)
+            if existing == nil { record.id = note.id; record.createdAt = note.createdAt }
+            record.title = note.title
+            record.body = note.body
+            record.notebook = note.notebook.isEmpty ? "Inbox" : note.notebook
+            record.tagsData = encodeTags(note.tags)
+            record.pinned = note.pinned
+            record.archived = note.archived
+            record.deletedAt = note.deletedAt
+            record.updatedAt = Date()
+            if existing != nil && changed { record.revision += 1 }
+            try context.save()
+            return value(record)
+        }
+    }
+
+    func restoreTrashedNote(noteID: UUID) throws -> ABookNativeNote {
+        try perform { context in
+            let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            request.predicate = NSPredicate(format: "id == %@ AND deletedAt != nil", noteID as CVarArg)
+            guard let note = try context.fetch(request).first else {
+                throw NSError(domain: "ABookLocalStore", code: 4, userInfo: [NSLocalizedDescriptionKey: "That trashed note is no longer available."])
+            }
+            note.deletedAt = nil
+            note.archived = false
+            note.updatedAt = Date()
+            try context.save()
+            return value(note)
+        }
+    }
+
+    func permanentlyDeleteNote(noteID: UUID) throws {
+        var filesToRemove: [URL] = []
+        try perform { context in
+            let attachmentsRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+            attachmentsRequest.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            let attachments = try context.fetch(attachmentsRequest)
+            let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("Abook", isDirectory: true).standardizedFileURL
+            for attachment in attachments {
+                let fileURL = root.appendingPathComponent(attachment.relativePath).standardizedFileURL
+                if fileURL.path.hasPrefix(root.path + "/") { filesToRemove.append(fileURL) }
+                context.delete(attachment)
+            }
+            let revisionsRequest = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+            revisionsRequest.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            try context.fetch(revisionsRequest).forEach(context.delete)
+            let noteRequest = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            noteRequest.predicate = NSPredicate(format: "id == %@", noteID as CVarArg)
+            try context.fetch(noteRequest).forEach(context.delete)
+            try context.save()
+        }
+        // Physical cleanup follows the durable database commit. A failed save never
+        // leaves a surviving note with attachment rows whose files were already removed.
+        filesToRemove.forEach { try? fileManager.removeItem(at: $0) }
+    }
+
+    func revisions(noteID: UUID) throws -> [ABookNativeRevision] {
+        try perform { context in
+            let request = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+            request.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+            return try context.fetch(request).map { ABookNativeRevision(id: $0.id, noteID: $0.noteID, title: $0.title, body: $0.body, notebook: $0.notebook, tags: decodeTags($0.tagsData), revision: Int($0.revision), createdAt: $0.createdAt) }
+        }
+    }
+
+    func restore(noteID: UUID, revisionID: UUID) throws -> ABookNativeNote {
+        try perform { context in
+            let history = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+            history.predicate = NSPredicate(format: "id == %@ AND noteID == %@", revisionID as CVarArg, noteID as CVarArg)
+            guard let revision = try context.fetch(history).first else { throw NSError(domain: "ABookLocalStore", code: 2, userInfo: [NSLocalizedDescriptionKey: "That revision is no longer available."]) }
+            let query = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
+            query.predicate = NSPredicate(format: "id == %@", noteID as CVarArg)
+            guard let note = try context.fetch(query).first else { throw NSError(domain: "ABookLocalStore", code: 3, userInfo: [NSLocalizedDescriptionKey: "The note no longer exists."]) }
+            let current = ABookRevisionEntity(context: context)
+            current.id = UUID(); current.noteID = noteID; current.title = note.title; current.body = note.body
+            current.notebook = note.notebook; current.tagsData = note.tagsData; current.revision = note.revision + 1; current.createdAt = Date()
+            note.title = revision.title; note.body = revision.body; note.notebook = revision.notebook
+            note.tagsData = revision.tagsData; note.revision += 1; note.updatedAt = Date()
+            try context.save()
+            return value(note)
+        }
+    }
+
+    func attachments(noteID: UUID) throws -> [ABookNativeAttachment] {
+        try perform { context in
+            let request = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+            request.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
+            request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+            return try context.fetch(request).map {
+                ABookNativeAttachment(id: $0.id, noteID: $0.noteID, name: $0.name, mime: $0.mime,
+                                      relativePath: $0.relativePath, size: $0.size, createdAt: $0.createdAt)
+            }
+        }
+    }
+
+    func removeAttachment(id: UUID) throws {
+        var fileToRemove: URL?
+        try perform { context in
+            let request = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+            request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+            guard let attachment = try context.fetch(request).first else {
+                throw NSError(domain: "ABookAttachment", code: 7, userInfo: [NSLocalizedDescriptionKey: "That attachment is no longer available."])
+            }
+            let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("Abook", isDirectory: true).standardizedFileURL
+            let candidate = root.appendingPathComponent(attachment.relativePath).standardizedFileURL
+            if candidate.path.hasPrefix(root.path + "/") { fileToRemove = candidate }
+            context.delete(attachment)
+            try context.save()
+        }
+        if let fileToRemove { try? fileManager.removeItem(at: fileToRemove) }
+    }
+
+    func importFiles(noteID: UUID, urls: [URL]) throws -> [ABookNativeAttachment] {
+        guard urls.count <= 10_000 else {
+            throw NSError(domain: "ABookAttachment", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose up to 10,000 attachments at a time."])
+        }
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let folder = root.appendingPathComponent("Abook/Attachments/" + noteID.uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        var createdFiles: [URL] = []
+        var attachments: [ABookNativeAttachment] = []
+        var totalBytes: Int64 = 0
+        do {
+            for url in urls {
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                if let values = try? url.resourceValues(forKeys: [.fileSizeKey]), let knownSize = values.fileSize {
+                    guard knownSize > 0, knownSize <= 100 * 1024 * 1024 else {
+                        throw NSError(domain: "ABookAttachment", code: 2, userInfo: [NSLocalizedDescriptionKey: "Each attachment must be between 1 byte and 100 MB so it can be included in a local A book backup."])
+                    }
+                }
+                let safeExtension = url.pathExtension.filter { $0.isLetter || $0.isNumber }.prefix(10)
+                let id = UUID()
+                let temporary = folder.appendingPathComponent("." + id.uuidString + ".tmp")
+                let destination = folder.appendingPathComponent(id.uuidString + (safeExtension.isEmpty ? "" : "." + safeExtension))
+                createdFiles.append(temporary)
+                try fileManager.copyItem(at: url, to: temporary)
+                let size = (try fileManager.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+                guard size > 0, size <= 100 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookAttachment", code: 3, userInfo: [NSLocalizedDescriptionKey: "Each attachment must be between 1 byte and 100 MB so it can be included in a local A book backup."])
+                }
+                totalBytes += size
+                guard totalBytes <= 150 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookAttachment", code: 4, userInfo: [NSLocalizedDescriptionKey: "Choose a smaller attachment batch (150 MB maximum per import)."])
+                }
+                try fileManager.moveItem(at: temporary, to: destination)
+                createdFiles.append(destination)
+                let displayName = String(url.lastPathComponent.prefix(500))
+                let mime = String((UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream").prefix(200))
+                attachments.append(ABookNativeAttachment(
+                    id: id, noteID: noteID, name: displayName, mime: mime,
+                    relativePath: "Attachments/" + noteID.uuidString + "/" + destination.lastPathComponent,
+                    size: size, createdAt: Date()
+                ))
+            }
+            try perform { context in
+                let existingRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+                let existing = try context.fetch(existingRequest)
+                let maxLibraryBytes = Int64(150 * 1024 * 1024)
+                let existingBytes = existing.reduce(Int64(0)) { total, item in
+                    if item.size < 0 || total > Int64.max - item.size { return Int64.max }
+                    return total + item.size
+                }
+                let incomingBytes = attachments.reduce(Int64(0)) { $0 + $1.size }
+                guard existing.count + attachments.count <= 10_000 else {
+                    throw NSError(domain: "ABookAttachment", code: 5, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing more."])
+                }
+                guard existingBytes <= maxLibraryBytes,
+                      incomingBytes <= maxLibraryBytes - existingBytes else {
+                    throw NSError(domain: "ABookAttachment", code: 6, userInfo: [NSLocalizedDescriptionKey: "The complete local library attachment limit is 150 MB. Export and remove older files before importing more."])
+                }
+                let inserted = attachments.map { attachment -> ABookAttachmentEntity in
+                    let entity = ABookAttachmentEntity(context: context)
+                    entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
+                    entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
+                    entity.size = attachment.size; entity.createdAt = attachment.createdAt
+                    return entity
+                }
+                do {
+                    try context.save()
+                } catch {
+                    inserted.forEach(context.delete)
+                    throw error
+                }
+            }
+            return attachments
+        } catch {
+            createdFiles.forEach { try? fileManager.removeItem(at: $0) }
+            throw error
+        }
+    }
+
+
+    func exportBackupArchive() throws -> Data {
+        let allNotes = try notes(includeArchived: true, includeDeleted: true)
+        guard allNotes.count <= 10_000 else { throw NSError(domain: "ABookArchive", code: 31, userInfo: [NSLocalizedDescriptionKey: "This library contains more than 10,000 notes and cannot be exported in one backup."]) }
+        var revisionCount = 0
+        var noteJSON: [[String: Any]] = []
+        var revisionJSON: [[String: Any]] = []
+        var attachmentJSON: [[String: Any]] = []
+        var files: [String: Data] = [:]
+        var totalBytes = 0
+        var attachmentIndex = 0
+
+        for note in allNotes {
+            guard note.title.count <= 10_000, note.body.count <= 5_000_000, note.notebook.count <= 500, note.tags.count <= 50, note.tags.allSatisfy({ $0.count <= 200 }) else {
+                throw NSError(domain: "ABookArchive", code: 32, userInfo: [NSLocalizedDescriptionKey: "A note exceeds the supported backup size."])
+            }
+            var item: [String: Any] = [
+                "id": note.id.uuidString, "title": note.title, "body": note.body,
+                "notebook": note.notebook, "tags": note.tags, "pinned": note.pinned,
+                "archived": note.archived, "createdAt": note.createdAt.timeIntervalSince1970 * 1000,
+                "updatedAt": note.updatedAt.timeIntervalSince1970 * 1000, "revision": note.revision
+            ]
+            if let deletedAt = note.deletedAt { item["deletedAt"] = deletedAt.timeIntervalSince1970 * 1000 } else { item["deletedAt"] = NSNull() }
+            noteJSON.append(item)
+
+            for revision in try revisions(noteID: note.id) {
+                revisionCount += 1
+                guard revisionCount <= 100_000, revision.title.count <= 10_000, revision.body.count <= 5_000_000,
+                      revision.notebook.count <= 500, revision.tags.count <= 50, revision.tags.allSatisfy({ $0.count <= 200 }) else {
+                    throw NSError(domain: "ABookArchive", code: 33, userInfo: [NSLocalizedDescriptionKey: "A revision exceeds the supported backup size or revision limit."])
+                }
+                revisionJSON.append([
+                    "id": revision.id.uuidString, "noteId": note.id.uuidString,
+                    "revision": revision.revision, "title": revision.title, "body": revision.body,
+                    "notebook": revision.notebook, "tags": revision.tags,
+                    "createdAt": revision.createdAt.timeIntervalSince1970 * 1000
+                ])
+            }
+            for attachment in try attachments(noteID: note.id) {
+                attachmentIndex += 1
+                guard attachmentIndex <= 10_000, attachment.name.count <= 500, attachment.mime.count <= 200 else {
+                    throw NSError(domain: "ABookArchive", code: 34, userInfo: [NSLocalizedDescriptionKey: "The local library contains too many attachments or invalid attachment metadata."])
+                }
+                let data = try Data(contentsOf: fileURL(for: attachment))
+                guard data.count <= 100 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 20, userInfo: [NSLocalizedDescriptionKey: "An attachment exceeds the 100 MB backup limit."])
+                }
+                totalBytes += data.count
+                guard totalBytes <= 150 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 21, userInfo: [NSLocalizedDescriptionKey: "The local library exceeds the 150 MB backup limit."])
+                }
+                let filePath = "attachments/" + String(attachmentIndex - 1) + ".bin"
+                files[filePath] = data
+                attachmentJSON.append([
+                    "id": attachment.id.uuidString, "noteId": note.id.uuidString,
+                    "name": attachment.name, "type": attachment.mime,
+                    "size": data.count, "createdAt": attachment.createdAt.timeIntervalSince1970 * 1000,
+                    "path": filePath
+                ])
+            }
+        }
+
+        let manifest: [String: Any] = [
+            "format": "env.abook.archive.v1",
+            "createdAt": ISO8601DateFormatter().string(from: Date()),
+            "notes": noteJSON, "revisions": revisionJSON, "attachments": attachmentJSON
+        ]
+        let manifestData = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+        guard manifestData.count + totalBytes <= 150 * 1024 * 1024 else {
+            throw NSError(domain: "ABookArchive", code: 22, userInfo: [NSLocalizedDescriptionKey: "The complete backup exceeds A book's 150 MB safety limit."])
+        }
+        files["manifest.json"] = manifestData
+        return try makeABookStoredZIP(files)
+    }
+
+    func importBackupArchive(_ archive: Data) throws -> Int {
+        let files = try readABookStoredZIP(archive)
+        guard let manifestData = files["manifest.json"],
+              let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any],
+              manifest["format"] as? String == "env.abook.archive.v1",
+              let rawNotes = manifest["notes"] as? [[String: Any]],
+              let rawRevisions = manifest["revisions"] as? [[String: Any]],
+              let rawAttachments = manifest["attachments"] as? [[String: Any]],
+              rawNotes.count <= 10_000, rawRevisions.count <= 100_000, rawAttachments.count <= 10_000 else {
+            throw NSError(domain: "ABookArchive", code: 23, userInfo: [NSLocalizedDescriptionKey: "This is not a supported A book backup or it contains too many records."])
+        }
+
+        func requiredString(_ item: [String: Any], _ key: String) throws -> String {
+            guard let value = item[key] as? String, !value.isEmpty, value.count <= 5_000_000 else {
+                throw NSError(domain: "ABookArchive", code: 24, userInfo: [NSLocalizedDescriptionKey: "The backup contains invalid " + key + " data."])
+            }
+            return value
+        }
+        func timestamp(_ item: [String: Any], _ key: String) throws -> Date {
+            guard let value = item[key] as? NSNumber, value.doubleValue.isFinite,
+                  abs(value.doubleValue) < 100_000_000_000_000 else {
+                throw NSError(domain: "ABookArchive", code: 25, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid date."])
+            }
+            return Date(timeIntervalSince1970: value.doubleValue / 1000)
+        }
+
+        var noteIDs: [String: UUID] = [:]
+        var importedNotes: [ABookNativeNote] = []
+        for item in rawNotes {
+            let oldID = try requiredString(item, "id")
+            guard oldID.count <= 180, noteIDs[oldID] == nil,
+                  let title = item["title"] as? String, title.count <= 10_000,
+                  let body = item["body"] as? String, body.count <= 5_000_000,
+                  let notebook = item["notebook"] as? String, notebook.count <= 500,
+                  let tags = item["tags"] as? [String], tags.count <= 50,
+                  tags.allSatisfy({ $0.count <= 200 }),
+                  let pinned = item["pinned"] as? Bool, let archived = item["archived"] as? Bool,
+                  let revision = item["revision"] as? Int, revision >= 0 else {
+                throw NSError(domain: "ABookArchive", code: 26, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid note."])
+            }
+            let newID = UUID()
+            noteIDs[oldID] = newID
+            let deletedAt = (item["deletedAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) }
+            importedNotes.append(ABookNativeNote(
+                id: newID, title: title, body: body, notebook: notebook, tags: tags,
+                pinned: pinned, archived: archived, deletedAt: deletedAt,
+                createdAt: try timestamp(item, "createdAt"),
+                updatedAt: try timestamp(item, "updatedAt"), revision: revision
+            ))
+        }
+
+        var importedRevisions: [ABookNativeRevision] = []
+        var revisionIDs = Set<String>()
+        for item in rawRevisions {
+            let oldRevisionID = try requiredString(item, "id")
+            guard oldRevisionID.count <= 180, revisionIDs.insert(oldRevisionID).inserted else { throw NSError(domain: "ABookArchive", code: 35, userInfo: [NSLocalizedDescriptionKey: "The backup contains duplicate revision IDs."]) }
+            let oldNoteID = try requiredString(item, "noteId")
+            guard let newNoteID = noteIDs[oldNoteID],
+                  let title = item["title"] as? String, title.count <= 10_000,
+                  let body = item["body"] as? String, body.count <= 5_000_000,
+                  let notebook = item["notebook"] as? String, notebook.count <= 500,
+                  let tags = item["tags"] as? [String], tags.count <= 50, tags.allSatisfy({ $0.count <= 200 }),
+                  let revision = item["revision"] as? Int, revision >= 0 else {
+                throw NSError(domain: "ABookArchive", code: 27, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid revision."])
+            }
+            importedRevisions.append(ABookNativeRevision(
+                id: UUID(), noteID: newNoteID, title: title, body: body,
+                notebook: notebook, tags: tags, revision: revision,
+                createdAt: try timestamp(item, "createdAt")
+            ))
+        }
+
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent("Abook", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        var copiedFiles: [URL] = []
+        var importedAttachments: [ABookNativeAttachment] = []
+        var expectedPaths: Set<String> = ["manifest.json"]
+        var attachmentIDs = Set<String>()
+        var totalBytes = 0
+        do {
+            for item in rawAttachments {
+                let oldNoteID = try requiredString(item, "noteId")
+                guard let newNoteID = noteIDs[oldNoteID],
+                      let originalAttachmentID = item["id"] as? String, !originalAttachmentID.isEmpty, originalAttachmentID.count <= 180, attachmentIDs.insert(originalAttachmentID).inserted,
+                      let filePath = item["path"] as? String,
+                      filePath.range(of: #"^attachments/\d+\.bin$"#, options: .regularExpression) != nil,
+                      !expectedPaths.contains(filePath),
+                      let data = files[filePath],
+                      let name = item["name"] as? String, !name.isEmpty, name.count <= 500,
+                      let mime = item["type"] as? String, mime.count <= 200,
+                      let declaredSize = item["size"] as? Int, declaredSize == data.count,
+                      declaredSize > 0, declaredSize <= 100 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 28, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid or damaged attachment."])
+                }
+                expectedPaths.insert(filePath)
+                totalBytes += data.count
+                guard totalBytes <= 150 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookArchive", code: 29, userInfo: [NSLocalizedDescriptionKey: "The backup attachments exceed 150 MB."])
+                }
+                let attachmentDate = try timestamp(item, "createdAt")
+                let attachmentID = UUID()
+                let ext = String((name as NSString).pathExtension.filter { $0.isLetter || $0.isNumber }.prefix(10))
+                let filename = attachmentID.uuidString + (ext.isEmpty ? "" : "." + ext)
+                let relativePath = "Attachments/" + newNoteID.uuidString + "/" + filename
+                let folder = root.appendingPathComponent("Attachments/" + newNoteID.uuidString, isDirectory: true)
+                try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+                let destination = folder.appendingPathComponent(filename)
+                try data.write(to: destination, options: .atomic)
+                copiedFiles.append(destination)
+                importedAttachments.append(ABookNativeAttachment(
+                    id: attachmentID, noteID: newNoteID, name: name, mime: mime,
+                    relativePath: relativePath, size: Int64(data.count), createdAt: attachmentDate
+                ))
+            }
+            guard Set(files.keys) == expectedPaths else {
+                throw NSError(domain: "ABookArchive", code: 30, userInfo: [NSLocalizedDescriptionKey: "The backup contains unexpected files."])
+            }
+            try perform { context in
+                do {
+                    let noteCountRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookNoteEntity")
+                    let revisionCountRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookRevisionEntity")
+                    let attachmentCountRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookAttachmentEntity")
+                    let existingNoteCount = try context.count(for: noteCountRequest)
+                    let existingRevisionCount = try context.count(for: revisionCountRequest)
+                    let existingAttachmentCount = try context.count(for: attachmentCountRequest)
+                    let attachmentRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+                    let existingAttachments = try context.fetch(attachmentRequest)
+                    let maxLibraryAttachmentBytes = Int64(150 * 1024 * 1024)
+                    let existingAttachmentBytes = existingAttachments.reduce(Int64(0)) { total, item in
+                        if item.size < 0 || total > Int64.max - item.size { return Int64.max }
+                        return total + item.size
+                    }
+                    guard existingNoteCount + importedNotes.count <= 10_000 else {
+                        throw NSError(domain: "ABookArchive", code: 36, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local notes. Export or remove older notes before importing this backup."])
+                    }
+                    guard existingRevisionCount + importedRevisions.count <= 100_000 else {
+                        throw NSError(domain: "ABookArchive", code: 37, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 100,000 local revisions. Export or remove older notes before importing this backup."])
+                    }
+                    guard existingAttachmentCount + importedAttachments.count <= 10_000 else {
+                        throw NSError(domain: "ABookArchive", code: 38, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing this backup."])
+                    }
+                    guard existingAttachmentBytes >= 0,
+                          existingAttachmentBytes <= maxLibraryAttachmentBytes,
+                          Int64(totalBytes) <= maxLibraryAttachmentBytes - existingAttachmentBytes else {
+                        throw NSError(domain: "ABookArchive", code: 39, userInfo: [NSLocalizedDescriptionKey: "The complete local library attachment limit is 150 MB. Export and remove older files before importing this backup."])
+                    }
+                    for note in importedNotes {
+                        let entity = ABookNoteEntity(context: context)
+                        entity.id = note.id; entity.title = note.title; entity.body = note.body
+                        entity.notebook = note.notebook; entity.tagsData = encodeTags(note.tags)
+                        entity.pinned = note.pinned; entity.archived = note.archived; entity.deletedAt = note.deletedAt
+                        entity.createdAt = note.createdAt; entity.updatedAt = note.updatedAt; entity.revision = Int64(note.revision)
+                    }
+                    for revision in importedRevisions {
+                        let entity = ABookRevisionEntity(context: context)
+                        entity.id = revision.id; entity.noteID = revision.noteID; entity.title = revision.title
+                        entity.body = revision.body; entity.notebook = revision.notebook
+                        entity.tagsData = encodeTags(revision.tags); entity.revision = Int64(revision.revision)
+                        entity.createdAt = revision.createdAt
+                    }
+                    for attachment in importedAttachments {
+                        let entity = ABookAttachmentEntity(context: context)
+                        entity.id = attachment.id; entity.noteID = attachment.noteID; entity.name = attachment.name
+                        entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
+                        entity.size = attachment.size; entity.createdAt = attachment.createdAt
+                    }
+                    try context.save()
+                } catch {
+                    context.rollback()
+                    throw error
+                }
+            }
+            return importedNotes.count
+        } catch {
+            copiedFiles.forEach { try? fileManager.removeItem(at: $0) }
+            throw error
+        }
+    }
+
+
+    func fileURL(for attachment: ABookNativeAttachment) throws -> URL {
+        let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        return root.appendingPathComponent("Abook/" + attachment.relativePath)
+    }
+}
+
+private struct ABookTextDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    var text: String
+    init(text: String) { self.text = text }
+    init(configuration: ReadConfiguration) throws {
+        text = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
+
+private struct ABookPDFDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.pdf] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
+private struct ABookArchiveDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.zip] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+private struct NativeABookView: View {
+    private let store = ABookLocalStore.shared
+    @State private var notes: [ABookNativeNote] = []
+    @State private var selectedID: UUID?
+    @State private var title = ""
+    @State private var bodyText = ""
+    @State private var notebook = "Inbox"
+    @State private var tags = ""
+    @State private var query = ""
+    @State private var showArchived = false
+    @State private var showTrash = false
+    @State private var confirmPermanentDelete = false
+    @State private var attachments: [ABookNativeAttachment] = []
+    @State private var revisions: [ABookNativeRevision] = []
+    @State private var status = "Saved on this device"
+    @State private var errorText = ""
+    @State private var pdfText = ""
+    @State private var pdfData = Data()
+    @State private var pdfName = "a-book-edited.pdf"
+    @State private var exportingPDF = false
+    @State private var exportingNote = false
+    @State private var importingFiles = false
+    @State private var importingArchive = false
+    @State private var exportingArchive = false
+    @State private var archiveData = Data()
+    @State private var archiveFilename = "a-book-backup.zip"
+    @State private var selectedPDFIDs: Set<UUID> = []
+    @State private var splitPageGroups = "1-3;4-6"
+    @State private var extractPageRange = "1-3"
+    @State private var commentText = ""
+    @State private var activePDFSelection: UUID?
+    @State private var pdfProcessingTask: Task<Void, Never>?
+    @State private var pdfProcessingID: UUID?
+
+    private var saveKey: String {
+        (selectedID?.uuidString ?? "") + "|" + title + "|" + notebook + "|" + tags + "|" + bodyText + "|" + String(showArchived) + "|" + String(showTrash)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("A book").font(.title2.weight(.semibold))
+                    Text("Private notes and documents on this device").font(.caption).foregroundStyle(Color.envMuted)
+                }
+                Spacer()
+                Text(status).font(.caption2).foregroundStyle(Color.envMuted).multilineTextAlignment(.trailing)
+            }
+            if !errorText.isEmpty {
+                Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
+                Button {
+                    showTrash = false
+                    showArchived = false
+                    selectedPDFIDs = []
+                    let now = Date()
+                    let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
+                                               pinned: false, archived: false, deletedAt: nil, createdAt: now, updatedAt: now, revision: 0)
+                    do { let saved = try store.save(note); reload(preferred: saved.id, includeDeleted: false, includeArchived: false) } catch { showError(error) }
+                } label: { Label("New note", systemImage: "plus") }
+                .buttonStyle(.borderedProminent)
+                Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
+                Button("Export backup") {
+                    do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
+                    catch { showError(error) }
+                }.buttonStyle(.bordered)
+                Button("Import backup") { importingArchive = true }.buttonStyle(.bordered)
+                Button(showArchived ? "Active notes" : "Archive") {
+                    showArchived.toggle()
+                    showTrash = false
+                    reload(includeDeleted: false, includeArchived: showArchived)
+                }.buttonStyle(.bordered)
+                Button(showTrash ? "All notes" : "Trash") {
+                    showTrash.toggle()
+                    if showTrash { showArchived = false }
+                    reload(includeDeleted: showTrash, includeArchived: false)
+                }.buttonStyle(.bordered)
+            }
+            TextField("Search notes", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Search local notes")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !filteredNotes.isEmpty {
+                        ForEach(filteredNotes) { note in
+                            Button { select(note) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text((note.pinned ? "★ " : "") + (note.title.isEmpty ? "Untitled note" : note.title))
+                                        .font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                                    Text(note.body.isEmpty ? "No content yet" : String(note.body.prefix(120)))
+                                        .font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(selectedID == note.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("No notes yet. Create your first note.").font(.footnote).foregroundStyle(Color.envMuted)
+                    }
+                    if selectedID != nil {
+                        Divider().padding(.vertical, 4)
+                        TextField("Note title", text: $title).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).font(.title3.weight(.semibold))
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Notebook", text: $notebook).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
+                        TextField("Tags, separated by commas", text: $tags).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
+                        TextEditor(text: $bodyText)
+                            .frame(minHeight: 220)
+                            .padding(6)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                            .accessibilityLabel("Note content")
+                            .disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 8) {
+                            if let selected = notes.first(where: { $0.id == selectedID }), selected.deletedAt != nil {
+                                Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
+                                Button("Delete permanently") { confirmPermanentDelete = true }.buttonStyle(.bordered)
+                            } else {
+                                Button((notes.first(where: { $0.id == selectedID })?.pinned ?? false) ? "Unpin" : "Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
+                                Button((notes.first(where: { $0.id == selectedID })?.archived ?? false) ? "Unarchive" : "Archive") { updateSelected(archived: !(notes.first(where: { $0.id == selectedID })?.archived ?? false)) }.buttonStyle(.bordered)
+                                Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
+                                Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
+                            }
+                        }
+                        Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                        let pdfAttachments = attachments.filter { $0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf") }
+                        if !pdfAttachments.isEmpty {
+                            TextField("Extract pages · 1-3,5", text: $extractPageRange).textFieldStyle(.roundedBorder)
+                            TextField("Split parts · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
+                                Button("Merge PDFs") { mergeSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.count < 2)
+                                Button("Rotate batch") { rotateSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                                Button("Extract pages") { extractSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                                Button("Split selected PDFs") { splitSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                            }
+                            Text("All selected PDF operations stay on this device").font(.caption2).foregroundStyle(Color.envMuted)
+                        }
+                        ForEach(attachments) { attachment in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(attachment.name).font(.caption.weight(.medium)).lineLimit(1)
+                                    Text(String(format: "%.0f KB", Double(attachment.size) / 1024)).font(.caption2).foregroundStyle(Color.envMuted)
+                                }
+                                Spacer()
+                                if attachment.mime == "application/pdf" || attachment.name.lowercased().hasSuffix(".pdf") {
+                                    Button {
+                                        if selectedPDFIDs.contains(attachment.id) { selectedPDFIDs.remove(attachment.id) }
+                                        else { selectedPDFIDs.insert(attachment.id) }
+                                    } label: {
+                                        Image(systemName: selectedPDFIDs.contains(attachment.id) ? "checkmark.circle.fill" : "circle")
+                                    }.buttonStyle(.plain).accessibilityLabel(selectedPDFIDs.contains(attachment.id) ? "Deselect PDF" : "Select PDF")
+                                    Button("PDF tools") { selectedPDFIDs.insert(attachment.id); activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                                }
+                                Button("Remove", role: .destructive) { removeAttachment(attachment) }.buttonStyle(.bordered)
+                            }
+                        }
+                        if let active = attachments.first(where: { $0.id == activePDFID }) {
+                            pdfTools(for: active)
+                        }
+                        if !revisions.isEmpty {
+                            Text("REVISION HISTORY").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                            ForEach(revisions) { revision in
+                                HStack {
+                                    Text("Revision " + String(revision.revision) + " · " + revision.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+                                    Spacer()
+                                    Button("Restore") { restore(revision) }.buttonStyle(.bordered)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .onAppear { reload() }
+        .task(id: saveKey) { await autosave() }
+        .fileImporter(isPresented: $importingArchive, allowedContentTypes: [.item]) { result in
+            switch result {
+            case .success(let url):
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let count = try store.importBackupArchive(Data(contentsOf: url))
+                    showTrash = false
+                    showArchived = false
+                    reload()
+                    status = "Imported " + String(count) + " notes and attachments on this device"
+                    errorText = ""
+                } catch { showError(error) }
+            case .failure(let error): showError(error)
+            }
+        }
+        .fileImporter(isPresented: $importingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                guard let selectedID else { return }
+                do {
+                    let imported = try store.importFiles(noteID: selectedID, urls: urls)
+                    attachments = try store.attachments(noteID: selectedID)
+                    status = "Saved " + String(imported.count) + " files on this device"
+                    errorText = ""
+                } catch { showError(error) }
+            case .failure(let error): showError(error)
+            }
+        }
+        .fileExporter(isPresented: $exportingNote, document: ABookTextDocument(text: markdownText),
+                      contentType: .plainText, defaultFilename: safeFilename(title) + ".md") { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+        .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
+                      contentType: .pdf, defaultFilename: pdfName) { result in
+            if case .failure(let error) = result { showError(error) }
+        }        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
+                      contentType: .zip, defaultFilename: archiveFilename) { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+        .onDisappear {
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
+        }
+        .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
+            Button("Delete permanently", role: .destructive) { permanentlyDeleteSelectedNote() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the note, its revision history and its attached files from this device. This cannot be undone.")
+        }
+    }
+
+    private var activePDFID: UUID? { activePDFSelection }
+    private var filteredNotes: [ABookNativeNote] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !term.isEmpty else { return notes }
+        return notes.filter { ($0.title + " " + $0.body + " " + $0.notebook + " " + $0.tags.joined(separator: " ")).lowercased().contains(term) }
+    }
+    private var markdownText: String {
+        "# " + (title.isEmpty ? "Untitled note" : title) + "\n\n" + bodyText + "\n\nNotebook: " + notebook + "\nTags: " + tags + "\n"
+    }
+
+    private func safeFilename(_ value: String) -> String {
+        let output = value.replacingOccurrences(of: "[^a-zA-Z0-9._-]+", with: "-", options: .regularExpression)
+        return output.isEmpty ? "a-book-note" : output
+    }
+
+    private func showError(_ error: Error) {
+        errorText = error.localizedDescription
+        status = "Not saved"
+    }
+
+    private func reload(preferred: UUID? = nil, includeDeleted: Bool? = nil, includeArchived: Bool? = nil) {
+        do {
+            notes = try store.notes(includeArchived: includeArchived ?? showArchived, includeDeleted: includeDeleted ?? showTrash)
+            let note = notes.first(where: { $0.id == (preferred ?? selectedID) }) ?? notes.first
+            select(note)
+            status = "Saved on this device"
+            errorText = ""
+        } catch { showError(error) }
+    }
+
+    private func select(_ note: ABookNativeNote?) {
+        let nextID = note?.id
+        if selectedID != nextID {
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
+            pdfText = ""
+            activePDFSelection = nil
+        }
+        selectedPDFIDs = []
+        selectedID = nextID
+        title = note?.title ?? ""
+        bodyText = note?.body ?? ""
+        notebook = note?.notebook ?? "Inbox"
+        tags = note?.tags.joined(separator: ", ") ?? ""
+        do {
+            if let id = note?.id {
+                attachments = try store.attachments(noteID: id)
+                revisions = try store.revisions(noteID: id)
+            } else { attachments = []; revisions = [] }
+        } catch { showError(error) }
+    }
+
+    private func autosave() async {
+        guard let id = selectedID else { return }
+        status = "Saving on this device…"
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard !Task.isCancelled else { return }
+        let current = ABookNativeNote(id: id, title: title, body: bodyText, notebook: notebook,
+                                      tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map { String($0) },
+                                      pinned: notes.first(where: { $0.id == id })?.pinned ?? false,
+                                      archived: notes.first(where: { $0.id == id })?.archived ?? false,
+                                      deletedAt: notes.first(where: { $0.id == id })?.deletedAt,
+                                      createdAt: notes.first(where: { $0.id == id })?.createdAt ?? Date(),
+                                      updatedAt: Date(), revision: notes.first(where: { $0.id == id })?.revision ?? 0)
+        do {
+            let saved = try store.save(current)
+            notes = try store.notes(includeArchived: showArchived, includeDeleted: showTrash)
+            if let index = notes.firstIndex(where: { $0.id == id }) { notes[index] = saved }
+            revisions = try store.revisions(noteID: id)
+            status = "Saved on this device"
+            errorText = ""
+        } catch { showError(error) }
+    }
+
+    private func restoreTrashedNote() {
+        guard let id = selectedID else { return }
+        do {
+            let restored = try store.restoreTrashedNote(noteID: id)
+            showTrash = false
+            reload(preferred: restored.id, includeDeleted: false)
+        } catch { showError(error) }
+    }
+
+    private func permanentlyDeleteSelectedNote() {
+        guard let id = selectedID else { return }
+        do {
+            try store.permanentlyDeleteNote(noteID: id)
+            selectedID = nil
+            title = ""; bodyText = ""; notebook = "Inbox"; tags = ""
+            showTrash = true
+            reload(includeDeleted: true)
+            status = "Permanently deleted from this device"
+        } catch { showError(error) }
+    }
+
+    private func updateSelected(pinned: Bool? = nil, archived: Bool? = nil, deleted: Bool = false) {
+        guard let id = selectedID, let original = notes.first(where: { $0.id == id }) else { return }
+        let note = ABookNativeNote(id: id, title: title, body: bodyText, notebook: notebook,
+                                   tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map { String($0) },
+                                   pinned: pinned ?? original.pinned, archived: archived ?? original.archived,
+                                   deletedAt: deleted ? Date() : original.deletedAt, createdAt: original.createdAt,
+                                   updatedAt: Date(), revision: original.revision)
+        do { _ = try store.save(note); reload() } catch { showError(error) }
+    }
+
+    private func restore(_ revision: ABookNativeRevision) {
+        guard let id = selectedID else { return }
+        do {
+            let restored = try store.restore(noteID: id, revisionID: revision.id)
+            reload(preferred: restored.id)
+        } catch { showError(error) }
+    }
+
+    private func removeAttachment(_ attachment: ABookNativeAttachment) {
+        do {
+            try store.removeAttachment(id: attachment.id)
+            attachments = try store.attachments(noteID: attachment.noteID)
+            selectedPDFIDs.remove(attachment.id)
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
+            if activePDFSelection == attachment.id {
+                activePDFSelection = nil
+                pdfText = ""
+            }
+            status = "Attachment removed from this device"
+            errorText = ""
+        } catch { showError(error) }
+    }
+
+    private func pdfTools(for attachment: ABookNativeAttachment) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("PDF processing runs on this device").font(.caption.weight(.semibold))
+            Text(attachment.name).font(.caption).foregroundStyle(Color.envMuted)
+            HStack(spacing: 8) {
+                Button("Extract text") { processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                Button("OCR scanned pages") { processPDF(attachment, operation: "ocr") }.buttonStyle(.bordered)
+                Button("Rotate 90°") { processPDF(attachment, operation: "rotate") }.buttonStyle(.bordered)
+            }
+            if !pdfText.isEmpty {
+                Text(pdfText).font(.caption).textSelection(.enabled).lineLimit(12)
+                Button("Insert extracted text into note") { bodyText += "\n\n" + pdfText }.buttonStyle(.bordered)
+            }
+        }
+        .padding(10)
+        .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func selectedPDFs() -> [ABookNativeAttachment] {
+        attachments.filter { selectedPDFIDs.contains($0.id) && ($0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf")) }
+    }
+
+    private func mergeSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard selected.count >= 2 else {
+            showError(NSError(domain: "ABookPDF", code: 40, userInfo: [NSLocalizedDescriptionKey: "Select at least two PDFs to merge."]))
+            return
+        }
+        guard let noteID = selectedID else { return }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 41, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        let workItems: [(url: URL, name: String, size: Int64)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
+        } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        status = "Merging PDFs locally…"
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
+            do {
+                var pageCount = 0
+                let merged = PDFDocument()
+                for item in workItems {
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 42, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
+                    }
+                    pageCount += source.pageCount
+                    guard pageCount <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 43, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be merged at once."])
+                    }
+                    for index in 0..<source.pageCount {
+                        try Task.checkCancellation()
+                        guard let page = source.page(at: index), let copiedPage = page.copy() as? PDFPage else { continue }
+                        merged.insert(copiedPage, at: merged.pageCount)
+                    }
+                }
+                try Task.checkCancellation()
+                guard let data = merged.dataRepresentation(), !data.isEmpty else {
+                    throw NSError(domain: "ABookPDF", code: 44, userInfo: [NSLocalizedDescriptionKey: "The merged PDF could not be created."])
+                }
+                await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    pdfData = data
+                    pdfName = "a-book-merged.pdf"
+                    exportingPDF = true
+                    status = "Merged " + String(workItems.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
+        }
+    }
+
+    private func rotateSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard !selected.isEmpty else { return }
+        guard let noteID = selectedID else { return }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 45, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        let workItems: [(url: URL, name: String, size: Int64)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
+        } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        status = "Rotating PDFs locally…"
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
+            do {
+                var files: [String: Data] = [:]
+                var names = Set<String>()
+                var pageCount = 0
+                for item in workItems {
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let document = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 46, userInfo: [NSLocalizedDescriptionKey: "Could not open " + item.name + "."])
+                    }
+                    pageCount += document.pageCount
+                    guard pageCount <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 47, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be processed in one batch."])
+                    }
+                    for index in 0..<document.pageCount {
+                        try Task.checkCancellation()
+                        guard let page = document.page(at: index) else { continue }
+                        page.rotation = (page.rotation + 90) % 360
+                    }
+                    guard let data = document.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 48, userInfo: [NSLocalizedDescriptionKey: "A rotated PDF could not be exported."])
+                    }
+                    let base = safeABookPDFName(item.name)
+                    var filename = base + "-rotated.pdf"
+                    var suffix = 2
+                    while !names.insert(filename.lowercased()).inserted {
+                        filename = base + "-rotated-" + String(suffix) + ".pdf"
+                        suffix += 1
+                    }
+                    files[filename] = data
+                }
+                try Task.checkCancellation()
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    archiveData = archive
+                    archiveFilename = "a-book-rotated-pdfs.zip"
+                    exportingArchive = true
+                    status = "Rotated " + String(workItems.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
+        }
+    }
+
+    private func splitPDF(_ attachment: ABookNativeAttachment) {
+        guard let noteID = selectedID, noteID == attachment.noteID,
+              attachments.contains(where: { $0.id == attachment.id }) else { return }
+        guard attachment.size > 0, attachment.size <= 200 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 49, userInfo: [NSLocalizedDescriptionKey: "This PDF exceeds the 200 MB local processing limit."]))
+            return
+        }
+        let pageGroups = splitPageGroups
+        let sourceURL: URL
+        do { sourceURL = try store.fileURL(for: attachment) }
+        catch { showError(error); return }
+        let outputBase = safeABookPDFName(attachment.name)
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        status = "Splitting PDF locally…"
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
+            do {
+                try Task.checkCancellation()
+                guard let source = PDFDocument(url: sourceURL), source.pageCount > 0 else {
+                    throw NSError(domain: "ABookPDF", code: 50, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."])
+                }
+                guard source.pageCount <= 5_000 else {
+                    throw NSError(domain: "ABookPDF", code: 51, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be split in one operation."])
+                }
+                let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
+                let totalPages = groups.reduce(0) { $0 + $1.count }
+                guard totalPages <= 5_000 else {
+                    throw NSError(domain: "ABookPDF", code: 52, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 split pages can be processed in one operation."])
+                }
+                var files: [String: Data] = [:]
+                let base = outputBase
+                for (index, pages) in groups.enumerated() {
+                    try Task.checkCancellation()
+                    let part = PDFDocument()
+                    for number in pages {
+                        try Task.checkCancellation()
+                        guard let page = source.page(at: number - 1), let copiedPage = page.copy() as? PDFPage else {
+                            throw NSError(domain: "ABookPDF", code: 53, userInfo: [NSLocalizedDescriptionKey: "A selected PDF page could not be copied."])
+                        }
+                        part.insert(copiedPage, at: part.pageCount)
+                    }
+                    guard let data = part.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 54, userInfo: [NSLocalizedDescriptionKey: "A PDF part could not be created."])
+                    }
+                    let partNumber = String(format: "%02d", index + 1)
+                    files[base + "-part-" + partNumber + ".pdf"] = data
+                }
+                try Task.checkCancellation()
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID,
+                          attachments.contains(where: { $0.id == attachment.id }) else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    archiveData = archive
+                    archiveFilename = base + "-parts.zip"
+                    exportingArchive = true
+                    status = "Created " + String(groups.count) + " PDF parts locally"
+                    errorText = ""
+                }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
+        }
+    }
+
+    private func extractSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard !selected.isEmpty else {
+            showError(NSError(domain: "ABookPDF", code: 55, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to extract pages."]))
+            return
+        }
+        guard let noteID = selectedID else { return }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 56, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        let pageRange = extractPageRange
+        let workItems: [(url: URL, name: String, size: Int64)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
+        } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        status = "Checking selected PDFs locally…"
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
+            do {
+                var prepared: [(url: URL, name: String, pages: [Int])] = []
+                var totalPages = 0
+                for item in workItems {
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 57, userInfo: [NSLocalizedDescriptionKey: item.name + " could not be opened or exceeds 200 MB."])
+                    }
+                    let pages = try parseABookPageSelection(pageRange, pageCount: source.pageCount)
+                    totalPages += pages.count
+                    guard totalPages <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 58, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 extracted pages can be processed in one batch."])
+                    }
+                    prepared.append((url: item.url, name: item.name, pages: pages))
+                }
+
+                if prepared.count == 1, let item = prepared.first {
+                    try Task.checkCancellation()
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 59, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
+                    }
+                    let output = PDFDocument()
+                    for number in item.pages {
+                        try Task.checkCancellation()
+                        guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
+                            throw NSError(domain: "ABookPDF", code: 60, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                        }
+                        output.insert(copied, at: output.pageCount)
+                    }
+                    guard let data = output.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 61, userInfo: [NSLocalizedDescriptionKey: "The extracted PDF could not be created."])
+                    }
+                    try Task.checkCancellation()
+                    await MainActor.run {
+                        guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                        pdfProcessingTask = nil
+                        pdfProcessingID = nil
+                        pdfData = data
+                        pdfName = safeABookPDFName(item.name) + "-extracted.pdf"
+                        exportingPDF = true
+                        status = "Extracted " + String(item.pages.count) + " pages locally"
+                        errorText = ""
+                    }
+                    return
+                }
+
+                var files: [String: Data] = [:]
+                var usedNames = Set<String>()
+                for item in prepared {
+                    try Task.checkCancellation()
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 62, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for extraction."])
+                    }
+                    let output = PDFDocument()
+                    for number in item.pages {
+                        try Task.checkCancellation()
+                        guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
+                            throw NSError(domain: "ABookPDF", code: 63, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                        }
+                        output.insert(copied, at: output.pageCount)
+                    }
+                    guard let data = output.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 64, userInfo: [NSLocalizedDescriptionKey: "An extracted PDF could not be created for " + item.name + "."])
+                    }
+                    let base = safeABookPDFName(item.name)
+                    var filename = base + "-extracted.pdf"
+                    var suffix = 2
+                    while !usedNames.insert(filename.lowercased()).inserted {
+                        filename = base + "-extracted-" + String(suffix) + ".pdf"
+                        suffix += 1
+                    }
+                    files[filename] = data
+                }
+                try Task.checkCancellation()
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    archiveData = archive
+                    archiveFilename = "a-book-extracted-pdfs.zip"
+                    exportingArchive = true
+                    status = "Extracted pages from " + String(prepared.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
+        }
+    }
+
+    private func splitSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard !selected.isEmpty else {
+            showError(NSError(domain: "ABookPDF", code: 65, userInfo: [NSLocalizedDescriptionKey: "Select at least one PDF to split."]))
+            return
+        }
+        guard let noteID = selectedID else { return }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 66, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        let pageGroups = splitPageGroups
+        let workItems: [(url: URL, name: String, size: Int64)]
+        do {
+            workItems = try selected.map { (url: try store.fileURL(for: $0), name: $0.name, size: $0.size) }
+        } catch { showError(error); return }
+
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        status = "Checking selected PDFs locally…"
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
+            do {
+                var prepared: [(url: URL, name: String, groups: [[Int]])] = []
+                var totalPages = 0
+                for item in workItems {
+                    try Task.checkCancellation()
+                    guard item.size > 0, item.size <= 200 * 1024 * 1024,
+                          let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 67, userInfo: [NSLocalizedDescriptionKey: item.name + " could not be opened or exceeds 200 MB."])
+                    }
+                    let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
+                    totalPages += groups.reduce(0) { $0 + $1.count }
+                    guard totalPages <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 68, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 split pages can be processed in one batch."])
+                    }
+                    prepared.append((url: item.url, name: item.name, groups: groups))
+                }
+
+                var files: [String: Data] = [:]
+                var usedNames = Set<String>()
+                for item in prepared {
+                    try Task.checkCancellation()
+                    guard let source = PDFDocument(url: item.url) else {
+                        throw NSError(domain: "ABookPDF", code: 69, userInfo: [NSLocalizedDescriptionKey: "Could not reopen " + item.name + " for splitting."])
+                    }
+                    let base = safeABookPDFName(item.name)
+                    for (index, pages) in item.groups.enumerated() {
+                        try Task.checkCancellation()
+                        let part = PDFDocument()
+                        for number in pages {
+                            try Task.checkCancellation()
+                            guard let page = source.page(at: number - 1), let copied = page.copy() as? PDFPage else {
+                                throw NSError(domain: "ABookPDF", code: 70, userInfo: [NSLocalizedDescriptionKey: "A selected page from " + item.name + " could not be copied."])
+                            }
+                            part.insert(copied, at: part.pageCount)
+                        }
+                        guard let data = part.dataRepresentation(), !data.isEmpty else {
+                            throw NSError(domain: "ABookPDF", code: 71, userInfo: [NSLocalizedDescriptionKey: "A PDF part could not be created for " + item.name + "."])
+                        }
+                        let partNumber = String(format: "%02d", index + 1)
+                        var filename = base + "-part-" + partNumber + ".pdf"
+                        var suffix = 2
+                        while !usedNames.insert(filename.lowercased()).inserted {
+                            filename = base + "-part-" + partNumber + "-" + String(suffix) + ".pdf"
+                            suffix += 1
+                        }
+                        files[filename] = data
+                    }
+                }
+                try Task.checkCancellation()
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    guard pdfProcessingID == operationID, selectedID == noteID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    archiveData = archive
+                    archiveFilename = "a-book-split-pdfs.zip"
+                    exportingArchive = true
+                    status = "Created parts from " + String(prepared.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID else { return }
+                    showError(error)
+                }
+            }
+        }
+    }
+
+    private func processPDF(_ attachment: ABookNativeAttachment, operation: String) {
+        guard let noteID = selectedID,
+              attachments.contains(where: { $0.id == attachment.id && $0.noteID == noteID }) else {
+            return
+        }
+        guard attachment.size > 0, attachment.size <= 200 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 72, userInfo: [
+                NSLocalizedDescriptionKey: "Choose a readable PDF smaller than 200 MB."
+            ]))
+            return
+        }
+        let sourceURL: URL
+        do { sourceURL = try store.fileURL(for: attachment) }
+        catch { showError(error); return }
+
+        // A new PDF task supersedes the previous one. Selection changes and
+        // attachment removal cancel active work and invalidate its result token.
+        pdfProcessingTask?.cancel()
+        let operationID = UUID()
+        pdfProcessingID = operationID
+        activePDFSelection = attachment.id
+        pdfText = ""
+        status = operation == "ocr" ? "Recognizing scanned PDF locally…" : operation == "rotate" ? "Rotating PDF locally…" : "Extracting PDF text locally…"
+
+        pdfProcessingTask = Task.detached(priority: .userInitiated) {
+            do {
+                try Task.checkCancellation()
+                guard let document = PDFDocument(url: sourceURL) else {
+                    throw NSError(domain: "ABookPDF", code: 1, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."])
+                }
+                guard document.pageCount > 0 else {
+                    throw NSError(domain: "ABookPDF", code: 73, userInfo: [NSLocalizedDescriptionKey: "This PDF has no readable pages."])
+                }
+                if operation != "ocr", document.pageCount > 5_000 {
+                    throw NSError(domain: "ABookPDF", code: 74, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be processed in one operation."])
+                }
+
+                var extracted = ""
+                if operation == "extract" {
+                    try Task.checkCancellation()
+                    extracted = String((document.string ?? "").prefix(150_000))
+                } else if operation == "ocr" {
+                    for index in 0..<min(document.pageCount, 100) {
+                        try Task.checkCancellation()
+                        guard let page = document.page(at: index) else { continue }
+                        let image = page.thumbnail(of: CGSize(width: 1600, height: 2200), for: .mediaBox)
+                        guard let cgImage = image.cgImage else { continue }
+                        let request = VNRecognizeTextRequest()
+                        request.recognitionLevel = .accurate
+                        request.usesLanguageCorrection = true
+                        try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+                        try Task.checkCancellation()
+                        let rows = request.results?.compactMap { $0.topCandidates(1).first?.string } ?? []
+                        extracted += rows.joined(separator: "\n") + "\n"
+                        if extracted.count >= 150_000 { break }
+                    }
+                    extracted = String(extracted.prefix(150_000))
+                } else if operation == "rotate" {
+                    for index in 0..<document.pageCount {
+                        try Task.checkCancellation()
+                        guard let page = document.page(at: index) else { continue }
+                        page.rotation = (page.rotation + 90) % 360
+                    }
+                    guard let data = document.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 2, userInfo: [NSLocalizedDescriptionKey: "The rotated PDF could not be exported."])
+                    }
+                    try Task.checkCancellation()
+                    await MainActor.run {
+                        guard pdfProcessingID == operationID,
+                              selectedID == noteID,
+                              attachments.contains(where: { $0.id == attachment.id }) else { return }
+                        pdfData = data
+                        pdfName = attachment.name.replacingOccurrences(of: ".pdf", with: "", options: .caseInsensitive) + "-rotated.pdf"
+                        exportingPDF = true
+                        status = "PDF processed locally"
+                        pdfText = ""
+                        pdfProcessingTask = nil
+                        pdfProcessingID = nil
+                    }
+                    return
+                } else {
+                    throw NSError(domain: "ABookPDF", code: 75, userInfo: [NSLocalizedDescriptionKey: "Unsupported local PDF operation."])
+                }
+
+                try Task.checkCancellation()
+                let extractedText = extracted
+                let truncatedOCR = operation == "ocr" && document.pageCount > 100
+                await MainActor.run {
+                    guard pdfProcessingID == operationID,
+                          selectedID == noteID,
+                          attachments.contains(where: { $0.id == attachment.id }) else { return }
+                    pdfText = extractedText
+                    activePDFSelection = attachment.id
+                    if extractedText.isEmpty {
+                        status = operation == "ocr" ? "No readable text found on this PDF" : "No selectable text found on this PDF"
+                    } else if operation == "ocr" {
+                        status = truncatedOCR ? "On-device OCR completed · first 100 pages" : "OCR completed on this device"
+                    } else {
+                        status = "Text extracted on this device"
+                    }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    errorText = ""
+                }
+            } catch {
+                let cancelled = Task.isCancelled || error is CancellationError
+                await MainActor.run {
+                    guard pdfProcessingID == operationID else { return }
+                    pdfProcessingTask = nil
+                    pdfProcessingID = nil
+                    guard !cancelled, selectedID == noteID,
+                          attachments.contains(where: { $0.id == attachment.id }) else { return }
+                    showError(error)
+                }
+            }
+        }
+    }
+
+}
+
