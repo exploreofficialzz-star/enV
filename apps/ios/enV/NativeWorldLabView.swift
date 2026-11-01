@@ -1192,8 +1192,10 @@ struct NativeWorldLabView:View {
         if let epoch=checkpoint.worldEpochUTC,let parsed=ISO8601DateFormatter().date(from:epoch){worldEpochUTC=parsed}
         speed=checkpoint.playbackRate ?? 1
         reversePlayback=checkpoint.playbackDirection=="reverse-recording"
-        playing=false;lastTick=Date();redraw()
-        timelineStatus="Matching reference experiment parameters and time restored."
+        playing=false;lastTick=Date()
+        rebuildDemoRecordedTimeline()
+        redraw()
+        timelineStatus="Reference experiment parameters and recorded-sample clock restored."
     }
     private var importExportView:some View {
         interactionView
