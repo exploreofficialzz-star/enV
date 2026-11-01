@@ -225,7 +225,13 @@ export function buildPaletteSwatchesSvg(colors: readonly string[], labels: reado
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&apos;");
-    return [{ color: toHex({ ...parsed, a: 1 }).slice(0, 7), label }];
+    const opaque = {
+      r: parsed.r * parsed.a + 255 * (1 - parsed.a),
+      g: parsed.g * parsed.a + 255 * (1 - parsed.a),
+      b: parsed.b * parsed.a + 255 * (1 - parsed.a),
+      a: 1,
+    };
+    return [{ color: toHex(opaque).slice(0, 7), label }];
   });
   if (swatches.length === 0) throw new Error("At least one valid color is required to export palette swatches.");
 
