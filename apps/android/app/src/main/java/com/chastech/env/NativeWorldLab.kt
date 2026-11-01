@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import com.chastech.env.engine.NativeLabInput
+import com.chastech.env.engine.NativeLabResult
 import com.chastech.env.engine.NativeWorldLabBranch
 import com.chastech.env.engine.NativeWorldLabBranchRecord
 import com.chastech.env.engine.toJson
@@ -29,6 +30,11 @@ import com.chastech.env.engine.NativeWorldLabDemoCheckpoint
 import com.chastech.env.engine.NativeWorldLabDemoCheckpointCodec
 import com.chastech.env.engine.nextWorldLabEventTime
 import com.chastech.env.engine.advanceWorldLabEventTime
+private data class NativeWorldLabDemoRecording(
+    val clockRun:NativeWorldLabRecordedRun,
+    val samples:List<NativeLabResult>
+)
+
 import com.chastech.env.engine.NativeWorldLabRecordedRun
 import com.chastech.env.engine.NativeWorldLabRecordedClock
 import com.chastech.env.engine.NativeWorldLabRecordedTime
@@ -93,6 +99,7 @@ fun NativeWorldLabForm() {
     var speed by remember { mutableFloatStateOf(1f) }
     var playing by remember { mutableStateOf(false) }
     var reversePlayback by remember { mutableStateOf(false) }
+    var demoClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
     var worldEpochUTC by remember { mutableStateOf(java.time.Instant.now().toString()) }
     var mass by remember { mutableFloatStateOf(1f) }
     var spring by remember { mutableFloatStateOf(4f) }
@@ -237,8 +244,26 @@ fun NativeWorldLabForm() {
         "rc"->NativeLabInput.RC(resistanceOhm=resistance.toDouble())
         else->NativeLabInput.Heat(diffusivityM2S=diffusivity.toDouble())
     }
-    val result=remember(model,time) { runCatching {
-        NativeWorldLabScience.evaluate(model,time.toDouble())
+    val demoRecording=remember(model,worldEpochUTC) {
+        runCatching {
+            val samples=(0..120).map { index ->
+                NativeWorldLabScience.evaluate(model,index/10.0)
+            }
+            val clockRun=NativeWorldLabRecordedRun(
+                runId=java.util.UUID.randomUUID().toString(),
+                modelId=when(kind){"spring"->"native-spring";"rc"->"native-rc";else->"native-heat"},
+                modelVersion="1.0.0",worldEpochUTC=worldEpochUTC,
+                sampleTimesSeconds=samples.map{it.timeSeconds})
+            clockRun.validate()
+            NativeWorldLabDemoRecording(clockRun,samples)
+        }.getOrNull()
+    }
+    val result=remember(model,time,demoRecording,demoClock?.sampleIndex) { runCatching {
+        val recording=demoRecording
+        val index=demoClock?.sampleIndex
+        if(recording!=null&&index!=null) recording.samples.getOrNull(index)
+            ?:throw IllegalStateException("Recorded native sample index is unavailable.")
+        else NativeWorldLabScience.evaluate(model,time.toDouble())
     } }
     val observation=result.getOrNull()
     fun captureBranchSource(){
@@ -731,12 +756,47 @@ fun NativeWorldLabForm() {
             }
         }
     }
-    LaunchedEffect(playing,speed,reversePlayback) {
-        while(playing) {
+    LaunchedEffect(demoRecording) {
+        val recording=demoRecording
+        if(recording==null){
+            demoClock=null;time=0f;playing=false
+        }else{
+            runCatching{
+                NativeWorldLabRecordedTime.start(recording.clockRun,
+                    java.time.Instant.now().toString(),java.time.ZoneId.systemDefault().id)
+            }.onSuccess{
+                demoClock=it;time=0f;playing=false;reversePlayback=false
+            }.onFailure{
+                demoClock=null;playing=false;warning=it.message?:"Recorded model timeline could not be initialized."
+            }
+        }
+    }
+    LaunchedEffect(demoRecording,playing,speed,reversePlayback) {
+        val recording=demoRecording?:return@LaunchedEffect
+        var previousNanos=System.nanoTime()
+        while(demoRecording==recording){
             delay(40)
-            time=if(reversePlayback)(time-0.04f*speed).coerceAtLeast(0f)
-                else (time+0.04f*speed).coerceAtMost(12f)
-            if((reversePlayback&&time<=0f)||(!reversePlayback&&time>=12f))playing=false
+            val now=System.nanoTime()
+            val elapsed=((now-previousNanos).coerceAtLeast(0L)/1_000_000_000.0).coerceIn(0.0,0.25)
+            previousNanos=now
+            val current=demoClock?:continue
+            val state=current.copy(playbackRate=speed.toDouble(),
+                direction=if(reversePlayback)"reverse-recording" else "forward",
+                paused=!playing)
+            val transition=runCatching{
+                NativeWorldLabRecordedTime.advance(recording.clockRun,state,elapsed,paused=!playing)
+            }
+            if(transition.isFailure){
+                warning=transition.exceptionOrNull()?.message?:"Native recorded playback rejected an invalid transition."
+                playing=false
+                continue
+            }
+            val next=transition.getOrThrow()
+            demoClock=next;time=next.simulationTimeSeconds.toFloat()
+            if(playing && ((reversePlayback&&next.simulationTimeSeconds<=1e-9)||
+                (!reversePlayback&&next.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9))){
+                playing=false
+            }
         }
     }
     if(confirmation!=null) AlertDialog(
@@ -1808,9 +1868,9 @@ fun NativeWorldLabForm() {
             style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             listOf("spring" to "Spring","rc" to "Circuit","heat" to "Heat").forEach { pair ->
-                if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first},
+                if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
                     modifier=Modifier.weight(1f)) { Text(pair.second) }
-                else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first},
+                else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
                     modifier=Modifier.weight(1f)) { Text(pair.second) }
             }
         }
@@ -1860,25 +1920,74 @@ fun NativeWorldLabForm() {
             }
         }
         if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
-        Text("Wall time (UTC): "+java.time.Instant.now().toString(),style=MaterialTheme.typography.bodySmall)
-        Text("World date (UTC): "+runCatching{
-            java.time.Instant.parse(worldEpochUTC).plusNanos((time*1_000_000_000.0).toLong()).toString()
-        }.getOrDefault(worldEpochUTC),style=MaterialTheme.typography.bodySmall)
-        Text("Simulation "+labNumber(time.toDouble())+" s · Solver sample "+labNumber(time.toDouble())+
-            " s · Display sample "+labNumber(time.toDouble())+" s · solver Δt "+
-            labNumber(observation?.solverStepSeconds?:1.0/240.0)+" s · "+java.time.ZoneId.systemDefault().id,
-            style=MaterialTheme.typography.bodySmall)
+        demoClock?.let{clock->
+            Text("Wall UTC "+clock.wallTimeUTC+" · World UTC "+clock.worldDateUTC+
+                " · "+clock.timezoneDisplay,style=MaterialTheme.typography.bodySmall)
+            Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
+                labNumber(clock.displaySampleTimeSeconds)+" s · cached model output",
+                style=MaterialTheme.typography.bodySmall)
+        }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onClick={playing=false;reversePlayback=false;time=0f}) { Text("Beginning") }
-            OutlinedButton(onClick={playing=false;reversePlayback=false;time=(time-1f/240f).coerceAtLeast(0f)}) { Text("Previous") }
-            Button(onClick={reversePlayback=false;playing=!playing}) { Text(if(playing&&!reversePlayback)"Pause" else "Play forward") }
-            OutlinedButton(onClick={reversePlayback=true;playing=true}) { Text("Rewind recording") }
-            OutlinedButton(onClick={playing=false;reversePlayback=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Next") }
-            OutlinedButton(onClick={playing=false;reversePlayback=false;time=12f}) { Text("End") }
+            OutlinedButton(onClick={
+                playing=false;reversePlayback=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("Beginning") }
+            OutlinedButton(onClick={
+                playing=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,-1)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("Previous") }
+            Button(onClick={
+                reversePlayback=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    if(clock.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9){
+                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
+                        time=0f
+                    }
+                }}
+                playing=!playing
+            }) { Text(if(playing&&!reversePlayback)"Pause" else "Play forward") }
+            OutlinedButton(onClick={
+                reversePlayback=true
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    if(clock.simulationTimeSeconds<=1e-9){
+                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                            recording.clockRun.durationSeconds)
+                        time=demoClock!!.simulationTimeSeconds.toFloat()
+                    }
+                }}
+                playing=true
+            }) { Text("Rewind recording") }
+            OutlinedButton(onClick={
+                playing=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,1)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("Next") }
+            OutlinedButton(onClick={
+                playing=false;reversePlayback=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                        recording.clockRun.durationSeconds)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("End") }
         }
         Text("Simulated time: "+labNumber(time.toDouble())+" s")
-        Slider(value=time,onValueChange={time=it;playing=false},valueRange=0f..12f,
-            modifier=Modifier.semantics { contentDescription="Simulated elapsed time" })
+        Slider(value=time,onValueChange={value->
+            playing=false
+            demoRecording?.let{recording->demoClock?.let{clock->
+                demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,value.toDouble())
+                time=demoClock!!.simulationTimeSeconds.toFloat()
+            }}
+        },valueRange=0f..12f,
+            modifier=Modifier.semantics { contentDescription="Recorded simulation sample position" })
         Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
             listOf(0.01f,0.1f,1f,10f,100f).forEach { rate ->
                 OutlinedButton(onClick={speed=rate},modifier=Modifier.weight(1f),
