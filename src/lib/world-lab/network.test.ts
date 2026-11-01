@@ -78,3 +78,28 @@ test("exported DC evidence retains immutable inputs after an inventor changes th
   assert.ok(Object.isFrozen(r.networkSnapshot.components));
   assert.equal(r.projectRevision,9);
 });
+
+
+import {dcBranchCurrentFlow} from "./network.ts";
+test("signed DC branch current resolves direction and reverses with source polarity",()=>{
+ const network=starterDcNetwork("flow");
+ const forward=solveDcNetwork(network,{id:"lab",revision:1});
+ const resistor=network.components.find(x=>x.id==="load")!;
+ const f=dcBranchCurrentFlow(resistor,forward.branchCurrentsA.load);
+ assert.equal(f.fromNodeId,"supply");assert.equal(f.toNodeId,"ground");
+ assert.equal(f.direction,"positive-to-negative");assert.ok(f.magnitudeA>0);
+ const reversedNetwork={...network,components:network.components.map(c=>
+  c.id==="source"&&c.kind==="dc-source"?{...c,voltageV:-9}:c)};
+ const reversed=solveDcNetwork(reversedNetwork,{id:"lab",revision:2});
+ const back=dcBranchCurrentFlow(resistor,reversed.branchCurrentsA.load);
+ assert.equal(back.fromNodeId,"ground");assert.equal(back.toNodeId,"supply");
+ assert.equal(back.direction,"negative-to-positive");
+ assert.ok(back.magnitudeA>0);
+ const zero=dcBranchCurrentFlow(resistor,0);
+ assert.equal(zero.direction,"zero");assert.equal(zero.fromNodeId,null);
+});
+test("DC current direction rejects invalid numeric evidence",()=>{
+ const component=starterDcNetwork("bounded").components[1];
+ assert.throws(()=>dcBranchCurrentFlow(component,Number.NaN),/finite SI/);
+ assert.throws(()=>dcBranchCurrentFlow(component,1e7),/finite SI/);
+});
