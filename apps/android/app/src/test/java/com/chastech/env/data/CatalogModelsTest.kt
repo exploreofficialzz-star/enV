@@ -5,6 +5,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogModelsTest {
+    @Test fun retiredDesignBuildSolveForToolsAreExcludedWithoutHidingRealMathTools() {
+        val catalog = Catalog.fromJson("""
+            {"schemaVersion":1,"catalogVersion":"test","counts":{"total":2,"active":2,"planned":0,"categories":1},
+             "categories":[],"tools":[
+               {"id":"math-exp-sum-business-design-build-delivery-effort-a","name":"Design / Build — Solve for a","slug":"design-build-a","description":"Retired misclassified formula","category":"calculators","keywords":[],"tags":[],"icon":"Calculator","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"active","related":[],"engine":{"type":"calculator","formula":"exp-sum-business-design-build-delivery-effort-a"}},
+               {"id":"math-exp-ratio-ratio-gradient-a","name":"Gradient: Change Y / Change X — Solve for a","slug":"ratio-gradient-a","description":"A valid maths relationship","category":"calculators","keywords":[],"tags":[],"icon":"Calculator","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"active","related":[],"engine":{"type":"calculator","formula":"exp-ratio-ratio-gradient-a"}}
+             ]}
+        """.trimIndent())
+        assertEquals(listOf("math-exp-ratio-ratio-gradient-a"), catalog.tools.map { it.id })
+        assertTrue(catalog.relatedReferenceTools.none { it.id == "math-exp-sum-business-design-build-delivery-effort-a" })
+    }
     @Test fun runtimeABookAdditionIsUniqueAndSearchable() {
         val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
         val catalog = base.withABook()
