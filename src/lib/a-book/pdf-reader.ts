@@ -203,7 +203,7 @@ export async function extractSelectedPdfTextLocally(
       signal,
       onProgress: (page, total) => onProgress?.(page, total),
     });
-    totalPages += result.pagesProcessed;
+    totalPages += result.pageCount;
     if (totalPages > A_BOOK_PDF_TEXT_LIMITS.maxTotalPagesPerBatch) {
       throw new Error("The selected PDFs exceed the 5,000-page local text-extraction batch limit.");
     }
