@@ -68,6 +68,30 @@ struct NativeWorldLabView:View {
         } catch {problem=error.localizedDescription;motorClock=nil}
     }
 
+    private func prepareMotorCheckpointExport() {
+        do {
+            guard let recording=motorRecordedRun,let clock=motorClock else {
+                throw NativeWorldLabError.invalid("A completed recorded motor run is required.")
+            }
+            let checkpoint=try NativeWorldLabRecordedTime.checkpoint(run:recording,state:clock)
+            motorCheckpointFile=NativeWorldLabJsonFile(content:try checkpoint.encodeBounded())
+            exportingMotorCheckpoint=true;motorCheckpointStatus=""
+        } catch {
+            motorCheckpointStatus=error.localizedDescription
+        }
+    }
+    private func restoreMotorCheckpoint(_ data:Data)throws {
+        guard let recording=motorRecordedRun else {
+            throw NativeWorldLabError.invalid("Run the same motor experiment before restoring its checkpoint.")
+        }
+        let checkpoint=try NativeWorldLabRecordedCheckpoint.decodeBounded(data)
+        let restored=try NativeWorldLabRecordedTime.restore(run:recording,checkpoint:checkpoint)
+        motorPlaying=false;motorClock=restored;motorTime=restored.simulationTimeSeconds
+        motorReversePlayback=restored.direction=="reverse-recording"
+        motorSpeed=restored.playbackRate
+        motorCheckpointStatus="Matching current recorded motor run restored at sample \(restored.sampleIndex+1)."
+    }
+
     private var currentInspectionView:NativeWorldLabInspectionSettings {
         NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
             axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
@@ -104,6 +128,10 @@ struct NativeWorldLabView:View {
     @State private var importingTimelineCheckpoint=false
     @State private var timelineCheckpointFile:NativeWorldLabJsonFile?
     @State private var timelineStatus=""
+    @State private var exportingMotorCheckpoint=false
+    @State private var importingMotorCheckpoint=false
+    @State private var motorCheckpointFile:NativeWorldLabJsonFile?
+    @State private var motorCheckpointStatus=""
     @State private var importing=false
     @State private var exporting=false
     @State private var exportingCAD=false
@@ -1094,6 +1122,27 @@ struct NativeWorldLabView:View {
                 try restoreTimelineCheckpoint(Data(contentsOf:url))
                 problem=""
             }catch{problem=error.localizedDescription;timelineStatus=""}
+        }
+        .fileExporter(isPresented:$exportingMotorCheckpoint,document:motorCheckpointFile,
+            contentType:.json,defaultFilename:"world-lab-motor-clock"){result in
+                if case .failure(let error)=result{motorCheckpointStatus=error.localizedDescription}
+                else{motorCheckpointStatus="Recorded motor checkpoint saved."}
+                motorCheckpointFile=nil
+            }
+        .fileImporter(isPresented:$importingMotorCheckpoint,allowedContentTypes:[.json]){result in
+            do{
+                let url=try result.get()
+                let accessed=url.startAccessingSecurityScopedResource()
+                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
+                let attrs=try FileManager.default.attributesOfItem(atPath:url.path)
+                guard let count=(attrs[.size] as? NSNumber)?.intValue,count<=16*1024 else{
+                    throw NativeWorldLabError.invalid("Motor checkpoints must be 16 KB or smaller")
+                }
+                try restoreMotorCheckpoint(Data(contentsOf:url))
+                problem=""
+            }catch{
+                motorCheckpointStatus=error.localizedDescription
+            }
         }
         .fileExporter(isPresented:$exporting,
             document:projectData.map{NativeWorldLabJsonFile(content:$0)},
@@ -2973,6 +3022,16 @@ Text("Invent chemical heat").font(.headline)
                                     Text("Simulation \(String(format:"%.4f",clock.simulationTimeSeconds)) s · display sample \(clock.sampleIndex+1)/\(run.samples.count) · world UTC \(clock.worldDateUTC)")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
+                                HStack {
+                                    Button("Save motor checkpoint",action:prepareMotorCheckpointExport)
+                                    Button("Restore motor checkpoint"){importingMotorCheckpoint=true}
+                                        .disabled(motorRecordedRun==nil)
+                                }.buttonStyle(.bordered)
+                                if !motorCheckpointStatus.isEmpty {
+                                    Text(motorCheckpointStatus).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.")
+                                    .font(.caption).foregroundStyle(.secondary)
                                 Text("Electricity and physical motion are coupled in one 1D solver. Material and actuator parameters are hypothetical, not measurements.")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
