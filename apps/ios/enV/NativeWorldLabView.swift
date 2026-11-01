@@ -98,6 +98,7 @@ struct NativeWorldLabView:View {
     @State private var exportingCollision=false
     @State private var collisionTime=0.0
     @State private var collisionPlaying=false
+    @State private var collisionReversePlayback=false
     @State private var collisionSpeed=1.0
     @State private var sphereOtherId=""
     @State private var sphereFirstVelocity="2,0,0"
@@ -106,6 +107,7 @@ struct NativeWorldLabView:View {
     @State private var sphereRun:NativeSphereImpactResult?
     @State private var sphereTime=0.0
     @State private var spherePlaying=false
+    @State private var sphereReversePlayback=false
     @State private var sphereSpeed=1.0
     @State private var exportingSphereImpact=false
     @State private var heatFirstId=""
@@ -139,6 +141,7 @@ struct NativeWorldLabView:View {
     @State private var groupRun:NativeGroupSphereRun?
     @State private var groupTime=0.0
     @State private var groupPlaying=false
+    @State private var groupReversePlayback=false
     @State private var groupPlaybackRate=1.0
     @State private var exportingGroupEvidence=false
     @State private var deviceName=""
@@ -846,19 +849,19 @@ struct NativeWorldLabView:View {
                 if gravityTime>=run.durationSeconds {gravityPlaying=false}
             }
             if groupPlaying,let run=groupRun {
-                groupTime=NativeWorldLabTime.next(current:groupTime,elapsed:dt,rate:groupPlaybackRate,duration:run.durationSeconds,events:run.events.map{$0.atSeconds})
+                groupTime=NativeWorldLabTime.advance(current:groupTime,elapsed:dt,rate:groupPlaybackRate,duration:run.durationSeconds,events:run.events.map{$0.atSeconds},reverse:groupReversePlayback)
                 updateGroupSphereScene()
-                if groupTime>=run.durationSeconds {groupPlaying=false}
+                if (groupReversePlayback && groupTime<=0) || (!groupReversePlayback && groupTime>=run.durationSeconds) {groupPlaying=false}
             }
             if spherePlaying,let run=sphereRun {
-                sphereTime=NativeWorldLabTime.next(current:sphereTime,elapsed:dt,rate:sphereSpeed,duration:run.durationSeconds,events:[run.impactTimeSeconds])
+                sphereTime=NativeWorldLabTime.advance(current:sphereTime,elapsed:dt,rate:sphereSpeed,duration:run.durationSeconds,events:[run.impactTimeSeconds],reverse:sphereReversePlayback)
                 updateSphereScene()
-                if sphereTime>=run.durationSeconds {spherePlaying=false}
+                if (sphereReversePlayback && sphereTime<=0) || (!sphereReversePlayback && sphereTime>=run.durationSeconds) {spherePlaying=false}
             }
             if collisionPlaying,let run=collisionRun {
-                collisionTime=NativeWorldLabTime.next(current:collisionTime,elapsed:dt,rate:collisionSpeed,duration:run.durationSeconds,events:[run.impactTimeSeconds])
+                collisionTime=NativeWorldLabTime.advance(current:collisionTime,elapsed:dt,rate:collisionSpeed,duration:run.durationSeconds,events:[run.impactTimeSeconds],reverse:collisionReversePlayback)
                 updateCollisionScene()
-                if collisionTime>=run.durationSeconds {collisionPlaying=false}
+                if (collisionReversePlayback && collisionTime<=0) || (!collisionReversePlayback && collisionTime>=run.durationSeconds) {collisionPlaying=false}
             }
             if dropPlaying,let run=dropRun {
                 dropTime=min(run.samples.last?.timeSeconds ?? 6,dropTime+dt*dropSpeed)
@@ -2045,8 +2048,9 @@ Text("Invent chemical heat").font(.headline)
                         duration:run.durationSeconds,events:run.events.map{$0.atSeconds})
                     updateGroupSphereScene()
                 }.disabled(!run.events.contains{$0.atSeconds<groupTime-1e-9})
-                Button(groupPlaying ? "Pause":"Play"){groupPlaying.toggle()}
+                Button(groupPlaying ? "Pause":"Play"){groupReversePlayback=false;groupPlaying.toggle()}
                     .buttonStyle(.borderedProminent)
+                Button("Rewind recording"){groupReversePlayback=true;groupPlaying=groupTime>0}
                 Button("Next contact"){
                     groupPlaying=false
                     groupTime=NativeWorldLabTime.nextEvent(current:groupTime,
@@ -2173,8 +2177,9 @@ Text("Invent chemical heat").font(.headline)
                         duration:run.durationSeconds,events:[run.impactTimeSeconds])
                     updateSphereScene()
                 }.disabled(sphereTime<=1e-9)
-                Button(spherePlaying ? "Pause":"Play"){spherePlaying.toggle()}
+                Button(spherePlaying ? "Pause":"Play"){sphereReversePlayback=false;spherePlaying.toggle()}
                     .buttonStyle(.borderedProminent)
+                Button("Rewind recording"){sphereReversePlayback=true;spherePlaying=sphereTime>0}
                 Button("Next contact"){
                     spherePlaying=false
                     sphereTime=NativeWorldLabTime.nextEvent(current:sphereTime,
@@ -2285,8 +2290,9 @@ Text("Invent chemical heat").font(.headline)
                         duration:run.durationSeconds,events:[run.impactTimeSeconds])
                     updateCollisionScene()
                 }.disabled(collisionTime<=1e-9)
-                Button(collisionPlaying ? "Pause":"Play"){collisionPlaying.toggle()}
+                Button(collisionPlaying ? "Pause":"Play"){collisionReversePlayback=false;collisionPlaying.toggle()}
                     .buttonStyle(.borderedProminent)
+                Button("Rewind recording"){collisionReversePlayback=true;collisionPlaying=collisionTime>0}
                 Button("Next contact"){
                     collisionPlaying=false
                     collisionTime=NativeWorldLabTime.nextEvent(current:collisionTime,
