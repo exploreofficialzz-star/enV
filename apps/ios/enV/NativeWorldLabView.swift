@@ -201,6 +201,7 @@ struct NativeWorldLabView:View {
     @State private var motorTime=0.0
     @State private var motorPlaying=false
     @State private var motorThermalEnabled=false
+    @State private var motorPowerOffAtSeconds:Double?=nil
     @State private var motorSpeed=1.0
     @State private var scene=SCNScene()
     @State private var sceneCameraNode=SCNNode()
@@ -2689,9 +2690,30 @@ Text("Invent chemical heat").font(.headline)
                                 motorThermalEnabled.toggle()
                                 motorRun=nil;motorAudit=nil;motorPlaying=false
                             }.buttonStyle(.bordered)
+                            Toggle("Open supply switch during standalone motor run",isOn:Binding(
+                                get:{motorPowerOffAtSeconds != nil},
+                                set:{enabled in
+                                    motorPowerOffAtSeconds=enabled ? 2.0 : nil
+                                    motorRun=nil;motorAudit=nil;motorPlaying=false
+                                }
+                            ))
+                            if let cutoff=motorPowerOffAtSeconds {
+                                Text("Supply switch opens at "+String(format:"%.3f",cutoff)+" s")
+                                    .font(.caption)
+                                Slider(value:Binding(
+                                    get:{motorPowerOffAtSeconds ?? cutoff},
+                                    set:{value in
+                                        motorPowerOffAtSeconds=value
+                                        motorRun=nil;motorAudit=nil;motorPlaying=false
+                                    }
+                                ),in:0...4)
+                                Text("The coil current remains continuous and decays through the R-L model after isolation. Fuse arcing and contact bounce are not modeled.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             Button("Power this solid"){
                                 do {
                                     var input=NativeActuatorInput(massKg:derived)
+                                    input.powerOffAtSeconds=motorPowerOffAtSeconds
                                     if motorThermalEnabled {input.thermal=NativeActuatorThermalInput()}
                                     let result=try NativeWorldLabActuator.evaluate(input)
                                     motorAudit=try NativeWorldLabActuator.numericalAudit(input,result)
@@ -2760,6 +2782,15 @@ Text("Invent chemical heat").font(.headline)
                                     Text("Invented digital output: "+String(linked.logicBit))
                                     value("Applied ideal voltage",linked.input.supplyVoltageV,"V")
                                     Text(linked.validity).font(.caption).foregroundStyle(.secondary)
+                                }
+                                value("Applied source voltage",sample.sourceVoltageV,"V")
+                                if run.modelVersion=="1.2.0" {
+                                    Text(sample.timeSeconds < (run.samples.last(where:{$0.sourceVoltageV==0})?.timeSeconds ?? 0)
+                                        ? "Supply connected"
+                                        : abs(sample.currentA)>1e-4
+                                            ? "Supply isolated · coil current decaying"
+                                            : "Supply isolated · current near zero")
+                                        .font(.caption).foregroundStyle(.secondary)
                                 }
                                 value("Computed powered height",sample.heightM,"m")
                                 value("Coil current",sample.currentA,"A")
