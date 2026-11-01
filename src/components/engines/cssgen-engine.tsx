@@ -4,7 +4,7 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, moveGradientStop, normalizeGradientStops, type GradientStop, type CssGradientOptions } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,7 +208,7 @@ function cssFor(
     const angle = numberValue(values, "angle", 135, 0, 360);
     const normalized = normalizeGradientStops(gradientStops);
     const position = `${numberValue(values, "centerX", 50, 0, 100)}% ${numberValue(values, "centerY", 50, 0, 100)}%`;
-    const gradientOptions = {
+    const gradientOptions: CssGradientOptions = {
       kind,
       angle,
       shape: values.shape === "ellipse" ? "ellipse" as const : "circle" as const,

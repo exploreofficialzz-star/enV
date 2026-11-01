@@ -26,9 +26,15 @@ const identifier=(s:unknown):string=>{
     throw new Error("Choose a valid World Lab solid identifier.");
   return s;
 };
-const exactKeys=(v:Record<string,unknown>,allowed:string[])=>{
-  if(Object.keys(v).some(k=>!allowed.includes(k)))
+const exactKeys=(v:Record<string,unknown>,allowed:string[],kind:WorldLabRemoteOperation)=>{
+  // Keep domain-specific failure diagnostics without permitting executable inputs.
+  if(Object.keys(v).some(k=>!allowed.includes(k))){
+    if(kind==="multi-sphere")throw new Error("Group collisions accept only velocities, restitution and duration.");
+    if(kind==="exhaustive-logic")throw new Error("Exhaustive digital logic only accepts an invented network identifier.");
+    if(kind==="chemical-sweep")throw new Error("Chemical sensitivity jobs accept only a bounded baseline input.");
+    if(kind==="structural-sweep")throw new Error("Structural sensitivity only accepts the invented beam and its load.");
     throw new Error("Unsupported request fields or executable settings are not accepted.");
+  }
 };
 export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   kind:WorldLabRemoteOperation;
@@ -47,9 +53,11 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
   exactKeys(data,["kind","project","entityId","fluidDensityKgM3",
     "immersionDepthM","forceConstantNPerA","thermal","chemicalInput",
     "velocities","restitution","durationSeconds","networkId","tipForceN",
-    "bodyIds","integrationSteps"]);
+    "bodyIds","integrationSteps"],kind as WorldLabRemoteOperation);
+  if(kind!=="multi-sphere"&&kind!=="newton-gravity"&&data.durationSeconds!==undefined)
+    throw new Error("Unsupported request fields or executable settings are not accepted.");
   if(kind!=="multi-sphere"&&kind!=="newton-gravity"&&
-    ["velocities","restitution","durationSeconds"].some(key=>data[key]!==undefined))
+    ["velocities","restitution"].some(key=>data[key]!==undefined))
     throw new Error("Sphere settings cannot be supplied to unrelated calculations.");
   if(kind!=="exhaustive-logic"&&data.networkId!==undefined)
     throw new Error("Digital network identifier is only accepted for digital verification.");
@@ -123,7 +131,7 @@ export function runBoundedWorldLabOperation(input:unknown):Readonly<{
         !value.every(v=>typeof v==="number"&&Number.isFinite(v))||
         Math.hypot(...value)>100)
         throw new Error("Sphere starting speeds require finite X/Y/Z components, at most 100 m/s.");
-      velocities[id]=value as Vec3;
+      velocities[id]=[value[0] as number,value[1] as number,value[2] as number];
     }
     outcome=runMultiSphereCollisions(project,velocities,
       finiteBound(data.restitution,0,1,"Sphere restitution"),

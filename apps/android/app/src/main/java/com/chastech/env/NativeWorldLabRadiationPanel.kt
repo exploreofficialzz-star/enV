@@ -118,7 +118,7 @@ fun NativeWorldLabRadiationPanel(project:NativeWorldLabProject,onError:(String)-
                 contentDescription="Radiative experiment simulated time"
             })
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-            OutlinedButton(onClick={playing=!playing}){Text(if(playing)"Pause":"Play")}
+            OutlinedButton(onClick={playing=!playing}){Text(if (playing) "Pause" else "Play")}
             OutlinedButton(onClick={playing=false;fraction=0f}){Text("Reset")}
             OutlinedButton(onClick={speed=if(speed==1f)4f else if(speed==4f)0.1f else 1f}){
                 Text("Speed "+speed+"×")

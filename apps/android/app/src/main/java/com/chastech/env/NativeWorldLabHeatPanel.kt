@@ -125,7 +125,7 @@ fun NativeWorldLabHeatPanel(project:NativeWorldLabProject,onError:(String)->Unit
             modifier=Modifier.semantics{contentDescription="Thermal transfer simulated time"})
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             OutlinedButton(onClick={playing=!playing}) {
-                Text(if(playing)"Pause heat":"Play heat")
+                Text(if (playing) "Pause heat" else "Play heat")
             }
             OutlinedButton(onClick={playing=false;time=0f}){Text("Reset")}
             OutlinedButton(onClick={export.launch("world-lab-material-heat.json")}){
