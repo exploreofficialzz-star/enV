@@ -39,7 +39,7 @@ for (const [browserName, browserType] of browserEntries) {
   }
   const browser = await browserType.launch(browserOptions);
   try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
   const failures = [];
   page.on("pageerror", (error) => failures.push(error.message));
   const response = await page.goto(baseUrl + "/tools/design", { waitUntil: "domcontentloaded", timeout: 60000 });
