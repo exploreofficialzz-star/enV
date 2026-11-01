@@ -74,11 +74,7 @@ for (const [browserName, browserType] of browserEntries) {
   const search = page.getByRole("textbox", { name: "Search design tools" });
   await search.focus();
   await page.keyboard.insertText("Gradient Token Generator");
-  await page.waitForFunction(() => {
-    const status = [...document.querySelectorAll('[aria-live="polite"]')]
-      .find((element) => /tools? found/.test(element.textContent ?? ""));
-    return status && status.textContent?.trim() !== "122 tools found";
-  }, { timeout: 10000 });
+  await page.getByText("1 tool found", { exact: true }).waitFor({ state: "visible", timeout: 10000 });
   const generatedGradientToken = page.locator('a[href="/tools/design/gradient-token-generator"]');
   await generatedGradientToken.waitFor({ state: "visible" });
   assert.equal(await cards.count(), 1, "Search should find the generated Gradient Token Generator alone");
