@@ -20,7 +20,12 @@ async function runDirect(task: ABookPdfWorkerTask): Promise<unknown> {
 
 function runInWorker(task: ABookPdfWorkerTask, signal?: AbortSignal): Promise<unknown> {
   if (signal?.aborted) return Promise.reject(new DOMException("PDF processing was cancelled.", "AbortError"));
-  if (typeof window === "undefined" || typeof Worker === "undefined") return runDirect(task);
+  // Node/unit-test callers use the same pure local functions directly. A browser
+  // without Web Workers must fail closed rather than run heavy PDF work on its UI thread.
+  if (typeof window === "undefined") return runDirect(task);
+  if (typeof Worker === "undefined") {
+    return Promise.reject(new Error("This browser does not support isolated local PDF processing. Enable Web Workers or use a supported browser."));
+  }
 
   return new Promise((resolve, reject) => {
     const requestId = "a-book-pdf-" + (++requestSequence);
