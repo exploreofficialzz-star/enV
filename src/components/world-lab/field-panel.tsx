@@ -1,5 +1,5 @@
 import type {FieldLayer,FieldPalette,FieldVectorPlane} from "@/lib/world-lab/field-layer";
-import {fieldFrameAtTime,fieldVectorGlyphsAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
+import {fieldFrameAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
 
 type Props={layers:readonly FieldLayer[];selectedId:string;onSelect:(id:string)=>void;
  timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void;
@@ -55,7 +55,7 @@ export function WorldLabFieldPanel(p:Props){
     </dl>
     <p className="mt-2 break-words text-xs text-muted-foreground">{source}</p>
     <p className="mt-1 text-xs">{layer.legend.accessibleDescription}</p>
-    {layer.kind==="vector"&&layer.renderer.kind==="glyphs"&&(()=>{
+    {layer.kind==="vector"&&(layer.renderer.kind==="glyphs"||layer.renderer.kind==="streamlines")&&(()=>{
      const normalAxis=p.vectorPlane==="xy"?2:p.vectorPlane==="xz"?1:0;
      const maximumSlice=layer.resolution.dimensions[normalAxis]-1;
      const slice=Math.max(0,Math.min(maximumSlice,p.vectorSliceIndex));
@@ -114,6 +114,34 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
    role="img" aria-label={layer.legend.accessibleDescription}>
    <p className="font-semibold">{layer.legend.title}</p>
    <p>{layer.network?.nodes.length??0} nodes · {layer.network?.edges.length??0} links</p>
+  </div>;
+ }
+ if(layer.kind==="vector"&&layer.renderer.kind==="streamlines"){
+  if(layer.interpolation.method!=="linear"||!layer.interpolation.validated){
+   return <div className="pointer-events-none absolute right-2 top-2 max-w-[min(78%,340px)] rounded-lg border border-border bg-bg/90 p-2 text-xs shadow" role="status">
+    <p className="font-semibold">{layer.legend.title}</p>
+    <p>Streamlines are unavailable until this vector field has validated linear spatial interpolation. No substitute rendering is shown.</p>
+   </div>;
+  }
+  const frame=fieldVectorStreamlinesAtTime(layer,p.timeSeconds,p.vectorPlane,p.vectorSliceIndex);
+  return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
+   role="img" aria-label={layer.legend.accessibleDescription+"; "+frame.paths.length+" computed streamlines on "+frame.plane.toUpperCase()+" slice "+(frame.sliceIndex+1)+"; recorded sample "+frame.sampleTimeSeconds.toFixed(4)+" seconds"}>
+   <p className="text-xs font-semibold">{layer.legend.title} · {frame.sampleTimeSeconds.toFixed(3)} s</p>
+   <svg viewBox="0 0 300 160" width="100%" height="132" role="presentation">
+    <defs><marker id="worldlab-streamline-arrowhead" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 L5 2.5 L0 5 Z" fill="currentColor"/></marker></defs>
+    <path d="M22 12 V140 H286" fill="none" stroke="currentColor" opacity=".28"/>
+    {frame.paths.map((path,index)=>{
+     const points=path.map(([u,v])=>{
+      const x=22+(u/Math.max(1,frame.dimensionU-1))*256;
+      const y=140-(v/Math.max(1,frame.dimensionV-1))*116;
+      return x.toFixed(1)+","+y.toFixed(1);
+     }).join(" ");
+     return <polyline key={index} points={points} fill="none" stroke="currentColor" strokeWidth="1.6"
+      markerEnd="url(#worldlab-streamline-arrowhead)"/>;
+    })}
+   </svg>
+   <p className="text-[10px]">{frame.plane.toUpperCase()} projection · slice {frame.sliceIndex+1}/{frame.plane==="xy"?layer.resolution.dimensions[2]:frame.plane==="xz"?layer.resolution.dimensions[1]:layer.resolution.dimensions[0]}</p>
+   <p className="text-[10px] text-muted-foreground">{frame.paths.length} recorded-field paths · arrowheads show vector direction, not magnitude · {layer.units.display}</p>
   </div>;
  }
  if(layer.kind==="vector"&&layer.renderer.kind==="glyphs"){

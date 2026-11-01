@@ -43,7 +43,7 @@ export function isFieldOverlayRendererImplemented(kind:FieldKind,renderer:FieldR
  if(kind==="event")return renderer==="event-trace";
  if(kind==="network")return renderer==="event-trace";
  if(kind==="scalar")return renderer==="heatmap"||renderer==="line-plot";
- if(kind==="vector")return renderer==="glyphs";
+ if(kind==="vector")return renderer==="glyphs"||renderer==="streamlines";
  return false;
 }
 const palettes:readonly FieldPalette[]=["cividis","viridis","magma","blue-orange"];
@@ -267,6 +267,108 @@ export function fieldVectorGlyphsAtTime(layer:FieldLayer,timeSeconds:number,
  }
  return Object.freeze({sampleTimeSeconds:frame.sampleTimeSeconds,plane,sliceIndex:slice,
   dimensionU,dimensionV,maximumProjectedMagnitude,glyphs:Object.freeze(glyphs)});
+}
+export type FieldVectorStreamlineFrame=Readonly<{
+ sampleTimeSeconds:number;plane:FieldVectorPlane;sliceIndex:number;
+ dimensionU:number;dimensionV:number;
+ paths:readonly (readonly (readonly [number,number])[])[];
+}>;
+/**
+ * Integrate 2D streamlines through one recorded vector-field slice.
+ * RK2 direction integration uses declared spatial spacing and requires
+ * validated linear interpolation. Time is always snapped to an immutable
+ * recorded sample; nodata terminates a path instead of being filled.
+ */
+export function fieldVectorStreamlinesAtTime(layer:FieldLayer,timeSeconds:number,
+ plane:FieldVectorPlane="xy",requestedSliceIndex?:number):FieldVectorStreamlineFrame{
+ if(layer.kind!=="vector"||layer.renderer.kind!=="streamlines")
+  throw new Error("Streamlines require a vector field with the streamline renderer.");
+ if(layer.interpolation.method!=="linear"||!layer.interpolation.validated)
+  throw new Error("Streamlines require validated linear spatial interpolation.");
+ const axes=plane==="xy"?{u:0,v:1,n:2}:plane==="xz"?{u:0,v:2,n:1}:
+  plane==="yz"?{u:1,v:2,n:0}:null;
+ if(!axes)throw new Error("Streamline plane is unsupported.");
+ const dims=layer.resolution.dimensions;
+ const dimensionU=dims[axes.u],dimensionV=dims[axes.v];
+ const sliceCount=dims[axes.n];
+ if(dimensionU<2||dimensionV<2||layer.resolution.spacingMeters[axes.u]<=0||
+  layer.resolution.spacingMeters[axes.v]<=0)
+  throw new Error("Streamlines require at least a 2 × 2 grid with positive in-plane spacing.");
+ const slice=requestedSliceIndex??Math.floor((sliceCount-1)/2);
+ if(!Number.isSafeInteger(slice)||slice<0||slice>=sliceCount)
+  throw new Error("Streamline slice is outside the field resolution.");
+ const frame=fieldFrameAtTime(layer,timeSeconds);
+ const indexAt=(u:number,v:number)=>{
+  const coordinates=[0,0,0];coordinates[axes.u]=u;
+  coordinates[axes.v]=v;coordinates[axes.n]=slice;
+  return coordinates[0]+dims[0]*(coordinates[1]+dims[1]*coordinates[2]);
+ };
+ const vectorAt=(u:number,v:number):readonly [number,number,number]|null=>{
+  if(!Number.isFinite(u)||!Number.isFinite(v)||u<0||v<0||
+   u>dimensionU-1||v>dimensionV-1)return null;
+  const u0=Math.floor(u),v0=Math.floor(v);
+  const u1=Math.min(dimensionU-1,u0+1),v1=Math.min(dimensionV-1,v0+1);
+  const fu=u-u0,fv=v-v0;
+  const corners=[
+   {cell:indexAt(u0,v0),weight:(1-fu)*(1-fv)},
+   {cell:indexAt(u1,v0),weight:fu*(1-fv)},
+   {cell:indexAt(u0,v1),weight:(1-fu)*fv},
+   {cell:indexAt(u1,v1),weight:fu*fv},
+  ];
+  const result=[0,0,0];
+  for(const corner of corners){
+   const offset=corner.cell*3;
+   const values=[frame.values[offset],frame.values[offset+1],frame.values[offset+2]];
+   if(values.some(value=>typeof value!=="number"))return null;
+   for(let component=0;component<3;component++)
+    result[component]+=(values[component] as number)*corner.weight;
+  }
+  return result.every(Number.isFinite)?result as unknown as readonly [number,number,number]:null;
+ };
+ const spacingU=layer.resolution.spacingMeters[axes.u];
+ const spacingV=layer.resolution.spacingMeters[axes.v];
+ const directionAt=(u:number,v:number):readonly [number,number]|null=>{
+  const vector=vectorAt(u,v);if(!vector)return null;
+  const du=vector[axes.u]/spacingU,dv=vector[axes.v]/spacingV;
+  const magnitude=Math.hypot(du,dv);
+  if(!Number.isFinite(magnitude)||magnitude<1e-15)return null;
+  return [du/magnitude,dv/magnitude];
+ };
+ const seedStride=Math.max(1,Math.ceil(Math.max(dimensionU,dimensionV)/7));
+ const indices=(size:number)=>{
+  const values:number[]=[];
+  for(let i=0;i<size;i+=seedStride)values.push(i);
+  if(values[values.length-1]!==size-1)values.push(size-1);
+  return values;
+ };
+ const paths:(readonly (readonly [number,number])[])[]=[];
+ const stepCells=0.35,maxSteps=120,maxPaths=96;
+ for(const v of indices(dimensionV))for(const u of indices(dimensionU)){
+  if(paths.length>=maxPaths)break;
+  if(!vectorAt(u,v))continue;
+  for(const sign of [1,-1]){
+   const path:(readonly [number,number])[]=[[u,v]];
+   let currentU=u,currentV=v;
+   for(let step=0;step<maxSteps;step++){
+    const first=directionAt(currentU,currentV);if(!first)break;
+    const middleU=currentU+first[0]*sign*stepCells/2;
+    const middleV=currentV+first[1]*sign*stepCells/2;
+    const middle=directionAt(middleU,middleV);if(!middle)break;
+    const nextU=currentU+middle[0]*sign*stepCells;
+    const nextV=currentV+middle[1]*sign*stepCells;
+    if(nextU<0||nextV<0||nextU>dimensionU-1||nextV>dimensionV-1)break;
+    if(Math.hypot(nextU-currentU,nextV-currentV)<1e-6)break;
+    if(!vectorAt(nextU,nextV))break;
+    if(path.length>5&&path.slice(0,-3).some(point=>
+      Math.hypot(point[0]-nextU,point[1]-nextV)<stepCells*0.6))break;
+    path.push([nextU,nextV]);currentU=nextU;currentV=nextV;
+   }
+   if(path.length>=2)paths.push(Object.freeze(path));
+   if(paths.length>=maxPaths)break;
+  }
+ }
+ return Object.freeze({sampleTimeSeconds:frame.sampleTimeSeconds,plane,sliceIndex:slice,
+  dimensionU,dimensionV,paths:Object.freeze(paths)});
 }
 export function fieldValueToDisplay(layer:FieldLayer,valueSI:number):number{
  if(!finite(valueSI))throw new Error("Field display conversion needs a finite SI value.");

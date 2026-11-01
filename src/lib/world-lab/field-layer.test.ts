@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {runExperiment,type ModelInput} from "./model.ts";
-import {createComputedFieldLayers,fieldFrameAtTime,fieldVectorGlyphsAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
+import {createComputedFieldLayers,fieldFrameAtTime,fieldVectorGlyphsAtTime,fieldVectorStreamlinesAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
 const run=(kind:"damped-oscillator"|"rc-circuit"|"heat-rod")=>{
  const inputs:ModelInput=kind==="damped-oscillator"
   ?{kind,massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0}
@@ -124,4 +124,41 @@ test("event fields cannot claim events beyond their recorded sample timeline",()
  const outside=JSON.parse(JSON.stringify(event));
  outside.events[0].atSeconds=run("damped-oscillator").time.simulatedDurationSeconds+1;
  assert.throws(()=>parseFieldLayer(outside),/out-of-timeline event/);
+});
+
+function streamlineLayer(){
+ const base=vectorLayer();
+ const raw=JSON.parse(JSON.stringify(base));
+ raw.renderer={kind:"streamlines",implementationId:"env-vector-streamlines-rk2-v1"};
+ raw.interpolation={method:"linear",validated:true,
+  notes:"Bilinear in-plane interpolation validated against the source grid."};
+ return parseFieldLayer(raw);
+}
+test("vector streamlines follow the recorded vector direction with bounded RK2 steps",()=>{
+ const layer=streamlineLayer();
+ const frame=fieldVectorStreamlinesAtTime(layer,0.099,"xy",0);
+ assert.equal(frame.sampleTimeSeconds,0.1);
+ assert.equal(frame.plane,"xy");
+ assert.equal(frame.sliceIndex,0);
+ assert.ok(frame.paths.length>0);
+ assert.ok(frame.paths.every(path=>path.length>=2&&path.length<=121));
+ const forward=frame.paths.find(path=>path[1][0]>path[0][0]);
+ assert.ok(forward,"the positive X component must produce a forward streamline");
+ assert.ok(forward!.every(([u,v])=>u>=0&&u<=1&&v>=0&&v<=1));
+});
+test("streamlines require declared validated spatial interpolation and the correct field type",()=>{
+ const base=vectorLayer();
+ const invalid=JSON.parse(JSON.stringify(base));
+ invalid.renderer={kind:"streamlines",implementationId:"env-vector-streamlines-rk2-v1"};
+ assert.throws(()=>fieldVectorStreamlinesAtTime(parseFieldLayer(invalid),0),/validated linear/);
+ assert.throws(()=>fieldVectorStreamlinesAtTime(base,0),/streamline renderer/);
+});
+test("streamlines stop cleanly when the selected slice contains only nodata",()=>{
+ const layer=streamlineLayer();
+ const raw=JSON.parse(JSON.stringify(layer));
+ raw.values=raw.values.map(()=>null);
+ raw.mask=raw.mask.map(()=>false);
+ const empty=parseFieldLayer(raw);
+ const frame=fieldVectorStreamlinesAtTime(empty,0,"xy",0);
+ assert.equal(frame.paths.length,0);
 });
