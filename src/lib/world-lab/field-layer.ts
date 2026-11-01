@@ -188,7 +188,7 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
     label:event.label as string,severity:event.severity as FieldEvent["severity"]});
   })),
   network,
-  range:Object.freeze({...raw.range}) as unknown as FieldLayer["range"],
+  range:Object.freeze({...rangeRaw}) as unknown as FieldLayer["range"],
   permissions:Object.freeze({...raw.permissions,readRoles:Object.freeze([...(raw.permissions.readRoles as string[])])}) as unknown as FieldLayer["permissions"],
   renderer:Object.freeze({...raw.renderer}) as unknown as FieldLayer["renderer"],
   legend:Object.freeze({...raw.legend}) as unknown as FieldLayer["legend"],
