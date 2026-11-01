@@ -109,7 +109,7 @@ export function ABookEngine() {
         setCurrent((value) => value?.id === saved.id && value.revision !== saved.revision
           ? { ...value, revision: saved.revision }
           : value);
-        setNotes(await listNotes({ includeArchived: showArchived }));
+        setNotes(await listNotes({ includeArchived: showArchived, includeDeleted: showTrash }));
         setStorageMessage("Saved on this device");
         setError("");
       }).catch((cause: unknown) => {
@@ -118,7 +118,7 @@ export function ABookEngine() {
       });
     }, 450);
     return () => window.clearTimeout(saveTimer.current);
-  }, [current, isReady, showArchived]);
+  }, [current, isReady, showArchived, showTrash]);
 
   useEffect(() => {
     if (!current) {
