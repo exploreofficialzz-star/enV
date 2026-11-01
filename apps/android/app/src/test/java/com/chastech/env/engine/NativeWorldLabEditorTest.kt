@@ -446,3 +446,63 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.extrudeCircle(json,0.5,2.0,rotationRadians=listOf(0.0,Double.NaN,0.0))
         }
     }
+
+
+    @Test fun cadExchangeRoundTripsGeometryAndOnlyReferencedMaterialAssumptions(){
+        var source=NativeWorldLabEditor.blank()
+        source=NativeWorldLabEditor.addSolid(source,"box",id="box-source")
+        source=NativeWorldLabEditor.positionSolid(source,"box-source",listOf(1.0,2.0,3.0))
+        source=NativeWorldLabEditor.rotateSolid(source,"box-source",listOf(0.1,0.2,0.3))
+        source=NativeWorldLabEditor.addHypotheticalMaterial(source,"Assumed alloy",7850.0,2e11,id="mat-used")
+        source=NativeWorldLabEditor.assignMaterial(source,"box-source","mat-used")
+        source=NativeWorldLabEditor.addHypotheticalMaterial(source,"Unused",null,null,id="mat-unused")
+        val exported=NativeWorldLabEditor.exportCadExchange(source)
+        val bundle=org.json.JSONObject(exported)
+        assertEquals("env-world-lab-cad",bundle.getString("format"))
+        assertEquals("m",bundle.getString("units"))
+        assertEquals(1,bundle.getJSONArray("entities").length())
+        assertEquals(1,bundle.getJSONArray("materials").length())
+        val target=NativeWorldLabEditor.blank()
+        val imported=NativeWorldLabEditor.importCadExchange(target,exported)
+        val project=NativeWorldLabProjectCodec.decode(imported)
+        assertEquals(1,project.entities.size)
+        assertEquals(NativeWorldLabProjectCodec.decode(source).entities[0].positionMeters,project.entities[0].positionMeters)
+        assertEquals(NativeWorldLabProjectCodec.decode(source).entities[0].rotationRadians,project.entities[0].rotationRadians)
+        assertEquals("mat-used",project.entities[0].materialId)
+        assertEquals("Assumed alloy",project.materials.single().name)
+        assertEquals(1,project.revision)
+    }
+
+    @Test fun cadExchangeMergesWithoutReplacingCameraAndRemapsConflictingIds(){
+        var target=NativeWorldLabEditor.blank()
+        target=NativeWorldLabEditor.addSolid(target,"box",id="shared")
+        target=NativeWorldLabEditor.positionSolid(target,"shared",listOf(4.0,5.0,6.0))
+        val source=NativeWorldLabEditor.blank()
+        val cad=NativeWorldLabEditor.addSolid(source,"sphere",id="shared")
+        val imported=NativeWorldLabEditor.importCadExchange(target,NativeWorldLabEditor.exportCadExchange(cad))
+        val project=NativeWorldLabProjectCodec.decode(imported)
+        assertEquals(2,project.entities.size)
+        assertEquals("shared",project.entities[0].id)
+        assertNotEquals("shared",project.entities[1].id)
+        assertEquals(NativeWorldLabProjectCodec.decode(target).cameraPositionMeters,project.cameraPositionMeters)
+        assertEquals(NativeWorldLabProjectCodec.decode(target).cameraLookingAtMeters,project.cameraLookingAtMeters)
+        assertEquals(1,project.revision)
+    }
+
+    @Test fun cadExchangeRejectsUnsupportedVersionsMalformedPrimitivesAndProjectOverflow(){
+        val source=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"box",id="box")
+        val exported=NativeWorldLabEditor.exportCadExchange(source)
+        val wrongVersion=org.json.JSONObject(exported).put("schemaVersion",99).toString()
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.importCadExchange(source,wrongVersion)}
+        val unknownField=org.json.JSONObject(exported).put("script","malicious").toString()
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.importCadExchange(source,unknownField)}
+        val malformed=org.json.JSONObject(exported)
+        malformed.getJSONArray("entities").getJSONObject(0)
+            .put("dimensionsMeters",org.json.JSONArray(listOf(0.0,1.0,1.0)))
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.importCadExchange(source,malformed.toString())}
+        var full=NativeWorldLabEditor.blank()
+        for(i in 0 until 200)full=NativeWorldLabEditor.addSolid(full,"box",id="e$i")
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.importCadExchange(full,NativeWorldLabEditor.exportCadExchange(source))
+        }
+    }

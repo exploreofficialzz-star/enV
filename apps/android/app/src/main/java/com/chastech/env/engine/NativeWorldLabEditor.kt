@@ -895,6 +895,116 @@ object NativeWorldLabEditor {
             .put("color","#A4C9C6").put("materialId",JSONObject.NULL)
             .put("scientificRole","visual-only").put("opacity",1.0))
     }
+
+    fun exportCadExchange(source:String):String{
+        NativeWorldLabProjectCodec.decode(source)
+        val root=JSONObject(source)
+        val entities=root.getJSONArray("entities")
+        val referenced=(0 until entities.length()).mapNotNull{index->
+            val entity=entities.getJSONObject(index)
+            if(entity.isNull("materialId"))null else entity.getString("materialId")
+        }.toSet()
+        val sourceMaterials=root.getJSONArray("materials")
+        val materials=JSONArray()
+        for(index in 0 until sourceMaterials.length()){
+            val material=sourceMaterials.getJSONObject(index)
+            if(material.getString("id") in referenced)materials.put(JSONObject(material.toString()))
+        }
+        val bundle=JSONObject()
+            .put("format","env-world-lab-cad")
+            .put("schemaVersion",1)
+            .put("units","m")
+            .put("coordinateFrame","LOCAL_ENU")
+            .put("source",JSONObject().put("projectId",root.getString("id"))
+                .put("revision",root.getInt("revision")))
+            .put("entities",JSONArray(entities.toString()))
+            .put("materials",materials)
+        val json=bundle.toString(2)
+        require(json.toByteArray(Charsets.UTF_8).size<=8*1024*1024){
+            "CAD geometry export exceeds the 8 MB interchange limit."
+        }
+        return json
+    }
+
+    fun importCadExchange(source:String,cadJson:String):String{
+        require(cadJson.toByteArray(Charsets.UTF_8).size<=8*1024*1024){
+            "CAD geometry files must be 8 MB or smaller."
+        }
+        val bundle=JSONObject(cadJson)
+        val requiredKeys=setOf("format","schemaVersion","units","coordinateFrame","source","entities","materials")
+        require(bundle.keys().asSequence().toSet()==requiredKeys){
+            "CAD geometry file contains missing or unsupported fields."
+        }
+        require(bundle.getString("format")=="env-world-lab-cad"&&
+            bundle.getInt("schemaVersion")==1&&bundle.getString("units")=="m"&&
+            bundle.getString("coordinateFrame")=="LOCAL_ENU"){
+            "This CAD geometry version, unit system or coordinate frame is unsupported."
+        }
+        val metadata=bundle.getJSONObject("source")
+        require(metadata.keys().asSequence().toSet()==setOf("projectId","revision")&&
+            metadata.getString("projectId").matches(Regex("[A-Za-z0-9_-]{1,120}"))&&
+            metadata.getInt("revision") in 0..1_000_000_000){
+            "CAD source project identity or revision is invalid."
+        }
+        val importedEntities=bundle.getJSONArray("entities")
+        val importedMaterials=bundle.getJSONArray("materials")
+        require(importedEntities.length() in 1..200&&importedMaterials.length()<=100){
+            "CAD geometry exceeds the 200-part or 100-material limit."
+        }
+        // Reuse the strict project codec to validate every primitive and hypothetical material.
+        val probe=JSONObject(blank("CAD import validation"))
+            .put("entities",JSONArray(importedEntities.toString()))
+            .put("materials",JSONArray(importedMaterials.toString()))
+        NativeWorldLabProjectCodec.decode(probe.toString())
+        return edit(source){target->
+            val existingEntities=target.getJSONArray("entities")
+            require(existingEntities.length()+importedEntities.length()<=200){
+                "Importing these parts would exceed the 200-solid invention limit."
+            }
+            val existingMaterials=target.getJSONArray("materials")
+            val usedMaterialIds=(0 until existingMaterials.length())
+                .map{existingMaterials.getJSONObject(it).getString("id")}.toMutableSet()
+            val materialIdMap=mutableMapOf<String,String>()
+            for(index in 0 until importedMaterials.length()){
+                val original=importedMaterials.getJSONObject(index)
+                val originalId=original.getString("id")
+                val existing=(0 until existingMaterials.length()).map{existingMaterials.getJSONObject(it)}
+                    .firstOrNull{it.getString("id")==originalId}
+                if(existing!=null&&existing.similar(original)){
+                    materialIdMap[originalId]=originalId
+                    continue
+                }
+                var nextId=originalId
+                if(nextId in usedMaterialIds){
+                    do{nextId=UUID.randomUUID().toString()}while(nextId in usedMaterialIds)
+                }
+                usedMaterialIds.add(nextId)
+                materialIdMap[originalId]=nextId
+                existingMaterials.put(JSONObject(original.toString()).put("id",nextId))
+            }
+            require(existingMaterials.length()<=100){
+                "Importing these assumptions would exceed the 100-material limit."
+            }
+            val usedEntityIds=(0 until existingEntities.length())
+                .map{existingEntities.getJSONObject(it).getString("id")}.toMutableSet()
+            for(index in 0 until importedEntities.length()){
+                val original=importedEntities.getJSONObject(index)
+                var nextId=original.getString("id")
+                if(nextId in usedEntityIds){
+                    do{nextId=UUID.randomUUID().toString()}while(nextId in usedEntityIds)
+                }
+                usedEntityIds.add(nextId)
+                val clone=JSONObject(original.toString()).put("id",nextId)
+                if(!clone.isNull("materialId")){
+                    val oldMaterial=clone.getString("materialId")
+                    clone.put("materialId",materialIdMap[oldMaterial]
+                        ?:error("CAD part refers to a missing imported material."))
+                }
+                existingEntities.put(clone)
+            }
+        }
+    }
+
     fun addHypotheticalMaterial(
         source:String,name:String,densityKgM3:Double?,youngModulusPa:Double?=null,
         id:String=UUID.randomUUID().toString(),
