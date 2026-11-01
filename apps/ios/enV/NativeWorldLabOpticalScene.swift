@@ -30,12 +30,7 @@ struct NativeOpticalSceneRay:Encodable {
     let segments:[NativeOpticalSceneSegment]
     let accountedLostBranchPowerFraction:Double
     let finalPrimaryRayPowerFraction:Double
-    let validity="Single geometric primary ray through user-invented " +
-        "non-overlapping box/sphere solids with hypothetically assumed " +
-        "isotropic, transparent refractive indices and Fresnel/Snell " +
-        "boundary behavior. Reflected partial branches are not propagated. " +
-        "No measured material identity, absorption, diffraction or " +
-        "physical instrument calibration is inferred."
+    let validity="Single geometric primary ray through user-invented " + "non-overlapping box/sphere solids with hypothetically assumed " + "isotropic, transparent refractive indices and Fresnel/Snell " + "boundary behavior. Reflected partial branches are not propagated. " + "No measured material identity, absorption, diffraction or " + "physical instrument calibration is inferred."
 }
 enum NativeWorldLabOpticalScene {
     private static let epsilon=1e-6
@@ -171,8 +166,7 @@ enum NativeWorldLabOpticalScene {
                     survivingRayPowerFraction:power))
                 break
             }
-            if collisions.count>1 &&
-                abs(collisions[0].1.distance-collisions[1].1.distance)<1e-7 {
+            if collisions.count>1 && abs(collisions[0].1.distance-collisions[1].1.distance)<1e-7 {
                 throw NativeWorldLabError.invalid("Ambiguous simultaneous optical surfaces.")
             }
             let (body,hit)=collisions[0]
@@ -220,8 +214,7 @@ enum NativeWorldLabOpticalScene {
             }
         }
         guard !segments.isEmpty,segments.allSatisfy({
-            bounded($0.endMeters)&&$0.survivingRayPowerFraction.isFinite&&
-            (0...1).contains($0.survivingRayPowerFraction)
+            bounded($0.endMeters)&&$0.survivingRayPowerFraction.isFinite&& (0...1).contains($0.survivingRayPowerFraction)
         })else{
             throw NativeWorldLabError.invalid("Optical trace left the finite native domain.")
         }
