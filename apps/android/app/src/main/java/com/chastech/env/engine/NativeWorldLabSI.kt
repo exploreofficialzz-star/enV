@@ -93,3 +93,62 @@ object NativeWorldLabSI {
         require(source.dimensions==target.dimensions){"Incompatible port dimensions"}
     }
 }
+
+
+data class NativeScienceComponent(val id:String,val modelId:String,
+    val ports:List<NativeSciencePort>)
+data class NativeScienceConnection(
+    val fromComponentId:String,val fromPortId:String,
+    val toComponentId:String,val toPortId:String,val delayed:Boolean=false)
+data class NativeScientificGraph(
+    val projectId:String,val projectRevision:Int,
+    val components:List<NativeScienceComponent>,
+    val connections:List<NativeScienceConnection>)
+object NativeWorldLabGraph {
+    private val id=Regex("[A-Za-z0-9_-]{1,120}")
+    /** Fail closed on untyped, duplicate or instantaneous cyclic science graphs. */
+    fun validate(g:NativeScientificGraph):NativeScientificGraph {
+        require(id.matches(g.projectId)&&g.projectRevision in 0..1000000000 &&
+            g.components.size in 1..128 && g.connections.size<=512){
+            "Invalid scientific graph identity, revision or resource budget"}
+        val ids=mutableMapOf<String,NativeScienceComponent>()
+        g.components.forEach{c->
+            require(id.matches(c.id)&&id.matches(c.modelId)&&
+                !ids.containsKey(c.id)&&c.ports.size in 1..20){
+                "Duplicate scientific component or invalid port count"}
+            val portIds=mutableSetOf<String>()
+            c.ports.forEach{p->
+                require(id.matches(p.id)&&portIds.add(p.id)&&
+                    p.direction in setOf("input","output","bidirectional")&&
+                    p.frame in setOf("SCALAR","LOCAL_ENU","ECEF","INERTIAL")&&
+                    p.flow in setOf("electrical","mechanical","thermal","fluid","chemical","signal")){
+                    "Invalid scientific port metadata"}
+                NativeWorldLabSI.declare(0.0,p.unit)
+            }
+            ids[c.id]=c
+        }
+        val destinations=mutableSetOf<String>()
+        val arcs=ids.keys.associateWith{mutableSetOf<String>()}.toMutableMap()
+        g.connections.forEach{edge->
+            val from=ids[edge.fromComponentId]?.ports?.firstOrNull{it.id==edge.fromPortId}
+            val to=ids[edge.toComponentId]?.ports?.firstOrNull{it.id==edge.toPortId}
+            require(from!=null&&to!=null){"Scientific connection references an absent port"}
+            NativeWorldLabSI.compatible(from,to)
+            require(destinations.add(edge.toComponentId+":"+edge.toPortId)){
+                "Only one upstream scientific source per input"}
+            if(!edge.delayed)arcs.getValue(edge.fromComponentId).add(edge.toComponentId)
+        }
+        val done=mutableSetOf<String>()
+        val active=mutableSetOf<String>()
+        fun visit(key:String){
+            require(active.add(key)){"Instantaneous scientific algebraic feedback cycle"}
+            if(key !in done){
+                arcs.getValue(key).forEach{if(it !in done)visit(it)}
+                done.add(key)
+            }
+            active.remove(key)
+        }
+        ids.keys.forEach{if(it !in done)visit(it)}
+        return g
+    }
+}
