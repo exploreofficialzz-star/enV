@@ -83,6 +83,8 @@ fun NativeWorldLabForm() {
     var time by remember { mutableFloatStateOf(0f) }
     var speed by remember { mutableFloatStateOf(1f) }
     var playing by remember { mutableStateOf(false) }
+    var reversePlayback by remember { mutableStateOf(false) }
+    var worldEpochUTC by remember { mutableStateOf(java.time.Instant.now().toString()) }
     var mass by remember { mutableFloatStateOf(1f) }
     var spring by remember { mutableFloatStateOf(4f) }
     var resistance by remember { mutableFloatStateOf(1000f) }
@@ -423,7 +425,10 @@ fun NativeWorldLabForm() {
                 kind=checkpoint.modelId;time=checkpoint.timeSeconds.toFloat()
                 mass=checkpoint.massKg.toFloat();spring=checkpoint.springNPerM.toFloat()
                 resistance=checkpoint.resistanceOhm.toFloat();diffusivity=checkpoint.diffusivityM2PerS.toFloat()
-                playing=false;timelineStatus="Matching reference experiment and inputs restored."
+                playing=false;reversePlayback=checkpoint.playbackDirection=="reverse-recording"
+                checkpoint.worldEpochUTC?.let{worldEpochUTC=it}
+                checkpoint.playbackRate?.let{speed=it.toFloat()}
+                timelineStatus="Matching reference experiment inputs and clock state restored."
             }.onFailure{timelineStatus=it.message?:"Timeline checkpoint restore failed."}
         }
     }
@@ -571,11 +576,12 @@ fun NativeWorldLabForm() {
             if(motorFrame==result.samples.lastIndex)motorPlaying=false
         }
     }
-    LaunchedEffect(playing,speed) {
+    LaunchedEffect(playing,speed,reversePlayback) {
         while(playing) {
             delay(40)
-            time=(time+0.04f*speed).coerceAtMost(12f)
-            if(time>=12f)playing=false
+            time=if(reversePlayback)(time-0.04f*speed).coerceAtLeast(0f)
+                else (time+0.04f*speed).coerceAtMost(12f)
+            if((reversePlayback&&time<=0f)||(!reversePlayback&&time>=12f))playing=false
         }
     }
     if(confirmation!=null) AlertDialog(
@@ -1574,7 +1580,12 @@ fun NativeWorldLabForm() {
                 runCatching{
                     pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
                         NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
-                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble()))
+                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble(),
+                            wallTimeUTC=java.time.Instant.now().toString(),worldEpochUTC=worldEpochUTC,
+                            solverInternalTimeSeconds=time.toDouble(),displaySampleTimeSeconds=time.toDouble(),
+                            playbackRate=speed.toDouble(),
+                            playbackDirection=if(reversePlayback)"reverse-recording" else "forward",
+                            timezoneDisplay=java.time.ZoneId.systemDefault().id))
                     timelineExportPicker.launch("world-lab-time-checkpoint.json")
                 }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
             }){Text("Save checkpoint")}
@@ -1583,12 +1594,20 @@ fun NativeWorldLabForm() {
             }
         }
         if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
+        Text("Wall time (UTC): "+java.time.Instant.now().toString(),style=MaterialTheme.typography.bodySmall)
+        Text("World date (UTC): "+runCatching{
+            java.time.Instant.parse(worldEpochUTC).plusNanos((time*1_000_000_000.0).toLong()).toString()
+        }.getOrDefault(worldEpochUTC),style=MaterialTheme.typography.bodySmall)
+        Text("Simulation "+labNumber(time.toDouble())+" s · Solver sample "+labNumber(time.toDouble())+
+            " s · Display sample "+labNumber(time.toDouble())+" s · "+java.time.ZoneId.systemDefault().id,
+            style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onClick={playing=false;time=0f}) { Text("Beginning") }
-            OutlinedButton(onClick={playing=false;time=(time-1f/240f).coerceAtLeast(0f)}) { Text("Previous") }
-            Button(onClick={playing=!playing}) { Text(if(playing)"Pause" else "Play") }
-            OutlinedButton(onClick={playing=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Next") }
-            OutlinedButton(onClick={playing=false;time=12f}) { Text("End") }
+            OutlinedButton(onClick={playing=false;reversePlayback=false;time=0f}) { Text("Beginning") }
+            OutlinedButton(onClick={playing=false;reversePlayback=false;time=(time-1f/240f).coerceAtLeast(0f)}) { Text("Previous") }
+            Button(onClick={reversePlayback=false;playing=!playing}) { Text(if(playing&&!reversePlayback)"Pause" else "Play forward") }
+            OutlinedButton(onClick={reversePlayback=true;playing=true}) { Text("Rewind recording") }
+            OutlinedButton(onClick={playing=false;reversePlayback=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Next") }
+            OutlinedButton(onClick={playing=false;reversePlayback=false;time=12f}) { Text("End") }
         }
         Text("Simulated time: "+labNumber(time.toDouble())+" s")
         Slider(value=time,onValueChange={time=it;playing=false},valueRange=0f..12f,

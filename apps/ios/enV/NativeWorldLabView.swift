@@ -25,6 +25,8 @@ struct NativeWorldLabView:View {
     @State private var seconds=0.0
     @State private var speed=1.0
     @State private var playing=false
+    @State private var reversePlayback=false
+    @State private var worldEpochUTC=Date()
     @State private var mass=1.0
     @State private var resistance=1000.0
     @State private var diffusivity=0.02
@@ -526,12 +528,14 @@ struct NativeWorldLabView:View {
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
                 HStack(spacing:6){
-                    Button("Beginning"){playing=false;seconds=0}
+                    Button("Beginning"){playing=false;reversePlayback=false;seconds=0}
                         .buttonStyle(.bordered)
                     Button("Prev"){playing=false;seconds=max(0,seconds-1.0/240)}
                         .buttonStyle(.bordered)
-                    Button(playing ? "Pause":"Play"){playing.toggle()}
-                        .buttonStyle(.borderedProminent)
+                    Button(playing && !reversePlayback ? "Pause":"Play forward"){
+                        reversePlayback=false;playing.toggle()
+                    }.buttonStyle(.borderedProminent)
+                    Button("Rewind recording"){reversePlayback=true;playing=true}.buttonStyle(.bordered)
                     Button("Next"){playing=false;seconds=min(12,seconds+1.0/240)}
                         .buttonStyle(.bordered)
                     Button("End"){playing=false;seconds=12}
@@ -597,6 +601,13 @@ struct NativeWorldLabView:View {
                     Button("Next step"){playing=false;seconds=min(12,seconds+1.0/240)}.buttonStyle(.bordered)
                     Button("End"){playing=false;seconds=12}.buttonStyle(.bordered)
                 }
+                Text("Wall time (UTC): "+ISO8601DateFormatter().string(from:Date()))
+                    .font(.caption).accessibilityLabel("Wall clock in UTC")
+                Text("World date (UTC): "+ISO8601DateFormatter().string(from:worldEpochUTC.addingTimeInterval(seconds)))
+                    .font(.caption).accessibilityLabel("Simulated world date in UTC")
+                Text("Simulation "+String(format:"%.4f",seconds)+" s · solver sample "+String(format:"%.4f",seconds)+
+                    " s · display sample "+String(format:"%.4f",seconds)+" s · "+TimeZone.current.identifier)
+                    .font(.caption)
                 Text("Simulated time: "+String(format:"%.2f",seconds)+" s")
                 Slider(value:$seconds,in:0...12,onEditingChanged:{ editing in if editing{playing=false} }).accessibilityLabel("Simulated elapsed time")
                 Picker("Playback speed",selection:$speed){
@@ -801,7 +812,10 @@ struct NativeWorldLabView:View {
         .onReceive(timer){now in
             let dt=max(0,min(0.25,now.timeIntervalSince(lastTick)))
             lastTick=now
-            if playing {seconds=min(12,seconds+dt*speed);if seconds>=12{playing=false}}
+            if playing {
+                seconds=reversePlayback ? max(0,seconds-dt*speed) : min(12,seconds+dt*speed)
+                if (reversePlayback && seconds<=0) || (!reversePlayback && seconds>=12){playing=false}
+            }
             if motorPlaying,let run=motorRun {
                 motorTime=min(run.samples.last?.timeSeconds ?? 4,motorTime+dt*motorSpeed)
                 if motorTime >= (run.samples.last?.timeSeconds ?? 4){motorPlaying=false}
@@ -878,7 +892,12 @@ struct NativeWorldLabView:View {
         do {
             let id=mode==0 ? "spring" : mode==1 ? "rc" : "heat"
             let checkpoint=try NativeWorldLabDemoCheckpoint.make(modelId:id,timeSeconds:seconds,
-                massKg:mass,springNPerM:4,resistanceOhm:resistance,diffusivityM2PerS:diffusivity)
+                massKg:mass,springNPerM:4,resistanceOhm:resistance,diffusivityM2PerS:diffusivity,
+                wallTimeUTC:ISO8601DateFormatter().string(from:Date()),
+                worldEpochUTC:ISO8601DateFormatter().string(from:worldEpochUTC),
+                solverInternalTimeSeconds:seconds,displaySampleTimeSeconds:seconds,
+                playbackRate:speed,playbackDirection:reversePlayback ? "reverse-recording":"forward",
+                timezoneDisplay:TimeZone.current.identifier)
             timelineCheckpointFile=NativeWorldLabJsonFile(content:try checkpoint.encodeBounded())
             exportingTimelineCheckpoint=true;timelineStatus=""
         }catch{problem=error.localizedDescription;timelineStatus=""}
@@ -888,6 +907,9 @@ struct NativeWorldLabView:View {
         mode=checkpoint.modelId=="spring" ? 0 : checkpoint.modelId=="rc" ? 1 : 2
         seconds=checkpoint.timeSeconds;mass=checkpoint.massKg;resistance=checkpoint.resistanceOhm
         diffusivity=checkpoint.diffusivityM2PerS
+        if let epoch=checkpoint.worldEpochUTC,let parsed=ISO8601DateFormatter().date(from:epoch){worldEpochUTC=parsed}
+        speed=checkpoint.playbackRate ?? 1
+        reversePlayback=checkpoint.playbackDirection=="reverse-recording"
         playing=false;lastTick=Date();redraw()
         timelineStatus="Matching reference experiment parameters and time restored."
     }
