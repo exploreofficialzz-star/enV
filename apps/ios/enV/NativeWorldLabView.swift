@@ -3116,6 +3116,35 @@ private struct NativeWorldLabMultiCadPanel:View {
         do{onEdit(try work(source));error=""}
         catch let caught{error=caught.localizedDescription}
     }
+    private var selectedMeasurement:NativeWorldLabEditor.GeometryMeasurement? {
+        guard ids.count==2 else{return nil}
+        return try? NativeWorldLabEditor.measureCenters(project,fromId:ids[0],toId:ids[1])
+    }
+    @ViewBuilder private var snapAndMeasure:some View {
+        VStack(alignment:.leading,spacing:6){
+            HStack{
+                TextField("Grid spacing m",text:$gridStep).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Snap selected"){
+                    guard let step=Double(gridStep) else{
+                        error="Enter a grid spacing from 0.001 to 100 metres";return
+                    }
+                    apply{try NativeWorldLabEditor.snapSolids($0,ids:ids,gridMeters:step)}
+                }.disabled(ids.isEmpty)
+            }.buttonStyle(.bordered)
+            if let measurement=selectedMeasurement {
+                VStack(alignment:.leading,spacing:3){
+                    Text(String(format:"Centre distance: %.3f m",measurement.centerDistanceM))
+                    Text(String(format:"Horizontal distance: %.3f m",measurement.horizontalDistanceM))
+                    Text(String(format:"Offset X/Y/Z: %.3f / %.3f / %.3f m",
+                        measurement.offsetXM,measurement.offsetYM,measurement.offsetZM))
+                }.font(.caption)
+            }else{
+                Text("Select exactly two parts to measure their centre-to-centre distance.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
     var body:some View{
         VStack(alignment:.leading,spacing:8){
             Text("Multi-part CAD").font(.headline)
@@ -3133,27 +3162,7 @@ private struct NativeWorldLabMultiCadPanel:View {
                 }
             }
             Text("Selected: \(ids.count) / \(project.entities.count)").font(.caption)
-            HStack{
-                TextField("Grid spacing m",text:$gridStep).keyboardType(.decimalPad)
-                    .textFieldStyle(.roundedBorder)
-                Button("Snap selected"){
-                    guard let step=Double(gridStep) else{
-                        error="Enter a grid spacing from 0.001 to 100 metres";return
-                    }
-                    apply{try NativeWorldLabEditor.snapSolids($0,ids:ids,gridMeters:step)}
-                }.disabled(ids.isEmpty)
-            }.buttonStyle(.bordered)
-            if ids.count==2,
-               let measurement=try? NativeWorldLabEditor.measureCenters(project,fromId:ids[0],toId:ids[1]){
-                Text("Centre distance: "+String(format:"%.3f",measurement.centerDistanceM)+
-                    " m · ΔX "+String(format:"%.3f",measurement.offsetXM)+
-                    " · ΔY "+String(format:"%.3f",measurement.offsetYM)+
-                    " · ΔZ "+String(format:"%.3f",measurement.offsetZM)+" m")
-                    .font(.caption)
-            }else{
-                Text("Select exactly two parts to measure their centre-to-centre distance.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            snapAndMeasure
             Picker("Axis",selection:$axis){
                 Text("X").tag(0);Text("Y").tag(1);Text("Z").tag(2)
             }.pickerStyle(.segmented)
