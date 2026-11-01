@@ -427,12 +427,13 @@ struct NativeScientificAdapter {
     let modelId:String
     let modelVersion:String
     let initialOutputs:[String:NativeScienceQuantity]
+    let reset:()->Void
     let advance:(Double,Double,[String:NativeScienceQuantity]) throws -> NativeScientificStepOutput
     init(componentId:String,modelId:String,modelVersion:String,
-         initialOutputs:[String:NativeScienceQuantity]=[:],
+         initialOutputs:[String:NativeScienceQuantity]=[:],reset:@escaping ()->Void={},
          advance:@escaping (Double,Double,[String:NativeScienceQuantity]) throws -> NativeScientificStepOutput) {
         self.componentId=componentId;self.modelId=modelId;self.modelVersion=modelVersion
-        self.initialOutputs=initialOutputs;self.advance=advance
+        self.initialOutputs=initialOutputs;self.reset=reset;self.advance=advance
     }
 }
 struct NativeScientificExchangeSample {
@@ -471,6 +472,7 @@ enum NativeWorldLabExecution {
                 throw NativeWorldLabError.invalid("Unregistered or mismatched scientific model version")
             }
         }
+        for adapter in adapters {adapter.reset()}
         var adjacency=Dictionary(uniqueKeysWithValues:graph.components.map{($0.id,Set<String>())})
         var indegree=Dictionary(uniqueKeysWithValues:graph.components.map{($0.id,0)})
         for edge in graph.connections where !edge.delayed {
@@ -598,7 +600,8 @@ enum NativeWorldLabExecution {
                 suppliedW:0,dissipatedW:0,storedRateW:0)
         }
         var capacitorVoltage=initialVoltageV
-        let load=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0"){_,delta,inputs in
+        let load=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",
+            modelVersion:"1.0.0",reset:{capacitorVoltage=initialVoltageV}){_,delta,inputs in
             guard let connected=inputs["Vin"] else {
                 throw NativeWorldLabError.invalid("RC load requires its connected source voltage")
             }
