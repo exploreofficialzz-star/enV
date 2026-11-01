@@ -14534,6 +14534,24 @@ private final class ABookLocalStore {
         }
     }
 
+    func removeAttachment(id: UUID) throws {
+        var fileToRemove: URL?
+        try perform { context in
+            let request = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
+            request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+            guard let attachment = try context.fetch(request).first else {
+                throw NSError(domain: "ABookAttachment", code: 7, userInfo: [NSLocalizedDescriptionKey: "That attachment is no longer available."])
+            }
+            let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("Abook", isDirectory: true).standardizedFileURL
+            let candidate = root.appendingPathComponent(attachment.relativePath).standardizedFileURL
+            if candidate.path.hasPrefix(root.path + "/") { fileToRemove = candidate }
+            context.delete(attachment)
+            try context.save()
+        }
+        if let fileToRemove { try? fileManager.removeItem(at: fileToRemove) }
+    }
+
     func importFiles(noteID: UUID, urls: [URL]) throws -> [ABookNativeAttachment] {
         guard urls.count <= 10_000 else {
             throw NSError(domain: "ABookAttachment", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose up to 10,000 attachments at a time."])
@@ -15020,6 +15038,7 @@ private struct NativeABookView: View {
                                     }.buttonStyle(.plain).accessibilityLabel(selectedPDFIDs.contains(attachment.id) ? "Deselect PDF" : "Select PDF")
                                     Button("PDF tools") { activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
                                 }
+                                Button("Remove", role: .destructive) { removeAttachment(attachment) }.buttonStyle(.bordered)
                             }
                         }
                         if let active = attachments.first(where: { $0.id == activePDFID }) {
@@ -15194,6 +15213,17 @@ private struct NativeABookView: View {
         do {
             let restored = try store.restore(noteID: id, revisionID: revision.id)
             reload(preferred: restored.id)
+        } catch { showError(error) }
+    }
+
+    private func removeAttachment(_ attachment: ABookNativeAttachment) {
+        do {
+            try store.removeAttachment(id: attachment.id)
+            attachments = try store.attachments(noteID: attachment.noteID)
+            selectedPDFIDs.remove(attachment.id)
+            if activePDFSelection == attachment.id { activePDFSelection = nil; pdfText = "" }
+            status = "Attachment removed from this device"
+            errorText = ""
         } catch { showError(error) }
     }
 
