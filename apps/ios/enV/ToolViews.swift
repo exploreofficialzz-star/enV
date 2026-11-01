@@ -14055,6 +14055,11 @@ private struct ABookNativeAttachment: Identifiable, Hashable {
 
 private struct ABookNativeRevision: Identifiable {
     var id: UUID
+    var noteID: UUID
+    var title: String
+    var body: String
+    var notebook: String
+    var tags: [String]
     var revision: Int
     var createdAt: Date
 }
@@ -14096,6 +14101,180 @@ private final class ABookAttachmentEntity: NSManagedObject {
     @NSManaged var size: Int64
     @NSManaged var createdAt: Date
 }
+
+
+private func aBookCRC32(_ bytes: Data) -> UInt32 {
+    var crc: UInt32 = 0xffff_ffff
+    for byte in bytes {
+        crc ^= UInt32(byte)
+        for _ in 0..<8 {
+            crc = (crc >> 1) ^ ((crc & 1) == 1 ? 0xedb8_8320 : 0)
+        }
+    }
+    return crc ^ 0xffff_ffff
+}
+
+private func appendABookZIPLE<T: FixedWidthInteger>(_ input: T, to data: inout Data) {
+    var value = input.littleEndian
+    withUnsafeBytes(of: &value) { data.append(contentsOf: $0) }
+}
+
+private func readABookZIPLE<T: FixedWidthInteger>(_ type: T.Type, from data: Data, at offset: Int) throws -> T {
+    let size = MemoryLayout<T>.size
+    guard offset >= 0, offset + size <= data.count else {
+        throw NSError(domain: "ABookArchive", code: 1, userInfo: [NSLocalizedDescriptionKey: "The backup archive is truncated."])
+    }
+    var result: T = 0
+    for index in 0..<size { result |= T(data[offset + index]) << (index * 8) }
+    return result
+}
+
+private func makeABookStoredZIP(_ files: [String: Data]) throws -> Data {
+    guard files.count <= 10_001 else {
+        throw NSError(domain: "ABookArchive", code: 2, userInfo: [NSLocalizedDescriptionKey: "This backup contains too many files."])
+    }
+    var archive = Data()
+    var directory = Data()
+    for name in files.keys.sorted() {
+        guard let payload = files[name], !name.isEmpty, !name.hasPrefix("/"),
+              !name.contains("\\"), !name.split(separator: "/", omittingEmptySubsequences: false).contains("..") else {
+            throw NSError(domain: "ABookArchive", code: 3, userInfo: [NSLocalizedDescriptionKey: "The backup contains an unsafe file path."])
+        }
+        let nameBytes = Data(name.utf8)
+        guard nameBytes.count <= Int(UInt16.max), payload.count <= Int(UInt32.max),
+              archive.count <= Int(UInt32.max), directory.count <= Int(UInt32.max) else {
+            throw NSError(domain: "ABookArchive", code: 4, userInfo: [NSLocalizedDescriptionKey: "This backup is larger than the supported ZIP format."])
+        }
+        let size = UInt32(payload.count)
+        let checksum = aBookCRC32(payload)
+        let localOffset = UInt32(archive.count)
+        appendABookZIPLE(UInt32(0x04034b50), to: &archive)
+        appendABookZIPLE(UInt16(20), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        appendABookZIPLE(checksum, to: &archive)
+        appendABookZIPLE(size, to: &archive)
+        appendABookZIPLE(size, to: &archive)
+        appendABookZIPLE(UInt16(nameBytes.count), to: &archive)
+        appendABookZIPLE(UInt16(0), to: &archive)
+        archive.append(nameBytes)
+        archive.append(payload)
+
+        appendABookZIPLE(UInt32(0x02014b50), to: &directory)
+        appendABookZIPLE(UInt16(20), to: &directory)
+        appendABookZIPLE(UInt16(20), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(checksum, to: &directory)
+        appendABookZIPLE(size, to: &directory)
+        appendABookZIPLE(size, to: &directory)
+        appendABookZIPLE(UInt16(nameBytes.count), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt16(0), to: &directory)
+        appendABookZIPLE(UInt32(0), to: &directory)
+        appendABookZIPLE(localOffset, to: &directory)
+        directory.append(nameBytes)
+    }
+    guard archive.count + directory.count + 22 <= 180 * 1024 * 1024,
+          files.count <= Int(UInt16.max) else {
+        throw NSError(domain: "ABookArchive", code: 5, userInfo: [NSLocalizedDescriptionKey: "The backup exceeds A book's 180 MB limit."])
+    }
+    let centralOffset = UInt32(archive.count)
+    let centralSize = UInt32(directory.count)
+    archive.append(directory)
+    appendABookZIPLE(UInt32(0x06054b50), to: &archive)
+    appendABookZIPLE(UInt16(0), to: &archive)
+    appendABookZIPLE(UInt16(0), to: &archive)
+    appendABookZIPLE(UInt16(files.count), to: &archive)
+    appendABookZIPLE(UInt16(files.count), to: &archive)
+    appendABookZIPLE(centralSize, to: &archive)
+    appendABookZIPLE(centralOffset, to: &archive)
+    appendABookZIPLE(UInt16(0), to: &archive)
+    return archive
+}
+
+private func readABookStoredZIP(_ archive: Data) throws -> [String: Data] {
+    guard archive.count >= 22, archive.count <= 180 * 1024 * 1024 else {
+        throw NSError(domain: "ABookArchive", code: 6, userInfo: [NSLocalizedDescriptionKey: "Choose a valid A book backup smaller than 180 MB."])
+    }
+    let lowerBound = max(0, archive.count - 65_557)
+    var endOffset: Int?
+    for offset in stride(from: archive.count - 22, through: lowerBound, by: -1) {
+        if try readABookZIPLE(UInt32.self, from: archive, at: offset) == 0x06054b50 {
+            endOffset = offset
+            break
+        }
+    }
+    guard let end = endOffset else {
+        throw NSError(domain: "ABookArchive", code: 7, userInfo: [NSLocalizedDescriptionKey: "The backup ZIP directory is missing or damaged."])
+    }
+    let entries = Int(try readABookZIPLE(UInt16.self, from: archive, at: end + 10))
+    let directorySize = Int(try readABookZIPLE(UInt32.self, from: archive, at: end + 12))
+    let directoryOffset = Int(try readABookZIPLE(UInt32.self, from: archive, at: end + 16))
+    guard entries <= 10_001, directoryOffset >= 0, directorySize >= 0,
+          directoryOffset + directorySize <= end else {
+        throw NSError(domain: "ABookArchive", code: 8, userInfo: [NSLocalizedDescriptionKey: "The backup ZIP directory is invalid or too large."])
+    }
+    var result: [String: Data] = [:]
+    var cursor = directoryOffset
+    var total = 0
+    for _ in 0..<entries {
+        guard try readABookZIPLE(UInt32.self, from: archive, at: cursor) == 0x02014b50 else {
+            throw NSError(domain: "ABookArchive", code: 9, userInfo: [NSLocalizedDescriptionKey: "The backup ZIP directory is damaged."])
+        }
+        let flags = try readABookZIPLE(UInt16.self, from: archive, at: cursor + 8)
+        let method = try readABookZIPLE(UInt16.self, from: archive, at: cursor + 10)
+        let checksum = try readABookZIPLE(UInt32.self, from: archive, at: cursor + 16)
+        let compressed = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 20))
+        let uncompressed = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 24))
+        let nameLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: cursor + 28))
+        let extraLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: cursor + 30))
+        let commentLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: cursor + 32))
+        let localOffset = Int(try readABookZIPLE(UInt32.self, from: archive, at: cursor + 42))
+        let nameStart = cursor + 46
+        let next = nameStart + nameLength + extraLength + commentLength
+        guard flags == 0, method == 0, compressed == uncompressed,
+              uncompressed <= 100 * 1024 * 1024, next <= archive.count else {
+            throw NSError(domain: "ABookArchive", code: 10, userInfo: [NSLocalizedDescriptionKey: "Encrypted, compressed or oversized backup entries are not supported by this native importer."])
+        }
+        guard let name = String(data: archive.subdata(in: nameStart..<(nameStart + nameLength)), encoding: .utf8),
+              !name.isEmpty, !name.hasPrefix("/"), !name.contains("\\"),
+              !name.split(separator: "/", omittingEmptySubsequences: false).contains(".."),
+              result[name] == nil else {
+            throw NSError(domain: "ABookArchive", code: 11, userInfo: [NSLocalizedDescriptionKey: "The backup contains an unsafe or duplicate file path."])
+        }
+        guard try readABookZIPLE(UInt32.self, from: archive, at: localOffset) == 0x04034b50 else {
+            throw NSError(domain: "ABookArchive", code: 12, userInfo: [NSLocalizedDescriptionKey: "A backup file entry is damaged."])
+        }
+        let localNameLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: localOffset + 26))
+        let localExtraLength = Int(try readABookZIPLE(UInt16.self, from: archive, at: localOffset + 28))
+        let payloadStart = localOffset + 30 + localNameLength + localExtraLength
+        guard payloadStart >= 0, payloadStart + uncompressed <= directoryOffset else {
+            throw NSError(domain: "ABookArchive", code: 13, userInfo: [NSLocalizedDescriptionKey: "A backup file entry has an invalid size."])
+        }
+        let payload = archive.subdata(in: payloadStart..<(payloadStart + uncompressed))
+        guard aBookCRC32(payload) == checksum else {
+            throw NSError(domain: "ABookArchive", code: 14, userInfo: [NSLocalizedDescriptionKey: "A backup file failed its integrity check."])
+        }
+        total += uncompressed
+        guard total <= 150 * 1024 * 1024 else {
+            throw NSError(domain: "ABookArchive", code: 15, userInfo: [NSLocalizedDescriptionKey: "The backup expands beyond A book's 150 MB safety limit."])
+        }
+        result[name] = payload
+        cursor = next
+    }
+    guard cursor == directoryOffset + directorySize, result["manifest.json"] != nil else {
+        throw NSError(domain: "ABookArchive", code: 16, userInfo: [NSLocalizedDescriptionKey: "The backup manifest is missing or the ZIP directory is inconsistent."])
+    }
+    return result
+}
+
 
 private final class ABookLocalStore {
     static let shared = ABookLocalStore()
@@ -14283,7 +14462,7 @@ private final class ABookLocalStore {
             let request = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
             request.predicate = NSPredicate(format: "noteID == %@", noteID as CVarArg)
             request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-            return try context.fetch(request).map { ABookNativeRevision(id: $0.id, revision: Int($0.revision), createdAt: $0.createdAt) }
+            return try context.fetch(request).map { ABookNativeRevision(id: $0.id, noteID: $0.noteID, title: $0.title, body: $0.body, notebook: $0.notebook, tags: decodeTags($0.tagsData), revision: Int($0.revision), createdAt: $0.createdAt) }
         }
     }
 
