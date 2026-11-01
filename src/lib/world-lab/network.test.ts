@@ -103,3 +103,17 @@ test("DC current direction rejects invalid numeric evidence",()=>{
  assert.throws(()=>dcBranchCurrentFlow(component,Number.NaN),/finite SI/);
  assert.throws(()=>dcBranchCurrentFlow(component,1e7),/finite SI/);
 });
+
+
+test("an unloaded ideal source is a valid open-load circuit with zero branch flow",()=>{
+ const network=starterDcNetwork("open-load");
+ network.components=network.components.filter(c=>c.kind==="dc-source");
+ const result=solveDcNetwork(network,{id:"lab",revision:3});
+ assert.equal(result.branchCurrentsA.source,0);
+ assert.equal(result.sourcePowerSuppliedW,0);
+ assert.equal(result.resistivePowerW,0);
+ const source=network.components[0];
+ const flow=dcBranchCurrentFlow(source,result.branchCurrentsA.source);
+ assert.equal(flow.direction,"zero");
+ assert.equal(flow.magnitudeA,0);
+});
