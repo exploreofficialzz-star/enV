@@ -1,7 +1,31 @@
 {
   "pricingVersion": "env-metering-preview-2026-10-18-v1",
-  "toolCount": 5,
+  "toolCount": 6,
   "profiles": [
+    {
+      "toolId": "a-book",
+      "toolName": "A book",
+      "category": "productivity",
+      "toolStatus": "active",
+      "engineType": "custom",
+      "clientSide": true,
+      "requiresBackend": false,
+      "executionMode": "local-device",
+      "billingKey": "local.general",
+      "pricingMode": "per-unit-hypothesis",
+      "provisionalSubunitsPerUnit": 200,
+      "unitLabel": "operation",
+      "meteringDimensions": [
+        "operation-count"
+      ],
+      "optionalAiAssistProfile": null,
+      "premiumRequired": false,
+      "adsEligible": false,
+      "priceStatus": "provisional",
+      "manualAuditRequired": true,
+      "classificationReason": "Local execution metadata; general local utility fallback pending individual review.",
+      "pricingVersion": "env-metering-preview-2026-10-18-v1"
+    },
     {
       "toolId": "age-calculator",
       "toolName": "Age Calculator",
