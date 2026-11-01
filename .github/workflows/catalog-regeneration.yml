@@ -6,7 +6,7 @@ on:
     paths:
       - ".github/workflows/catalog-regeneration.yml"
       - "src/data/math-expansion.json"
-      - "scripts/gen-catalog.mjs"
+      - "scripts/remove-misplaced-design-build-calculators.mjs"
       - "scripts/check-design.mjs"
       - "scripts/check-billing.mjs"
       - "scripts/export-native-engine-data.mjs"
@@ -41,8 +41,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Regenerate Web catalogue
-        run: node scripts/gen-catalog.mjs
+      - name: Surgically remove the retired Design/Build calculator entries
+        run: node scripts/remove-misplaced-design-build-calculators.mjs
       - name: Regenerate Android and iOS engine data and coverage
         run: npm run export:native-engine-data
       - name: Regenerate shared native catalogue
