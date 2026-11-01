@@ -80,7 +80,7 @@ export function quantity(value:number,unit:ScientificUnit,evidence:EvidenceLabel
   const valueSI=value*spec.factor,uncertaintySI=uncertainty===null?null:uncertainty*spec.factor;
   if(!Number.isFinite(valueSI)||uncertaintySI!==null&&!Number.isFinite(uncertaintySI))
     throw new Error("Scientific unit conversion exceeded finite bounds.");
-  return Object.freeze({valueSI,unit,dimension:[...spec.dimension] as Dimension,
+  return Object.freeze({valueSI,unit,dimension:Object.freeze([...spec.dimension]) as unknown as Dimension,
     evidence,sourceId,uncertaintySI});
 }
 export function parseQuantity(data:unknown):ScientificQuantity{
