@@ -287,13 +287,28 @@ enum NativeWorldLabSI {
             (unit != "K" || value>=0) else {
             throw NativeWorldLabError.invalid("Invalid source, physical quantity or SI unit")
         }
-        return NativeScienceQuantity(valueSI:value*spec.factor,unit:unit,
-            dimension:spec.dimension,evidence:evidence,
-            sourceId:sourceId,uncertaintySI:uncertainty.map{$0*spec.factor})
+        let canonical=value*spec.factor
+        let sigma=uncertainty.map{$0*spec.factor}
+        guard canonical.isFinite,sigma.map({$0.isFinite}) ?? true else {
+            throw NativeWorldLabError.invalid("Scientific value or uncertainty exceeds finite SI bounds")
+        }
+        return NativeScienceQuantity(valueSI:canonical,unit:unit,
+            dimension:spec.dimension,evidence:evidence,sourceId:sourceId,uncertaintySI:sigma)
+    }
+    static func validate(_ value:NativeScienceQuantity)throws {
+        guard let spec=units[value.unit],value.dimension==spec.dimension,
+              value.valueSI.isFinite,abs(value.valueSI)<=1e30,
+              ["measured-observed","physics-model-computed","hypothetical-user-assumed"].contains(value.evidence),
+              value.sourceId.map({$0.range(of:"^[A-Za-z0-9:_-]{1,120}$",options:.regularExpression) != nil}) ?? true,
+              value.evidence != "measured-observed" || !(value.sourceId ?? "").isEmpty,
+              value.uncertaintySI.map({$0.isFinite&&(0...1e30).contains($0)}) ?? true,
+              value.unit != "K" || value.valueSI>=0 else {
+            throw NativeWorldLabError.invalid("Invalid canonical scientific quantity or provenance")
+        }
     }
     static func convert(_ value:NativeScienceQuantity,to unit:String)throws->Double {
+        try validate(value)
         guard let input=units[value.unit],let output=units[unit],
-            value.valueSI.isFinite,
             value.dimension==input.dimension && input.dimension==output.dimension else {
             throw NativeWorldLabError.invalid("Scientific quantity dimension mismatch")
         }
@@ -387,5 +402,172 @@ enum NativeWorldLabGraph {
             seen.insert(key)
         }
         for key in parts.keys {try visit(key)}
+    }
+}
+
+
+/// Registered app-owned native solver adapter. Imported projects never provide closures.
+struct NativeScientificStepOutput {
+    let outputs:[String:NativeScienceQuantity]
+    let suppliedW:Double
+    let dissipatedW:Double
+    let storedRateW:Double
+    let nextEventSeconds:Double?
+    init(outputs:[String:NativeScienceQuantity],suppliedW:Double,dissipatedW:Double,
+         storedRateW:Double,nextEventSeconds:Double?=nil){
+        self.outputs=outputs;self.suppliedW=suppliedW;self.dissipatedW=dissipatedW
+        self.storedRateW=storedRateW;self.nextEventSeconds=nextEventSeconds
+    }
+}
+struct NativeScientificAdapter {
+    let componentId:String
+    let modelId:String
+    let modelVersion:String
+    let advance:(Double,Double,[String:NativeScienceQuantity]) throws -> NativeScientificStepOutput
+}
+struct NativeScientificExchangeSample {
+    let timeSeconds:Double;let stepSeconds:Double;let eventBoundary:Bool
+    let values:[String:NativeScienceQuantity]
+    let suppliedW:Double;let dissipatedW:Double;let storedRateW:Double;let residualW:Double
+}
+struct NativeScientificRun {
+    let graph:NativeScientificGraph
+    let samples:[NativeScientificExchangeSample]
+}
+enum NativeWorldLabExecution {
+    static func execute(_ graph:NativeScientificGraph,adapters:[NativeScientificAdapter],
+        durationSeconds:Double,stepSeconds:Double,powerToleranceW:Double=1e-6)throws->NativeScientificRun {
+        try NativeWorldLabGraph.validate(graph)
+        guard durationSeconds.isFinite,(0.001...60).contains(durationSeconds),
+              stepSeconds.isFinite,(0.00001...1).contains(stepSeconds),
+              ceil(durationSeconds/stepSeconds)<=20000,
+              powerToleranceW.isFinite,(0...1e6).contains(powerToleranceW) else {
+            throw NativeWorldLabError.invalid("Scientific timeline or tolerance exceeds the bounded budget")
+        }
+        guard adapters.count==graph.components.count else {
+            throw NativeWorldLabError.invalid("One trusted adapter is required for each component")
+        }
+        var byId:[String:NativeScientificAdapter]=[:]
+        for adapter in adapters {
+            guard byId[adapter.componentId]==nil else {
+                throw NativeWorldLabError.invalid("Duplicate trusted component adapter")
+            }
+            byId[adapter.componentId]=adapter
+        }
+        let components=Dictionary(uniqueKeysWithValues:graph.components.map{($0.id,$0)})
+        for component in graph.components {
+            guard let adapter=byId[component.id],adapter.modelId==component.modelId,
+                  adapter.modelVersion.range(of:"^[0-9]+\\.[0-9]+\\.[0-9]+$",options:.regularExpression) != nil else {
+                throw NativeWorldLabError.invalid("Unregistered or mismatched scientific model version")
+            }
+        }
+        var adjacency=Dictionary(uniqueKeysWithValues:graph.components.map{($0.id,Set<String>())})
+        var indegree=Dictionary(uniqueKeysWithValues:graph.components.map{($0.id,0)})
+        for edge in graph.connections where !edge.delayed {
+            if adjacency[edge.fromComponentId,default:[]].insert(edge.toComponentId).inserted {
+                indegree[edge.toComponentId,default:0]+=1
+            }
+        }
+        var ready=indegree.filter{$0.value==0}.map{$0.key}.sorted()
+        var order:[String]=[]
+        while !ready.isEmpty {
+            let id=ready.removeFirst();order.append(id)
+            for next in (adjacency[id] ?? []).sorted() {
+                indegree[next,default:0]-=1
+                if indegree[next]==0 {ready.append(next);ready.sort()}
+            }
+        }
+        guard order.count==components.count else {
+            throw NativeWorldLabError.invalid("Algebraic loop requires an explicitly supported implicit solver")
+        }
+        var samples:[NativeScientificExchangeSample]=[]
+        var now=0.0
+        var scheduled:Double?
+        var previous:[String:NativeScienceQuantity]=[:]
+        while now<durationSeconds-1e-12 && samples.count<20000 {
+            let end=min(durationSeconds,min(now+stepSeconds,scheduled ?? durationSeconds))
+            guard end>now+1e-12 else {
+                throw NativeWorldLabError.invalid("Scientific solver failed to advance")
+            }
+            var values:[String:NativeScienceQuantity]=[:]
+            var nextEvents:[Double]=[]
+            var supplied=0.0,dissipated=0.0,stored=0.0
+            for id in order {
+                guard let component=components[id],let adapter=byId[id] else {
+                    throw NativeWorldLabError.invalid("Missing trusted scientific component adapter")
+                }
+                var inputs:[String:NativeScienceQuantity]=[:]
+                for edge in graph.connections where edge.toComponentId==id {
+                    let sourceMap=edge.delayed ? previous : values
+                    guard let source=sourceMap[edge.fromComponentId+":"+edge.fromPortId] else{continue}
+                    guard let port=component.ports.first(where:{$0.id==edge.toPortId}) else {
+                        throw NativeWorldLabError.invalid("Scientific edge targets an absent port")
+                    }
+                    let converted=NativeScienceQuantity(valueSI:source.valueSI,unit:port.unit,
+                        dimension:source.dimension,evidence:source.evidence,
+                        sourceId:source.sourceId,uncertaintySI:source.uncertaintySI)
+                    try NativeWorldLabSI.validate(converted)
+                    inputs[port.id]=converted
+                }
+                let output=try adapter.advance(end,end-now,inputs)
+                guard [output.suppliedW,output.dissipatedW,output.storedRateW].allSatisfy({$0.isFinite&&abs($0)<=1e18}),
+                      output.dissipatedW>=0 else {
+                    throw NativeWorldLabError.invalid("Scientific solver emitted an invalid rate or negative dissipation")
+                }
+                for (portId,value) in output.outputs {
+                    guard let port=component.ports.first(where:{$0.id==portId}),
+                          port.direction != "input",value.unit==port.unit else {
+                        throw NativeWorldLabError.invalid("Solver output port or unit is not registered")
+                    }
+                    try NativeWorldLabSI.validate(value)
+                    values[id+":"+portId]=value
+                }
+                supplied+=output.suppliedW;dissipated+=output.dissipatedW;stored+=output.storedRateW
+                if let event=output.nextEventSeconds {
+                    guard event.isFinite,event>end+1e-10,event<=durationSeconds else {
+                        throw NativeWorldLabError.invalid("Solver proposed an invalid future event boundary")
+                    }
+                    nextEvents.append(event)
+                }
+            }
+            let residual=supplied-dissipated-stored
+            guard residual.isFinite,abs(residual)<=powerToleranceW+1e-9*max(1,abs(supplied),abs(dissipated)) else {
+                throw NativeWorldLabError.invalid("Power conservation residual exceeded tolerance")
+            }
+            samples.append(NativeScientificExchangeSample(timeSeconds:end,stepSeconds:end-now,
+                eventBoundary:scheduled.map{abs(end-$0)<1e-9} ?? false,values:values,
+                suppliedW:supplied,dissipatedW:dissipated,storedRateW:stored,residualW:residual))
+            previous=values;now=end;scheduled=nextEvents.min()
+        }
+        guard let last=samples.last,abs(last.timeSeconds-durationSeconds)<=1e-9 else {
+            throw NativeWorldLabError.invalid("Scientific simulation failed to reach its duration")
+        }
+        return NativeScientificRun(graph:graph,samples:samples)
+    }
+    static func idealRCAdapters(sourceVoltageV:Double,resistanceOhm:Double,
+        capacitanceF:Double,initialVoltageV:Double=0)throws->[NativeScientificAdapter] {
+        guard sourceVoltageV.isFinite,abs(sourceVoltageV)<=1000,
+              initialVoltageV.isFinite,abs(initialVoltageV)<=1000,
+              resistanceOhm.isFinite,(0.001...1e9).contains(resistanceOhm),
+              capacitanceF.isFinite,(1e-9...1000).contains(capacitanceF) else {
+            throw NativeWorldLabError.invalid("Ideal RC assumptions are outside the supported physical domain")
+        }
+        let source=NativeScientificAdapter(componentId:"source",modelId:"ideal-dc-source",modelVersion:"1.0.0"){_,_,_ in
+            NativeScientificStepOutput(outputs:["V":try NativeWorldLabSI.declare(sourceVoltageV,unit:"V")],
+                suppliedW:0,dissipatedW:0,storedRateW:0)
+        }
+        let load=NativeScientificAdapter(componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0"){time,_,inputs in
+            guard inputs["Vin"] != nil else {
+                throw NativeWorldLabError.invalid("RC load requires its connected source voltage")
+            }
+            let voltage=sourceVoltageV+(initialVoltageV-sourceVoltageV)*exp(-time/(resistanceOhm*capacitanceF))
+            let current=(sourceVoltageV-voltage)/resistanceOhm
+            return NativeScientificStepOutput(
+                outputs:["Vc":try NativeWorldLabSI.declare(voltage,unit:"V",evidence:"physics-model-computed"),
+                         "I":try NativeWorldLabSI.declare(current,unit:"A",evidence:"physics-model-computed")],
+                suppliedW:sourceVoltageV*current,dissipatedW:current*current*resistanceOhm,
+                storedRateW:voltage*current)
+        }
+        return [source,load]
     }
 }
