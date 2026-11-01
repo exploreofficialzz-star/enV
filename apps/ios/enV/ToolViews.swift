@@ -14906,10 +14906,13 @@ private struct NativeABookView: View {
             }
             HStack(spacing: 8) {
                 Button {
+                    showTrash = false
+                    showArchived = false
+                    selectedPDFIDs = []
                     let now = Date()
                     let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
                                                pinned: false, archived: false, deletedAt: nil, createdAt: now, updatedAt: now, revision: 0)
-                    do { let saved = try store.save(note); reload(preferred: saved.id) } catch { showError(error) }
+                    do { let saved = try store.save(note); reload(preferred: saved.id, includeDeleted: false, includeArchived: false) } catch { showError(error) }
                 } label: { Label("New note", systemImage: "plus") }
                 .buttonStyle(.borderedProminent)
                 Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
