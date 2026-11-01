@@ -33,6 +33,7 @@ import com.chastech.env.engine.advanceWorldLabEventTime
 import com.chastech.env.engine.NativeWorldLabRecordedRun
 import com.chastech.env.engine.NativeWorldLabRecordedClock
 import com.chastech.env.engine.NativeWorldLabRecordedTime
+import com.chastech.env.engine.NativeWorldLabReplayCodec
 import com.chastech.env.engine.NativeWorldLabRecordedCheckpointCodec
 import com.chastech.env.engine.NativeWorldLabChemicalThermal
 import com.chastech.env.engine.NativeChemicalThermalInput
@@ -115,6 +116,15 @@ fun NativeWorldLabForm() {
     var spring by remember { mutableFloatStateOf(4f) }
     var resistance by remember { mutableFloatStateOf(1000f) }
     var diffusivity by remember { mutableFloatStateOf(0.02f) }
+    var springDamping by remember { mutableFloatStateOf(0.5f) }
+    var springInitialDisplacement by remember { mutableFloatStateOf(0.5f) }
+    var springInitialVelocity by remember { mutableFloatStateOf(0f) }
+    var capacitance by remember { mutableFloatStateOf(0.001f) }
+    var supplyVoltage by remember { mutableFloatStateOf(10f) }
+    var initialVoltage by remember { mutableFloatStateOf(0f) }
+    var heatLength by remember { mutableFloatStateOf(2f) }
+    var ambientTemperature by remember { mutableFloatStateOf(293.15f) }
+    var centerTemperature by remember { mutableFloatStateOf(373.15f) }
     var inside by remember { mutableStateOf(false) }
     var timelineStatus by remember { mutableStateOf("") }
     var branchSourceInput by remember { mutableStateOf<NativeLabInput?>(null) }
@@ -123,6 +133,8 @@ fun NativeWorldLabForm() {
     var branchRecord by remember { mutableStateOf<NativeWorldLabBranchRecord?>(null) }
     var branchStatus by remember { mutableStateOf("") }
     var pendingTimelineJson by remember { mutableStateOf<String?>(null) }
+    var pendingReplayJson by remember { mutableStateOf<String?>(null) }
+    var replayManifestStatus by remember { mutableStateOf("") }
     var inspection by remember { mutableStateOf(com.chastech.env.engine.NativeInspectionSettings()) }
     var inspectionHistory by remember { mutableStateOf(com.chastech.env.engine.NativeWorldLabInspectionHistory()) }
     fun updateInspection(next:com.chastech.env.engine.NativeInspectionSettings){
@@ -250,9 +262,12 @@ fun NativeWorldLabForm() {
     var snapMeters by remember { mutableStateOf(0.5) }
     var measurementTargetIndex by remember { mutableIntStateOf(0) }
     val model=when(kind) {
-        "spring"->NativeLabInput.Spring(massKg=mass.toDouble(),springNPerM=spring.toDouble())
-        "rc"->NativeLabInput.RC(resistanceOhm=resistance.toDouble())
-        else->NativeLabInput.Heat(diffusivityM2S=diffusivity.toDouble())
+        "spring"->NativeLabInput.Spring(massKg=mass.toDouble(),springNPerM=spring.toDouble(),
+            dampingNsPerM=springDamping.toDouble(),x0=springInitialDisplacement.toDouble(),v0=springInitialVelocity.toDouble())
+        "rc"->NativeLabInput.RC(resistanceOhm=resistance.toDouble(),capacitanceF=capacitance.toDouble(),
+            supplyV=supplyVoltage.toDouble(),initialV=initialVoltage.toDouble())
+        else->NativeLabInput.Heat(diffusivityM2S=diffusivity.toDouble(),lengthM=heatLength.toDouble(),
+            backgroundK=ambientTemperature.toDouble(),centerK=centerTemperature.toDouble())
     }
     val demoRecording=remember(model,worldEpochUTC) {
         runCatching {
@@ -535,6 +550,38 @@ fun NativeWorldLabForm() {
                 motorCheckpointStatus="Matching current recorded motor run restored at sample "+(restored.sampleIndex+1)+"."
             }.onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint restore failed."}
         }
+    }
+    val replayExportPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+        val json=pendingReplayJson
+        if(uri!=null&&json!=null)scope.launch{runCatching{withContext(Dispatchers.IO){
+            context.contentResolver.openOutputStream(uri,"wt")?.use{it.write(json.toByteArray(Charsets.UTF_8));it.flush()}
+                ?:error("Cannot write deterministic replay manifest")
+        }}.onSuccess{replayManifestStatus="Deterministic replay manifest saved."}
+            .onFailure{replayManifestStatus=it.message?:"Replay manifest export failed."}}
+    }
+    val replayImportPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{runCatching{withContext(Dispatchers.IO){
+            val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                val out=ByteArrayOutputStream();val buffer=ByteArray(4096)
+                while(true){val n=input.read(buffer);if(n<0)break
+                    require(out.size()+n<=NativeWorldLabReplayCodec.MAX_BYTES){"Replay manifest exceeds 64 KB"}
+                    out.write(buffer,0,n)}
+                out.toByteArray()
+            }?:error("Cannot read replay manifest")
+            NativeWorldLabReplayCodec.decodeAndReplay(bytes)
+        }}.onSuccess{replayed->
+            when(val input=replayed.input){
+                is NativeLabInput.Spring->{kind="spring";mass=input.massKg.toFloat();spring=input.springNPerM.toFloat()
+                    springDamping=input.dampingNsPerM.toFloat();springInitialDisplacement=input.x0.toFloat();springInitialVelocity=input.v0.toFloat()}
+                is NativeLabInput.RC->{kind="rc";resistance=input.resistanceOhm.toFloat();capacitance=input.capacitanceF.toFloat()
+                    supplyVoltage=input.supplyV.toFloat();initialVoltage=input.initialV.toFloat()}
+                is NativeLabInput.Heat->{kind="heat";diffusivity=input.diffusivityM2S.toFloat();heatLength=input.lengthM.toFloat()
+                    ambientTemperature=input.backgroundK.toFloat();centerTemperature=input.centerK.toFloat()}
+            }
+            worldEpochUTC=replayed.manifest.worldEpochUTC
+            time=0f;playing=false;reversePlayback=false;demoClock=null
+            replayManifestStatus="Validated ${replayed.manifest.modelId} ${replayed.manifest.modelVersion}; rebuilt ${replayed.samples.size} output samples from its fingerprinted inputs."
+        }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be restored."}}
     }
     val timelineExportPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
         if(uri!=null){
@@ -1982,6 +2029,20 @@ fun NativeWorldLabForm() {
             OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
                 Text("Restore checkpoint")
             }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                Button(onClick={runCatching{
+                    val manifest=NativeWorldLabReplayCodec.create(model,worldEpochUTC,java.time.ZoneId.systemDefault().id)
+                    pendingReplayJson=NativeWorldLabReplayCodec.encode(manifest).toString(Charsets.UTF_8)
+                    replayExportPicker.launch("world-lab-replay-manifest.json")
+                    replayManifestStatus=""
+                }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be created."}){
+                    Text("Save deterministic replay")
+                }
+                OutlinedButton(onClick={replayImportPicker.launch(arrayOf("application/json"))}){
+                    Text("Open & replay manifest")
+                }
+            }
+            if(replayManifestStatus.isNotBlank())Text(replayManifestStatus,style=MaterialTheme.typography.bodySmall)
         }
         if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
         demoClock?.let{clock->
