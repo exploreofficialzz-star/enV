@@ -136,13 +136,15 @@ export function createIdealRcAdapters(input:{
   const load:ScientificAdapter={
     componentId:"load",modelId:"series-rc-load",modelVersion:"1.0.0",
     advance:(atSeconds,_deltaSeconds,ports)=>{
-      if(!ports.Vin)throw new Error("RC load requires its connected source voltage.");
-      const voltage=input.sourceVoltageV+(initial-input.sourceVoltageV)*
+      const connectedVoltage=ports.Vin?.valueSI;
+      if(!Number.isFinite(connectedVoltage))
+        throw new Error("RC load requires its connected source voltage.");
+      const voltage=connectedVoltage+(initial-connectedVoltage)*
         Math.exp(-atSeconds/(input.resistanceOhm*input.capacitanceF));
-      const current=(input.sourceVoltageV-voltage)/input.resistanceOhm;
+      const current=(connectedVoltage-voltage)/input.resistanceOhm;
       return {outputs:{Vc:quantity(voltage,"V","physics-model-computed"),
         I:quantity(current,"A","physics-model-computed")},
-        suppliedW:input.sourceVoltageV*current,dissipatedW:current*current*input.resistanceOhm,
+        suppliedW:connectedVoltage*current,dissipatedW:current*current*input.resistanceOhm,
         storedRateW:voltage*current,nextEventSeconds:null};
     },
   };
