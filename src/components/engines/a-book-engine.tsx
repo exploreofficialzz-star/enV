@@ -209,7 +209,7 @@ export function ABookEngine() {
     if (!file) { setError("Select one PDF to split."); return; }
     try {
       const archive = await splitPdfIntoZip(file.blob, file.name, splitRanges);
-      zipDownload(archive, `${safeName(file.name.replace(/\\.pdf$/i, ""))}-parts.zip`);
+      zipDownload(archive, `${safeName(file.name.replace(/\.pdf$/i, ""))}-parts.zip`);
       setPdfInfo(`Created PDF parts from ${file.name} locally`);
       setError("");
     } catch (cause) {
