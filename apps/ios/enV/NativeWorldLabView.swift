@@ -472,8 +472,7 @@ struct NativeWorldLabView:View {
                     Button("Restore viewpoint"){restoreObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Surface"){returnObserverToSurface()}.buttonStyle(.bordered)
                 }
-                Text("Vertical observer offset: "+String(format:"%.1f",observerVerticalOffset)+
-                    " m · illustrative volume, not mapped geology")
+                Text("Vertical observer offset: \(observerVerticalOffset) m · illustrative volume, not mapped geology")
                     .font(.caption).foregroundStyle(.secondary)
                 Slider(value:$observerVerticalOffset,in:-20000...20000){_ in
                     applyObserverVerticalOffset()
@@ -2079,6 +2078,14 @@ Text("Invent chemical heat").font(.headline)
         }
     }
 
+    private func geodeticSummary(solid:NativeLabSolid,origin:NativeGeodetic)->String? {
+        let local=NativeEnu(eastMeters:solid.positionMeters[0],
+            northMeters:solid.positionMeters[2],upMeters:solid.positionMeters[1])
+        guard let ecef=try? NativeWorldLabGeodesy.fromEnu(local,origin:origin),
+              let point=try? NativeWorldLabGeodesy.fromEcef(ecef) else{return nil}
+        return String(format:"WGS84: %.7f° / %.7f° / %.2f m",
+            point.latitudeDegrees,point.longitudeDegrees,point.heightMeters)
+    }
     @ViewBuilder private func solidPlacementContent(project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
                         HStack {
                             Button("Previous"){selected=max(0,selected-1)}.disabled(selected==0)
@@ -2090,14 +2097,8 @@ Text("Invent chemical heat").font(.headline)
                         }
                         Text("Selected: "+solid.name+" ("+solid.shape+")")
                         if let origin=project.world.geodeticOrigin,
-                           let point=try? NativeWorldLabGeodesy.fromEnu(
-                            NativeEnu(eastMeters:solid.positionMeters[0],
-                                northMeters:solid.positionMeters[2],upMeters:solid.positionMeters[1]),
-                            origin:origin),
-                           let geo=try? NativeWorldLabGeodesy.fromEcef(point) {
-                            Text("WGS84: "+String(format:"%.7f° / %.7f° / %.2f m",
-                                geo.latitudeDegrees,geo.longitudeDegrees,geo.heightMeters))
-                                .font(.caption).foregroundStyle(.secondary)
+                           let summary=geodeticSummary(solid:solid,origin:origin) {
+                            Text(summary).font(.caption).foregroundStyle(.secondary)
                         }
                         value("Ideal volume",solid.volumeMetersCubed,"m³")
                         HStack {
@@ -2486,7 +2487,7 @@ Text("Invent chemical heat").font(.headline)
         node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightAboveGroundM)
     }
     private func currentObserverTarget()->[Double]{
-        var target=project?.cameraLookingAtMeters ?? [0,1.2,0]
+        var target=project?.camera.lookingAtMeters ?? [0,1.2,0]
         target[1]=max(-20000,min(100000,target[1]+observerVerticalOffset))
         return target
     }
@@ -2534,11 +2535,11 @@ Text("Invent chemical heat").font(.headline)
         guard let current=project else{return}
         observerVerticalOffset=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(
-            Float(current.cameraPositionMeters[0]),
-            Float(current.cameraPositionMeters[1]),
-            Float(current.cameraPositionMeters[2]))
-        sceneCameraNode.look(at:SCNVector3(Float(current.cameraLookingAtMeters[0]),
-            Float(current.cameraLookingAtMeters[1]),Float(current.cameraLookingAtMeters[2])))
+            Float(current.camera.positionMeters[0]),
+            Float(current.camera.positionMeters[1]),
+            Float(current.camera.positionMeters[2]))
+        sceneCameraNode.look(at:SCNVector3(Float(current.camera.lookingAtMeters[0]),
+            Float(current.camera.lookingAtMeters[1]),Float(current.camera.lookingAtMeters[2])))
         updateObserverCameraClip()
     }
     private func returnObserverToSurface(){
@@ -2555,8 +2556,8 @@ Text("Invent chemical heat").font(.headline)
         let savedCamera=SCNNode()
         savedCamera.name="world-lab-observer-camera"
         savedCamera.camera=SCNCamera()
-        let position=project?.cameraPositionMeters ?? [0,1.65,-8]
-        let target=project?.cameraLookingAtMeters ?? [0,1.2,0]
+        let position=project?.camera.positionMeters ?? [0,1.65,-8]
+        let target=project?.camera.lookingAtMeters ?? [0,1.2,0]
         savedCamera.position=SCNVector3(Float(position[0]),Float(position[1]),Float(position[2]))
         savedCamera.camera?.zNear=0.03
         savedCamera.camera?.zFar=5_000_000
@@ -2962,7 +2963,7 @@ private struct NativeWorldLabMultiCadPanel:View {
     }
     private func apply(_ work:(Data)throws->Data){
         do{onEdit(try work(source));error=""}
-        catch{error=error.localizedDescription}
+        catch let caught{error=caught.localizedDescription}
     }
     var body:some View{
         VStack(alignment:.leading,spacing:8){
