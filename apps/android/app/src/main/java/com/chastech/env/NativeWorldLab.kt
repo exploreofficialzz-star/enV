@@ -65,6 +65,7 @@ import com.chastech.env.engine.NativeActuatorResult
 import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
+import com.chastech.env.engine.NativeWorldLabSolarEvents
 
 import com.chastech.env.engine.NativeWorldLabDigitalMotor
 import com.chastech.env.engine.NativeDigitalMotorResult
@@ -103,6 +104,7 @@ fun NativeWorldLabForm() {
     var demoClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
     var pendingDemoWallTimeUTC by remember { mutableStateOf<String?>(null) }
     var worldEpochUTC by remember { mutableStateOf(java.time.Instant.now().toString()) }
+    var solarDateUTC by remember { mutableStateOf(java.time.Instant.now().toString().take(10)) }
     var mass by remember { mutableFloatStateOf(1f) }
     var spring by remember { mutableFloatStateOf(4f) }
     var resistance by remember { mutableFloatStateOf(1000f) }
@@ -1967,6 +1969,52 @@ fun NativeWorldLabForm() {
             Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
                 labNumber(clock.displaySampleTimeSeconds)+" s · cached model output",
                 style=MaterialTheme.typography.bodySmall)
+        }
+        Text("Approximate sunrise and sunset",style=MaterialTheme.typography.titleSmall)
+        OutlinedTextField(value=solarDateUTC,onValueChange={solarDateUTC=it.take(10)},
+            label={Text("UTC date · YYYY-MM-DD")},singleLine=true,
+            modifier=Modifier.fillMaxWidth())
+        val solarOrigin=project?.geodeticOrigin
+        if(solarOrigin==null){
+            Text("Save a WGS84 Earth reference to calculate solar events for this project.",
+                style=MaterialTheme.typography.bodySmall)
+        }else{
+            val solarResult=remember(solarDateUTC,solarOrigin){
+                runCatching{NativeWorldLabSolarEvents.calculate(solarDateUTC,
+                    solarOrigin.latitudeDegrees,solarOrigin.longitudeDegrees)}
+            }
+            val solarZone=remember(demoClock?.timezoneDisplay){
+                runCatching{java.time.ZoneId.of(demoClock?.timezoneDisplay?:java.time.ZoneId.systemDefault().id)}
+                    .getOrDefault(java.time.ZoneId.systemDefault())
+            }
+            val solarFormatter=remember(solarZone){
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm z",Locale.getDefault()).withZone(solarZone)
+            }
+            solarResult.fold(onSuccess={events->
+                when(events.status){
+                    NativeWorldLabSolarEvents.Status.NORMAL->{
+                        Text("Sunrise "+solarFormatter.format(java.time.Instant.parse(events.sunriseUTC!!))+
+                            " · Sunset "+solarFormatter.format(java.time.Instant.parse(events.sunsetUTC!!)),
+                            style=MaterialTheme.typography.bodyMedium)
+                        Text("Solar noon "+solarFormatter.format(java.time.Instant.parse(events.solarNoonUTC))+
+                            " · Daylight "+labNumber(events.daylightMinutes!!/60.0)+" h",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    NativeWorldLabSolarEvents.Status.POLAR_DAY->Text(
+                        "Polar day · Sun remains above the model's apparent horizon for this UTC date.",
+                        style=MaterialTheme.typography.bodySmall)
+                    NativeWorldLabSolarEvents.Status.POLAR_NIGHT->Text(
+                        "Polar night · Sun remains below the model's apparent horizon for this UTC date.",
+                        style=MaterialTheme.typography.bodySmall)
+                }
+                Text("NOAA general solar-position estimate · WGS84 project origin · "+
+                    "local display zone "+solarZone.id+
+                    ". Not an observed horizon, weather forecast or precision ephemeris.",
+                    style=MaterialTheme.typography.bodySmall)
+            },onFailure={error->
+                Text(error.message?: "Solar estimate is unavailable.",style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.error)
+            })
         }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick={
