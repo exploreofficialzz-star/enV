@@ -44,6 +44,16 @@ struct NativeWorldLabView:View {
     @State private var mass=1.0
     @State private var resistance=1000.0
     @State private var diffusivity=0.02
+    @State private var springNPerM=4.0
+    @State private var springDamping=0.5
+    @State private var springInitialDisplacement=0.5
+    @State private var springInitialVelocity=0.0
+    @State private var capacitance=0.001
+    @State private var supplyVoltage=10.0
+    @State private var initialVoltage=0.0
+    @State private var heatLength=2.0
+    @State private var ambientTemperature=293.15
+    @State private var centerTemperature=373.15
     @State private var seeInside=false
     @State private var inspectionMode:NativeWorldLabInspectionMode = .normal
     @State private var inspectionOpacity=0.32
@@ -136,6 +146,10 @@ struct NativeWorldLabView:View {
     @State private var importingTimelineCheckpoint=false
     @State private var timelineCheckpointFile:NativeWorldLabJsonFile?
     @State private var timelineStatus=""
+    @State private var exportingReplayManifest=false
+    @State private var importingReplayManifest=false
+    @State private var replayManifestFile:NativeWorldLabJsonFile?
+    @State private var replayManifestStatus=""
     @State private var exportingMotorCheckpoint=false
     @State private var importingMotorCheckpoint=false
     @State private var motorCheckpointFile:NativeWorldLabJsonFile?
@@ -502,9 +516,12 @@ struct NativeWorldLabView:View {
         }catch{problem=error.localizedDescription}
     }
     private var input:NativeLabInput {
-        if mode==0 {return .spring(massKg:mass)}
-        if mode==1 {return .rc(resistanceOhm:resistance)}
-        return .heat(diffusivityM2S:diffusivity)
+        if mode==0 {return .spring(massKg:mass,springNPerM:springNPerM,
+            dampingNsPerM:springDamping,x0:springInitialDisplacement,v0:springInitialVelocity)}
+        if mode==1 {return .rc(resistanceOhm:resistance,capacitanceF:capacitance,
+            supplyV:supplyVoltage,initialV:initialVoltage)}
+        return .heat(diffusivityM2S:diffusivity,lengthM:heatLength,
+            backgroundK:ambientTemperature,centerK:centerTemperature)
     }
     private var values:NativeLabResult? {
         if let clock=demoClock,demoRecordedSamples.indices.contains(clock.sampleIndex) {
@@ -819,8 +836,11 @@ struct NativeWorldLabView:View {
                 HStack {
                     Button("Save checkpoint"){prepareTimelineCheckpointExport()}.buttonStyle(.bordered)
                     Button("Restore checkpoint"){importingTimelineCheckpoint=true}.buttonStyle(.bordered)
+                    Button("Save deterministic replay",action:prepareReplayManifestExport).buttonStyle(.bordered)
+                    Button("Open & replay manifest"){importingReplayManifest=true}.buttonStyle(.bordered)
                 }
                 if !timelineStatus.isEmpty {Text(timelineStatus).font(.caption).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)}
+                if !replayManifestStatus.isEmpty {Text(replayManifestStatus).font(.caption).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)}
 
                 if mode==0 {
                     Text("Assumed mass: "+String(format:"%.2f",mass)+" kg")
@@ -1190,6 +1210,32 @@ struct NativeWorldLabView:View {
         }catch{problem=error.localizedDescription}
     }
 
+    private func prepareReplayManifestExport(){
+        do {
+            let manifest=try NativeWorldLabReplayManifest.make(input:input,
+                worldEpochUTC:ISO8601DateFormatter().string(from:worldEpochUTC),
+                timezoneDisplay:TimeZone.current.identifier)
+            replayManifestFile=NativeWorldLabJsonFile(content:try manifest.encodeBounded())
+            exportingReplayManifest=true;replayManifestStatus=""
+        }catch{replayManifestStatus=error.localizedDescription}
+    }
+    private func restoreReplayManifest(_ data:Data)throws {
+        let replay=try NativeWorldLabReplayManifest.decodeAndReplay(data)
+        switch replay.input {
+        case let .spring(massKg,k,damping,x0,v0):
+            mode=0;mass=massKg;springNPerM=k;springDamping=damping
+            springInitialDisplacement=x0;springInitialVelocity=v0
+        case let .rc(resistanceOhm,c,supply,initial):
+            mode=1;resistance=resistanceOhm;capacitance=c;supplyVoltage=supply;initialVoltage=initial
+        case let .heat(diffusivityM2S,length,ambient,center):
+            mode=2;diffusivity=diffusivityM2S;heatLength=length
+            ambientTemperature=ambient;centerTemperature=center
+        }
+        if let epoch=ISO8601DateFormatter().date(from:replay.manifest.worldEpochUTC){worldEpochUTC=epoch}
+        seconds=0;playing=false;reversePlayback=false;speed=1;lastTick=Date()
+        rebuildDemoRecordedTimeline();redraw()
+        replayManifestStatus="Validated \(replay.manifest.modelId) \(replay.manifest.modelVersion); recomputed \(replay.samples.count) reference samples from its input fingerprint."
+    }
     private func prepareTimelineCheckpointExport(){
         do {
             let id=mode==0 ? "spring" : mode==1 ? "rc" : "heat"
@@ -1328,6 +1374,25 @@ struct NativeWorldLabView:View {
                 if case .failure(let error)=result{problem=error.localizedDescription}
                 timelineCheckpointFile=nil
             }
+        .fileExporter(isPresented:$exportingReplayManifest,document:replayManifestFile,
+            contentType:.json,defaultFilename:"world-lab-replay-manifest"){result in
+                if case .failure(let error)=result{replayManifestStatus=error.localizedDescription}
+                else{replayManifestStatus="Deterministic replay manifest saved."}
+                replayManifestFile=nil
+            }
+        .fileImporter(isPresented:$importingReplayManifest,allowedContentTypes:[.json]){result in
+            do {
+                let url=try result.get()
+                let accessed=url.startAccessingSecurityScopedResource()
+                defer{if accessed{url.stopAccessingSecurityScopedResource()}}
+                let attrs=try FileManager.default.attributesOfItem(atPath:url.path)
+                guard let count=(attrs[.size] as? NSNumber)?.intValue,
+                      count<=NativeWorldLabReplayManifest.maxBytes else {
+                    throw NativeWorldLabError.invalid("Replay manifests must be 64 KB or smaller.")
+                }
+                try restoreReplayManifest(Data(contentsOf:url))
+            }catch{replayManifestStatus=error.localizedDescription}
+        }
         .fileImporter(isPresented:$importingIersBulletin,allowedContentTypes:[.plainText,.data]){result in
             do {
                 let url=try result.get()
