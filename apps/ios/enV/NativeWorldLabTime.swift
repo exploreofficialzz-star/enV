@@ -864,7 +864,7 @@ struct NativeWorldLabReplayManifest:Equatable {
         }
     }
     static func make(input:NativeLabInput,worldEpochUTC:String,timezoneDisplay:String,
-        sampleTimesSeconds:[Double]=stride(from:0.0,through:12.0,by:0.1).map{$0})throws->Self {
+        sampleTimesSeconds:[Double]=(0...120).map{Double($0)/10.0})throws->Self {
         let (modelId,parameters)=values(input)
         let base=Self(format:formatName,schemaVersion:1,modelId:modelId,modelVersion:version,
             worldEpochUTC:worldEpochUTC,timezoneDisplay:timezoneDisplay,parameters:parameters,
@@ -906,7 +906,12 @@ struct NativeWorldLabReplayManifest:Equatable {
         guard format==Self.formatName,schemaVersion==1,modelVersion==Self.version else {
             throw NativeWorldLabError.invalid("Replay manifest format or solver version is unsupported.")
         }
-        guard worldEpochUTC.hasSuffix("Z"),ISO8601DateFormatter().date(from:worldEpochUTC) != nil else {
+        let fractionalFormatter=ISO8601DateFormatter()
+        fractionalFormatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        let strictFormatter=ISO8601DateFormatter()
+        strictFormatter.formatOptions=[.withInternetDateTime]
+        let parsedEpoch=fractionalFormatter.date(from:worldEpochUTC) ?? strictFormatter.date(from:worldEpochUTC)
+        guard worldEpochUTC.hasSuffix("Z"),parsedEpoch != nil else {
             throw NativeWorldLabError.invalid("Replay world epoch must be a valid UTC-Z timestamp.")
         }
         guard TimeZone(identifier:timezoneDisplay) != nil else {

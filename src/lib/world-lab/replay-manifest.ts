@@ -69,7 +69,7 @@ function parseManifest(value:unknown):WorldLabReplayManifest{
  const o=value as Record<string,unknown>;
  const fields=["format","schemaVersion","modelId","modelVersion","worldEpochUTC","timezoneDisplay","parameters","sampleTimesSeconds","mandatoryEventTimesSeconds","eventQueuePolicy","randomStatePolicy","solverStatePolicy","inputFingerprint"];
  if(Object.keys(o).length!==fields.length||fields.some(k=>!(k in o)))throw new Error("Replay manifest contains unknown or missing fields.");
- if(typeof o.modelId!=="string"||!(o.modelId in KEYS)||!o.parameters||typeof o.parameters!=="object"||Array.isArray(o.parameters)||!Array.isArray(o.sampleTimesSeconds)||!Array.isArray(o.mandatoryEventTimesSeconds))throw new Error("Replay manifest contains unsupported or mistyped fields.");
+ if(typeof o.modelId!=="string"||!Object.prototype.hasOwnProperty.call(KEYS,o.modelId)||!o.parameters||typeof o.parameters!=="object"||Array.isArray(o.parameters)||!Array.isArray(o.sampleTimesSeconds)||!Array.isArray(o.mandatoryEventTimesSeconds))throw new Error("Replay manifest contains unsupported or mistyped fields.");
  const keys=KEYS[o.modelId as ModelInput["kind"]],p=o.parameters as Record<string,unknown>;
  if(Object.keys(p).length!==keys.length||keys.some(k=>typeof p[k]!=="number"||!Number.isFinite(p[k])))throw new Error("Replay parameter set is incomplete, unknown or non-finite.");
  if(o.sampleTimesSeconds.some(x=>typeof x!=="number")||o.mandatoryEventTimesSeconds.some(x=>typeof x!=="number"))throw new Error("Replay times must be numeric.");
