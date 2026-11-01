@@ -208,5 +208,8 @@ export function buildDesignPaletteExport(
     };
     return JSON.stringify(tokens, null, 2);
   }
-  return JSON.stringify({ colors: normalized, primaryScale: scale }, null, 2);
+  if (format === "json") {
+    return JSON.stringify({ colors: normalized, primaryScale: scale }, null, 2);
+  }
+  throw new Error("Unsupported design token export format.");
 }
