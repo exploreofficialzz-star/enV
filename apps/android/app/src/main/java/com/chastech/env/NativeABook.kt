@@ -139,8 +139,8 @@ fun NativeABookScreen(){
     var pdfText by remember{mutableStateOf("")}
     var pendingPdf by remember{mutableStateOf<File?>(null)}
 
-    fun reload(id:String?=selected){
-        notes=db.notes(archived,showTrash)
+    fun reload(id:String?=selected,trashOnly:Boolean=showTrash){
+        notes=db.notes(archived,trashOnly)
         val n=notes.firstOrNull{it.id==id}?:notes.firstOrNull()
         selected=n?.id;title=n?.title.orEmpty();body=n?.body.orEmpty();notebook=n?.notebook?:"Inbox"
         tags=n?.let{runCatching{JSONArray(it.tags).let{a->(0 until a.length()).joinToString(", "){i->a.getString(i)}}}.getOrDefault("")}.orEmpty()
@@ -218,7 +218,7 @@ fun NativeABookScreen(){
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 val selectedNote=notes.firstOrNull{it.id==selected}
                 if(selectedNote?.deletedAt!=null){
-                    OutlinedButton(onClick={db.restore(selectedNote.id);showTrash=false;reload(selectedNote.id)}){Text("Restore")}
+                    OutlinedButton(onClick={db.restore(selectedNote.id);showTrash=false;reload(selectedNote.id,false)}){Text("Restore")}
                     OutlinedButton(onClick={
                         val paths=db.permanentlyDelete(selectedNote.id)
                         paths.forEach{path->val root=context.filesDir.canonicalFile;val target=File(context.filesDir,path).canonicalFile;if(target.path.startsWith(root.path+File.separator))target.delete()}
