@@ -4,7 +4,7 @@ import { initialValues } from "@/components/engines/initial-values";
 import { CodeResult } from "@/components/engines/result-panel";
 import { CopyButton } from "@/components/tools/copy-button";
 import { parseCssColor } from "@/lib/engines/accessibility-color";
-import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type GradientStop } from "@/lib/engines/css-gradient";
+import { buildCssGradient, buildCssMeshGradient, moveGradientStop, normalizeGradientStops, type CssGradientKind, type GradientStop } from "@/lib/engines/css-gradient";
 import { buildBlobSvg, buildNoiseDataUrl, buildPatternSvg, buildWaveSvg } from "@/lib/engines/svg-generators";
 import { buildLowPolySvg, buildMeshGradientSvg, buildScatterSvg, buildTextureSvg } from "@/lib/engines/svg-backgrounds";
 import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engines/css-shadow";
@@ -239,7 +239,7 @@ function cssFor(
   textShadowLayers: TextShadowLayer[] = createTextShadowPreset("soft"),
 ) {
   if (family === "gradient") {
-    const kind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
+    const kind: CssGradientKind = values.kind === "radial" || values.kind === "conic" ? values.kind : "linear";
     const angle = numberValue(values, "angle", 135, 0, 360);
     const normalized = normalizeGradientStops(gradientStops);
     const position = `${numberValue(values, "centerX", 50, 0, 100)}% ${numberValue(values, "centerY", 50, 0, 100)}%`;
@@ -493,7 +493,7 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
   const gradientOverlay = { enabled: gradientGlow, color: glowColor, x: glowX, y: glowY };
   const output = useMemo(() => cssFor(family, values, gradientStops, gradientOverlay, shadowLayers, textShadowLayers), [family, gradientGlow, glowColor, glowX, glowY, gradientStops, shadowLayers, textShadowLayers, values]);
   const componentContrast = inspectDesignComponentContrast(family, values);
-  const generatedSvg = output.svg;
+  const generatedSvg = "svg" in output ? output.svg : undefined;
   const code = generatedSvg ?? output.css;
   const isText = family === "button" || family === "badge" || family === "text-shadow";
 

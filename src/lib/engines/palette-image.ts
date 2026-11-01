@@ -1,13 +1,14 @@
 export type PalettePixelBuffer = ArrayLike<number>;
 
 type Pixel = { r: number; g: number; b: number; count: number };
+type Rgb = Pick<Pixel, "r" | "g" | "b">;
 type Channel = "r" | "g" | "b";
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
 }
 
-function colorHex(color: Pixel): string {
+function colorHex(color: Rgb): string {
   return "#" + [color.r, color.g, color.b]
     .map((channel) => Math.round(clamp(channel, 0, 255)).toString(16).padStart(2, "0"))
     .join("");
