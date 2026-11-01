@@ -134,6 +134,9 @@ for (const [browserName, browserType] of browserEntries) {
   await page.waitForLoadState("networkidle", { timeout: 30000 });
   const swatchExport = page.locator('[aria-labelledby="palette-swatch-export-heading"]');
   await swatchExport.waitFor({ state: "visible" });
+  // Confirm React has hydrated by changing the palette count and waiting for the sixth editable swatch.
+  await page.locator("#palette-count").selectOption("6");
+  await page.getByLabel("Edit palette color 6").waitFor({ state: "visible" });
   const [pngDownload] = await Promise.all([
     page.waitForEvent("download", { timeout: 15000 }),
     page.getByTestId("palette-download-png").click(),
