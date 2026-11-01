@@ -72,9 +72,17 @@ export function WorldLabFieldPanel(p:Props){
       </label>
      </div>;
     })()}
-    {layer.kind==="vector"&&layer.renderer.kind==="glyphs"&&<p className="mt-1 text-xs text-muted-foreground">The viewport shows a computed XY vector projection at the centre Z slice. Arrow direction follows the recorded X/Y components; arrow length is relative within that slice. This is a 2D projection, not a rendered 3D field volume.</p>}
+    {layer.kind==="vector"&&layer.renderer.kind==="glyphs"&&<p className="mt-1 text-xs text-muted-foreground">The viewport shows the selected 2D projection from recorded vector components. Arrow direction and relative length use the selected slice only; this is not a rendered 3D field volume.</p>}
     <p className="mt-1 text-xs text-muted-foreground">Range: {layer.range.minimumSI.toPrecision(5)}–{layer.range.maximumSI.toPrecision(5)} {layer.units.si}; {layer.range.uncertaintyStatement}</p>
     <p className="mt-1 text-xs text-muted-foreground">World date (UTC): {layer.timeReference.worldDateUTC}; interpolation: {layer.interpolation.method} ({layer.interpolation.validated?"validated":"not validated"})</p>
+    <p className="mt-1 text-xs text-muted-foreground">
+     Time basis: {layer.timeReference.kind} · display zone: {layer.timeReference.timezoneDisplay}.
+     {layer.timeReference.acquiredAtUTC?"Acquired at UTC: "+layer.timeReference.acquiredAtUTC:"Acquisition time: not applicable to this computed run"}.
+    </p>
+    <p className="mt-1 text-xs text-muted-foreground">
+     Valid window: {layer.timeReference.validFromUTC??"not declared"} → {layer.timeReference.validToUTC??"not declared"}.
+     {layer.source.kind==="dataset"?"Dataset retrieved at UTC: "+layer.source.retrievedAtUTC+" · evidence: "+layer.source.evidence:"Solver output is not an external observation or forecast."}
+    </p>
     {layer.kind==="event"&&<ul className="mt-2 list-disc pl-5 text-xs">{latestEvents.map(e=><li key={e.id}>{e.atSeconds.toFixed(4)} s · {e.label} · {e.severity}</li>)}</ul>}
     {layer.kind==="network"&&<p className="mt-2 text-xs">{layer.network?.nodes.length??0} nodes · {layer.network?.edges.length??0} edges</p>}
     <p className="mt-2 text-xs text-muted-foreground">{layer.validity}</p>
