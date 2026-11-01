@@ -157,7 +157,7 @@ test("streamlines stop cleanly when the selected slice contains only nodata",()=
  const layer=streamlineLayer();
  const raw=JSON.parse(JSON.stringify(layer));
  raw.values=raw.values.map(()=>null);
- raw.mask=raw.mask.map(()=>false);
+ raw.mask=Array(raw.values.length).fill(false);
  const empty=parseFieldLayer(raw);
  const frame=fieldVectorStreamlinesAtTime(empty,0,"xy",0);
  assert.equal(frame.paths.length,0);
