@@ -578,202 +578,8 @@ fun NativeWorldLabForm() {
         }){Text("Discard draft")}},
         dismissButton={TextButton(onClick={confirmingDraftDelete=false}){Text("Cancel")}}
     )
-    // Keep large native feature panels in independent composable lambdas. This
-    // prevents NativeWorldLabForm from compiling into a JVM method over 64 KB.
+    // Keep the two largest editor panels out of NativeWorldLabForm's bytecode.
     val digitalCircuitContent: @Composable () -> Unit = {
-            digitalCircuitContent()
-    }
-    val selectedSolidContent: @Composable () -> Unit = {
-            selectedSolidContent()
-    }
-    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("The World Lab",style=MaterialTheme.typography.titleLarge)
-        Text("Native offline reference models. Ground and shapes are illustrative, not measured or certified.",
-            style=MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            listOf("spring" to "Spring","rc" to "Circuit","heat" to "Heat").forEach { pair ->
-                if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first},
-                    modifier=Modifier.weight(1f)) { Text(pair.second) }
-                else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first},
-                    modifier=Modifier.weight(1f)) { Text(pair.second) }
-            }
-        }
-        Canvas(Modifier.fillMaxWidth().height(170.dp)
-            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
-            .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
-            if(kind=="spring") {
-                drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
-                    Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
-                val x=((observation?.xMeters?:0.0).coerceIn(-1.0,1.0)*size.width*0.3).toFloat()
-                drawCircle(Color(0xFFF2B877),size.minDimension*0.11f,
-                    Offset(size.width/2+x,size.height/2))
-            }else if(kind=="rc") {
-                drawRect(Color.Gray,Offset(size.width*0.28f,size.height*0.2f),
-                    Size(size.width*0.44f,size.height*0.6f))
-                val ratio=((observation?.voltageV?:0.0)/10.0).coerceIn(0.0,1.0).toFloat()
-                drawRect(Color(0xFF65B7CD),
-                    Offset(size.width*0.28f,size.height*(0.8f-0.6f*ratio)),
-                    Size(size.width*0.44f,size.height*0.6f*ratio))
-            }else {
-                val temperatures=observation?.temperatureK?:List(21){293.15}
-                temperatures.forEachIndexed { i,kelvin ->
-                    val hot=((kelvin-293.15)/80.0).coerceIn(0.0,1.0).toFloat()
-                    drawRect(Color(0.2f+0.78f*hot,0.32f+0.47f*hot,0.56f),
-                        Offset(size.width*(0.07f+0.86f*i/21),size.height*0.38f),
-                        Size(size.width*0.86f/21*0.96f,size.height*0.24f))
-                }
-            }
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            Button(onClick={playing=!playing}) { Text(if(playing)"Pause" else "Play") }
-            OutlinedButton(onClick={playing=false;time=0f}) { Text("Reset") }
-            OutlinedButton(onClick={playing=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Step") }
-            OutlinedButton(onClick={inside=!inside}) { Text(if(inside)"Hide" else "See inside") }
-        }
-        Text("Simulated time: "+labNumber(time.toDouble())+" s")
-        Slider(value=time,onValueChange={time=it;playing=false},valueRange=0f..12f,
-            modifier=Modifier.semantics { contentDescription="Simulated elapsed time" })
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            listOf(0.1f,1f,10f).forEach { rate ->
-                OutlinedButton(onClick={speed=rate}) { Text(labNumber(rate.toDouble())+"×") }
-            }
-        }
-        if(kind=="spring") {
-            Text("Assumed mass: "+labNumber(mass.toDouble())+" kg")
-            Slider(value=mass.coerceIn(0.1f,100f),onValueChange={mass=it;playing=false},
-                valueRange=0.1f..100f)
-            Text("Spring stiffness: "+labNumber(spring.toDouble())+" N/m")
-            Slider(value=spring,onValueChange={spring=it;playing=false},valueRange=0.1f..30f)
-        }else if(kind=="rc") {
-            Text("Resistance: "+labNumber(resistance.toDouble())+" Ω")
-            Slider(value=resistance,onValueChange={resistance=it;playing=false},valueRange=100f..10000f)
-        }else{
-            Text("Thermal diffusivity: "+labNumber(diffusivity.toDouble())+" m²/s")
-            Slider(value=diffusivity,onValueChange={diffusivity=it;playing=false},valueRange=0.001f..0.08f)
-        }
-        Text("Computed observations",style=MaterialTheme.typography.titleMedium)
-        if(observation==null) Text(result.exceptionOrNull()?.message?:"Unsupported input",
-            color=MaterialTheme.colorScheme.error)
-        else if(kind=="spring") {
-            Text("Position: "+labNumber(observation.xMeters)+" m")
-            Text("Velocity: "+labNumber(observation.velocityMPerS)+" m/s")
-            Text("Mechanical energy: "+labNumber(observation.mechanicalEnergyJ)+" J")
-        }else if(kind=="rc") {
-            Text("Capacitor voltage: "+labNumber(observation.voltageV)+" V")
-            Text("Current: "+labNumber(observation.currentA)+" A")
-            Text("Resistor heating: "+labNumber(observation.resistorHeatW)+" W")
-        }else{
-            Text("Mean temperature: "+labNumber(observation.meanTemperatureK)+" K")
-            Text("Hottest cell: "+labNumber(observation.peakTemperatureK)+" K")
-            if(inside) Text("21 computed internal cell temperatures (K): "+
-                observation.temperatureK.orEmpty().joinToString(", "){labNumber(it)},
-                style=MaterialTheme.typography.bodySmall)
-        }
-        if(inside && kind!="heat") Text("This is a model illustration, not X-ray imaging.",
-            style=MaterialTheme.typography.bodySmall)
-        HorizontalDivider()
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            Button(onClick={askReplace("new")}){Text("New project")}
-            OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
-                enabled=projectJson!=null){Text("Export JSON")}
-            OutlinedButton(onClick={projectJson?.let{cadExportPicker.launch("world-lab-cad.envcad.json")}},
-                enabled=projectJson!=null&&project!!.entities.isNotEmpty()){Text("Export CAD")}
-            OutlinedButton(onClick={
-                if(projectJson!=null)archiveExportPicker.launch(
-                    "world-lab-complete-archive.json")
-            },enabled=projectJson!=null){Text("Export complete archive")}
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            OutlinedButton(onClick={askReplace("import")}) {
-                Text("Import project or archive")
-            }
-            OutlinedButton(onClick={picker.launch(arrayOf("application/json"))}){
-                Text("Import CAD geometry")
-            }
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            Button(onClick={
-                val json=projectJson
-                if(json!=null)scope.launch{
-                    val prior=savedSnapshot
-                    runCatching { withContext(Dispatchers.IO){
-                        val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
-                        val current=NativeWorldLabProjectCodec.decode(json)
-                        val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
-                        localProjects.save(json,expectedSavedRevision=expected)
-                        localProjects.deleteDraft(current.id)
-                        localProjects.listProjects()
-                    } }.onSuccess{items->
-                        savedSnapshot=json;savedProjects=items
-                        selectedSavedId=project?.id?:""
-                        warning="";editHistory.clear()
-                        scope.launch {
-                            runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
-                                .onSuccess{recoveryDrafts=it}
-                        }
-                    }
-                        .onFailure{warning=it.message?:"Could not save the project locally."}
-                }
-            },enabled=projectJson!=null){Text("Save locally")}
-            OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
-        }
-        if(savedProjects.isNotEmpty()){
-            Box {
-                OutlinedButton(onClick={savedMenuOpen=true}){
-                    Text("Saved projects: "+
-                        (savedProjects.firstOrNull{it.id==selectedSavedId}?.title?:"Choose"))
-                }
-                DropdownMenu(expanded=savedMenuOpen,onDismissRequest={savedMenuOpen=false}){
-                    savedProjects.forEach{item->
-                        DropdownMenuItem(
-                            text={Text(item.title+" · revision "+item.revision)},
-                            onClick={selectedSavedId=item.id;savedMenuOpen=false})
-                    }
-                }
-            }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                OutlinedButton(onClick={askReplace("open-selected")},
-                    enabled=selectedSavedId.isNotEmpty()){Text("Open selected")}
-                OutlinedButton(onClick={confirmingSavedDelete=true},
-                    enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
-            }
-        }
-        if(recoveryDrafts.isNotEmpty()){
-            Text("Recover unfinished inventions",style=MaterialTheme.typography.titleSmall)
-            Text("Cached drafts never replace the open project unless you choose Restore.",
-                style=MaterialTheme.typography.bodySmall)
-            recoveryDrafts.take(10).forEach{draft->
-                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    Text(draft.title,modifier=Modifier.weight(1f))
-                    OutlinedButton(onClick={
-                        selectedDraftId=draft.id;askReplace("restore-draft")
-                    }){Text("Restore")}
-                    OutlinedButton(onClick={
-                        selectedDraftId=draft.id;confirmingDraftDelete=true
-                    }){Text("Discard")}
-                }
-            }
-            if(recoveryDrafts.size>10)Text("Older cached drafts: "+
-                (recoveryDrafts.size-10)+" (export or clean up your project cache).")
-        }
-        if(projectJson!=null && savedSnapshot!=projectJson)
-            Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
-                style=MaterialTheme.typography.bodySmall)
-        if(project!=null){
-            Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
-            NativeWorldLabViewport(project!!,project!!.entities.getOrNull(selected)?.id,
-                onSelect={id->selected=project!!.entities.indexOfFirst{it.id==id}.coerceAtLeast(0)},
-                onSaveView={position,target->applyProjectEdit{
-                    NativeWorldLabEditor.saveCameraViewpoint(it,position,target)
-                }},
-                onResetView={applyProjectEdit{
-                    NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
-                }},
-                onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
-                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}})
-            NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
-                applyProjectEdit(transform)
-            }
             Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
             Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
                 style=MaterialTheme.typography.bodySmall)
@@ -1061,62 +867,8 @@ fun NativeWorldLabForm() {
                     Text(result.validity,style=MaterialTheme.typography.bodySmall)
                 }
             }
-            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
-                    .forEach { (shape,label) ->
-                        OutlinedButton(onClick={applyProjectEdit { NativeWorldLabEditor.addSolid(it,shape) }},
-                            enabled=project!!.entities.size<200,modifier=Modifier.weight(1f)){
-                            Text(label)
-                        }
-                    }
-            }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                OutlinedButton(onClick={travelEdit(false)},enabled=editHistory.canUndo){
-                    Text("Undo")
-                }
-                OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
-                    Text("Redo")
-                }
-            }
-            Text("Build from connected visual parts",style=MaterialTheme.typography.titleSmall)
-            Text("Group solids and move them together. A visual assembly is not a simulated joint.",
-                style=MaterialTheme.typography.bodySmall)
-            if(solid!=null){
-                val candidates=project!!.entities.filter{it.id!=solid.id &&
-                    project!!.assemblies.none{a->a.entityIds.contains(it.id)}}
-                if(candidates.isNotEmpty()){
-                    val other=candidates[secondAssemblyIndex%candidates.size]
-                    OutlinedTextField(value=assemblyName,onValueChange={assemblyName=it},
-                        label={Text("Invention group name")},singleLine=true)
-                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                        OutlinedButton(onClick={
-                            secondAssemblyIndex=(secondAssemblyIndex+1)%candidates.size
-                        }){Text("Second part: "+other.name)}
-                        OutlinedButton(onClick={applyProjectEdit{
-                            NativeWorldLabEditor.createVisualAssembly(
-                                it,assemblyName,listOf(solid.id,other.id))
-                        }},enabled=project!!.assemblies.size<50&&assemblyName.isNotBlank()&&
-                            project!!.assemblies.none{it.entityIds.contains(solid.id)}){
-                            Text("Group parts")
-                        }
-                    }
-                }
-            }
-            project!!.assemblies.forEach{group->
-                Text(group.name+" · "+group.entityIds.size+" parts",
-                    style=MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    listOf(0 to "X",1 to "Y",2 to "Z").forEach{(axis,label)->
-                        OutlinedButton(onClick={applyProjectEdit{
-                            NativeWorldLabEditor.moveVisualAssembly(it,group.id,
-                                List(3){j->if(j==axis)assemblyMoveStep else 0.0})
-                        }}){Text("Move +"+label)}
-                    }
-                }
-                OutlinedButton(onClick={applyProjectEdit{
-                    NativeWorldLabEditor.ungroupVisualAssembly(it,group.id)
-                }}){Text("Ungroup safely")}
-            }
+    }
+    val selectedSolidContent: @Composable () -> Unit = {
             if(solid!=null) {
                 Row {
                     TextButton(onClick={selected=(selected-1+project!!.entities.size)%project!!.entities.size}) {
@@ -1733,6 +1485,253 @@ fun NativeWorldLabForm() {
                     }
                 }
             }
+    }
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text("The World Lab",style=MaterialTheme.typography.titleLarge)
+        Text("Native offline reference models. Ground and shapes are illustrative, not measured or certified.",
+            style=MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            listOf("spring" to "Spring","rc" to "Circuit","heat" to "Heat").forEach { pair ->
+                if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first},
+                    modifier=Modifier.weight(1f)) { Text(pair.second) }
+                else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first},
+                    modifier=Modifier.weight(1f)) { Text(pair.second) }
+            }
+        }
+        Canvas(Modifier.fillMaxWidth().height(170.dp)
+            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+            .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
+            if(kind=="spring") {
+                drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
+                    Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
+                val x=((observation?.xMeters?:0.0).coerceIn(-1.0,1.0)*size.width*0.3).toFloat()
+                drawCircle(Color(0xFFF2B877),size.minDimension*0.11f,
+                    Offset(size.width/2+x,size.height/2))
+            }else if(kind=="rc") {
+                drawRect(Color.Gray,Offset(size.width*0.28f,size.height*0.2f),
+                    Size(size.width*0.44f,size.height*0.6f))
+                val ratio=((observation?.voltageV?:0.0)/10.0).coerceIn(0.0,1.0).toFloat()
+                drawRect(Color(0xFF65B7CD),
+                    Offset(size.width*0.28f,size.height*(0.8f-0.6f*ratio)),
+                    Size(size.width*0.44f,size.height*0.6f*ratio))
+            }else {
+                val temperatures=observation?.temperatureK?:List(21){293.15}
+                temperatures.forEachIndexed { i,kelvin ->
+                    val hot=((kelvin-293.15)/80.0).coerceIn(0.0,1.0).toFloat()
+                    drawRect(Color(0.2f+0.78f*hot,0.32f+0.47f*hot,0.56f),
+                        Offset(size.width*(0.07f+0.86f*i/21),size.height*0.38f),
+                        Size(size.width*0.86f/21*0.96f,size.height*0.24f))
+                }
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            Button(onClick={playing=!playing}) { Text(if(playing)"Pause" else "Play") }
+            OutlinedButton(onClick={playing=false;time=0f}) { Text("Reset") }
+            OutlinedButton(onClick={playing=false;time=(time+1f/240f).coerceAtMost(12f)}) { Text("Step") }
+            OutlinedButton(onClick={inside=!inside}) { Text(if(inside)"Hide" else "See inside") }
+        }
+        Text("Simulated time: "+labNumber(time.toDouble())+" s")
+        Slider(value=time,onValueChange={time=it;playing=false},valueRange=0f..12f,
+            modifier=Modifier.semantics { contentDescription="Simulated elapsed time" })
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            listOf(0.1f,1f,10f).forEach { rate ->
+                OutlinedButton(onClick={speed=rate}) { Text(labNumber(rate.toDouble())+"×") }
+            }
+        }
+        if(kind=="spring") {
+            Text("Assumed mass: "+labNumber(mass.toDouble())+" kg")
+            Slider(value=mass.coerceIn(0.1f,100f),onValueChange={mass=it;playing=false},
+                valueRange=0.1f..100f)
+            Text("Spring stiffness: "+labNumber(spring.toDouble())+" N/m")
+            Slider(value=spring,onValueChange={spring=it;playing=false},valueRange=0.1f..30f)
+        }else if(kind=="rc") {
+            Text("Resistance: "+labNumber(resistance.toDouble())+" Ω")
+            Slider(value=resistance,onValueChange={resistance=it;playing=false},valueRange=100f..10000f)
+        }else{
+            Text("Thermal diffusivity: "+labNumber(diffusivity.toDouble())+" m²/s")
+            Slider(value=diffusivity,onValueChange={diffusivity=it;playing=false},valueRange=0.001f..0.08f)
+        }
+        Text("Computed observations",style=MaterialTheme.typography.titleMedium)
+        if(observation==null) Text(result.exceptionOrNull()?.message?:"Unsupported input",
+            color=MaterialTheme.colorScheme.error)
+        else if(kind=="spring") {
+            Text("Position: "+labNumber(observation.xMeters)+" m")
+            Text("Velocity: "+labNumber(observation.velocityMPerS)+" m/s")
+            Text("Mechanical energy: "+labNumber(observation.mechanicalEnergyJ)+" J")
+        }else if(kind=="rc") {
+            Text("Capacitor voltage: "+labNumber(observation.voltageV)+" V")
+            Text("Current: "+labNumber(observation.currentA)+" A")
+            Text("Resistor heating: "+labNumber(observation.resistorHeatW)+" W")
+        }else{
+            Text("Mean temperature: "+labNumber(observation.meanTemperatureK)+" K")
+            Text("Hottest cell: "+labNumber(observation.peakTemperatureK)+" K")
+            if(inside) Text("21 computed internal cell temperatures (K): "+
+                observation.temperatureK.orEmpty().joinToString(", "){labNumber(it)},
+                style=MaterialTheme.typography.bodySmall)
+        }
+        if(inside && kind!="heat") Text("This is a model illustration, not X-ray imaging.",
+            style=MaterialTheme.typography.bodySmall)
+        HorizontalDivider()
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            Button(onClick={askReplace("new")}){Text("New project")}
+            OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
+                enabled=projectJson!=null){Text("Export JSON")}
+            OutlinedButton(onClick={projectJson?.let{cadExportPicker.launch("world-lab-cad.envcad.json")}},
+                enabled=projectJson!=null&&project!!.entities.isNotEmpty()){Text("Export CAD")}
+            OutlinedButton(onClick={
+                if(projectJson!=null)archiveExportPicker.launch(
+                    "world-lab-complete-archive.json")
+            },enabled=projectJson!=null){Text("Export complete archive")}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            OutlinedButton(onClick={askReplace("import")}) {
+                Text("Import project or archive")
+            }
+            OutlinedButton(onClick={picker.launch(arrayOf("application/json"))}){
+                Text("Import CAD geometry")
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Button(onClick={
+                val json=projectJson
+                if(json!=null)scope.launch{
+                    val prior=savedSnapshot
+                    runCatching { withContext(Dispatchers.IO){
+                        val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
+                        val current=NativeWorldLabProjectCodec.decode(json)
+                        val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
+                        localProjects.save(json,expectedSavedRevision=expected)
+                        localProjects.deleteDraft(current.id)
+                        localProjects.listProjects()
+                    } }.onSuccess{items->
+                        savedSnapshot=json;savedProjects=items
+                        selectedSavedId=project?.id?:""
+                        warning="";editHistory.clear()
+                        scope.launch {
+                            runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
+                                .onSuccess{recoveryDrafts=it}
+                        }
+                    }
+                        .onFailure{warning=it.message?:"Could not save the project locally."}
+                }
+            },enabled=projectJson!=null){Text("Save locally")}
+            OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
+        }
+        if(savedProjects.isNotEmpty()){
+            Box {
+                OutlinedButton(onClick={savedMenuOpen=true}){
+                    Text("Saved projects: "+
+                        (savedProjects.firstOrNull{it.id==selectedSavedId}?.title?:"Choose"))
+                }
+                DropdownMenu(expanded=savedMenuOpen,onDismissRequest={savedMenuOpen=false}){
+                    savedProjects.forEach{item->
+                        DropdownMenuItem(
+                            text={Text(item.title+" · revision "+item.revision)},
+                            onClick={selectedSavedId=item.id;savedMenuOpen=false})
+                    }
+                }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={askReplace("open-selected")},
+                    enabled=selectedSavedId.isNotEmpty()){Text("Open selected")}
+                OutlinedButton(onClick={confirmingSavedDelete=true},
+                    enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
+            }
+        }
+        if(recoveryDrafts.isNotEmpty()){
+            Text("Recover unfinished inventions",style=MaterialTheme.typography.titleSmall)
+            Text("Cached drafts never replace the open project unless you choose Restore.",
+                style=MaterialTheme.typography.bodySmall)
+            recoveryDrafts.take(10).forEach{draft->
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    Text(draft.title,modifier=Modifier.weight(1f))
+                    OutlinedButton(onClick={
+                        selectedDraftId=draft.id;askReplace("restore-draft")
+                    }){Text("Restore")}
+                    OutlinedButton(onClick={
+                        selectedDraftId=draft.id;confirmingDraftDelete=true
+                    }){Text("Discard")}
+                }
+            }
+            if(recoveryDrafts.size>10)Text("Older cached drafts: "+
+                (recoveryDrafts.size-10)+" (export or clean up your project cache).")
+        }
+        if(projectJson!=null && savedSnapshot!=projectJson)
+            Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
+                style=MaterialTheme.typography.bodySmall)
+        if(project!=null){
+            Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            NativeWorldLabViewport(project!!,project!!.entities.getOrNull(selected)?.id,
+                onSelect={id->selected=project!!.entities.indexOfFirst{it.id==id}.coerceAtLeast(0)},
+                onSaveView={position,target->applyProjectEdit{
+                    NativeWorldLabEditor.saveCameraViewpoint(it,position,target)
+                }},
+                onResetView={applyProjectEdit{
+                    NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
+                }},
+                onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
+                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}})
+            NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
+                applyProjectEdit(transform)
+            }
+            digitalCircuitContent()
+            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
+                    .forEach { (shape,label) ->
+                        OutlinedButton(onClick={applyProjectEdit { NativeWorldLabEditor.addSolid(it,shape) }},
+                            enabled=project!!.entities.size<200,modifier=Modifier.weight(1f)){
+                            Text(label)
+                        }
+                    }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={travelEdit(false)},enabled=editHistory.canUndo){
+                    Text("Undo")
+                }
+                OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
+                    Text("Redo")
+                }
+            }
+            Text("Build from connected visual parts",style=MaterialTheme.typography.titleSmall)
+            Text("Group solids and move them together. A visual assembly is not a simulated joint.",
+                style=MaterialTheme.typography.bodySmall)
+            if(solid!=null){
+                val candidates=project!!.entities.filter{it.id!=solid.id &&
+                    project!!.assemblies.none{a->a.entityIds.contains(it.id)}}
+                if(candidates.isNotEmpty()){
+                    val other=candidates[secondAssemblyIndex%candidates.size]
+                    OutlinedTextField(value=assemblyName,onValueChange={assemblyName=it},
+                        label={Text("Invention group name")},singleLine=true)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={
+                            secondAssemblyIndex=(secondAssemblyIndex+1)%candidates.size
+                        }){Text("Second part: "+other.name)}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.createVisualAssembly(
+                                it,assemblyName,listOf(solid.id,other.id))
+                        }},enabled=project!!.assemblies.size<50&&assemblyName.isNotBlank()&&
+                            project!!.assemblies.none{it.entityIds.contains(solid.id)}){
+                            Text("Group parts")
+                        }
+                    }
+                }
+            }
+            project!!.assemblies.forEach{group->
+                Text(group.name+" · "+group.entityIds.size+" parts",
+                    style=MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    listOf(0 to "X",1 to "Y",2 to "Z").forEach{(axis,label)->
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.moveVisualAssembly(it,group.id,
+                                List(3){j->if(j==axis)assemblyMoveStep else 0.0})
+                        }}){Text("Move +"+label)}
+                    }
+                }
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.ungroupVisualAssembly(it,group.id)
+                }}){Text("Ungroup safely")}
+            }
+            selectedSolidContent()
             OutlinedTextField(value=proposedName,onValueChange={proposedName=it},
                 label={Text("Invented material name")},singleLine=true,
                 modifier=Modifier.fillMaxWidth())
