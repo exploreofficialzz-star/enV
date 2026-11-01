@@ -41,6 +41,8 @@ const componentA11yTests = read("src/lib/engines/design-component-a11y.test.ts")
 const cssBorder = read("src/lib/engines/css-border.ts");
 const cssBorderTests = read("src/lib/engines/css-border.test.ts");
 const contrastTests = read("src/lib/engines/accessibility-color.test.ts");
+const layerUtils = read("src/lib/engines/design-layer-utils.ts");
+const layerUtilsTests = read("src/lib/engines/design-layer-utils.test.ts");
 const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const checks = [
@@ -69,7 +71,7 @@ const checks = [
   ["Palette harmony counts avoid duplicate swatches", palette.includes("const anchors:") && paletteTests.includes("must not contain duplicate swatches")],
   ["Palette utility regression tests", paletteTests.includes("primary shade scale") && paletteTests.includes("W3C token exports") && paletteTests.includes("selectable counts from three to eight")],
   ["HSV, HSB, CMYK, HWB and OKLCH parsers and copyable formatters", designColor.includes("parsePercentOrUnit") && designColor.includes("parseOklch") && designColor.includes("parseHwb") && designColor.includes("formatOklch") && designColor.includes("formatHwb") && designColorTests.includes("HWB CSS colors parse") && designColorTests.includes("OKLCH CSS colors parse") && colorEngine.includes("formatOklch(converted)")],
-  ["Independent multi-layer shadow editor", cssEngine.includes("Independent shadow layers") && cssEngine.includes("setShadowLayers") && cssEngine.includes("buildBoxShadow") && cssEngine.includes("Add layer")],
+  ["Independent multi-layer shadow editor with stack reordering", cssEngine.includes("Independent shadow layers") && cssEngine.includes("setShadowLayers") && cssEngine.includes("buildBoxShadow") && cssEngine.includes("Move shadow layer") && layerUtils.includes("moveLayerItem") && layerUtilsTests.includes("layer stack reordering") && cssEngine.includes("Add layer")],
   ["Button variants and disabled interaction preview", cssEngine.includes("Button style") && cssEngine.includes("env-button:disabled") && cssEngine.includes("disabled={values.disabled === \"yes\"}")],
   ["Five structured card preview layouts", cssEngine.includes("Card layout") && ["product", "profile", "article", "metric"].every((layout) => cssEngine.includes(`values.layout === "${layout}"`))],
   ["Button hover, focus and reduced-motion states", cssEngine.includes("env-live-button:hover") && cssEngine.includes("env-live-input:focus-visible") && cssEngine.includes("Focus ring color") && cssEngine.includes("prefers-reduced-motion")],
@@ -86,7 +88,7 @@ const checks = [
   ["SVG shape color controls and PNG export", cssEngine.includes("values.color ??") && cssEngine.includes("values.fill ??") && cssEngine.includes("Copy SVG") && cssEngine.includes("downloadSvgAsPng")],
   ["Exported blob and wave SVGs include accessible names", svgGenerators.includes('aria-label="Generated organic blob shape"') && svgGenerators.includes('aria-label="Generated layered wave background"') && svgGeneratorTests.includes("Generated organic blob shape") && svgGeneratorTests.includes("Generated layered wave background")],
   ["Median-cut image palette extraction and transparent-pixel filtering", paletteImage.includes("extractDominantColors") && paletteImage.includes("selectedChannel") && paletteImageTests.includes("ignores transparent pixels") && colorEngine.includes("extractDominantColors(pixels, 5, 160)")],
-  ["Independently editable text-shadow layers and presets", textShadow.includes("buildTextShadow") && textShadow.includes("normalizeTextShadowLayers") && textShadowTests.includes("keeps its own editable values") && cssEngine.includes("Independent text-shadow layers") && cssEngine.includes("Add layer (")],
+  ["Independently editable and reorderable text-shadow layers", textShadow.includes("buildTextShadow") && textShadow.includes("normalizeTextShadowLayers") && textShadowTests.includes("keeps its own editable values") && cssEngine.includes("Independent text-shadow layers") && cssEngine.includes("Move text shadow layer") && cssEngine.includes("Add layer (" )],
   ["Consistent SVG wave export dimensions", svgGenerators.includes('viewBox="0 0 1440 240"') && svgGenerators.includes("L1440 240 L0 240 Z") && svgGeneratorTests.includes('viewBox="0 0 1440 240"')],
 ];
 const failedChecks = checks.filter(([, pass]) => !pass).map(([label]) => label);

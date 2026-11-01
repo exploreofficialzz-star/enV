@@ -10,6 +10,7 @@ import { buildBoxShadow, createShadowPreset, type ShadowLayer } from "@/lib/engi
 import { buildTextShadow, createTextShadowPreset, type TextShadowLayer } from "@/lib/engines/css-text-shadow";
 import { toHex } from "@/lib/engines/accessibility-color";
 import { inspectDesignComponentContrast } from "@/lib/engines/design-component-a11y";
+import { moveLayerItem } from "@/lib/engines/design-layer-utils";
 import { buildCssBorder } from "@/lib/engines/css-border";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -572,6 +573,8 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                           <input type="checkbox" checked={layer.inset} onChange={(event) => setShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, inset: event.target.checked } : item))} className="size-4 accent-accent" />
                           Inset
                         </label>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => moveLayerItem(previous, index, -1))} disabled={index === 0} aria-label={"Move shadow layer " + (index + 1) + " up"}>Up</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => moveLayerItem(previous, index, 1))} disabled={index === shadowLayers.length - 1} aria-label={"Move shadow layer " + (index + 1) + " down"}>Down</Button>
                         <Button type="button" size="sm" variant="ghost" onClick={() => setShadowLayers((previous) => previous.filter((item) => item.id !== layer.id))} aria-label={"Remove shadow layer " + (index + 1)}>Remove</Button>
                       </div>
                     </div>
@@ -625,7 +628,11 @@ export function CssGenEngine({ op, toolId }: { op: string; toolId?: string }) {
                         <input type="checkbox" checked={layer.enabled} onChange={(event) => setTextShadowLayers((previous) => previous.map((item) => item.id === layer.id ? { ...item, enabled: event.target.checked } : item))} className="size-4 accent-accent" />
                         Layer {index + 1}
                       </label>
+                      <div className="flex items-center gap-1">
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => moveLayerItem(previous, index, -1))} disabled={index === 0} aria-label={"Move text shadow layer " + (index + 1) + " up"}>Up</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => moveLayerItem(previous, index, 1))} disabled={index === textShadowLayers.length - 1} aria-label={"Move text shadow layer " + (index + 1) + " down"}>Down</Button>
                       <Button type="button" size="sm" variant="ghost" onClick={() => setTextShadowLayers((previous) => previous.filter((item) => item.id !== layer.id))} aria-label={"Remove text shadow layer " + (index + 1)}>Remove</Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <label className="space-y-1 text-xs text-muted">Color
