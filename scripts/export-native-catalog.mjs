@@ -2,23 +2,16 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { presentGeneratedCalculator } from "../src/lib/calc/generated-calculator-presentation.ts";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const [{ tools: catalogTools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
+const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
   import("../src/data/catalog.ts"),
   import("../src/data/categories.ts"),
   import("../src/lib/datetime/catalog-tools.ts"),
 ]);
 // Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
 // runtime extensions are validated below but are not duplicated into the generated base export.
-// The native catalogue indexes the public name and description directly; preserve its
-// existing keyword array to keep the generated JSON compact while search still finds labels.
-const tools = catalogTools.map((tool) => {
-  const presented = presentGeneratedCalculator(tool);
-  return { ...presented, keywords: tool.keywords };
-});
 
 const runtimeCatalogExtensions = [
   {
@@ -66,9 +59,9 @@ if (missingCategories.length) {
 }
 const active = exportedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
 const planned = exportedTools.length - active;
-const catalogVersion = createHash("sha256").update(catalogSource).update(JSON.stringify(exportedTools)).digest("hex").slice(0, 12);
+const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
 const runtimeInventoryVersion = createHash("sha256")
-  .update(catalogVersion + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
+  .update(catalogSource + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
   .digest("hex").slice(0, 12);
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
