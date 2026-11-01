@@ -402,3 +402,88 @@ extension NativeWorldLabTimeCheckpointTests {
         XCTAssertLessThan((result.tcgMjd-result.ttMjd)*86400,0.01)
     }
 }
+
+
+final class NativeWorldLabReplayManifestTests:XCTestCase {
+    private let samples=[0.0,0.1,0.2,0.3,0.4]
+    private func replay(_ input:NativeLabInput)throws->(NativeWorldLabReplayManifest,[NativeLabResult]) {
+        let manifest=try NativeWorldLabReplayManifest.make(input:input,
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"Africa/Lagos",
+            sampleTimesSeconds:samples)
+        let decoded=try NativeWorldLabReplayManifest.decodeAndReplay(manifest.encodeBounded())
+        return (decoded.manifest,decoded.samples)
+    }
+
+    func testSpringManifestRebuildsIdenticalNativeSolverSamples() throws {
+        let input=NativeLabInput.spring(massKg:2,springNPerM:8,dampingNsPerM:0.5,x0:0.25,v0:-0.1)
+        let manifest=try NativeWorldLabReplayManifest.make(input:input,
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"Africa/Lagos",sampleTimesSeconds:samples)
+        let encoded=try manifest.encodeBounded()
+        let decoded=try NativeWorldLabReplayManifest.decodeAndReplay(encoded)
+        XCTAssertEqual(decoded.manifest,manifest)
+        for (index,time) in samples.enumerated() {
+            let expected=try NativeWorldLabScience.evaluate(input,atSeconds:time)
+            let actual=decoded.samples[index]
+            XCTAssertEqual(actual.timeSeconds,expected.timeSeconds,accuracy:0)
+            XCTAssertEqual(actual.xMeters!,expected.xMeters!,accuracy:0)
+            XCTAssertEqual(actual.velocityMPerS!,expected.velocityMPerS!,accuracy:0)
+            XCTAssertEqual(actual.mechanicalEnergyJ!,expected.mechanicalEnergyJ!,accuracy:0)
+        }
+    }
+
+    func testRcAndHeatManifestsReplayTheirModelEvaluators() throws {
+        let rc=NativeLabInput.rc(resistanceOhm:2200,capacitanceF:0.002,supplyV:5,initialV:0.4)
+        let heat=NativeLabInput.heat(diffusivityM2S:0.015,lengthM:1.5,backgroundK:290,centerK:360)
+        for input in [rc,heat] {
+            let manifest=try NativeWorldLabReplayManifest.make(input:input,
+                worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"UTC",sampleTimesSeconds:samples)
+            let replay=try NativeWorldLabReplayManifest.decodeAndReplay(manifest.encodeBounded())
+            XCTAssertEqual(replay.samples.map{$0.timeSeconds},samples)
+        }
+    }
+
+    func testFingerprintChangesWithInputsTimezoneAndSampleAxis() throws {
+        let input=NativeLabInput.spring()
+        let baseline=try NativeWorldLabReplayManifest.make(input:input,
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"UTC",sampleTimesSeconds:samples)
+        let changedInput=try NativeWorldLabReplayManifest.make(input:.spring(massKg:2),
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"UTC",sampleTimesSeconds:samples)
+        let changedZone=try NativeWorldLabReplayManifest.make(input:input,
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"Africa/Lagos",sampleTimesSeconds:samples)
+        let changedSamples=try NativeWorldLabReplayManifest.make(input:input,
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"UTC",sampleTimesSeconds:samples+[0.5])
+        XCTAssertNotEqual(baseline.inputFingerprint,changedInput.inputFingerprint)
+        XCTAssertNotEqual(baseline.inputFingerprint,changedZone.inputFingerprint)
+        XCTAssertNotEqual(baseline.inputFingerprint,changedSamples.inputFingerprint)
+    }
+
+    func testTamperedParametersUnknownFieldsAndEventQueueAreRejected() throws {
+        let manifest=try NativeWorldLabReplayManifest.make(input:.spring(),
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"UTC",sampleTimesSeconds:samples)
+        let original=try JSONSerialization.jsonObject(with:manifest.encodeBounded()) as! [String:Any]
+        var changed=original
+        var parameters=changed["parameters"] as! [String:Any]
+        parameters["massKg"]=3.0
+        changed["parameters"]=parameters
+        XCTAssertThrowsError(try NativeWorldLabReplayManifest.decodeAndReplay(
+            JSONSerialization.data(withJSONObject:changed)))
+        changed=original
+        changed["unexpectedState"]="do-not-restore"
+        XCTAssertThrowsError(try NativeWorldLabReplayManifest.decodeAndReplay(
+            JSONSerialization.data(withJSONObject:changed)))
+        changed=original
+        changed["mandatoryEventTimesSeconds"]=[0.2]
+        XCTAssertThrowsError(try NativeWorldLabReplayManifest.decodeAndReplay(
+            JSONSerialization.data(withJSONObject:changed)))
+    }
+
+    func testInvalidTimeZoneSampleAxisAndPayloadBoundsAreRejected() throws {
+        XCTAssertThrowsError(try NativeWorldLabReplayManifest.make(input:.spring(),
+            worldEpochUTC:"bad",timezoneDisplay:"UTC",sampleTimesSeconds:samples))
+        XCTAssertThrowsError(try NativeWorldLabReplayManifest.make(input:.spring(),
+            worldEpochUTC:"2026-11-01T00:00:00Z",timezoneDisplay:"UTC",
+            sampleTimesSeconds:[0,0.2,0.1]))
+        XCTAssertThrowsError(try NativeWorldLabReplayManifest.decodeAndReplay(
+            Data(repeating:0,count:NativeWorldLabReplayManifest.maxBytes+1)))
+    }
+}
