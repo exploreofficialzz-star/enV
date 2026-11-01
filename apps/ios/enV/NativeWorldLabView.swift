@@ -172,6 +172,8 @@ struct NativeWorldLabView:View {
     @State private var scene=SCNScene()
     @State private var sceneCameraNode=SCNNode()
     @State private var observerVerticalOffset=0.0
+    @State private var observerPanX=0.0
+    @State private var observerPanZ=0.0
     @State private var appliedObserverVerticalOffset=0.0
     @State private var lastTick=Date()
     private let timer=Timer.publish(every:0.04,on:.main,in:.common).autoconnect()
@@ -471,6 +473,26 @@ struct NativeWorldLabView:View {
                     Button("Save viewpoint"){saveObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Restore viewpoint"){restoreObserverViewpoint()}.buttonStyle(.bordered)
                     Button("Surface"){returnObserverToSurface()}.buttonStyle(.bordered)
+                }
+                HStack{
+                    Button("Look left"){orbitObserverView(yawDelta:-0.16,pitchDelta:0)}
+                        .buttonStyle(.bordered).keyboardShortcut(.leftArrow)
+                    Button("Look right"){orbitObserverView(yawDelta:0.16,pitchDelta:0)}
+                        .buttonStyle(.bordered).keyboardShortcut(.rightArrow)
+                    Button("Look up"){orbitObserverView(yawDelta:0,pitchDelta:0.10)}
+                        .buttonStyle(.bordered).keyboardShortcut(.upArrow)
+                    Button("Look down"){orbitObserverView(yawDelta:0,pitchDelta:-0.10)}
+                        .buttonStyle(.bordered).keyboardShortcut(.downArrow)
+                }
+                HStack{
+                    Button("Pan left"){panObserverView(horizontal:-observerPanStepMeters(),depth:0)}
+                        .buttonStyle(.bordered)
+                    Button("Pan right"){panObserverView(horizontal:observerPanStepMeters(),depth:0)}
+                        .buttonStyle(.bordered)
+                    Button("Pan forward"){panObserverView(horizontal:0,depth:observerPanStepMeters())}
+                        .buttonStyle(.bordered)
+                    Button("Pan back"){panObserverView(horizontal:0,depth:-observerPanStepMeters())}
+                        .buttonStyle(.bordered)
                 }
                 Text("Observer distance: \(String(format: "%.2f", currentObserverRangeMeters())) m")
                     .font(.caption).foregroundStyle(.secondary)
@@ -2490,6 +2512,8 @@ Text("Invent chemical heat").font(.headline)
     }
     private func currentObserverTarget()->[Double]{
         var target=project?.camera.lookingAtMeters ?? [0,1.2,0]
+        target[0]+=observerPanX
+        target[2]+=observerPanZ
         target[1]=max(-20000,min(100000,target[1]+observerVerticalOffset))
         return target
     }
@@ -2497,6 +2521,39 @@ Text("Invent chemical heat").font(.headline)
         let target=currentObserverTarget(),position=sceneCameraNode.position
         return max(0.25,hypot(hypot(Double(position.x)-target[0],
             Double(position.y)-target[1]),Double(position.z)-target[2]))
+    }
+    private func orbitObserverView(yawDelta:Double,pitchDelta:Double){
+        guard yawDelta.isFinite,pitchDelta.isFinite else{return}
+        let target=currentObserverTarget(),position=sceneCameraNode.position
+        let dx=Double(position.x)-target[0],dy=Double(position.y)-target[1],dz=Double(position.z)-target[2]
+        let radius=max(0.25,hypot(hypot(dx,dy),dz))
+        let yaw=atan2(dx,dz)+yawDelta
+        let pitch=max(-1.3962634016,min(1.3962634016,
+            asin(max(-1,min(1,dy/radius)))+pitchDelta))
+        let horizontal=radius*cos(pitch)
+        sceneCameraNode.position=SCNVector3(
+            Float(target[0]+sin(yaw)*horizontal),
+            Float(target[1]+sin(pitch)*radius),
+            Float(target[2]+cos(yaw)*horizontal))
+        sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        updateObserverCameraClip()
+    }
+    private func observerPanStepMeters()->Double{
+        max(0.5,min(100,currentObserverRangeMeters()*0.1))
+    }
+    private func panObserverView(horizontal:Double,depth:Double){
+        guard horizontal.isFinite,depth.isFinite else{return}
+        let position=sceneCameraNode.position
+        let yaw=atan2(Double(position.x)-currentObserverTarget()[0],
+            Double(position.z)-currentObserverTarget()[2])
+        let dx=horizontal*cos(yaw)+depth*sin(yaw)
+        let dz=depth*cos(yaw)-horizontal*sin(yaw)
+        observerPanX+=dx;observerPanZ+=dz
+        sceneCameraNode.position=SCNVector3(
+            position.x+Float(dx),position.y,position.z+Float(dz))
+        let target=currentObserverTarget()
+        sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        updateObserverCameraClip()
     }
     private func updateObserverCameraClip(){
         let target=currentObserverTarget(),position=sceneCameraNode.position
@@ -2533,14 +2590,14 @@ Text("Invent chemical heat").font(.headline)
                 positionMeters:[Double(position.x),Double(position.y),Double(position.z)],
                 lookingAtMeters:target)
             projectData=next;project=try NativeWorldLabProject.decode(next)
-            observerVerticalOffset=0;appliedObserverVerticalOffset=0
+            observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
             savedSnapshot=nil;problem="Observer viewpoint saved with this invention."
             redraw()
         }catch{problem=error.localizedDescription}
     }
     private func restoreObserverViewpoint(){
         guard let current=project else{return}
-        observerVerticalOffset=0;appliedObserverVerticalOffset=0
+        observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(
             Float(current.camera.positionMeters[0]),
             Float(current.camera.positionMeters[1]),
@@ -2550,7 +2607,7 @@ Text("Invent chemical heat").font(.headline)
         updateObserverCameraClip()
     }
     private func returnObserverToSurface(){
-        observerVerticalOffset=0;appliedObserverVerticalOffset=0
+        observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(0,1.65,-8)
         sceneCameraNode.look(at:SCNVector3(0,1.2,0))
         updateObserverCameraClip()
@@ -2647,7 +2704,7 @@ Text("Invent chemical heat").font(.headline)
             }
         }
         scene=next
-        observerVerticalOffset=0;appliedObserverVerticalOffset=0
+        observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
         updateObserverCameraClip()
         applyDropPosition()
         applyMotorPosition()
