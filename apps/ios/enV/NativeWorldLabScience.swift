@@ -25,6 +25,43 @@ struct NativeLabResult {
     var peakTemperatureK:Double?
     var solverStepSeconds:Double=1.0/240.0
 }
+enum NativeLabBranchFlowDirection:String {
+    case positiveToNegative="positive-to-negative"
+    case negativeToPositive="negative-to-positive"
+    case zero
+}
+struct NativeLabBranchFlow:Equatable {
+    let signedCurrentA:Double
+    let magnitudeA:Double
+    let fromNodeId:String?
+    let toNodeId:String?
+    let direction:NativeLabBranchFlowDirection
+}
+/** Conventional branch flow only; never implies a spatial electromagnetic field. */
+enum NativeWorldLabBranchCurrent {
+    static func resolve(positiveNodeId:String,negativeNodeId:String,
+                        signedCurrentA:Double)throws->NativeLabBranchFlow {
+        guard !positiveNodeId.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+              !negativeNodeId.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+              positiveNodeId != negativeNodeId else {
+            throw NativeWorldLabError.invalid("Branch current requires two distinct connected node IDs.")
+        }
+        guard signedCurrentA.isFinite,abs(signedCurrentA)<=1e6 else {
+            throw NativeWorldLabError.invalid("Branch current must be finite and within the supported SI range.")
+        }
+        if abs(signedCurrentA)<=1e-12 {
+            return NativeLabBranchFlow(signedCurrentA:signedCurrentA,magnitudeA:0,
+                fromNodeId:nil,toNodeId:nil,direction:.zero)
+        }
+        let forward=signedCurrentA>0
+        return NativeLabBranchFlow(signedCurrentA:signedCurrentA,
+            magnitudeA:abs(signedCurrentA),
+            fromNodeId:forward ? positiveNodeId:negativeNodeId,
+            toNodeId:forward ? negativeNodeId:positiveNodeId,
+            direction:forward ? .positiveToNegative:.negativeToPositive)
+    }
+}
+
 enum NativeWorldLabScience {
     static let heatCells=21
     private static func domain(_ n:Double,_ low:Double,_ high:Double,_ label:String)throws{
