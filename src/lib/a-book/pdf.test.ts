@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { extractPdfTextLocally, extractSelectedPdfTextLocally } from "./pdf-reader.ts";
 import { extractPdfPagesInWorker, extractSelectedPdfsInWorker, inspectPdfInWorker, mergePdfsInWorker, rotateSelectedPdfsInWorker, splitPdfIntoZipInWorker, splitSelectedPdfsIntoZipInWorker } from "./pdf-worker-client.ts";
 import test from "node:test";
 import { PDFDocument } from "pdf-lib";
@@ -236,4 +237,58 @@ test("A book rejects browser PDF work when Web Workers are unavailable", async (
     if (originalWorker) Object.defineProperty(globalThis, "Worker", originalWorker);
     else Reflect.deleteProperty(globalThis, "Worker");
   }
+});
+
+
+test("extracts embedded PDF text locally and reports page-level progress", async () => {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont("Helvetica");
+  for (const line of ["A book local PDF text", "Second page searchable phrase"]) {
+    const page = pdf.addPage([320, 420]);
+    page.drawText(line, { x: 32, y: 350, size: 16, font });
+  }
+  const bytes = await pdf.save();
+  const progress: Array<[number, number]> = [];
+  const result = await extractPdfTextLocally(new Blob([bytes]), {
+    onProgress: (page, total) => progress.push([page, total]),
+  });
+  assert.equal(result.pageCount, 2);
+  assert.equal(result.pagesProcessed, 2);
+  assert.equal(result.truncated, false);
+  assert.match(result.text, /A book local PDF text/);
+  assert.match(result.text, /Second page searchable phrase/);
+  assert.deepEqual(progress, [[1, 2], [2, 2]]);
+});
+
+test("extracts several PDFs into distinct local searchable text files", async () => {
+  const { unzipSync } = await import("fflate");
+  const first = await PDFDocument.create();
+  const firstFont = await first.embedFont("Helvetica");
+  first.addPage([300, 400]).drawText("Research alpha note", { x: 24, y: 340, font: firstFont });
+  const second = await PDFDocument.create();
+  const secondFont = await second.embedFont("Helvetica");
+  second.addPage([300, 400]).drawText("Research beta note", { x: 24, y: 340, font: secondFont });
+  const archive = await extractSelectedPdfTextLocally([
+    { name: "Research.pdf", blob: new Blob([await first.save()]) },
+    { name: "research.PDF", blob: new Blob([await second.save()]) },
+  ]);
+  const entries = unzipSync(archive);
+  assert.deepEqual(Object.keys(entries).sort(), ["Research-2.txt", "Research.txt"]);
+  assert.match(new TextDecoder().decode(entries["Research.txt"]), /Research alpha note/);
+  assert.match(new TextDecoder().decode(entries["Research-2.txt"]), /Research beta note/);
+});
+
+test("batch PDF text extraction validates selection and file limits before processing", async () => {
+  await assert.rejects(() => extractSelectedPdfTextLocally([]), /Choose at least one PDF/);
+  await assert.rejects(
+    () => extractSelectedPdfTextLocally(Array.from({ length: 26 }, (_, index) => ({
+      name: `file-${index}.pdf`,
+      blob: new Blob(["pdf"]),
+    }))),
+    /Select up to 25 PDFs/,
+  );
+  await assert.rejects(
+    () => extractPdfTextLocally(new Blob([])),
+    /selected PDF is empty/,
+  );
 });
