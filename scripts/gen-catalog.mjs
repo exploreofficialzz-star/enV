@@ -6,6 +6,7 @@ import { writeFileSync, readFileSync } from "node:fs";
 import { IMAGE_DESCRIPTIONS } from "./image-descriptions.mjs";
 import mathExpansion from "../src/data/math-expansion.json" with { type: "json" };
 import { describeExpansion } from "../src/lib/calc/expansion-rows.mjs";
+import { parseMathExerciseCatalog, mathExercisePresentation } from "./math-exercise-catalog.mjs";
 
 /** @typedef {[string, string, string, string, string, string, string, number, number, string?]} Tuple */
 // id, name, cat, desc, engineType, engineKey, keywords, featured(0/1), pop, extra
@@ -1082,6 +1083,8 @@ add([
 // Systematic STEM/math exercise expansion. These are real formula-driven tools
 // registered by math-exercise-calculators.ts. Keep the catalog in sync with the
 // executable registry by deriving IDs from the source spec keys/targets.
+const mathExerciseCatalog = parseMathExerciseCatalog(readFileSync(new URL("../src/lib/engines/math-exercise-calculators.ts", import.meta.url), "utf8"));
+
 const mathExerciseRows = [
   ["linear", ["m","x","b","y"]], ["distance", ["d","r","t"]], ["acceleration", ["a","v","u","t"]],
   ["force", ["F","m","a"]], ["work", ["W","F","d"]], ["power", ["P","W","t"]], ["ke", ["E","m","v"]],
@@ -1112,19 +1115,19 @@ const calculusAndStatisticsRows = [
 ];
 for (const [key, targets] of calculusAndStatisticsRows) {
   for (const target of targets) {
+    const { name: formulaName, targetLabel } = mathExercisePresentation(mathExerciseCatalog, key, target);
     RAW.push([
       `math-exercise-${key}-${target}`,
-      `${key.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())} — Solve for ${target}`,
+      `${formulaName} — Solve for ${targetLabel}`,
       "calculators",
-      `Formula exercise calculator for ${key.replace(/-/g, " ")}, solving for ${target}.`,
+      `Formula exercise calculator for ${formulaName}, solving for ${targetLabel}. `,
       "calculator",
       `exercise-${key}-${target}`,
-      `math exercise formula ${key} solve ${target} calculus statistics STEM`,
+      `math exercise formula ${key} solve ${targetLabel.toLowerCase()} calculus statistics STEM`,
       0, 66, "n",
     ]);
   }
 }
-
 const advancedMathExerciseRows = [
   ["quadratic-discriminant", ["D"]], ["quadratic-root", ["x"]], ["vertex-x", ["h","b","a"]], ["vertex-y", ["k","c","a","b"]],
   ["trig-sine", ["sin","opposite","hypotenuse"]], ["trig-cosine", ["cos","adjacent","hypotenuse"]], ["trig-tangent", ["tan","opposite","adjacent"]], ["law-of-sines", ["a","b","A","B"]], ["law-of-cosines", ["c","a","b","C"]],
@@ -1134,36 +1137,34 @@ const advancedMathExerciseRows = [
 ];
 for (const [key, targets] of advancedMathExerciseRows) {
   for (const target of targets) {
+    const { name: formulaName, targetLabel } = mathExercisePresentation(mathExerciseCatalog, key, target);
     RAW.push([
       `math-exercise-${key}-${target}`,
-      `${key.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())} — Solve for ${target}`,
+      `${formulaName} — Solve for ${targetLabel}`,
       "calculators",
-      `Formula exercise calculator for ${key.replace(/-/g, " ")}, solving for ${target}.`,
+      `Formula exercise calculator for ${formulaName}, solving for ${targetLabel}. `,
       "calculator",
       `exercise-${key}-${target}`,
-      `math exercise formula ${key} solve ${target} algebra STEM`,
+      `math exercise formula ${key} solve ${targetLabel.toLowerCase()} algebra STEM`,
       0, 64, "n",
     ]);
   }
 }
-
 for (const [key, targets] of mathExerciseRows) {
   for (const target of targets) {
+    const { name: formulaName, targetLabel } = mathExercisePresentation(mathExerciseCatalog, key, target);
     RAW.push([
       `math-exercise-${key}-${target}`,
-      `${key.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())} — Solve for ${target}`,
+      `${formulaName} — Solve for ${targetLabel}`,
       "calculators",
-      `Formula exercise calculator for ${key.replace(/-/g, " ")}, solving for ${target}. Shows the computed unknown from the remaining values.`,
+      `Formula exercise calculator for ${formulaName}, solving for ${targetLabel}. Shows the computed unknown from the remaining values.`,
       "calculator",
       `exercise-${key}-${target}`,
-      `math exercise formula ${key} solve ${target} algebra STEM`,
-      0,
-      62,
-      "n",
+      `math exercise formula ${key} solve ${targetLabel.toLowerCase()} algebra STEM`,
+      0, 62, "n",
     ]);
   }
 }
-
 
 const expansionData = JSON.parse(readFileSync(new URL("../src/data/math-expansion.json", import.meta.url), "utf8"));
 const titleCase = (text) => String(text).replace(/\b\w/g, (c) => c.toUpperCase());
@@ -1173,12 +1174,13 @@ for (const [family, rows] of Object.entries(expansionData)) {
     const info = describeExpansion(family, row);
     for (const target of ["a", "b", "c"]) {
       const op = `exp-${family}-${info.key}-${target}`;
-      const pair = `${titleCase(info.a)} / ${titleCase(info.b)} — Solve for ${target}`;
+      const targetLabel = info.labels[target];
+      const equationTitle = `${info.relation} — Solve for ${targetLabel}`;
       RAW.push([
         `math-${op}`,
-        info.title ? `${info.title}: ${pair}` : pair,
+        info.title ? `${info.title}: ${equationTitle}` : equationTitle,
         "calculators",
-        `Formula exercise calculator: ${info.relation}. Solve for ${target} (${info.labels[target]}).`,
+        `Formula exercise calculator: ${info.relation}. Solve for ${targetLabel}. Enter the other two values to calculate the missing value.`,
         "calculator",
         op,
         `math exercise formula ${family} ${info.key} solve ${target}${info.title ? ` ${info.title.toLowerCase()}` : ""}`,
