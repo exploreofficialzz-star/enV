@@ -246,7 +246,7 @@ object NativeWorldLabExecution {
                 initialValues[adapter.componentId+":"+portId]=value.copy(dimension=value.dimension.toList())
             }
         }
-        var previous:Map<String,NativeScienceQuantity>=initialValues
+        var previous: Map<String,NativeScienceQuantity> = initialValues
         while(now<durationSeconds-1e-12&&samples.size<50000){
             val end=minOf(durationSeconds,now+stepSeconds,scheduled?:durationSeconds)
             require(end>now+1e-12){"Scientific solver failed to advance"}
