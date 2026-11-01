@@ -66,6 +66,8 @@ export function ABookEngine() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [loadedProfileId, setLoadedProfileId] = useState<string | null | undefined>(undefined);
+  const [profileSwitchError, setProfileSwitchError] = useState("");
+  const [profileSwitchRetry, setProfileSwitchRetry] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -179,13 +181,17 @@ export function ABookEngine() {
           await flushCurrentDraft();
         } catch (cause) {
           if (mounted) {
-            setError(cause instanceof Error
-              ? `The previous local library could not finish saving: ${cause.message}`
-              : "The previous local library could not finish saving.");
+            setProfileSwitchError(cause instanceof Error
+              ? `The current local library could not be saved, so switching libraries was blocked: ${cause.message}`
+              : "The current local library could not be saved, so switching libraries was blocked.");
+            setStorageMessage("Account switch blocked · retry local save");
+            setIsReady(true);
           }
+          return;
         }
         if (!mounted || authPending) return;
 
+        setProfileSwitchError("");
         setABookLocalProfile(activeProfileId);
         setCurrentNote(null);
         setNotes([]);
@@ -226,7 +232,7 @@ export function ABookEngine() {
       mounted = false;
       window.clearTimeout(saveTimer.current);
     };
-  }, [activeProfileId, authPending]);
+  }, [activeProfileId, authPending, profileSwitchRetry]);
 
   useEffect(() => {
     if (!current || !isReady) return;
@@ -504,7 +510,15 @@ export function ABookEngine() {
   // before the profile-loading effect gets a chance to run.
   if (authPending || !isReady || loadedProfileId !== activeProfileId) {
     return <section className="rounded-xl border border-border bg-surface p-6 text-sm text-muted" aria-live="polite">
-      Opening your private local library…
+      {profileSwitchError ? (
+        <div className="space-y-3">
+          <p role="alert" className="text-danger">{profileSwitchError}</p>
+          <p>Your current library remains closed while the draft is protected. Retry after local storage is available.</p>
+          <Button size="sm" onClick={() => { setProfileSwitchError(""); setProfileSwitchRetry((value) => value + 1); }}>
+            Retry secure local save
+          </Button>
+        </div>
+      ) : "Opening your private local library…"}
     </section>;
   }
 
