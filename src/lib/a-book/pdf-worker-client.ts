@@ -38,8 +38,9 @@ function runInWorker(task: ABookPdfWorkerTask, signal?: AbortSignal): Promise<un
     }
 
     let settled = false;
+    let finish: (error?: Error, value?: unknown) => void;
     const abort = () => finish(new DOMException("PDF processing was cancelled.", "AbortError"));
-    const finish = (error?: Error, value?: unknown) => {
+    finish = (error?: Error, value?: unknown) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
