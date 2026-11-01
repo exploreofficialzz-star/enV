@@ -56,3 +56,35 @@ final class NativeWorldLabInspectionTests:XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabInspectionSettings(mode:.exploded,explosionDistanceMeters:11).validate())
     }
 }
+
+
+final class NativeWorldLabInspectionHistoryTests:XCTestCase {
+    func testUndoRedoRestoresCutawayAndXrayDisplayState() throws {
+        let initial=NativeWorldLabInspectionSettings()
+        var history=NativeWorldLabInspectionHistory(present:initial)
+        let cutaway=NativeWorldLabInspectionSettings(mode:.cutaway,opacity:0.32,
+            axis:.z,cutawayFraction:0.4,explosionDistanceMeters:1)
+        try history.commit(cutaway)
+        try history.commit(NativeWorldLabInspectionSettings(mode:.xray,opacity:0.25,
+            axis:.z,cutawayFraction:0.4,explosionDistanceMeters:1))
+        XCTAssertEqual(history.present.mode,.xray)
+        XCTAssertEqual(history.undo(),cutaway)
+        XCTAssertEqual(history.undo(),initial)
+        XCTAssertEqual(history.redo(),cutaway)
+    }
+    func testHistoryIsBoundedAndNewChangesClearRedo() throws {
+        var history=NativeWorldLabInspectionHistory()
+        for index in 0..<65 {
+            try history.commit(NativeWorldLabInspectionSettings(
+                mode:index.isMultiple(of:2) ? .transparent : .xray,
+                opacity:index.isMultiple(of:2) ? 0.3 : 0.6,
+                axis:.x,cutawayFraction:Double(index%20)/20,
+                explosionDistanceMeters:1))
+        }
+        XCTAssertEqual(history.past.count,NativeWorldLabInspectionHistory.limit)
+        _ = history.undo()
+        try history.commit(NativeWorldLabInspectionSettings(mode:.cutaway))
+        XCTAssertTrue(history.future.isEmpty)
+        XCTAssertThrowsError(try history.commit(NativeWorldLabInspectionSettings(opacity:2)))
+    }
+}
