@@ -460,3 +460,76 @@ class NativeWorldLabScienceTest {
     }
 
 }
+
+
+class NativeWorldLabVehicleTests {
+    @Test fun roadVehicleComputesTractionDragAndBatteryState() {
+        val run=NativeWorldLabVehicle.evaluate("vehicle-project",3,"road-run",NativeWorldLabVehicleInput())
+        assertEquals("ground-run",run.outcome)
+        assertTrue(run.samples.last().horizontalSpeedMps>0.0)
+        assertTrue(run.samples.last().distanceMeters>0.0)
+        assertTrue(run.samples.last().batterySoc<1.0)
+        assertTrue(run.samples.all { it.batteryCurrentA.isFinite() && it.terminalVoltageV>0.0 })
+        run.samples.forEach {
+            assertTrue(it.wheelDriveForceN<=run.input.tireFriction*it.normalForceN+1e-6)
+        }
+    }
+
+    @Test fun motorDropoutIsRecordedAndRemovesDriveForce() {
+        val input=NativeWorldLabVehicleInput(motorFailureAtSeconds=2.0)
+        val run=NativeWorldLabVehicle.evaluate("vehicle-project",4,"motor-dropout",input)
+        assertTrue(run.events.any { it.contains("motor dropout") })
+        val after=run.samples.first { it.timeSeconds>=4.0 }
+        assertEquals(0.0,after.wheelDriveForceN,1e-9)
+    }
+
+    @Test fun rotorcraftComputesInducedPowerAndTakeoff() {
+        val input=NativeWorldLabVehicleInput(
+            mode="rotorcraft",massKg=600.0,batteryVoltageV=800.0,
+            batteryResistanceOhm=0.01,batteryMaxCurrentA=1500.0,
+            batteryCapacityWh=200000.0,motorMaxPowerW=1200000.0,
+            rotorDiskAreaM2=15.0,rotorMaxThrustN=10000.0,rotorThrottle=0.9,
+            maxCruiseThrustN=1800.0,driveThrottle=0.0,
+            durationSeconds=2.0,maxStructuralLoadFactor=4.0
+        )
+        val run=NativeWorldLabVehicle.evaluate("vehicle-project",5,"rotorcraft",input)
+        assertTrue(run.samples.any { it.airborne })
+        assertTrue(run.samples.any { it.rotorThrustN>600.0*9.80665 })
+        assertTrue(run.events.any { it.startsWith("Takeoff") })
+    }
+
+    @Test fun fixedWingCannotTakeOffBelowItsLiftEnvelope() {
+        val run=NativeWorldLabVehicle.evaluate("vehicle-project",6,"wing-blocked",
+            NativeWorldLabVehicleInput(mode="fixed-wing",wingAreaM2=2.0,
+                wingLiftCoefficient=1.0,takeoffSpeedMps=25.0,
+                maxCruiseThrustN=2500.0,durationSeconds=12.0))
+        assertTrue(run.preflight.any { it.contains("Wing lift at configured takeoff speed is below") })
+        assertEquals("unable-to-takeoff",run.outcome)
+        assertTrue(run.failureReasons.any { it.contains("did not reach") })
+    }
+
+    @Test fun fixedWingTakeoffUsesDynamicPressureAndRecordsAirborneState() {
+        val run=NativeWorldLabVehicle.evaluate("vehicle-project",7,"wing-takeoff",
+            NativeWorldLabVehicleInput(mode="fixed-wing",massKg=1200.0,
+                wingAreaM2=18.0,wingLiftCoefficient=1.4,takeoffSpeedMps=28.0,
+                maxCruiseThrustN=4000.0,maxWheelForceN=10000.0,
+                motorMaxPowerW=350000.0,batteryMaxCurrentA=700.0,
+                durationSeconds=60.0,maxSpeedMps=100.0))
+        assertTrue(run.samples.any { it.airborne })
+    }
+
+    @Test fun invalidVehicleAndModelBoundsFailClosed() {
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabVehicle.evaluate("vehicle-project",-1,"bad",NativeWorldLabVehicleInput())
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabVehicle.validate(NativeWorldLabVehicleInput(massKg=Double.NaN))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabVehicle.validate(NativeWorldLabVehicleInput(mode="rotorcraft"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeWorldLabVehicle.validate(NativeWorldLabVehicleInput(durationSeconds=120.0,solverStepSeconds=0.001))
+        }
+    }
+}
