@@ -2021,6 +2021,7 @@ fun NativeWorldLabForm() {
             })
         }
         if(earthOrientationStatus.isNotBlank())Text(earthOrientationStatus,style=MaterialTheme.typography.bodySmall)
+        NativeWorldLabFieldImportPanel(timeSeconds=demoClock?.simulationTimeSeconds?:time.toDouble())
         Text("Approximate sunrise and sunset",style=MaterialTheme.typography.titleSmall)
         OutlinedTextField(value=solarDateUTC,onValueChange={solarDateUTC=it.take(10)},
             label={Text("UTC date · YYYY-MM-DD")},singleLine=true,
