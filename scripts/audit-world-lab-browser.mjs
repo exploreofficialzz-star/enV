@@ -417,8 +417,9 @@ try{
   await cad.getByRole("spinbutton",{name:"Sketch rectangle width (m)"}).fill("2");
   await cad.getByRole("spinbutton",{name:"Sketch rectangle depth (m)"}).fill("4");
   await cad.getByRole("spinbutton",{name:"Sketch extrusion height (m)"}).fill("6");
-  const rectangleDownload=page.waitForEvent("download");
   await cad.getByRole("button",{name:"Extrude rectangle"}).click();
+  const rectangleDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export project"}).click();
   const rectangleStream=await (await rectangleDownload).createReadStream();
   let rectangleJson="";
   for await(const chunk of rectangleStream)rectangleJson+=chunk.toString();
@@ -428,6 +429,7 @@ try{
   assert.ok(Math.abs(rectangle.positionMeters[0]-7)<1e-10);
   assert.ok(Math.abs(rectangle.positionMeters[1]-2)<1e-10);
   assert.ok(Math.abs(rectangle.positionMeters[2]+3)<1e-10);
+  assert.deepEqual(rectangle.dimensionsMeters,[2,6,4]);
   assert.ok(Math.abs(rectangle.rotationRadians[2]-Math.PI/2)<1e-10);
 
   await cad.getByRole("spinbutton",{name:"Sketch base centre X (m)"}).fill("1");
@@ -438,8 +440,9 @@ try{
   await cad.getByRole("spinbutton",{name:"Sketch orientation Z (degrees)"}).fill("0");
   await cad.getByRole("spinbutton",{name:"Sketch circle radius (m)"}).fill("0.5");
   await cad.getByRole("spinbutton",{name:"Sketch extrusion height (m)"}).fill("2");
-  const circleDownload=page.waitForEvent("download");
   await cad.getByRole("button",{name:"Extrude circle"}).click();
+  const circleDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export project"}).click();
   const circleStream=await (await circleDownload).createReadStream();
   let circleJson="";
   for await(const chunk of circleStream)circleJson+=chunk.toString();
@@ -450,6 +453,7 @@ try{
   assert.ok(Math.abs(circle.positionMeters[0]-1)<1e-10);
   assert.ok(Math.abs(circle.positionMeters[1]-2)<1e-10);
   assert.ok(Math.abs(circle.positionMeters[2]-4)<1e-10);
+  assert.deepEqual(circle.dimensionsMeters,[1,2,1]);
   assert.ok(Math.abs(circle.rotationRadians[0]-Math.PI/2)<1e-10);
 
   assert.deepEqual(pageErrors,[],"No unhandled browser page errors");
