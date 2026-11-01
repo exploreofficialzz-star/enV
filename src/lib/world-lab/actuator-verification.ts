@@ -55,7 +55,7 @@ function energyResidualFraction(sample: ActuatorSample, initialEnergyJ: number):
 
 export function verifyActuatorNumerics(run: ActuatorRun): ActuatorNumericalAudit {
   if (run?.format !== "env-world-lab-actuator-run" ||
-      (run.modelVersion !== "1.0.0" && run.modelVersion !== "1.1.0") ||
+      (run.modelVersion !== "1.0.0" && run.modelVersion !== "1.1.0" && run.modelVersion !== "1.2.0") ||
       !Array.isArray(run.samples) || run.samples.length < 2 ||
       !(Number.isFinite(run.solverStepSeconds) && run.solverStepSeconds > 0)) {
     throw new Error("A completed, versioned actuator calculation is required.");
