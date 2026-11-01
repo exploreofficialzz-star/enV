@@ -536,6 +536,7 @@ struct ToolCommunityPanel: View {
     @State private var enabled = true
     @State private var isSending = false
     @State private var commentText = ""
+    @State private var activePDFSelection: UUID?
     @State private var publicIdentity = false
     @State private var displayName = ""
     @State private var replyTo: String?
@@ -14479,7 +14480,7 @@ private struct NativeABookView: View {
         }
     }
 
-    private var activePDFID: UUID? { attachments.first(where: { $0.name == pdfName })?.id }
+    private var activePDFID: UUID? { activePDFSelection }
     private var filteredNotes: [ABookNativeNote] {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !term.isEmpty else { return notes }
@@ -14582,7 +14583,6 @@ private struct NativeABookView: View {
     }
 
     private func processPDF(_ attachment: ABookNativeAttachment, operation: String) {
-        do { activePDFSelection = attachment.id } catch { }
         Task.detached(priority: .userInitiated) {
             do {
                 let url = try store.fileURL(for: attachment)
@@ -14632,7 +14632,5 @@ private struct NativeABookView: View {
         }
     }
 
-    @State private var activePDFSelection: UUID?
-    private var activePDFID: UUID? { activePDFSelection }
 }
 
