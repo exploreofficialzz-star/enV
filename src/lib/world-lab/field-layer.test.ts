@@ -100,3 +100,28 @@ test("renderer capability is explicit and unsupported vector or tensor renderers
  assert.equal(isFieldOverlayRendererImplemented("event","event-trace"),true);
  assert.equal(isFieldOverlayRendererImplemented("network","event-trace"),true);
 });
+
+
+test("field validation rejects samples outside declared ranges and ambiguous non-UTC timestamps",()=>{
+ const layer=createComputedFieldLayers(run("heat-rod"))[0];
+ const badRange=JSON.parse(JSON.stringify(layer));
+ badRange.range.maximumSI=300;
+ assert.throws(()=>parseFieldLayer(badRange),/outside the declared SI/);
+ const badTime=JSON.parse(JSON.stringify(layer));
+ badTime.timeReference.worldDateUTC="2026-11-01T00:00:00+01:00";
+ assert.throws(()=>parseFieldLayer(badTime),/time reference/);
+ const badSamples=JSON.parse(JSON.stringify(layer));
+ badSamples.timeReference.sampleTimesSeconds=[];
+ assert.throws(()=>parseFieldLayer(badSamples),/time reference/);
+});
+
+test("event fields cannot claim events beyond their recorded sample timeline",()=>{
+ const base=createComputedFieldLayers(run("damped-oscillator"))[0];
+ const event=parseFieldLayer({...base,id:"event-trace",kind:"event",renderer:{
+  kind:"event-trace",implementationId:"env-event-trace-v1"
+ },values:[],mask:null,events:[{id:"event-1",atSeconds:0.1,label:"Contact",severity:"info"}]});
+ assert.equal(event.events.length,1);
+ const outside=JSON.parse(JSON.stringify(event));
+ outside.events[0].atSeconds=run("damped-oscillator").time.simulatedDurationSeconds+1;
+ assert.throws(()=>parseFieldLayer(outside),/out-of-timeline event/);
+});
