@@ -1455,7 +1455,7 @@ fun NativeWorldLabForm() {
                             motorPowerOffAtSeconds=if(enabled)2.0 else null
                             motorPlaying=false;motorResult=null;motorAudit=null
                         })
-                        Text("Open motor supply switch during the run")
+                        Text("Open supply switch during standalone motor run")
                     }
                     motorPowerOffAtSeconds?.let{cutoff->
                         Text("Supply switch opens at "+labNumber(cutoff)+" s")
