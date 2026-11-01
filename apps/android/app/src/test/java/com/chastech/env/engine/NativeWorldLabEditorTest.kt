@@ -484,7 +484,7 @@ class NativeWorldLabEditorTest {
         assertNotEquals("shared",project.entities[1].id)
         assertEquals(NativeWorldLabProjectCodec.decode(target).cameraPositionMeters,project.cameraPositionMeters)
         assertEquals(NativeWorldLabProjectCodec.decode(target).cameraLookingAtMeters,project.cameraLookingAtMeters)
-        assertEquals(1,project.revision)
+        assertEquals(NativeWorldLabProjectCodec.decode(target).revision+1,project.revision)
     }
 
     @Test fun cadExchangeRejectsUnsupportedVersionsMalformedPrimitivesAndProjectOverflow(){
