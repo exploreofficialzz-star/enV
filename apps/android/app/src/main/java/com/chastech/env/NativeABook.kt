@@ -49,7 +49,7 @@ private data class ABookNoteRecord(
 )
 private data class ABookFileRecord(val id:String,val noteId:String,val name:String,val mime:String,val relativePath:String,val size:Long,val createdAt:Long)
 
-private fun parseABookPageGroups(value:String,pageCount:Int):List<List<Int>>{
+internal fun parseABookPageGroups(value:String,pageCount:Int):List<List<Int>>{
     require(pageCount>0){"This PDF has no readable pages."}
     val groups=value.split(";").map{it.trim()}.filter{it.isNotEmpty()}
     require(groups.size>=2){"Enter at least two page groups, for example 1-3;4-6."}
@@ -116,7 +116,7 @@ private suspend fun recognizeABookPdfOffline(file: File): String = withContext(D
     output.toString().take(150_000)
 }
 
-private fun parseABookPageSelection(value:String,pageCount:Int):List<Int>{
+internal fun parseABookPageSelection(value:String,pageCount:Int):List<Int>{
     require(pageCount>0){"This PDF has no readable pages."}
     val tokens=value.split(",").map{it.trim()}.filter{it.isNotEmpty()}
     require(tokens.isNotEmpty()){"Enter page numbers, for example 1-3,5."}
@@ -609,57 +609,132 @@ fun NativeABookScreen(){
         }
     }
     fun extractSelectedPdfPages(){
-        val record=activePdf
-        if(record==null){error="Choose a PDF first";return}
+        val chosen=selectedPdfFiles()
+        if(chosen.isEmpty()){error="Select at least one PDF to extract";return}
+        if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
         scope.launch{
-            status="Extracting PDF pages locally…";error=""
+            status="Checking selected PDFs locally…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
-                require(record.size<=200L*1024*1024){"This PDF exceeds the 200 MB local processing limit."}
                 PDFBoxResourceLoader.init(context)
-                val local=File(context.filesDir,record.relativePath)
-                PDDocument.load(local).use{source->
-                    val pages=parseABookPageSelection(extractPageRange,source.numberOfPages)
-                    val outputDocument=PDDocument()
+                val prepared=mutableListOf<Pair<ABookFileRecord,List<Int>>>()
+                var totalPages=0
+                chosen.forEach{record->
+                    require(record.size in 1..(200L*1024*1024)){"${record.name} exceeds the 200 MB local processing limit."}
+                    val root=context.filesDir.canonicalFile
+                    val local=File(context.filesDir,record.relativePath).canonicalFile
+                    require(local.path.startsWith(root.path+File.separator)&&local.isFile){"${record.name} is missing from local A book storage."}
+                    PDDocument.load(local).use{source->
+                        val pages=parseABookPageSelection(extractPageRange,source.numberOfPages)
+                        totalPages+=pages.size
+                        require(totalPages<=5000){"A maximum of 5,000 extracted pages can be processed in one batch."}
+                        prepared.add(record to pages)
+                    }
+                }
+                if(prepared.size==1){
+                    val (record,pages)=prepared.single()
+                    val local=File(context.filesDir,record.relativePath).canonicalFile
+                    val output=File(context.cacheDir,"a-book-extracted-"+UUID.randomUUID()+".pdf")
+                    PDDocument.load(local).use{source->
+                        val document=PDDocument()
+                        try{
+                            pages.forEach{number->document.importPage(source.getPage(number-1))}
+                            document.save(output)
+                        }finally{document.close()}
+                    }
+                    output to null
+                }else{
+                    val zip=File(context.cacheDir,"a-book-extracted-${UUID.randomUUID()}.zip")
                     try{
-                        pages.forEach{number->outputDocument.importPage(source.getPage(number-1))}
-                        val output=File(context.cacheDir,"a-book-extracted-"+UUID.randomUUID()+".pdf")
-                        outputDocument.save(output);output
-                    }finally{outputDocument.close()}
+                        ZipOutputStream(FileOutputStream(zip)).use{archive->
+                            val used=mutableSetOf<String>()
+                            prepared.forEach{(record,pages)->
+                                val root=context.filesDir.canonicalFile
+                                val local=File(context.filesDir,record.relativePath).canonicalFile
+                                require(local.path.startsWith(root.path+File.separator)&&local.isFile){"${record.name} is missing from local A book storage."}
+                                val base=safeABookPdfName(record.name)
+                                var name="$base-extracted.pdf";var suffix=2
+                                while(!used.add(name.lowercase(Locale.ROOT)))name="$base-extracted-${suffix++}.pdf"
+                                val temp=File(context.cacheDir,"a-book-extract-"+UUID.randomUUID()+".pdf")
+                                PDDocument.load(local).use{source->
+                                    val document=PDDocument()
+                                    try{
+                                        pages.forEach{number->document.importPage(source.getPage(number-1))}
+                                        document.save(temp)
+                                    }finally{document.close()}
+                                }
+                                try{
+                                    archive.putNextEntry(ZipEntry(name))
+                                    temp.inputStream().use{it.copyTo(archive)}
+                                    archive.closeEntry()
+                                }finally{temp.delete()}
+                            }
+                        }
+                        null to zip
+                    }catch(failure:Throwable){zip.delete();throw failure}
                 }
             }}
-            result.fold({output->pendingPdf=output;status="Extracted selected pages locally";exportPdf.launch(safeABookPdfName(record.name)+"-pages.pdf")},{failure->error=failure.message?:"PDF page extraction failed";status="Not saved"})
+            result.fold({(pdf,zip)->
+                if(pdf!=null){
+                    pendingPdf=pdf;status="Extracted pages locally";exportPdf.launch(safeABookPdfName(chosen.first().name)+"-pages.pdf")
+                }else if(zip!=null){
+                    pendingZip=zip;status="Extracted pages from ${chosen.size} PDFs locally";exportZip.launch("a-book-extracted-pdfs.zip")
+                }
+            },{failure->error=failure.message?:"PDF page extraction failed";status="Not saved"})
         }
     }
 
     fun splitActivePdf(){
-        val record=activePdf
-        if(record==null){error="Choose a PDF first";return}
+        val chosen=selectedPdfFiles()
+        if(chosen.isEmpty()){error="Select at least one PDF to split";return}
+        if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
         scope.launch{
-            status="Splitting PDF locally…";error=""
+            status="Checking selected PDFs locally…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
                 PDFBoxResourceLoader.init(context)
-                val source=File(context.filesDir,record.relativePath)
-                PDDocument.load(source).use{input->
-                    val groups=parseABookPageGroups(splitPageGroups,input.numberOfPages)
-                    val zip=File(context.cacheDir,"a-book-split-${UUID.randomUUID()}.zip")
+                val prepared=mutableListOf<Triple<ABookFileRecord,File,List<List<Int>>>>()
+                var totalPages=0
+                chosen.forEach{record->
+                    require(record.size in 1..(200L*1024*1024)){"${record.name} exceeds the 200 MB local processing limit."}
+                    val root=context.filesDir.canonicalFile
+                    val local=File(context.filesDir,record.relativePath).canonicalFile
+                    require(local.path.startsWith(root.path+File.separator)&&local.isFile){"${record.name} is missing from local A book storage."}
+                    val groups=PDDocument.load(local).use{input->parseABookPageGroups(splitPageGroups,input.numberOfPages)}
+                    totalPages+=groups.sumOf{it.size}
+                    require(totalPages<=5000){"A maximum of 5,000 split pages can be processed in one batch."}
+                    prepared.add(Triple(record,local,groups))
+                }
+                val zip=File(context.cacheDir,"a-book-split-${UUID.randomUUID()}.zip")
+                try{
                     ZipOutputStream(FileOutputStream(zip)).use{archive->
-                        val base=safeABookPdfName(record.name)
-                        groups.forEachIndexed{index,pages->
-                            val part=PDDocument()
-                            try{
-                                pages.forEach{number->part.importPage(input.getPage(number-1))}
-                                val temp=File(context.cacheDir,"a-book-part-${UUID.randomUUID()}.pdf")
-                                part.save(temp)
-                                archive.putNextEntry(ZipEntry("$base-part-${(index+1).toString().padStart(2,'0')}.pdf"))
-                                temp.inputStream().use{it.copyTo(archive)}
-                                archive.closeEntry();temp.delete()
-                            }finally{part.close()}
+                        val used=mutableSetOf<String>()
+                        prepared.forEach{(record,local,groups)->
+                            val base=safeABookPdfName(record.name)
+                            PDDocument.load(local).use{source->
+                                groups.forEachIndexed{index,pages->
+                                    val requested="$base-part-${(index+1).toString().padStart(2,'0')}.pdf"
+                                    var name=requested;var suffix=2
+                                    while(!used.add(name.lowercase(Locale.ROOT))){
+                                        name="$base-part-${(index+1).toString().padStart(2,'0')}-$suffix.pdf";suffix++
+                                    }
+                                    val part=PDDocument()
+                                    val temp=File(context.cacheDir,"a-book-part-${UUID.randomUUID()}.pdf")
+                                    try{
+                                        pages.forEach{number->part.importPage(source.getPage(number-1))}
+                                        part.save(temp)
+                                        archive.putNextEntry(ZipEntry(name))
+                                        temp.inputStream().use{it.copyTo(archive)}
+                                        archive.closeEntry()
+                                    }finally{part.close();temp.delete()}
+                                }
+                            }
                         }
                     }
                     zip
-                }
+                }catch(failure:Throwable){zip.delete();throw failure}
             }}
-            result.fold({pendingZip=it;status="Created local PDF parts";exportZip.launch("${safeABookPdfName(record.name)}-parts.zip")},{error=it.message?:"PDF split failed";status="Not saved"})
+            result.fold({archive->
+                pendingZip=archive;status="Created PDF parts from ${chosen.size} PDFs locally";exportZip.launch("a-book-split-pdfs.zip")
+            },{failure->error=failure.message?:"PDF split failed";status="Not saved"})
         }
     }
 
@@ -796,7 +871,7 @@ fun NativeABookScreen(){
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
                     if(isPdf)Checkbox(checked=f.id in selectedPdfIds,onCheckedChange={checked->selectedPdfIds=if(checked)selectedPdfIds+f.id else selectedPdfIds-f.id})
                     Text("${f.name} · ${f.size/1024} KB",modifier=Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
-                    if(isPdf)OutlinedButton(onClick={activePdf=f;pdfText=""}){Text("PDF tools")}
+                    if(isPdf)OutlinedButton(onClick={activePdf=f;selectedPdfIds=selectedPdfIds+f.id;pdfText=""}){Text("PDF tools")}
                     TextButton(onClick={removeAttachment(f)}){Text("Remove",color=MaterialTheme.colorScheme.error)}
                 }
             }
@@ -805,7 +880,7 @@ fun NativeABookScreen(){
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 OutlinedButton(onClick={mergeSelectedPdfs()},enabled=selectedCount>=2){Text("Merge selected")}
                 OutlinedButton(onClick={rotateSelectedPdfs()},enabled=selectedCount>=1){Text("Rotate batch")}
-                OutlinedButton(onClick={splitActivePdf()},enabled=activePdf!=null){Text("Split PDF")}
+                OutlinedButton(onClick={splitActivePdf()},enabled=selectedCount>=1){Text("Split selected PDFs")}
             }
             activePdf?.let{f->
                 val local=File(context.filesDir,f.relativePath)
