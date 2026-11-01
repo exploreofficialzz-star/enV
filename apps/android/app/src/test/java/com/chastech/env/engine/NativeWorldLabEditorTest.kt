@@ -272,14 +272,19 @@ class NativeWorldLabEditorTest {
         assertEquals(p.entities[2].dimensionsMeters.x,p.entities[2].dimensionsMeters.z,0.0)
         json=NativeWorldLabEditor.alignSolids(json,listOf("a","b","c"),0,"min")
         p=NativeWorldLabProjectCodec.decode(json)
-        val left=p.entities.map{it.positionMeters.x-it.dimensionsMeters.x/2}
+        fun halfExtentX(s:NativeLabSolid):Double{
+            val angle=s.rotationRadians.z
+            return (kotlin.math.abs(kotlin.math.cos(angle))*s.dimensionsMeters.x+
+                kotlin.math.abs(kotlin.math.sin(angle))*s.dimensionsMeters.y)/2
+        }
+        val left=p.entities.map{it.positionMeters.x-halfExtentX(it)}
         assertTrue(left.max()-left.min()<1e-8)
         json=NativeWorldLabEditor.distributeSolids(json,listOf("a","b","c"),0,0.5)
         p=NativeWorldLabProjectCodec.decode(json)
         val sorted=p.entities.sortedBy{it.positionMeters.x}
         for(i in 0..1){
-            val gap=sorted[i+1].positionMeters.x-sorted[i+1].dimensionsMeters.x/2-
-                (sorted[i].positionMeters.x+sorted[i].dimensionsMeters.x/2)
+            val gap=sorted[i+1].positionMeters.x-halfExtentX(sorted[i+1])-
+                (sorted[i].positionMeters.x+halfExtentX(sorted[i]))
             assertEquals(0.5,gap,1e-8)
         }
         json=NativeWorldLabEditor.duplicateSolids(json,listOf("a","b"),listOf(10.0,0.0,0.0))

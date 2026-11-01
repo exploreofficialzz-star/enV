@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {newSolid} from "./project.ts";
+import {blankWorldLabProject,newSolid} from "./project.ts";
 import {inspectWorldLabSpatialClearance} from "./spatial-clearance.ts";
 
 test("axis-aligned boxes report exact positive gap, contact and interpenetration",()=>{

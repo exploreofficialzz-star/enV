@@ -77,7 +77,7 @@ fun NativeWorldLabViewport(
         mutableFloatStateOf((45.0*8.0/horizontal).toFloat().coerceIn(0.1f,160f))
     }
     var yaw by remember(project.id,project.revision){
-        mutableFloatStateOf(atan2(cameraDeltaX,-cameraDeltaZ))
+        mutableFloatStateOf(atan2(cameraDeltaX,-cameraDeltaZ).toFloat())
     }
     var elevation by remember(project.id,project.revision){
         mutableFloatStateOf(Math.toDegrees(atan2(cameraDeltaY,horizontal)).toFloat().coerceIn(5f,80f))
@@ -142,7 +142,7 @@ fun NativeWorldLabViewport(
             val selected=solid.id==selectedId
             if(solid.shape=="sphere"){
                 val p=projection(center,size.width,size.height)
-                val radius=(dimensions.x*zoom*0.5f).coerceIn(2f,100f)
+                val radius=(dimensions.x.toFloat()*zoom*0.5f).coerceIn(2f,100f)
                 drawCircle(color.copy(alpha=0.88f),radius,Offset(p.x,p.y))
                 drawCircle(if(selected)Color.White else color.copy(alpha=0.65f),
                     radius,Offset(p.x,p.y),style=Stroke(if(selected)3f else 1.2f))
@@ -152,8 +152,8 @@ fun NativeWorldLabViewport(
                     style=Stroke(1f))
             }else if(solid.shape=="cylinder"){
                 val p=projection(center,size.width,size.height)
-                val radius=(dimensions.x*zoom*0.5f).coerceIn(2f,80f)
-                val heightPx=(dimensions.y*zoom*cos(Math.toRadians(elevation.toDouble()))).toFloat().coerceIn(3f,160f)
+                val radius=(dimensions.x.toFloat()*zoom*0.5f).coerceIn(2f,80f)
+                val heightPx=(dimensions.y.toFloat()*zoom*cos(Math.toRadians(elevation.toDouble())).toFloat()).coerceIn(3f,160f)
                 val left=p.x-radius;val top=p.y-heightPx/2
                 drawRect(color.copy(alpha=0.72f),Offset(left,top),androidx.compose.ui.geometry.Size(radius*2,heightPx))
                 drawOval(color,topLeft=Offset(left,top-radius*0.22f),
@@ -249,7 +249,7 @@ fun NativeWorldLabViewport(
             val dx=saved.x-target.x;val dz=saved.z-target.z
             val h=hypot(dx,dz).coerceAtLeast(0.25)
             zoom=(45.0*8.0/h).toFloat().coerceIn(0.1f,160f)
-            yaw=atan2(dx,-dz)
+            yaw=atan2(dx,-dz).toFloat()
             elevation=Math.toDegrees(atan2(saved.y-target.y,h)).toFloat().coerceIn(5f,80f)
             observerDepthMeters=0f;pan=Offset.Zero
         }){Text("Restore saved view")}

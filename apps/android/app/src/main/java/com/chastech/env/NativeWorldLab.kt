@@ -1093,8 +1093,8 @@ fun NativeWorldLabForm() {
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.duplicateSolid(it,solid.id,listOf(snapMeters,0.0,0.0))}}){Text("Duplicate +X")}
                     OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.linearPattern(it,solid.id,0,snapMeters,2)}}){Text("Linear pattern")}
-                    OutlinedButton(onClick={applyProject{NativeWorldLabEditor.mirrorSolid(it,solid.id,0,0.0)}}){Text("Mirror X")}
-                    OutlinedButton(onClick={applyProject{NativeWorldLabEditor.circularPattern(it,solid.id,2,listOf(0.0,0.0,0.0),4)}}){Text("Circular pattern")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.mirrorSolid(it,solid.id,0,0.0)}}){Text("Mirror X")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.circularPattern(it,solid.id,2,listOf(0.0,0.0,0.0),4)}}){Text("Circular pattern")}
                 }
                 Text("Rotation X/Y/Z: "+listOf(solid.rotationRadians.x,solid.rotationRadians.y,solid.rotationRadians.z)
                     .joinToString(" / "){labNumber(it)}+" rad",style=MaterialTheme.typography.bodySmall)

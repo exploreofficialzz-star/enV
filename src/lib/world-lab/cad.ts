@@ -2,7 +2,7 @@ import {newSolid,parseWorldLabProject,type WorldLabEntity,type WorldLabProject} 
 export type CadAxis="x"|"y"|"z";
 export type CadAlignment="min"|"center"|"max";
 const axisIndex=(axis:CadAxis)=>axis==="x"?0:axis==="y"?1:2;
-const bounded=(n:number,min:number,max:number,label:string)=>{if(!Number.isFinite(n)||n<min||n>max)throw new Error(label+" is outside supported bounds.");};
+const bounded=(n:number,min:number,max:number,label:string):number=>{if(!Number.isFinite(n)||n<min||n>max)throw new Error(label+" is outside supported bounds.");return n;};
 const wrap=(r:number)=>{const v=((r+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;return Math.abs(v)<1e-12?0:v;};
 type Matrix3=readonly [number,number,number,number,number,number,number,number,number];
 function multiply(a:Matrix3,b:Matrix3):Matrix3{
