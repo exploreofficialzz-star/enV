@@ -24,6 +24,7 @@ fun NativeWorldLabMultiCadPanel(
     var scale by remember(project.id){mutableStateOf("1.1")}
     var spacing by remember(project.id){mutableStateOf("1")}
     var gap by remember(project.id){mutableStateOf("0.25")}
+    var gridStep by remember(project.id){mutableStateOf("0.5")}
     var plane by remember(project.id){mutableStateOf("0")}
     var patternSpacing by remember(project.id){mutableStateOf("2")}
     var copies by remember(project.id){mutableStateOf("2")}
@@ -39,7 +40,7 @@ fun NativeWorldLabMultiCadPanel(
         runCatching{onEdit(action)}.onSuccess{feedback=""}
             .onFailure{feedback=it.message?:"Multi-part CAD operation was rejected"}
     }
-    val ids=selected.toList()
+    val ids=project.entities.map{it.id}.filter{it in selected}
     Column(Modifier.fillMaxWidth().padding(vertical=8.dp),
         verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Multi-part CAD",style=MaterialTheme.typography.titleSmall)
@@ -57,6 +58,28 @@ fun NativeWorldLabMultiCadPanel(
             }
         }
         Text("Selected: "+ids.size+" / "+project.entities.size)
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
+            OutlinedTextField(value=gridStep,onValueChange={gridStep=it},
+                label={Text("Grid spacing m")},singleLine=true,modifier=Modifier.weight(1f))
+            OutlinedButton(enabled=ids.isNotEmpty(),onClick={
+                runCatching{gridStep.toDouble()}.onSuccess{step->
+                    apply{NativeWorldLabEditor.snapSolids(it,ids,step)}
+                }.onFailure{feedback="Enter a grid spacing from 0.001 to 100 metres"}
+            }){Text("Snap selected")}
+        }
+        if(ids.size==2){
+            runCatching{NativeWorldLabEditor.measureCenters(project,ids[0],ids[1])}
+                .onSuccess{measurement->
+                    Text("Centre distance: "+String.format(java.util.Locale.US,"%.3f",measurement.centerDistanceM)+
+                        " m · ΔX "+String.format(java.util.Locale.US,"%.3f",measurement.offsetXM)+
+                        " · ΔY "+String.format(java.util.Locale.US,"%.3f",measurement.offsetYM)+
+                        " · ΔZ "+String.format(java.util.Locale.US,"%.3f",measurement.offsetZM)+" m",
+                        style=MaterialTheme.typography.bodySmall)
+                }.onFailure{feedback=it.message?: "Could not measure the selected parts"}
+        }else{
+            Text("Select exactly two parts to measure their centre-to-centre distance.",
+                style=MaterialTheme.typography.bodySmall)
+        }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             listOf("X","Y","Z").forEachIndexed{i,label->
                 FilterChip(selected=axis==i,onClick={axis=i},label={Text(label)})
