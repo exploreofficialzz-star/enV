@@ -56,7 +56,7 @@ private fun parseABookPageGroups(value:String,pageCount:Int):List<List<Int>>{
             val first=parts[0].toInt();val last=parts.getOrNull(1)?.toInt()?:first
             require(first>=1&&last>=first&&last<=pageCount){"Choose page numbers from 1 to $pageCount."}
             require(pages.size+last-first+1<=5000){"A maximum of 5,000 pages can be split at once."}
-            for(page in first..last){require(used.add(page)){"Page $page appears in more than one part."};pages.add(page)}
+            for(page in first..last){require(used.add(page)){"Page $page appears in more than one part."};pages.add(page);require(used.size<=5000){"A maximum of 5,000 pages can be split in one operation."}}
         }
         require(pages.isNotEmpty()){"Each PDF part must contain at least one page."}
         pages
