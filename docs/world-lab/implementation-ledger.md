@@ -765,3 +765,10 @@ release-candidate evidence bundle are unfinished.
 - Rectangle and circle extrusions now use the same cross-platform contract: the entered X/Y/Z point is the 2D profile centre on its base plane, extrusion proceeds along local +Y, and the solid centre is derived by transforming the half-height vector through the entered Euler orientation.
 - Web, Android Kotlin and iOS Swift expose base-plane location and X/Y/Z orientation controls. Resulting portable solids store the computed world centre and full rotation.
 - Native and Web regression source covers ground-contact defaults, translated and 90° rotated extrusions, and invalid/out-of-world position and rotation values. The CAD subset remains analytic box/cylinder primitives rather than arbitrary B-rep, arbitrary mesh booleans or persistent feature-tree history.
+
+## C/D cross-platform snap and measurement parity — 2026-11-01
+- Android Kotlin and iOS Swift multi-part CAD panels now expose grid spacing and an atomic Snap selected action for every selected solid. A group snap validates all IDs and coordinates before one project revision is committed; unselected solids, dimensions, orientations and material references remain unchanged.
+- Native snap tie handling now follows the Web Math.round rule for negative half-grid coordinates, avoiding platform-specific placement differences. Grid spacing is bounded to 0.001–100 m and snapped coordinates remain within the portable local-world envelope.
+- Android Compose and iOS SwiftUI now display measured centre-to-centre 3D distance and X/Y/Z offsets whenever exactly two parts are selected. The readout is geometry-derived and does not claim surface clearance or physical contact.
+- Added Kotlin JUnit and Swift XCTest source for positive/negative half-grid boundaries, atomic revision increments, isolation of unselected parts, invalid selection rejection, and 3D/horizontal centre-distance calculation.
+- Source integration only: exact-head Kotlin/Xcode builds, Web/browser acceptance, device accessibility and full production release gates remain pending. No acceptance scenario is marked verified by this entry.
