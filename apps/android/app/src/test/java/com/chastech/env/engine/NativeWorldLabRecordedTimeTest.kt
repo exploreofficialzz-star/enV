@@ -77,3 +77,14 @@ class NativeWorldLabRecordedTimeTest {
    NativeWorldLabRecordedCheckpointCodec.decode(" ".repeat(16*1024+1),run)
   }
  }
+
+ @Test fun mandatoryEventBetweenSamplesStopsAtItsExactTime(){
+  val run=run().copy(mandatoryEventTimesSeconds=listOf(0.15))
+  val start=NativeWorldLabRecordedTime.start(run,"2026-11-01T12:00:00Z","Africa/Lagos")
+      .copy(paused=false,playbackRate=10.0)
+  val next=NativeWorldLabRecordedTime.advance(run,start,0.05,paused=false)
+  assertEquals(0.15,next.simulationTimeSeconds,1e-9)
+  assertEquals(run.sampleTimesSeconds[next.sampleIndex],next.displaySampleTimeSeconds,0.0)
+  val checkpoint=NativeWorldLabRecordedTime.checkpoint(run,next)
+  assertEquals(0.15,NativeWorldLabRecordedTime.restore(run,checkpoint).simulationTimeSeconds,1e-9)
+ }
