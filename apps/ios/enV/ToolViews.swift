@@ -15140,6 +15140,143 @@ private struct NativeABookView: View {
         .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private func selectedPDFs() -> [ABookNativeAttachment] {
+        attachments.filter { selectedPDFIDs.contains($0.id) && ($0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf")) }
+    }
+
+    private func mergeSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard selected.count >= 2 else {
+            showError(NSError(domain: "ABookPDF", code: 40, userInfo: [NSLocalizedDescriptionKey: "Select at least two PDFs to merge."]))
+            return
+        }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 41, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        status = "Merging PDFs locally…"
+        Task.detached(priority: .userInitiated) {
+            do {
+                let merged = PDFDocument()
+                var pageCount = 0
+                for attachment in selected {
+                    let url = try store.fileURL(for: attachment)
+                    guard let source = PDFDocument(url: url) else {
+                        throw NSError(domain: "ABookPDF", code: 42, userInfo: [NSLocalizedDescriptionKey: "Could not open " + attachment.name + "."])
+                    }
+                    pageCount += source.pageCount
+                    guard pageCount <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 43, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be merged at once."])
+                    }
+                    for index in 0..<source.pageCount {
+                        guard let page = source.page(at: index), let copiedPage = page.copy() as? PDFPage else { continue }
+                        merged.insert(copiedPage, at: merged.pageCount)
+                    }
+                }
+                guard let data = merged.dataRepresentation(), !data.isEmpty else {
+                    throw NSError(domain: "ABookPDF", code: 44, userInfo: [NSLocalizedDescriptionKey: "The merged PDF could not be created."])
+                }
+                await MainActor.run {
+                    pdfData = data
+                    pdfName = "a-book-merged.pdf"
+                    exportingPDF = true
+                    status = "Merged " + String(selected.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch { await MainActor.run { showError(error) } }
+        }
+    }
+
+    private func rotateSelectedPDFs() {
+        let selected = selectedPDFs()
+        guard !selected.isEmpty else { return }
+        guard selected.count <= 25, selected.reduce(Int64(0), { $0 + $1.size }) <= 300 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 45, userInfo: [NSLocalizedDescriptionKey: "Select up to 25 PDFs with a combined size below 300 MB."]))
+            return
+        }
+        status = "Rotating PDFs locally…"
+        Task.detached(priority: .userInitiated) {
+            do {
+                var files: [String: Data] = [:]
+                var names = Set<String>()
+                var pageCount = 0
+                for attachment in selected {
+                    guard let document = PDFDocument(url: try store.fileURL(for: attachment)) else {
+                        throw NSError(domain: "ABookPDF", code: 46, userInfo: [NSLocalizedDescriptionKey: "Could not open " + attachment.name + "."])
+                    }
+                    pageCount += document.pageCount
+                    guard pageCount <= 5_000 else {
+                        throw NSError(domain: "ABookPDF", code: 47, userInfo: [NSLocalizedDescriptionKey: "A maximum of 5,000 pages can be processed in one batch."])
+                    }
+                    for index in 0..<document.pageCount {
+                        guard let page = document.page(at: index) else { continue }
+                        page.rotation = (page.rotation + 90) % 360
+                    }
+                    guard let data = document.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 48, userInfo: [NSLocalizedDescriptionKey: "A rotated PDF could not be exported."])
+                    }
+                    let base = safeABookPDFName(attachment.name)
+                    var filename = base + "-rotated.pdf"
+                    var suffix = 2
+                    while !names.insert(filename.lowercased()).inserted {
+                        filename = base + "-rotated-" + String(suffix) + ".pdf"
+                        suffix += 1
+                    }
+                    files[filename] = data
+                }
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    archiveData = archive
+                    archiveFilename = "a-book-rotated-pdfs.zip"
+                    exportingArchive = true
+                    status = "Rotated " + String(selected.count) + " PDFs locally"
+                    errorText = ""
+                }
+            } catch { await MainActor.run { showError(error) } }
+        }
+    }
+
+    private func splitPDF(_ attachment: ABookNativeAttachment) {
+        guard attachment.size <= 200 * 1024 * 1024 else {
+            showError(NSError(domain: "ABookPDF", code: 49, userInfo: [NSLocalizedDescriptionKey: "This PDF exceeds the 200 MB local processing limit."]))
+            return
+        }
+        let pageGroups = splitPageGroups
+        status = "Splitting PDF locally…"
+        Task.detached(priority: .userInitiated) {
+            do {
+                guard let source = PDFDocument(url: try store.fileURL(for: attachment)) else {
+                    throw NSError(domain: "ABookPDF", code: 50, userInfo: [NSLocalizedDescriptionKey: "This PDF could not be opened locally."])
+                }
+                let groups = try parseABookPageGroups(pageGroups, pageCount: source.pageCount)
+                var files: [String: Data] = [:]
+                let base = safeABookPDFName(attachment.name)
+                for (index, pages) in groups.enumerated() {
+                    let part = PDFDocument()
+                    for number in pages {
+                        guard let page = source.page(at: number - 1), let copiedPage = page.copy() as? PDFPage else {
+                            throw NSError(domain: "ABookPDF", code: 51, userInfo: [NSLocalizedDescriptionKey: "A selected PDF page could not be copied."])
+                        }
+                        part.insert(copiedPage, at: part.pageCount)
+                    }
+                    guard let data = part.dataRepresentation(), !data.isEmpty else {
+                        throw NSError(domain: "ABookPDF", code: 52, userInfo: [NSLocalizedDescriptionKey: "A PDF part could not be created."])
+                    }
+                    let partNumber = String(format: "%02d", index + 1)
+                    files[base + "-part-" + partNumber + ".pdf"] = data
+                }
+                let archive = try makeABookStoredZIP(files)
+                await MainActor.run {
+                    archiveData = archive
+                    archiveFilename = base + "-parts.zip"
+                    exportingArchive = true
+                    status = "Created " + String(groups.count) + " PDF parts locally"
+                    errorText = ""
+                }
+            } catch { await MainActor.run { showError(error) } }
+        }
+    }
+
     private func processPDF(_ attachment: ABookNativeAttachment, operation: String) {
         Task.detached(priority: .userInitiated) {
             do {
