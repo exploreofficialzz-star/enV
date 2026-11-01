@@ -167,11 +167,11 @@ function scalarSliceLayer(){
  const base=createComputedFieldLayers(run("damped-oscillator"))[0];
  const timeSamples=base.timeReference.sampleTimesSeconds.length;
  const values=Array.from({length:timeSamples},(_,t)=>
-  Array.from({length:8},(_,cell)=>t*100+cell));
+  Array.from({length:8},(_,cell)=>t*10+cell));
  return parseFieldLayer({...base,id:"scalar-volume",label:"Temperature volume",kind:"scalar",
   resolution:{dimensions:[2,2,2],spacingMeters:[1,1,1],sampleCount:8},
   values:values.flat(),mask:null,renderer:{kind:"slice",implementationId:"env-scalar-slice-v1"},
-  range:{...base.range,minimumSI:0,maximumSI:(timeSamples-1)*100+7}});
+  range:{...base.range,minimumSI:0,maximumSI:(timeSamples-1)*10+7}});
 }
 test("scalar slice extracts exact XYZ grid-plane cells from the nearest recorded time sample",()=>{
  const layer=scalarSliceLayer();
