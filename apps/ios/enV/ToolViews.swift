@@ -14438,6 +14438,15 @@ private final class ABookLocalStore {
                 $0.title != note.title || $0.body != note.body || $0.notebook != note.notebook || decodeTags($0.tagsData) != note.tags
             } ?? false
             if let existing, changed {
+                let allRevisionsRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "ABookRevisionEntity")
+                let allRevisionCount = try context.count(for: allRevisionsRequest)
+                if allRevisionCount >= 100_000 {
+                    let removeCount = allRevisionCount - 100_000 + 1
+                    let oldestRequest = NSFetchRequest<ABookRevisionEntity>(entityName: "ABookRevisionEntity")
+                    oldestRequest.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+                    oldestRequest.fetchLimit = removeCount
+                    try context.fetch(oldestRequest).forEach(context.delete)
+                }
                 let revision = ABookRevisionEntity(context: context)
                 revision.id = UUID()
                 revision.noteID = note.id
@@ -14614,12 +14623,17 @@ private final class ABookLocalStore {
             try perform { context in
                 let existingRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
                 let existing = try context.fetch(existingRequest)
-                let existingBytes = existing.reduce(Int64(0)) { $0 + $1.size }
+                let maxLibraryBytes = Int64(150 * 1024 * 1024)
+                let existingBytes = existing.reduce(Int64(0)) { total, item in
+                    if item.size < 0 || total > Int64.max - item.size { return Int64.max }
+                    return total + item.size
+                }
                 let incomingBytes = attachments.reduce(Int64(0)) { $0 + $1.size }
-                guard existingBytes >= 0, existing.count + attachments.count <= 10_000 else {
+                guard existing.count + attachments.count <= 10_000 else {
                     throw NSError(domain: "ABookAttachment", code: 5, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing more."])
                 }
-                guard incomingBytes <= 150 * 1024 * 1024 - existingBytes else {
+                guard existingBytes <= maxLibraryBytes,
+                      incomingBytes <= maxLibraryBytes - existingBytes else {
                     throw NSError(domain: "ABookAttachment", code: 6, userInfo: [NSLocalizedDescriptionKey: "The complete local library attachment limit is 150 MB. Export and remove older files before importing more."])
                 }
                 let inserted = attachments.map { attachment -> ABookAttachmentEntity in
@@ -14846,8 +14860,10 @@ private final class ABookLocalStore {
                     let existingAttachmentCount = try context.count(for: attachmentCountRequest)
                     let attachmentRequest = NSFetchRequest<ABookAttachmentEntity>(entityName: "ABookAttachmentEntity")
                     let existingAttachments = try context.fetch(attachmentRequest)
+                    let maxLibraryAttachmentBytes = Int64(150 * 1024 * 1024)
                     let existingAttachmentBytes = existingAttachments.reduce(Int64(0)) { total, item in
-                        total + max(0, item.size)
+                        if item.size < 0 || total > Int64.max - item.size { return Int64.max }
+                        return total + item.size
                     }
                     guard existingNoteCount + importedNotes.count <= 10_000 else {
                         throw NSError(domain: "ABookArchive", code: 36, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local notes. Export or remove older notes before importing this backup."])
@@ -14858,7 +14874,6 @@ private final class ABookLocalStore {
                     guard existingAttachmentCount + importedAttachments.count <= 10_000 else {
                         throw NSError(domain: "ABookArchive", code: 38, userInfo: [NSLocalizedDescriptionKey: "A book supports up to 10,000 local attachments. Remove unused files before importing this backup."])
                     }
-                    let maxLibraryAttachmentBytes = Int64(150 * 1024 * 1024)
                     guard existingAttachmentBytes >= 0,
                           existingAttachmentBytes <= maxLibraryAttachmentBytes,
                           Int64(totalBytes) <= maxLibraryAttachmentBytes - existingAttachmentBytes else {
