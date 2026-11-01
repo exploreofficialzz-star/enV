@@ -430,6 +430,47 @@ enum NativeWorldLabEditor {
             root["camera"]=camera
         }
     }
+    static func extrudeRectangle(_ data:Data,widthMeters:Double,depthMeters:Double,
+        heightMeters:Double,id:String=UUID().uuidString)throws->Data {
+        guard [widthMeters,depthMeters,heightMeters].allSatisfy({$0.isFinite && (0.001...10000).contains($0)}),
+              id.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("Rectangular sketch needs bounded positive SI dimensions")
+        }
+        return try mutate(data){root in
+            guard var entities=root["entities"] as? [[String:Any]],entities.count<200,
+                  !entities.contains(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Sketch exceeds the project solid limit or duplicates an ID")
+            }
+            entities.append(["id":id,"name":"Extruded rectangular profile","shape":"box",
+                "positionMeters":[0,heightMeters/2,0],
+                "dimensionsMeters":[widthMeters,heightMeters,depthMeters],
+                "rotationRadians":[0,0,0],"color":"#A4C9C6",
+                "materialId":NSNull(),"scientificRole":"visual-only","opacity":1])
+            root["entities"]=entities
+        }
+    }
+    static func extrudeCircle(_ data:Data,radiusMeters:Double,heightMeters:Double,
+        id:String=UUID().uuidString)throws->Data {
+        guard radiusMeters.isFinite,(0.0005...5000).contains(radiusMeters),
+              heightMeters.isFinite,(0.001...10000).contains(heightMeters),
+              radiusMeters*2<=10000,
+              id.range(of:"^[A-Za-z0-9_-]{1,120}$",options:.regularExpression) != nil else {
+            throw NativeWorldLabError.invalid("Circular sketch needs a bounded radius and height")
+        }
+        let diameter=radiusMeters*2
+        return try mutate(data){root in
+            guard var entities=root["entities"] as? [[String:Any]],entities.count<200,
+                  !entities.contains(where:{$0["id"] as? String==id}) else {
+                throw NativeWorldLabError.invalid("Sketch exceeds the project solid limit or duplicates an ID")
+            }
+            entities.append(["id":id,"name":"Extruded circular profile","shape":"cylinder",
+                "positionMeters":[0,heightMeters/2,0],
+                "dimensionsMeters":[diameter,heightMeters,diameter],
+                "rotationRadians":[0,0,0],"color":"#A4C9C6",
+                "materialId":NSNull(),"scientificRole":"visual-only","opacity":1])
+            root["entities"]=entities
+        }
+    }
     static func addHypotheticalMaterial(_ data:Data,name:String,densityKgM3:Double?,
                                         youngModulusPa:Double?=nil,
                                         id:String=UUID().uuidString,

@@ -59,6 +59,10 @@ struct NativeWorldLabView:View {
     @State private var opticalRayDistance="10"
     @State private var opticalRayContacts="8"
     @State private var editingMaterialId:String?
+    @State private var cadSketchWidth="2"
+    @State private var cadSketchDepth="2"
+    @State private var cadSketchHeight="1"
+    @State private var cadSketchRadius="0.5"
     @State private var beamForce="1000"
     @State private var beamRun:NativeLabBeamBendingResult?
     @State private var collisionOtherId=""
@@ -2065,6 +2069,38 @@ Text("Invent chemical heat").font(.headline)
                         }.buttonStyle(.bordered)
                         Text("Rotation: "+solid.effectiveRotationRadians.map{String(format:"%.3f",$0)}.joined(separator:" / ")+" rad")
                             .font(.caption).foregroundStyle(.secondary)
+                        Text("2D sketch and extrusion").font(.headline)
+                        Text("Draw a closed rectangle or circle in the X/Z plane and extrude along Y.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        HStack{
+                            TextField("Width m",text:$cadSketchWidth).keyboardType(.decimalPad)
+                            TextField("Depth m",text:$cadSketchDepth).keyboardType(.decimalPad)
+                        }.textFieldStyle(.roundedBorder)
+                        HStack{
+                            TextField("Height m",text:$cadSketchHeight).keyboardType(.decimalPad)
+                            TextField("Circle radius m",text:$cadSketchRadius).keyboardType(.decimalPad)
+                        }.textFieldStyle(.roundedBorder)
+                        HStack{
+                            Button("Extrude rectangle"){
+                                do{
+                                    guard let width=Double(cadSketchWidth),let depth=Double(cadSketchDepth),
+                                          let height=Double(cadSketchHeight) else {
+                                        throw NativeWorldLabError.invalid("Enter valid sketch dimensions")
+                                    }
+                                    applyProject{try NativeWorldLabEditor.extrudeRectangle($0,
+                                        widthMeters:width,depthMeters:depth,heightMeters:height)}
+                                }catch{problem=error.localizedDescription}
+                            }.disabled(project.entities.count>=200)
+                            Button("Extrude circle"){
+                                do{
+                                    guard let radius=Double(cadSketchRadius),let height=Double(cadSketchHeight) else {
+                                        throw NativeWorldLabError.invalid("Enter a valid circular sketch")
+                                    }
+                                    applyProject{try NativeWorldLabEditor.extrudeCircle($0,
+                                        radiusMeters:radius,heightMeters:height)}
+                                }catch{problem=error.localizedDescription}
+                            }.disabled(project.entities.count>=200)
+                        }.buttonStyle(.bordered)
                         Text("Position and measure").font(.headline)
                         HStack {
                             Picker("Grid spacing",selection:$gridSpacing) {

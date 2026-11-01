@@ -201,6 +201,22 @@ class NativeWorldLabEditorTest {
         assertEquals(10.0,p.cameraPositionMeters.x,0.0)
         assertEquals(3.0,p.cameraLookingAtMeters.z,0.0)
     }
+    @Test fun nativeSketchExtrusionsCreatePortableBoxAndCylinderProfiles(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.extrudeRectangle(json,2.0,3.0,4.0,id="rect")
+        json=NativeWorldLabEditor.extrudeCircle(json,0.5,2.0,id="circle")
+        val p=NativeWorldLabProjectCodec.decode(json)
+        assertEquals(listOf("box","cylinder"),p.entities.map{it.shape})
+        assertEquals(4.0,p.entities[0].dimensionsMeters.y,0.0)
+        assertEquals(1.0,p.entities[1].dimensionsMeters.x,0.0)
+        assertEquals(1.0,p.entities[1].dimensionsMeters.z,0.0)
+        assertEquals(2.0,p.entities[0].positionMeters.y,0.0)
+    }
+    @Test fun invalidSketchProfilesAreRejected(){
+        val json=NativeWorldLabEditor.blank()
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.extrudeRectangle(json,0.0,1.0,1.0)}
+        assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.extrudeCircle(json,0.0,1.0)}
+    }
     @Test fun nativeCadOperationsRejectInvalidRotationPatternAndScale(){
         val json=NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),"sphere",id="s")
         assertThrows(IllegalArgumentException::class.java){NativeWorldLabEditor.rotateSolid(json,"s",5,15.0)}

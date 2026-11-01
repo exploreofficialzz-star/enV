@@ -118,6 +118,10 @@ fun NativeWorldLabForm() {
     var deviceAssumption by remember { mutableStateOf("") }
     var deviceResistance by remember { mutableStateOf("") }
     var junctionName by remember { mutableStateOf("") }
+    var cadSketchWidth by remember { mutableStateOf("2") }
+    var cadSketchDepth by remember { mutableStateOf("2") }
+    var cadSketchHeight by remember { mutableStateOf("1") }
+    var cadSketchRadius by remember { mutableStateOf("0.5") }
     var positiveWire by remember { mutableStateOf("supply") }
     var negativeWire by remember { mutableStateOf("ground") }
     var selected by remember { mutableIntStateOf(0) }
@@ -1087,6 +1091,35 @@ fun NativeWorldLabForm() {
                 }
                 Text("Rotation X/Y/Z: "+listOf(solid.rotationRadians.x,solid.rotationRadians.y,solid.rotationRadians.z)
                     .joinToString(" / "){labNumber(it)}+" rad",style=MaterialTheme.typography.bodySmall)
+                Text("2D sketch and extrusion",style=MaterialTheme.typography.titleSmall)
+                Text("Create a closed rectangle or circle on the X/Z plane and extrude along Y.",
+                    style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchWidth,onValueChange={cadSketchWidth=it},
+                        label={Text("Width m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchDepth,onValueChange={cadSketchDepth=it},
+                        label={Text("Depth m")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchHeight,onValueChange={cadSketchHeight=it},
+                        label={Text("Height m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchRadius,onValueChange={cadSketchRadius=it},
+                        label={Text("Circle radius m")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={
+                        runCatching{
+                            applyProjectEdit{NativeWorldLabEditor.extrudeRectangle(it,
+                                cadSketchWidth.toDouble(),cadSketchDepth.toDouble(),cadSketchHeight.toDouble())}
+                        }.onFailure{warning=it.message?:"Rectangle sketch could not be extruded"}
+                    },enabled=project!!.entities.size<200){Text("Extrude rectangle")}
+                    OutlinedButton(onClick={
+                        runCatching{
+                            applyProjectEdit{NativeWorldLabEditor.extrudeCircle(it,
+                                cadSketchRadius.toDouble(),cadSketchHeight.toDouble())}
+                        }.onFailure{warning=it.message?:"Circle sketch could not be extruded"}
+                    },enabled=project!!.entities.size<200){Text("Extrude circle")}
+                }
                 Text("Place with precision",style=MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(onClick={

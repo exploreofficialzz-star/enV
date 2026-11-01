@@ -207,6 +207,23 @@ final class NativeWorldLabEditorTests: XCTestCase {
         XCTAssertEqual(parsed.cameraPositionMeters,[10,8,-10])
         XCTAssertEqual(parsed.cameraLookingAtMeters,[1,2,3])
     }
+    func testNativeSketchExtrusionsCreatePortableBoxAndCylinderProfiles() throws {
+        var data=try NativeWorldLabEditor.extrudeRectangle(
+            NativeWorldLabEditor.blank(),widthMeters:2,depthMeters:3,heightMeters:4,id:"rect")
+        data=try NativeWorldLabEditor.extrudeCircle(data,radiusMeters:0.5,heightMeters:2,id:"circle")
+        let p=try NativeWorldLabProject.decode(data)
+        XCTAssertEqual(p.entities.map{$0.shape},["box","cylinder"])
+        XCTAssertEqual(p.entities[0].dimensionsMeters,[2,4,3])
+        XCTAssertEqual(p.entities[1].dimensionsMeters,[1,2,1])
+        XCTAssertEqual(p.entities[0].positionMeters,[0,2,0])
+    }
+    func testNativeSketchProfilesRejectInvalidDimensions() throws {
+        let data=try NativeWorldLabEditor.blank()
+        XCTAssertThrowsError(try NativeWorldLabEditor.extrudeRectangle(
+            data,widthMeters:0,depthMeters:1,heightMeters:1))
+        XCTAssertThrowsError(try NativeWorldLabEditor.extrudeCircle(
+            data,radiusMeters:0,heightMeters:1))
+    }
     func testNativeCADRejectsUnsafeTransformParameters() throws {
         let data=try NativeWorldLabEditor.addSolid(NativeWorldLabEditor.blank(),shape:"sphere",id:"s")
         XCTAssertThrowsError(try NativeWorldLabEditor.rotateSolid(data,id:"s",axis:4,deltaDegrees:15))
