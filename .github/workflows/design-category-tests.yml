@@ -1,0 +1,49 @@
+name: Design category — standalone engine tests
+
+on:
+  pull_request:
+    paths:
+      - "src/components/engines/color-engine.tsx"
+      - "src/components/engines/cssgen-engine.tsx"
+      - "src/lib/engines/**"
+      - "scripts/check-design.mjs"
+      - "scripts/catalog-reader.mjs"
+      - "src/data/catalog.ts"
+      - "package.json"
+      - ".github/workflows/design-category-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  design-engine-tests:
+    name: Design engine unit tests and 21-tool audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Verify Node supports built-in TypeScript stripping
+        run: node --version
+      - name: Run Design engine unit tests
+        run: >-
+          node --experimental-strip-types --test
+          src/lib/engines/css-gradient.test.ts
+          src/lib/engines/css-shadow.test.ts
+          src/lib/engines/css-text-shadow.test.ts
+          src/lib/engines/design-component-a11y.test.ts
+          src/lib/engines/css-border.test.ts
+          src/lib/engines/design-layer-utils.test.ts
+          src/lib/engines/palette-image.test.ts
+          src/lib/engines/design-palette.test.ts
+          src/lib/engines/design-color.test.ts
+          src/lib/engines/accessibility-color.test.ts
+          src/lib/engines/svg-generators.test.ts
+          src/lib/engines/design-contrast.test.ts
+      - name: Audit all 21 Design tools and implementation gates
+        run: node scripts/check-design.mjs
