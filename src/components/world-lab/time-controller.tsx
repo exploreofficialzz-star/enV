@@ -18,7 +18,7 @@ export function WorldLabTimeController(p:Props){
  useEffect(()=>setBranchDraft(p.run?.inputs??null),[p.run?.id]);
  const run=p.run,duration=run?.time.simulatedDurationSeconds??0;
  const branchChanged=!!run&&!!branchDraft&&JSON.stringify(branchDraft)!==JSON.stringify(run.inputs);
- const updateBranchDraft=(patch:Partial<ModelInput>)=>{
+ const updateBranchDraft=(patch:Record<string,number>)=>{
   setBranchDraft(current=>current?({...current,...patch} as ModelInput):current);
  };
  const sample=run?Math.round(p.timeSeconds/run.time.solverStepSeconds):0;
