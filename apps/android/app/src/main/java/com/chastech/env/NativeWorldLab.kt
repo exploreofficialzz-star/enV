@@ -66,6 +66,7 @@ import com.chastech.env.engine.NativeActuatorThermal
 import com.chastech.env.engine.NativeActuatorNumericalAudit
 import com.chastech.env.engine.NativeWorldLabActuator
 import com.chastech.env.engine.NativeWorldLabSolarEvents
+import com.chastech.env.engine.NativeWorldLabSolarStatus
 import com.chastech.env.engine.NativeWorldLabTimeScales
 import com.chastech.env.engine.NativeWorldLabEarthOrientationSeries
 import com.chastech.env.engine.NativeWorldLabEarthOrientationQuality
