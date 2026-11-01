@@ -14530,29 +14530,68 @@ private final class ABookLocalStore {
         }
     }
 
-    func importFile(noteID: UUID, url: URL) throws -> ABookNativeAttachment {
-        let access = url.startAccessingSecurityScopedResource()
-        defer { if access { url.stopAccessingSecurityScopedResource() } }
+    func importFiles(noteID: UUID, urls: [URL]) throws -> [ABookNativeAttachment] {
+        guard urls.count <= 10_000 else {
+            throw NSError(domain: "ABookAttachment", code: 1, userInfo: [NSLocalizedDescriptionKey: "Choose up to 10,000 attachments at a time."])
+        }
         let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         let folder = root.appendingPathComponent("Abook/Attachments/" + noteID.uuidString, isDirectory: true)
         try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-        let safeExtension = url.pathExtension.filter { $0.isLetter || $0.isNumber }.prefix(10)
-        let id = UUID()
-        let destination = folder.appendingPathComponent(id.uuidString + (safeExtension.isEmpty ? "" : "." + safeExtension))
-        try fileManager.copyItem(at: url, to: destination)
-        let size = (try fileManager.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
-        let attachment = ABookNativeAttachment(id: id, noteID: noteID, name: url.lastPathComponent,
-                                               mime: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream",
-                                               relativePath: "Attachments/" + noteID.uuidString + "/" + destination.lastPathComponent,
-                                               size: size, createdAt: Date())
-        try perform { context in
-            let entity = ABookAttachmentEntity(context: context)
-            entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
-            entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
-            entity.size = size; entity.createdAt = Date()
-            try context.save()
+        var createdFiles: [URL] = []
+        var attachments: [ABookNativeAttachment] = []
+        var totalBytes: Int64 = 0
+        do {
+            for url in urls {
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                if let knownSize = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, let knownSize {
+                    guard knownSize > 0, knownSize <= 100 * 1024 * 1024 else {
+                        throw NSError(domain: "ABookAttachment", code: 2, userInfo: [NSLocalizedDescriptionKey: "Each attachment must be between 1 byte and 100 MB so it can be included in a local A book backup."])
+                    }
+                }
+                let safeExtension = url.pathExtension.filter { $0.isLetter || $0.isNumber }.prefix(10)
+                let id = UUID()
+                let temporary = folder.appendingPathComponent("." + id.uuidString + ".tmp")
+                let destination = folder.appendingPathComponent(id.uuidString + (safeExtension.isEmpty ? "" : "." + safeExtension))
+                createdFiles.append(temporary)
+                try fileManager.copyItem(at: url, to: temporary)
+                let size = (try fileManager.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+                guard size > 0, size <= 100 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookAttachment", code: 3, userInfo: [NSLocalizedDescriptionKey: "Each attachment must be between 1 byte and 100 MB so it can be included in a local A book backup."])
+                }
+                totalBytes += size
+                guard totalBytes <= 150 * 1024 * 1024 else {
+                    throw NSError(domain: "ABookAttachment", code: 4, userInfo: [NSLocalizedDescriptionKey: "Choose a smaller attachment batch (150 MB maximum per import)."])
+                }
+                try fileManager.moveItem(at: temporary, to: destination)
+                createdFiles.append(destination)
+                let displayName = String(url.lastPathComponent.prefix(500))
+                let mime = String((UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream").prefix(200))
+                attachments.append(ABookNativeAttachment(
+                    id: id, noteID: noteID, name: displayName, mime: mime,
+                    relativePath: "Attachments/" + noteID.uuidString + "/" + destination.lastPathComponent,
+                    size: size, createdAt: Date()
+                ))
+            }
+            try perform { context in
+                do {
+                    for attachment in attachments {
+                        let entity = ABookAttachmentEntity(context: context)
+                        entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
+                        entity.mime = attachment.mime; entity.relativePath = attachment.relativePath
+                        entity.size = attachment.size; entity.createdAt = attachment.createdAt
+                    }
+                    try context.save()
+                } catch {
+                    context.rollback()
+                    throw error
+                }
+            }
+            return attachments
+        } catch {
+            createdFiles.forEach { try? fileManager.removeItem(at: $0) }
+            throw error
         }
-        return attachment
     }
 
 
@@ -15006,9 +15045,9 @@ private struct NativeABookView: View {
             case .success(let urls):
                 guard let selectedID else { return }
                 do {
-                    for url in urls { _ = try store.importFile(noteID: selectedID, url: url) }
+                    let imported = try store.importFiles(noteID: selectedID, urls: urls)
                     attachments = try store.attachments(noteID: selectedID)
-                    status = "Files saved on this device"
+                    status = "Saved " + String(imported.count) + " files on this device"
                     errorText = ""
                 } catch { showError(error) }
             case .failure(let error): showError(error)
