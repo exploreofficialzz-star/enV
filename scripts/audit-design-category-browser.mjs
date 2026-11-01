@@ -47,6 +47,18 @@ try {
   const hrefs = await cards.evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href")));
   assert.equal(new Set(hrefs).size, hrefs.length, "Every Design tool card should have a unique route");
 
+  const routeChecks = [];
+  for (let offset = 0; offset < hrefs.length; offset += 12) {
+    const batch = await Promise.all(hrefs.slice(offset, offset + 12).map(async (href) => {
+      const response = await page.request.get(baseUrl + href, { timeout: 30000 });
+      return { href, status: response.status(), finalUrl: response.url() };
+    }));
+    routeChecks.push(...batch);
+  }
+  const failedRoutes = routeChecks.filter((result) => result.status !== 200);
+  assert.deepEqual(failedRoutes, [], "Every Design tool route should respond with HTTP 200");
+  console.log("PASS Design tool route smoke test: " + routeChecks.length + " routes returned HTTP 200.");
+
   const search = page.getByRole("textbox", { name: "Search design tools" });
   await search.click();
   await search.fill("Gradient Token Generator");
