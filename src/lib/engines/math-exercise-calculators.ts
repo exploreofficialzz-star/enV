@@ -397,6 +397,18 @@ const specs: Spec[] = [
 
 ];
 
+/** Public presentation metadata used by the catalogue, while internal variable keys stay in the engine. */
+export const MATH_EXERCISE_CATALOG = specs.map((spec) => ({
+  key: spec.key,
+  name: spec.name,
+  targetLabels: Object.fromEntries(
+    Object.keys(spec.solve).map((target) => [
+      target,
+      spec.labels[target] ?? spec.fields.find((field) => field.name === target)?.label ?? target,
+    ]),
+  ),
+}));
+
 
 /** Inputs that cannot be negative (lengths, areas, volumes, density, magnitudes), checked before solving. */
 const NONNEGATIVE: Record<string, string[]> = {
