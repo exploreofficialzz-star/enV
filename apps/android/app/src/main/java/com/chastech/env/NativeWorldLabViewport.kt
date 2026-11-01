@@ -9,6 +9,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusable
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -124,7 +128,21 @@ fun NativeWorldLabViewport(
                     hit?.first?.let{onSelect(it.id)}
                 }
             }
-            .semantics{contentDescription="Interactive perspective 3D World Lab view with drag, pinch zoom, orbit, elevation and part selection"}
+            .semantics{contentDescription="Interactive perspective 3D World Lab view with drag, pinch zoom, orbit, elevation, keyboard controls and part selection"}
+            .focusable()
+            .onPreviewKeyEvent{event->
+                if(event.type!=KeyEventType.KeyDown)return@onPreviewKeyEvent false
+                val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
+                when(event.key){
+                    Key.DirectionLeft->{yaw+=0.12f;true}
+                    Key.DirectionRight->{yaw-=0.12f;true}
+                    Key.DirectionUp->{elevation=(elevation+4f).coerceAtMost(80f);true}
+                    Key.DirectionDown->{elevation=(elevation-4f).coerceAtLeast(5f);true}
+                    Key.PageDown->{observerDepthMeters=(observerDepthMeters-step).coerceAtLeast(-20000f);true}
+                    Key.PageUp->{observerDepthMeters=(observerDepthMeters+step).coerceAtMost(20000f);true}
+                    else->false
+                }
+            }
     ){
         val focalLength=360f*density
         // Ground grid follows the saved target and adapts to the current visible range.
@@ -236,6 +254,29 @@ fun NativeWorldLabViewport(
         style=MaterialTheme.typography.bodySmall)
     Text("Perspective observer · "+String.format(java.util.Locale.US,"%.2f",cameraDistance)+" m from focus · "+
         "visible far range is clipped at 50,000 km",style=MaterialTheme.typography.bodySmall)
+    Text("Accessible camera controls · arrow keys orbit and tilt · Page Up/Down move vertically")
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        OutlinedButton(onClick={yaw+=0.18f}){Text("Look left")}
+        OutlinedButton(onClick={yaw-=0.18f}){Text("Look right")}
+    }
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        OutlinedButton(onClick={pan+=Offset(48f,0f)}){Text("Pan right")}
+        OutlinedButton(onClick={pan-=Offset(48f,0f)}){Text("Pan left")}
+    }
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        OutlinedButton(onClick={elevation=(elevation+5f).coerceAtMost(80f)}){Text("Look up")}
+        OutlinedButton(onClick={elevation=(elevation-5f).coerceAtLeast(5f)}){Text("Look down")}
+    }
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        OutlinedButton(onClick={
+            val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
+            observerDepthMeters=(observerDepthMeters-step).coerceAtLeast(-20000f)
+        }){Text("Move down")}
+        OutlinedButton(onClick={
+            val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
+            observerDepthMeters=(observerDepthMeters+step).coerceAtMost(20000f)
+        }){Text("Move up")}
+    }
     Text("Observer elevation: "+elevation.toInt()+"°")
     Slider(value=elevation,onValueChange={elevation=it},valueRange=5f..80f,
         modifier=Modifier.semantics{contentDescription="Observer camera elevation angle"})
