@@ -207,3 +207,37 @@ final class NativeWorldLabRecordedCheckpointInteropTests:XCTestCase {
         XCTAssertThrowsError(try NativeWorldLabRecordedCheckpoint.decodeBounded(alteredClock))
     }
 }
+
+
+final class NativeWorldLabDemoRecordingTests:XCTestCase {
+    func testSpringRCAndHeatUseOneBoundedRecordedClockAxis()throws {
+        let models:[(String,NativeLabInput)]=[
+            ("native-spring",.spring()),
+            ("native-rc",.rc()),
+            ("native-heat",.heat())
+        ]
+        for (id,input) in models {
+            let samples=try (0...120).map{try NativeWorldLabScience.evaluate(input,atSeconds:Double($0)/10)}
+            XCTAssertEqual(samples.count,121)
+            XCTAssertEqual(samples.last?.timeSeconds ?? -1,12,accuracy:1e-12)
+            XCTAssertTrue(samples.allSatisfy{$0.timeSeconds.isFinite})
+            let run=NativeWorldLabRecordedRun(runId:"recorded-\(id)",modelId:id,
+                modelVersion:"1.0.0",worldEpochUTC:"2026-11-01T00:00:00Z",
+                sampleTimesSeconds:samples.map{$0.timeSeconds})
+            let started=try NativeWorldLabRecordedTime.start(run:run,
+                wallTimeUTC:"2026-11-01T12:00:00Z",timezoneDisplay:"Africa/Lagos")
+            let selected=try NativeWorldLabRecordedTime.seek(run:run,state:started,timeSeconds:0.76)
+            XCTAssertEqual(selected.simulationTimeSeconds,0.8,accuracy:1e-12)
+            let clock=NativeWorldLabRecordedClock(wallTimeUTC:selected.wallTimeUTC,
+                worldDateUTC:selected.worldDateUTC,simulationTimeSeconds:selected.simulationTimeSeconds,
+                solverInternalTimeSeconds:samples[selected.sampleIndex].timeSeconds,
+                displaySampleTimeSeconds:selected.displaySampleTimeSeconds,sampleIndex:selected.sampleIndex,
+                playbackRate:selected.playbackRate,direction:selected.direction,paused:true,
+                timezoneDisplay:selected.timezoneDisplay,fidelity:selected.fidelity)
+            let checkpoint=try NativeWorldLabRecordedTime.checkpoint(run:run,state:clock)
+            let restored=try NativeWorldLabRecordedTime.restore(run:run,checkpoint:checkpoint)
+            XCTAssertEqual(restored.sampleIndex,selected.sampleIndex)
+            XCTAssertEqual(restored.displaySampleTimeSeconds,selected.displaySampleTimeSeconds,accuracy:1e-12)
+        }
+    }
+}
