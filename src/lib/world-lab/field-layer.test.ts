@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {runExperiment,type ModelInput} from "./model.ts";
-import {createComputedFieldLayers,fieldFrameAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
+import {createComputedFieldLayers,fieldFrameAtTime,fieldVectorGlyphsAtTime,fieldValueToDisplay,parseFieldLayer,isFieldOverlayRendererImplemented} from "./field-layer.ts";
 const run=(kind:"damped-oscillator"|"rc-circuit"|"heat-rod")=>{
  const inputs:ModelInput=kind==="damped-oscillator"
   ?{kind,massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0}
@@ -53,9 +53,48 @@ test("unit conversion uses declared display factor and offset",()=>{
  assert.throws(()=>fieldValueToDisplay(celsius,Number.NaN),/finite SI/);
 });
 
+
+function vectorLayer(){
+ const base=createComputedFieldLayers(run("damped-oscillator"))[0];
+ const timeSamples=base.timeReference.sampleTimesSeconds.length;
+ const vectors=Array.from({length:timeSamples},()=>Array.from({length:8},(_,cell)=>[cell+1,2,3]).flat()).flat();
+ return parseFieldLayer({...base,id:"vector-xy",label:"Computed velocity vectors",kind:"vector",
+  resolution:{dimensions:[2,2,2],spacingMeters:[1,1,1],sampleCount:8},
+  values:vectors,mask:null,renderer:{kind:"glyphs",implementationId:"env-vector-glyphs-v1"},
+  range:{...base.range,minimumSI:0,maximumSI:Math.sqrt(64+4+9)}});
+}
+test("vector glyphs preserve XYZ components and select a real recorded 2D slice",()=>{
+ const layer=vectorLayer();
+ const xy=fieldVectorGlyphsAtTime(layer,0.05,"xy",1);
+ assert.equal(xy.plane,"xy");assert.equal(xy.sliceIndex,1);
+ assert.equal(xy.dimensionU,2);assert.equal(xy.dimensionV,2);
+ assert.equal(xy.glyphs.length,4);
+ assert.equal(xy.glyphs[0].uIndex,0);assert.equal(xy.glyphs[0].vIndex,0);
+ assert.deepEqual([xy.glyphs[0].uComponent,xy.glyphs[0].vComponent],[5,2]);
+ assert.ok(Math.abs(xy.glyphs[0].magnitude-Math.sqrt(38))<1e-12);
+ const xz=fieldVectorGlyphsAtTime(layer,0.05,"xz",1);
+ assert.deepEqual([xz.glyphs[0].uComponent,xz.glyphs[0].vComponent],[5,3]);
+ const yz=fieldVectorGlyphsAtTime(layer,0.05,"yz",1);
+ assert.deepEqual([yz.glyphs[0].uComponent,yz.glyphs[0].vComponent],[2,3]);
+});
+test("vector glyphs omit nodata cells and reject invalid slice or scalar input",()=>{
+ const base=createComputedFieldLayers(run("damped-oscillator"))[0];
+ const layer=vectorLayer();
+ const raw=JSON.parse(JSON.stringify(layer));
+ raw.mask=Array(raw.values.length).fill(true);
+ raw.values[0]=null;raw.values[1]=null;raw.values[2]=null;
+ raw.mask[0]=false;raw.mask[1]=false;raw.mask[2]=false;
+ const masked=parseFieldLayer(raw);
+ const result=fieldVectorGlyphsAtTime(masked,0,"xy",0);
+ assert.equal(result.glyphs.length,3);
+ assert.throws(()=>fieldVectorGlyphsAtTime(layer,0,"xy",2),/slice/);
+ assert.throws(()=>fieldVectorGlyphsAtTime(base,0,"xy"),/vector field/);
+});
+
 test("renderer capability is explicit and unsupported vector or tensor renderers never masquerade as line plots",()=>{
  assert.equal(isFieldOverlayRendererImplemented("scalar","line-plot"),true);
  assert.equal(isFieldOverlayRendererImplemented("scalar","heatmap"),true);
+ assert.equal(isFieldOverlayRendererImplemented("vector","glyphs"),true);
  assert.equal(isFieldOverlayRendererImplemented("vector","streamlines"),false);
  assert.equal(isFieldOverlayRendererImplemented("tensor","isosurface"),false);
  assert.equal(isFieldOverlayRendererImplemented("event","event-trace"),true);
