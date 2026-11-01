@@ -149,7 +149,7 @@ export async function extractPdfPages(file: Blob, requestedPages: number[]): Pro
  */
 export async function extractSelectedPdfs(files: ABookPdfInput[], pageRange: string): Promise<Uint8Array> {
   assertBatch(files);
-  const prepared: Array<{ name: string; source: PDFDocument; pages: number[] }> = [];
+  const prepared: Array<{ name: string; blob: Blob; pages: number[] }> = [];
   let totalPages = 0;
 
   for (const file of files) {
@@ -159,16 +159,17 @@ export async function extractSelectedPdfs(files: ABookPdfInput[], pageRange: str
     if (totalPages > MAX_TOTAL_PAGES) {
       throw new Error(`A maximum of ${MAX_TOTAL_PAGES} extracted pages can be processed in one batch.`);
     }
-    prepared.push({ name: file.name, source, pages });
+    prepared.push({ name: file.name, blob: file.blob, pages });
   }
 
   const output: Record<string, Uint8Array> = {};
   const names = new Set<string>();
   for (const item of prepared) {
+    const source = await openPdf(item.blob);
     const base = safeArchiveName(item.name);
     const filename = uniqueArchiveEntryName(`${base}-extracted.pdf`, names);
     const document = await PDFDocument.create();
-    const copied = await document.copyPages(item.source, item.pages.map((page) => page - 1));
+    const copied = await document.copyPages(source, item.pages.map((page) => page - 1));
     copied.forEach((page) => document.addPage(page));
     output[filename] = await document.save({ useObjectStreams: true });
   }
@@ -181,7 +182,7 @@ export async function extractSelectedPdfs(files: ABookPdfInput[], pageRange: str
  */
 export async function splitSelectedPdfsIntoZip(files: ABookPdfInput[], pageGroups: string): Promise<Uint8Array> {
   assertBatch(files);
-  const prepared: Array<{ name: string; source: PDFDocument; groups: number[][] }> = [];
+  const prepared: Array<{ name: string; blob: Blob; groups: number[][] }> = [];
   let totalPages = 0;
 
   for (const file of files) {
@@ -191,19 +192,20 @@ export async function splitSelectedPdfsIntoZip(files: ABookPdfInput[], pageGroup
     if (totalPages > MAX_TOTAL_PAGES) {
       throw new Error(`A maximum of ${MAX_TOTAL_PAGES} split pages can be processed in one batch.`);
     }
-    prepared.push({ name: file.name, source, groups });
+    prepared.push({ name: file.name, blob: file.blob, groups });
   }
 
   const output: Record<string, Uint8Array> = {};
   const names = new Set<string>();
   for (const item of prepared) {
+    const source = await openPdf(item.blob);
     const base = safeArchiveName(item.name);
     for (let index = 0; index < item.groups.length; index += 1) {
       const pages = item.groups[index];
       const requestedName = `${base}-part-${String(index + 1).padStart(2, "0")}.pdf`;
       const filename = uniqueArchiveEntryName(requestedName, names);
       const part = await PDFDocument.create();
-      const copied = await part.copyPages(item.source, pages.map((page) => page - 1));
+      const copied = await part.copyPages(source, pages.map((page) => page - 1));
       copied.forEach((page) => part.addPage(page));
       output[filename] = await part.save({ useObjectStreams: true });
     }
