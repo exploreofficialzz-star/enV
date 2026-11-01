@@ -34,6 +34,7 @@ private data class ABookNoteRecord(
     val pinned:Boolean,val archived:Boolean,val deletedAt:Long?,val createdAt:Long,val updatedAt:Long,val revision:Int
 )
 private data class ABookFileRecord(val id:String,val name:String,val mime:String,val relativePath:String,val size:Long)
+private data class ABookRevisionRecord(val id:String,val noteId:String,val title:String,val body:String,val notebook:String,val tags:String,val revision:Int,val createdAt:Long)
 
 private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.applicationContext,"env-a-book.db",null,1){
     override fun onCreate(db:SQLiteDatabase){
@@ -53,8 +54,8 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
         c.getLong(c.getColumnIndexOrThrow("created_at")),c.getLong(c.getColumnIndexOrThrow("updated_at")),
         c.getInt(c.getColumnIndexOrThrow("revision"))
     )
-    fun notes(includeArchived:Boolean=false):List<ABookNoteRecord> =
-        readableDatabase.query("notes",null,if(includeArchived)"deleted_at IS NULL" else "deleted_at IS NULL AND archived=0",null,null,null,"pinned DESC,updated_at DESC")
+    fun notes(includeArchived:Boolean=false,includeDeleted:Boolean=false):List<ABookNoteRecord> =
+        readableDatabase.query("notes",null,when { includeDeleted -> "deleted_at IS NOT NULL"; includeArchived -> "deleted_at IS NULL"; else -> "deleted_at IS NULL AND archived=0" },null,null,null,"pinned DESC,updated_at DESC")
             .use{c->buildList{while(c.moveToNext())add(read(c))}}
     fun save(note:ABookNoteRecord):ABookNoteRecord{
         val db=writableDatabase;db.beginTransaction()
@@ -84,6 +85,31 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
         readableDatabase.query("attachments",null,"note_id=?",arrayOf(noteId),null,null,"created_at").use{c->buildList{
             while(c.moveToNext())add(ABookFileRecord(c.getString(c.getColumnIndexOrThrow("id")),c.getString(c.getColumnIndexOrThrow("name")),c.getString(c.getColumnIndexOrThrow("mime")),c.getString(c.getColumnIndexOrThrow("path")),c.getLong(c.getColumnIndexOrThrow("size"))))
         }}
+    fun restore(noteId:String){
+        writableDatabase.update("notes",ContentValues().apply{putNull("deleted_at");put("archived",0);put("updated_at",System.currentTimeMillis())},"id=?",arrayOf(noteId))
+    }
+    fun revisions(noteId:String):List<ABookRevisionRecord> = readableDatabase.query("revisions",null,"note_id=?",arrayOf(noteId),null,null,"created_at DESC").use{c->buildList{
+        while(c.moveToNext())add(ABookRevisionRecord(c.getString(c.getColumnIndexOrThrow("id")),c.getString(c.getColumnIndexOrThrow("note_id")),c.getString(c.getColumnIndexOrThrow("title")),c.getString(c.getColumnIndexOrThrow("body")),c.getString(c.getColumnIndexOrThrow("notebook")),c.getString(c.getColumnIndexOrThrow("tags")),c.getInt(c.getColumnIndexOrThrow("revision")),c.getLong(c.getColumnIndexOrThrow("created_at"))))
+    }}
+    fun restoreRevision(noteId:String,revisionId:String):ABookNoteRecord? {
+        val db=writableDatabase;db.beginTransaction()
+        try{
+            val old=db.query("revisions",null,"id=? AND note_id=?",arrayOf(revisionId,noteId),null,null,null).use{if(it.moveToFirst())ABookRevisionRecord(it.getString(it.getColumnIndexOrThrow("id")),it.getString(it.getColumnIndexOrThrow("note_id")),it.getString(it.getColumnIndexOrThrow("title")),it.getString(it.getColumnIndexOrThrow("body")),it.getString(it.getColumnIndexOrThrow("notebook")),it.getString(it.getColumnIndexOrThrow("tags")),it.getInt(it.getColumnIndexOrThrow("revision")),it.getLong(it.getColumnIndexOrThrow("created_at")))else null}?:return null
+            val current=db.query("notes",null,"id=?",arrayOf(noteId),null,null,null).use{if(it.moveToFirst())read(it)else null}?:return null
+            val next=current.copy(title=old.title,body=old.body,notebook=old.notebook,tags=old.tags,revision=current.revision+1,updatedAt=System.currentTimeMillis())
+            db.insertOrThrow("revisions",null,ContentValues().apply{put("id",UUID.randomUUID().toString());put("note_id",noteId);put("title",current.title);put("body",current.body);put("notebook",current.notebook);put("tags",current.tags);put("revision",current.revision);put("created_at",System.currentTimeMillis())})
+            db.update("notes",ContentValues().apply{put("title",next.title);put("body",next.body);put("notebook",next.notebook);put("tags",next.tags);put("revision",next.revision);put("updated_at",next.updatedAt)},"id=?",arrayOf(noteId))
+            db.setTransactionSuccessful();return next
+        }finally{db.endTransaction()}
+    }
+    fun permanentlyDelete(noteId:String):List<String>{
+        val db=writableDatabase;db.beginTransaction()
+        try{
+            val paths=db.query("attachments",arrayOf("path"),"note_id=?",arrayOf(noteId),null,null,null).use{c->buildList{while(c.moveToNext())add(c.getString(0))}}
+            db.delete("attachments","note_id=?",arrayOf(noteId));db.delete("revisions","note_id=?",arrayOf(noteId));db.delete("notes","id=?",arrayOf(noteId))
+            db.setTransactionSuccessful();return paths
+        }finally{db.endTransaction()}
+    }
     fun addFile(noteId:String,name:String,mime:String,path:String,size:Long){
         writableDatabase.insertOrThrow("attachments",null,ContentValues().apply{
             put("id",UUID.randomUUID().toString());put("note_id",noteId);put("name",name);put("mime",mime);put("path",path);put("size",size);put("created_at",System.currentTimeMillis())
@@ -104,6 +130,8 @@ fun NativeABookScreen(){
     var tags by rememberSaveable{mutableStateOf("")}
     var search by rememberSaveable{mutableStateOf("")}
     var archived by rememberSaveable{mutableStateOf(false)}
+    var showTrash by rememberSaveable{mutableStateOf(false)}
+    var revisions by remember{mutableStateOf(emptyList<ABookRevisionRecord>())}
     var status by remember{mutableStateOf("Saved on this device")}
     var error by remember{mutableStateOf("")}
     var files by remember{mutableStateOf(emptyList<ABookFileRecord>())}
@@ -112,11 +140,11 @@ fun NativeABookScreen(){
     var pendingPdf by remember{mutableStateOf<File?>(null)}
 
     fun reload(id:String?=selected){
-        notes=db.notes(archived)
+        notes=db.notes(archived,showTrash)
         val n=notes.firstOrNull{it.id==id}?:notes.firstOrNull()
         selected=n?.id;title=n?.title.orEmpty();body=n?.body.orEmpty();notebook=n?.notebook?:"Inbox"
         tags=n?.let{runCatching{JSONArray(it.tags).let{a->(0 until a.length()).joinToString(", "){i->a.getString(i)}}}.getOrDefault("")}.orEmpty()
-        files=n?.let{db.attachments(it.id)}?:emptyList()
+        files=n?.let{db.attachments(it.id)}?:emptyList();revisions=n?.let{db.revisions(it.id)}?:emptyList()
     }
     val importPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()){uris->
         val id=selected?:return@rememberLauncherForActivityResult
@@ -150,11 +178,11 @@ fun NativeABookScreen(){
         }.onFailure{error=it.message?:"PDF export failed"}
         source?.delete();pendingPdf=null
     }
-    LaunchedEffect(selected,title,body,notebook,tags,archived){
+    LaunchedEffect(selected,title,body,notebook,tags,archived,showTrash){
         val id=selected?:return@LaunchedEffect
         delay(500);status="Saving on this device…"
         val result=withContext(Dispatchers.IO){runCatching{
-            val old=db.notes(true).firstOrNull{it.id==id}
+            val old=db.notes(true,true).firstOrNull{it.id==id}
             val tagData=JSONArray(tags.split(",").map{it.trim()}.filter{it.isNotEmpty()}.take(50)).toString()
             db.save(ABookNoteRecord(id,title,body,notebook.ifBlank{"Inbox"},tagData,old?.pinned?:false,old?.archived?:false,old?.deletedAt,old?.createdAt?:System.currentTimeMillis(),System.currentTimeMillis(),old?.revision?:0))
         }}
@@ -170,7 +198,8 @@ fun NativeABookScreen(){
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
             Button(onClick={val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id)}){Text("New note")}
             OutlinedButton(onClick={exportMarkdown.launch("${title.ifBlank{"note"}}.md")},enabled=selected!=null){Text("Export .md")}
-            OutlinedButton(onClick={archived=!archived;notes=db.notes(!archived)}){Text(if(archived)"Hide archived" else "Archived")}
+            OutlinedButton(onClick={showTrash=!showTrash;archived=false;notes=db.notes(false,showTrash);selected=null;title="";body="";files=emptyList();revisions=emptyList()}){Text(if(showTrash)"All notes" else "Trash")}
+            if(!showTrash)OutlinedButton(onClick={archived=!archived;notes=db.notes(archived,false)}){Text(if(archived)"Hide archived" else "Archived")}
         }
         OutlinedTextField(search,{search=it},label={Text("Search notes")},modifier=Modifier.fillMaxWidth(),singleLine=true)
         filtered.forEach{n->
@@ -187,9 +216,23 @@ fun NativeABookScreen(){
             OutlinedTextField(tags,{tags=it},label={Text("Tags · comma separated")},modifier=Modifier.fillMaxWidth(),singleLine=true)
             OutlinedTextField(body,{body=it},label={Text("Write a note")},modifier=Modifier.fillMaxWidth().heightIn(min=180.dp),minLines=7)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                OutlinedButton(onClick={val n=notes.firstOrNull{it.id==selected}?:return@OutlinedButton;db.save(n.copy(pinned=!n.pinned,title=title,body=body,notebook=notebook));reload(selected)}){Text("Pin")}
-                OutlinedButton(onClick={val n=notes.firstOrNull{it.id==selected}?:return@OutlinedButton;db.save(n.copy(archived=true,title=title,body=body));reload()}){Text("Archive")}
-                OutlinedButton(onClick={val n=notes.firstOrNull{it.id==selected}?:return@OutlinedButton;db.save(n.copy(deletedAt=System.currentTimeMillis(),title=title,body=body));reload()}){Text("Trash")}
+                val selectedNote=notes.firstOrNull{it.id==selected}
+                if(selectedNote?.deletedAt!=null){
+                    OutlinedButton(onClick={db.restore(selectedNote.id);showTrash=false;reload(selectedNote.id)}){Text("Restore")}
+                    OutlinedButton(onClick={
+                        val paths=db.permanentlyDelete(selectedNote.id)
+                        paths.forEach{path->val root=context.filesDir.canonicalFile;val target=File(context.filesDir,path).canonicalFile;if(target.path.startsWith(root.path+File.separator))target.delete()}
+                        selected=null;title="";body="";files=emptyList();revisions=emptyList();notes=db.notes(false,true)
+                    }){Text("Delete permanently")}
+                }else{
+                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(pinned=!n.pinned,title=title,body=body,notebook=notebook));reload(selected)}){Text("Pin")}
+                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(archived=true,title=title,body=body));reload()}){Text("Archive")}
+                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(deletedAt=System.currentTimeMillis(),title=title,body=body));reload()}){Text("Trash")}
+                }
+            }
+            if(revisions.isNotEmpty()){
+                Text("REVISION HISTORY",style=MaterialTheme.typography.labelMedium)
+                revisions.forEach{revision->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Revision ${revision.revision}",style=MaterialTheme.typography.bodySmall);OutlinedButton(onClick={val restored=db.restoreRevision(revision.noteId,revision.id);if(restored!=null)reload(restored.id)}){Text("Restore version")}}}
             }
             Button(onClick={importPicker.launch(arrayOf("*/*"))}){Text("Attach files locally")}
             Text("FILES ON THIS DEVICE",style=MaterialTheme.typography.labelMedium)
