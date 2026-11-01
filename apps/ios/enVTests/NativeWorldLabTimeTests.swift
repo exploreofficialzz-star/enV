@@ -67,3 +67,76 @@ final class NativeWorldLabTimeCheckpointTests:XCTestCase {
   XCTAssertEqual(v.schemaVersion,2);XCTAssertNil(v.solverStepSeconds)
  }
 }
+
+
+final class NativeWorldLabRecordedTimeTests:XCTestCase {
+    private func run()->NativeWorldLabRecordedRun {
+        NativeWorldLabRecordedRun(runId:"run-1",modelId:"spring",modelVersion:"2.1.0",
+            worldEpochUTC:"2026-11-01T00:00:00Z",
+            sampleTimesSeconds:[0,0.1,0.2,0.3,0.4,0.5],
+            mandatoryEventTimesSeconds:[0.2,0.4])
+    }
+    private func state()throws->NativeWorldLabRecordedClock {
+        try NativeWorldLabRecordedTime.start(run:run(),
+            wallTimeUTC:"2026-11-01T12:00:00Z",timezoneDisplay:"Africa/Lagos")
+    }
+    func testPauseAdvancesWallClockWithoutAdvancingSimulationOrWorldDate()throws {
+        let initial=try state()
+        let paused=try NativeWorldLabRecordedTime.advance(run:run(),state:initial,
+            elapsedSeconds:2,paused:true)
+        XCTAssertEqual(paused.simulationTimeSeconds,initial.simulationTimeSeconds,accuracy:0)
+        XCTAssertEqual(paused.worldDateUTC,initial.worldDateUTC)
+        XCTAssertEqual(ISO8601DateFormatter().date(from:paused.wallTimeUTC)?.timeIntervalSince1970 ?? 0,
+            ISO8601DateFormatter().date(from:initial.wallTimeUTC)!.timeIntervalSince1970+2,accuracy:0.001)
+    }
+    func testPlaybackRespectsRateMandatoryEventsAndCachedReverse()throws {
+        let initial=try state()
+        let forward=try NativeWorldLabRecordedTime.advance(run:run(),
+            state:NativeWorldLabRecordedClock(wallTimeUTC:initial.wallTimeUTC,
+                worldDateUTC:initial.worldDateUTC,simulationTimeSeconds:0,
+                solverInternalTimeSeconds:nil,displaySampleTimeSeconds:0,sampleIndex:0,
+                playbackRate:10,direction:"forward",paused:false,timezoneDisplay:"Africa/Lagos",
+                fidelity:"recorded-sample-playback"),elapsedSeconds:0.05)
+        XCTAssertEqual(forward.simulationTimeSeconds,0.2,accuracy:1e-9)
+        let reverseState=NativeWorldLabRecordedClock(wallTimeUTC:forward.wallTimeUTC,
+            worldDateUTC:forward.worldDateUTC,simulationTimeSeconds:0.2,
+            solverInternalTimeSeconds:nil,displaySampleTimeSeconds:0.2,sampleIndex:2,
+            playbackRate:10,direction:"reverse-recording",paused:false,
+            timezoneDisplay:"Africa/Lagos",fidelity:"recorded-sample-playback")
+        let reverse=try NativeWorldLabRecordedTime.advance(run:run(),state:reverseState,elapsedSeconds:0.05)
+        XCTAssertEqual(reverse.simulationTimeSeconds,0,accuracy:1e-9)
+    }
+    func testSeekAndStepSelectExactRecordedSamplesAndPause()throws {
+        let initial=try state()
+        let step=try NativeWorldLabRecordedTime.step(run:run(),state:initial,direction:1)
+        XCTAssertEqual(step.sampleIndex,1);XCTAssertEqual(step.simulationTimeSeconds,0.1,accuracy:0)
+        let seek=try NativeWorldLabRecordedTime.seek(run:run(),state:step,timeSeconds:0.39)
+        XCTAssertEqual(seek.sampleIndex,4);XCTAssertEqual(seek.displaySampleTimeSeconds,0.4,accuracy:0)
+        XCTAssertTrue(seek.paused)
+    }
+    func testCheckpointIsBoundToRunVersionEpochAndExactSample()throws {
+        let selected=try NativeWorldLabRecordedTime.seek(run:run(),state:state(),timeSeconds:0.3)
+        let checkpoint=try NativeWorldLabRecordedTime.checkpoint(run:run(),state:selected)
+        let bytes=try checkpoint.encodeBounded()
+        let decoded=try NativeWorldLabRecordedCheckpoint.decodeBounded(bytes)
+        let restored=try NativeWorldLabRecordedTime.restore(run:run(),checkpoint:decoded)
+        XCTAssertEqual(restored.sampleIndex,3);XCTAssertTrue(restored.paused)
+        let other=NativeWorldLabRecordedRun(runId:"other",modelId:"spring",modelVersion:"2.1.0",
+            worldEpochUTC:"2026-11-01T00:00:00Z",sampleTimesSeconds:run().sampleTimesSeconds,
+            mandatoryEventTimesSeconds:run().mandatoryEventTimesSeconds)
+        XCTAssertThrowsError(try NativeWorldLabRecordedTime.restore(run:other,checkpoint:decoded))
+        let forged=NativeWorldLabRecordedCheckpoint(runId:"run-1",modelId:"spring",
+            modelVersion:"2.1.0",worldEpochUTC:"2026-11-01T00:00:00Z",
+            sampleIndex:1,sampleTimeSeconds:0.1,clock:selected)
+        XCTAssertThrowsError(try NativeWorldLabRecordedTime.restore(run:run(),checkpoint:forged))
+    }
+    func testInvalidTimelineAxesAndEventTimesAreRejected() {
+        let duplicate=NativeWorldLabRecordedRun(runId:"bad",modelId:"spring",modelVersion:"1",
+            worldEpochUTC:"2026-11-01T00:00:00Z",sampleTimesSeconds:[0,0.1,0.1])
+        XCTAssertThrowsError(try duplicate.validate())
+        let event=NativeWorldLabRecordedRun(runId:"bad",modelId:"spring",modelVersion:"1",
+            worldEpochUTC:"2026-11-01T00:00:00Z",sampleTimesSeconds:[0,0.1,0.2],
+            mandatoryEventTimesSeconds:[0.15])
+        XCTAssertThrowsError(try event.validate())
+    }
+}
