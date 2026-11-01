@@ -279,6 +279,17 @@ class NativeWorldLabEditorTest {
         }
         val left=p.entities.map{it.positionMeters.x-halfExtentX(it)}
         assertTrue(left.max()-left.min()<1e-8)
+        json=NativeWorldLabEditor.alignSolids(json,listOf("a","b","c"),0,"center")
+        p=NativeWorldLabProjectCodec.decode(json)
+        val centres=p.entities.map{it.positionMeters.x}
+        assertTrue(centres.max()-centres.min()<1e-8)
+        json=NativeWorldLabEditor.alignSolids(json,listOf("a","b","c"),0,"max")
+        p=NativeWorldLabProjectCodec.decode(json)
+        val right=p.entities.map{it.positionMeters.x+halfExtentX(it)}
+        assertTrue(right.max()-right.min()<1e-8)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.alignSolids(json,listOf("a","b","c"),0,"unsupported")
+        }
         json=NativeWorldLabEditor.distributeSolids(json,listOf("a","b","c"),0,0.5)
         p=NativeWorldLabProjectCodec.decode(json)
         val sorted=p.entities.sortedBy{it.positionMeters.x}
