@@ -92,7 +92,9 @@ function downloadPaletteAsPng(colors: RgbaColor[], filename: string): void {
   const anchor = document.createElement("a");
   anchor.href = canvas.toDataURL("image/png");
   anchor.download = filename;
+  document.body.appendChild(anchor);
   anchor.click();
+  anchor.remove();
 }
 function extractImageColors(file: File): Promise<string[]> {
   return new Promise((resolve, reject) => {
