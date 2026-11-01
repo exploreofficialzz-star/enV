@@ -666,9 +666,15 @@ fun NativeWorldLabForm() {
             val state=current.copy(playbackRate=motorSpeed.toDouble(),
                 direction=if(motorReversePlayback)"reverse-recording" else "forward",
                 paused=!motorPlaying)
-            val next=runCatching {
+            val transition=runCatching {
                 NativeWorldLabRecordedTime.advance(recording,state,elapsed,paused=!motorPlaying)
-            }.getOrElse { warning=it.message?: "Recorded motor clock rejected an invalid transition.";motorPlaying=false;continue }
+            }
+            if(transition.isFailure) {
+                warning=transition.exceptionOrNull()?.message?: "Recorded motor clock rejected an invalid transition."
+                motorPlaying=false
+                continue
+            }
+            val next=transition.getOrThrow()
             motorClock=next
             if(motorPlaying) {
                 motorFrame=next.sampleIndex
@@ -1607,7 +1613,7 @@ fun NativeWorldLabForm() {
                         }
                         Text("Applied source voltage: "+labNumber(sample.sourceVoltageV)+" V")
                         if(run.modelVersion=="1.2.0"){
-                            Text(if(sample.timeSeconds<(motorPowerOffAtSeconds?:Double.POSITIVE_INFINITY))
+                            Text(if((motorClock?.simulationTimeSeconds?:sample.timeSeconds)<(motorPowerOffAtSeconds?:Double.POSITIVE_INFINITY))
                                 "Supply connected" else if(abs(sample.currentA)>1e-4)
                                 "Supply isolated · coil current decaying" else "Supply isolated · current near zero")
                         }
