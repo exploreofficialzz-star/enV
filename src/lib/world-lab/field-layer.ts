@@ -149,18 +149,19 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
   });
   network=Object.freeze({nodes:Object.freeze(nodes),edges:Object.freeze(edges)});
  }else if(raw.network!==null)throw new Error("Only network fields may include a network graph.");
- if(!record(raw.range)||!finite(raw.range.minimumSI)||!finite(raw.range.maximumSI)||
-  raw.range.minimumSI>raw.range.maximumSI||!["linear","log"].includes(String(raw.range.scale))||
-  (raw.range.scale==="log"&&raw.range.minimumSI<=0)||
-  (raw.range.uncertaintyLowerSI!==null&&!finite(raw.range.uncertaintyLowerSI))||
-  (raw.range.uncertaintyUpperSI!==null&&!finite(raw.range.uncertaintyUpperSI))||
-  (raw.range.uncertaintyLowerSI!==null&&raw.range.uncertaintyUpperSI!==null&&raw.range.uncertaintyLowerSI>raw.range.uncertaintyUpperSI)||
-  !nonempty(raw.range.uncertaintyStatement,500))
-  throw new Error("Field range and uncertainty declaration is invalid.");
- const valuesForRange=(raw.values as unknown[]).filter(finite);
- if(valuesForRange.some(value=>value<raw.range.minimumSI||value>raw.range.maximumSI||
-  (raw.range.scale==="log"&&value<=0)))
-  throw new Error("Field values fall outside the declared SI display range.");
+  const rangeRaw=raw.range;
+  if(!record(rangeRaw)||!finite(rangeRaw.minimumSI)||!finite(rangeRaw.maximumSI)||
+   rangeRaw.minimumSI>rangeRaw.maximumSI||!["linear","log"].includes(String(rangeRaw.scale))||
+   (rangeRaw.scale==="log"&&rangeRaw.minimumSI<=0)||
+   (rangeRaw.uncertaintyLowerSI!==null&&!finite(rangeRaw.uncertaintyLowerSI))||
+   (rangeRaw.uncertaintyUpperSI!==null&&!finite(rangeRaw.uncertaintyUpperSI))||
+   (rangeRaw.uncertaintyLowerSI!==null&&rangeRaw.uncertaintyUpperSI!==null&&rangeRaw.uncertaintyLowerSI>rangeRaw.uncertaintyUpperSI)||
+   !nonempty(rangeRaw.uncertaintyStatement,500))
+   throw new Error("Field range and uncertainty declaration is invalid.");
+  const valuesForRange=(raw.values as unknown[]).filter(finite);
+  if(valuesForRange.some(value=>value<(rangeRaw.minimumSI as number)||value>(rangeRaw.maximumSI as number)||
+   (rangeRaw.scale==="log"&&value<=0)))
+   throw new Error("Field values fall outside the declared SI display range.");
  if(!record(raw.permissions)||!["private","shared","public"].includes(String(raw.permissions.scope))||
   !Array.isArray(raw.permissions.readRoles)||!raw.permissions.readRoles.every(v=>nonempty(v,80))||
   typeof raw.permissions.exportAllowed!=="boolean")
