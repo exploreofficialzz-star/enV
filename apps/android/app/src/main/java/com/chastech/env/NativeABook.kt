@@ -559,7 +559,7 @@ fun NativeABookScreen(){
         }}
         result.fold({status="Saved on this device";notes=db.notes(archived,showTrash)},{error=it.message?:"Local save failed";status="Not saved"})
     }
-    LaunchedEffect(selected){files=selected?.let{withContext(Dispatchers.IO){db.attachments(it)}}?:emptyList();activePdf=null;pdfText=""}
+    LaunchedEffect(selected){selectedPdfIds=emptySet();files=selected?.let{withContext(Dispatchers.IO){db.attachments(it)}}?:emptyList();activePdf=null;pdfText=""}
     val filtered=notes.filter{n->val q=search.trim().lowercase(Locale.ROOT);q.isEmpty()||(n.title+" "+n.body+" "+n.tags+" "+n.notebook).lowercase(Locale.ROOT).contains(q)}
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text("A book",style=MaterialTheme.typography.headlineSmall)
@@ -594,8 +594,8 @@ fun NativeABookScreen(){
                     OutlinedButton(onClick={db.restore(selectedNote.id);showTrash=false;reload(selectedNote.id,false)}){Text("Restore")}
                     OutlinedButton(onClick={confirmPermanentDelete=true}){Text("Delete permanently")}
                 }else{
-                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(pinned=!n.pinned,title=title,body=body,notebook=notebook));reload(selected)}){Text("Pin")}
-                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(archived=true,title=title,body=body));reload()}){Text("Archive")}
+                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(pinned=!n.pinned,title=title,body=body,notebook=notebook));reload(selected)}){Text(if(selectedNote?.pinned==true)"Unpin" else "Pin")}
+                    OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(archived=!n.archived,title=title,body=body));reload()}){Text(if(selectedNote?.archived==true)"Unarchive" else "Archive")}
                     OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(deletedAt=System.currentTimeMillis(),title=title,body=body));reload()}){Text("Trash")}
                 }
             }
