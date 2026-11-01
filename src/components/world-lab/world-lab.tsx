@@ -995,6 +995,18 @@ export default function WorldLab() {
       setError(cause instanceof Error ? cause.message : "This experiment could not be calculated.");
     }
   }
+  function branchReferenceRun(input:ModelInput) {
+    if(!currentRun)return;
+    setModelKind(input.kind);
+    if(input.kind==="damped-oscillator")setMechanical(input);
+    else if(input.kind==="rc-circuit")setCircuit(input);
+    else setHeat(input);
+    // Keep the material-to-mass provenance only if the derived mass itself is unchanged.
+    const retainedMassSource=input.kind==="damped-oscillator"&&
+      currentRun.inputs.kind==="damped-oscillator"&&currentRun.assumedMassSource&&
+      input.massKg===currentRun.inputs.massKg?currentRun.assumedMassSource:null;
+    runModel(input,retainedMassSource);
+  }
   function start() {
     runModel(modelKind === "damped-oscillator" ? mechanical : modelKind === "heat-rod" ? heat : circuit);
   }
@@ -3696,7 +3708,8 @@ export default function WorldLab() {
             wallTimeUTC={new Date().toISOString()}
             onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
             onRateChange={setPlaybackRate}
-            onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}/>
+            onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}
+            onCreateBranch={branchReferenceRun}/>
           {runs.length > 0 && (
             <div className="mt-4 rounded-lg border border-border p-3 text-sm">
               <label htmlFor="worldlab-run-history" className="block font-medium">
