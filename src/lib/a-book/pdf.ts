@@ -142,6 +142,88 @@ export async function extractPdfPages(file: Blob, requestedPages: number[]): Pro
   return output.save({ useObjectStreams: true });
 }
 
+
+/**
+ * Extracts the same requested page range from multiple local PDFs into one ZIP.
+ * Every source is opened and validated before any output document is constructed.
+ */
+export async function extractSelectedPdfs(files: ABookPdfInput[], pageRange: string): Promise<Uint8Array> {
+  assertBatch(files);
+  const prepared: Array<{ name: string; source: PDFDocument; pages: number[] }> = [];
+  let totalPages = 0;
+
+  for (const file of files) {
+    const source = await openPdf(file.blob);
+    const pages = parsePageRanges(pageRange, source.getPageCount());
+    totalPages += pages.length;
+    if (totalPages > MAX_TOTAL_PAGES) {
+      throw new Error(`A maximum of ${MAX_TOTAL_PAGES} extracted pages can be processed in one batch.`);
+    }
+    prepared.push({ name: file.name, source, pages });
+  }
+
+  const output: Record<string, Uint8Array> = {};
+  const names = new Set<string>();
+  for (const item of prepared) {
+    const base = safeArchiveName(item.name);
+    const filename = uniqueArchiveEntryName(`${base}-extracted.pdf`, names);
+    const document = await PDFDocument.create();
+    const copied = await document.copyPages(item.source, item.pages.map((page) => page - 1));
+    copied.forEach((page) => document.addPage(page));
+    output[filename] = await document.save({ useObjectStreams: true });
+  }
+  return zipSync(output, { level: 6 });
+}
+
+/**
+ * Splits every selected PDF with the same page-group expression into one ZIP.
+ * All PDFs and all page groups are validated before the first output is built.
+ */
+export async function splitSelectedPdfsIntoZip(files: ABookPdfInput[], pageGroups: string): Promise<Uint8Array> {
+  assertBatch(files);
+  const prepared: Array<{ name: string; source: PDFDocument; groups: number[][] }> = [];
+  let totalPages = 0;
+
+  for (const file of files) {
+    const source = await openPdf(file.blob);
+    const groups = parsePageGroups(pageGroups, source.getPageCount());
+    totalPages += groups.reduce((sum, pages) => sum + pages.length, 0);
+    if (totalPages > MAX_TOTAL_PAGES) {
+      throw new Error(`A maximum of ${MAX_TOTAL_PAGES} split pages can be processed in one batch.`);
+    }
+    prepared.push({ name: file.name, source, groups });
+  }
+
+  const output: Record<string, Uint8Array> = {};
+  const names = new Set<string>();
+  for (const item of prepared) {
+    const base = safeArchiveName(item.name);
+    for (let index = 0; index < item.groups.length; index += 1) {
+      const pages = item.groups[index];
+      const requestedName = `${base}-part-${String(index + 1).padStart(2, "0")}.pdf`;
+      const filename = uniqueArchiveEntryName(requestedName, names);
+      const part = await PDFDocument.create();
+      const copied = await part.copyPages(item.source, pages.map((page) => page - 1));
+      copied.forEach((page) => part.addPage(page));
+      output[filename] = await part.save({ useObjectStreams: true });
+    }
+  }
+  return zipSync(output, { level: 6 });
+}
+
+function uniqueArchiveEntryName(requestedName: string, used: Set<string>): string {
+  const dot = requestedName.lastIndexOf(".");
+  const stem = dot > 0 ? requestedName.slice(0, dot) : requestedName;
+  const extension = dot > 0 ? requestedName.slice(dot) : "";
+  let candidate = requestedName;
+  let suffix = 2;
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${stem}-${suffix++}${extension}`;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
+}
+
 export async function splitPdfIntoZip(file: Blob, filename: string, pageGroups: string): Promise<Uint8Array> {
   const source = await openPdf(file);
   const groups = parsePageGroups(pageGroups, source.getPageCount());
