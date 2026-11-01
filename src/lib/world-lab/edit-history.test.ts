@@ -56,6 +56,7 @@ test("multi-part grid snapping is atomic, bounded and matches native half-grid r
  const project={...p,entities:[a,b,outside]};
  const result=snapSolidsToGrid(project,["a","b"],0.5);
  assert.deepEqual(result.entities[0].positionMeters,[0.5,0,2.5]);
+ assert.equal(Object.is(result.entities[0].positionMeters[1],-0),false);
  assert.deepEqual(result.entities[1].positionMeters,[3,4,12]);
  assert.deepEqual(result.entities[2],outside);
  assert.deepEqual(project.entities[0].positionMeters,[0.25,-0.25,2.49]);
