@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  addAttachment,
+  addAttachments,
   createNote,
   getLocalStorageStatus,
   deleteAttachment,
@@ -167,9 +167,9 @@ export function ABookEngine() {
   async function attachFiles(files: FileList | null) {
     if (!current || !files?.length) return;
     try {
-      for (const file of Array.from(files)) await addAttachment(current.id, file);
+      const imported = await addAttachments(current.id, Array.from(files));
       setAttachments(await listAttachments(current.id));
-      setStorageMessage("Files saved on this device");
+      setStorageMessage(`Saved ${imported.length} files on this device`);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The file could not be saved locally. Check available device storage.");
