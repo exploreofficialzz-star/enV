@@ -9,6 +9,7 @@ on:
       - "scripts/check-calculators.mjs"
       - "scripts/gen-catalog.mjs"
       - "scripts/check-business-studios.mjs"
+      - "scripts/remove-misplaced-design-build-calculators.mjs"
 
 permissions:
   contents: write
@@ -39,8 +40,13 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Regenerate the canonical Web catalogue
-        run: node scripts/gen-catalog.mjs
+      - name: Restore the current main catalogue baseline
+        run: |
+          git fetch origin main --depth=1
+          git show FETCH_HEAD:src/data/catalog.ts > src/data/catalog.ts
+
+      - name: Surgically remove only the misplaced Design/Build calculator records
+        run: node scripts/remove-misplaced-design-build-calculators.mjs
 
       - name: Regenerate native engine data and platform coverage
         run: npm run export:native-engine-data
@@ -67,6 +73,9 @@ jobs:
           node scripts/check-native-coverage.mjs
           node scripts/check-native-math-exercises.mjs
           node scripts/check-catalog.mjs
+          npm run check:design
+          npm run check:developer
+          npm run check:billing
 
       - name: Commit regenerated catalogue data
         id: generated
