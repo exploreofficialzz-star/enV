@@ -1069,14 +1069,24 @@ fun NativeWorldLabForm() {
                 Text("Ideal "+solid.shape+" volume: "+labNumber(solid.volumeMetersCubed())+" m³")
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(onClick={
-                        val scaled=solid.dimensionsMeters.let{listOf(it.x,it.y,it.z)}.map{(it*0.9).coerceAtLeast(0.001)}
-                        applyProjectEdit{NativeWorldLabEditor.resizeSolid(it,solid.id,scaled)}
+                        applyProjectEdit{NativeWorldLabEditor.scaleSolid(it,solid.id,listOf(0.9,0.9,0.9))}
                     }){Text("Smaller")}
                     OutlinedButton(onClick={
-                        val scaled=solid.dimensionsMeters.let{listOf(it.x,it.y,it.z)}.map{(it*1.1).coerceAtMost(10000.0)}
-                        applyProjectEdit{NativeWorldLabEditor.resizeSolid(it,solid.id,scaled)}
+                        applyProjectEdit{NativeWorldLabEditor.scaleSolid(it,solid.id,listOf(1.1,1.1,1.1))}
                     }){Text("Larger")}
                 }
+                Text("Rotate and transform",style=MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.rotateSolid(it,solid.id,0,15.0)}}){Text("Rotate X")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.rotateSolid(it,solid.id,1,15.0)}}){Text("Rotate Y")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.rotateSolid(it,solid.id,2,15.0)}}){Text("Rotate Z")}
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.duplicateSolid(it,solid.id,listOf(snapMeters,0.0,0.0))}}){Text("Duplicate +X")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.linearPattern(it,solid.id,0,snapMeters,2)}}){Text("Linear pattern")}
+                }
+                Text("Rotation X/Y/Z: "+listOf(solid.rotationRadians.x,solid.rotationRadians.y,solid.rotationRadians.z)
+                    .joinToString(" / "){labNumber(it)}+" rad",style=MaterialTheme.typography.bodySmall)
                 Text("Place with precision",style=MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                     OutlinedButton(onClick={

@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {
-  alignSolids,circularPattern,distributeSolids,duplicateSolids,linearPattern,
-  mirrorSolids,rotateSolids,scaleSolids,type CadAxis,type CadAlignment,
+  alignSolids,circularPattern,distributeSolids,duplicateSolids,extrudeCircle,
+  extrudeRectangle,linearPattern,mirrorSolids,rotateSolids,scaleSolids,type CadAxis,type CadAlignment,
 } from "@/lib/world-lab/cad";
 import type {WorldLabProject} from "@/lib/world-lab/project";
 
@@ -23,6 +23,10 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
  const [center,setCenter]=useState<[number,number,number]>([0,0,0]);
  const [alignment,setAlignment]=useState<CadAlignment>("center");
  const [gap,setGap]=useState(0.25);
+ const [sketchWidth,setSketchWidth]=useState(2);
+ const [sketchDepth,setSketchDepth]=useState(2);
+ const [extrusionHeight,setExtrusionHeight]=useState(1);
+ const [circleRadius,setCircleRadius]=useState(0.5);
  const [error,setError]=useState("");
  const entityKey=project?.entities.map(e=>e.id).join("|")??"";
  useEffect(()=>{
@@ -115,6 +119,45 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
        <input className={input} type="number" step="any" value={center[i]}
         onChange={e=>setCenter(old=>old.map((x,j)=>j===i?Number(e.target.value):x) as [number,number,number])}/>
       </label>)}
+     </div>
+    </div>
+
+    <div className="mt-3 rounded border border-border p-2">
+     <p className="text-xs font-medium">2D sketch and extrusion</p>
+     <p className="text-xs text-muted-foreground">
+      Draw a bounded closed rectangle or circle in the X/Z sketch plane, then
+      extrude along Y. These profile tools create portable box/cylinder solids;
+      arbitrary curves and feature-tree history are not implied.
+     </p>
+     <div className="mt-2 grid grid-cols-2 gap-2">
+      <label className="text-xs">Rectangle width (m)
+       <input className={input} type="number" min={0.001} max={10000} step="any"
+        value={sketchWidth} onChange={e=>setSketchWidth(Number(e.target.value))}/>
+      </label>
+      <label className="text-xs">Rectangle depth (m)
+       <input className={input} type="number" min={0.001} max={10000} step="any"
+        value={sketchDepth} onChange={e=>setSketchDepth(Number(e.target.value))}/>
+      </label>
+      <label className="text-xs">Extrusion height (m)
+       <input className={input} type="number" min={0.001} max={10000} step="any"
+        value={extrusionHeight} onChange={e=>setExtrusionHeight(Number(e.target.value))}/>
+      </label>
+      <label className="text-xs">Circle radius (m)
+       <input className={input} type="number" min={0.0005} max={5000} step="any"
+        value={circleRadius} onChange={e=>setCircleRadius(Number(e.target.value))}/>
+      </label>
+     </div>
+     <div className="mt-2 flex flex-wrap gap-2">
+      <button className={button} disabled={!project||project.entities.length>=200}
+       onClick={()=>apply(p=>extrudeRectangle(p,{center:[0,0,0],
+        widthMeters:sketchWidth,depthMeters:sketchDepth,heightMeters:extrusionHeight},idFactory))}>
+       Extrude rectangle
+      </button>
+      <button className={button} disabled={!project||project.entities.length>=200}
+       onClick={()=>apply(p=>extrudeCircle(p,{center:[0,0,0],
+        radiusMeters:circleRadius,heightMeters:extrusionHeight},idFactory))}>
+       Extrude circle
+      </button>
      </div>
     </div>
     <div className="mt-3 grid grid-cols-2 gap-2">
