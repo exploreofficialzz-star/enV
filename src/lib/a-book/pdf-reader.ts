@@ -151,7 +151,7 @@ export async function extractPdfTextLocally(
         throwIfAborted(operation.signal);
         const pageText = textFromItems(content.items as unknown[]);
         if (pageText) {
-          const prefix = \`[Page \${pageNumber}]\\n\`;
+          const prefix = `[Page ${pageNumber}]\n`;
           const remaining = A_BOOK_PDF_TEXT_LIMITS.maxTextCharactersPerPdf - characterCount;
           if (remaining <= prefix.length) {
             truncated = true;
