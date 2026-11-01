@@ -11,7 +11,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusable
 import android.view.KeyEvent as AndroidKeyEvent
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -120,7 +119,7 @@ fun NativeWorldLabViewport(
             .semantics{contentDescription="Interactive perspective 3D World Lab view with drag, pinch zoom, orbit, elevation, keyboard controls and part selection"}
             .focusable()
             .onPreviewKeyEvent{event->
-                if(event.type!=KeyEventType.KeyDown)return@onPreviewKeyEvent false
+                if(event.nativeKeyEvent.action!=AndroidKeyEvent.ACTION_DOWN)return@onPreviewKeyEvent false
                 val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
                 when(event.nativeKeyEvent.keyCode){
                     AndroidKeyEvent.KEYCODE_DPAD_LEFT->{yaw+=0.12f;true}
