@@ -69,11 +69,16 @@ export type AssumedMassSource = Readonly<{
   assumption: string;
 }>;
 
+export type ExperimentInputDiff=Readonly<{field:string;previous:number|string|null;next:number|string|null}>;
+export type ExperimentBranch=Readonly<{branchId:string;sourceRunId:string;sourceModelId:string;
+ sourceModelVersion:string;targetModelId:string;targetModelVersion:string;createdAtUTC:string;
+ fidelity:"recomputed-new-run";inputDiff:readonly ExperimentInputDiff[]}>;
 export type LabRun = Readonly<{
   format: "env-world-lab-run";
   schemaVersion: 1;
   id: string;
   parentRunId: string | null;
+  branch:ExperimentBranch|null;
   modelId: string;
   modelVersion: string;
   evidence: "physics-model-computed";
@@ -154,10 +159,28 @@ function oscillatorStep(x: number, v: number, h: number, model: DampedOscillator
     v + h * (b1 + 2 * b2 + 2 * b3 + b4) / 6];
 }
 
+function buildExperimentBranch(source:LabRun,input:ModelInput,id:string,
+ modelVersion:string,createdAtUTC:string):ExperimentBranch{
+ const before=source.inputs as unknown as Record<string,unknown>;
+ const after=input as unknown as Record<string,unknown>;
+ const fields=[...new Set([...Object.keys(before),...Object.keys(after)])].sort();
+ const inputDiff=fields.flatMap(field=>{
+  const previous=before[field],next=after[field];if(previous===next)return [];
+  const normalize=(value:unknown):number|string|null=>
+   typeof value==="number"||typeof value==="string"?value:null;
+  return [{field,previous:normalize(previous),next:normalize(next)}];
+ });
+ return Object.freeze({branchId:id,sourceRunId:source.id,sourceModelId:source.modelId,
+  sourceModelVersion:source.modelVersion,targetModelId:input.kind,targetModelVersion:modelVersion,
+  createdAtUTC,inputDiff:Object.freeze(inputDiff.map(x=>Object.freeze(x))),
+  fidelity:"recomputed-new-run" as const});
+}
 export function runExperiment(input: ModelInput, options: Readonly<{
   id: string;
   worldDateUTC: string;
   parentRunId?: string | null;
+  sourceRun?: LabRun | null;
+  startedAtUTC?: string;
   assumedMassSource?: AssumedMassSource | null;
   durationSeconds?: number;
   solverStepSeconds?: number;
@@ -183,7 +206,9 @@ export function runExperiment(input: ModelInput, options: Readonly<{
       throw new Error("Derived run mass does not match its solid geometry and assumed density.");
     }
   }
-  if (!options.id || options.id.length > 120 || !Number.isFinite(Date.parse(options.worldDateUTC))) {
+  const startedAtUTC=options.startedAtUTC??new Date().toISOString();
+  if (!options.id || options.id.length > 120 || !Number.isFinite(Date.parse(options.worldDateUTC))||
+      !Number.isFinite(Date.parse(startedAtUTC))) {
     throw new Error("A valid run ID and UTC world date are required.");
   }
   const duration = options.durationSeconds ?? DEMO_DURATION_SECONDS;
@@ -265,7 +290,9 @@ export function runExperiment(input: ModelInput, options: Readonly<{
     format: "env-world-lab-run" as const,
     schemaVersion: 1 as const,
     id: options.id,
-    parentRunId: options.parentRunId ?? null,
+    parentRunId: options.sourceRun?.id??options.parentRunId??null,
+    branch:options.sourceRun?buildExperimentBranch(options.sourceRun,input,options.id,MODEL_VERSION,
+      new Date(startedAtUTC).toISOString()):null,
     modelId: input.kind,
     modelVersion: MODEL_VERSION,
     evidence: "physics-model-computed" as const,

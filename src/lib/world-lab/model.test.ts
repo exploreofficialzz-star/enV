@@ -124,3 +124,14 @@ test("heat solver adapts timestep or rejects over-budget stiff diffusion", () =>
     id: "heat-too-stiff", worldDateUTC: "2026-10-30T00:00:00Z",
   }), /specialized solver/);
 });
+
+test("parameter edits create a versioned child run with an explicit input diff",()=>{
+ const source=runExperiment({kind:"damped-oscillator",massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0},{
+  id:"branch-source",worldDateUTC:"2026-11-01T00:00:00Z",startedAtUTC:"2026-11-01T12:00:00Z"});
+ const child=runExperiment({...source.inputs,massKg:2},{
+  id:"branch-child",worldDateUTC:"2026-11-01T00:00:00Z",startedAtUTC:"2026-11-01T12:01:00Z",sourceRun:source});
+ assert.equal(child.parentRunId,source.id);
+ assert.equal(child.branch?.sourceRunId,source.id);
+ assert.equal(child.branch?.fidelity,"recomputed-new-run");
+ assert.deepEqual(child.branch?.inputDiff,[{field:"massKg",previous:1,next:2}]);
+});
