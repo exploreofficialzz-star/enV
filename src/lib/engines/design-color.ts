@@ -51,14 +51,14 @@ function parseColorNumber(token: string, percentScale = 1): number | null {
   const clean = token.trim();
   const isPercent = clean.endsWith("%");
   const raw = isPercent ? clean.slice(0, -1) : clean;
-  if (!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?$/i.test(raw)) return null;
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(raw)) return null;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return null;
   return isPercent ? parsed / 100 * percentScale : parsed;
 }
 
 function parseColorHue(token: string): number | null {
-  const match = token.trim().match(/^([+-]?(?:\\d+\\.?\\d*|\\.\\d+))(deg|rad|turn)?$/i);
+  const match = token.trim().match(/^([+-]?(?:\d+\.?\d*|\.\d+))(deg|rad|turn)?$/i);
   if (!match) return null;
   const value = Number(match[1]);
   if (!Number.isFinite(value)) return null;
@@ -71,11 +71,47 @@ function parseColorHue(token: string): number | null {
 function splitCssFunction(body: string): { channels: string[]; alpha: number } | null {
   const parts = body.split("/");
   if (parts.length > 2) return null;
-  const channels = parts[0].trim().split(/[\\s,]+/).filter(Boolean);
+  const channels = parts[0].trim().split(/[\s,]+/).filter(Boolean);
   if (channels.length !== 3) return null;
   const alpha = parts.length === 2 ? parseColorNumber(parts[1].trim()) : 1;
   if (alpha === null || alpha < 0 || alpha > 1) return null;
   return { channels, alpha };
+}
+
+function parseOklch(input: string): RgbaColor | null {
+  const match = input.trim().match(/^oklch\((.*)\)$/i);
+  if (!match) return null;
+  const values = splitCssFunction(match[1]);
+  if (!values) return null;
+  const lightness = parseColorNumber(values.channels[0], 1);
+  const chroma = parseColorNumber(values.channels[1], 0.4);
+  const hue = parseColorHue(values.channels[2]);
+  if (lightness === null || chroma === null || hue === null || lightness < 0 || lightness > 1 || chroma < 0) return null;
+  const radians = hue * Math.PI / 180;
+  return oklabToRgb(lightness, chroma * Math.cos(radians), chroma * Math.sin(radians), values.alpha);
+}
+
+function parseHwb(input: string): RgbaColor | null {
+  const match = input.trim().match(/^hwb\((.*)\)$/i);
+  if (!match) return null;
+  const values = splitCssFunction(match[1]);
+  if (!values || !values.channels[1].endsWith("%") || !values.channels[2].endsWith("%")) return null;
+  const hue = parseColorHue(values.channels[0]);
+  const whiteness = parseColorNumber(values.channels[1], 1);
+  const blackness = parseColorNumber(values.channels[2], 1);
+  if (hue === null || whiteness === null || blackness === null || whiteness < 0 || blackness < 0 || whiteness > 1 || blackness > 1) return null;
+  if (whiteness + blackness >= 1) {
+    const gray = whiteness / (whiteness + blackness || 1) * 255;
+    return { r: gray, g: gray, b: gray, a: values.alpha };
+  }
+  const pure = hsvToRgb(hue, 1, 1);
+  const scale = 1 - whiteness - blackness;
+  return {
+    r: pure.r * scale + 255 * whiteness,
+    g: pure.g * scale + 255 * whiteness,
+    b: pure.b * scale + 255 * whiteness,
+    a: values.alpha,
+  };
 }
 
 function oklabToRgb(lightness: number, a: number, b: number, alpha = 1): RgbaColor {
