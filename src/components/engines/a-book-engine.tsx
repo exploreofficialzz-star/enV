@@ -20,7 +20,7 @@ import {
   type ABookRevision,
 } from "@/lib/a-book/local-store";
 import { extractPdfPages, inspectPdf, mergePdfs, pdfDownload, rotatePdf, rotateSelectedPdfs, splitPdfIntoZip, zipDownload } from "@/lib/a-book/pdf";
-import { createABookArchive, readABookArchive } from "@/lib/a-book/archive";
+import { createABookArchive, parseABookLegacyNotesJson, readABookArchive } from "@/lib/a-book/archive";
 
 function localDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -279,32 +279,11 @@ export function ABookEngine() {
         setError("");
         setStorageMessage(`Imported ${count} notes, revisions and attachments locally`);
       } else {
-        const payload = JSON.parse(await file.text()) as { format?: string; notes?: ABookNote[] };
-        if (payload.format !== "env.abook.notes.v1" || !Array.isArray(payload.notes)) {
-          throw new Error("This file is not a supported A book notes export.");
-        }
-        for (const raw of payload.notes) {
-          if (!raw || typeof raw.id !== "string" || typeof raw.body !== "string" || typeof raw.title !== "string" || !Array.isArray(raw.tags)) {
-            throw new Error("The import contains an invalid note record.");
-          }
-          const now = Date.now();
-          const imported: ABookNote = {
-            ...raw,
-            id: crypto.randomUUID(),
-            notebook: typeof raw.notebook === "string" ? raw.notebook : "Imported",
-            tags: raw.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 50),
-            pinned: Boolean(raw.pinned),
-            archived: Boolean(raw.archived),
-            deletedAt: null,
-            createdAt: now,
-            updatedAt: now,
-            revision: 0,
-          };
-          await saveNote(imported);
-        }
+        const importedNotes = parseABookLegacyNotesJson(await file.text());
+        const count = await importLocalLibrary({ notes: importedNotes, revisions: [], attachments: [] });
         await refresh();
         setError("");
-        setStorageMessage(`Imported ${payload.notes.length} legacy notes locally`);
+        setStorageMessage(`Imported ${count} legacy notes locally`);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The A book backup could not be imported.");
