@@ -601,6 +601,74 @@ object NativeWorldLabEditor {
 
 
 
+
+    fun rotateGroupAroundCentroid(source:String,ids:List<String>,
+        axis:Int,degrees:Double):String=edit(source){project->
+        require(axis in 0..2&&degrees.isFinite()&&degrees in -3600.0..3600.0){
+            "Group rotation requires an axis and bounded finite angle"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        val pivot=(0..2).map{coordinate->selected.map{
+            it.getJSONArray("positionMeters").getDouble(coordinate)
+        }.average()}
+        val angles=List(3){if(it==axis)degrees*Math.PI/180.0 else 0.0}
+        val rotation=rotationMatrix(angles)
+        val rotations=selected.associate{part->
+            val local=if(part.has("rotationRadians"))
+                (0..2).map{part.getJSONArray("rotationRadians").getDouble(it)}
+                else listOf(0.0,0.0,0.0)
+            part.getString("id") to multiplyRotation(rotation,rotationMatrix(local))
+        }
+        val positions=selected.associate{part->
+            val old=(0..2).map{part.getJSONArray("positionMeters").getDouble(it)}
+            val relative=(0..2).map{old[it]-pivot[it]}
+            val next=(0..2).map{axisIndex->
+                pivot[axisIndex]+(0..2).sumOf{rotation[axisIndex][it]*relative[it]}
+            }
+            require(next.all{it.isFinite()&&it in -100000.0..100000.0}){
+                "Group rotation leaves portable world bounds"
+            }
+            part.getString("id") to next
+        }
+        for(index in 0 until rows.length()){
+            val row=rows.getJSONObject(index);val id=row.getString("id")
+            val position=positions[id]?:continue
+            row.put("positionMeters",JSONArray(position))
+                .put("rotationRadians",JSONArray(matrixAngles(rotations.getValue(id))))
+        }
+    }
+    fun scaleGroupAroundCentroid(source:String,ids:List<String>,factor:Double):String=edit(source){project->
+        require(factor.isFinite()&&factor in 0.001..1000.0){
+            "Group scale must be a finite positive factor between 0.001 and 1000"
+        }
+        val (rows,selected)=selectedCadRows(project,ids)
+        val pivot=(0..2).map{coordinate->selected.map{
+            it.getJSONArray("positionMeters").getDouble(coordinate)
+        }.average()}
+        val positions=selected.associate{part->
+            val p=part.getJSONArray("positionMeters")
+            val next=(0..2).map{pivot[it]+(p.getDouble(it)-pivot[it])*factor}
+            require(next.all{it.isFinite()&&it in -100000.0..100000.0}){
+                "Group scale moves part outside portable world bounds"
+            }
+            part.getString("id") to next
+        }
+        val dimensions=selected.associate{part->
+            val d=part.getJSONArray("dimensionsMeters")
+            val next=(0..2).map{d.getDouble(it)*factor}
+            require(next.all{it.isFinite()&&it in 0.001..10000.0}){
+                "Group scale exceeds primitive dimension bounds"
+            }
+            part.getString("id") to next
+        }
+        for(index in 0 until rows.length()){
+            val row=rows.getJSONObject(index);val id=row.getString("id")
+            val position=positions[id]?:continue
+            row.put("positionMeters",JSONArray(position))
+                .put("dimensionsMeters",JSONArray(dimensions.getValue(id)))
+        }
+    }
+
     fun translateSolids(source:String,ids:List<String>,deltaMeters:List<Double>):String=edit(source){project->
         require(deltaMeters.size==3&&deltaMeters.all{it.isFinite()&&it in -100000.0..100000.0}){
             "Translation needs three finite bounded SI offsets"

@@ -656,6 +656,78 @@ enum NativeWorldLabEditor {
 
 
 
+
+    static func rotateGroupAroundCentroid(_ data:Data,ids:[String],
+        axis:Int,degrees:Double)throws->Data {
+        guard (0...2).contains(axis),degrees.isFinite,abs(degrees)<=3600 else{
+            throw NativeWorldLabError.invalid("Group rotation requires an axis and bounded finite angle")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            let pivot=(0..<3).map{axisIndex in
+                selected.compactMap{$0["positionMeters"] as? [Double]}.map{$0[axisIndex]}.reduce(0,+)/Double(selected.count)
+            }
+            var angles=[0.0,0.0,0.0];angles[axis]=degrees*Double.pi/180
+            let groupRotation=Self.rotationMatrix(angles)
+            var updated:[String:(position:[Double],rotation:[Double])]=[:]
+            for part in selected{
+                guard let id=part["id"] as? String,
+                      let position=part["positionMeters"] as? [Double],position.count==3 else{
+                    throw NativeWorldLabError.invalid("Group member position is invalid")
+                }
+                let relative=(0..<3).map{position[$0]-pivot[$0]}
+                let next=(0..<3).map{row in
+                    pivot[row]+(0..<3).reduce(0.0){$0+groupRotation[row][$1]*relative[$1]}
+                }
+                guard next.allSatisfy({$0.isFinite&&abs($0)<=100000}) else{
+                    throw NativeWorldLabError.invalid("Group rotation leaves local-world bounds")
+                }
+                let local=Self.rotationMatrix(part["rotationRadians"] as? [Double] ?? [0,0,0])
+                updated[id]=(next,Self.matrixAngles(Self.multiplyRotation(groupRotation,local)))
+            }
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for index in entities.indices{
+                guard let id=entities[index]["id"] as? String,let item=updated[id] else{continue}
+                entities[index]["positionMeters"]=item.position
+                entities[index]["rotationRadians"]=item.rotation
+            }
+            root["entities"]=entities
+        }
+    }
+    static func scaleGroupAroundCentroid(_ data:Data,ids:[String],factor:Double)throws->Data {
+        guard factor.isFinite,(0.001...1000).contains(factor) else{
+            throw NativeWorldLabError.invalid("Group scale must be a finite positive factor between 0.001 and 1000")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            let pivot=(0..<3).map{axisIndex in
+                selected.compactMap{$0["positionMeters"] as? [Double]}.map{$0[axisIndex]}.reduce(0,+)/Double(selected.count)
+            }
+            var updated:[String:(position:[Double],dimensions:[Double])]=[:]
+            for part in selected{
+                guard let id=part["id"] as? String,
+                      let position=part["positionMeters"] as? [Double],position.count==3,
+                      let dimensions=part["dimensionsMeters"] as? [Double],dimensions.count==3 else{
+                    throw NativeWorldLabError.invalid("Group member geometry is invalid")
+                }
+                let next=(0..<3).map{pivot[$0]+(position[$0]-pivot[$0])*factor}
+                let scaled=dimensions.map{$0*factor}
+                guard next.allSatisfy({$0.isFinite&&abs($0)<=100000}),
+                      scaled.allSatisfy({$0.isFinite&&(0.001...10000).contains($0)}) else{
+                    throw NativeWorldLabError.invalid("Group scale exceeds geometry bounds")
+                }
+                updated[id]=(next,scaled)
+            }
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for index in entities.indices{
+                guard let id=entities[index]["id"] as? String,let item=updated[id] else{continue}
+                entities[index]["positionMeters"]=item.position
+                entities[index]["dimensionsMeters"]=item.dimensions
+            }
+            root["entities"]=entities
+        }
+    }
+
     static func translateSolids(_ data:Data,ids:[String],deltaMeters:[Double])throws->Data {
         guard deltaMeters.count==3,deltaMeters.allSatisfy({$0.isFinite&&abs($0)<=100000}) else {
             throw NativeWorldLabError.invalid("Translation needs three finite bounded SI offsets")
