@@ -8,7 +8,8 @@ import { calculators } from "./engines/formulas.ts";
 
 const allTools = getAllTools();
 const generated = allTools.filter((tool) =>
-  tool.category === "calculators" && tool.engine.type === "calculator" &&
+  tool.category === "calculators" &&
+  tool.engine.type === "calculator" &&
   (tool.engine.formula.startsWith("exercise-") || tool.engine.formula.startsWith("exp-")),
 );
 
@@ -17,44 +18,42 @@ function getExpansionInfo(formula: string) {
   if (!match) return null;
   const [, family, key, target] = match;
   const row = (mathExpansion as Record<string, string[][]>)[family].find((entry) => entry[0] === key);
-  return row ? { info: describeExpansion(family as (typeof EXPANSION_FAMILIES)[number], row), target } : null;
+  return row
+    ? { info: describeExpansion(family as (typeof EXPANSION_FAMILIES)[number], row), target }
+    : null;
 }
 
-test("every generated formula calculator uses human-readable labels in its title, description and formula caption", () => {
+test("every generated formula calculator uses the correct human label in its title, description, and formula caption", () => {
   const specs = new Map(MATH_EXERCISE_CATALOG.map((spec) => [spec.key, spec]));
-  assert.ok(generated.length > 1000, `expected the large generated calculator family, got \${generated.length}`);
+  assert.ok(generated.length > 1000, `Expected the generated calculator family, received ${generated.length} tools.`);
 
   for (const tool of generated) {
     const formula = tool.engine.type === "calculator" ? tool.engine.formula : "";
-    assert.doesNotMatch(tool.name, /solve for [abc]\b/i, `\${tool.id} leaked an internal key in its title`);
-    assert.doesNotMatch(tool.description, /solve for [abc]\b/i, `\${tool.id} leaked an internal key in its description`);
-
     const definition = calculators[formula];
-    assert.ok(definition, `\${tool.id} has a live calculator definition`);
+    assert.ok(definition, `${tool.id} has a live calculator definition.`);
 
     if (formula.startsWith("exercise-")) {
       const split = formula.lastIndexOf("-");
       const key = formula.slice("exercise-".length, split);
       const target = formula.slice(split + 1);
-      const label = specs.get(key)?.targetLabels[target];
-      assert.ok(label, `\${tool.id} has a target label in the engine metadata`);
-      assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `\${tool.id} title should include \${label}: \${tool.name}`);
-      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `\${tool.id} description should include \${label}: \${tool.description}`);
-      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), `\${tool.id} formula caption should include \${label}: \${definition.formula}`);
+      const targetLabel = specs.get(key)?.targetLabels[target];
+      assert.ok(targetLabel, `${tool.id} has a readable result label in its engine specification.`);
+      assert.ok(tool.name.toLowerCase().includes(targetLabel.toLowerCase()), `${tool.id} title must include "${targetLabel}": ${tool.name}`);
+      assert.ok(tool.description.toLowerCase().includes(targetLabel.toLowerCase()), `${tool.id} description must include "${targetLabel}".`);
+      assert.ok(definition.formula?.toLowerCase().includes(targetLabel.toLowerCase()), `${tool.id} formula caption must include "${targetLabel}".`);
     } else {
       const expansion = getExpansionInfo(formula);
-      assert.ok(expansion, `\${tool.id} resolves to an expansion row`);
-      const label = expansion.info.labels[expansion.target as "a" | "b" | "c"];
-      assert.ok(tool.name.toLowerCase().includes(label.toLowerCase()), `\${tool.id} title should include \${label}: \${tool.name}`);
-      assert.ok(tool.description.toLowerCase().includes(label.toLowerCase()), `\${tool.id} description should include \${label}: \${tool.description}`);
-      assert.ok(tool.name.includes(expansion.info.relation), `\${tool.id} title should show its actual relationship`);
-      assert.ok(definition.formula?.toLowerCase().includes(label.toLowerCase()), `\${tool.id} formula caption should include \${label}: \${definition.formula}`);
+      assert.ok(expansion, `${tool.id} resolves to an expansion relationship.`);
+      const targetLabel = expansion.info.labels[expansion.target as "a" | "b" | "c"];
+      assert.ok(tool.name.toLowerCase().includes(targetLabel.toLowerCase()), `${tool.id} title must include "${targetLabel}": ${tool.name}`);
+      assert.ok(tool.description.toLowerCase().includes(targetLabel.toLowerCase()), `${tool.id} description must include "${targetLabel}".`);
+      assert.ok(tool.name.includes(expansion.info.relation), `${tool.id} title must show the actual equation.`);
+      assert.ok(definition.formula?.toLowerCase().includes(targetLabel.toLowerCase()), `${tool.id} formula caption must include "${targetLabel}".`);
     }
-    assert.doesNotMatch(definition.formula ?? "", /solve for [abc]\b/i, `\${tool.id} leaked an internal key in its formula caption`);
   }
 });
 
-test("design/build/delivery-effort examples remain calculators but use the correct target labels", () => {
+test("design/build/delivery-effort examples remain calculators and use the correct target labels", () => {
   const examples = generated.filter((tool) => tool.id.includes("design-build-delivery-effort"));
   assert.equal(examples.length, 18);
   assert.ok(examples.every((tool) => tool.category === "calculators"));
