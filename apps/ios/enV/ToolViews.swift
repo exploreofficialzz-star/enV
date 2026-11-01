@@ -14558,6 +14558,8 @@ private final class ABookLocalStore {
 
     func exportBackupArchive() throws -> Data {
         let allNotes = try notes(includeArchived: true, includeDeleted: true)
+        guard allNotes.count <= 10_000 else { throw NSError(domain: "ABookArchive", code: 31, userInfo: [NSLocalizedDescriptionKey: "This library contains more than 10,000 notes and cannot be exported in one backup."]) }
+        var revisionCount = 0
         var noteJSON: [[String: Any]] = []
         var revisionJSON: [[String: Any]] = []
         var attachmentJSON: [[String: Any]] = []
@@ -14566,6 +14568,9 @@ private final class ABookLocalStore {
         var attachmentIndex = 0
 
         for note in allNotes {
+            guard note.title.count <= 10_000, note.body.count <= 5_000_000, note.notebook.count <= 500, note.tags.count <= 50, note.tags.allSatisfy({ $0.count <= 200 }) else {
+                throw NSError(domain: "ABookArchive", code: 32, userInfo: [NSLocalizedDescriptionKey: "A note exceeds the supported backup size."])
+            }
             var item: [String: Any] = [
                 "id": note.id.uuidString, "title": note.title, "body": note.body,
                 "notebook": note.notebook, "tags": note.tags, "pinned": note.pinned,
@@ -14576,6 +14581,11 @@ private final class ABookLocalStore {
             noteJSON.append(item)
 
             for revision in try revisions(noteID: note.id) {
+                revisionCount += 1
+                guard revisionCount <= 100_000, revision.title.count <= 10_000, revision.body.count <= 5_000_000,
+                      revision.notebook.count <= 500, revision.tags.count <= 50, revision.tags.allSatisfy({ $0.count <= 200 }) else {
+                    throw NSError(domain: "ABookArchive", code: 33, userInfo: [NSLocalizedDescriptionKey: "A revision exceeds the supported backup size or revision limit."])
+                }
                 revisionJSON.append([
                     "id": revision.id.uuidString, "noteId": note.id.uuidString,
                     "revision": revision.revision, "title": revision.title, "body": revision.body,
@@ -14584,6 +14594,10 @@ private final class ABookLocalStore {
                 ])
             }
             for attachment in try attachments(noteID: note.id) {
+                attachmentIndex += 1
+                guard attachmentIndex <= 10_000, attachment.name.count <= 500, attachment.mime.count <= 200 else {
+                    throw NSError(domain: "ABookArchive", code: 34, userInfo: [NSLocalizedDescriptionKey: "The local library contains too many attachments or invalid attachment metadata."])
+                }
                 let data = try Data(contentsOf: fileURL(for: attachment))
                 guard data.count <= 100 * 1024 * 1024 else {
                     throw NSError(domain: "ABookArchive", code: 20, userInfo: [NSLocalizedDescriptionKey: "An attachment exceeds the 100 MB backup limit."])
@@ -14592,7 +14606,7 @@ private final class ABookLocalStore {
                 guard totalBytes <= 150 * 1024 * 1024 else {
                     throw NSError(domain: "ABookArchive", code: 21, userInfo: [NSLocalizedDescriptionKey: "The local library exceeds the 150 MB backup limit."])
                 }
-                let filePath = "attachments/" + String(attachmentIndex) + ".bin"
+                let filePath = "attachments/" + String(attachmentIndex - 1) + ".bin"
                 files[filePath] = data
                 attachmentJSON.append([
                     "id": attachment.id.uuidString, "noteId": note.id.uuidString,
@@ -14600,7 +14614,6 @@ private final class ABookLocalStore {
                     "size": data.count, "createdAt": attachment.createdAt.timeIntervalSince1970 * 1000,
                     "path": filePath
                 ])
-                attachmentIndex += 1
             }
         }
 
@@ -14669,13 +14682,16 @@ private final class ABookLocalStore {
         }
 
         var importedRevisions: [ABookNativeRevision] = []
+        var revisionIDs = Set<String>()
         for item in rawRevisions {
+            let oldRevisionID = try requiredString(item, "id")
+            guard revisionIDs.insert(oldRevisionID).inserted else { throw NSError(domain: "ABookArchive", code: 35, userInfo: [NSLocalizedDescriptionKey: "The backup contains duplicate revision IDs."]) }
             let oldNoteID = try requiredString(item, "noteId")
             guard let newNoteID = noteIDs[oldNoteID],
                   let title = item["title"] as? String, title.count <= 10_000,
                   let body = item["body"] as? String, body.count <= 5_000_000,
                   let notebook = item["notebook"] as? String, notebook.count <= 500,
-                  let tags = item["tags"] as? [String], tags.count <= 50,
+                  let tags = item["tags"] as? [String], tags.count <= 50, tags.allSatisfy({ $0.count <= 200 }),
                   let revision = item["revision"] as? Int, revision >= 0 else {
                 throw NSError(domain: "ABookArchive", code: 27, userInfo: [NSLocalizedDescriptionKey: "The backup contains an invalid revision."])
             }
@@ -14692,11 +14708,13 @@ private final class ABookLocalStore {
         var copiedFiles: [URL] = []
         var importedAttachments: [ABookNativeAttachment] = []
         var expectedPaths: Set<String> = ["manifest.json"]
+        var attachmentIDs = Set<String>()
         var totalBytes = 0
         do {
             for item in rawAttachments {
                 let oldNoteID = try requiredString(item, "noteId")
                 guard let newNoteID = noteIDs[oldNoteID],
+                      let originalAttachmentID = item["id"] as? String, !originalAttachmentID.isEmpty, attachmentIDs.insert(originalAttachmentID).inserted,
                       let filePath = item["path"] as? String,
                       filePath.range(of: #"^attachments/\d+\.bin$"#, options: .regularExpression) != nil,
                       !expectedPaths.contains(filePath),
