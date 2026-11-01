@@ -42,6 +42,7 @@ export function isFieldOverlayRendererImplemented(kind:FieldKind,renderer:FieldR
  if(kind==="event")return renderer==="event-trace";
  if(kind==="network")return renderer==="event-trace";
  if(kind==="scalar")return renderer==="heatmap"||renderer==="line-plot";
+ if(kind==="vector")return renderer==="glyphs";
  return false;
 }
 const palettes:readonly FieldPalette[]=["cividis","viridis","magma","blue-orange"];
@@ -201,6 +202,62 @@ export function fieldFrameAtTime(layer:FieldLayer,timeSeconds:number):Readonly<{
  const count=layer.resolution.sampleCount*componentCount(layer.kind);
  return Object.freeze({sampleTimeSeconds:layer.timeReference.sampleTimesSeconds[index],sampleIndex:index,
   values:Object.freeze(layer.values.slice(index*count,(index+1)*count))});
+}
+export type FieldVectorPlane="xy"|"xz"|"yz";
+export type FieldVectorGlyphFrame=Readonly<{
+ sampleTimeSeconds:number;plane:FieldVectorPlane;sliceIndex:number;
+ dimensionU:number;dimensionV:number;maximumProjectedMagnitude:number;
+ glyphs:readonly Readonly<{
+  uIndex:number;vIndex:number;uComponent:number;vComponent:number;
+  magnitude:number;projectedMagnitude:number;
+ }>[];
+}>;
+/**
+ * Returns a bounded 2D projection of actual vector samples on one grid plane.
+ * Flattened values use x-fastest cells and XYZ components; this projection
+ * never synthesizes intermediate field values or a 3D volume.
+ */
+export function fieldVectorGlyphsAtTime(layer:FieldLayer,timeSeconds:number,
+ plane:FieldVectorPlane="xy",requestedSliceIndex?:number):FieldVectorGlyphFrame{
+ if(layer.kind!=="vector"||layer.renderer.kind!=="glyphs")
+  throw new Error("Vector glyphs require a vector field with the glyph renderer.");
+ const axes=plane==="xy"?{u:0,v:1,n:2}:plane==="xz"?{u:0,v:2,n:1}:
+  plane==="yz"?{u:1,v:2,n:0}:null;
+ if(!axes)throw new Error("Vector glyph plane is unsupported.");
+ const dims=layer.resolution.dimensions;
+ const sliceCount=dims[axes.n];
+ const slice=requestedSliceIndex??Math.floor((sliceCount-1)/2);
+ if(!Number.isSafeInteger(slice)||slice<0||slice>=sliceCount)
+  throw new Error("Vector glyph slice is outside the field resolution.");
+ const frame=fieldFrameAtTime(layer,timeSeconds);
+ const dimensionU=dims[axes.u],dimensionV=dims[axes.v];
+ const stride=Math.max(1,Math.ceil(Math.max(dimensionU,dimensionV)/16));
+ const indices=(size:number)=>{
+  const values:number[]=[];
+  for(let i=0;i<size;i+=stride)values.push(i);
+  if(values[values.length-1]!==size-1)values.push(size-1);
+  return values;
+ };
+ const uIndices=indices(dimensionU),vIndices=indices(dimensionV);
+ const glyphs:FieldVectorGlyphFrame["glyphs"][number][]=[];
+ let maximumProjectedMagnitude=0;
+ for(const vIndex of vIndices)for(const uIndex of uIndices){
+  const coordinates=[0,0,0];coordinates[axes.u]=uIndex;
+  coordinates[axes.v]=vIndex;coordinates[axes.n]=slice;
+  const cellIndex=coordinates[0]+dims[0]*(coordinates[1]+dims[1]*coordinates[2]);
+  const offset=cellIndex*3;
+  const x=frame.values[offset],y=frame.values[offset+1],z=frame.values[offset+2];
+  if(typeof x!=="number"||typeof y!=="number"||typeof z!=="number")continue;
+  const components=[x,y,z];
+  const uComponent=components[axes.u],vComponent=components[axes.v];
+  const magnitude=Math.hypot(x,y,z),projectedMagnitude=Math.hypot(uComponent,vComponent);
+  if(!Number.isFinite(magnitude)||!Number.isFinite(projectedMagnitude))
+   throw new Error("Vector glyph source contains a non-finite vector.");
+  maximumProjectedMagnitude=Math.max(maximumProjectedMagnitude,projectedMagnitude);
+  glyphs.push(Object.freeze({uIndex,vIndex,uComponent,vComponent,magnitude,projectedMagnitude}));
+ }
+ return Object.freeze({sampleTimeSeconds:frame.sampleTimeSeconds,plane,sliceIndex:slice,
+  dimensionU,dimensionV,maximumProjectedMagnitude,glyphs:Object.freeze(glyphs)});
 }
 export function fieldValueToDisplay(layer:FieldLayer,valueSI:number):number{
  if(!finite(valueSI))throw new Error("Field display conversion needs a finite SI value.");
