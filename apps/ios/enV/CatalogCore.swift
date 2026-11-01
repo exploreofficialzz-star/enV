@@ -14,6 +14,39 @@ struct Catalog: Decodable {
     }
 }
 
+private let retiredDesignBuildCalculatorIDs: Set<String> = [
+    "math-exp-sum-math-design-build-delivery-effort-a",
+    "math-exp-sum-math-design-build-delivery-effort-b",
+    "math-exp-sum-math-design-build-delivery-effort-c",
+    "math-exp-sum-engineering-design-build-delivery-effort-a",
+    "math-exp-sum-engineering-design-build-delivery-effort-b",
+    "math-exp-sum-engineering-design-build-delivery-effort-c",
+    "math-exp-sum-business-design-build-delivery-effort-a",
+    "math-exp-sum-business-design-build-delivery-effort-b",
+    "math-exp-sum-business-design-build-delivery-effort-c",
+    "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-a",
+    "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-b",
+    "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-c",
+    "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-a",
+    "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-b",
+    "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-c",
+    "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-a",
+    "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-b",
+    "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-c",
+    "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-a",
+    "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-b",
+    "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-c",
+    "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-a",
+    "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-b",
+    "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-c",
+    "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-a",
+    "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-b",
+    "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-c",
+    "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-a",
+    "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-b",
+    "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-c",
+]
+
 struct CatalogCounts: Codable {
     let total: Int
     let active: Int
@@ -159,10 +192,12 @@ extension ToolCategory {
 
 extension Catalog {
     func nativeFacing() -> Catalog {
-        let nativeTools = tools
+        // Remove the retired formula records from both primary and related-reference discovery.
+        let availableTools = tools.filter { !retiredDesignBuildCalculatorIDs.contains($0.id) }
+        let nativeTools = availableTools
             .filter { !NativeCopy.isWebRuntimeOnly($0.id) }
             .map { $0.nativeFacing() }
-        let relatedReferences = (relatedReferenceTools ?? []) + tools
+        let relatedReferences = (relatedReferenceTools ?? []).filter { !retiredDesignBuildCalculatorIDs.contains($0.id) } + availableTools
             .filter { NativeCopy.isWebRuntimeOnly($0.id) }
             .map { $0.nativeFacing() }
         let planned = nativeTools.filter(\.isPlanned).count
