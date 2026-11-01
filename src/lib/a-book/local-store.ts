@@ -36,6 +36,8 @@ export type ABookRevision = {
 const DATABASE_NAME = "env-a-book-local";
 const DATABASE_VERSION = 1;
 const MAX_REVISIONS_PER_NOTE = 40;
+const MAX_LOCAL_NOTES = 10_000;
+const MAX_LOCAL_REVISIONS = 100_000;
 const MAX_LOCAL_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 const MAX_LOCAL_LIBRARY_ATTACHMENT_BYTES = 150 * 1024 * 1024;
 const MAX_LOCAL_ATTACHMENTS = 10_000;
@@ -394,30 +396,154 @@ export async function deleteAttachment(id: string): Promise<void> {
 }
 
 
+export function assertABookImportQuotas(input: {
+  incomingNotes: number;
+  existingNotes: number;
+  incomingRevisions: number;
+  existingRevisions: number;
+  incomingAttachments: Array<Pick<ABookAttachment, "blob" | "size">>;
+  existingAttachmentCount: number;
+  existingAttachmentBytes: number;
+}): void {
+  const {
+    incomingNotes, existingNotes, incomingRevisions, existingRevisions,
+    incomingAttachments, existingAttachmentCount, existingAttachmentBytes,
+  } = input;
+  if ([incomingNotes, existingNotes, incomingRevisions, existingRevisions, existingAttachmentCount, existingAttachmentBytes]
+      .some((value) => !Number.isSafeInteger(value) || value < 0)) {
+    throw new Error("The local library index contains invalid quota values.");
+  }
+  if (incomingNotes + existingNotes > MAX_LOCAL_NOTES) {
+    throw new Error("A book supports up to 10,000 local notes. Export or remove older notes before importing this backup.");
+  }
+  if (incomingRevisions + existingRevisions > MAX_LOCAL_REVISIONS) {
+    throw new Error("A book supports up to 100,000 local revisions. Export or remove older notes before importing this backup.");
+  }
+  if (existingAttachmentCount + incomingAttachments.length > MAX_LOCAL_ATTACHMENTS) {
+    throw new Error("A book supports up to 10,000 local attachments. Remove unused files before importing this backup.");
+  }
+  if (existingAttachmentBytes > MAX_LOCAL_LIBRARY_ATTACHMENT_BYTES) {
+    throw new Error("The existing local attachments already exceed the portable backup limit. Export the library and remove older files before importing.");
+  }
+  if (incomingAttachments.length) {
+    assertABookAttachmentBatch(
+      incomingAttachments.map((item) => item.blob),
+      existingAttachmentBytes,
+      existingAttachmentCount,
+    );
+    for (const item of incomingAttachments) {
+      if (!Number.isSafeInteger(item.size) || item.size !== item.blob.size) {
+        throw new Error("The backup contains an attachment with an invalid recorded size.");
+      }
+    }
+  }
+}
+
 export async function importLocalLibrary(data: {
   notes: ABookNote[];
   revisions: ABookRevision[];
   attachments: ABookAttachment[];
 }): Promise<number> {
+  if (data.notes.length > MAX_LOCAL_NOTES || data.revisions.length > MAX_LOCAL_REVISIONS
+    || data.attachments.length > MAX_LOCAL_ATTACHMENTS) {
+    throw new Error("This backup exceeds the A book local library item limits.");
+  }
+  const originalNoteIds = new Set<string>();
+  for (const note of data.notes) {
+    if (!note.id || originalNoteIds.has(note.id)) {
+      throw new Error("The backup contains an empty or duplicate note ID.");
+    }
+    originalNoteIds.add(note.id);
+  }
+  for (const revision of data.revisions) {
+    if (!originalNoteIds.has(revision.noteId) || !revision.id || revision.title.length > 10_000
+      || revision.body.length > 5_000_000 || revision.notebook.length > 500
+      || revision.tags.length > 50 || !revision.tags.every((tag) => typeof tag === "string" && tag.length <= 200)
+      || !Number.isSafeInteger(revision.revision) || revision.revision < 0
+      || !Number.isSafeInteger(revision.createdAt)) {
+      throw new Error("The backup contains an invalid revision record.");
+    }
+  }
+  const attachmentIds = new Set<string>();
+  for (const attachment of data.attachments) {
+    if (!originalNoteIds.has(attachment.noteId) || !attachment.id || attachmentIds.has(attachment.id)
+      || attachment.name.length > 500 || attachment.type.length > 200) {
+      throw new Error("The backup contains invalid or duplicate attachment metadata.");
+    }
+    attachmentIds.add(attachment.id);
+  }
+
   const db = await openDatabase();
   const noteIds = new Map<string, string>();
   for (const note of data.notes) noteIds.set(note.id, createId());
   const importedNotes = data.notes.map((note) => ({ ...note, id: noteIds.get(note.id)! }));
   const importedRevisions = data.revisions
-    .filter((revision) => noteIds.has(revision.noteId))
     .map((revision) => ({ ...revision, id: createId(), noteId: noteIds.get(revision.noteId)! }));
   const importedAttachments = data.attachments
-    .filter((attachment) => noteIds.has(attachment.noteId))
     .map((attachment) => ({ ...attachment, id: createId(), noteId: noteIds.get(attachment.noteId)! }));
+
   const tx = db.transaction(["notes", "revisions", "attachments"], "readwrite");
   const done = transactionDone(tx, "The A book backup could not be imported completely.");
   const notes = tx.objectStore("notes");
   const revisions = tx.objectStore("revisions");
   const attachments = tx.objectStore("attachments");
-  importedNotes.forEach((note) => notes.add(note));
-  importedRevisions.forEach((revision) => revisions.add(revision));
-  importedAttachments.forEach((attachment) => attachments.add(attachment));
-  await done;
+  let validationError: Error | undefined;
+  let loaded = 0;
+  let existingNotes: ABookNote[] = [];
+  let existingRevisions: ABookRevision[] = [];
+  let existingAttachments: ABookAttachment[] = [];
+
+  const abortWith = (cause: unknown) => {
+    validationError = cause instanceof Error ? cause : new Error("The local library import is invalid.");
+    try { tx.abort(); } catch { /* The transaction may already be inactive. */ }
+  };
+  const queueImportIfReady = () => {
+    loaded += 1;
+    if (loaded !== 3) return;
+    try {
+      const existingBytes = existingAttachments.reduce((sum, item) => sum + Number(item.size || 0), 0);
+      assertABookImportQuotas({
+        incomingNotes: importedNotes.length,
+        existingNotes: existingNotes.length,
+        incomingRevisions: importedRevisions.length,
+        existingRevisions: existingRevisions.length,
+        incomingAttachments: importedAttachments,
+        existingAttachmentCount: existingAttachments.length,
+        existingAttachmentBytes: existingBytes,
+      });
+      importedNotes.forEach((note) => notes.add(note));
+      importedRevisions.forEach((revision) => revisions.add(revision));
+      importedAttachments.forEach((attachment) => attachments.add(attachment));
+    } catch (cause) {
+      abortWith(cause);
+    }
+  };
+
+  const existingNotesRequest = notes.getAll();
+  existingNotesRequest.onsuccess = () => {
+    existingNotes = existingNotesRequest.result as ABookNote[];
+    queueImportIfReady();
+  };
+  existingNotesRequest.onerror = () => abortWith(existingNotesRequest.error);
+  const existingRevisionsRequest = revisions.getAll();
+  existingRevisionsRequest.onsuccess = () => {
+    existingRevisions = existingRevisionsRequest.result as ABookRevision[];
+    queueImportIfReady();
+  };
+  existingRevisionsRequest.onerror = () => abortWith(existingRevisionsRequest.error);
+  const existingAttachmentsRequest = attachments.getAll();
+  existingAttachmentsRequest.onsuccess = () => {
+    existingAttachments = existingAttachmentsRequest.result as ABookAttachment[];
+    queueImportIfReady();
+  };
+  existingAttachmentsRequest.onerror = () => abortWith(existingAttachmentsRequest.error);
+
+  try {
+    await done;
+  } catch (cause) {
+    if (validationError) throw validationError;
+    throw cause;
+  }
   return importedNotes.length;
 }
 
