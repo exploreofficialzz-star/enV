@@ -25,6 +25,8 @@ class NativeWorldLabInspectionTest{
  }
 }
 
+
+class NativeWorldLabInspectionHistoryTest{
  @Test fun inspectionViewHistoryRestoresCutawayAndXrayWithoutChangingProject(){
   val initial=NativeInspectionSettings()
   val original=NativeWorldLabInspectionHistory(present=initial)
@@ -50,3 +52,5 @@ class NativeWorldLabInspectionTest{
   val edited=undone.commit(undone.present.copy(mode=NativeInspectionMode.TRANSPARENT))
   assertTrue(edited.future.isEmpty())
  }
+
+}
