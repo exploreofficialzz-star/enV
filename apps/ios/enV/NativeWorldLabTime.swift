@@ -98,4 +98,20 @@ enum NativeWorldLabTime {
             .min(),next<candidate-1e-9{return next}
         return candidate
     }
+    /** Reverse only traverses cached recording time; it does not integrate physics backward. */
+    static func previous(current:Double,elapsed:Double,rate:Double,duration:Double,
+                         events:[Double])->Double {
+        guard current.isFinite,elapsed.isFinite,rate.isFinite,duration.isFinite,
+              duration>0,current>=0,current<=duration,elapsed>=0,elapsed<=60,
+              rate>=0.01,rate<=100 else{return current}
+        let candidate=max(0,current-elapsed*rate)
+        if let previous=events.filter({$0.isFinite && $0>=0 && $0<current-1e-9 && $0<=duration})
+            .max(),previous>candidate+1e-9{return previous}
+        return candidate
+    }
+    static func advance(current:Double,elapsed:Double,rate:Double,duration:Double,
+                        events:[Double],reverse:Bool)->Double {
+        reverse ? previous(current:current,elapsed:elapsed,rate:rate,duration:duration,events:events)
+                : next(current:current,elapsed:elapsed,rate:rate,duration:duration,events:events)
+    }
 }
