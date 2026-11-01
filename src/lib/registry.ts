@@ -84,7 +84,7 @@ for (const spec of MATH_EXERCISE_CATALOG) {
     generatedCalculatorPresentation.set(`exercise-${spec.key}-${target}`, {
       name: `${spec.name} — Solve for ${targetLabel}`,
       description: `Formula exercise calculator for ${spec.name}, solving for ${targetLabel}. Enter the other known values to calculate the missing value.`,
-      keywords: [...new Set(["math", "exercise", "formula", spec.key, ...spec.name.toLowerCase().split(/\\s+/), ...targetLabel.toLowerCase().split(/\\s+/)])],
+      keywords: [...new Set(["math", "exercise", "formula", spec.key, ...spec.name.toLowerCase().split(/\s+/), ...targetLabel.toLowerCase().split(/\s+/)])],
     });
   }
 }
@@ -97,7 +97,7 @@ for (const family of EXPANSION_FAMILIES) {
       generatedCalculatorPresentation.set(`exp-${family}-${info.key}-${target}`, {
         name: info.title ? `${info.title}: ${equationTitle}` : equationTitle,
         description: `${expansionCalculatorDescription(info, target)} Enter the other two values to calculate the missing value.`,
-        keywords: expansionCalculatorKeywords(family, info, target).split(/\\s+/),
+        keywords: expansionCalculatorKeywords(family, info, target).split(/\s+/),
       });
     }
   }
