@@ -44,6 +44,15 @@ struct NativeWorldLabDemoCheckpoint:Codable,Equatable {
     }
 }
 enum NativeWorldLabTime {
+    static func previousEvent(current:Double,duration:Double,events:[Double])->Double {
+        guard current.isFinite,duration.isFinite,duration>0,current>=0,current<=duration else{return 0}
+        return events.filter{$0.isFinite && $0>=0 && $0<current-1e-9}.max() ?? 0
+    }
+    static func nextEvent(current:Double,duration:Double,events:[Double])->Double {
+        guard current.isFinite,duration.isFinite,duration>0,current>=0,current<=duration else{return current}
+        return events.filter{$0.isFinite && $0>current+1e-9 && $0<=duration}.min() ?? duration
+    }
+
     static func next(current:Double,elapsed:Double,rate:Double,duration:Double,
                      events:[Double])->Double {
         guard current.isFinite,elapsed.isFinite,rate.isFinite,duration.isFinite,

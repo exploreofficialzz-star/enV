@@ -18,3 +18,11 @@ final class NativeWorldLabTimeCheckpointTests:XCTestCase {
   XCTAssertEqual(NativeWorldLabTime.next(current:2,elapsed:0.1,rate:1,duration:5,events:[1,2]),2.1,accuracy:1e-12)
  }
 }
+
+    func testPreviousAndNextContactNavigationIsBoundedAndSorted() {
+        let events=[0.8,0.2,0.5,0.5,Double.nan,-1,4]
+        XCTAssertEqual(NativeWorldLabTime.previousEvent(current:0,duration:3,events:events),0,accuracy:1e-12)
+        XCTAssertEqual(NativeWorldLabTime.previousEvent(current:0.7,duration:3,events:events),0.5,accuracy:1e-12)
+        XCTAssertEqual(NativeWorldLabTime.nextEvent(current:0.2,duration:3,events:events),0.5,accuracy:1e-12)
+        XCTAssertEqual(NativeWorldLabTime.nextEvent(current:0.8,duration:3,events:events),3,accuracy:1e-12)
+    }

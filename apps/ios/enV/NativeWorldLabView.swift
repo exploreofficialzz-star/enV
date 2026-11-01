@@ -1985,13 +1985,23 @@ Text("Invent chemical heat").font(.headline)
             if let frame=try? run.sample(groupTime) {
                 value("Contacts completed",Double(frame.completedEvents),"")
             }
-            HStack {
-                Button(groupPlaying ? "Pause group":"Play group"){
-                    groupPlaying.toggle()
+            HStack(spacing:6) {
+                Button("Beginning"){groupPlaying=false;groupTime=0;updateGroupSphereScene()}
+                Button("Prev contact"){
+                    groupPlaying=false
+                    groupTime=NativeWorldLabTime.previousEvent(current:groupTime,
+                        duration:run.durationSeconds,events:run.events.map{$0.atSeconds})
+                    updateGroupSphereScene()
+                }.disabled(!run.events.contains{$0.atSeconds<groupTime-1e-9})
+                Button(groupPlaying ? "Pause":"Play"){groupPlaying.toggle()}
+                    .buttonStyle(.borderedProminent)
+                Button("Next contact"){
+                    groupPlaying=false
+                    groupTime=NativeWorldLabTime.nextEvent(current:groupTime,
+                        duration:run.durationSeconds,events:run.events.map{$0.atSeconds})
+                    updateGroupSphereScene()
                 }
-                Button("Reset group"){
-                    groupPlaying=false;groupTime=0;updateGroupSphereScene()
-                }
+                Button("End"){groupPlaying=false;groupTime=run.durationSeconds;updateGroupSphereScene()}
             }.buttonStyle(.bordered)
             Picker("Group impact playback speed",selection:$groupPlaybackRate) {
                 Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
@@ -2103,13 +2113,23 @@ Text("Invent chemical heat").font(.headline)
                     if editing {spherePlaying=false}
                 }).accessibilityLabel("Explore three-dimensional impact time")
                 .onChange(of:sphereTime){_ in updateSphereScene()}
-            HStack{
-                Button(spherePlaying ? "Pause 3D impact":"Play 3D impact"){
-                    spherePlaying.toggle()
+            HStack(spacing:6){
+                Button("Beginning"){spherePlaying=false;sphereTime=0;updateSphereScene()}
+                Button("Prev contact"){
+                    spherePlaying=false
+                    sphereTime=NativeWorldLabTime.previousEvent(current:sphereTime,
+                        duration:run.durationSeconds,events:[run.impactTimeSeconds])
+                    updateSphereScene()
+                }.disabled(sphereTime<=1e-9)
+                Button(spherePlaying ? "Pause":"Play"){spherePlaying.toggle()}
+                    .buttonStyle(.borderedProminent)
+                Button("Next contact"){
+                    spherePlaying=false
+                    sphereTime=NativeWorldLabTime.nextEvent(current:sphereTime,
+                        duration:run.durationSeconds,events:[run.impactTimeSeconds])
+                    updateSphereScene()
                 }
-                Button("Reset 3D impact"){
-                    spherePlaying=false;sphereTime=0;updateSphereScene()
-                }
+                Button("End"){spherePlaying=false;sphereTime=run.durationSeconds;updateSphereScene()}
             }.buttonStyle(.bordered)
             Picker("3D collision playback rate",selection:$sphereSpeed){
                 Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
@@ -2205,13 +2225,23 @@ Text("Invent chemical heat").font(.headline)
                     updateCollisionScene()
                 }).accessibilityLabel("Explore collision time")
                 .onChange(of:collisionTime){_ in updateCollisionScene()}
-            HStack {
-                Button(collisionPlaying ? "Pause collision":"Play collision"){
-                    collisionPlaying.toggle()
+            HStack(spacing:6){
+                Button("Beginning"){collisionPlaying=false;collisionTime=0;updateCollisionScene()}
+                Button("Prev contact"){
+                    collisionPlaying=false
+                    collisionTime=NativeWorldLabTime.previousEvent(current:collisionTime,
+                        duration:run.durationSeconds,events:[run.impactTimeSeconds])
+                    updateCollisionScene()
+                }.disabled(collisionTime<=1e-9)
+                Button(collisionPlaying ? "Pause":"Play"){collisionPlaying.toggle()}
+                    .buttonStyle(.borderedProminent)
+                Button("Next contact"){
+                    collisionPlaying=false
+                    collisionTime=NativeWorldLabTime.nextEvent(current:collisionTime,
+                        duration:run.durationSeconds,events:[run.impactTimeSeconds])
+                    updateCollisionScene()
                 }
-                Button("Reset collision"){
-                    collisionPlaying=false;collisionTime=0;updateCollisionScene()
-                }
+                Button("End"){collisionPlaying=false;collisionTime=run.durationSeconds;updateCollisionScene()}
             }.buttonStyle(.bordered)
             Picker("Collision playback speed",selection:$collisionSpeed){
                 Text("0.1×").tag(0.1);Text("1×").tag(1.0);Text("4×").tag(4.0)
