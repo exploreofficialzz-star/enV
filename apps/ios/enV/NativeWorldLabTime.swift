@@ -40,31 +40,60 @@ struct NativeWorldLabDemoCheckpoint:Codable,Equatable {
         try value.validate();return value
     }
     func validate()throws {
-        guard format==Self.formatName,(1...3).contains(schemaVersion),modelVersion=="1.0.0",
-            ["spring","rc","heat"].contains(modelId),timeSeconds.isFinite,(0...12).contains(timeSeconds),
-            massKg.isFinite,(0.1...100).contains(massKg),springNPerM.isFinite,(0.1...30).contains(springNPerM),
-            resistanceOhm.isFinite,(100...10000).contains(resistanceOhm),
-            diffusivityM2PerS.isFinite,(0.001...0.08).contains(diffusivityM2PerS) else {
-            throw NativeWorldLabError.invalid("Timeline checkpoint version, model or parameter bounds are invalid")
+        guard format==Self.formatName else {
+            throw NativeWorldLabError.invalid("Timeline checkpoint format is unsupported")
         }
-        if schemaVersion>=2 {
-            guard let wallTimeUTC,let worldEpochUTC,let solverInternalTimeSeconds,
-                let displaySampleTimeSeconds,let playbackRate,let playbackDirection,let timezoneDisplay,
-                wallTimeUTC.hasSuffix("Z"),worldEpochUTC.hasSuffix("Z"),
-                ISO8601DateFormatter().date(from:wallTimeUTC) != nil,
-                ISO8601DateFormatter().date(from:worldEpochUTC) != nil,
-                solverInternalTimeSeconds.isFinite,(0...12).contains(solverInternalTimeSeconds),
-                displaySampleTimeSeconds.isFinite,(0...12).contains(displaySampleTimeSeconds),
-                playbackRate.isFinite,(0.01...100).contains(playbackRate),
-                ["forward","reverse-recording"].contains(playbackDirection),
-                TimeZone(identifier:timezoneDisplay) != nil,
-                (schemaVersion<3 || (solverStepSeconds?.isFinite == true && (1e-9...12).contains(solverStepSeconds!))) else {
-                throw NativeWorldLabError.invalid("Timeline clock checkpoint fields are invalid")
+        guard (1...3).contains(schemaVersion),modelVersion=="1.0.0" else {
+            throw NativeWorldLabError.invalid("Timeline checkpoint schema or model version is unsupported")
+        }
+        guard ["spring","rc","heat"].contains(modelId),
+              timeSeconds.isFinite,(0...12).contains(timeSeconds),
+              massKg.isFinite,(0.1...100).contains(massKg),
+              springNPerM.isFinite,(0.1...30).contains(springNPerM),
+              resistanceOhm.isFinite,(100...10000).contains(resistanceOhm),
+              diffusivityM2PerS.isFinite,(0.001...0.08).contains(diffusivityM2PerS) else {
+            throw NativeWorldLabError.invalid("Timeline checkpoint model or parameter bounds are invalid")
+        }
+        if schemaVersion==1 {
+            let hasClockExtension = wallTimeUTC != nil || worldEpochUTC != nil ||
+                solverInternalTimeSeconds != nil || displaySampleTimeSeconds != nil ||
+                playbackRate != nil || playbackDirection != nil || timezoneDisplay != nil ||
+                solverStepSeconds != nil
+            guard !hasClockExtension else {
+                throw NativeWorldLabError.invalid("Version 1 checkpoints cannot contain clock extensions")
             }
-        } else if [wallTimeUTC,worldEpochUTC,solverInternalTimeSeconds.map(String.init),
-            displaySampleTimeSeconds.map(String.init),playbackRate.map(String.init),solverStepSeconds.map(String.init),
-            playbackDirection,timezoneDisplay].contains(where:{$0 != nil}) {
-            throw NativeWorldLabError.invalid("Version 1 checkpoints cannot contain clock extensions")
+            return
+        }
+        guard let wall=wallTimeUTC,let epoch=worldEpochUTC,
+              let solverTime=solverInternalTimeSeconds,let displayTime=displaySampleTimeSeconds,
+              let rate=playbackRate,let direction=playbackDirection,let timezone=timezoneDisplay else {
+            throw NativeWorldLabError.invalid("Timeline clock checkpoint fields are incomplete")
+        }
+        guard wall.hasSuffix("Z"),epoch.hasSuffix("Z") else {
+            throw NativeWorldLabError.invalid("Timeline checkpoint timestamps must use UTC Z notation")
+        }
+        let wallDate=ISO8601DateFormatter().date(from:wall)
+        let epochDate=ISO8601DateFormatter().date(from:epoch)
+        guard wallDate != nil,epochDate != nil else {
+            throw NativeWorldLabError.invalid("Timeline checkpoint timestamps must be valid ISO 8601 UTC values")
+        }
+        guard solverTime.isFinite,(0...12).contains(solverTime),
+              displayTime.isFinite,(0...12).contains(displayTime) else {
+            throw NativeWorldLabError.invalid("Timeline solver and display times are outside their supported bounds")
+        }
+        guard rate.isFinite,(0.01...100).contains(rate),
+              direction=="forward" || direction=="reverse-recording" else {
+            throw NativeWorldLabError.invalid("Timeline playback rate or direction is unsupported")
+        }
+        guard TimeZone(identifier:timezone) != nil else {
+            throw NativeWorldLabError.invalid("Timeline display timezone is unsupported")
+        }
+        if schemaVersion==3 {
+            guard let step=solverStepSeconds,step.isFinite,(1e-9...12).contains(step) else {
+                throw NativeWorldLabError.invalid("Timeline checkpoint solver step is invalid")
+            }
+        } else if solverStepSeconds != nil {
+            throw NativeWorldLabError.invalid("Version 2 checkpoints cannot contain a solver-step extension")
         }
     }
     func encodeBounded()throws->Data {
