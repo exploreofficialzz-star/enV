@@ -88,3 +88,28 @@ final class NativeWorldLabInspectionHistoryTests:XCTestCase {
         XCTAssertThrowsError(try history.commit(NativeWorldLabInspectionSettings(opacity:2)))
     }
 }
+
+    func testObliqueCutawayUsesNormalizedNormalAndProjectedBounds() throws {
+        let project=try fixture()
+        let settings=NativeWorldLabInspectionSettings(mode:.cutaway,normal:[1,1,0],
+            cutawayFraction:0.5)
+        try settings.validate()
+        let plane=try XCTUnwrap(NativeWorldLabInspectionGeometry.plane(
+            project:project,selectedId:"box-a",settings:settings))
+        XCTAssertEqual(plane.normal[0],1/sqrt(2),accuracy:1e-9)
+        XCTAssertEqual(plane.normal[1],1/sqrt(2),accuracy:1e-9)
+        XCTAssertEqual(plane.offset,-1/sqrt(2)+0.5/sqrt(2),accuracy:1e-9)
+        let polygon=[[-2.0,0.0,0.0],[0.0,0.0,0.0],[0.0,1.0,0.0],[-2.0,1.0,0.0]]
+        let clipped=NativeWorldLabInspectionGeometry.clipPolygon(
+            polygon,normal:plane.normal,offset:plane.offset)
+        XCTAssertGreaterThanOrEqual(clipped.count,3)
+        XCTAssertTrue(clipped.allSatisfy{point in
+            zip(point,plane.normal).map{$0.0*$0.1}.reduce(0,+)>=plane.offset-1e-9
+        })
+    }
+    func testCutawayNormalCannotBeZeroOrNonFinite() {
+        XCTAssertThrowsError(try NativeWorldLabInspectionSettings(
+            mode:.cutaway,normal:[0,0,0]).validate())
+        XCTAssertThrowsError(try NativeWorldLabInspectionSettings(
+            mode:.cutaway,normal:[1,.nan,0]).validate())
+    }

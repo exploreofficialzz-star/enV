@@ -44,6 +44,7 @@ struct NativeWorldLabView:View {
     @State private var inspectionMode:NativeWorldLabInspectionMode = .normal
     @State private var inspectionOpacity=0.32
     @State private var inspectionAxis:NativeWorldLabInspectionAxis = .x
+    @State private var inspectionNormal:[Double] = [1,0,0]
     @State private var inspectionCutawayFraction=0.0
     @State private var inspectionExplodeDistance=1.0
     @State private var inspectionViewHistory=NativeWorldLabInspectionHistory()
@@ -97,7 +98,7 @@ struct NativeWorldLabView:View {
 
     private var currentInspectionView:NativeWorldLabInspectionSettings {
         NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
-            axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
+            axis:inspectionAxis,normal:inspectionNormal,cutawayFraction:inspectionCutawayFraction,
             explosionDistanceMeters:inspectionExplodeDistance)
     }
     private func applyInspectionView(_ settings:NativeWorldLabInspectionSettings,record:Bool=true) {
@@ -109,7 +110,7 @@ struct NativeWorldLabView:View {
                 inspectionViewHistory=history
             }
             inspectionMode=settings.mode;inspectionOpacity=settings.opacity
-            inspectionAxis=settings.axis;inspectionCutawayFraction=settings.cutawayFraction
+            inspectionAxis=settings.axis;inspectionNormal=settings.normal;inspectionCutawayFraction=settings.cutawayFraction
             inspectionExplodeDistance=settings.explosionDistanceMeters
             seeInside=settings.mode == .transparent || settings.mode == .xray || settings.mode == .cutaway
             redraw()
@@ -729,11 +730,23 @@ struct NativeWorldLabView:View {
                     }),in:0...1).accessibilityLabel("See Inside selected target opacity")
                 }
                 if inspectionMode == .cutaway {
-                    Picker("Cutaway axis",selection:Binding(get:{inspectionAxis},set:{value in
-                        var next=currentInspectionView;next.axis=value;applyInspectionView(next)
+                    Picker("Plane orientation preset",selection:Binding(get:{inspectionAxis},set:{value in
+                        var next=currentInspectionView;next.axis=value
+                        next.normal=value == .x ? [1,0,0] : value == .y ? [0,1,0] : [0,0,1]
+                        applyInspectionView(next)
                     })){
                         ForEach(NativeWorldLabInspectionAxis.allCases){axis in Text(axis.rawValue.uppercased()).tag(axis)}
                     }.pickerStyle(.segmented)
+                    ForEach(0..<3,id:\.self){axis in
+                        Text("Plane normal \(["X","Y","Z"][axis]) · \(String(format:"%.2f",inspectionNormal[axis]))").font(.caption)
+                        Slider(value:Binding(get:{inspectionNormal[axis]},set:{value in
+                            var normal=inspectionNormal;normal[axis]=value
+                            if sqrt(normal.reduce(0){$0+$1*$1})>1e-9 {
+                                var next=currentInspectionView;next.normal=normal;applyInspectionView(next)
+                            }
+                        }),in:-1...1)
+                            .accessibilityLabel("Cutaway plane normal \(["X","Y","Z"][axis])")
+                    }
                     Text("Cutaway plane \(String(format:"%.2f",inspectionCutawayFraction))").font(.caption)
                     Slider(value:Binding(get:{inspectionCutawayFraction},set:{value in
                         var next=currentInspectionView;next.cutawayFraction=value;applyInspectionView(next)
@@ -983,6 +996,7 @@ struct NativeWorldLabView:View {
         .onChange(of:inspectionMode){value in seeInside=value == .transparent || value == .xray || value == .cutaway;redraw()}
         .onChange(of:inspectionOpacity){_ in redraw()}
         .onChange(of:inspectionAxis){_ in redraw()}
+        .onChange(of:inspectionNormal){_ in redraw()}
         .onChange(of:inspectionCutawayFraction){_ in redraw()}
         .onChange(of:inspectionExplodeDistance){_ in redraw()}
         .onChange(of:mass){_ in redraw()}
@@ -3343,16 +3357,17 @@ Text("Invent chemical heat").font(.headline)
             let selectedId=project.entities.indices.contains(selected) ? project.entities[selected].id : nil
             let targets=NativeWorldLabInspectionGeometry.targetIds(project:project,selectedId:selectedId)
             let settings=NativeWorldLabInspectionSettings(mode:inspectionMode,opacity:inspectionOpacity,
-                axis:inspectionAxis,cutawayFraction:inspectionCutawayFraction,
+                axis:inspectionAxis,normal:inspectionNormal,cutawayFraction:inspectionCutawayFraction,
                 explosionDistanceMeters:inspectionExplodeDistance)
-            let offset=NativeWorldLabInspectionGeometry.planeOffset(project:project,selectedId:selectedId,settings:settings)
+            let sectionPlane=NativeWorldLabInspectionGeometry.plane(project:project,selectedId:selectedId,settings:settings)
+            let offset=sectionPlane?.offset
             for item in project.entities.prefix(200) {
                 if !NativeWorldLabInspectionGeometry.isVisible(project:project,selectedId:selectedId,mode:inspectionMode,id:item.id){continue}
                 let xyz=item.dimensionsMeters
                 let cut=inspectionMode == .cutaway && targets.contains(item.id) && offset != nil
                 let geometry:SCNGeometry
                 if cut,let offset {
-                    geometry=NativeWorldLabInspectionGeometry.makeCutawayGeometry(item,axis:inspectionAxis.index,offset:offset)
+                    geometry=NativeWorldLabInspectionGeometry.makeCutawayGeometry(item,normal:sectionPlane?.normal ?? inspectionNormal,offset:offset)
                 }else{
                     switch item.shape {
                     case "sphere":geometry=SCNSphere(radius:CGFloat(xyz[0]/2))

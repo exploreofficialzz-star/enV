@@ -1,6 +1,11 @@
 import Foundation
 import SceneKit
 
+struct NativeWorldLabInspectionPlane {
+    let normal:[Double]
+    let offset:Double
+}
+
 enum NativeWorldLabInspectionMode:String,CaseIterable,Identifiable {
     case normal, transparent, xray, cutaway, isolate, exploded
     var id:String { rawValue }
@@ -24,16 +29,20 @@ struct NativeWorldLabInspectionSettings:Equatable {
     var mode:NativeWorldLabInspectionMode = .normal
     var opacity:Double = 0.32
     var axis:NativeWorldLabInspectionAxis = .x
+    var normal:[Double] = [1,0,0]
     var cutawayFraction:Double = 0
     var explosionDistanceMeters:Double = 1
     init(mode:NativeWorldLabInspectionMode = .normal,opacity:Double = 0.32,
-         axis:NativeWorldLabInspectionAxis = .x,cutawayFraction:Double = 0,
-         explosionDistanceMeters:Double = 1) {
-        self.mode=mode;self.opacity=opacity;self.axis=axis
+         axis:NativeWorldLabInspectionAxis = .x,normal:[Double] = [1,0,0],
+         cutawayFraction:Double = 0,explosionDistanceMeters:Double = 1) {
+        self.mode=mode;self.opacity=opacity;self.axis=axis;self.normal=normal
         self.cutawayFraction=cutawayFraction;self.explosionDistanceMeters=explosionDistanceMeters
     }
     func validate() throws {
+        let normalLength=normal.count==3 ? sqrt(normal.reduce(0){$0+$1*$1}) : 0
         guard opacity.isFinite,(0...1).contains(opacity),
+              normal.count==3,normal.allSatisfy({$0.isFinite && abs($0)<=1}),
+              normalLength.isFinite,normalLength>1e-9,
               cutawayFraction.isFinite,(-1...1).contains(cutawayFraction),
               explosionDistanceMeters.isFinite,(0...10).contains(explosionDistanceMeters) else {
             throw NativeWorldLabError.invalid("Inspection display settings are outside their safe visual bounds")
@@ -69,23 +78,40 @@ enum NativeWorldLabInspectionGeometry {
         }
         return (0..<3).map{item.positionMeters[$0]+delta[$0]/norm*settings.explosionDistanceMeters}
     }
+    static func plane(project:NativeWorldLabProject,selectedId:String?,
+        settings:NativeWorldLabInspectionSettings)->NativeWorldLabInspectionPlane? {
+        guard settings.mode == .cutaway,
+              let item=project.entities.first(where:{$0.id==selectedId}),
+              settings.normal.count==3 else{return nil}
+        let length=sqrt(settings.normal.reduce(0){$0+$1*$1})
+        guard length.isFinite,length>1e-9 else{return nil}
+        let normal=settings.normal.map{$0/length}
+        let centreProjection=(0..<3).reduce(0){$0+normal[$1]*item.positionMeters[$1]}
+        let projectedHalf=(0..<3).reduce(0){$0+abs(normal[$1])*item.dimensionsMeters[$1]*0.5}
+        return NativeWorldLabInspectionPlane(normal:normal,
+            offset:centreProjection+projectedHalf*settings.cutawayFraction)
+    }
     static func planeOffset(project:NativeWorldLabProject,selectedId:String?,
         settings:NativeWorldLabInspectionSettings)->Double? {
-        guard settings.mode == .cutaway,
-              let item=project.entities.first(where:{$0.id==selectedId}) else{return nil}
-        let axis=settings.axis.index
-        return item.positionMeters[axis]+item.dimensionsMeters[axis]*0.5*settings.cutawayFraction
+        plane(project:project,selectedId:selectedId,settings:settings)?.offset
     }
     static func clipPolygon(_ polygon:[[Double]],axis:Int,offset:Double)->[[Double]] {
-        clipped(polygon,axis:axis,offset:offset).vertices
+        guard (0...2).contains(axis) else{return []}
+        var normal=[0.0,0.0,0.0];normal[axis]=1
+        return clipPolygon(polygon,normal:normal,offset:offset)
     }
-    private static func clipped(_ polygon:[[Double]],axis:Int,offset:Double)->(vertices:[[Double]],intersections:[[Double]]) {
-        guard polygon.count>=3,(0...2).contains(axis),offset.isFinite else{return([],[])}
-        var output:[[Double]]=[],crossings:[[Double]]=[]
+    static func clipPolygon(_ polygon:[[Double]],normal:[Double],offset:Double)->[[Double]] {
+        clipped(polygon,normal:normal,offset:offset).vertices
+    }
+    private static func clipped(_ polygon:[[Double]],normal:[Double],offset:Double)->(vertices:[[Double]],intersections:[[Double]]) {
+        guard polygon.count>=3,normal.count==3,normal.allSatisfy({$0.isFinite}),
+              sqrt(normal.reduce(0){$0+$1*$1})>1e-9,offset.isFinite else{return([],[])}
+        var output:[[Double]]=[],crossings:[[Double]]()
         for i in polygon.indices {
             let current=polygon[i],previous=polygon[(i+polygon.count-1)%polygon.count]
             guard current.count==3,previous.count==3 else{return([],[])}
-            let dc=current[axis]-offset,dp=previous[axis]-offset
+            let dc=(0..<3).reduce(-offset){$0+current[$1]*normal[$1]}
+            let dp=(0..<3).reduce(-offset){$0+previous[$1]*normal[$1]}
             let insideCurrent = dc >= (-1.0e-10)
             let insidePrevious = dp >= (-1.0e-10)
             if insideCurrent != insidePrevious {
@@ -155,6 +181,15 @@ enum NativeWorldLabInspectionGeometry {
         return(v,t)
     }
     static func makeCutawayGeometry(_ solid:NativeLabSolid,axis:Int,offset:Double)->SCNGeometry {
+        guard (0...2).contains(axis) else{return SCNGeometry()}
+        var normal=[0.0,0.0,0.0];normal[axis]=1
+        return makeCutawayGeometry(solid,normal:normal,offset:offset)
+    }
+    static func makeCutawayGeometry(_ solid:NativeLabSolid,normal:[Double],offset:Double)->SCNGeometry {
+        guard normal.count==3,normal.allSatisfy({$0.isFinite}),offset.isFinite else{return SCNGeometry()}
+        let normalLength=sqrt(normal.reduce(0){$0+$1*$1})
+        guard normalLength>1e-9 else{return SCNGeometry()}
+        let n=normal.map{$0/normalLength}
         let (local,triangles)=primitive(solid)
         let centre=solid.positionMeters,rotation=solid.effectiveRotationRadians
         let world=local.map{p->[Double] in let q=rotate(p,rotation);return [q[0]+centre[0],q[1]+centre[1],q[2]+centre[2]]}
@@ -172,7 +207,7 @@ enum NativeWorldLabInspectionGeometry {
             }
         }
         for tri in triangles {
-            let result=clipped(tri.map{world[$0]},axis:axis,offset:offset)
+            let result=clipped(tri.map{world[$0]},normal:n,offset:offset)
             intersections.append(contentsOf:result.intersections)
             guard result.vertices.count>=3 else{continue}
             for i in 1..<(result.vertices.count-1) {
@@ -186,11 +221,26 @@ enum NativeWorldLabInspectionGeometry {
         }
         if unique.count>=3 {
             let centrePoint=(0..<3).map{axisIndex in unique.map{$0[axisIndex]}.reduce(0,+)/Double(unique.count)}
-            let planeAxes=axis==0 ? [1,2] : axis==1 ? [2,0] : [0,1]
-            unique.sort{a,b in
-                atan2(a[planeAxes[1]]-centrePoint[planeAxes[1]],a[planeAxes[0]]-centrePoint[planeAxes[0]]) <
-                atan2(b[planeAxes[1]]-centrePoint[planeAxes[1]],b[planeAxes[0]]-centrePoint[planeAxes[0]])
+            let reference=abs(n[0])<0.9 ? [1.0,0.0,0.0] : [0.0,1.0,0.0]
+            let crossU=[
+                n[1]*reference[2]-n[2]*reference[1],
+                n[2]*reference[0]-n[0]*reference[2],
+                n[0]*reference[1]-n[1]*reference[0]
+            ]
+            let crossLength=sqrt(crossU.reduce(0){$0+$1*$1})
+            let basisU=crossU.map{$0/crossLength}
+            let basisV=[
+                n[1]*basisU[2]-n[2]*basisU[1],
+                n[2]*basisU[0]-n[0]*basisU[2],
+                n[0]*basisU[1]-n[1]*basisU[0]
+            ]
+            func planeAngle(_ point:[Double])->Double {
+                let relative=(0..<3).map{point[$0]-centrePoint[$0]}
+                let u=(0..<3).reduce(0){$0+relative[$1]*basisU[$1]}
+                let v=(0..<3).reduce(0){$0+relative[$1]*basisV[$1]}
+                return atan2(v,u)
             }
+            unique.sort{planeAngle($0)<planeAngle($1)}
             for i in unique.indices {addTriangle(centrePoint,unique[i],unique[(i+1)%unique.count])}
         }
         let source=SCNGeometrySource(vertices:vertices)
