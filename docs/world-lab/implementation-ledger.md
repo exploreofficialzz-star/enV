@@ -772,3 +772,10 @@ release-candidate evidence bundle are unfinished.
 - Android Compose and iOS SwiftUI now display measured centre-to-centre 3D distance and X/Y/Z offsets whenever exactly two parts are selected. The readout is geometry-derived and does not claim surface clearance or physical contact.
 - Added Kotlin JUnit and Swift XCTest source for positive/negative half-grid boundaries, atomic revision increments, isolation of unselected parts, invalid selection rejection, and 3D/horizontal centre-distance calculation.
 - Source integration only: exact-head Kotlin/Xcode builds, Web/browser acceptance, device accessibility and full production release gates remain pending. No acceptance scenario is marked verified by this entry.
+
+## C/D Web CAD selection and sketch placement parity — 2026-11-01
+- The dedicated Web CAD panel now supports atomic grid snapping for one or multiple selected parts, using the same bounded 0.001–100 m spacing and Math.round half-grid behavior as its native Kotlin and Swift counterparts. Missing or duplicated IDs reject the whole edit; unselected geometry is unchanged.
+- The Web multi-part panel now displays centre-to-centre 3D distance, horizontal distance and X/Y/Z offsets when exactly two parts are selected. The readout is explicitly geometry-derived and does not represent surface clearance or a physical joint.
+- Fixed a functional mismatch in the Web sketch UI: rectangle and circle extrusion now consume the entered base-plane X/Y/Z centre and X/Y/Z orientation, rather than silently creating every extrusion at the origin with zero rotation.
+- Web regression coverage includes positive/negative half-grid snapping, atomic selection validation, unselected-part isolation and no mutation of source projects. CAD geometry remains bounded analytic primitives, not arbitrary B-rep or a full feature-history kernel.
+- This is source integration; exact-head Web type/build/browser, Android Gradle, iOS Xcode/simulator, accessibility and release-gate results remain unverified.
