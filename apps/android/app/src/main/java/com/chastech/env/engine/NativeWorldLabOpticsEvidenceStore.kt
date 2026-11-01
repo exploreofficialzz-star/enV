@@ -186,7 +186,9 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         validate(bytes,run.projectId,recordId)
         val dir=dir(run.projectId)
         require(dir.isDirectory||dir.mkdirs()){"Cannot create private optics history."}
-        require((dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0)<20){
+        val sharedCount=NativeWorldLabEvidenceStore(root).list(run.projectId).size
+        require(sharedCount+(dir.listFiles()?.count{
+            it.isFile&&it.extension=="json"}?:0)<20){
             "Optical evidence history is full (20 records)."
         }
         val target=file(run.projectId,recordId)
@@ -215,17 +217,26 @@ class NativeWorldLabOpticsEvidenceStore(private val root:File){
         require(record.getInt("projectRevision")<=saved.revision){
             "Scientific evidence belongs to a later invention revision."
         }
+        val shared=NativeWorldLabEvidenceStore(root).list(projectId)
+        val existingShared=shared.firstOrNull{it.getString("id")==id}
+        if(existingShared!=null){
+            require(existingShared.similar(record)){
+                "A different immutable optical result already uses this ID."
+            }
+            return id // Same immutable content is already in complete-archive history.
+        }
         val destination=file(projectId,id)
         if(destination.exists()){
-            require(read(projectId,id)==json){
+            require(JSONObject(read(projectId,id)).similar(record)){
                 "A different immutable optical result already uses this ID."
             }
             return id
         }
         val dir=dir(projectId)
         require(dir.isDirectory||dir.mkdirs()){"Cannot create optical evidence history."}
-        require((dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0)<20){
-            "Optical evidence quota is full."
+        require(shared.size+
+            (dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0)<20){
+            "Combined optical and scientific evidence quota is full (20)."
         }
         val temp=File.createTempFile("optic-import-",".tmp",dir)
         try{

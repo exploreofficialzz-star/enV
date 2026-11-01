@@ -50,3 +50,10 @@ test("interface budget counts actual crossings without solving an extra interfac
  assert.equal(run.segments[1].travelMeters,0);
  assert.ok(Math.abs(run.segments[0].endMeters[0]+1)<1e-8);
 });
+
+test("primary ray power and ignored reflected branches sum to one",()=>{
+ const record=traceOpticalScene(source("box"),{originMeters:[-4,0,0],
+   direction:[1,0,0],maximumDistanceMeters:10,maximumInterfaces:8});
+ assert.ok(Math.abs(record.accountedLostBranchPowerFraction+
+   record.finalPrimaryRayPowerFraction-1)<1e-12);
+});

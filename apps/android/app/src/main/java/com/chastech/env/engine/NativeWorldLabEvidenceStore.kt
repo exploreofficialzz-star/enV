@@ -87,7 +87,17 @@ class NativeWorldLabEvidenceStore(private val root:File){
         val checked=validated(json,projectId)
         require(checked.getInt("projectRevision")<=savedProject.revision){
             "Scientific evidence is newer than the local invention"}
-        val dest=file(projectId,checked.getString("id"))
+        val recordId=checked.getString("id")
+        if(checked.getString("kind") in setOf("interface-optics","optical-scene-ray")){
+            val optics=NativeWorldLabOpticsEvidenceStore(root)
+            if(recordId in optics.list(projectId)){
+                require(JSONObject(optics.read(projectId,recordId)).similar(checked)){
+                    "A different immutable optical result already uses this ID"
+                }
+                return
+            }
+        }
+        val dest=file(projectId,recordId)
         if(dest.isFile){
             val existing=read(projectId,checked.getString("id"))
             require(existing.similar(record)){
@@ -96,7 +106,10 @@ class NativeWorldLabEvidenceStore(private val root:File){
         }
         val dir=folder(projectId)
         val count=dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0
-        require(count<20){"Scientific device history is full"}
+        val opticalCount=NativeWorldLabOpticsEvidenceStore(root).list(projectId).size
+        require(count+opticalCount<20){
+            "Combined scientific history has reached the 20-record limit"
+        }
         atomic(dest,json.toByteArray(StandardCharsets.UTF_8))
     }
     @Synchronized fun save(project:NativeWorldLabProject,
@@ -123,9 +136,11 @@ class NativeWorldLabEvidenceStore(private val root:File){
         val json=envelope.toString()
         validated(json,project.id)
         val dir=folder(project.id)
-        if(dir.isDirectory){
-            val count=dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0
-            require(count<20){"Scientific device history is full (20 records)"}
+        val count=if(dir.isDirectory)
+            dir.listFiles()?.count{it.isFile&&it.extension=="json"}?:0 else 0
+        val opticalCount=NativeWorldLabOpticsEvidenceStore(root).list(project.id).size
+        require(count+opticalCount<20){
+            "Combined scientific device history is full (20 records)"
         }
         atomic(file(project.id,recordId),json.toByteArray(StandardCharsets.UTF_8))
         return recordId

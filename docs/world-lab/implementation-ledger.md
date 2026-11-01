@@ -637,12 +637,6 @@ release-candidate evidence bundle are unfinished.
   branch-complete rendering, scattering, absorption or confirmed optical
   behavior of actual substances. Native geometry tracing remains unimplemented.
 
-test("primary ray power and ignored reflected branches sum to one",()=>{
- const record=traceOpticalScene(source("box"),{originMeters:[-4,0,0],
-   direction:[1,0,0],maximumDistanceMeters:10,maximumInterfaces:8});
- assert.ok(Math.abs(record.accountedLostBranchPowerFraction+
-   record.finalPrimaryRayPowerFraction-1)<1e-12);
-});
 
 - Native Android now has a separate fully local optical scene ray UI, connected
   to the existing invented-solid editor. It can aim at authored optically
@@ -685,3 +679,8 @@ test("primary ray power and ignored reflected branches sum to one",()=>{
 - Strengthened imported Fresnel evidence with independent expected critical/transmitted angles and polarization/power checks, against its recorded assumed indices.
 - Refused full archive interchange when a scientific result claims a future invention revision; aligned Web behavior with the existing native archive validators.
 - Added source regressions for altered optical measurements, primary-ray boundaries and future-revision provenance. Execution and CI verification remain deferred by instruction.
+
+## Native evidence history interoperability
+- Native iOS now accepts both whole-second and fractional-second valid ISO-8601 timestamps in Web/Android scientific records, without altering the signed-out original evidence string.
+- Android scientific and optical histories now enforce one combined 20-record quota and reject cross-store duplicate IDs with different immutable bodies; equivalent optical records imported from full archives are idempotent. Formatting differences alone no longer create false conflicting records.
+- Relocated an optical power-conservation source regression accidentally pasted into the documentation ledger into its real TypeScript test file. New source and revisions remain unverified until the deferred test pass.

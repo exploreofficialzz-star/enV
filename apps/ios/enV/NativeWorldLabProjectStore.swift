@@ -203,6 +203,14 @@ struct NativeWorldLabScientificEvidenceStore {
         try validateID(id)
         return try folder(projectId).appendingPathComponent(id+".json")
     }
+    /// Web Date.toISOString() and Kotlin Instant may carry fractional seconds.
+    /// Preserve the exact original string, but accept both ISO-8601 variants.
+    private static func readScientificTimestamp(_ text:String)->Date? {
+        let standard=ISO8601DateFormatter()
+        if let parsed=standard.date(from:text){return parsed}
+        standard.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        return standard.date(from:text)
+    }
     private func inspect(_ bytes:Data,expectedId:String?,
         expectedProject:String)throws->[String:Any] {
         guard bytes.count<=Self.maxRecordBytes,
@@ -214,7 +222,7 @@ struct NativeWorldLabScientificEvidenceStore {
               projectId==expectedProject,
               let revision=record["projectRevision"] as? Int,revision>=0,
               let createdAt=record["createdAt"] as? String,
-              ISO8601DateFormatter().date(from:createdAt) != nil,
+              Self.readScientificTimestamp(createdAt) != nil,
               let kind=record["kind"] as? String,
               let result=record["result"] as? [String:Any],
               let innerId=result["projectId"] as? String,innerId==projectId,
