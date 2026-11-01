@@ -801,8 +801,9 @@ enum NativeWorldLabTimeScales {
                 throw NativeWorldLabError.invalid("IERS interpolation interval is invalid.")
             }
             dut1=left.dut1Seconds+(right.dut1Seconds-left.dut1Seconds)*fraction
-            sigma=sqrt(pow(1-fraction,2)*pow(left.uncertaintySeconds,2)+
-                pow(fraction,2)*pow(right.uncertaintySeconds,2))
+            let leftVariance=pow(1-fraction,2)*pow(left.uncertaintySeconds,2)
+            let rightVariance=pow(fraction,2)*pow(right.uncertaintySeconds,2)
+            sigma=sqrt(leftVariance+rightVariance)
             quality=(left.quality == .predicted || right.quality == .predicted) ? .predicted : .observed
         }
         let converted=try utcToTaiTt(utc)

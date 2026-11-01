@@ -614,7 +614,7 @@ enum NativeWorldLabFieldLayerCodec {
             throw NativeWorldLabError.invalid("Field dimensions must have three axes.")
         }
         let dimensionValues=try dimRaw.map{try number($0,"grid dimension")}
-        guard dimensionValues.allSatisfy({$0.rounded()==$0 && $0>0 && $0<=maxCells}) else {
+        guard dimensionValues.allSatisfy({$0.rounded()==$0 && $0>0 && $0<=Double(maxCells)}) else {
             throw NativeWorldLabError.invalid("Field dimensions are outside the native grid limits.")
         }
         let dimensions=dimensionValues.map{Int($0)}
