@@ -116,6 +116,11 @@ export function WorldLabTimeController(p:Props){
    </div>
    {run&&<p className="mt-1 text-[11px] text-muted-foreground">Source run: {run.id} · {run.modelId} v{run.modelVersion}</p>}
   </details>
+  <p className="mt-2 text-xs text-muted-foreground">
+   Stored time basis is UTC; the selected display timezone never changes the run's timestamps.
+   UT1/Earth-orientation, TT/leap-second and astronomical ephemeris conversions are unavailable until versioned authoritative inputs are attached.
+   Long-horizon seasonal, orbital, erosion and climate time models are not enabled in this bounded local reference engine.
+  </p>
   <label htmlFor="worldlab-checkpoint-restore" className="mt-2 inline-block text-sm">Restore saved time-engine checkpoint</label>
   <input id="worldlab-checkpoint-restore" className="mt-1 block w-full text-sm" type="file"
    accept=".json,application/json" disabled={!run} onChange={event=>{
