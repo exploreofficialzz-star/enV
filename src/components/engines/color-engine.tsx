@@ -114,6 +114,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [lockedSwatches, setLockedSwatches] = useState<Record<number, string>>({});
   const [roleOverrides, setRoleOverrides] = useState<Partial<SemanticPaletteColors>>({});
   const [previewMode, setPreviewMode] = useState<"light" | "dark">("light");
+  const [previewLayout, setPreviewLayout] = useState<"landing" | "dashboard" | "forms" | "content">("dashboard");
   const [exportFormat, setExportFormat] = useState<PaletteExportFormat>("css");
   const [imagePalette, setImagePalette] = useState<string[]>([]);
   const [paletteError, setPaletteError] = useState("");
@@ -586,10 +587,18 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
                   <h3 id="semantic-colors-heading" className="text-sm font-semibold text-fg">Interface color roles</h3>
                   <p className="mt-1 text-xs leading-5 text-muted">A palette mapped to practical roles instead of disconnected swatches.</p>
                 </div>
-                <Select value={previewMode} onChange={(event) => setPreviewMode(event.target.value as "light" | "dark")} aria-label="Preview color theme" className="w-32">
-                  <option value="light">Light preview</option>
-                  <option value="dark">Dark preview</option>
-                </Select>
+                <div className="flex flex-wrap gap-2">
+                  <Select value={previewLayout} onChange={(event) => setPreviewLayout(event.target.value as "landing" | "dashboard" | "forms" | "content")} aria-label="Page preview layout" className="w-36">
+                    <option value="landing">Landing page</option>
+                    <option value="dashboard">Dashboard</option>
+                    <option value="forms">Forms</option>
+                    <option value="content">Content</option>
+                  </Select>
+                  <Select value={previewMode} onChange={(event) => setPreviewMode(event.target.value as "light" | "dark")} aria-label="Preview color theme" className="w-32">
+                    <option value="light">Light preview</option>
+                    <option value="dark">Dark preview</option>
+                  </Select>
+                </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted">Edit any role without regenerating the rest of your palette.</p>
@@ -615,25 +624,95 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               </div>
               <p className="text-[10px] leading-4 text-muted">These pair checks are colour-contrast references only. They do not certify all text, component states, imagery or a complete page against WCAG.</p>
               <div className="overflow-hidden rounded-xl border" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }}>
-                <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
-                  <span className="text-sm font-bold">Acme workspace</span>
-                  <span className="rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: "#ffffff" }}>PRO</span>
-                </div>
-                <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr]">
-                  <div className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
-                    <p className="text-xs font-medium opacity-70">Overview</p>
-                    <p className="mt-2 text-xl font-bold">Design system</p>
-                    <p className="mt-1 text-xs opacity-70">Semantic colors, components and states.</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="rounded-md px-3 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Primary action</span>
-                      <span className="rounded-md border px-3 py-2 text-xs font-semibold" style={{ background: roleColors.surface, borderColor: roleColors.secondary, color: roleColors.text }}>Secondary</span>
+                {previewLayout === "landing" ? (
+                  <div data-testid="palette-preview-landing">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                      <span className="text-sm font-bold">northstar<span style={{ color: roleColors.primary }}>.</span></span>
+                      <div className="flex flex-wrap items-center gap-3 text-[11px]" style={{ color: roleColors.text }}>
+                        <span>Product</span><span>Solutions</span><span>Resources</span>
+                        <span className="rounded-md px-3 py-2 font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Get started</span>
+                      </div>
+                    </div>
+                    <div className="grid gap-5 p-5 sm:grid-cols-[1.15fr_0.85fr] sm:items-center sm:p-8">
+                      <div>
+                        <span className="inline-flex rounded-full px-3 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: primaryText }}>A clearer way to work</span>
+                        <h4 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">Make your next idea feel possible.</h4>
+                        <p className="mt-3 max-w-md text-xs leading-6 opacity-75">A landing-page preview to test your primary, accent, text and surface colors together before exporting a design system.</p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="rounded-md px-4 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Explore the platform</span>
+                          <span className="rounded-md border px-4 py-2 text-xs font-semibold" style={{ borderColor: roleColors.border }}>See how it works</span>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border p-4" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                        <div className="flex items-center justify-between"><span className="text-xs font-semibold">Project overview</span><span className="size-2 rounded-full" style={{ background: roleColors.success }} /></div>
+                        <div className="mt-5 grid grid-cols-2 gap-2">
+                          <div className="rounded-lg p-3" style={{ background: roleColors.background }}><span className="text-[10px] opacity-70">Growth</span><p className="mt-1 text-xl font-bold">+28%</p></div>
+                          <div className="rounded-lg p-3" style={{ background: roleColors.background }}><span className="text-[10px] opacity-70">Projects</span><p className="mt-1 text-xl font-bold">124</p></div>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: roleColors.border }}><div className="h-full w-3/4 rounded-full" style={{ background: roleColors.primary }} /></div>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 border-t p-4 sm:grid-cols-3" style={{ borderColor: roleColors.border }}>
+                      {["Flexible workflows", "Useful insights", "One shared workspace"].map((item) => <div key={item} className="rounded-lg p-3 text-xs font-semibold" style={{ background: roleColors.surface }}>{item}</div>)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
-                    <span className="size-9 rounded-full" style={{ background: roleColors.success }} />
-                    <span><span className="block text-sm font-semibold">All systems normal</span><span className="block text-xs opacity-70">Status uses a label as well as color.</span></span>
+                ) : previewLayout === "forms" ? (
+                  <div data-testid="palette-preview-forms" className="grid gap-5 p-4 sm:grid-cols-[0.9fr_1.1fr] sm:p-7">
+                    <div className="flex flex-col justify-center rounded-xl p-5" style={{ background: roleColors.primary, color: primaryText }}>
+                      <p className="text-xs font-semibold uppercase tracking-wider">Welcome aboard</p>
+                      <h4 className="mt-3 text-2xl font-bold">A good first impression starts here.</h4>
+                      <p className="mt-3 text-xs leading-6 opacity-85">Check form surfaces, labels, helper text, focus colors and action contrast against your selected theme.</p>
+                    </div>
+                    <div className="rounded-xl border p-4 sm:p-5" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                      <h4 className="text-lg font-bold">Create your account</h4>
+                      <p className="mt-1 text-xs opacity-70">A sample form using your semantic color roles.</p>
+                      <div className="mt-4 space-y-3">
+                        <label className="block space-y-1 text-xs font-semibold">Full name<input aria-label="Preview full name" readOnly value="Alex Morgan" className="block w-full rounded-lg border px-3 py-2 text-xs font-normal" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }} /></label>
+                        <label className="block space-y-1 text-xs font-semibold">Email address<input aria-label="Preview email address" readOnly value="alex@example.com" className="block w-full rounded-lg border px-3 py-2 text-xs font-normal" style={{ background: roleColors.background, borderColor: roleColors.border, color: roleColors.text }} /></label>
+                        <p className="text-[10px] leading-4" style={{ color: roleColors.info }}>We’ll only use this address for your account updates.</p>
+                        <span className="block rounded-lg px-4 py-2.5 text-center text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Create account</span>
+                        <p className="text-center text-[10px] opacity-70">Already have an account? <span className="font-semibold" style={{ color: roleColors.info }}>Sign in</span></p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : previewLayout === "content" ? (
+                  <div data-testid="palette-preview-content">
+                    <header className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                      <span className="text-sm font-bold">The Daily Edit</span><span className="text-[10px] font-semibold" style={{ color: roleColors.accent }}>Ideas worth keeping</span>
+                    </header>
+                    <div className="grid gap-4 p-4 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
+                      <article className="overflow-hidden rounded-xl border" style={{ borderColor: roleColors.border, background: roleColors.surface }}>
+                        <div className="flex h-28 items-end p-4 sm:h-40" style={{ background: `linear-gradient(135deg, ${roleColors.primary}, ${roleColors.accent})`, color: primaryText }}><span className="text-xs font-semibold">FEATURED STORY</span></div>
+                        <div className="p-4"><h4 className="text-xl font-bold">Designing for the moments that matter</h4><p className="mt-2 text-xs leading-5 opacity-75">A content preview for checking headline hierarchy, paragraph readability, tags, links and card surfaces.</p><span className="mt-3 inline-block text-xs font-semibold" style={{ color: roleColors.info }}>Read the story →</span></div>
+                      </article>
+                      <aside className="space-y-2">
+                        {["A practical guide to better systems", "Small details, stronger experiences", "What thoughtful teams measure"].map((item, index) => <article key={item} className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}><p className="text-[10px] font-semibold" style={{ color: roleColors.accent }}>0{index + 1} · EDITOR’S PICK</p><h5 className="mt-2 text-sm font-semibold">{item}</h5><p className="mt-1 text-[10px] leading-4 opacity-70">A short supporting description for this story.</p></article>)}
+                      </aside>
+                    </div>
+                  </div>
+                ) : (
+                  <div data-testid="palette-preview-dashboard">
+                    <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: roleColors.border }}>
+                      <span className="text-sm font-bold">Acme workspace</span>
+                      <span className="rounded-full px-2 py-1 text-[10px] font-semibold" style={{ background: roleColors.accent, color: primaryText }}>PRO</span>
+                    </div>
+                    <div className="grid gap-3 p-4 sm:grid-cols-[1fr_1fr]">
+                      <div className="rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                        <p className="text-xs font-medium opacity-70">Overview</p>
+                        <p className="mt-2 text-xl font-bold">Design system</p>
+                        <p className="mt-1 text-xs opacity-70">Semantic colors, components and states.</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-md px-3 py-2 text-xs font-semibold" style={{ background: roleColors.primary, color: primaryText }}>Primary action</span>
+                          <span className="rounded-md border px-3 py-2 text-xs font-semibold" style={{ background: roleColors.surface, borderColor: roleColors.secondary, color: roleColors.text }}>Secondary</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-lg border p-3" style={{ background: roleColors.surface, borderColor: roleColors.border }}>
+                        <span className="size-9 rounded-full" style={{ background: roleColors.success }} />
+                        <span><span className="block text-sm font-semibold">All systems normal</span><span className="block text-xs opacity-70">Status uses a label as well as color.</span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
             <section className="space-y-2" aria-labelledby="shade-scale-heading">
