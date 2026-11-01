@@ -14051,6 +14051,7 @@ private struct ABookNativeAttachment: Identifiable, Hashable {
     var mime: String
     var relativePath: String
     var size: Int64
+    var createdAt: Date
 }
 
 private struct ABookNativeRevision: Identifiable {
@@ -14373,7 +14374,10 @@ private final class ABookLocalStore {
     func notes(includeArchived: Bool = false, includeDeleted: Bool = false) throws -> [ABookNativeNote] {
         try perform { context in
             let request = NSFetchRequest<ABookNoteEntity>(entityName: "ABookNoteEntity")
-            request.predicate = includeDeleted ? NSPredicate(format: "deletedAt != nil") : (includeArchived ? NSPredicate(format: "deletedAt == nil") : NSPredicate(format: "deletedAt == nil AND archived == NO"))
+            if includeDeleted && includeArchived { request.predicate = nil }
+            else if includeDeleted { request.predicate = NSPredicate(format: "deletedAt != nil") }
+            else if includeArchived { request.predicate = NSPredicate(format: "deletedAt == nil") }
+            else { request.predicate = NSPredicate(format: "deletedAt == nil AND archived == NO") }
             request.sortDescriptors = [NSSortDescriptor(key: "pinned", ascending: false), NSSortDescriptor(key: "updatedAt", ascending: false)]
             return try context.fetch(request).map(value)
         }
@@ -14491,7 +14495,7 @@ private final class ABookLocalStore {
             request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
             return try context.fetch(request).map {
                 ABookNativeAttachment(id: $0.id, noteID: $0.noteID, name: $0.name, mime: $0.mime,
-                                      relativePath: $0.relativePath, size: $0.size)
+                                      relativePath: $0.relativePath, size: $0.size, createdAt: $0.createdAt)
             }
         }
     }
@@ -14510,7 +14514,7 @@ private final class ABookLocalStore {
         let attachment = ABookNativeAttachment(id: id, noteID: noteID, name: url.lastPathComponent,
                                                mime: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream",
                                                relativePath: "Attachments/" + noteID.uuidString + "/" + destination.lastPathComponent,
-                                               size: size)
+                                               size: size, createdAt: Date())
         try perform { context in
             let entity = ABookAttachmentEntity(context: context)
             entity.id = attachment.id; entity.noteID = noteID; entity.name = attachment.name
