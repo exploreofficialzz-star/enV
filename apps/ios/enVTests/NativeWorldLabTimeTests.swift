@@ -356,6 +356,19 @@ extension NativeWorldLabTimeCheckpointTests {
         XCTAssertGreaterThan(reading.ut1UncertaintySeconds ?? 0,0)
         XCTAssertTrue(reading.bulletin?.contains("No. 44") == true)
     }
+    func testPredictionUncertaintyStartsAtFinalObservedMjd() throws {
+        let shifted=testBulletinA
+            .replacingOccurrences(of:"29 October 2026",with:"29 October 2027")
+            .replacingOccurrences(of:"26 10 28  61341",with:"27 10 28  61706")
+            .replacingOccurrences(of:"26 10 29  61342",with:"27 10 29  61707")
+            .replacingOccurrences(of:"2026 10 30 61343",with:"2027 10 30 61708")
+            .replacingOccurrences(of:"2026 10 31 61344",with:"2027 10 31 61709")
+            .replacingOccurrences(of:"2026 11  1 61345",with:"2027 11  1 61710")
+            .replacingOccurrences(of:"2026 11  2 61346",with:"2027 11  2 61711")
+        let series=try NativeWorldLabTimeScales.parseBulletinA(shifted)
+        XCTAssertEqual(series.samples[2].uncertaintySeconds,0.00025,accuracy:1e-15)
+        XCTAssertEqual(series.samples[3].uncertaintySeconds,0.00025*pow(2.0,0.75),accuracy:1e-15)
+    }
     func testNativeTimeScaleConversionsFailClosedOutsideCertifiedCoverage() throws {
         let series=try NativeWorldLabTimeScales.parseBulletinA(testBulletinA)
         XCTAssertThrowsError(try NativeWorldLabTimeScales.utcToTaiTt("2027-01-02T00:00:00Z"))

@@ -110,6 +110,7 @@ export function parseIersBulletinA(rawText:string):IersBulletinASeries{
   throw new Error("IERS bulletin issue date is invalid.");
  let inCombined=false,inPredictions=false;
  const rows:EarthOrientationSample[]=[];
+ let lastObservedMjd:number|null=null;
  let algorithm="IERS Rapid Service/Prediction Centre source-defined algorithm";
  const lines=rawText.split(/\r?\n/);
  for(const line of lines){
@@ -126,12 +127,16 @@ export function parseIersBulletinA(rawText:string):IersBulletinASeries{
    const ut1=Number(tokens[8]),sigma=Number(tokens[9]);
    const date=[rowYear,String(month).padStart(2,"0"),String(rowDay).padStart(2,"0")].join("-");
    rows.push({utcDay:date,mjd,ut1MinusUtcSeconds:ut1,uncertaintySeconds:sigma,quality:"observed"});
+   lastObservedMjd=mjd;
    continue;
   }
   if(inPredictions&&tokens.length>=7&&/^\d{4}$/.test(tokens[0])&&
     /^\d{1,2}$/.test(tokens[1])&&/^\d{1,2}$/.test(tokens[2])&&/^\d{5}$/.test(tokens[3])){
    const rowYear=Number(tokens[0]),month=Number(tokens[1]),rowDay=Number(tokens[2]),mjd=Number(tokens[3]);
-   const ut1=Number(tokens[6]),daysAfterLastObservation=mjd-61342;
+   const lastObserved=lastObservedMjd;
+   if(lastObserved===null)throw new Error("IERS prediction rows require a preceding observed Earth-orientation sample.");
+   const ut1=Number(tokens[6]),daysAfterLastObservation=mjd-lastObserved;
+   if(daysAfterLastObservation<=0)throw new Error("IERS prediction date must follow the last observed sample.");
    const date=[rowYear,String(month).padStart(2,"0"),String(rowDay).padStart(2,"0")].join("-");
    // Bulletin A's stated prediction-error law: S_t = 0.00025 × (MJD − 61342)^0.75 seconds.
    const sigma=0.00025*Math.pow(daysAfterLastObservation,0.75);

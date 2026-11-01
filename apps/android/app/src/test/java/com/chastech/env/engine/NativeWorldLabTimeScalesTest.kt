@@ -2,6 +2,7 @@ package com.chastech.env.engine
 
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.pow
 
 class NativeWorldLabTimeScalesTest {
     private val bulletin="""I E R S   B U L L E T I N - A
@@ -31,6 +32,19 @@ PREDICTIONS:
         assertEquals(NativeWorldLabEarthOrientationQuality.PREDICTED,reading.quality)
         assertTrue(reading.ut1UncertaintySeconds!!>0)
         assertTrue(reading.bulletin!!.contains("No. 44"))
+    }
+    @Test fun predictionUncertaintyStartsAtTheFinalObservedMjd(){
+        val shifted=bulletin
+            .replace("29 October 2026","29 October 2027")
+            .replace("26 10 28  61341","27 10 28  61706")
+            .replace("26 10 29  61342","27 10 29  61707")
+            .replace("2026 10 30 61343","2027 10 30 61708")
+            .replace("2026 10 31 61344","2027 10 31 61709")
+            .replace("2026 11  1 61345","2027 11  1 61710")
+            .replace("2026 11  2 61346","2027 11  2 61711")
+        val parsed=NativeWorldLabTimeScales.parseBulletinA(shifted)
+        assertEquals(0.00025,parsed.samples[2].uncertaintySeconds,1e-15)
+        assertEquals(0.00025*2.0.pow(0.75),parsed.samples[3].uncertaintySeconds,1e-15)
     }
     @Test fun conversionsFailClosedOutsideDataValidity(){
         assertThrows(IllegalArgumentException::class.java){

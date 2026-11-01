@@ -89,6 +89,7 @@ object NativeWorldLabTimeScales {
         var combined=false;var predictions=false
         var algorithm="IERS Rapid Service/Prediction Centre source-defined algorithm"
         val rows=mutableListOf<NativeWorldLabEarthOrientationSample>()
+        var lastObservedMjd:Int?=null
         raw.lineSequence().forEach { line->
             if(line.contains("COMBINED EARTH ORIENTATION PARAMETERS",true))combined=true
             if(line.trim().startsWith("PREDICTIONS:",true))predictions=true
@@ -100,13 +101,19 @@ object NativeWorldLabTimeScales {
                 t[1].matches(Regex("\\d{1,2}"))&&t[2].matches(Regex("\\d{1,2}"))&&t[3].matches(Regex("\\d{5}"))){
                 val short=t[0].toInt();val year=if(short<50)2000+short else 1900+short
                 val date=LocalDate.of(year,t[1].toInt(),t[2].toInt())
-                rows.add(NativeWorldLabEarthOrientationSample(date.toString(),t[3].toInt(),
+                val observedMjd=t[3].toInt()
+                rows.add(NativeWorldLabEarthOrientationSample(date.toString(),observedMjd,
                     t[8].toDouble(),t[9].toDouble(),NativeWorldLabEarthOrientationQuality.OBSERVED))
+                lastObservedMjd=observedMjd
             }else if(predictions&&t.size>=7&&t[0].matches(Regex("\\d{4}"))&&
                 t[1].matches(Regex("\\d{1,2}"))&&t[2].matches(Regex("\\d{1,2}"))&&t[3].matches(Regex("\\d{5}"))){
                 val date=LocalDate.of(t[0].toInt(),t[1].toInt(),t[2].toInt())
                 val mjd=t[3].toInt()
-                val sigma=0.00025*(mjd-61342).toDouble().pow(0.75)
+                val lastObserved=lastObservedMjd
+                    ?:throw IllegalArgumentException("IERS prediction rows require a preceding observed Earth-orientation sample.")
+                val daysAfterLastObservation=mjd-lastObserved
+                require(daysAfterLastObservation>0){"IERS prediction date must follow the last observed sample."}
+                val sigma=0.00025*daysAfterLastObservation.toDouble().pow(0.75)
                 rows.add(NativeWorldLabEarthOrientationSample(date.toString(),mjd,
                     t[6].toDouble(),sigma,NativeWorldLabEarthOrientationQuality.PREDICTED))
             }

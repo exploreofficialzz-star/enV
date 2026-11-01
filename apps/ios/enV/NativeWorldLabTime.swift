@@ -680,6 +680,7 @@ enum NativeWorldLabTimeScales {
         var combined=false,predictions=false
         var algorithm="IERS Rapid Service/Prediction Centre source-defined algorithm"
         var samples:[NativeWorldLabEarthOrientationSample]=[]
+        var lastObservedMjd:Int?
         for line in raw.components(separatedBy:.newlines) {
             if line.localizedCaseInsensitiveContains("COMBINED EARTH ORIENTATION PARAMETERS"){combined=true}
             if line.trimmingCharacters(in:.whitespaces).uppercased().hasPrefix("PREDICTIONS:"){predictions=true}
@@ -698,13 +699,21 @@ enum NativeWorldLabTimeScales {
                 let day=issueFormatter.string(from:date)
                 samples.append(NativeWorldLabEarthOrientationSample(utcDay:day,mjd:mjd,
                     dut1Seconds:dut1,uncertaintySeconds:uncertainty,quality:.observed))
+                lastObservedMjd=mjd
             }else if predictions,t.count>=7,t[0].range(of:"^\\d{4}$",options:.regularExpression) != nil,
                      let y=Int(t[0]),let mm=Int(t[1]),let dd=Int(t[2]),let mjd=Int(t[3]),let dut1=Double(t[6]) {
                 var c=DateComponents();c.calendar=Calendar(identifier:.gregorian)
                 c.timeZone=TimeZone(secondsFromGMT:0);c.year=y;c.month=mm;c.day=dd
                 guard let date=c.calendar?.date(from:c) else{continue}
                 let day=issueFormatter.string(from:date)
-                let uncertainty=0.00025*pow(Double(mjd-61342),0.75)
+                guard let lastObservedMjd else {
+                    throw NativeWorldLabError.invalid("IERS prediction rows require a preceding observed Earth-orientation sample.")
+                }
+                let daysAfterLastObservation=mjd-lastObservedMjd
+                guard daysAfterLastObservation>0 else {
+                    throw NativeWorldLabError.invalid("IERS prediction date must follow the last observed sample.")
+                }
+                let uncertainty=0.00025*pow(Double(daysAfterLastObservation),0.75)
                 samples.append(NativeWorldLabEarthOrientationSample(utcDay:day,mjd:mjd,
                     dut1Seconds:dut1,uncertaintySeconds:uncertainty,quality:.predicted))
             }
