@@ -59,6 +59,7 @@ import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,inspectionTargetIds,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
 import { WorldLabInspectionPanel } from "./inspection-panel";
+import { WorldLabMotorInternalsPanel } from "./motor-internals-panel";
 import { WorldLabTimeController } from "./time-controller";
 import { createComputedFieldLayers } from "@/lib/world-lab/field-layer";
 import { WorldLabFieldPanel,WorldLabFieldOverlay } from "./field-panel";
@@ -3534,6 +3535,8 @@ export default function WorldLab() {
                           )}
                         </p>
                       )}
+                      <WorldLabMotorInternalsPanel run={selectedActuator}
+                        sample={actuatorSample} timeSeconds={actuatorTime}/>
                       <label className="block text-xs">Explore motor time
                         <input aria-label="Explore motor time" type="range" min={0} className="w-full"
                           max={selectedActuator.input.durationSeconds} step={selectedActuator.solverStepSeconds}
