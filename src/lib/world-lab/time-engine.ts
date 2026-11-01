@@ -73,17 +73,26 @@ export function stepTimeEngine(run:LabRun,state:TimeEngineState,direction:-1|1):
  return seekTimeEngine(run,state,next);
 }
 /** Reverse only traverses immutable recorded samples; it never integrates physics backward. */
-export function advanceTimeEngine(run:LabRun,state:TimeEngineState,elapsedWallSeconds:number):TimeEngineState{
+export function advanceTimeEngine(run:LabRun,state:TimeEngineState,elapsedWallSeconds:number,
+ mandatoryEventTimesSeconds:readonly number[]=[]):TimeEngineState{
  bounded(elapsedWallSeconds,0,60,"Elapsed wall time");
  const wallTimeUTC=new Date(Date.parse(state.wallTimeUTC)+elapsedWallSeconds*1000).toISOString();
  if(state.paused||elapsedWallSeconds===0)return Object.freeze({...state,wallTimeUTC});
  let next=state.simulationTimeSeconds;
  if(state.direction==="forward"){
   next=advanceEventSafeTime(next,elapsedWallSeconds,state.playbackRate,
-    run.time.simulatedDurationSeconds,[]);
+    run.time.simulatedDurationSeconds,mandatoryEventTimesSeconds);
  }else{
   const candidate=Math.max(0,next-elapsedWallSeconds*state.playbackRate);
-  next=candidate;
+  const events=mandatoryEventTimesSeconds.map(event=>{
+   bounded(event,0,run.time.simulatedDurationSeconds,"Mandatory event time");
+   return event;
+  });
+  // Reverse is cached playback, but still lands on event boundaries rather than
+  // skipping over a recorded event in one wall-clock frame.
+  const previous=events.filter(event=>event<next-1e-9&&event>candidate+1e-9)
+   .sort((a,b)=>b-a)[0];
+  next=previous??candidate;
  }
  const {sample}=nearestSample(run,next);
  return Object.freeze({...state,wallTimeUTC,
