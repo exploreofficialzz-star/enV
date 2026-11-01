@@ -131,6 +131,7 @@ fun NativeABookScreen(){
     var search by rememberSaveable{mutableStateOf("")}
     var archived by rememberSaveable{mutableStateOf(false)}
     var showTrash by rememberSaveable{mutableStateOf(false)}
+    var confirmPermanentDelete by rememberSaveable{mutableStateOf(false)}
     var revisions by remember{mutableStateOf(emptyList<ABookRevisionRecord>())}
     var status by remember{mutableStateOf("Saved on this device")}
     var error by remember{mutableStateOf("")}
@@ -219,11 +220,7 @@ fun NativeABookScreen(){
                 val selectedNote=notes.firstOrNull{it.id==selected}
                 if(selectedNote?.deletedAt!=null){
                     OutlinedButton(onClick={db.restore(selectedNote.id);showTrash=false;reload(selectedNote.id,false)}){Text("Restore")}
-                    OutlinedButton(onClick={
-                        val paths=db.permanentlyDelete(selectedNote.id)
-                        paths.forEach{path->val root=context.filesDir.canonicalFile;val target=File(context.filesDir,path).canonicalFile;if(target.path.startsWith(root.path+File.separator))target.delete()}
-                        selected=null;title="";body="";files=emptyList();revisions=emptyList();notes=db.notes(false,true)
-                    }){Text("Delete permanently")}
+                    OutlinedButton(onClick={confirmPermanentDelete=true}){Text("Delete permanently")}
                 }else{
                     OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(pinned=!n.pinned,title=title,body=body,notebook=notebook));reload(selected)}){Text("Pin")}
                     OutlinedButton(onClick={val n=selectedNote?:return@OutlinedButton;db.save(n.copy(archived=true,title=title,body=body));reload()}){Text("Archive")}
@@ -269,5 +266,25 @@ fun NativeABookScreen(){
             if(pendingPdf!=null)Button(onClick={exportPdf.launch("a-book-edited.pdf")}){Text("Save edited PDF")}
         }else Text("Create a note to start your local library.",style=MaterialTheme.typography.bodySmall)
         Text("PDF text extraction and rotation run locally. Files are not uploaded.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if(confirmPermanentDelete){
+        AlertDialog(
+            onDismissRequest={confirmPermanentDelete=false},
+            title={Text("Delete permanently?")},
+            text={Text("This removes the note, its revision history and its attached files from this device. This cannot be undone.")},
+            confirmButton={TextButton(onClick={
+                confirmPermanentDelete=false
+                selected?.let{id->
+                    val paths=db.permanentlyDelete(id)
+                    paths.forEach{path->
+                        val root=context.filesDir.canonicalFile
+                        val target=File(context.filesDir,path).canonicalFile
+                        if(target.path.startsWith(root.path+File.separator))target.delete()
+                    }
+                    selected=null;title="";body="";files=emptyList();revisions=emptyList();notes=db.notes(false,true)
+                }
+            }){Text("Delete permanently",color=MaterialTheme.colorScheme.error)}},
+            dismissButton={TextButton(onClick={confirmPermanentDelete=false}){Text("Cancel")}}
+        )
     }
 }
