@@ -74,7 +74,7 @@ const designHexColorConverterTool: ToolMeta = {
 
 type ExpansionFamily = (typeof EXPANSION_FAMILIES)[number];
 const expansionRows = mathExpansion as Record<ExpansionFamily, string[][]>;
-const generatedCalculatorPresentation = new Map<string, { name: string; description: string }>();
+const generatedCalculatorPresentation = new Map<string, { name: string; description: string; keywords: string[] }>();
 
 // Human-readable labels are generated from the same field metadata the calculator
 // engine uses. This also repairs existing checked-in catalog records immediately,
@@ -105,7 +105,7 @@ for (const family of EXPANSION_FAMILIES) {
 function presentGeneratedCalculator(tool: ToolMeta): ToolMeta {
   if (tool.engine.type !== "calculator") return tool;
   const presentation = generatedCalculatorPresentation.get(tool.engine.formula);
-  return presentation ? { ...tool, ...presentation } : tool;
+  return presentation ? { ...tool, ...presentation, keywords: [...new Set([...tool.keywords, ...presentation.keywords])] } : tool;
 }
 
 const allTools: ToolMeta[] = [
