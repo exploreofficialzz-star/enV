@@ -5,7 +5,7 @@ const catalogMatch = catalogSource.match(/const catalogJson = \[([\s\S]*?)\]\.jo
 assert.ok(catalogMatch, "catalog JSON literal is present");
 const tools = JSON.parse(JSON.parse(`[${catalogMatch[1]}]`).join(""));
 
-const expectedWebExempt = ["accessibility", "audio", "business", "calculators", "datetime", "developer", "ecommerce", "qr", "video"]
+const expectedWebExempt = ["accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video"];
 const expectedNativeExempt = ["accessibility", "audio", "business", "calculators", "datetime", "developer", "ecommerce", "qr", "video"]
 const webPolicy = fs.readFileSync(new URL("../src/lib/production-notice.ts", import.meta.url), "utf8");
 const android = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
@@ -27,9 +27,9 @@ function quotedValues(source, pattern, description) {
 const webExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_CATEGORIES\s*=\s*new Set<CategoryId>\(\[([\s\S]*?)\]\)/, "Web");
 const androidExempt = quotedValues(android, /productionExemptCategories\s*=\s*setOf\(([^)]*)\)/, "Android");
 const iosExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(category\.lowercased\(\)\)/, "iOS");
-assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the eight implemented categories");
-assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented QR and E-commerce categories");
-assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented QR and E-commerce categories");
+assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the implemented Web-ready categories");
+assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented native categories");
+assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented native categories");
 
 assert.ok(Array.isArray(tools) && tools.length > 0, "catalog tools load");
 const categories = new Set(tools.map((tool) => tool.category));
@@ -45,4 +45,4 @@ assert.ok(android.includes("candidate?.isUnderProduction() == true") && android.
 assert.ok(android.includes('Text("Under production"') && android.includes('if (tool.isUnderProduction()) Text("Under production"'), "Android card and search surfaces are labeled");
 assert.ok(ios.includes("var isUnderProduction: Bool") && iosCards.includes("if tool.isUnderProduction") && iosDestinations.includes("ToolDestinationView(tool: $0)"), "iOS cards and destinations apply production policy");
 
-console.log(`Production-gating audit PASS: ${tools.length} catalog tools scanned; Web, Android and iOS expose the same 8 implemented categories; ${restricted.length} other tools remain restricted.`);
+console.log(`Production-gating audit PASS: ${tools.length} catalog tools scanned; Web exposes ${expectedWebExempt.length} implemented categories and Android/iOS expose ${expectedNativeExempt.length} native categories; ${restricted.length} other tools remain restricted.`);
