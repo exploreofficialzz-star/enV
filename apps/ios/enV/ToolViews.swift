@@ -536,7 +536,6 @@ struct ToolCommunityPanel: View {
     @State private var enabled = true
     @State private var isSending = false
     @State private var commentText = ""
-    @State private var activePDFSelection: UUID?
     @State private var publicIdentity = false
     @State private var displayName = ""
     @State private var replyTo: String?
@@ -14131,8 +14130,11 @@ private final class ABookLocalStore {
             ]
             let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
             let root = try fileManager.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            let directory = root.appendingPathComponent("Abook", isDirectory: true)
+            var directory = root.appendingPathComponent("Abook", isDirectory: true)
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            var backupProtection = URLResourceValues()
+            backupProtection.isExcludedFromBackup = true
+            try directory.setResourceValues(backupProtection)
             let storeURL = directory.appendingPathComponent("Abook.sqlite")
             try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL, options: [
                 NSMigratePersistentStoresAutomaticallyOption: true,
@@ -14350,6 +14352,7 @@ private struct NativeABookView: View {
     @State private var exportingNote = false
     @State private var importingFiles = false
     @State private var commentText = ""
+    @State private var activePDFSelection: UUID?
 
     private var saveKey: String {
         (selectedID?.uuidString ?? "") + "|" + title + "|" + notebook + "|" + tags + "|" + bodyText + "|" + String(showArchived)
@@ -14530,7 +14533,7 @@ private struct NativeABookView: View {
         try? await Task.sleep(nanoseconds: 500_000_000)
         guard !Task.isCancelled else { return }
         let current = ABookNativeNote(id: id, title: title, body: bodyText, notebook: notebook,
-                                      tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map(String.init),
+                                      tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map { String($0) },
                                       pinned: notes.first(where: { $0.id == id })?.pinned ?? false,
                                       archived: notes.first(where: { $0.id == id })?.archived ?? false,
                                       deletedAt: notes.first(where: { $0.id == id })?.deletedAt,
@@ -14549,7 +14552,7 @@ private struct NativeABookView: View {
     private func updateSelected(pinned: Bool? = nil, archived: Bool? = nil, deleted: Bool = false) {
         guard let id = selectedID, let original = notes.first(where: { $0.id == id }) else { return }
         let note = ABookNativeNote(id: id, title: title, body: bodyText, notebook: notebook,
-                                   tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map(String.init),
+                                   tags: tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(50).map { String($0) },
                                    pinned: pinned ?? original.pinned, archived: archived ?? original.archived,
                                    deletedAt: deleted ? Date() : original.deletedAt, createdAt: original.createdAt,
                                    updatedAt: Date(), revision: original.revision)
