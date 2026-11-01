@@ -662,7 +662,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
         <div className="space-y-2">
           <Label htmlFor="design-color">Color value</Label>
           <Input id="design-color" value={colorValue} onChange={(event) => setColorValue(event.target.value)} className="font-mono" />
-          {!color ? <p className="text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV or CMYK color.</p> : null}
+          {!color ? <p className="text-xs text-danger">Enter a valid HEX, RGB, HSL, HSV, CMYK, HWB or OKLCH color.</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="design-color-picker">Pick a color</Label>
@@ -686,7 +686,7 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
             className="min-h-9 w-full accent-accent"
             aria-label="Color opacity"
           />
-          <p className="text-xs text-muted">The HEX and RGB outputs include alpha when it is below 100%.</p>
+          <p className="text-xs text-muted">HEX, RGB, HWB and OKLCH values preserve the selected alpha where the format supports it.</p>
         </div>
       ) : null}
       {color ? (
@@ -705,6 +705,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               ["RGB", toRgbString(color)],
               ["HSL", toHslString(color)],
               ["HSV / HSB", formatHsv(color)],
+              ["HWB", formatHwb(color)],
+              ["OKLCH", formatOklch(color)],
               ["CMYK · screen estimate", formatCmyk(color)],
             ].map(([label, value]) => (
               <div key={label} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3">

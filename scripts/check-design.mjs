@@ -49,7 +49,7 @@ const checks = [
   ["Design category search", explorer.includes("Search design tools")],
   ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
   ["Color converter-specific routing", dispatcher.includes("ColorEngine op={tool.engine.op} toolId={tool.id}")],
-  ["Color picker alpha control", colorEngine.includes("design-color-alpha") && colorEngine.includes("Opacity / alpha")],
+  ["Color picker alpha control and extended CSS Color 4 outputs", colorEngine.includes("design-color-alpha") && colorEngine.includes("Opacity / alpha") && colorEngine.includes('["HWB", formatHwb(color)]') && colorEngine.includes('["OKLCH", formatOklch(color)]')],
   ["CSS generator-specific routing", dispatcher.includes("CssGenEngine op={tool.engine.op} toolId={tool.id}")],
   ["HSV conversion implementation", designColor.includes("function rgbToHsv") && designColor.includes("function hsvToRgb")],
   ["Palette harmony controls and selectable palette counts", colorEngine.includes("Split complementary") && colorEngine.includes("Monochromatic") && colorEngine.includes("palette-count") && colorEngine.includes("Edit palette color") && palette.includes("createHarmonyPalette")],
