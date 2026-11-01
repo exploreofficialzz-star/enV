@@ -171,7 +171,12 @@ export async function extractSelectedPdfs(files: ABookPdfInput[], pageRange: str
     const document = await PDFDocument.create();
     const copied = await document.copyPages(source, item.pages.map((page) => page - 1));
     copied.forEach((page) => document.addPage(page));
-    output[filename] = await document.save({ useObjectStreams: true });
+    const serialized = await document.save({ useObjectStreams: true });
+    if (!(serialized instanceof Uint8Array) || serialized.byteLength === 0) {
+      throw new Error(`The extracted PDF for ${item.name} could not be serialized.`);
+    }
+    // Retain an independently-owned byte range for each ZIP entry.
+    output[filename] = serialized.slice();
   }
   return zipSync(output, { level: 6 });
 }
