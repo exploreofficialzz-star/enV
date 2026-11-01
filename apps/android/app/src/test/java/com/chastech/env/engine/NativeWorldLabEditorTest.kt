@@ -401,8 +401,6 @@ class NativeWorldLabEditorTest {
         }
     }
 
-}
-
 
     @Test fun sketchExtrusionsHonorBasePlanePlacementAndWorldOrientation(){
         var json=NativeWorldLabEditor.blank()
@@ -506,3 +504,53 @@ class NativeWorldLabEditorTest {
             NativeWorldLabEditor.importCadExchange(full,NativeWorldLabEditor.exportCadExchange(source))
         }
     }
+
+ 
+    @Test fun multiSelectionSnapIsAtomicAndMatchesWebNegativeHalfGridRule(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="b")
+        json=NativeWorldLabEditor.addSolid(json,"box",id="outside")
+        json=NativeWorldLabEditor.positionSolid(json,"a",listOf(0.25,-0.25,2.49))
+        json=NativeWorldLabEditor.positionSolid(json,"b",listOf(3.0,4.0,12.0))
+        json=NativeWorldLabEditor.positionSolid(json,"outside",listOf(8.25,0.0,0.0))
+        val before=NativeWorldLabProjectCodec.decode(json)
+        val snapped=NativeWorldLabEditor.snapSolids(json,listOf("a","b"),0.5)
+        val after=NativeWorldLabProjectCodec.decode(snapped)
+        assertEquals(before.revision+1,after.revision)
+        val a=after.entities.first{it.id=="a"}
+        assertEquals(0.5,a.positionMeters.x,1e-12)
+        assertEquals(0.0,a.positionMeters.y,1e-12)
+        assertEquals(2.5,a.positionMeters.z,1e-12)
+        assertEquals(before.entities.first{it.id=="outside"}.positionMeters,
+            after.entities.first{it.id=="outside"}.positionMeters)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.snapSolids(json,listOf("a","missing"),0.5)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.snapSolids(json,listOf("a","a"),0.5)
+        }
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.snapSolids(json,listOf("a"),0.0)
+        }
+    }
+
+    @Test fun selectedGeometryMeasurementReportsRealThreeDimensionalAndHorizontalOffsets(){
+        var json=NativeWorldLabEditor.blank()
+        json=NativeWorldLabEditor.addSolid(json,"box",id="a")
+        json=NativeWorldLabEditor.addSolid(json,"sphere",id="b")
+        json=NativeWorldLabEditor.positionSolid(json,"a",listOf(0.0,0.0,0.0))
+        json=NativeWorldLabEditor.positionSolid(json,"b",listOf(3.0,4.0,12.0))
+        val project=NativeWorldLabProjectCodec.decode(json)
+        val measured=NativeWorldLabEditor.measureCenters(project,"a","b")
+        assertEquals(13.0,measured.centerDistanceM,1e-12)
+        assertEquals(kotlin.math.hypot(3.0,12.0),measured.horizontalDistanceM,1e-12)
+        assertEquals(3.0,measured.offsetXM,1e-12)
+        assertEquals(4.0,measured.offsetYM,1e-12)
+        assertEquals(12.0,measured.offsetZM,1e-12)
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabEditor.measureCenters(project,"a","a")
+        }
+    }
+ 
+}
