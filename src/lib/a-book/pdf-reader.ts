@@ -24,17 +24,17 @@ type PdfReaderOptions = {
   onProgress?: ABookPdfTextProgress;
 };
 
-let pdfjsPromise: Promise<typeof import("pdfjs-dist")> | null = null;
+let pdfjsPromise: Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> | null = null;
 
-async function loadPdfJs(): Promise<typeof import("pdfjs-dist")> {
+async function loadPdfJs(): Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
-      const pdfjs = await import("pdfjs-dist");
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
       if (typeof window !== "undefined") {
         if (typeof Worker === "undefined") {
           throw new Error("This browser does not support isolated local PDF reading. Enable Web Workers or use a supported browser.");
         }
-        const workerAsset = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+        const workerAsset = await import("pdfjs-dist/legacy/build/pdf.worker.mjs?url");
         pdfjs.GlobalWorkerOptions.workerSrc = workerAsset.default;
       }
       return pdfjs;
