@@ -59,10 +59,9 @@ enum NativeWorldLabOptics {
             incidentAngleDegrees:angleDegrees,reflectedAngleDegrees:angleDegrees,
             transmittedAngleDegrees:total ? nil : asin(min(1,sinT))*180/Double.pi,
             criticalAngleDegrees:n1>n2 ? asin(n2/n1)*180/Double.pi : nil,
-            totalInternalReflection:total,sReflectance:reflectS,
-            pReflectance:reflectP,unpolarizedReflectance:reflectance,
-            unpolarizedTransmittance:transmittance,
-            energyResidual:abs(1-reflectance-transmittance),
+            sReflectance:reflectS,pReflectance:reflectP,
+            unpolarizedReflectance:reflectance,unpolarizedTransmittance:transmittance,
+            energyResidual:abs(1-reflectance-transmittance),totalInternalReflection:total,
             validity:"Lossless planar isotropic nonmagnetic Fresnel/Snell model. " + "All refractive indices are invented assumptions, not measurements. " + "No absorption, dispersion, interference or real material certification.")
     }
 }
