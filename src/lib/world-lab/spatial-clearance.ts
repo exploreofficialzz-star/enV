@@ -2,15 +2,15 @@ import {cadBounds} from "./cad.ts";
 import type {WorldLabEntity} from "./project.ts";
 
 /**
- * Primitive-axis aligned broad-phase only. Portable v1 has no rotation.
- * For two boxes the Euclidean surface gap is exact; for a curved shape
- * it is a conservative lower bound from the enclosing AABBs.
+ * Rotation-aware enclosing-AABB broad phase. Only unrotated rectangular boxes
+ * receive an exact axis-aligned overlap classification; all other overlap
+ * reports remain conservative and do not claim oriented-box contact.
  */
 export type WorldLabSpatialClearance=Readonly<{
   fromId:string;toId:string;gapLowerBoundMeters:number;
   axisGapMeters:readonly [number,number,number];
   overlapDepthMeters:readonly [number,number,number];
-  status:"separated"|"bounds-touch"|"box-intersection"|"potential-curved-intersection";
+  status:"separated"|"bounds-touch"|"box-intersection"|"potential-rotated-box-intersection"|"potential-curved-intersection";
   exactForBoxes:boolean;
   evidence:"geometry-model-computed";
   validity:string;
@@ -38,12 +38,14 @@ export function inspectWorldLabSpatialClearance(
   const exact=a.shape==="box"&&b.shape==="box"&&
     (a.rotationRadians??[0,0,0]).every(v=>Math.abs(v)<1e-10)&&
     (b.rotationRadians??[0,0,0]).every(v=>Math.abs(v)<1e-10);
+  const bothBoxes=a.shape==="box"&&b.shape==="box";
   const status=separated?"separated":touching?"bounds-touch":
-    exact?"box-intersection":"potential-curved-intersection";
+    exact?"box-intersection":bothBoxes?"potential-rotated-box-intersection":"potential-curved-intersection";
   return {fromId:a.id,toId:b.id,gapLowerBoundMeters:gap,
     axisGapMeters:gaps,overlapDepthMeters:overlap,status,exactForBoxes:exact,
     evidence:"geometry-model-computed",
     validity:exact?
       "Axis-aligned rectangular-box geometry only. Interpenetration is not an impact, contact-force or structural simulation.":
+      bothBoxes?"Conservative transformed-AABB broad-phase for rotated rectangular solids. Overlap does not establish exact oriented-box contact, penetration depth, impact or contact force.":
       "Conservative enclosing-box broad-phase. The lower bound may be zero for curved objects that do not touch; no shape-accurate collision, material deformation or contact force is claimed."};
 }

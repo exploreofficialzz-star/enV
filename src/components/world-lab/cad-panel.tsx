@@ -24,6 +24,7 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
  const [alignment,setAlignment]=useState<CadAlignment>("center");
  const [gap,setGap]=useState(0.25);
  const [error,setError]=useState("");
+ const entityKey=project?.entities.map(e=>e.id).join("|")??"";
  useEffect(()=>{
    if(!project){setSelection([]);return;}
    setSelection(old=>{
@@ -32,9 +33,9 @@ export function WorldLabCadPanel({project,selectedEntityId,onChange}:Props){
        return [selectedEntityId];
      return valid;
    });
- },[project?.id,project?.entities.map(e=>e.id).join("|"),selectedEntityId]);
+ },[project?.id,entityKey,selectedEntityId]);
  const selected=useMemo(()=>project?.entities.filter(e=>selection.includes(e.id))??[],
-   [project,selection]);
+   [project,entityKey,selection]);
  const canEdit=Boolean(project&&selected.length);
  function apply(transform:(p:WorldLabProject)=>WorldLabProject){
    try{setError("");onChange(transform);}

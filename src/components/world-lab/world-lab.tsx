@@ -1032,6 +1032,15 @@ export default function WorldLab() {
     }
   }
 
+  const observerProjectId=project?.id;
+  useEffect(()=>{
+    const current=projectForEdits.current,camera=sceneRef.current?.camera;
+    if(!current||!camera||current.id!==observerProjectId||cameraRestoredProject.current===current.id)return;
+    camera.position.copyFromFloats(...current.camera.positionMeters);
+    camera.setTarget(new B.Vector3(...current.camera.lookingAtMeters));
+    cameraRestoredProject.current=current.id;
+  },[observerProjectId]);
+
   function saveObserverViewpoint(){
     const current=projectForEdits.current,camera=sceneRef.current?.camera;
     if(!current||!camera)return;
