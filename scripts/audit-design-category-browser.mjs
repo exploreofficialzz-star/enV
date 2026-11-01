@@ -180,15 +180,19 @@ for (const [browserName, browserType] of browserEntries) {
   // keyboard acceptance is deterministic across Chromium, Firefox and WebKit.
   const gradientResponse = await page.goto(baseUrl + "/tools/design/gradient-generator", { waitUntil: "domcontentloaded", timeout: 60000 });
   assert.ok(gradientResponse && gradientResponse.ok(), "Gradient Generator route should respond successfully");
+  // Wait for the gradient route's client-side editor to hydrate before keyboard interaction.
+  await page.waitForLoadState("networkidle", { timeout: 30000 });
   const endStopRow = page.locator('[data-testid="gradient-stop-end"]');
   const moveEarlier = endStopRow.getByRole("button", { name: "Move stop 3 earlier" });
   await moveEarlier.waitFor({ state: "visible" });
+  assert.equal(await moveEarlier.isEnabled(), true, "The third stop must expose an enabled Move earlier control");
   await moveEarlier.focus();
+  assert.equal(await moveEarlier.evaluate((element) => element === document.activeElement), true, "Gradient reorder control should receive keyboard focus");
   await page.keyboard.press("Enter");
   await page.waitForFunction(() => {
-    const order = [...document.querySelectorAll('[data-testid^="gradient-stop-"]')]
-      .map((element) => element.getAttribute("data-testid"));
-    return order.join(",") === "gradient-stop-start,gradient-stop-end,gradient-stop-middle";
+    const endPosition = document.querySelector('[data-testid="gradient-stop-end"] input[type="number"]')?.value;
+    const middlePosition = document.querySelector('[data-testid="gradient-stop-middle"] input[type="number"]')?.value;
+    return endPosition === "50" && middlePosition === "100";
   }, { timeout: 10000 });
   assert.equal(await page.getByRole("button", { name: "Move stop 2 earlier" }).isVisible(), true, "Keyboard reorder controls should remain available after state changes");
 
