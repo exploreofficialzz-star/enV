@@ -1,4 +1,28 @@
-import type {WorldLabCircuitNetwork} from "./project.ts";
+import type {WorldLabCircuitNetwork,WorldLabCircuitComponent} from "./project.ts";
+
+export type DcBranchCurrentFlow=Readonly<{
+ signedCurrentA:number;magnitudeA:number;
+ fromNodeId:string|null;toNodeId:string|null;
+ direction:"positive-to-negative"|"negative-to-positive"|"zero";
+}>;
+/** Resolve conventional signed branch current to a topology direction; never imply an EM field. */
+export function dcBranchCurrentFlow(
+ component:Pick<WorldLabCircuitComponent,"positiveNodeId"|"negativeNodeId">,
+ signedCurrentA:number,
+):DcBranchCurrentFlow{
+ if(!Number.isFinite(signedCurrentA)||Math.abs(signedCurrentA)>1e6)
+  throw new Error("Branch current is outside the supported finite SI range.");
+ if(Math.abs(signedCurrentA)<=1e-12)return Object.freeze({
+  signedCurrentA,magnitudeA:0,fromNodeId:null,toNodeId:null,direction:"zero",
+ });
+ const forward=signedCurrentA>0;
+ return Object.freeze({
+  signedCurrentA,magnitudeA:Math.abs(signedCurrentA),
+  fromNodeId:forward?component.positiveNodeId:component.negativeNodeId,
+  toNodeId:forward?component.negativeNodeId:component.positiveNodeId,
+  direction:forward?"positive-to-negative":"negative-to-positive",
+ });
+}
 
 /**
  * Bounded real DC resistive network, modified nodal analysis (MNA).
