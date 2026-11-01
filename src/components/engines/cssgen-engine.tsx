@@ -128,6 +128,7 @@ const BASE_FIELDS: Record<string, UiField[]> = {
   blob: [
     { name: "seed", label: "Shape variation", type: "number", defaultValue: 7, min: 1, max: 999, step: 1 },
     { name: "points", label: "Shape detail", type: "select", defaultValue: "12", options: [{ value: "8", label: "Simple" }, { value: "12", label: "Balanced" }, { value: "18", label: "Detailed" }] },
+    { name: "irregularity", label: "Organic variation", type: "number", defaultValue: 0.7, min: 0, max: 1, step: 0.01 },
     { name: "rotation", label: "Rotation", type: "number", defaultValue: 0, min: 0, max: 360, suffix: "deg" },
     { name: "color", label: "Fill color", type: "color", defaultValue: "#0d9f8a" },
     { name: "stroke", label: "Outline color", type: "color", defaultValue: "#ffffff" },
@@ -361,6 +362,7 @@ function cssFor(
       rotation: numberValue(values, "rotation", 0, 0, 360),
       stroke: values.stroke ?? "#ffffff",
       strokeWidth: numberValue(values, "strokeWidth", 0, 0, 8),
+      irregularity: numberValue(values, "irregularity", 0.7, 0, 1),
     });
     return { css: svg, style: {}, svg };
   }

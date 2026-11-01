@@ -11,6 +11,9 @@ test("blob generator is deterministic, bounded and safely colors its output", ()
   assert.match(first, /viewBox="0 0 100 100"/);
   assert.match(buildBlobSvg({ seed: 18, points: 12, color: "#0d9f8a" }), /<path /);
   assert.match(first, /fill="#0d9f8a"/);
+  const round = buildBlobSvg({ seed: 17, points: 12, color: "#0d9f8a", irregularity: 0 });
+  const organic = buildBlobSvg({ seed: 17, points: 12, color: "#0d9f8a", irregularity: 1 });
+  assert.notEqual(round, organic);
   const outlined = buildBlobSvg({ seed: 17, points: 12, color: "#0d9f8a", rotation: 45, stroke: "#112233", strokeWidth: 2 });
   assert.match(outlined, /rotate\(45 50 50\)/);
   assert.match(outlined, /stroke="#112233" stroke-width="2"/);

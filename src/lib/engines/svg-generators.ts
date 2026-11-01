@@ -1,5 +1,5 @@
 export type PatternStyle = "dots" | "grid" | "diagonal" | "cross" | "horizontal" | "rings" | "chevron" | "hexagons" | "crosshatch" | "checkerboard" | "triangles" | "polka" | "waves" | "zigzag";
-export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number };
+export type BlobSvgOptions = { seed: number; points: number; color: string; rotation?: number; stroke?: string; strokeWidth?: number; irregularity?: number };
 export type WaveSvgOptions = {
   amplitude: number;
   layers: number;
@@ -53,13 +53,14 @@ export function buildPatternSvg(size: number, opacity: number, color: string, pa
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${safeSize}" height="${safeSize}" viewBox="0 0 ${safeSize} ${safeSize}"><g transform="rotate(${safeRotation} ${center} ${center})">${patternShapes[safePattern]}</g></svg>`;
 }
 
-export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#ffffff", strokeWidth = 0 }: BlobSvgOptions): string {
+export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#ffffff", strokeWidth = 0, irregularity = 0.7 }: BlobSvgOptions): string {
   const safeSeed = Math.round(clamp(seed, 1, 999));
   const count = Math.round(clamp(points, 8, 18));
   const safeColor = safeHex(color, "#0d9f8a");
   const safeStroke = safeHex(stroke, "#ffffff");
   const safeRotation = clamp(rotation, 0, 360);
   const safeStrokeWidth = clamp(strokeWidth, 0, 8);
+  const safeIrregularity = clamp(irregularity, 0, 1);
   let randomState = safeSeed >>> 0;
   const random = () => {
     randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
@@ -67,7 +68,7 @@ export function buildBlobSvg({ seed, points, color, rotation = 0, stroke = "#fff
   };
   const coordinates = Array.from({ length: count }, (_, index) => {
     const angle = (index / count) * Math.PI * 2;
-    const radius = 28 + random() * 18;
+    const radius = 42 - safeIrregularity * 9 + random() * safeIrregularity * 18;
     return { x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius };
   });
   const middle = (a: { x: number; y: number }, b: { x: number; y: number }) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
