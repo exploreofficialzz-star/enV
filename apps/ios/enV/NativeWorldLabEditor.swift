@@ -1286,7 +1286,7 @@ enum NativeWorldLabEditor {
             throw NativeWorldLabError.invalid("Selected solid is missing")
         }
         let result=try solid.positionMeters.map{value -> Double in
-            let raw=(value/gridMeters).rounded()*gridMeters
+            let raw=floor(value/gridMeters+0.5)*gridMeters
             let rounded=(raw*1e6).rounded()/1e6
             guard rounded.isFinite,abs(rounded)<=100000 else {
                 throw NativeWorldLabError.invalid("Snapped position outside local world")
@@ -1294,6 +1294,34 @@ enum NativeWorldLabEditor {
             return rounded
         }
         return try positionSolid(data,id:id,positionMeters:result)
+    }
+    /** Snap a selected CAD group atomically, preserving one-revision edit semantics. */
+    static func snapSolids(_ data:Data,ids:[String],gridMeters:Double)throws->Data {
+        guard gridMeters.isFinite,gridMeters>=0.001,gridMeters<=100 else {
+            throw NativeWorldLabError.invalid("Grid spacing must be 0.001–100 metres")
+        }
+        return try mutate(data){root in
+            let selected=try Self.selectedCAD(root,ids)
+            var entities=root["entities"] as? [[String:Any]] ?? []
+            for part in selected {
+                guard let id=part["id"] as? String,
+                      let index=entities.firstIndex(where:{$0["id"] as? String==id}),
+                      let position=entities[index]["positionMeters"] as? [Double],
+                      position.count==3 else {
+                    throw NativeWorldLabError.invalid("A selected CAD part has invalid coordinates")
+                }
+                let snapped=position.map{value -> Double in
+                    let raw=floor(value/gridMeters+0.5)*gridMeters
+                    let rounded=floor(raw*1e6+0.5)/1e6
+                    guard rounded.isFinite,abs(rounded)<=100000 else {
+                        throw NativeWorldLabError.invalid("Snapped position exceeds the local-world coordinate envelope")
+                    }
+                    return rounded==0 ? 0:rounded
+                }
+                entities[index]["positionMeters"]=snapped
+            }
+            root["entities"]=entities
+        }
     }
     static func measureCenters(_ project:NativeWorldLabProject,
                                fromId:String,toId:String) throws -> GeometryMeasurement {
