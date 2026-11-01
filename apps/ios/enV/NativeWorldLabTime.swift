@@ -135,8 +135,8 @@ struct NativeWorldLabRecordedRun:Equatable {
     func validate()throws {
         guard !runId.isEmpty,runId.count<=160,!modelId.isEmpty,modelId.count<=120,
               !modelVersion.isEmpty,modelVersion.count<=80,
-              worldEpochUTC.hasSuffix("Z"),ISO8601DateFormatter().date(from:worldEpochUTC) != nil,
-              (2...200_000).contains(sampleTimesSeconds.count),
+              worldEpochUTC.hasSuffix("Z"),NativeWorldLabRecordedTime.parseUTC(worldEpochUTC) != nil,
+              (2...200_000).contains(sampleTimesSeconds.count),durationSeconds<=315_576_000,
               sampleTimesSeconds.allSatisfy({$0.isFinite && $0>=0}),
               zip(sampleTimesSeconds,sampleTimesSeconds.dropFirst()).allSatisfy({$1>$0}),
               mandatoryEventTimesSeconds.count<=100_000,
@@ -149,7 +149,7 @@ struct NativeWorldLabRecordedRun:Equatable {
     }
 }
 
-struct NativeWorldLabRecordedClock:Equatable {
+struct NativeWorldLabRecordedClock:Codable,Equatable {
     let wallTimeUTC:String
     let worldDateUTC:String
     let simulationTimeSeconds:Double
@@ -213,6 +213,17 @@ struct NativeWorldLabRecordedCheckpoint:Codable,Equatable {
 
 enum NativeWorldLabRecordedTime {
     static let epsilon=1e-9
+    private static func parseUTC(_ value:String)->Date? {
+        guard value.hasSuffix("Z") else{return nil}
+        let fractional=ISO8601DateFormatter()
+        fractional.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        return fractional.date(from:value) ?? ISO8601DateFormatter().date(from:value)
+    }
+    private static func formatUTC(_ value:Date)->String {
+        let formatter=ISO8601DateFormatter()
+        formatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        return formatter.string(from:value)
+    }
     static func nearestIndex(run:NativeWorldLabRecordedRun,timeSeconds:Double)throws->Int {
         try run.validate()
         guard timeSeconds.isFinite,(0...run.durationSeconds).contains(timeSeconds) else {
@@ -224,8 +235,8 @@ enum NativeWorldLabRecordedTime {
     }
     static func validate(clock:NativeWorldLabRecordedClock,run:NativeWorldLabRecordedRun)throws {
         guard clock.wallTimeUTC.hasSuffix("Z"),clock.worldDateUTC.hasSuffix("Z"),
-              let wall=ISO8601DateFormatter().date(from:clock.wallTimeUTC),
-              let world=ISO8601DateFormatter().date(from:clock.worldDateUTC),
+              let wall=parseUTC(clock.wallTimeUTC),
+              let world=parseUTC(clock.worldDateUTC),
               clock.simulationTimeSeconds.isFinite,
               (0...run.durationSeconds).contains(clock.simulationTimeSeconds),
               run.sampleTimesSeconds.indices.contains(clock.sampleIndex),
@@ -240,7 +251,7 @@ enum NativeWorldLabRecordedTime {
             throw NativeWorldLabError.invalid("Recorded playback clock fields are inconsistent or out of bounds.")
         }
         _ = wall
-        let epoch=ISO8601DateFormatter().date(from:run.worldEpochUTC)!
+        let epoch=parseUTC(run.worldEpochUTC)!
         let expected=epoch.addingTimeInterval(clock.simulationTimeSeconds)
         guard abs(expected.timeIntervalSince(world))<=0.001 else {
             throw NativeWorldLabError.invalid("World date does not agree with recorded simulation time.")
@@ -261,10 +272,10 @@ enum NativeWorldLabRecordedTime {
         elapsedSeconds:Double,paused:Bool?=nil)throws->NativeWorldLabRecordedClock {
         try run.validate();try validate(clock:state,run:run)
         guard elapsedSeconds.isFinite,(0...60).contains(elapsedSeconds),
-              let wall=ISO8601DateFormatter().date(from:state.wallTimeUTC) else {
+              let wall=parseUTC(state.wallTimeUTC) else {
             throw NativeWorldLabError.invalid("Elapsed wall time or wall clock is invalid.")
         }
-        let wallString=ISO8601DateFormatter().string(from:wall.addingTimeInterval(elapsedSeconds))
+        let wallString=formatUTC(wall.addingTimeInterval(elapsedSeconds))
         if paused ?? state.paused {
             let result=NativeWorldLabRecordedClock(wallTimeUTC:wallString,worldDateUTC:state.worldDateUTC,
                 simulationTimeSeconds:state.simulationTimeSeconds,solverInternalTimeSeconds:nil,
@@ -282,8 +293,8 @@ enum NativeWorldLabRecordedTime {
         if !crossed.isEmpty {next=signed>0 ? crossed.min()!:crossed.max()!}
         let index=try nearestIndex(run:run,timeSeconds:next)
         let sample=run.sampleTimesSeconds[index]
-        let epoch=ISO8601DateFormatter().date(from:run.worldEpochUTC)!
-        let world=ISO8601DateFormatter().string(from:epoch.addingTimeInterval(next))
+        let epoch=parseUTC(run.worldEpochUTC)!
+        let world=formatUTC(epoch.addingTimeInterval(next))
         let result=NativeWorldLabRecordedClock(wallTimeUTC:wallString,worldDateUTC:world,
             simulationTimeSeconds:next,solverInternalTimeSeconds:nil,
             displaySampleTimeSeconds:sample,sampleIndex:index,playbackRate:state.playbackRate,
@@ -296,8 +307,8 @@ enum NativeWorldLabRecordedTime {
         try run.validate();try validate(clock:state,run:run)
         let index=try nearestIndex(run:run,timeSeconds:timeSeconds)
         let sample=run.sampleTimesSeconds[index]
-        let epoch=ISO8601DateFormatter().date(from:run.worldEpochUTC)!
-        let world=ISO8601DateFormatter().string(from:epoch.addingTimeInterval(sample))
+        let epoch=parseUTC(run.worldEpochUTC)!
+        let world=formatUTC(epoch.addingTimeInterval(sample))
         let result=NativeWorldLabRecordedClock(wallTimeUTC:state.wallTimeUTC,
             worldDateUTC:world,simulationTimeSeconds:sample,solverInternalTimeSeconds:nil,
             displaySampleTimeSeconds:sample,sampleIndex:index,playbackRate:state.playbackRate,
