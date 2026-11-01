@@ -504,7 +504,7 @@ fun NativeABookScreen(){
             val tagData=JSONArray(tags.split(",").map{it.trim()}.filter{it.isNotEmpty()}.take(50)).toString()
             db.save(ABookNoteRecord(id,title,body,notebook.ifBlank{"Inbox"},tagData,old?.pinned?:false,old?.archived?:false,old?.deletedAt,old?.createdAt?:System.currentTimeMillis(),System.currentTimeMillis(),old?.revision?:0))
         }}
-        result.fold({status="Saved on this device";notes=db.notes(archived)},{error=it.message?:"Local save failed";status="Not saved"})
+        result.fold({status="Saved on this device";notes=db.notes(archived,showTrash)},{error=it.message?:"Local save failed";status="Not saved"})
     }
     LaunchedEffect(selected){files=selected?.let{withContext(Dispatchers.IO){db.attachments(it)}}?:emptyList();activePdf=null;pdfText=""}
     val filtered=notes.filter{n->val q=search.trim().lowercase(Locale.ROOT);q.isEmpty()||(n.title+" "+n.body+" "+n.tags+" "+n.notebook).lowercase(Locale.ROOT).contains(q)}
