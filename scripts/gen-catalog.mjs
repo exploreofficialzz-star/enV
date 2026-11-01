@@ -2333,6 +2333,7 @@ for (let start = 0; start < serializedCatalog.length; start += chunkSize) {
 }
 
 const body = `import type { ToolMeta } from "@/types/tool";
+import { designToolIcon } from "@/lib/tool-icon-design";
 
 const catalogJson = [
 ${catalogChunks.join(",\n")}
