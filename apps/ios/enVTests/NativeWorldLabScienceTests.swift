@@ -127,4 +127,30 @@ final class NativeWorldLabRadiationTests:XCTestCase {
             startK:400,environmentK:300,emissivity:0.8,duration:1000))
         XCTAssertThrowsError(try make().sample(Double.infinity))
     }
+    func testNativeScientificSIAndPortParity() throws {
+        let length=try NativeWorldLabSI.declare(150,unit:"cm")
+        XCTAssertEqual(length.valueSI,1.5,accuracy:1e-12)
+        XCTAssertEqual(try NativeWorldLabSI.convert(length,to:"mm"),1500,accuracy:1e-8)
+        XCTAssertEqual(try NativeWorldLabSI.convert(
+            NativeWorldLabSI.declare(250,unit:"g"),to:"kg"),0.25,accuracy:1e-12)
+        XCTAssertEqual(try NativeWorldLabSI.convert(
+            NativeWorldLabSI.declare(2,unit:"kPa"),to:"Pa"),2000,accuracy:1e-8)
+        XCTAssertThrowsError(try NativeWorldLabSI.convert(length,to:"K"))
+        XCTAssertThrowsError(try NativeWorldLabSI.declare(-1,unit:"K"))
+        XCTAssertThrowsError(try NativeWorldLabSI.declare(Double.nan,unit:"m"))
+        XCTAssertThrowsError(try NativeWorldLabSI.declare(1,unit:"V",
+            evidence:"measured-observed"))
+        let measured=try NativeWorldLabSI.declare(5,unit:"V",
+            evidence:"measured-observed",sourceId:"lab:volt-5")
+        XCTAssertEqual(measured.sourceId,"lab:volt-5")
+        let source=NativeSciencePort(id:"source",direction:"output",
+            unit:"V",frame:"SCALAR",flow:"electrical")
+        let load=NativeSciencePort(id:"load",direction:"input",
+            unit:"V",frame:"SCALAR",flow:"electrical")
+        try NativeWorldLabSI.connect(source,load)
+        XCTAssertThrowsError(try NativeWorldLabSI.connect(
+            source,NativeSciencePort(id:"load",direction:"input",
+                unit:"W",frame:"SCALAR",flow:"electrical")))
+        XCTAssertThrowsError(try NativeWorldLabSI.connect(load,source))
+    }
 }
