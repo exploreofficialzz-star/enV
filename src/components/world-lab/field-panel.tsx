@@ -1,8 +1,10 @@
-import type {FieldLayer,FieldPalette} from "@/lib/world-lab/field-layer";
+import type {FieldLayer,FieldPalette,FieldVectorPlane} from "@/lib/world-lab/field-layer";
 import {fieldFrameAtTime,fieldVectorGlyphsAtTime,isFieldOverlayRendererImplemented} from "@/lib/world-lab/field-layer";
 
 type Props={layers:readonly FieldLayer[];selectedId:string;onSelect:(id:string)=>void;
- timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void};
+ timeSeconds:number;overlayEnabled:boolean;onOverlayChange:(v:boolean)=>void;
+ vectorPlane:FieldVectorPlane;onVectorPlaneChange:(v:FieldVectorPlane)=>void;
+ vectorSliceIndex:number;onVectorSliceIndexChange:(v:number)=>void};
 const palette:Record<FieldPalette,readonly [number,number,number][]>={
  cividis:[[0,32,76],[55,77,104],[123,124,118],[182,168,109],[254,232,56]],
  viridis:[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]],
@@ -53,6 +55,23 @@ export function WorldLabFieldPanel(p:Props){
     </dl>
     <p className="mt-2 break-words text-xs text-muted-foreground">{source}</p>
     <p className="mt-1 text-xs">{layer.legend.accessibleDescription}</p>
+    {layer.kind==="vector"&&layer.renderer.kind==="glyphs"&&(()=>{
+     const normalAxis=p.vectorPlane==="xy"?2:p.vectorPlane==="xz"?1:0;
+     const maximumSlice=layer.resolution.dimensions[normalAxis]-1;
+     const slice=Math.max(0,Math.min(maximumSlice,p.vectorSliceIndex));
+     return <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      <label className="text-xs">Vector projection plane
+       <select className="mt-1 w-full rounded border border-border bg-bg p-2"
+        value={p.vectorPlane} onChange={e=>p.onVectorPlaneChange(e.target.value as FieldVectorPlane)}>
+        <option value="xy">XY plane</option><option value="xz">XZ plane</option><option value="yz">YZ plane</option>
+       </select>
+      </label>
+      <label className="text-xs">Slice index · {slice+1}/{maximumSlice+1}
+       <input className="mt-2 w-full" type="range" min="0" max={maximumSlice} step="1"
+        value={slice} onChange={e=>p.onVectorSliceIndexChange(Number(e.target.value))}/>
+      </label>
+     </div>;
+    })()}
     {layer.kind==="vector"&&layer.renderer.kind==="glyphs"&&<p className="mt-1 text-xs text-muted-foreground">The viewport shows a computed XY vector projection at the centre Z slice. Arrow direction follows the recorded X/Y components; arrow length is relative within that slice. This is a 2D projection, not a rendered 3D field volume.</p>}
     <p className="mt-1 text-xs text-muted-foreground">Range: {layer.range.minimumSI.toPrecision(5)}–{layer.range.maximumSI.toPrecision(5)} {layer.units.si}; {layer.range.uncertaintyStatement}</p>
     <p className="mt-1 text-xs text-muted-foreground">World date (UTC): {layer.timeReference.worldDateUTC}; interpolation: {layer.interpolation.method} ({layer.interpolation.validated?"validated":"not validated"})</p>
@@ -63,7 +82,8 @@ export function WorldLabFieldPanel(p:Props){
   </>}
  </section>;
 }
-export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number;visible:boolean}){
+export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number;visible:boolean;
+ vectorPlane:FieldVectorPlane;vectorSliceIndex:number}){
  const layer=p.layer;
  if(!p.visible||!layer)return null;
  if(!isFieldOverlayRendererImplemented(layer.kind,layer.renderer.kind)){
@@ -89,10 +109,10 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
   </div>;
  }
  if(layer.kind==="vector"&&layer.renderer.kind==="glyphs"){
-  const frame=fieldVectorGlyphsAtTime(layer,p.timeSeconds,"xy");
+  const frame=fieldVectorGlyphsAtTime(layer,p.timeSeconds,p.vectorPlane,p.vectorSliceIndex);
   const max=frame.maximumProjectedMagnitude;
   return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
-   role="img" aria-label={layer.legend.accessibleDescription+"; projected XY vector glyphs at "+frame.sampleTimeSeconds.toFixed(4)+" seconds; Z slice "+frame.sliceIndex+" of "+layer.resolution.dimensions[2]}>
+   role="img" aria-label={layer.legend.accessibleDescription+"; projected "+frame.plane.toUpperCase()+" vector glyphs at "+frame.sampleTimeSeconds.toFixed(4)+" seconds; slice "+frame.sliceIndex+"}>
    <p className="text-xs font-semibold">{layer.legend.title} · {frame.sampleTimeSeconds.toFixed(3)} s</p>
    <svg viewBox="0 0 300 160" width="100%" height="132" role="presentation">
     <defs><marker id="worldlab-vector-arrowhead" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 L5 2.5 L0 5 Z" fill="currentColor"/></marker></defs>
@@ -112,7 +132,7 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
      </g>;
     })}
    </svg>
-   <p className="text-[10px]">XY projection · Z slice {frame.sliceIndex+1}/{layer.resolution.dimensions[2]} · arrow length is relative to the largest projected vector in this slice</p>
+   <p className="text-[10px]">{frame.plane.toUpperCase()} projection · slice {frame.sliceIndex+1}/{frame.plane==="xy"?layer.resolution.dimensions[2]:frame.plane==="xz"?layer.resolution.dimensions[1]:layer.resolution.dimensions[0]} · arrow length is relative to the largest projected vector in this slice</p>
    <p className="text-[10px] text-muted-foreground">{frame.glyphs.length} valid glyphs · no-data cells omitted · units {layer.units.display}</p>
   </div>;
  }
