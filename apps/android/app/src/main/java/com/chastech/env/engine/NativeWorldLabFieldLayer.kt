@@ -92,6 +92,13 @@ data class NativeWorldLabFieldLayer(
         }
         return selectedSlice(timeSeconds,plane,sliceIndex)
     }
+    fun vectorDisplaySlice(timeSeconds:Double,plane:NativeWorldLabFieldPlane=NativeWorldLabFieldPlane.XY,
+        sliceIndex:Int=(dimensions[plane.normal]-1)/2):NativeWorldLabFieldSliceFrame {
+        require(kind==NativeWorldLabFieldKind.VECTOR&&rendererKind in setOf("glyphs","streamlines")){
+            "Vector slice display requires a supported vector renderer."
+        }
+        return selectedSlice(timeSeconds,plane,sliceIndex)
+    }
     private fun interpolateVector(frame:List<Double?>,plane:NativeWorldLabFieldPlane,u:Double,v:Double):Pair<Double,Double>? {
         val width=dimensions[plane.u];val height=dimensions[plane.v]
         if(u<0||v<0||u>width-1||v>height-1)return null
@@ -184,7 +191,9 @@ object NativeWorldLabFieldLayerCodec {
     private const val MAX_CELLS=100_000
     private const val MAX_VALUES=2_000_000
     private fun string(o:JSONObject,key:String,max:Int=1000):String {
-        val value=o.optString(key,"")
+        val raw=o.opt(key)
+        require(raw is String){"Field layer field '$key' must be a string."}
+        val value=raw as String
         require(value.isNotBlank()&&value.length<=max){"Field layer field '$key' is missing or too long."}
         return value
     }
@@ -263,9 +272,17 @@ object NativeWorldLabFieldLayerCodec {
         val resolution=root.getJSONObject("resolution")
         val dimsRaw=resolution.getJSONArray("dimensions")
         require(dimsRaw.length()==3)
-        val dims=(0..2).map{dimsRaw.getInt(it)}
-        require(dims.all{it>0}&&dims.fold(1L){a,b->a*b}<=MAX_CELLS){"Field grid exceeds native cell limits."}
-        val cells=dims.fold(1){a,b->a*b}
+        val dims=(0..2).map{index->
+            val value=finiteNumber(dimsRaw.get(index))
+            require(value>0&&value%1.0==0.0&&value<=MAX_CELLS){"Field dimensions must be positive bounded integers."}
+            value.toInt()
+        }
+        var cellProduct=1L
+        dims.forEach { dimension->
+            require(cellProduct<=MAX_CELLS.toLong()/dimension){"Field grid exceeds native cell limits."}
+            cellProduct*=dimension
+        }
+        val cells=cellProduct.toInt()
         require(resolution.optInt("sampleCount",-1)==cells){"Field cell count does not match dimensions."}
         val spacing=arrayOfNumbers(resolution.getJSONArray("spacingMeters"),"spacing",3)
         require(spacing.all{it>=0})
@@ -286,10 +303,12 @@ object NativeWorldLabFieldLayerCodec {
         if(rendererKind=="streamlines")require(interpolationMethod=="linear"&&interpolationValidated){
             "Vector streamlines need validated linear interpolation."
         }
-        val expected=samples.size*cells*when(kind){
+        val components=when(kind){
             NativeWorldLabFieldKind.SCALAR->1;NativeWorldLabFieldKind.VECTOR->3;NativeWorldLabFieldKind.TENSOR->9
         }
-        require(expected<=MAX_VALUES){"Field import exceeds the 2,000,000-value native limit."}
+        val expectedLong=samples.size.toLong()*cells.toLong()*components.toLong()
+        require(expectedLong<=MAX_VALUES.toLong()){"Field import exceeds the 2,000,000-value native limit."}
+        val expected=expectedLong.toInt()
         val valuesRaw=root.getJSONArray("values")
         require(valuesRaw.length()==expected){"Field data length does not match samples, dimensions and components."}
         val maskValue=root.opt("mask")
@@ -317,7 +336,11 @@ object NativeWorldLabFieldLayerCodec {
         val scope=string(permissions,"scope",20)
         require(scope in setOf("private","shared","public"))
         val rolesArray=permissions.getJSONArray("readRoles")
-        val roles=(0 until rolesArray.length()).map{rolesArray.getString(it)}.toSet()
+        val roles=(0 until rolesArray.length()).map{index->
+            val role=rolesArray.get(index)
+            require(role is String&&role.isNotBlank()&&role.length<=80){"Field read roles must be bounded non-empty strings."}
+            role as String
+        }.toSet()
         when(scope){
             "private"->require("owner" in principalRoles&&("owner" in roles||"*" in roles)){
                 "Private field layer requires an authenticated local owner role."
@@ -330,6 +353,7 @@ object NativeWorldLabFieldLayerCodec {
         val exportAllowed=permissions.optBoolean("exportAllowed",false)
         val legend=root.getJSONObject("legend")
         val legendTitle=string(legend,"title",240)
+        require(legend.optString("palette") in setOf("cividis","viridis","magma","blue-orange")){"Field legend palette is unsupported."}
         val accessible=string(legend,"accessibleDescription",1000)
         val validity=string(root,"validity",1000)
         return NativeWorldLabFieldLayer(id,label,kind,siUnits,displayUnits,scaleToSI,offsetToSI,
