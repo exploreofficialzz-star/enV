@@ -83,7 +83,7 @@ private class ABookLocalDb(context:Context):SQLiteOpenHelper(context.application
         c.getInt(c.getColumnIndexOrThrow("revision"))
     )
     fun notes(includeArchived:Boolean=false,includeDeleted:Boolean=false):List<ABookNoteRecord> =
-        readableDatabase.query("notes",null,when { includeDeleted -> "deleted_at IS NOT NULL"; includeArchived -> "deleted_at IS NULL"; else -> "deleted_at IS NULL AND archived=0" },null,null,null,"pinned DESC,updated_at DESC")
+        readableDatabase.query("notes",null,when { includeDeleted && includeArchived -> null; includeDeleted -> "deleted_at IS NOT NULL"; includeArchived -> "deleted_at IS NULL"; else -> "deleted_at IS NULL AND archived=0" },null,null,null,"pinned DESC,updated_at DESC")
             .use{c->buildList{while(c.moveToNext())add(read(c))}}
     fun save(note:ABookNoteRecord):ABookNoteRecord{
         val db=writableDatabase;db.beginTransaction()
