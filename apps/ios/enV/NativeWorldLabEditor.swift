@@ -44,7 +44,7 @@ enum NativeWorldLabEditor {
             "id":UUID().uuidString,"title":title,"revision":0,
             "createdAt":now,"updatedAt":now,
             "world":["frame":"LOCAL_ENU","representation":"representative-not-measured",
-                     "origin":[0,0,0],"terrainSource":NSNull()],
+                     "origin":[0,0,0],"terrainSource":NSNull(),"geodeticOrigin":NSNull()],
             "camera":["positionMeters":[0,1.65,-8],"lookingAtMeters":[0,1.2,0]],
             "entities":[],"materials":[],"networks":[],"assemblies":[],
             "digitalNetworks":[],
@@ -413,6 +413,18 @@ enum NativeWorldLabEditor {
                 "materialId":NSNull(),"scientificRole":"visual-only","opacity":1,
             ])
             root["entities"]=entities
+        }
+    }
+    static func setGeodeticOrigin(_ data:Data,origin:NativeGeodetic?)throws->Data {
+        if let origin {_ = try NativeWorldLabGeodesy.validate(origin)}
+        return try mutate(data){root in
+            guard var world=root["world"] as? [String:Any] else {
+                throw NativeWorldLabError.invalid("Project world reference settings are unavailable")
+            }
+            if let origin {world["geodeticOrigin"]=["latitudeDegrees":origin.latitudeDegrees,
+                "longitudeDegrees":origin.longitudeDegrees,"heightMeters":origin.heightMeters]}
+            else {world["geodeticOrigin"]=NSNull()}
+            root["world"]=world
         }
     }
     static func saveCameraViewpoint(_ data:Data,positionMeters:[Double],

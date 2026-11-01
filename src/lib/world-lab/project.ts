@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { GeodeticCoordinate } from "./earth-coordinates.ts";
 import { validateProject as validateLegacyGameProject } from "../game-studio/project.ts";
 
 /**
@@ -152,6 +153,8 @@ export const worldLabProjectSchema = z.object({
     representation: z.literal("representative-not-measured"),
     origin: z.tuple([z.literal(0), z.literal(0), z.literal(0)]),
     terrainSource: z.null(),
+    geodeticOrigin:z.object({latitudeDegrees:scalar.min(-90).max(90),
+      longitudeDegrees:scalar.min(-180).max(180),heightMeters:scalar.min(-12000).max(1e9)}).strict().nullable().optional(),
   }).strict(),
   camera: z.object({
     positionMeters: coords,
@@ -231,7 +234,7 @@ export function blankWorldLabProject(id: string, now: string): WorldLabProject {
     format: "env-world-lab", schemaVersion: 1, id, title: "My World Lab",
     revision: 0, createdAt: now, updatedAt: now,
     world: { frame: "LOCAL_ENU", origin: [0, 0, 0],
-      representation: "representative-not-measured", terrainSource: null },
+      representation: "representative-not-measured", terrainSource: null, geodeticOrigin:null },
     camera: { positionMeters: [0, 1.65, -8], lookingAtMeters: [0, 1.2, 0] },
     entities: [], materials: [], networks: [], assemblies: [], digitalNetworks: [],
   });
@@ -336,4 +339,15 @@ export function importLegacyGameScene(input: unknown, id: string, now: string): 
   }
   if (ignoredObjectIds.length) warnings.push("Skipped " + ignoredObjectIds.length + " objects requiring unsupported assets, shape fidelity or capacity.");
   return { project: parseWorldLabProject(project), warnings, ignoredObjectIds };
+}
+
+/** Set a WGS84 reference origin for local ENU project coordinates. Does not fetch terrain. */
+export function setWorldLabGeodeticOrigin(raw:WorldLabProject,origin:GeodeticCoordinate|null):WorldLabProject{
+ const project=parseWorldLabProject(raw);
+ if(origin&&(!Number.isFinite(origin.latitudeDegrees)||origin.latitudeDegrees< -90||
+   origin.latitudeDegrees>90||!Number.isFinite(origin.longitudeDegrees)||
+   origin.longitudeDegrees< -180||origin.longitudeDegrees>180||
+   !Number.isFinite(origin.heightMeters)||origin.heightMeters< -12000||origin.heightMeters>1e9))
+   throw new Error("Earth reference must be a valid WGS84 latitude, longitude and ellipsoidal height.");
+ return parseWorldLabProject({...project,world:{...project.world,geodeticOrigin:origin}});
 }

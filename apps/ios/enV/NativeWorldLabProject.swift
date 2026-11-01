@@ -179,6 +179,7 @@ struct NativeWorldLabProject: Decodable {
         let representation: String
         let origin: [Double]
         let terrainSource: String?
+        let geodeticOrigin:NativeGeodetic?
     }
     struct Camera: Decodable {
         let positionMeters: [Double]
@@ -219,7 +220,11 @@ struct NativeWorldLabProject: Decodable {
               let materials = root["materials"] as? [[String: Any]] else {
             throw NativeWorldLabError.invalid("Missing typed World Lab project members")
         }
-        try requireKeys(world, ["frame","representation","origin","terrainSource"])
+        let baseWorldKeys:Set<String>=["frame","representation","origin","terrainSource"]
+        let providedWorldKeys=Set(world.keys)
+        guard providedWorldKeys==baseWorldKeys || providedWorldKeys==baseWorldKeys.union(["geodeticOrigin"]) else {
+            throw NativeWorldLabError.invalid("Unsupported local-world reference fields")
+        }
         try requireKeys(camera, ["positionMeters","lookingAtMeters"])
         for o in entities {
             let required:Set<String>=["id","name","shape","positionMeters","dimensionsMeters","color","materialId","scientificRole","opacity"]
@@ -426,6 +431,7 @@ struct NativeWorldLabProject: Decodable {
             }
         }
         let p = try JSONDecoder().decode(NativeWorldLabProject.self, from: data)
+        if let geo=p.world.geodeticOrigin {_ = try NativeWorldLabGeodesy.validate(geo)}
         guard p.format == "env-world-lab", p.schemaVersion == 1,
               p.revision >= 0, p.revision <= 1_000_000_000,
               p.world.frame == "LOCAL_ENU",

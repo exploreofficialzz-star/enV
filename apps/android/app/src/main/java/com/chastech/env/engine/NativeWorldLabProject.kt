@@ -122,6 +122,7 @@ data class NativeWorldLabProject(
     val networks: List<NativeLabCircuitNetwork> = emptyList(),
     val assemblies:List<NativeLabAssembly> = emptyList(),
     val digitalNetworks:List<NativeLabDigitalNetwork> = emptyList(),
+    val geodeticOrigin:NativeGeodetic?=null,
 )
 object NativeWorldLabProjectCodec {
     const val MAX_BYTES=1024*1024
@@ -174,11 +175,21 @@ object NativeWorldLabProjectCodec {
         val created=name(p,"createdAt",80);val updated=name(p,"updatedAt",80)
         require(!OffsetDateTime.parse(updated).isBefore(OffsetDateTime.parse(created)))
         val world=p.getJSONObject("world")
-        keys(world,setOf("frame","representation","origin","terrainSource"))
+        val baseWorldKeys=setOf("frame","representation","origin","terrainSource")
+        val worldKeys=world.keys().asSequence().toSet()
+        require(worldKeys==baseWorldKeys||worldKeys==baseWorldKeys+"geodeticOrigin"){
+            "Unsupported local-world reference fields"
+        }
         require(world.getString("frame")=="LOCAL_ENU")
         require(world.getString("representation")=="representative-not-measured")
         val origin=vector(world.getJSONArray("origin"))
         require(origin.x==0.0 && origin.y==0.0 && origin.z==0.0 && world.isNull("terrainSource"))
+        val geodeticOrigin=if(!world.has("geodeticOrigin")||world.isNull("geodeticOrigin"))null else {
+            val geo=world.getJSONObject("geodeticOrigin")
+            require(geo.keys().asSequence().toSet()==setOf("latitudeDegrees","longitudeDegrees","heightMeters"))
+            NativeWorldLabGeodesy.validate(NativeGeodetic(
+                geo.getDouble("latitudeDegrees"),geo.getDouble("longitudeDegrees"),geo.getDouble("heightMeters")))
+        }
         val camera=p.getJSONObject("camera")
         keys(camera,setOf("positionMeters","lookingAtMeters"))
         val solidArray=p.getJSONArray("entities")
@@ -365,7 +376,7 @@ object NativeWorldLabProjectCodec {
         }
         return NativeWorldLabProject(projectId,title,revision.toInt(),created,updated,
             vector(camera.getJSONArray("positionMeters")),
-            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks,assemblies,digital)
+            vector(camera.getJSONArray("lookingAtMeters")),entities,materials,networks,assemblies,digital,geodeticOrigin)
     }
 }
 

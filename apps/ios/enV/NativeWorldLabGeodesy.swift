@@ -1,6 +1,6 @@
 import Foundation
 
-struct NativeGeodetic {
+struct NativeGeodetic:Decodable {
     let latitudeDegrees:Double
     let longitudeDegrees:Double
     let heightMeters:Double

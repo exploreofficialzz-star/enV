@@ -37,7 +37,8 @@ object NativeWorldLabEditor {
                 .put("frame","LOCAL_ENU")
                 .put("representation","representative-not-measured")
                 .put("origin",JSONArray(listOf(0,0,0)))
-                .put("terrainSource",JSONObject.NULL))
+                .put("terrainSource",JSONObject.NULL)
+                .put("geodeticOrigin",JSONObject.NULL))
             .put("camera",JSONObject()
                 .put("positionMeters",JSONArray(listOf(0,1.65,-8)))
                 .put("lookingAtMeters",JSONArray(listOf(0,1.2,0))))
@@ -416,6 +417,14 @@ object NativeWorldLabEditor {
                 .put("name",(original.getString("name")+" "+(n+1)).take(120))
             if(!clone.has("rotationRadians"))clone.put("rotationRadians",JSONArray(listOf(0.0,0.0,0.0)))
             entities.put(clone)
+        }
+    }
+    fun setGeodeticOrigin(source:String,origin:NativeGeodetic?):String=edit(source){project->
+        val world=project.getJSONObject("world")
+        if(origin==null)world.put("geodeticOrigin",JSONObject.NULL) else {
+            val valid=NativeWorldLabGeodesy.validate(origin)
+            world.put("geodeticOrigin",JSONObject().put("latitudeDegrees",valid.latitudeDegrees)
+                .put("longitudeDegrees",valid.longitudeDegrees).put("heightMeters",valid.heightMeters))
         }
     }
     fun saveCameraViewpoint(source:String,position:List<Double>,target:List<Double>):String=edit(source){project->
