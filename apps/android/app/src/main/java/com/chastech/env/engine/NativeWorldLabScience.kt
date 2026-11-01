@@ -20,6 +20,31 @@ data class NativeLabResult(val timeSeconds:Double, val modelVersion:String="1.0.
     val meanTemperatureK:Double?=null,val peakTemperatureK:Double?=null,
     val solverStepSeconds:Double=1.0/240.0)
 
+enum class NativeLabBranchFlowDirection { POSITIVE_TO_NEGATIVE, NEGATIVE_TO_POSITIVE, ZERO }
+data class NativeLabBranchFlow(
+    val signedCurrentA:Double,val magnitudeA:Double,
+    val fromNodeId:String?,val toNodeId:String?,
+    val direction:NativeLabBranchFlowDirection
+)
+/** Conventional branch-flow direction derived only from the DC solver's signed current. */
+object NativeWorldLabBranchCurrent {
+    fun resolve(positiveNodeId:String,negativeNodeId:String,signedCurrentA:Double):NativeLabBranchFlow {
+        require(positiveNodeId.isNotBlank()&&negativeNodeId.isNotBlank()&&
+            positiveNodeId!=negativeNodeId) { "Branch current needs two distinct connected node IDs." }
+        require(signedCurrentA.isFinite()&&kotlin.math.abs(signedCurrentA)<=1e6) {
+            "Branch current must be finite and within the supported SI range."
+        }
+        if(kotlin.math.abs(signedCurrentA)<=1e-12) return NativeLabBranchFlow(
+            signedCurrentA,0.0,null,null,NativeLabBranchFlowDirection.ZERO)
+        val forward=signedCurrentA>0.0
+        return NativeLabBranchFlow(signedCurrentA,kotlin.math.abs(signedCurrentA),
+            if(forward)positiveNodeId else negativeNodeId,
+            if(forward)negativeNodeId else positiveNodeId,
+            if(forward)NativeLabBranchFlowDirection.POSITIVE_TO_NEGATIVE
+                else NativeLabBranchFlowDirection.NEGATIVE_TO_POSITIVE)
+    }
+}
+
 object NativeWorldLabScience {
     const val HEAT_CELLS=21
     private fun domain(n:Double,min:Double,max:Double,label:String){
