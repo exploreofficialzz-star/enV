@@ -182,6 +182,7 @@ data class NativeScientificStepOutput(
 data class NativeScientificAdapter(
     val componentId:String,val modelId:String,val modelVersion:String,
     val initialOutputs:Map<String,NativeScienceQuantity> = emptyMap(),
+    val reset:()->Unit = {},
     val advance:(Double,Double,Map<String,NativeScienceQuantity>)->NativeScientificStepOutput
 )
 data class NativeScientificExchangeSample(
@@ -215,6 +216,7 @@ object NativeWorldLabExecution {
                 "Unregistered or mismatched scientific model version"
             }
         }
+        adapters.forEach{it.reset()}
         val adjacency=graph.components.associate{it.id to linkedSetOf<String>()}.toMutableMap()
         val indegree=graph.components.associate{it.id to 0}.toMutableMap()
         graph.connections.filter{!it.delayed}.forEach{edge->
@@ -326,7 +328,8 @@ object NativeWorldLabExecution {
             NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(sourceVoltageV,"V")),0.0,0.0,0.0)
         }
         var capacitorVoltage=initialVoltageV
-        val load=NativeScientificAdapter("load","series-rc-load","1.0.0"){_,delta,inputs->
+        val load=NativeScientificAdapter(componentId="load",modelId="series-rc-load",
+            modelVersion="1.0.0",reset={capacitorVoltage=initialVoltageV}){_,delta,inputs->
             val connectedVoltage=inputs["Vin"]?.let{NativeWorldLabSI.convert(it,"V")}
                 ?:error("RC load requires its connected source voltage")
             require(delta.isFinite()&&delta>0.0){"RC solver requires a positive finite step"}
