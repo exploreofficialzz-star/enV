@@ -67,5 +67,5 @@ test("untrusted missing model, altered port unit, false conserved power and huge
   assert.throws(()=>executeScientificGraph(graph,[fraud,load],{
     durationSeconds:0.2,stepSeconds:0.1}),/Conservation residual/);
   assert.throws(()=>executeScientificGraph(graph,[supply,load],{
-    durationSeconds:60,stepSeconds:0.00001}),/step budgets/);
+    durationSeconds:60,stepSeconds:0.00001}),/bounded execution steps/);
 });
