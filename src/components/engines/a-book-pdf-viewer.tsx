@@ -128,6 +128,7 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
     let page: PdfPageProxy | null = null;
     let renderTask: { promise: Promise<void>; cancel(): void } | null = null;
     let renderTimeout: number | undefined;
+    let renderTimedOut = false;
     setRendering(true);
     setError("");
     setPageText("");
@@ -165,14 +166,19 @@ export function ABookPdfViewer({ src, fileName }: { src: string; fileName: strin
         renderTask = page.render({ canvasContext: context, viewport: renderViewport });
         renderTimeout = window.setTimeout(() => {
           if (cancelled) return;
+          renderTimedOut = true;
           renderTask?.cancel();
-          setError("Local PDF page rendering exceeded the 45-second safety limit.");
+          void document.destroy();
+          documentRef.current = null;
+          setPageCount(0);
         }, 45_000);
         const [content] = await Promise.all([contentPromise, renderTask.promise]);
         if (!cancelled) setPageText(extractPageText(content.items));
       } catch (cause) {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "This PDF page could not be rendered locally.");
+          setError(renderTimedOut
+            ? "Local PDF page rendering exceeded the 45-second safety limit. Reopen the PDF to try again."
+            : cause instanceof Error ? cause.message : "This PDF page could not be rendered locally.");
         }
       } finally {
         if (renderTimeout !== undefined) window.clearTimeout(renderTimeout);
