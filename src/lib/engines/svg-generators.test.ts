@@ -50,6 +50,37 @@ test("wave geometry responds to frequency, phase, layers and transparent canvas"
   assert.notEqual(basic, changed);
 });
 
+test("wave artwork stays inside its viewBox at extreme amplitude and baselines", () => {
+  const configurations = [
+    { amplitude: 58, layers: 5, baseline: 30 },
+    { amplitude: 58, layers: 5, baseline: 140 },
+    { amplitude: 58, layers: 1, baseline: 30 },
+    { amplitude: 58, layers: 1, baseline: 140 },
+  ];
+  for (const configuration of configurations) {
+    const svg = buildWaveSvg({
+      ...configuration,
+      frequency: 5,
+      phase: 270,
+      fill: "#0d9f8a",
+      secondary: "#7c4dff",
+      background: "#ffffff",
+      transparent: false,
+    });
+    const paths = [...svg.matchAll(/d="([^"]+)"/g)].map((match) => match[1]);
+    const yValues: number[] = [];
+    for (const path of paths) {
+      const first = path.match(/^M 0 ([\d.]+)/);
+      if (first) yValues.push(Number(first[1]));
+      for (const curve of path.matchAll(/C [\d.]+ ([\d.]+) [\d.]+ ([\d.]+) [\d.]+ ([\d.]+)/g)) {
+        yValues.push(Number(curve[1]), Number(curve[2]), Number(curve[3]));
+      }
+    }
+    assert.ok(yValues.length > 0);
+    assert.ok(yValues.every((value) => value >= 0 && value <= 240), "all wave endpoints and control points must remain within the 240px canvas");
+  }
+});
+
 test("noise generator emits a tintable data URL with adjustable grain strength", () => {
   const subtle = buildNoiseDataUrl("#112233", 0.6, 0.1);
   const strong = buildNoiseDataUrl("#112233", 0.6, 0.8);

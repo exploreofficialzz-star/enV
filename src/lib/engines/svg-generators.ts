@@ -93,8 +93,10 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
   const secondary = safeHex(options.secondary, "#7c4dff");
   const background = safeHex(options.background, "#ffffff");
   const paths = Array.from({ length: layerCount }, (_, index) => {
-    const offset = (layerCount - index - 1) * amplitude * 0.32;
-    const height = Math.max(0, amplitude * (1 - index * 0.16));
+    // Keep stacked waves inside the 240px export canvas at every allowed baseline.
+    const offset = (layerCount - index - 1) * Math.min(10, amplitude * 0.18);
+    const centerY = baseline + offset;
+    const height = Math.max(0, Math.min(amplitude * (1 - index * 0.16), centerY - 8, 232 - centerY));
     const segmentCount = frequency * 4;
     const layerPhase = phase + index * 0.42;
     const points = Array.from({ length: segmentCount + 1 }, (_, pointIndex) => {
@@ -102,7 +104,7 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
       const angle = progress * frequency * Math.PI * 2 + layerPhase;
       return {
         x: progress * 1440,
-        y: baseline + offset - Math.sin(angle) * height,
+        y: centerY - Math.sin(angle) * height,
         derivative: -Math.cos(angle) * height * frequency * Math.PI * 2 / segmentCount,
       };
     });
@@ -111,8 +113,8 @@ export function buildWaveSvg(options: WaveSvgOptions): string {
       const start = points[pointIndex];
       const end = points[pointIndex + 1];
       const dx = end.x - start.x;
-      const controlOneY = start.y + start.derivative / 3;
-      const controlTwoY = end.y - end.derivative / 3;
+      const controlOneY = clamp(start.y + start.derivative / 3, 0, 240);
+      const controlTwoY = clamp(end.y - end.derivative / 3, 0, 240);
       path += ` C ${(start.x + dx / 3).toFixed(2)} ${controlOneY.toFixed(2)} ${(end.x - dx / 3).toFixed(2)} ${controlTwoY.toFixed(2)} ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
     }
     path += " L1440 240 L0 240 Z";
