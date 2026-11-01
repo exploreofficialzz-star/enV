@@ -28,6 +28,9 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -489,6 +492,9 @@ fun NativeABookScreen(){
     val context=LocalContext.current
     val db=remember{ABookLocalDb(context)}
     val scope=rememberCoroutineScope()
+    var pdfProcessingJob by remember{mutableStateOf<Job?>(null)}
+    fun cancelPdfProcessing(){pdfProcessingJob?.cancel();pdfProcessingJob=null}
+    fun launchPdfProcessing(block:suspend ()->Unit){cancelPdfProcessing();pdfProcessingJob=scope.launch{block()}}
     var notes by remember{mutableStateOf(db.notes())}
     var selected by rememberSaveable{mutableStateOf<String?>(null)}
     var title by rememberSaveable{mutableStateOf("")}
@@ -535,6 +541,7 @@ fun NativeABookScreen(){
     }
 
     fun removeAttachment(record:ABookFileRecord){
+        cancelPdfProcessing()
         val path=db.removeFile(record.id)
         if(path!=null){
             val root=context.filesDir.canonicalFile
@@ -552,7 +559,7 @@ fun NativeABookScreen(){
         val chosen=selectedPdfFiles()
         if(chosen.size<2){error="Select at least two PDFs to merge";return}
         if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
-        scope.launch{
+        launchPdfProcessing{
             status="Merging PDFs locally…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
                 PDFBoxResourceLoader.init(context)
@@ -578,7 +585,7 @@ fun NativeABookScreen(){
         val chosen=selectedPdfFiles()
         if(chosen.isEmpty()){error="Select at least one PDF";return}
         if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
-        scope.launch{
+        launchPdfProcessing{
             status="Rotating PDFs locally…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
                 PDFBoxResourceLoader.init(context)
@@ -612,7 +619,7 @@ fun NativeABookScreen(){
         val chosen=selectedPdfFiles()
         if(chosen.isEmpty()){error="Select at least one PDF to extract";return}
         if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
-        scope.launch{
+        launchPdfProcessing{
             status="Checking selected PDFs locally…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
                 PDFBoxResourceLoader.init(context)
@@ -687,7 +694,7 @@ fun NativeABookScreen(){
         val chosen=selectedPdfFiles()
         if(chosen.isEmpty()){error="Select at least one PDF to split";return}
         if(chosen.size>25||chosen.sumOf{it.size}>300L*1024*1024){error="Select up to 25 PDFs with a combined size below 300 MB";return}
-        scope.launch{
+        launchPdfProcessing{
             status="Checking selected PDFs locally…";error=""
             val result=withContext(Dispatchers.IO){runCatching{
                 PDFBoxResourceLoader.init(context)
@@ -820,7 +827,8 @@ fun NativeABookScreen(){
         }}
         result.fold({status="Saved on this device";notes=db.notes(archived,showTrash)},{error=it.message?:"Local save failed";status="Not saved"})
     }
-    LaunchedEffect(selected){selectedPdfIds=emptySet();files=selected?.let{withContext(Dispatchers.IO){db.attachments(it)}}?:emptyList();activePdf=null;pdfText=""}
+    DisposableEffect(Unit){onDispose{cancelPdfProcessing()}}
+    LaunchedEffect(selected){cancelPdfProcessing();selectedPdfIds=emptySet();files=selected?.let{withContext(Dispatchers.IO){db.attachments(it)}}?:emptyList();activePdf=null;pdfText=""}
     val filtered=notes.filter{n->val q=search.trim().lowercase(Locale.ROOT);q.isEmpty()||(n.title+" "+n.body+" "+n.tags+" "+n.notebook).lowercase(Locale.ROOT).contains(q)}
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text("A book",style=MaterialTheme.typography.headlineSmall)
@@ -871,7 +879,7 @@ fun NativeABookScreen(){
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
                     if(isPdf)Checkbox(checked=f.id in selectedPdfIds,onCheckedChange={checked->selectedPdfIds=if(checked)selectedPdfIds+f.id else selectedPdfIds-f.id})
                     Text("${f.name} · ${f.size/1024} KB",modifier=Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
-                    if(isPdf)OutlinedButton(onClick={activePdf=f;selectedPdfIds=selectedPdfIds+f.id;pdfText=""}){Text("PDF tools")}
+                    if(isPdf)OutlinedButton(onClick={cancelPdfProcessing();activePdf=f;selectedPdfIds=selectedPdfIds+f.id;pdfText=""}){Text("PDF tools")}
                     TextButton(onClick={removeAttachment(f)}){Text("Remove",color=MaterialTheme.colorScheme.error)}
                 }
             }
@@ -888,12 +896,12 @@ fun NativeABookScreen(){
                 OutlinedTextField(extractPageRange,{extractPageRange=it},label={Text("Extract pages · e.g. 1-3,5")},modifier=Modifier.fillMaxWidth(),singleLine=true)
                 OutlinedButton(onClick={extractSelectedPdfPages()}){Text("Extract selected pages")}
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    OutlinedButton(onClick={scope.launch{
+                    OutlinedButton(onClick={launchPdfProcessing{
                         status="Extracting PDF text locally…";error=""
                         val result=withContext(Dispatchers.IO){runCatching{PDFBoxResourceLoader.init(context);PDDocument.load(local).use{doc->"Pages: ${doc.numberOfPages}\n\n"+PDFTextStripper().getText(doc).take(150000)}}}
                         result.fold({pdfText=it;status="Text extracted on this device";error=""},{error=it.message?:"Local PDF extraction failed";status="Not saved"})
                     }}){Text("Extract text")}
-                    OutlinedButton(onClick={scope.launch{
+                    OutlinedButton(onClick={launchPdfProcessing{
                         val result=withContext(Dispatchers.IO){runCatching{
                             PDFBoxResourceLoader.init(context)
                             val output=File(context.cacheDir,"a-book-rotated-${UUID.randomUUID()}.pdf")
@@ -902,9 +910,10 @@ fun NativeABookScreen(){
                         }}
                         result.fold({pendingPdf=it;exportPdf.launch("${f.name.substringBeforeLast(".")}-rotated.pdf")},{error=it.message?:"PDF rotation failed"})
                     }}){Text("Rotate 90°")}
-                    OutlinedButton(onClick={scope.launch{
+                    OutlinedButton(onClick={launchPdfProcessing{
                         status="Recognizing scanned PDF locally…";error=""
                         val result=runCatching{recognizeABookPdfOffline(local)}
+                        currentCoroutineContext().ensureActive()
                         result.fold({text->
                             pdfText=text
                             status=if(text.isBlank())"No readable text found on this PDF" else "OCR completed on this device"
