@@ -286,3 +286,428 @@ struct NativeWorldLabInspectionHistory {
         return present
     }
 }
+
+
+// MARK: - Recorded scientific field layers (native scalar/vector/tensor interchange)
+
+enum NativeWorldLabFieldKind:String { case scalar,vector,tensor }
+enum NativeWorldLabFieldPlane:String,CaseIterable,Identifiable {
+    case xy,xz,yz
+    var id:String {rawValue}
+    var axes:(u:Int,v:Int,normal:Int) {
+        switch self {
+        case .xy:return (0,1,2)
+        case .xz:return (0,2,1)
+        case .yz:return (1,2,0)
+        }
+    }
+}
+struct NativeWorldLabFieldCell:Equatable {
+    let uIndex:Int
+    let vIndex:Int
+    let components:[Double?]
+}
+struct NativeWorldLabFieldSliceFrame:Equatable {
+    let sampleTimeSeconds:Double
+    let sampleIndex:Int
+    let plane:NativeWorldLabFieldPlane
+    let sliceIndex:Int
+    let dimensionU:Int
+    let dimensionV:Int
+    let cells:[NativeWorldLabFieldCell]
+}
+struct NativeWorldLabFieldVectorPoint:Equatable {
+    let u:Double
+    let v:Double
+}
+struct NativeWorldLabFieldStreamlineFrame:Equatable {
+    let sampleTimeSeconds:Double
+    let sampleIndex:Int
+    let plane:NativeWorldLabFieldPlane
+    let sliceIndex:Int
+    let paths:[[NativeWorldLabFieldVectorPoint]]
+}
+struct NativeWorldLabFieldLayer:Equatable {
+    let id:String
+    let label:String
+    let kind:NativeWorldLabFieldKind
+    let siUnits:String
+    let displayUnits:String
+    let scaleToSI:Double
+    let offsetToSI:Double
+    let spatialFrame:String
+    let crs:String
+    let originMeters:[Double]
+    let worldDateUTC:String
+    let sampleTimesSeconds:[Double]
+    let timezoneDisplay:String
+    let sourceDescription:String
+    let calibrationStatus:String
+    let calibrationMethod:String
+    let dimensions:[Int]
+    let spacingMeters:[Double]
+    let interpolationMethod:String
+    let interpolationValidated:Bool
+    let mask:[Bool]?
+    let values:[Double?]
+    let minimumSI:Double
+    let maximumSI:Double
+    let permissionsScope:String
+    let readRoles:Set<String>
+    let exportAllowed:Bool
+    let rendererKind:String
+    let rendererImplementationId:String
+    let legendTitle:String
+    let accessibleDescription:String
+    let validity:String
+
+    var cellCount:Int { dimensions[0]*dimensions[1]*dimensions[2] }
+    var componentCount:Int {
+        switch kind {case .scalar:return 1;case .vector:return 3;case .tensor:return 9}
+    }
+    func nearestSampleIndex(_ timeSeconds:Double)throws->Int {
+        guard timeSeconds.isFinite,timeSeconds>=0 else {
+            throw NativeWorldLabError.invalid("Field sample time must be finite and non-negative.")
+        }
+        var best=0,distance=Double.infinity
+        for (index,value) in sampleTimesSeconds.enumerated() {
+            let next=abs(value-timeSeconds)
+            if next<distance {best=index;distance=next}
+        }
+        return best
+    }
+    private func cellIndex(_ x:Int,_ y:Int,_ z:Int)->Int {
+        x+dimensions[0]*(y+dimensions[1]*z)
+    }
+    private func recordedValues(_ sampleIndex:Int)->[Double?] {
+        let count=cellCount*componentCount
+        let start=sampleIndex*count
+        return Array(values[start..<(start+count)])
+    }
+    private func extractSlice(_ timeSeconds:Double,_ plane:NativeWorldLabFieldPlane,
+        _ requestedSlice:Int)throws->NativeWorldLabFieldSliceFrame {
+        let axes=plane.axes
+        guard requestedSlice>=0,requestedSlice<dimensions[axes.normal] else {
+            throw NativeWorldLabError.invalid("Field slice index is outside the grid resolution.")
+        }
+        let sampleIndex=try nearestSampleIndex(timeSeconds)
+        let frame=recordedValues(sampleIndex)
+        var cells:[NativeWorldLabFieldCell]=[]
+        cells.reserveCapacity(dimensions[axes.u]*dimensions[axes.v])
+        for v in 0..<dimensions[axes.v] {
+            for u in 0..<dimensions[axes.u] {
+                var c=[0,0,0]
+                c[axes.u]=u;c[axes.v]=v;c[axes.normal]=requestedSlice
+                let start=cellIndex(c[0],c[1],c[2])*componentCount
+                cells.append(NativeWorldLabFieldCell(uIndex:u,vIndex:v,
+                    components:Array(frame[start..<(start+componentCount)])))
+            }
+        }
+        return NativeWorldLabFieldSliceFrame(sampleTimeSeconds:sampleTimesSeconds[sampleIndex],
+            sampleIndex:sampleIndex,plane:plane,sliceIndex:requestedSlice,
+            dimensionU:dimensions[axes.u],dimensionV:dimensions[axes.v],cells:cells)
+    }
+    func scalarSlice(_ timeSeconds:Double,plane:NativeWorldLabFieldPlane = .xy,
+        sliceIndex:Int?=nil)throws->NativeWorldLabFieldSliceFrame {
+        guard kind == .scalar,rendererKind=="slice" else {
+            throw NativeWorldLabError.invalid("Scalar slices require a scalar field with the slice renderer.")
+        }
+        return try extractSlice(timeSeconds,plane,sliceIndex ?? (dimensions[plane.axes.normal]-1)/2)
+    }
+    func tensorSlice(_ timeSeconds:Double,component:Int,plane:NativeWorldLabFieldPlane = .xy,
+        sliceIndex:Int?=nil)throws->NativeWorldLabFieldSliceFrame {
+        guard kind == .tensor,rendererKind=="slice" else {
+            throw NativeWorldLabError.invalid("Tensor slices require a tensor field with the slice renderer.")
+        }
+        guard (0...8).contains(component) else {
+            throw NativeWorldLabError.invalid("Tensor component must be between 0 and 8.")
+        }
+        return try extractSlice(timeSeconds,plane,sliceIndex ?? (dimensions[plane.axes.normal]-1)/2)
+    }
+    func vectorGlyphs(_ timeSeconds:Double,plane:NativeWorldLabFieldPlane = .xy,
+        sliceIndex:Int?=nil)throws->NativeWorldLabFieldSliceFrame {
+        guard kind == .vector,rendererKind=="glyphs" else {
+            throw NativeWorldLabError.invalid("Vector glyphs require the vector glyph renderer.")
+        }
+        return try extractSlice(timeSeconds,plane,sliceIndex ?? (dimensions[plane.axes.normal]-1)/2)
+    }
+    func vectorStreamlines(_ timeSeconds:Double,plane:NativeWorldLabFieldPlane = .xy,
+        sliceIndex:Int?=nil)throws->NativeWorldLabFieldStreamlineFrame {
+        guard kind == .vector,rendererKind=="streamlines" else {
+            throw NativeWorldLabError.invalid("Vector streamlines require the vector streamline renderer.")
+        }
+        guard interpolationMethod=="linear",interpolationValidated else {
+            throw NativeWorldLabError.invalid("Streamlines require validated linear interpolation.")
+        }
+        let slice=sliceIndex ?? (dimensions[plane.axes.normal]-1)/2
+        let grid=try extractSlice(timeSeconds,plane,slice)
+        let width=grid.dimensionU,height=grid.dimensionV
+        func vector(_ u:Double,_ v:Double)->(Double,Double)? {
+            guard u>=0,v>=0,u<=Double(width-1),v<=Double(height-1) else{return nil}
+            let x0=Int(floor(u)),y0=Int(floor(v))
+            let x1=min(x0+1,width-1),y1=min(y0+1,height-1)
+            let fu=u-Double(x0),fv=v-Double(y0)
+            func comp(_ x:Int,_ y:Int,_ component:Int)->Double? {
+                let cell=grid.cells[y*width+x]
+                return cell.components[component]
+            }
+            func bilinear(_ component:Int)->Double? {
+                guard let a=comp(x0,y0,component),let b=comp(x1,y0,component),
+                      let c=comp(x0,y1,component),let d=comp(x1,y1,component) else{return nil}
+                return (1-fv)*((1-fu)*a+fu*b)+fv*((1-fu)*c+fu*d)
+            }
+            guard let uValue=bilinear(plane.axes.u),let vValue=bilinear(plane.axes.v) else{return nil}
+            return (uValue,vValue)
+        }
+        func direction(_ u:Double,_ v:Double)->(Double,Double)? {
+            guard let raw=vector(u,v) else{return nil}
+            let length=hypot(raw.0,raw.1)
+            guard length.isFinite,length>1e-12 else{return nil}
+            return (raw.0/length,raw.1/length)
+        }
+        var paths:[[NativeWorldLabFieldVectorPoint]]=[]
+        for seedIndex in 1...7 {
+            var u=Double(max(0,width-1))*Double(seedIndex)/8
+            var v=Double(max(0,height-1))*0.05
+            var points:[NativeWorldLabFieldVectorPoint]=[]
+            for _ in 0...120 {
+                guard u>=0,v>=0,u<=Double(width-1),v<=Double(height-1) else{break}
+                points.append(NativeWorldLabFieldVectorPoint(
+                    u:width<=1 ? 0 : u/Double(width-1),
+                    v:height<=1 ? 0 : v/Double(height-1)))
+                guard let k1=direction(u,v),
+                      let k2=direction(u+k1.0*0.1,v+k1.1*0.1) else{break}
+                let nextU=u+k2.0*0.2,nextV=v+k2.1*0.2
+                if abs(nextU-u)+abs(nextV-v)<1e-8 {break}
+                u=nextU;v=nextV
+            }
+            if points.count>=2 {paths.append(points)}
+        }
+        return NativeWorldLabFieldStreamlineFrame(sampleTimeSeconds:grid.sampleTimeSeconds,
+            sampleIndex:grid.sampleIndex,plane:plane,sliceIndex:slice,paths:paths)
+    }
+}
+
+enum NativeWorldLabFieldLayerCodec {
+    static let maxBytes=16*1024*1024
+    private static let maxCells=100_000
+    private static let maxValues=2_000_000
+    private static func object(_ value:Any?,_ label:String)throws->[String:Any] {
+        guard let result=value as? [String:Any] else {
+            throw NativeWorldLabError.invalid("Field layer (label) must be an object.")
+        }
+        return result
+    }
+    private static func string(_ object:[String:Any],_ key:String,_ max:Int=1000)throws->String {
+        guard let value=object[key] as? String,!value.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,
+              value.count<=max else {
+            throw NativeWorldLabError.invalid("Field layer field '(key)' is missing or too long.")
+        }
+        return value
+    }
+    private static func number(_ value:Any?,_ label:String)throws->Double {
+        guard let value=value as? NSNumber,CFGetTypeID(value) != CFBooleanGetTypeID() else {
+            throw NativeWorldLabError.invalid("Field layer (label) must be a finite number.")
+        }
+        let result=value.doubleValue
+        guard result.isFinite else {throw NativeWorldLabError.invalid("Field layer (label) must be finite.")}
+        return result
+    }
+    private static func numbers(_ value:Any?,_ count:Int,_ label:String)throws->[Double] {
+        guard let values=value as? [Any],values.count==count else {
+            throw NativeWorldLabError.invalid("Field layer (label) must contain (count) values.")
+        }
+        return try values.map{try number($0,label)}
+    }
+    private static func utc(_ value:String)->Bool {
+        guard value.hasSuffix("Z") else{return false}
+        let formatter=ISO8601DateFormatter()
+        formatter.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+        if formatter.date(from:value) != nil{return true}
+        formatter.formatOptions=[.withInternetDateTime]
+        return formatter.date(from:value) != nil
+    }
+    static func decode(_ data:Data,principalRoles:Set<String>=[])throws->NativeWorldLabFieldLayer {
+        guard !data.isEmpty,data.count<=maxBytes else {
+            throw NativeWorldLabError.invalid("Field layer JSON must be between 1 byte and 16 MB.")
+        }
+        guard let root=try JSONSerialization.jsonObject(with:data) as? [String:Any],
+              (root["schemaVersion"] as? NSNumber)?.intValue==1 else {
+            throw NativeWorldLabError.invalid("Unsupported or malformed field-layer schema.")
+        }
+        let id=try string(root,"id",120),label=try string(root,"label",240)
+        guard let kind=NativeWorldLabFieldKind(rawValue:try string(root,"kind",20)) else {
+            throw NativeWorldLabError.invalid("Native field renderer supports scalar, vector and tensor fields only.")
+        }
+        let units=try object(root["units"],"units")
+        let si=try string(units,"si",80),display=try string(units,"display",80)
+        let scale=try number(units["scaleToSI"],"unit scale"),offset=try number(units["offsetToSI"],"unit offset")
+        guard scale>0 else {throw NativeWorldLabError.invalid("Field unit scale must be positive.")}
+        let spatial=try object(root["spatialReference"],"spatial reference")
+        let frame=try string(spatial,"frame",30),crs=try string(spatial,"crs",120)
+        guard ["LOCAL_ENU","WGS84","EPSG"].contains(frame) else {
+            throw NativeWorldLabError.invalid("Unsupported field spatial reference.")
+        }
+        let origin=try numbers(spatial["originMeters"],3,"origin")
+        guard let axes=spatial["axisOrder"] as? [String],axes==["x","y","z"] else {
+            throw NativeWorldLabError.invalid("Field coordinate axes must use x,y,z order.")
+        }
+        let time=try object(root["timeReference"],"time reference")
+        guard ["simulation","UTC"].contains(time["kind"] as? String ?? "") else {
+            throw NativeWorldLabError.invalid("Unknown field time reference.")
+        }
+        let worldDate=try string(time,"worldDateUTC",64)
+        guard utc(worldDate),let timezone=time["timezoneDisplay"] as? String,timezone.count<=120,
+              let sampleRaw=time["sampleTimesSeconds"] as? [Any],!sampleRaw.isEmpty,sampleRaw.count<=100_000 else {
+            throw NativeWorldLabError.invalid("Field timeline or timezone is invalid.")
+        }
+        let samples=try sampleRaw.map{try number($0,"sample time")}
+        guard samples.first!>=0,samples.enumerated().allSatisfy({$0.offset==0 || $0.element>samples[$0.offset-1]}) else {
+            throw NativeWorldLabError.invalid("Field sample times must be non-negative and strictly increasing.")
+        }
+        for key in ["acquiredAtUTC","validFromUTC","validToUTC"] {
+            if let value=time[key],!(value is NSNull) {
+                guard let text=value as? String,utc(text) else {
+                    throw NativeWorldLabError.invalid("Field timestamp (key) must be UTC.")
+                }
+            }
+        }
+        let source=try object(root["source"],"source")
+        let sourceDescription:String
+        switch source["kind"] as? String {
+        case "solver":
+            let run=try string(source,"runId",120),model=try string(source,"modelId",120)
+            let version=try string(source,"modelVersion",40)
+            guard version.range(of:"^\\d+\\.\\d+\\.\\d+$",options:.regularExpression) != nil,
+                  source["evidence"] as? String=="physics-model-computed",
+                  source["inputEvidence"] as? String=="hypothetical-user-assumed" else {
+                throw NativeWorldLabError.invalid("Computed field provenance needs a versioned solver and input evidence.")
+            }
+            sourceDescription="Solver (model) v(version) · run (run)"
+        case "dataset":
+            let provider=try string(source,"provider",240),dataset=try string(source,"datasetId",240)
+            let version=try string(source,"datasetVersion",120),license=try string(source,"license",240)
+            let retrieved=try string(source,"retrievedAtUTC",64)
+            guard utc(retrieved),["measured-observed","forecast"].contains(source["evidence"] as? String ?? "") else {
+                throw NativeWorldLabError.invalid("Dataset provenance needs UTC retrieval and an evidence type.")
+            }
+            sourceDescription="Dataset (provider) · (dataset) v(version) · (license)"
+        default:
+            throw NativeWorldLabError.invalid("Field source provenance is missing.")
+        }
+        let calibration=try object(root["calibration"],"calibration")
+        let calibrationStatus=try string(calibration,"status",30)
+        guard ["calibrated","uncalibrated","not-applicable"].contains(calibrationStatus) else {
+            throw NativeWorldLabError.invalid("Field calibration status is invalid.")
+        }
+        let calibrationMethod=try string(calibration,"method",500)
+        let resolution=try object(root["resolution"],"resolution")
+        guard let dimRaw=resolution["dimensions"] as? [Any],dimRaw.count==3 else {
+            throw NativeWorldLabError.invalid("Field dimensions must have three axes.")
+        }
+        let dimensionValues=try dimRaw.map{try number($0,"grid dimension")}
+        guard dimensionValues.allSatisfy({$0.rounded()==$0 && $0>0 && $0<=maxCells}) else {
+            throw NativeWorldLabError.invalid("Field dimensions are outside the native grid limits.")
+        }
+        let dimensions=dimensionValues.map{Int($0)}
+        let cellCount=dimensions.reduce(1,*)
+        guard cellCount<=maxCells,(resolution["sampleCount"] as? NSNumber)?.intValue==cellCount else {
+            throw NativeWorldLabError.invalid("Field cell count does not match the grid dimensions.")
+        }
+        let spacing=try numbers(resolution["spacingMeters"],3,"grid spacing")
+        guard spacing.allSatisfy({$0>=0}) else {throw NativeWorldLabError.invalid("Field grid spacing cannot be negative.")}
+        let interpolation=try object(root["interpolation"],"interpolation")
+        let interpolationMethod=try string(interpolation,"method",20)
+        guard ["none","nearest","linear"].contains(interpolationMethod),
+              let validated=interpolation["validated"] as? Bool,
+              (interpolation["notes"] as? String)?.isEmpty==false,
+              interpolationMethod != "linear" || validated else {
+            throw NativeWorldLabError.invalid("Field interpolation is unsupported or not validated.")
+        }
+        let renderer=try object(root["renderer"],"renderer")
+        let rendererKind=try string(renderer,"kind",20)
+        let implementation=try string(renderer,"implementationId",120)
+        let supported=(kind == .scalar && rendererKind=="slice") ||
+            (kind == .vector && (rendererKind=="glyphs" || rendererKind=="streamlines")) ||
+            (kind == .tensor && rendererKind=="slice")
+        guard supported else {throw NativeWorldLabError.invalid("Native field renderer does not implement this kind/renderer pair.")}
+        if rendererKind=="streamlines" && (interpolationMethod != "linear" || !validated) {
+            throw NativeWorldLabError.invalid("Vector streamlines need validated linear interpolation.")
+        }
+        let components=kind == .scalar ? 1 : kind == .vector ? 3 : 9
+        let expected=samples.count*cellCount*components
+        guard expected<=maxValues,let valuesRaw=root["values"] as? [Any],valuesRaw.count==expected else {
+            throw NativeWorldLabError.invalid("Field data length exceeds native limits or does not match the grid.")
+        }
+        let mask:[Bool]?
+        if let rawMask=root["mask"],!(rawMask is NSNull) {
+            guard let values=rawMask as? [Any],values.count==expected else {
+                throw NativeWorldLabError.invalid("Field no-data mask has the wrong length.")
+            }
+            mask=try values.map { value in
+                guard let flag=value as? NSNumber,CFGetTypeID(flag)==CFBooleanGetTypeID() else {
+                    throw NativeWorldLabError.invalid("Field no-data mask must contain booleans.")
+                }
+                return flag.boolValue
+            }
+        } else {mask=nil}
+        var values:[Double?]=[]
+        values.reserveCapacity(expected)
+        for index in 0..<expected {
+            if mask == nil || mask![index] {
+                values.append(try number(valuesRaw[index],"field value"))
+            } else {
+                guard valuesRaw[index] is NSNull else {
+                    throw NativeWorldLabError.invalid("Masked field cells must be JSON null.")
+                }
+                values.append(nil)
+            }
+        }
+        let range=try object(root["range"],"range")
+        let minimum=try number(range["minimumSI"],"minimum range")
+        let maximum=try number(range["maximumSI"],"maximum range")
+        let scaleKind=try string(range,"scale",20)
+        guard minimum<=maximum,["linear","log"].contains(scaleKind),
+              (scaleKind != "log" || minimum>0),
+              values.compactMap({$0}).allSatisfy({$0>=minimum && $0<=maximum && (scaleKind != "log" || $0>0)}) else {
+            throw NativeWorldLabError.invalid("Field values exceed the declared SI range.")
+        }
+        guard let events=root["events"] as? [Any],events.isEmpty,
+              root["network"] is NSNull else {
+            throw NativeWorldLabError.invalid("Native dense renderer does not accept event/network layers.")
+        }
+        let permissions=try object(root["permissions"],"permissions")
+        let scope=try string(permissions,"scope",20)
+        guard ["private","shared","public"].contains(scope),
+              let roleArray=permissions["readRoles"] as? [String] else {
+            throw NativeWorldLabError.invalid("Field permissions are invalid.")
+        }
+        let roles=Set(roleArray)
+        switch scope {
+        case "private":
+            guard principalRoles.contains("owner"),roles.contains("owner") || roles.contains("*") else {
+                throw NativeWorldLabError.invalid("Private field layer requires the authenticated owner role.")
+            }
+        case "shared":
+            guard principalRoles.contains(where:{roles.contains($0) || roles.contains("*")}) else {
+                throw NativeWorldLabError.invalid("Shared field layer is not readable by this principal.")
+            }
+        default:break
+        }
+        let exportAllowed=permissions["exportAllowed"] as? Bool ?? false
+        let legend=try object(root["legend"],"legend")
+        let legendTitle=try string(legend,"title",240)
+        let accessible=try string(legend,"accessibleDescription",1000)
+        let validity=try string(root,"validity",1000)
+        return NativeWorldLabFieldLayer(id:id,label:label,kind:kind,siUnits:si,displayUnits:display,
+            scaleToSI:scale,offsetToSI:offset,spatialFrame:frame,crs:crs,originMeters:origin,
+            worldDateUTC:worldDate,sampleTimesSeconds:samples,timezoneDisplay:timezone,
+            sourceDescription:sourceDescription,calibrationStatus:calibrationStatus,
+            calibrationMethod:calibrationMethod,dimensions:dimensions,spacingMeters:spacing,
+            interpolationMethod:interpolationMethod,interpolationValidated:validated,
+            mask:mask,values:values,minimumSI:minimum,maximumSI:maximum,permissionsScope:scope,
+            readRoles:roles,exportAllowed:exportAllowed,rendererKind:rendererKind,
+            rendererImplementationId:implementation,legendTitle:legendTitle,
+            accessibleDescription:accessible,validity:validity)
+    }
+}
