@@ -120,7 +120,7 @@ export function WorldLabFieldOverlay(p:{layer:FieldLayer|null;timeSeconds:number
   const frame=fieldVectorGlyphsAtTime(layer,p.timeSeconds,p.vectorPlane,p.vectorSliceIndex);
   const max=frame.maximumProjectedMagnitude;
   return <div className="pointer-events-none absolute right-2 top-2 w-[min(92%,340px)] rounded-lg border border-border bg-bg/90 p-2 shadow"
-   role="img" aria-label={layer.legend.accessibleDescription+"; projected "+frame.plane.toUpperCase()+" vector glyphs at "+frame.sampleTimeSeconds.toFixed(4)+" seconds; slice "+frame.sliceIndex+"}>
+   role="img" aria-label={layer.legend.accessibleDescription+"; projected "+frame.plane.toUpperCase()+" vector glyphs at "+frame.sampleTimeSeconds.toFixed(4)+" seconds; slice "+frame.sliceIndex}>
    <p className="text-xs font-semibold">{layer.legend.title} · {frame.sampleTimeSeconds.toFixed(3)} s</p>
    <svg viewBox="0 0 300 160" width="100%" height="132" role="presentation">
     <defs><marker id="worldlab-vector-arrowhead" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0 0 L5 2.5 L0 5 Z" fill="currentColor"/></marker></defs>
