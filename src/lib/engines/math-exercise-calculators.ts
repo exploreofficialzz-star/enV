@@ -474,7 +474,7 @@ export function registerMathExerciseCalculators(calculators: Record<string, Calc
       const resultLabel = spec.labels[target] ?? labelOf[target] ?? target;
       calculators[key] = {
         fields: withHints(spec, spec.fields.filter((field) => field.name !== target)),
-        formula: `${spec.formula} · solve for ${target}`,
+        formula: `${spec.formula} · solve for ${resultLabel}`,
         compute: (v) =>
           withLabels(labelOf, () => {
             for (const name of NONNEGATIVE[spec.key] ?? []) {
