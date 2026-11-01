@@ -71,7 +71,7 @@ function downloadSvgAsPng(svg: string, filename: string): void {
         anchor.href = pngUrl;
         anchor.download = filename;
         anchor.click();
-        URL.revokeObjectURL(pngUrl);
+        window.setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
       }, "image/png");
     } finally {
       URL.revokeObjectURL(sourceUrl);
@@ -245,7 +245,9 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
     [exportFormat, roleColors, shadeScale],
   );
   const paletteSwatchesSvg = useMemo(
-    () => buildPaletteSwatchesSvg(palette.map((swatch, index) => toHex(swatch)), palette.map((_, index) => `Color ${index + 1}`)),
+    () => palette.length > 0
+      ? buildPaletteSwatchesSvg(palette.map((swatch) => toHex(swatch)), palette.map((_, index) => `Color ${index + 1}`))
+      : "",
     [palette],
   );
   const paletteShareUrl = useMemo(() => {
