@@ -57,7 +57,9 @@ import { WorldLabFluidCutaway } from "./fluid-cutaway";
 import { WorldLabVehiclePanel } from "./vehicle-panel";
 import { verifyActuatorNumerics, type ActuatorNumericalAudit } from "@/lib/world-lab/actuator-verification";
 import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
-import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,inspectionTargetIds,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
+import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,inspectionTargetIds,
+  createInspectionViewHistory,commitInspectionViewHistory,travelInspectionViewHistory,
+  type InspectionViewState,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
 import { WorldLabInspectionPanel } from "./inspection-panel";
 import { WorldLabMotorInternalsPanel } from "./motor-internals-panel";
 import { WorldLabTimeController } from "./time-controller";
@@ -183,6 +185,29 @@ export default function WorldLab() {
   const cameraRestoredProject=useRef("");
   const visualSettings = useRef({ seeInside: false, opacity: 55,mode:"normal" as InspectionMode,axis:"x" as InspectionAxis,cutawayFraction:0,explosionDistanceM:1,selectedEntityId:"" });
   const [opacity, setOpacity] = useState(55);
+  const inspectionHistory=useRef(createInspectionViewHistory({
+    mode:"normal",opacity:55,axis:"x",cutawayFraction:0,explosionDistanceM:1,
+  }));
+  const [inspectionHistoryRevision,setInspectionHistoryRevision]=useState(0);
+  function applyInspectionViewState(view:InspectionViewState){
+    setInspectionMode(view.mode);setOpacity(view.opacity);setCutawayAxis(view.axis);
+    setCutawayFraction(view.cutawayFraction);setExplosionDistanceM(view.explosionDistanceM);
+    setSeeInside(["transparent","xray","cutaway"].includes(view.mode));
+  }
+  function updateInspectionView(patch:Partial<InspectionViewState>){
+    const current=inspectionHistory.current;
+    const next=commitInspectionViewHistory(current,{...current.present,...patch});
+    if(next===current)return;
+    inspectionHistory.current=next;applyInspectionViewState(next.present);
+    setInspectionHistoryRevision(value=>value+1);
+  }
+  function travelInspectionView(direction:"undo"|"redo"){
+    const current=inspectionHistory.current;
+    const next=travelInspectionViewHistory(current,direction);
+    if(next===current)return;
+    inspectionHistory.current=next;applyInspectionViewState(next.present);
+    setInspectionHistoryRevision(value=>value+1);
+  }
   const [project, setProjectState] = useState<WorldLabProject | null>(null);
   const projectForEdits=useRef<WorldLabProject|null>(null);
   const editHistory=useRef(emptyWorldLabEditHistory());
@@ -333,7 +358,7 @@ export default function WorldLab() {
   const spatialClearance=measurement&&selectedEntity&&measurementTarget
     ?inspectWorldLabSpatialClearance(selectedEntity,measurementTarget):null;
   const canUndo=editHistory.current.past.length>0,canRedo=editHistory.current.future.length>0;
-  void editEpoch;
+  void editEpoch;void inspectionHistoryRevision;
   const selectedDrop = dropRun && selectedEntity?.id === dropRun.source.entityId
     && project?.id === dropRun.source.projectId
     && project?.revision === dropRun.source.projectRevision ? dropRun : null;
@@ -2788,14 +2813,20 @@ export default function WorldLab() {
                 aria-label="Redo World Lab edit" onClick={()=>travelEdit("redo")}>Redo</button>
           </div>
           <WorldLabInspectionPanel mode={inspectionMode}
-            onModeChange={mode=>{setInspectionMode(mode);setSeeInside(["transparent","xray","cutaway"].includes(mode));}}
-            opacity={opacity} onOpacityChange={setOpacity}
-            axis={cutawayAxis} onAxisChange={setCutawayAxis}
-            cutawayFraction={cutawayFraction} onCutawayFractionChange={setCutawayFraction}
-            explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={setExplosionDistanceM}
+            onModeChange={mode=>updateInspectionView({mode})}
+            opacity={opacity} onOpacityChange={value=>updateInspectionView({opacity:value})}
+            axis={cutawayAxis} onAxisChange={axis=>updateInspectionView({axis})}
+            cutawayFraction={cutawayFraction} onCutawayFractionChange={value=>updateInspectionView({cutawayFraction:value})}
+            explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={value=>updateInspectionView({explosionDistanceM:value})}
             selected={selectedEntity??null} hasAssembly={!!project?.assemblies?.some(a=>a.entityIds.includes(selectedEntityId))}
             onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}
-            onZoomSelected={focusSelected} onReset={()=>{setInspectionMode("normal");setSeeInside(false);setCutawayFraction(0);setOpacity(55);setExplosionDistanceM(1);setFieldOverlayEnabled(false);setInspectionUiHidden(false);setShowInspectionLabels(true);}}
+            onZoomSelected={focusSelected} onReset={()=>{
+              updateInspectionView({mode:"normal",opacity:55,axis:"x",cutawayFraction:0,explosionDistanceM:1});
+              setFieldOverlayEnabled(false);setInspectionUiHidden(false);setShowInspectionLabels(true);
+            }}
+            canUndoView={inspectionHistory.current.past.length>0}
+            canRedoView={inspectionHistory.current.future.length>0}
+            onUndoView={()=>travelInspectionView("undo")} onRedoView={()=>travelInspectionView("redo")}
             showLabels={showInspectionLabels} onShowLabelsChange={setShowInspectionLabels}
             uiHidden={inspectionUiHidden} onUiHiddenChange={setInspectionUiHidden}/>
           <WorldLabFieldPanel layers={fieldLayers} selectedId={fieldLayerId}
