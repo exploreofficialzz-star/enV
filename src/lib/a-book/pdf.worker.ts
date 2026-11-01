@@ -7,6 +7,7 @@ import {
   splitPdfIntoZip,
   splitSelectedPdfsIntoZip,
 } from "./pdf.ts";
+import type { ABookPdfInfo } from "./pdf.ts";
 import type { ABookPdfWorkerRequest, ABookPdfWorkerResponse } from "./pdf-worker-types.ts";
 
 const workerScope = self as unknown as {
@@ -24,7 +25,7 @@ workerScope.onmessage = async (event) => {
   if (!request || typeof request.requestId !== "string") return;
 
   try {
-    let value: ABookPdfWorkerResponse extends { ok: true; value: infer T } ? T : never;
+    let value: ABookPdfInfo | Uint8Array;
     switch (request.action) {
       case "inspect":
         value = await inspectPdf(request.blob);
