@@ -694,12 +694,16 @@ export default function WorldLab() {
       mesh.isVisible=inspectionEntityVisible(project,settings,entity.id);
       if (mesh.material instanceof B.StandardMaterial) {
         mesh.material.diffuseColor = B.Color3.FromHexString(entity.color);
-        mesh.material.alpha = (settings.mode==="xray"?Math.min(0.24,settings.opacity/100):
-          settings.seeInside||settings.mode==="cutaway"?settings.opacity/100:1)*entity.opacity;
-        mesh.material.wireframe=settings.mode==="xray";
-        mesh.material.backFaceCulling=settings.mode!=="xray";
-        mesh.material.needDepthPrePass=settings.mode==="xray";
-        mesh.material.clipPlane=plane&&clipTargets.has(entity.id)?new B.Plane(plane.normal[0],plane.normal[1],plane.normal[2],-plane.offset):null;
+        const isInspectionTarget=clipTargets.has(entity.id);
+        const inspectOpacity=isInspectionTarget&&(settings.mode==="transparent"||
+          settings.mode==="xray"||settings.mode==="cutaway")?settings.opacity/100:1;
+        mesh.material.alpha = (settings.mode==="xray"&&isInspectionTarget?
+          Math.min(0.24,inspectOpacity):inspectOpacity)*entity.opacity;
+        mesh.material.wireframe=settings.mode==="xray"&&isInspectionTarget;
+        mesh.material.backFaceCulling=!(settings.mode==="xray"&&isInspectionTarget);
+        mesh.material.needDepthPrePass=settings.mode==="xray"&&isInspectionTarget;
+        mesh.material.clipPlane=plane&&isInspectionTarget?
+          new B.Plane(plane.normal[0],plane.normal[1],plane.normal[2],-plane.offset):null;
       }
     }
   }, [modelKind, mechanical.initialDisplacementM, sample, seeInside, opacity,inspectionMode,cutawayAxis,cutawayFraction,explosionDistanceM,selectedEntityId, project, currentRun, heat]);
@@ -2640,7 +2644,7 @@ export default function WorldLab() {
             <canvas ref={canvasRef} className="h-[52dvh] min-h-[300px] w-full touch-none"
               aria-label="Interactive 3D illustrative environment. Touch or drag to look around; use WASD or arrow keys to move."
               tabIndex={0} />
-            <WorldLabFieldOverlay layer={activeFieldLayer} timeSeconds={timeSeconds} visible={fieldOverlayEnabled}/>
+            <WorldLabFieldOverlay layer={activeFieldLayer} timeSeconds={timeSeconds} visible={fieldOverlayEnabled&&!inspectionUiHidden}/>
             {graphicsError && (
               <div role="alert" className="absolute inset-0 flex items-center justify-center bg-bg p-4 text-center text-sm">
                 3D unavailable: {graphicsError}. The scientific controls and values remain accessible below.
