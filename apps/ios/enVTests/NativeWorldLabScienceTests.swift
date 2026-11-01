@@ -263,3 +263,56 @@ final class NativeWorldLabConnectedPortContractTests:XCTestCase {
             adapters:[missingSource,base[1]],durationSeconds:0.3,stepSeconds:0.1))
     }
 }
+
+
+final class NativeWorldLabStatefulExecutionParityTests:XCTestCase {
+    func testRCCapacitorStatePersistsAcrossConnectedSourceSwitch() throws {
+        let graph=NativeWorldLabExecution.idealRCGraph(projectId:"rc-switch",projectRevision:1)
+        let base=try NativeWorldLabExecution.idealRCAdapters(
+            sourceVoltageV:12,resistanceOhm:6,capacitanceF:0.5)
+        let switched=NativeScientificAdapter(componentId:"source",modelId:"ideal-dc-source",
+            modelVersion:"1.0.0"){time,_,_ in
+            let voltage=time<0.15 ? 12.0 : 0.0
+            return NativeScientificStepOutput(outputs:["V":try NativeWorldLabSI.declare(voltage,unit:"V")],
+                suppliedW:0,dissipatedW:0,storedRateW:0)
+        }
+        let run=try NativeWorldLabExecution.execute(graph,adapters:[switched,base[1]],
+            durationSeconds:0.3,stepSeconds:0.1)
+        let charged=12*(1-exp(-0.1/3))
+        XCTAssertEqual(try XCTUnwrap(run.samples.last?.values["load:Vc"]?.valueSI),
+            charged*exp(-0.2/3),accuracy:1e-12)
+    }
+
+    func testDelayedFeedbackRequiresExplicitInitialPortState() throws {
+        let ports=[
+            NativeSciencePort(id:"out",direction:"output",unit:"1",frame:"SCALAR",flow:"signal"),
+            NativeSciencePort(id:"in",direction:"input",unit:"1",frame:"SCALAR",flow:"signal")]
+        let graph=NativeScientificGraph(projectId:"delay-loop",projectRevision:1,
+            components:[
+                NativeScienceComponent(id:"a",modelId:"delay-step",ports:ports),
+                NativeScienceComponent(id:"b",modelId:"delay-step",ports:ports)],
+            connections:[
+                NativeScienceEdge(fromComponentId:"a",fromPortId:"out",toComponentId:"b",toPortId:"in",delayed:true),
+                NativeScienceEdge(fromComponentId:"b",fromPortId:"out",toComponentId:"a",toPortId:"in",delayed:true)])
+        func adapter(_ id:String,_ initial:Double)throws->NativeScientificAdapter {
+            NativeScientificAdapter(componentId:id,modelId:"delay-step",modelVersion:"1.0.0",
+                initialOutputs:["out":try NativeWorldLabSI.declare(initial,unit:"1")]){_,_,inputs in
+                NativeScientificStepOutput(outputs:["out":try NativeWorldLabSI.declare(
+                    inputs["in"]!.valueSI+1,unit:"1",evidence:"physics-model-computed")],
+                    suppliedW:0,dissipatedW:0,storedRateW:0)
+            }
+        }
+        let run=try NativeWorldLabExecution.execute(graph,
+            adapters:[try adapter("a",1),try adapter("b",10)],durationSeconds:0.2,stepSeconds:0.1)
+        XCTAssertEqual(try XCTUnwrap(run.samples[0].values["a:out"]?.valueSI),11,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(run.samples[0].values["b:out"]?.valueSI),2,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(run.samples[1].values["a:out"]?.valueSI),3,accuracy:1e-12)
+        XCTAssertEqual(try XCTUnwrap(run.samples[1].values["b:out"]?.valueSI),12,accuracy:1e-12)
+
+        let missing=try adapter("a",1)
+        let noInitial=NativeScientificAdapter(componentId:"a",modelId:"delay-step",
+            modelVersion:"1.0.0",advance:missing.advance)
+        XCTAssertThrowsError(try NativeWorldLabExecution.execute(graph,
+            adapters:[noInitial,try adapter("b",10)],durationSeconds:0.1,stepSeconds:0.1))
+    }
+}
