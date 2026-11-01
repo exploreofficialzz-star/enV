@@ -121,3 +121,53 @@ class NativeWorldLabSIContractTest {
         }
     }
 }
+
+
+class NativeWorldLabStatefulGraphExecutionTest {
+    @Test fun rcCapacitorStatePersistsAcrossConnectedSourceSwitch() {
+        val graph=NativeWorldLabExecution.idealRcGraph("rc-switch",1)
+        val base=NativeWorldLabExecution.idealRcAdapters(12.0,6.0,0.5)
+        val switched=base.first().copy(advance={time,_,_->
+            val voltage=if(time<0.15)12.0 else 0.0
+            NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(voltage,"V")),
+                0.0,0.0,0.0)
+        })
+        val run=NativeWorldLabExecution.execute(graph,listOf(switched,base.last()),0.3,0.1)
+        val charged=12.0*(1.0-kotlin.math.exp(-0.1/3.0))
+        assertEquals(charged*kotlin.math.exp(-0.2/3.0),
+            run.samples.last().values.getValue("load:Vc").valueSI,1e-12)
+    }
+
+    @Test fun delayedFeedbackRequiresExplicitInitialOutputState() {
+        val ports=listOf(
+            NativeSciencePort("out","output","1","SCALAR","signal"),
+            NativeSciencePort("in","input","1","SCALAR","signal"))
+        val graph=NativeScientificGraph("delay-loop",1,listOf(
+            NativeScienceComponent("a","delay-step",ports),
+            NativeScienceComponent("b","delay-step",ports)
+        ),listOf(
+            NativeScienceConnection("a","out","b","in",true),
+            NativeScienceConnection("b","out","a","in",true)))
+        fun adapter(id:String,initial:Double)=NativeScientificAdapter(
+            componentId=id,modelId="delay-step",modelVersion="1.0.0",
+            initialOutputs=mapOf("out" to NativeWorldLabSI.declare(initial,"1")),
+            advance={_,_,inputs->
+                NativeScientificStepOutput(mapOf("out" to NativeWorldLabSI.declare(
+                    inputs.getValue("in").valueSI+1.0,"1","physics-model-computed")),
+                    0.0,0.0,0.0)
+            })
+        val run=NativeWorldLabExecution.execute(graph,listOf(adapter("a",1.0),adapter("b",10.0)),0.2,0.1)
+        assertEquals(11.0,run.samples[0].values.getValue("a:out").valueSI,1e-12)
+        assertEquals(2.0,run.samples[0].values.getValue("b:out").valueSI,1e-12)
+        assertEquals(3.0,run.samples[1].values.getValue("a:out").valueSI,1e-12)
+        assertEquals(12.0,run.samples[1].values.getValue("b:out").valueSI,1e-12)
+
+        val noInitial=adapter("a",1.0).copy(initialOutputs=emptyMap())
+        var rejected=false
+        try {
+            NativeWorldLabExecution.execute(graph,listOf(noInitial,adapter("b",10.0)),0.1,0.1)
+        } catch (_:IllegalArgumentException) { rejected=true }
+          catch (_:IllegalStateException) { rejected=true }
+        assertTrue("Delayed feedback without t=0 state must be rejected",rejected)
+    }
+}
