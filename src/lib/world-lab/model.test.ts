@@ -128,7 +128,10 @@ test("heat solver adapts timestep or rejects over-budget stiff diffusion", () =>
 test("parameter edits create a versioned child run with an explicit input diff",()=>{
  const source=runExperiment({kind:"damped-oscillator",massKg:1,springNPerM:4,dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0},{
   id:"branch-source",worldDateUTC:"2026-11-01T00:00:00Z",startedAtUTC:"2026-11-01T12:00:00Z"});
- const child=runExperiment({...source.inputs,massKg:2},{
+ const sourceInput={kind:"damped-oscillator" as const,massKg:1,springNPerM:4,
+  dampingNsPerM:0.2,initialDisplacementM:0.5,initialVelocityMPerS:0};
+ const changedInput={...sourceInput,massKg:2};
+ const child=runExperiment(changedInput,{
   id:"branch-child",worldDateUTC:"2026-11-01T00:00:00Z",startedAtUTC:"2026-11-01T12:01:00Z",sourceRun:source});
  assert.equal(child.parentRunId,source.id);
  assert.equal(child.branch?.sourceRunId,source.id);

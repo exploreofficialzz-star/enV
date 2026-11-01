@@ -118,15 +118,24 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
   if(!record(raw.network)||!Array.isArray(raw.network.nodes)||!Array.isArray(raw.network.edges)||
    raw.network.nodes.length===0||raw.network.nodes.length>2000||raw.network.edges.length>10000)
    throw new Error("Network field needs a bounded graph of nodes and edges.");
-  const nodes=raw.network.nodes as unknown[];
-  if(!nodes.every(n=>record(n)&&nonempty(n.id,120)&&nonempty(n.label)&&vector3(n.positionMeters)))
+  const nodesRaw=raw.network.nodes as unknown[];
+  if(!nodesRaw.every(n=>record(n)&&nonempty(n.id,120)&&nonempty(n.label)&&vector3(n.positionMeters)))
    throw new Error("Network field contains an invalid node.");
-  const ids=new Set(nodes.map(n=>(n as Record<string,unknown>).id as string));
-  const edges=raw.network.edges as unknown[];
-  if(!edges.every(e=>record(e)&&nonempty(e.id,120)&&ids.has(String(e.from))&&ids.has(String(e.to))&&nonempty(e.label)))
+  const nodes:FieldNetwork["nodes"][number][]=nodesRaw.map(n=>{
+   const node=n as Record<string,unknown>;
+   const position=node.positionMeters as number[];
+   return Object.freeze({id:node.id as string,label:node.label as string,
+    positionMeters:Object.freeze([position[0],position[1],position[2]]) as unknown as FieldNetwork["nodes"][number]["positionMeters"]});
+  });
+  const ids=new Set(nodes.map(n=>n.id));
+  const edgesRaw=raw.network.edges as unknown[];
+  if(!edgesRaw.every(e=>record(e)&&nonempty(e.id,120)&&ids.has(String(e.from))&&ids.has(String(e.to))&&nonempty(e.label)))
    throw new Error("Network field edges must connect existing nodes.");
-  network=Object.freeze({nodes:Object.freeze(nodes.map(n=>Object.freeze({...n}) as FieldNetwork["nodes"][number])),
-   edges:Object.freeze(edges.map(e=>Object.freeze({...e}) as FieldNetwork["edges"][number]))});
+  const edges:FieldNetwork["edges"][number][]=edgesRaw.map(e=>{
+   const edge=e as Record<string,unknown>;
+   return Object.freeze({id:edge.id as string,from:edge.from as string,to:edge.to as string,label:edge.label as string});
+  });
+  network=Object.freeze({nodes:Object.freeze(nodes),edges:Object.freeze(edges)});
  }else if(raw.network!==null)throw new Error("Only network fields may include a network graph.");
  if(!record(raw.range)||!finite(raw.range.minimumSI)||!finite(raw.range.maximumSI)||
   raw.range.minimumSI>raw.range.maximumSI||!["linear","log"].includes(String(raw.range.scale))||
@@ -147,24 +156,29 @@ export function parseFieldLayer(raw:unknown):FieldLayer{
   !nonempty(raw.legend.maximumLabel)||!palettes.includes(raw.legend.palette as FieldPalette)||
   !nonempty(raw.legend.accessibleDescription,1000)||!nonempty(raw.validity,1000))
   throw new Error("Field legend and accessibility description are required.");
- return Object.freeze({
+ const normalized={
   schemaVersion:1,id:raw.id,label:raw.label,kind,units:Object.freeze({...raw.units}) as FieldUnits,
   spatialReference:Object.freeze({...raw.spatialReference,originMeters:Object.freeze([...raw.spatialReference.originMeters]),axisOrder:Object.freeze(["x","y","z"])}) as FieldLayer["spatialReference"],
   timeReference:Object.freeze({...raw.timeReference,sampleTimesSeconds:Object.freeze([...raw.timeReference.sampleTimesSeconds])}) as FieldLayer["timeReference"],
   source:Object.freeze({...raw.source}) as FieldLayer["source"],
   calibration:Object.freeze({...raw.calibration}) as FieldLayer["calibration"],
-  resolution:Object.freeze({...raw.resolution,dimensions:Object.freeze([...raw.resolution.dimensions]),spacingMeters:Object.freeze([...raw.resolution.spacingMeters])}) as FieldLayer["resolution"],
-  interpolation:Object.freeze({...raw.interpolation}),
+  resolution:Object.freeze({...raw.resolution,dimensions:Object.freeze([...raw.resolution.dimensions]),spacingMeters:Object.freeze([...raw.resolution.spacingMeters])}) as unknown as FieldLayer["resolution"],
+  interpolation:Object.freeze({...raw.interpolation}) as unknown as FieldLayer["interpolation"],
   mask:raw.mask===null?null:Object.freeze([...(raw.mask as boolean[])]),
   values:Object.freeze([...(raw.values as (number|null)[])]),
-  events:Object.freeze(events.map(e=>Object.freeze({...e}) as FieldEvent)),
+  events:Object.freeze(events.map(e=>{
+   const event=e as Record<string,unknown>;
+   return Object.freeze({id:event.id as string,atSeconds:event.atSeconds as number,
+    label:event.label as string,severity:event.severity as FieldEvent["severity"]});
+  })),
   network,
-  range:Object.freeze({...raw.range}),
-  permissions:Object.freeze({...raw.permissions,readRoles:Object.freeze([...(raw.permissions.readRoles as string[])])}),
-  renderer:Object.freeze({...raw.renderer}),
-  legend:Object.freeze({...raw.legend}),
-  validity:raw.validity,
- });
+  range:Object.freeze({...raw.range}) as unknown as FieldLayer["range"],
+  permissions:Object.freeze({...raw.permissions,readRoles:Object.freeze([...(raw.permissions.readRoles as string[])])}) as unknown as FieldLayer["permissions"],
+  renderer:Object.freeze({...raw.renderer}) as unknown as FieldLayer["renderer"],
+  legend:Object.freeze({...raw.legend}) as unknown as FieldLayer["legend"],
+  validity:raw.validity as string,
+ } as unknown as FieldLayer;
+ return Object.freeze(normalized);
 }
 export function fieldFrameAtTime(layer:FieldLayer,timeSeconds:number):Readonly<{
  sampleTimeSeconds:number;sampleIndex:number;values:readonly (number|null)[];
