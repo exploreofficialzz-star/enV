@@ -59,6 +59,8 @@ import { buildScientificTimeTrace } from "@/lib/world-lab/time-trace";
 import { inspectionEntityVisible,inspectionPlane,inspectionRenderPosition,inspectionTargetIds,type InspectionMode,type InspectionAxis } from "@/lib/world-lab/inspection";
 import { WorldLabInspectionPanel } from "./inspection-panel";
 import { WorldLabTimeController } from "./time-controller";
+import { createComputedFieldLayers,type FieldLayer } from "@/lib/world-lab/field-layer";
+import { WorldLabFieldPanel,WorldLabFieldOverlay } from "./field-panel";
 import { illustrativeLayerForDepth, observerTravelMetres, OBSERVER_BOUNDS_METRES,
   observerAdaptiveStepMetres,observerClippingPlanes,observerRangeMetres } from "@/lib/world-lab/observer";
 import {
@@ -162,6 +164,10 @@ export default function WorldLab() {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [seeInside, setSeeInside] = useState(false);
+  const [fieldLayerId,setFieldLayerId]=useState("");
+  const [fieldOverlayEnabled,setFieldOverlayEnabled]=useState(false);
+  const [showInspectionLabels,setShowInspectionLabels]=useState(true);
+  const [inspectionUiHidden,setInspectionUiHidden]=useState(false);
   const [inspectionMode,setInspectionMode]=useState<InspectionMode>("normal");
   const [cutawayAxis,setCutawayAxis]=useState<InspectionAxis>("x");
   const [cutawayFraction,setCutawayFraction]=useState(0);
@@ -339,6 +345,11 @@ export default function WorldLab() {
   const [message, setMessage] = useState("Choose an experiment and press Start to calculate a real reference trajectory.");
   const [error, setError] = useState("");
   const currentRun = useMemo(() => runs.find((run) => run.id === runId) ?? null, [runs, runId]);
+  const fieldLayers=useMemo(()=>{
+    if(!currentRun)return [];
+    try{return createComputedFieldLayers(currentRun);}catch{return [];}
+  },[currentRun]);
+  const activeFieldLayer=fieldLayers.find(x=>x.id===fieldLayerId)??fieldLayers[0]??null;
   const sample = currentRun ? sampleRun(currentRun, timeSeconds) : null;
   const trace = useMemo(() => currentRun ? buildScientificTimeTrace(currentRun) : null, [currentRun]);
   const compatibleRuns = runs.filter(run => currentRun &&
@@ -2629,14 +2640,15 @@ export default function WorldLab() {
             <canvas ref={canvasRef} className="h-[52dvh] min-h-[300px] w-full touch-none"
               aria-label="Interactive 3D illustrative environment. Touch or drag to look around; use WASD or arrow keys to move."
               tabIndex={0} />
+            <WorldLabFieldOverlay layer={activeFieldLayer} timeSeconds={timeSeconds} visible={fieldOverlayEnabled}/>
             {graphicsError && (
               <div role="alert" className="absolute inset-0 flex items-center justify-center bg-bg p-4 text-center text-sm">
                 3D unavailable: {graphicsError}. The scientific controls and values remain accessible below.
               </div>
             )}
-            <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-bg/90 px-2 py-1 text-xs text-fg">
+            {showInspectionLabels&&!inspectionUiHidden&&<p className="pointer-events-none absolute bottom-2 left-2 rounded bg-bg/90 px-2 py-1 text-xs text-fg">
               {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · {observerRange.toFixed(1)} m view scale · illustrative, not mapped
-            </p>
+            </p>}
           </div>
           <section className="mt-3 rounded-lg border border-border p-3" aria-label="Build interconnected visual assemblies">
             <h3 className="text-sm font-semibold">Build an invention from parts</h3>
@@ -2746,7 +2758,13 @@ export default function WorldLab() {
             cutawayFraction={cutawayFraction} onCutawayFractionChange={setCutawayFraction}
             explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={setExplosionDistanceM}
             selected={selectedEntity??null} hasAssembly={!!project?.assemblies?.some(a=>a.entityIds.includes(selectedEntityId))}
-            onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}/>
+            onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}
+            onZoomSelected={focusSelected} onReset={()=>{setInspectionMode("normal");setSeeInside(false);setCutawayFraction(0);setOpacity(55);setExplosionDistanceM(1);setFieldOverlayEnabled(false);setInspectionUiHidden(false);setShowInspectionLabels(true);}}
+            showLabels={showInspectionLabels} onShowLabelsChange={setShowInspectionLabels}
+            uiHidden={inspectionUiHidden} onUiHiddenChange={setInspectionUiHidden}/>
+          <WorldLabFieldPanel layers={fieldLayers} selectedId={fieldLayerId}
+            onSelect={setFieldLayerId} timeSeconds={timeSeconds}
+            overlayEnabled={fieldOverlayEnabled} onOverlayChange={setFieldOverlayEnabled}/>
           <p className="mt-2 text-xs text-muted-foreground">
             Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
             Added solids are visual geometry with analytic volume. Without material density, mass is unknown;
