@@ -72,6 +72,14 @@ class NativeWorldLabSIContractTest {
         assertEquals(12.0*(1.0-kotlin.math.exp(-0.3/3.0)),last.values.getValue("load:Vc").valueSI,1e-12)
         assertTrue(last.values.getValue("load:I").valueSI>0.0)
         assertTrue(run.samples.all{kotlin.math.abs(it.residualW)<1e-10&&it.dissipatedW>=0.0})
+        val adapters=NativeWorldLabExecution.idealRcAdapters(12.0,6.0,0.5)
+        val changedSource=adapters.first().copy(advance={_,_,_->
+            NativeScientificStepOutput(mapOf("V" to NativeWorldLabSI.declare(6.0,"V")),
+                0.0,0.0,0.0)
+        })
+        val connected=NativeWorldLabExecution.execute(graph,listOf(changedSource,adapters.last()),0.3,0.1)
+        assertEquals(6.0*(1.0-kotlin.math.exp(-0.3/3.0)),
+            connected.samples.last().values.getValue("load:Vc").valueSI,1e-12)
     }
     @Test fun schedulerHonoursFutureEventsAndRejectsFalsePower() {
         val graph=NativeScientificGraph("rc-events",1,listOf(
