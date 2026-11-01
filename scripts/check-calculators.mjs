@@ -7,7 +7,6 @@ const advancedText = readFileSync(new URL("../src/lib/engines/advanced-calculato
 const mathExerciseText = readFileSync(new URL("../src/lib/engines/math-exercise-calculators.ts", import.meta.url), "utf8");
 const generatorText = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
 const presentationHelperText = readFileSync(new URL("./math-exercise-catalog.mjs", import.meta.url), "utf8");
-const nativeExporterText = readFileSync(new URL("./export-native-catalog.mjs", import.meta.url), "utf8");
 const stemText = readFileSync(new URL("../src/lib/engines/stem-calculators.ts", import.meta.url), "utf8");
 const regularText = readFileSync(new URL("../src/lib/engines/regular-calculators.ts", import.meta.url), "utf8");
 
