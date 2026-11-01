@@ -1137,17 +1137,20 @@ fun NativeWorldLabForm() {
                     Text("Power residual: "+labNumber(result.powerResidualW)+" W")
                     result.branchCurrentsA.forEach{(id,current)->
                         val part=net.components.firstOrNull{it.id==id}
-                        val positive=current>1e-12
-                        val negative=current< -1e-12
-                        val fromId=if(positive)part?.positiveNodeId else part?.negativeNodeId
-                        val toId=if(positive)part?.negativeNodeId else part?.positiveNodeId
-                        val fromLabel=fromId?.let{node->net.nodes.firstOrNull{it.id==node}?.label?:node}
-                        val toLabel=toId?.let{node->net.nodes.firstOrNull{it.id==node}?.label?:node}
-                        val flow=when{
-                            !positive&&!negative->"0 A · no net branch current"
-                            fromLabel!=null&&toLabel!=null->labNumber(kotlin.math.abs(current))+" A · "+fromLabel+" → "+toLabel
-                            else->labNumber(kotlin.math.abs(current))+" A · signed branch flow"
+                        val resolved=part?.let{
+                            runCatching{com.chastech.env.engine.NativeWorldLabBranchCurrent.resolve(
+                                it.positiveNodeId,it.negativeNodeId,current)}.getOrNull()
                         }
+                        val flow=if(resolved==null) "Direction unavailable"
+                            else if(resolved.direction==com.chastech.env.engine.NativeLabBranchFlowDirection.ZERO)
+                                "0 A · no net branch current"
+                            else {
+                                val fromId=resolved.fromNodeId.orEmpty()
+                                val toId=resolved.toNodeId.orEmpty()
+                                val from=net.nodes.firstOrNull{it.id==fromId}?.label?:fromId
+                                val to=net.nodes.firstOrNull{it.id==toId}?.label?:toId
+                                labNumber(resolved.magnitudeA)+" A · "+from+" → "+to
+                            }
                         Text(id+": "+flow)
                     }
                     Text("Direction follows the calculated signed conventional branch current; this is circuit topology, not a measured 3D electromagnetic field.",
