@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { extractPdfTextLocally, extractSelectedPdfTextLocally } from "./pdf-reader.ts";
 import { extractPdfPagesInWorker, extractSelectedPdfsInWorker, inspectPdfInWorker, mergePdfsInWorker, rotateSelectedPdfsInWorker, splitPdfIntoZipInWorker, splitSelectedPdfsIntoZipInWorker } from "./pdf-worker-client.ts";
 import test from "node:test";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import {
   A_BOOK_PDF_LIMITS,
   extractPdfPages,
@@ -242,7 +242,7 @@ test("A book rejects browser PDF work when Web Workers are unavailable", async (
 
 test("extracts embedded PDF text locally and reports page-level progress", async () => {
   const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont("Helvetica");
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
   for (const line of ["A book local PDF text", "Second page searchable phrase"]) {
     const page = pdf.addPage([320, 420]);
     page.drawText(line, { x: 32, y: 350, size: 16, font });
@@ -263,10 +263,10 @@ test("extracts embedded PDF text locally and reports page-level progress", async
 test("extracts several PDFs into distinct local searchable text files", async () => {
   const { unzipSync } = await import("fflate");
   const first = await PDFDocument.create();
-  const firstFont = await first.embedFont("Helvetica");
+  const firstFont = await first.embedFont(StandardFonts.Helvetica);
   first.addPage([300, 400]).drawText("Research alpha note", { x: 24, y: 340, font: firstFont });
   const second = await PDFDocument.create();
-  const secondFont = await second.embedFont("Helvetica");
+  const secondFont = await second.embedFont(StandardFonts.Helvetica);
   second.addPage([300, 400]).drawText("Research beta note", { x: 24, y: 340, font: secondFont });
   const archive = await extractSelectedPdfTextLocally([
     { name: "Research.pdf", blob: new Blob([await first.save()]) },
