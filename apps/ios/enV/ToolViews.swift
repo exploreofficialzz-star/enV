@@ -14379,6 +14379,7 @@ private struct NativeABookView: View {
     @State private var query = ""
     @State private var showArchived = false
     @State private var showTrash = false
+    @State private var confirmPermanentDelete = false
     @State private var attachments: [ABookNativeAttachment] = []
     @State private var revisions: [ABookNativeRevision] = []
     @State private var status = "Saved on this device"
@@ -14469,7 +14470,7 @@ private struct NativeABookView: View {
                         HStack(spacing: 8) {
                             if let selected = notes.first(where: { $0.id == selectedID }), selected.deletedAt != nil {
                                 Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
-                                Button("Delete permanently") { permanentlyDeleteSelectedNote() }.buttonStyle(.bordered)
+                                Button("Delete permanently") { confirmPermanentDelete = true }.buttonStyle(.bordered)
                             } else {
                                 Button("Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
                                 Button("Archive") { updateSelected(archived: true) }.buttonStyle(.bordered)
@@ -14530,6 +14531,12 @@ private struct NativeABookView: View {
         .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
                       contentType: .pdf, defaultFilename: pdfName) { result in
             if case .failure(let error) = result { showError(error) }
+        }
+        .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
+            Button("Delete permanently", role: .destructive) { permanentlyDeleteSelectedNote() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the note, its revision history and its attached files from this device. This cannot be undone.")
         }
     }
 
