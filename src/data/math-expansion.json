@@ -4736,12 +4736,6 @@
       "project time"
     ],
     [
-      "math-design-build-delivery-effort",
-      "design",
-      "build",
-      "delivery effort"
-    ],
-    [
       "math-draft-revision-final-effort",
       "draft",
       "revision",
@@ -5066,12 +5060,6 @@
       "project time"
     ],
     [
-      "engineering-design-build-delivery-effort",
-      "design",
-      "build",
-      "delivery effort"
-    ],
-    [
       "engineering-draft-revision-final-effort",
       "draft",
       "revision",
@@ -5394,12 +5382,6 @@
       "setup",
       "run",
       "project time"
-    ],
-    [
-      "business-design-build-delivery-effort",
-      "design",
-      "build",
-      "delivery effort"
     ],
     [
       "business-draft-revision-final-effort",
@@ -5762,12 +5744,6 @@
       "project-time"
     ],
     [
-      "science-sum-design-effort-build-effort-delivery-effort-33",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
-    ],
-    [
       "engineering-sum-draft-revision-final-effort-34",
       "draft",
       "revision",
@@ -6060,12 +6036,6 @@
       "setup",
       "run-time",
       "project-time"
-    ],
-    [
-      "engineering-sum-design-effort-build-effort-delivery-effort-83",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
     ],
     [
       "core-sum-draft-revision-final-effort-84",
@@ -6362,12 +6332,6 @@
       "project-time"
     ],
     [
-      "core-sum-design-effort-build-effort-delivery-effort-133",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
-    ],
-    [
       "advanced-sum-draft-revision-final-effort-134",
       "draft",
       "revision",
@@ -6660,12 +6624,6 @@
       "setup",
       "run-time",
       "project-time"
-    ],
-    [
-      "advanced-sum-design-effort-build-effort-delivery-effort-183",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
     ],
     [
       "applied-sum-draft-revision-final-effort-184",
@@ -6962,12 +6920,6 @@
       "project-time"
     ],
     [
-      "applied-sum-design-effort-build-effort-delivery-effort-233",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
-    ],
-    [
       "technical-sum-draft-revision-final-effort-234",
       "draft",
       "revision",
@@ -7262,12 +7214,6 @@
       "project-time"
     ],
     [
-      "technical-sum-design-effort-build-effort-delivery-effort-283",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
-    ],
-    [
       "business-sum-draft-revision-final-effort-284",
       "draft",
       "revision",
@@ -7560,12 +7506,6 @@
       "setup",
       "run-time",
       "project-time"
-    ],
-    [
-      "business-sum-design-effort-build-effort-delivery-effort-333",
-      "design-effort",
-      "build-effort",
-      "delivery-effort"
     ],
     [
       "science-sum-draft-revision-final-effort-334",
