@@ -14660,7 +14660,7 @@ private final class ABookLocalStore {
         var importedNotes: [ABookNativeNote] = []
         for item in rawNotes {
             let oldID = try requiredString(item, "id")
-            guard noteIDs[oldID] == nil,
+            guard oldID.count <= 180, noteIDs[oldID] == nil,
                   let title = item["title"] as? String, title.count <= 10_000,
                   let body = item["body"] as? String, body.count <= 5_000_000,
                   let notebook = item["notebook"] as? String, notebook.count <= 500,
@@ -14685,7 +14685,7 @@ private final class ABookLocalStore {
         var revisionIDs = Set<String>()
         for item in rawRevisions {
             let oldRevisionID = try requiredString(item, "id")
-            guard revisionIDs.insert(oldRevisionID).inserted else { throw NSError(domain: "ABookArchive", code: 35, userInfo: [NSLocalizedDescriptionKey: "The backup contains duplicate revision IDs."]) }
+            guard oldRevisionID.count <= 180, revisionIDs.insert(oldRevisionID).inserted else { throw NSError(domain: "ABookArchive", code: 35, userInfo: [NSLocalizedDescriptionKey: "The backup contains duplicate revision IDs."]) }
             let oldNoteID = try requiredString(item, "noteId")
             guard let newNoteID = noteIDs[oldNoteID],
                   let title = item["title"] as? String, title.count <= 10_000,
@@ -14714,7 +14714,7 @@ private final class ABookLocalStore {
             for item in rawAttachments {
                 let oldNoteID = try requiredString(item, "noteId")
                 guard let newNoteID = noteIDs[oldNoteID],
-                      let originalAttachmentID = item["id"] as? String, !originalAttachmentID.isEmpty, attachmentIDs.insert(originalAttachmentID).inserted,
+                      let originalAttachmentID = item["id"] as? String, !originalAttachmentID.isEmpty, originalAttachmentID.count <= 180, attachmentIDs.insert(originalAttachmentID).inserted,
                       let filePath = item["path"] as? String,
                       filePath.range(of: #"^attachments/\d+\.bin$"#, options: .regularExpression) != nil,
                       !expectedPaths.contains(filePath),
