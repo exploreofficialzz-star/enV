@@ -17,6 +17,26 @@ final class CatalogCoreTests: XCTestCase {
     }
 
 
+    func testRetiredDesignBuildSolveForToolsAreExcludedFromNativeAndRelatedDiscovery() {
+        let retiredID = "math-exp-sum-business-design-build-delivery-effort-a"
+        let retainedID = "math-exp-ratio-ratio-gradient-a"
+        func calculator(_ id: String, _ name: String) -> Tool {
+            Tool(id: id, name: name, slug: id, description: "", category: "calculators", subcategory: nil,
+                 keywords: [], tags: [], icon: "Calculator", popularity: 10, featured: false,
+                 clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+                 disclaimer: nil, related: [], engine: ToolEngine(type: "calculator", id: id, op: nil))
+        }
+        let retired = calculator(retiredID, "Design / Build — Solve for a")
+        let retained = calculator(retainedID, "Gradient: Change Y / Change X — Solve for a")
+        let source = Catalog(schemaVersion: 1, catalogVersion: "test",
+                             counts: CatalogCounts(total: 2, active: 2, planned: 0, categories: 1),
+                             categories: [], tools: [retired, retained], relatedReferenceTools: [retired])
+
+        let native = source.nativeFacing()
+        XCTAssertEqual(native.tools.map(\\.id), [retainedID])
+        XCTAssertFalse((native.relatedReferenceTools ?? []).contains { $0.id == retiredID })
+    }
+
     private let catalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 2, planned: 1, categories: 1), categories: [ToolCategory(id: "text", name: "Text", description: "Text tools", blurb: "Text", icon: "Type")], tools: [
         Tool(id: "word-count", name: "Word Count", slug: "word-count", description: "Count words and characters", category: "text", subcategory: nil, keywords: ["count", "words"], tags: ["writing"], icon: "Type", popularity: 70, featured: true, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "text", id: "word-count", op: nil)),
         Tool(id: "case-converter", name: "Case Converter", slug: "case-converter", description: "Convert text case", category: "text", subcategory: nil, keywords: ["uppercase"], tags: ["text"], icon: "Type", popularity: 90, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: [], engine: ToolEngine(type: "text", id: "case-converter", op: nil)),
