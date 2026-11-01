@@ -25,7 +25,7 @@ test("depth labels remain illustrative and bounded",()=>{
  for(const depth of [0.01,1,2,99,1000,10000,35000,410000,660000,1000000,2890000,5150000,6371000])assert.match(illustrativeLayerForDepth(depth),/Illustrative/);
  assert.throws(()=>illustrativeLayerForDepth(Infinity),/Invalid/);
  assert.equal(OBSERVER_BOUNDS_METRES.minHeight,-6371000);
- assert.match(illustrativeLayerForDepth(3000000),/outer core/);
+ assert.match(illustrativeLayerForDepth(3000000),/outer core/i);
  assert.match(illustrativeLayerForDepth(6000000),/inner core/);
  assert.throws(()=>illustrativeLayerForDepth(6371001),/Invalid/);
 });

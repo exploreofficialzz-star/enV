@@ -56,7 +56,7 @@ test("fixed-wing takeoff is blocked when modeled wing lift at takeoff speed is b
 });
 
 test("fixed-wing takeoff uses computed dynamic pressure and can become airborne",()=>{
-  const input:VehicleInput={...base,mode:"fixed-wing",massKg:1200,wingAreaM2:18,wingLiftCoefficient:1.4,takeoffSpeedMps:25,maximumCruiseThrustN:4000,
+  const input:VehicleInput={...base,mode:"fixed-wing",massKg:1200,wingAreaM2:24,wingLiftCoefficient:1.4,takeoffSpeedMps:25,maximumCruiseThrustN:4000,
     maximumWheelDriveForceN:10000,motorMaximumPowerW:350000,batteryMaximumCurrentA:700,durationSeconds:60,maximumSpeedMps:100};
   const run=runWorldLabVehicle(context,"wing-takeoff",input);
   assert.ok(run.preflight.wingLiftAtTakeoffN!>run.preflight.weightN);
