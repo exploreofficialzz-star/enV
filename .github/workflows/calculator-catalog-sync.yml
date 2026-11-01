@@ -8,6 +8,7 @@ on:
       - "src/data/math-expansion.json"
       - "scripts/check-calculators.mjs"
       - "scripts/gen-catalog.mjs"
+      - "scripts/check-business-studios.mjs"
 
 permissions:
   contents: write
@@ -60,6 +61,7 @@ jobs:
       - name: Verify calculator categorization and catalog integrity
         run: |
           node scripts/check-calculators.mjs
+          node scripts/check-business-studios.mjs
           npm run check:calculators:registry
           node scripts/check-native-calculators.mjs
           node scripts/check-native-coverage.mjs
