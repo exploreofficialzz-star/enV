@@ -91,6 +91,6 @@ test("palette swatch SVG export is self-contained, accessible and escapes labels
 test("palette swatch SVG export rejects an empty or invalid palette", () => {
   assert.throws(() => buildPaletteSwatchesSvg([]), /At least one valid color/);
   assert.throws(() => buildPaletteSwatchesSvg(["not-a-color"]), /At least one valid color/);
-  const many = buildPaletteSwatchesSvg(Array.from({ length: 12 }, (_, index) => `hsl(${index * 25} 80% 50%)`));
+  const many = buildPaletteSwatchesSvg(Array.from({ length: 12 }, (_, index) => { const value = (index + 1).toString(16).padStart(2, "0"); return `#${value}${value}${value}`; }));
   assert.equal((many.match(/<text /g) ?? []).length, 8);
 });
