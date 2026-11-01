@@ -132,7 +132,7 @@ export async function createABookArchive(
   let totalBytes = 0;
   for (let index = 0; index < attachments.length; index += 1) {
     const attachment = attachments[index];
-    if (!noteIds.has(attachment.noteId) || !attachment.id || attachment.name.length > 500
+    if (!noteIds.has(attachment.noteId) || !attachment.id || attachment.id.length > 180 || attachment.name.length > 500
       || attachment.type.length > 200 || attachment.size !== attachment.blob.size
       || attachment.size > MAX_ATTACHMENT_BYTES) {
       fail("An attachment is invalid or exceeds the 100 MB per-file backup limit.");
@@ -201,7 +201,7 @@ export async function readABookArchive(file: Blob): Promise<ABookArchiveData> {
   let totalBytes = 0;
   for (const raw of manifest.attachments) {
     if (!isRecord(raw) || typeof raw.path !== "string" || typeof raw.id !== "string"
-      || typeof raw.noteId !== "string" || typeof raw.name !== "string" || typeof raw.type !== "string"
+      || typeof raw.noteId !== "string" || !raw.id || raw.id.length > 180 || typeof raw.name !== "string" || typeof raw.type !== "string"
       || !Number.isSafeInteger(raw.size) || !Number.isSafeInteger(raw.createdAt)
       || !noteIds.has(raw.noteId) || raw.name.length > 500 || raw.type.length > 200) {
       fail("The backup contains invalid attachment metadata.");
