@@ -41,3 +41,40 @@ test("heat observations are complete or rejected rather than backfilled",()=>{
     {...run.samples[0],temperaturesK:[]},...run.samples.slice(1),
   ]}));
 });
+
+test("branched experiment persistence keeps a validated, immutable versioned parent diff",()=>{
+  const source=runExperiment(model,{id:"branch-source",worldDateUTC:date});
+  const childInput={...model,springNPerM:9};
+  const child=runExperiment(childInput,{
+    id:"branch-child",worldDateUTC:date,sourceRun:source,
+    startedAtUTC:"2026-11-01T12:00:00Z",
+  });
+  const restored=parseStoredWorldLabRun(JSON.parse(serializeStoredWorldLabRun(child)));
+  assert.equal(restored.parentRunId,source.id);
+  assert.equal(restored.branch?.branchId,child.id);
+  assert.equal(restored.branch?.sourceRunId,source.id);
+  assert.equal(restored.branch?.sourceModelVersion,source.modelVersion);
+  assert.equal(restored.branch?.targetModelVersion,child.modelVersion);
+  assert.deepEqual(restored.branch?.inputDiff,[
+    {field:"springNPerM",previous:5,next:9},
+  ]);
+  assert.ok(Object.isFrozen(restored.branch));
+  assert.ok(Object.isFrozen(restored.branch?.inputDiff));
+  assert.ok(Object.isFrozen(restored.branch?.inputDiff[0]));
+});
+test("stored branch provenance rejects parent, model, duplicate and malformed diff tampering",()=>{
+  const source=runExperiment(model,{id:"tamper-source",worldDateUTC:date});
+  const child=runExperiment({...model,springNPerM:8},{
+    id:"tamper-child",worldDateUTC:date,sourceRun:source,
+    startedAtUTC:"2026-11-01T12:00:00Z",
+  });
+  const raw=JSON.parse(serializeStoredWorldLabRun(child));
+  assert.throws(()=>parseStoredWorldLabRun({...raw,branch:{...raw.branch,sourceRunId:"other"}}),/provenance/);
+  assert.throws(()=>parseStoredWorldLabRun({...raw,branch:{...raw.branch,targetModelId:"heat-rod"}}),/provenance/);
+  assert.throws(()=>parseStoredWorldLabRun({...raw,branch:{...raw.branch,inputDiff:[
+    ...raw.branch.inputDiff,...raw.branch.inputDiff,
+  ]}}),/duplicated/);
+  assert.throws(()=>parseStoredWorldLabRun({...raw,branch:{...raw.branch,inputDiff:[
+    {field:"springNPerM",previous:5,next:Infinity},
+  ]}}),/input diff/);
+});
