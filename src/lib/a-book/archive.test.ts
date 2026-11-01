@@ -45,3 +45,44 @@ test("A book backups reject duplicate note, revision and attachment IDs", async 
   await assert.rejects(() => createABookArchive([note], [revision, { ...revision }], []), /cannot be safely exported/);
   await assert.rejects(() => createABookArchive([note], [], [attachment, { ...attachment }]), /cannot be safely exported/);
 });
+
+
+test("legacy JSON import validates the complete file before any local writes", async () => {
+  const { parseABookLegacyNotesJson } = await import("./archive.ts");
+  const parsed = parseABookLegacyNotesJson(JSON.stringify({
+    format: "env.abook.notes.v1",
+    notes: [{ id: "legacy-1", title: "Imported", body: "Body", notebook: "Research", tags: ["local"], pinned: true, archived: false }],
+  }));
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].notebook, "Research");
+  assert.equal(parsed[0].pinned, true);
+  assert.equal(parsed[0].revision, 0);
+  assert.equal(parsed[0].deletedAt, null);
+});
+
+test("legacy JSON import rejects duplicate IDs and a malformed later record", async () => {
+  const { parseABookLegacyNotesJson } = await import("./archive.ts");
+  assert.throws(() => parseABookLegacyNotesJson(JSON.stringify({
+    format: "env.abook.notes.v1",
+    notes: [
+      { id: "same", title: "One", body: "Body", tags: [] },
+      { id: "same", title: "Two", body: "Body", tags: [] },
+    ],
+  })), /duplicate note IDs/);
+  assert.throws(() => parseABookLegacyNotesJson(JSON.stringify({
+    format: "env.abook.notes.v1",
+    notes: [
+      { id: "valid", title: "One", body: "Body", tags: [] },
+      { id: "bad", title: "Two", body: "Body", tags: ["x".repeat(201)] },
+    ],
+  })), /invalid note record/);
+});
+
+test("legacy JSON import enforces record and file bounds", async () => {
+  const { parseABookLegacyNotesJson } = await import("./archive.ts");
+  assert.throws(() => parseABookLegacyNotesJson(JSON.stringify({
+    format: "env.abook.notes.v1",
+    notes: [{ id: "bad", title: "Title", body: "Body", tags: Array.from({ length: 51 }, () => "tag") }],
+  })), /invalid note record/);
+  assert.throws(() => parseABookLegacyNotesJson("x".repeat(180 * 1024 * 1024 + 1)), /smaller than 180 MB/);
+});
