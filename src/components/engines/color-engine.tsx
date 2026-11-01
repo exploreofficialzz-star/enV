@@ -20,6 +20,7 @@ import {
 import { simulateColorVision, type ColorVisionMode } from "@/lib/engines/color-vision";
 import { buildDesignPaletteExport, createColorShadeScale, createHarmonyPalette, type PaletteExportFormat, type PaletteHarmony, type SemanticPaletteColors } from "@/lib/engines/design-palette";
 import { formatCmyk, formatHsv, parseDesignColor } from "@/lib/engines/design-color";
+import { extractDominantColors } from "@/lib/engines/palette-image";
 
 type Harmony = PaletteHarmony;
 const DEFAULT_VISION_COLORS = [
@@ -55,8 +56,8 @@ function extractImageColors(file: File): Promise<string[]> {
     image.onload = () => {
       try {
         const canvas = document.createElement("canvas");
-        canvas.width = 72;
-        canvas.height = 72;
+        canvas.width = 96;
+        canvas.height = 96;
         const context = canvas.getContext("2d", { willReadFrequently: true });
         if (!context) throw new Error("This browser could not read the selected image.");
         const sourceWidth = image.naturalWidth || image.width;
@@ -72,16 +73,7 @@ function extractImageColors(file: File): Promise<string[]> {
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-        const counts = new Map<string, number>();
-        for (let index = 0; index < pixels.length; index += 4) {
-          if (pixels[index + 3] < 160) continue;
-          const red = Math.min(255, Math.round(pixels[index] / 17) * 17);
-          const green = Math.min(255, Math.round(pixels[index + 1] / 17) * 17);
-          const blue = Math.min(255, Math.round(pixels[index + 2] / 17) * 17);
-          const hex = "#" + [red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("");
-          counts.set(hex, (counts.get(hex) ?? 0) + 1);
-        }
-        const colors = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([hex]) => hex);
+        const colors = extractDominantColors(pixels, 5, 160);
         if (!colors.length) throw new Error("No visible colors could be sampled from this image.");
         resolve(colors);
       } catch (error) {
