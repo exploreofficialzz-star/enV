@@ -430,6 +430,11 @@ struct NativeWorldLabView:View {
                 SceneView(scene:scene,options:[.allowsCameraControl,.autoenablesDefaultLighting])
                     .frame(height:260).clipShape(RoundedRectangle(cornerRadius:12))
                     .accessibilityLabel("Interactive native 3D invention scene; drag to orbit and pinch to zoom.")
+                if let project=project,let source=projectData {
+                    NativeWorldLabMultiCadPanel(project:project,source:source){data in
+                        applyProject{_ in data}
+                    }
+                }
                 Text("Earth reference (WGS84)").font(.headline)
                 Text("Set a mathematical local ENU origin. No terrain, imagery or device location is fetched.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -2892,5 +2897,114 @@ private struct NativeWorldLabRadiationPanel:View {
                 if case .failure(let error)=result{problem=error.localizedDescription}
                 evidenceFile=nil
             }
+    }
+}
+
+
+private struct NativeWorldLabMultiCadPanel:View {
+    let project:NativeWorldLabProject
+    let source:Data
+    let onEdit:(Data)->Void
+    @State private var selected:Set<String>=[]
+    @State private var axis=0
+    @State private var alignment="min"
+    @State private var degrees="15"
+    @State private var factor="1.1"
+    @State private var offset="1"
+    @State private var gap="0.25"
+    @State private var error=""
+    private var ids:[String]{
+        project.entities.map{$0.id}.filter{selected.contains($0)}
+    }
+    private func apply(_ work:(Data)throws->Data){
+        do{onEdit(try work(source));error=""}
+        catch{error=error.localizedDescription}
+    }
+    var body:some View{
+        VStack(alignment:.leading,spacing:8){
+            Text("Multi-part CAD").font(.headline)
+            Text("Select several parts and transform them together. Each action is one atomic project revision. This changes geometry, not physical joints.")
+                .font(.caption).foregroundStyle(.secondary)
+            ForEach(project.entities,id:\.id){solid in
+                Toggle(isOn:Binding(
+                    get:{selected.contains(solid.id)},
+                    set:{value in
+                        if value{selected.insert(solid.id)}
+                        else{selected.remove(solid.id)}
+                    }
+                )){
+                    Text(solid.name+" · "+solid.shape).font(.caption)
+                }
+            }
+            Text("Selected: \(ids.count) / \(project.entities.count)").font(.caption)
+            Picker("Axis",selection:$axis){
+                Text("X").tag(0);Text("Y").tag(1);Text("Z").tag(2)
+            }.pickerStyle(.segmented)
+            HStack{
+                TextField("Rotation °",text:$degrees).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Uniform scale",text:$factor).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+            }
+            HStack{
+                Button("Rotate selection"){
+                    guard let angle=Double(degrees) else{
+                        error="Enter a valid rotation angle";return
+                    }
+                    apply{try NativeWorldLabEditor.rotateSolids($0,ids:ids,axis:axis,degrees:angle)}
+                }.disabled(ids.isEmpty)
+                Button("Scale selection"){
+                    guard let size=Double(factor) else{
+                        error="Enter a valid scale factor";return
+                    }
+                    apply{try NativeWorldLabEditor.scaleSolids($0,ids:ids,
+                        factors:[size,size,size])}
+                }.disabled(ids.isEmpty)
+            }.buttonStyle(.bordered)
+            HStack{
+                TextField("Duplicate offset m",text:$offset).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Duplicate all"){
+                    guard let distance=Double(offset) else{
+                        error="Enter a valid duplicate offset";return
+                    }
+                    var vector=[0.0,0.0,0.0];vector[axis]=distance
+                    apply{try NativeWorldLabEditor.duplicateSolids($0,ids:ids,
+                        offsetMeters:vector)}
+                }.disabled(ids.isEmpty||project.entities.count+ids.count>200)
+            }
+            HStack{
+                Picker("Alignment",selection:$alignment){
+                    Text("Minimum").tag("min")
+                    Text("Center").tag("center")
+                    Text("Maximum").tag("max")
+                }.pickerStyle(.menu)
+                Button("Align"){
+                    apply{try NativeWorldLabEditor.alignSolids($0,ids:ids,
+                        axis:axis,alignment:alignment)}
+                }.disabled(ids.count<2)
+            }.buttonStyle(.bordered)
+            HStack{
+                TextField("Distribution gap m",text:$gap).keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Distribute"){
+                    guard let distance=Double(gap) else{
+                        error="Enter a valid distribution gap";return
+                    }
+                    apply{try NativeWorldLabEditor.distributeSolids($0,ids:ids,
+                        axis:axis,gapMeters:distance)}
+                }.disabled(ids.count<3)
+            }
+            if !error.isEmpty{Text(error).font(.caption).foregroundStyle(.red)}
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.07),in:RoundedRectangle(cornerRadius:12))
+        .onAppear{
+            if selected.isEmpty,let id=project.entities.first?.id{selected.insert(id)}
+        }
+        .onChange(of:project.revision){_ in
+            let valid=Set(project.entities.map{$0.id})
+            selected=selected.intersection(valid)
+        }
     }
 }
