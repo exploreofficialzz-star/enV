@@ -94,5 +94,5 @@ test("palette swatch SVG export rejects an empty or invalid palette", () => {
   assert.throws(() => buildPaletteSwatchesSvg([]), /At least one valid color/);
   assert.throws(() => buildPaletteSwatchesSvg(["not-a-color"]), /At least one valid color/);
   const many = buildPaletteSwatchesSvg(Array.from({ length: 12 }, (_, index) => { const value = (index + 1).toString(16).padStart(2, "0"); return `#${value}${value}${value}`; }));
-  assert.equal((many.match(/<text /g) ?? []).length, 8);
+  assert.equal((many.match(/<text /g) ?? []).length, 16); // eight swatches, each with a name and HEX value
 });
