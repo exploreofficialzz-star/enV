@@ -120,7 +120,10 @@ export async function createABookArchive(
     fail("This library exceeds the A book backup item limit. Export smaller groups of notes.");
   }
   const noteIds = new Set(notes.map((note) => note.id));
-  if (notes.some((note) => !isValidNote(note))
+  const revisionIds = new Set(revisions.map((revision) => revision.id));
+  const attachmentIds = new Set(attachments.map((attachment) => attachment.id));
+  if (noteIds.size !== notes.length || revisionIds.size !== revisions.length || attachmentIds.size !== attachments.length
+    || notes.some((note) => !isValidNote(note))
     || revisions.some((revision) => !isValidRevision(revision, noteIds))) {
     fail("The local library contains a record that cannot be safely exported.");
   }
@@ -186,11 +189,14 @@ export async function readABookArchive(file: Blob): Promise<ABookArchiveData> {
   const notes = manifest.notes;
   if (!notes.every(isValidNote)) fail("The backup contains an invalid note.");
   const noteIds = new Set(notes.map((note) => note.id));
+  if (noteIds.size !== notes.length) fail("The backup contains duplicate note IDs.");
   const revisions = manifest.revisions;
-  if (!revisions.every((revision) => isValidRevision(revision, noteIds))) {
+  const revisionIds = new Set(revisions.filter(isRecord).map((revision) => revision.id));
+  if (!revisions.every((revision) => isValidRevision(revision, noteIds)) || revisionIds.size !== revisions.length) {
     fail("The backup contains an invalid note revision.");
   }
   const attachments: ABookAttachment[] = [];
+  const attachmentIds = new Set<string>();
   const expectedPaths = new Set(["manifest.json"]);
   let totalBytes = 0;
   for (const raw of manifest.attachments) {
@@ -200,6 +206,8 @@ export async function readABookArchive(file: Blob): Promise<ABookArchiveData> {
       || !noteIds.has(raw.noteId) || raw.name.length > 500 || raw.type.length > 200) {
       fail("The backup contains invalid attachment metadata.");
     }
+    if (!raw.id || attachmentIds.has(raw.id)) fail("The backup contains duplicate attachment IDs.");
+    attachmentIds.add(raw.id);
     if (!/^attachments\/\d+\.bin$/.test(raw.path) || expectedPaths.has(raw.path)) {
       fail("The backup contains an invalid or duplicate attachment path.");
     }
