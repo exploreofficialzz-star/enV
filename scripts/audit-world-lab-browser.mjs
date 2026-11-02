@@ -259,7 +259,7 @@ try{
   await page.getByText("Difference at selected time").waitFor();
   await page.getByRole("button",{name:"Pause"}).click();
   await page.getByLabel("Playback speed (wall-clock rate)").selectOption("0.1");
-  await page.getByRole("button",{name:"Step",exact:true}).click();
+  await page.getByRole("button",{name:"Next step",exact:true}).click();
   await page.getByRole("combobox",{name:"Experiment"}).selectOption("heat-rod");
   await page.getByRole("button",{name:"Start / Recalculate"}).click();
   await page.getByText("Mean temperature",{exact:true}).waitFor();
