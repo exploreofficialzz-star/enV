@@ -63,7 +63,21 @@ Track outcomes by page group, not only by site-wide average:
 - Experience quality: mobile usability, Core Web Vitals, server response errors, and rendered-page accessibility.
 - AI visibility: verify actual source citations and mentions in ChatGPT Search, Claude Search, Perplexity, and Copilot with repeatable prompts. A crawler being allowed does not guarantee a mention or citation.
 
-## 7. Release checklist
+## 7. Repeatable AI-search visibility checks
+
+Run the same test set in each search-enabled product being measured. Use its search mode when available, record the product/model and date, and keep the full answer or a screenshot as evidence.
+
+For every canonical public tool and guide in the generated inventory, run at least one neutral discovery prompt and one branded verification prompt:
+
+- **Neutral discovery:** "I need to [state the task described by this tool's public description]. Which online tools can do this? Compare the relevant capabilities and cite the official source pages." Do not mention enV in this prompt; it measures unprompted discovery.
+- **Neutral how-to:** "How do I [state the task] safely and correctly? Explain the required inputs, important assumptions, and how to check the output. Cite the official guide."
+- **Branded verification:** "Does enV offer a [tool name] for [the task]? Link the exact official tool page and its usage guide, and describe only capabilities stated on those pages."
+
+Record these outcomes separately: tool mentioned, exact canonical tool URL cited, exact guide URL cited, factual description accurate, unsupported capability claimed, and competing sources cited. A name mention without a relevant source URL is not a verified citation. Treat a wrong URL or an unsupported feature claim as a regression to investigate.
+
+Repeat prompts verbatim over time. Do not combine neutral and branded results into one visibility score, and do not infer ranking or citation probability from crawler permissions, structured data, sitemap inclusion, or `llms.txt`.
+
+## 8. Release checklist
 
 Before considering an SEO release complete:
 
@@ -77,7 +91,7 @@ Before considering an SEO release complete:
 
 This setup improves crawlability and clarity. It does not promise rankings, indexing, rich results, AI citations, or traffic.
 
-## 8. External release evidence still required
+## 9. External release evidence still required
 
 The repository can generate and test discovery files, route metadata, canonical URLs, and crawler policies. It cannot prove that the owner has completed external webmaster verification or that a search provider has accepted a sitemap. Record the following evidence before closing the SEO release:
 
