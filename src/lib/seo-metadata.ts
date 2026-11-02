@@ -46,7 +46,6 @@ export function seoPageHead(options: SeoPageOptions) {
   const type = options.type ?? "website";
   return {
     meta: [
-      ...webmasterVerificationMeta(),
       { title: options.title },
       { name: "description", content: description },
       { name: "robots", content: options.robots ?? "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" },

@@ -5,6 +5,11 @@ import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTe
 
 const result = buildSeoArtifacts();
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
+const seoMetadataSource = readFileSync(new URL("../src/lib/seo-metadata.ts", import.meta.url), "utf8");
+const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.meta.url), "utf8");
+const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
+assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
+assert.doesNotMatch(seoHeadSource, /webmasterVerificationMeta\(\)/, "Child routes must not duplicate root verification tags.");
 const toolDocumentationSource = readFileSync(new URL("../src/lib/tool-documentation.ts", import.meta.url), "utf8");
 assert.doesNotMatch(toolDocumentationSource, /catalogue lists these related search terms for discovery/, "Raw keyword lists must not be rendered as guide copy.");
 const vercelConfig = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
