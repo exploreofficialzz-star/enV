@@ -187,8 +187,8 @@ async function waitForHomepageDeployment() {
         signal: AbortSignal.timeout(15_000),
       });
       const html = await response.text();
-      const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
-      const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+      const head = html.match(/<head\b[^>]*>([\s\S]*?)<\\/head>/i)?.[1] ?? "";
+      const title = head.match(/<title\b[^>]*>([\s\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
       last = { status: response.status, title, url: response.url };
       if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE) {
         checked.push({ path: "/", status: response.status, title, deploymentVersionConfirmed: true });
