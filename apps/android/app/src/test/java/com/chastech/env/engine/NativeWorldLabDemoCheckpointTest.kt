@@ -10,7 +10,7 @@ class NativeWorldLabDemoCheckpointTest {
   val v=NativeWorldLabDemoCheckpoint("heat",2.5,1.0,4.0,1000.0,0.02,
    "2026-11-01T12:00:05Z","2020-01-01T00:00:00Z",2.5,2.5,10.0,"reverse-recording","Africa/Lagos",0.0025)
   val json=NativeWorldLabDemoCheckpointCodec.encode(v)
-  assertTrue(json.contains("\\"schemaVersion\\": 3"))
+  assertTrue(json.contains("\"schemaVersion\": 3"))
   val restored=NativeWorldLabDemoCheckpointCodec.decode(json)
   assertEquals(v,restored)
   assertEquals(0.0025,restored.solverStepSeconds!!,0.0)
