@@ -87,6 +87,7 @@ Before considering an SEO release complete:
 - Public policy, support, platform, and token-guide pages appear in the sitemap.
 - Private or interaction-only routes remain noindex.
 - The production deployment is READY and the live canonical domain serves the same robots.txt, sitemap, and llms.txt as the committed build.
+- The `Production live connectivity smoke` workflow runs every 30 minutes and on manual dispatch. Its `scripts/check-live-seo.mjs` step checks the live robots policy, sitemap and shards, llms.txt, canonical host, required public routes, private-route exclusion, and representative server-rendered page metadata/schema.
 - Search Console and Bing Webmaster Tools have verified ownership and have accepted the sitemap.
 
 This setup improves crawlability and clarity. It does not promise rankings, indexing, rich results, AI citations, or traffic.
