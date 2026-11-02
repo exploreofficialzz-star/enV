@@ -17,11 +17,11 @@ import type { ToolMeta } from "@/types/tool";
 
 export const Route = createFileRoute("/")({
   head: () => seoPageHead({
-    title: "enV | Online Tools, Calculators, Converters and Creative Studios",
-    description: "Discover practical online tools for calculations, unit conversion, image and audio work, developer tasks, productivity, business, and creative projects. Explore enV across web, Android, and iOS.",
+    title: "enV Digital Toolkit by chAs Technologies | Online Tools",
+    description: "enV Digital Toolkit by chAs Technologies LLC brings calculators, converters, developer utilities, media and productivity tools to Web, Android and iOS.",
     path: "/",
     structuredData: pageSchema(
-      "enV digital toolkit",
+      "enV Digital Toolkit by chAs Technologies",
       "A cross-device toolkit of practical browser-based utilities, calculators, converters, developer workspaces, media tools, and productivity tools.",
       "/",
       "WebPage"
