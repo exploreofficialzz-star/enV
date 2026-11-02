@@ -16,7 +16,7 @@ const routes = [
   { path: "/wallet", kind: "noindex" },
   { path: "/updates", kind: "noindex" },
   { path: "/3d-game-studio", kind: "noindex" },
-  { path: "/this-route-does-not-exist-seo-audit", kind: "noindex" },
+  { path: "/this-route-does-not-exist-seo-audit", kind: "noindex", expectedStatus: 404 },
 ];
 
 function attribute(tag, name) {
@@ -70,7 +70,8 @@ for (const route of routes) {
     && source.includes('"url":"' + route.aboutUrl + '"')
   );
 
-  if (!response.ok) failures.push(route.path + ": HTTP " + response.status);
+  const expectedStatus = route.expectedStatus ?? 200;
+  if (response.status !== expectedStatus) failures.push(route.path + ": expected HTTP " + expectedStatus + ", received " + response.status);
   if (!title || title.length < 8) failures.push(route.path + ": missing or unhelpful title");
   if (route.kind === "indexable") {
     if (!description || description.length < 40 || description.length > 170) {
@@ -113,7 +114,7 @@ async function auditStaticDiscoveryFiles() {
   const assets = [
     { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
     { path: "/sitemap.xml", required: ["<urlset", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/tool-json-studio"] },
-    { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## All public tool pages and guides", "https://envtools.store/tools/developer/json-studio"] },
+    { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "https://envtools.store/tools/developer/json-studio"] },
   ];
   for (const asset of assets) {
     try {
