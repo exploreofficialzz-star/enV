@@ -21,7 +21,7 @@ function Tool() {
   const { category, slug } = Route.useParams();
   const { mode, action, op } = Route.useSearch();
   if (category === "developer" && slug === "artboard-studio") {
-    return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: "the-world-lab" }} replace />;
+    return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: "the-world-lab" }} search={{ mode: undefined, action: undefined, op: undefined }} replace />;
   }
   if (category === "developer" && slug === "the-world-lab") {
     return <AppShell><ToolViewAnalytics toolId="the-world-lab" /><Suspense fallback={<p className="p-5">Loading The World Lab…</p>}><WorldLab /></Suspense></AppShell>;
