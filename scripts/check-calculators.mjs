@@ -5,6 +5,8 @@ const catalogText = readFileSync(new URL("../src/data/catalog.ts", import.meta.u
 const formulasText = readFileSync(new URL("../src/lib/engines/formulas.ts", import.meta.url), "utf8");
 const advancedText = readFileSync(new URL("../src/lib/engines/advanced-calculators.ts", import.meta.url), "utf8");
 const mathExerciseText = readFileSync(new URL("../src/lib/engines/math-exercise-calculators.ts", import.meta.url), "utf8");
+const generatorText = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
+const presentationHelperText = readFileSync(new URL("./math-exercise-catalog.mjs", import.meta.url), "utf8");
 const stemText = readFileSync(new URL("../src/lib/engines/stem-calculators.ts", import.meta.url), "utf8");
 const regularText = readFileSync(new URL("../src/lib/engines/regular-calculators.ts", import.meta.url), "utf8");
 const mathExpansion = JSON.parse(readFileSync(new URL("../src/data/math-expansion.json", import.meta.url), "utf8"));
@@ -32,6 +34,12 @@ const nonCalculator = categoryTools.filter((tool) => tool.engine.type !== "calcu
 const allowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine.type === "business" && tool.engine.op === "break-even";
 const unexpectedEngine = nonCalculator.filter((tool) => !allowedBusinessRoute(tool));
 const planned = calculators.filter((tool) => tool.status === "planned");
+const presentationPipelineMissing = !generatorText.includes("mathExercisePresentation(mathExerciseCatalog, key, target)")
+  || !generatorText.includes("expansionCalculatorName(info, target)")
+  || !generatorText.includes("expansionCalculatorDescription(info, target)")
+  || !generatorText.includes("expansionCalculatorKeywords(family, info, target)")
+  || !presentationHelperText.includes("Missing human-readable label for math exercise target");
+const legacyGeneratedTitleLogic = generatorText.includes("Solve for ${target}") || mathExerciseText.includes("formula: `${spec.formula} · solve for ${target}`");
 const misplacedDesignBuildRows = Object.entries(mathExpansion).flatMap(([family, rows]) => rows
   .filter((row) => {
     const variables = row.slice(1).map((value) => String(value).trim().toLowerCase());
@@ -49,6 +57,7 @@ console.log(`Missing definitions: ${missing.length}`);
 console.log(`Intentional break-even business routes: ${nonCalculator.filter(allowedBusinessRoute).length}`);
 console.log(`Unexpected non-calculator engines: ${unexpectedEngine.length}`);
 console.log(`Still Coming Soon: ${planned.length}`);
+console.log(`Readable generated-title pipeline: ${presentationPipelineMissing ? "missing" : "present"}`);
 console.log(`Misplaced Design/Build expansion rows: ${misplacedDesignBuildRows.length}`);
 console.log(`Misplaced Design/Build calculator records: ${misplacedDesignBuildTools.length}`);
 if (missing.length) console.log("Missing:", missing.map((x) => `${x.id} → ${x.engine.formula}`).join(", "));
@@ -56,5 +65,6 @@ if (unexpectedEngine.length) console.log("Wrong engine:", unexpectedEngine.map((
 if (planned.length) console.log("Planned calculators:", planned.map((x) => x.id).join(", "));
 if (misplacedDesignBuildRows.length) console.log("Remove Design/Build expansion rows:", misplacedDesignBuildRows.join(", "));
 if (misplacedDesignBuildTools.length) console.log("Remove Design/Build calculator records:", misplacedDesignBuildTools.map((x) => x.id).join(", "));
-if (missing.length || unexpectedEngine.length || planned.length || misplacedDesignBuildRows.length || misplacedDesignBuildTools.length) process.exit(1);
+if (missing.length || unexpectedEngine.length || planned.length || misplacedDesignBuildRows.length || misplacedDesignBuildTools.length || presentationPipelineMissing || legacyGeneratedTitleLogic) process.exit(1);
+if (presentationPipelineMissing || legacyGeneratedTitleLogic) console.log("Generated math calculator titles must use formula result labels, never raw variable keys.");
 console.log("Calculator catalog is fully executable.");

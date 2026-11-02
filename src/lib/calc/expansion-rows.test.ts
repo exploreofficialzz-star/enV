@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import mathExpansion from "../../data/math-expansion.json" with { type: "json" };
-import { EXPANSION_FAMILIES, describeExpansion, expansionLabel, parseExpansionRow } from "./expansion-rows.mjs";
+import { EXPANSION_FAMILIES, describeExpansion, expansionCalculatorDescription, expansionCalculatorName, expansionLabel, parseExpansionRow } from "./expansion-rows.mjs";
 import { getAllTools } from "../registry.ts";
 
 test("four- and five-element rows are read with the right variable in each slot", () => {
@@ -22,6 +22,32 @@ test("the absence-rate row keeps absence rate = absent ÷ enrolled (it used to b
   const info = describeExpansion("ratio", row);
   assert.equal(info.title, "Absence Rate");
   assert.equal(info.relation, "Absence rate = Absent ÷ Enrolled");
+});
+
+test("titled expansion rows use semantic labels in public names and descriptions", () => {
+  const row = (mathExpansion as Record<string, string[][]>).ratio.find((entry) => entry[0] === "ratio-absent");
+  if (!row) throw new Error("ratio-absent row is missing");
+  const info = describeExpansion("ratio", row);
+  assert.equal(expansionCalculatorName(info, "a"), "Absence Rate: Absence rate = Absent ÷ Enrolled — Solve for Absent");
+  assert.equal(expansionCalculatorName(info, "b"), "Absence Rate: Absence rate = Absent ÷ Enrolled — Solve for Enrolled");
+  assert.equal(expansionCalculatorName(info, "c"), "Absence Rate: Absence rate = Absent ÷ Enrolled — Solve for Absence rate");
+  assert.equal(expansionCalculatorDescription(info, "a"), "Formula exercise calculator: Absence rate = Absent ÷ Enrolled. Solve for Absent. Enter the other two values to calculate the missing value.");
+});
+
+test("every expansion row generates three public titles with its actual target label", () => {
+  let generated = 0;
+  for (const family of EXPANSION_FAMILIES) {
+    for (const row of (mathExpansion as Record<string, string[][]>)[family]) {
+      const info = describeExpansion(family, row);
+      for (const target of ["a", "b", "c"] as const) {
+        const name = expansionCalculatorName(info, target);
+        assert.ok(name.endsWith(`— Solve for ${info.labels[target]}`), `${family}:${info.key}:${target} has the wrong target title`);
+        assert.ok(name.includes(info.relation), `${family}:${info.key}:${target} hides the relationship`);
+        generated++;
+      }
+    }
+  }
+  assert.equal(generated, (625 + 599 + 622) * 3);
 });
 
 const misplacedDesignBuildKeys = new Set([
