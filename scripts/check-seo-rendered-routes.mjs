@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+import { CATEGORIES } from "../src/data/categories.ts";
+import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
+import { getToolsByCategory, toolPath } from "../src/lib/registry.ts";
+import { isIndexableTool } from "../src/lib/seo-metadata.ts";
+
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
 const routes = [
   { path: "/", kind: "indexable", schema: "WebSite" },
@@ -32,6 +37,41 @@ const routes = [
   { path: "/tools/unknown-category-seo-audit", kind: "noindex", expectedStatus: 404 },
 ];
 
+const routeMap = new Map(routes.map((route) => [route.path, route]));
+// Generate live coverage from the catalogue so new categories, representative
+// canonical tools and their usage guides automatically enter this rendered audit.
+for (const category of CATEGORIES) {
+  const publicTools = getToolsByCategory(category.id).filter(isIndexableTool);
+  const categoryPath = "/tools/" + category.id;
+  routeMap.set(categoryPath, {
+    path: categoryPath,
+    kind: publicTools.length > 0 ? "indexable" : "noindex",
+    ...(publicTools.length > 0 ? { schema: "CollectionPage" } : {}),
+  });
+  const sampleTool = publicTools[0];
+  if (sampleTool) {
+    routeMap.set(toolPath(sampleTool), {
+      path: toolPath(sampleTool),
+      kind: "indexable",
+      schema: "SoftwareApplication",
+    });
+    const guidePath = "/blog/tool-" + sampleTool.id;
+    routeMap.set(guidePath, {
+      path: guidePath,
+      kind: "indexable",
+      schema: "TechArticle",
+      ...(sampleTool.category === "developer" && !sampleTool.tags.includes("developer-studio")
+        ? { aboutUrl: "https://envtools.store" + toolPath(getToolsByCategory("developer").find((tool) => tool.tags.includes("developer-studio") && tool.id === sampleTool.id) ?? sampleTool) }
+        : {}),
+    });
+  }
+}
+for (const article of BLOG_ARTICLES) {
+  const articlePath = "/blog/" + article.slug;
+  routeMap.set(articlePath, { path: articlePath, kind: "indexable", schema: "Article" });
+}
+const renderedRoutes = [...routeMap.values()];
+
 function attribute(tag, name) {
   const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i"));
   return match?.[1] ?? match?.[2] ?? "";
@@ -45,7 +85,7 @@ function metaContent(head, key, value) {
 
 const failures = [];
 const report = [];
-for (const route of routes) {
+for (const route of renderedRoutes) {
   const url = new URL(route.path, baseUrl);
   let response;
   let html = "";

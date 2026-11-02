@@ -108,7 +108,7 @@
     "generate:seo": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs",
     "prebuild": "npm run generate:seo",
     "check:seo": "node --test scripts/seo-artifacts.test.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs --check",
-    "audit:seo:rendered": "node scripts/check-seo-rendered-routes.mjs"
+    "audit:seo:rendered": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-seo-rendered-routes.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
