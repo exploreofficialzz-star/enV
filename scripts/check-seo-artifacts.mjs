@@ -36,9 +36,10 @@ for (const path of [
 ]) assert.ok(result.urls.includes(path), "Missing public informational route " + path);
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
+assert.ok(result.eligibleToolCount > result.guideTools.length, "Duplicate generated equations must be consolidated from SEO discovery while remaining in the app catalog.");
 assert.ok(result.categories.length > 0);
 assert.ok(result.articles.length > 0);
-assert.ok(!result.guideTools.some((tool) => tool.engine.type === "calculator" && /^exp-product-general-product-relation-\\d+-[abc]$/.test(tool.engine.formula ?? "")), "Generic Input A/Input B equations must not be indexed.");
+assert.ok(!result.guideTools.some((tool) => tool.engine.type === "calculator" && /^exp-product-general-product-relation-\d+-[abc]$/.test(tool.engine.formula ?? "")), "Generic Input A/Input B equations must not be indexed.");
 const expansionFingerprints = result.guideTools
   .filter((tool) => tool.engine.type === "calculator" && /^exp-(product|sum|ratio)-/.test(tool.engine.formula ?? ""))
   .map((tool) => [tool.category, tool.name.trim().toLocaleLowerCase(), tool.description.trim().toLocaleLowerCase()].join("|"));
