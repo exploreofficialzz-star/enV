@@ -208,14 +208,17 @@ export function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength
 }
 
 export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
-  const baseTitle = boundedToolSeoTitle(tool.name, " documentation | enV");
+  // Formula guides must keep the distinct "Solve for" target visible. The
+  // shorter suffix leaves room for both the tool identity and that target.
+  const suffix = /[—–-]\\s*Solve for\\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV";
+  const baseTitle = boundedToolSeoTitle(tool.name, suffix);
   const collisions = peers
-    .filter((candidate) => boundedToolSeoTitle(candidate.name, " documentation | enV") === baseTitle)
+    .filter((candidate) => boundedToolSeoTitle(candidate.name, suffix) === baseTitle)
     .slice()
     .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
   if (collisions.length <= 1) return baseTitle;
   const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
-  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") documentation | enV");
+  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.length + ")" + suffix);
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
