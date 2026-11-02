@@ -85,9 +85,53 @@ for (const route of routes) {
   });
 }
 
+async function auditStaticDiscoveryFiles() {
+  const assets = [
+    { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
+    { path: "/sitemap.xml", required: ["<urlset", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/tool-json-studio"] },
+    { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## All public tool pages and guides", "https://envtools.store/tools/developer/json-studio"] },
+  ];
+  for (const asset of assets) {
+    try {
+      const response = await fetch(new URL(asset.path, baseUrl), {
+        redirect: "follow",
+        signal: AbortSignal.timeout(20_000),
+      });
+      const body = await response.text();
+      if (!response.ok) failures.push(asset.path + ": HTTP " + response.status);
+      if (!body.trim() || body.trimStart().startsWith("<!doctype html")) {
+        failures.push(asset.path + ": expected a static discovery file, not an HTML fallback");
+      }
+      for (const phrase of asset.required) {
+        if (!body.includes(phrase)) failures.push(asset.path + ": missing required content " + phrase);
+      }
+      if (asset.path === "/robots.txt" && !body.includes("Disallow: /api/")) {
+        failures.push("/robots.txt: API routes must remain excluded from crawler access");
+      }
+      if (asset.path === "/sitemap.xml") {
+        const locations = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+        if (locations.length < 20) failures.push("/sitemap.xml: expected the platform and public tool route inventory");
+        if (new Set(locations).size !== locations.length) failures.push("/sitemap.xml: duplicate canonical URL entries");
+        if (locations.some((url) => !url.startsWith("https://envtools.store/") && url !== "https://envtools.store")) {
+          failures.push("/sitemap.xml: every URL must use the canonical https://envtools.store host");
+        }
+        for (const privatePath of ["/wallet", "/account", "/settings", "/login", "/search", "/updates", "/3d-game-studio"]) {
+          if (locations.some((url) => url === "https://envtools.store" + privatePath || url.startsWith("https://envtools.store" + privatePath + "/"))) {
+            failures.push("/sitemap.xml: private or interaction-only route must not be listed: " + privatePath);
+          }
+        }
+      }
+      report.push({ path: asset.path, status: response.status, contentLength: body.length });
+    } catch (error) {
+      failures.push(asset.path + ": request failed: " + String(error));
+    }
+  }
+}
+
+await auditStaticDiscoveryFiles();
 process.stdout.write(JSON.stringify({ checked: report.length, report, failures }, null, 2) + "\n");
 if (failures.length) {
   process.stderr.write("Rendered SEO audit failed with " + failures.length + " issue(s):\n" + failures.map((item) => "- " + item).join("\n") + "\n");
   process.exit(1);
 }
-process.stdout.write("PASS: rendered SEO metadata, canonicals, structured data and noindex policies.\n");
+process.stdout.write("PASS: rendered metadata, canonicals, structured data, noindex policies, robots.txt, sitemap.xml and llms.txt.\n");
