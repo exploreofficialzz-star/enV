@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const toolDocumentationSource = readFileSync(new URL("../src/lib/tool-documentation.ts", import.meta.url), "utf8");
@@ -55,6 +55,10 @@ for (const tool of result.tools) {
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
 for (const tool of result.guideTools) {
+  const guideTitle = toolGuideSeoTitle(tool);
+  const guideDescription = toolSeoDescription(tool);
+  assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
+  assert.ok(guideDescription.length >= 45 && guideDescription.length <= 160, "Guide SEO description must be 45-160 characters for " + tool.id);
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(guide), "Missing public guide sitemap entry for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing public guide in llms.txt for " + tool.id);

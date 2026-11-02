@@ -23,7 +23,7 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 import type { ToolMeta } from "@/types/tool";
-import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool } from "@/lib/seo-metadata";
+import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, toolGuideSeoTitle } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
@@ -67,14 +67,14 @@ export const Route = createFileRoute("/blog/$slug")({
     if (!isIndexableTool(loaderData.tool)) {
       return {
         meta: [
-          { title: loaderData.tool.name + " documentation | enV" },
+          { title: toolGuideSeoTitle(loaderData.tool) },
           { name: "description", content: description },
           { name: "robots", content: "noindex,follow" }
         ]
       };
     }
     return seoPageHead({
-      title: loaderData.tool.name + " documentation | enV",
+      title: toolGuideSeoTitle(loaderData.tool),
       description,
       path,
       type: "article",

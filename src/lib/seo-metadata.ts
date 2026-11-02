@@ -165,6 +165,17 @@ export function toolSeoDescription(tool: ToolMeta): string {
   return cleanMetaDescription(toolDocumentationSummary(tool), 160);
 }
 
+export function toolGuideSeoTitle(tool: ToolMeta): string {
+  const suffix = " documentation | enV";
+  const maxTitleLength = 65;
+  const rawName = tool.name.trim();
+  const maxNameLength = maxTitleLength - suffix.length;
+  const displayName = rawName.length > maxNameLength
+    ? rawName.slice(0, maxNameLength - 1).trimEnd() + "…"
+    : rawName;
+  return displayName + suffix;
+}
+
 export function toolSchema(tool: ToolMeta) {
   const category = CATEGORY_MAP[tool.category as CategoryId];
   const path = "/tools/" + tool.category + "/" + tool.slug;

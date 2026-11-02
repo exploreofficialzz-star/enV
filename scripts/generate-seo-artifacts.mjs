@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { isIndexableTool, toolSeoTitle, toolSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
@@ -135,6 +135,13 @@ export function buildSeoArtifacts() {
       "[Guide](" + guide + ") |",
     ].join(" | ");
   });
+  const guideInventoryRows = guideTools.map((tool) => [
+    "| [" + tableCell(tool.name) + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
+    tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
+    tableCell(toolGuideSeoTitle(tool)),
+    tableCell(toolSeoDescription(tool)),
+    "[Open tool](" + SITE_ORIGIN + toolPath(tool) + ") |",
+  ].join(" | "));
   const inventory = [
     "# enV public tool SEO inventory",
     "",
@@ -150,6 +157,12 @@ export function buildSeoArtifacts() {
     "| Tool | Category | SEO title | Meta description | Catalogue search-intent seeds | Usage guide |",
     "|---|---|---|---|---|---|",
     ...inventoryRows,
+    "",
+    "## Individual usage guide coverage",
+    "",
+    "| Usage guide | Category | SEO title | Meta description | Related tool |",
+    "|---|---|---|---|---|",
+    ...guideInventoryRows,
     "",
   ].join("\n");
 
