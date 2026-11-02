@@ -33,7 +33,7 @@ final class CatalogCoreTests: XCTestCase {
                              categories: [], tools: [retired, retained], relatedReferenceTools: [retired])
 
         let native = source.nativeFacing()
-        XCTAssertEqual(native.tools.map(\\.id), [retainedID])
+        XCTAssertEqual(native.tools.map(\.id), [retainedID])
         XCTAssertFalse((native.relatedReferenceTools ?? []).contains { $0.id == retiredID })
     }
 
