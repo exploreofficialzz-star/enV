@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const toolDocumentationSource = readFileSync(new URL("../src/lib/tool-documentation.ts", import.meta.url), "utf8");
@@ -31,6 +31,7 @@ for (const path of [
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.categories.length > 0);
+assert.ok(result.articles.length > 0);
 for (const category of result.categories) {
   const title = categorySeoTitle(category.name);
   assert.ok(title.length <= 65, "Category SEO title exceeds 65 characters for " + category.id);
@@ -59,6 +60,13 @@ for (const tool of result.tools) {
   assert.ok(result.urls.includes(guide), "Missing guide sitemap entry for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + route), "Missing llms.txt tool link for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
+}
+for (const article of result.articles) {
+  const title = articleSeoTitle(article.title);
+  assert.ok(title.length <= 65, "Article SEO title exceeds 65 characters for " + article.slug);
+  assert.ok(title.toLowerCase().startsWith(article.title.toLowerCase().slice(0, Math.min(12, article.title.length))), "Article SEO title must identify " + article.slug);
+  assert.ok(result.urls.includes("/blog/" + article.slug), "Missing article sitemap entry for " + article.slug);
+  assert.ok(result.llms.includes("https://envtools.store/blog/" + article.slug), "Missing article in llms.txt for " + article.slug);
 }
 for (const tool of result.guideTools) {
   const guideTitle = toolGuideSeoTitle(tool);
@@ -96,6 +104,7 @@ assert.match(result.llms, /^# enV/m);
 assert.match(result.llms, /## Public tool categories/);
 assert.match(result.llms, /## Canonical public tool pages/);
 assert.match(result.llms, /## All public tool guides/);
+assert.match(result.llms, /## Product articles/);
 for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"

@@ -120,6 +120,9 @@ export function buildSeoArtifacts() {
   const publicGuideLinks = guideTools.map((tool) =>
     "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolDocumentationSummary(tool)
   );
+  const publicArticleLinks = BLOG_ARTICLES.map((article) =>
+    "- [" + article.title + "](" + SITE_ORIGIN + "/blog/" + article.slug + "): " + article.summary
+  );
   const tableCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
   const inventoryRows = tools.map((tool) => {
     const canonical = SITE_ORIGIN + toolPath(tool);
@@ -194,6 +197,9 @@ export function buildSeoArtifacts() {
     "## All public tool guides",
     ...publicGuideLinks,
     "",
+    "## Product articles",
+    ...publicArticleLinks,
+    "",
     "## Documentation and discovery",
     "- Each available tool has a detailed guide at /blog/tool-{tool-id}.",
     "- The XML sitemap lists canonical public tool pages, categories, guides, and articles: " + SITE_ORIGIN + "/sitemap.xml",
@@ -206,7 +212,7 @@ export function buildSeoArtifacts() {
     "",
   ].join("\n");
 
-  return { sitemap, robots, llms, inventory, urls: [...paths], tools, guideTools, categories };
+  return { sitemap, robots, llms, inventory, urls: [...paths], tools, guideTools, categories, articles: BLOG_ARTICLES };
 }
 
 async function run() {
