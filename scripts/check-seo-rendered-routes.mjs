@@ -86,6 +86,7 @@ for (const route of routes) {
   const expectedStatus = route.expectedStatus ?? 200;
   if (response.status !== expectedStatus) failures.push(route.path + ": expected HTTP " + expectedStatus + ", received " + response.status);
   if (!title || title.length < 8) failures.push(route.path + ": missing or unhelpful title");
+  if (route.kind === "indexable" && title.length > 65) failures.push(route.path + ": SEO title exceeds 65 characters (" + title.length + ")");
   if (route.kind === "indexable") {
     if (!description || description.length < 40 || description.length > 170) {
       failures.push(route.path + ": missing or out-of-range meta description (" + description.length + ")");

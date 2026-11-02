@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const toolDocumentationSource = readFileSync(new URL("../src/lib/tool-documentation.ts", import.meta.url), "utf8");
@@ -31,6 +31,11 @@ for (const path of [
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.categories.length > 0);
+for (const category of result.categories) {
+  const title = categorySeoTitle(category.name);
+  assert.ok(title.length <= 65, "Category SEO title exceeds 65 characters for " + category.id);
+  assert.ok(title.includes(category.name), "Category SEO title must identify " + category.id);
+}
 assert.ok(result.urls.some((path) => path.startsWith("/tools/") && path.split("/").length === 4));
 assert.ok(result.urls.some((path) => path.startsWith("/blog/tool-")));
 assert.equal(result.urls.length, new Set(result.urls).size, "Sitemap routes must be unique.");

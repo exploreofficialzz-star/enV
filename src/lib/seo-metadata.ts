@@ -166,15 +166,25 @@ export function toolSeoDescription(tool: ToolMeta): string {
   return cleanMetaDescription(toolDocumentationSummary(tool), 160);
 }
 
-export function toolGuideSeoTitle(tool: ToolMeta): string {
-  const suffix = " documentation | enV";
-  const maxTitleLength = 65;
-  const rawName = tool.name.trim();
-  const maxNameLength = maxTitleLength - suffix.length;
+function boundedSeoTitle(name: string, suffix: string, maxTitleLength = 65): string {
+  const rawName = name.trim();
+  const maxNameLength = Math.max(12, maxTitleLength - suffix.length);
   const displayName = rawName.length > maxNameLength
     ? rawName.slice(0, maxNameLength - 1).trimEnd() + "…"
     : rawName;
   return displayName + suffix;
+}
+
+export function articleSeoTitle(title: string): string {
+  return boundedSeoTitle(title, " | enV");
+}
+
+export function categorySeoTitle(name: string): string {
+  return boundedSeoTitle(name, " Tools | enV");
+}
+
+export function toolGuideSeoTitle(tool: ToolMeta): string {
+  return boundedSeoTitle(tool.name, " documentation | enV");
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {

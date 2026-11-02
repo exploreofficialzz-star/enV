@@ -23,7 +23,7 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 import type { ToolMeta } from "@/types/tool";
-import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, toolGuideSeoTitle } from "@/lib/seo-metadata";
+import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, articleSeoTitle, toolGuideSeoTitle } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
@@ -55,7 +55,7 @@ export const Route = createFileRoute("/blog/$slug")({
     if (loaderData.kind === "article") {
       const path = "/blog/" + params.slug;
       return seoPageHead({
-        title: loaderData.article.title + " | enV Blogs & Guides",
+        title: articleSeoTitle(loaderData.article.title),
         description: loaderData.article.summary,
         path,
         type: "article",

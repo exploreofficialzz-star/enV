@@ -8,7 +8,7 @@ import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
 import type { CategoryId } from "@/types/tool";
-import { isIndexableTool, seoPageHead, categorySchema } from "@/lib/seo-metadata";
+import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/$category/")({
   head: ({ params }) => {
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/tools/$category/")({
     }
     const description = meta.description + " Browse available " + meta.name.toLowerCase() + " tools on enV, with individual tool pages and practical usage guides.";
     return seoPageHead({
-      title: meta.name + " Tools | Online " + meta.name + " Utilities | enV",
+      title: categorySeoTitle(meta.name),
       description,
       path: "/tools/" + params.category,
       structuredData: categorySchema(meta.name + " tools", description, "/tools/" + params.category, publicTools.slice(0, 6))
