@@ -4,8 +4,8 @@ import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { isToolUnderProduction } from "../src/lib/production-notice.ts";
-import { toolSeoTitle, toolSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { isIndexableTool, toolSeoTitle, toolSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
 const OUTPUTS = [
@@ -22,13 +22,16 @@ function escapeXml(value) {
 }
 
 function isPublicTool(tool) {
-  return (tool.status === "active" || tool.status === "beta") && !isToolUnderProduction(tool);
+  return isIndexableTool(tool);
 }
 
 export function buildSeoArtifacts() {
   const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
-  const tools = [...toolMap.values()].filter(isPublicTool).sort((a, b) => a.name.localeCompare(b.name));
+  const guideTools = [...toolMap.values()].filter(isPublicTool).sort((a, b) => a.name.localeCompare(b.name));
+  // Legacy Developer utility URLs canonicalize to one of the public Studio routes.
+  // Keep their standalone task guides discoverable, but do not list the alias paths as canonical tools.
+  const tools = guideTools.filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
   const categories = CATEGORIES
     .filter((category) => tools.some((tool) => tool.category === category.id))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -38,10 +41,8 @@ export function buildSeoArtifacts() {
     "/platform/android", "/platform/ios", "/token-guide",
   ]);
   for (const category of categories) paths.add("/tools/" + category.id);
-  for (const tool of tools) {
-    paths.add(toolPath(tool));
-    paths.add("/blog/tool-" + tool.id);
-  }
+  for (const tool of tools) paths.add(toolPath(tool));
+  for (const tool of guideTools) paths.add("/blog/tool-" + tool.id);
   for (const article of BLOG_ARTICLES) paths.add("/blog/" + article.slug);
 
   const sitemap = [
@@ -115,10 +116,12 @@ export function buildSeoArtifacts() {
   const categoryLinks = categories.map((category) =>
     "- [" + category.name + "](" + SITE_ORIGIN + "/tools/" + category.id + "): " + category.description
   );
-  const publicToolLinks = tools.map((tool) => [
-    "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description,
-    "  - [Usage guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
-  ].join("\n"));
+  const publicToolLinks = tools.map((tool) =>
+    "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description
+  );
+  const publicGuideLinks = guideTools.map((tool) =>
+    "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolDocumentationSummary(tool)
+  );
   const tableCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
   const inventoryRows = tools.map((tool) => {
     const canonical = SITE_ORIGIN + toolPath(tool);
@@ -137,7 +140,8 @@ export function buildSeoArtifacts() {
     "",
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
     "",
-    "- Public tools included: " + tools.length,
+    "- Canonical public tool pages included: " + tools.length,
+    "- Public tool guides included: " + guideTools.length,
     "- Tool categories included: " + categories.length,
     "- Canonical host: " + SITE_ORIGIN,
     "- Each row links to the canonical tool page and its detailed usage guide.",
@@ -173,8 +177,11 @@ export function buildSeoArtifacts() {
     "## Public tool categories",
     ...categoryLinks,
     "",
-    "## All public tool pages and guides",
+    "## Canonical public tool pages",
     ...publicToolLinks,
+    "",
+    "## All public tool guides",
+    ...publicGuideLinks,
     "",
     "## Documentation and discovery",
     "- Each available tool has a detailed guide at /blog/tool-{tool-id}.",
@@ -188,7 +195,7 @@ export function buildSeoArtifacts() {
     "",
   ].join("\n");
 
-  return { sitemap, robots, llms, inventory, urls: [...paths], tools, categories };
+  return { sitemap, robots, llms, inventory, urls: [...paths], tools, guideTools, categories };
 }
 
 async function run() {

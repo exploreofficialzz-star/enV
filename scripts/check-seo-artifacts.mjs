@@ -29,6 +29,7 @@ for (const path of [
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
 ]) assert.ok(result.urls.includes(path), "Missing public informational route " + path);
 assert.ok(result.tools.length > 0);
+assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.categories.length > 0);
 assert.ok(result.urls.some((path) => path.startsWith("/tools/") && path.split("/").length === 4));
 assert.ok(result.urls.some((path) => path.startsWith("/blog/tool-")));
@@ -53,6 +54,16 @@ for (const tool of result.tools) {
   assert.ok(result.llms.includes("https://envtools.store" + route), "Missing llms.txt tool link for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
+for (const tool of result.guideTools) {
+  const guide = "/blog/tool-" + tool.id;
+  assert.ok(result.urls.includes(guide), "Missing public guide sitemap entry for " + tool.id);
+  assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing public guide in llms.txt for " + tool.id);
+  if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
+    assert.ok(!result.urls.includes("/tools/developer/" + tool.slug), "Legacy Developer alias must not be listed as a canonical tool URL: " + tool.id);
+  }
+}
+assert.ok(!result.urls.includes("/tools/developer/artboard-studio"), "Retired Artboard route must not be listed in the sitemap.");
+assert.ok(!result.urls.includes("/blog/tool-artboard-studio"), "Retired Artboard guide must not be listed in the sitemap.");
 assert.ok(result.sitemap.includes("<urlset"));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
@@ -70,7 +81,8 @@ assert.match(result.robots, /Sitemap: https:\/\/envtools\.store\/sitemap\.xml/);
 
 assert.match(result.llms, /^# enV/m);
 assert.match(result.llms, /## Public tool categories/);
-assert.match(result.llms, /## All public tool pages and guides/);
+assert.match(result.llms, /## Canonical public tool pages/);
+assert.match(result.llms, /## All public tool guides/);
 for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
