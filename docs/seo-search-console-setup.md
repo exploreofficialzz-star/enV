@@ -46,7 +46,7 @@ The crawler tokens have different purposes:
 - Claude-SearchBot is used to improve Claude search results; Claude-User supports user-directed retrieval. ClaudeBot is a separate training crawler and remains disallowed.
 - PerplexityBot supports Perplexity search discovery; Perplexity-User is for user-directed requests.
 - Applebot supports Apple search discovery. Applebot-Extended is a separate extended/model-related control and remains disallowed.
-- Google-Extended is explicitly allowed. It is not a Google Search crawler and does not affect Google Search indexing or rankings. This setting permits Google to use crawled enV content for Gemini Apps grounding and future Gemini model training. Keep this allow rule only while that use is acceptable to the company.
+- Google-Extended is disallowed. It is not a Google Search crawler and does not affect Google Search indexing or rankings. Googlebot remains allowed, so this does not block ordinary Search crawling or eligibility for Search-based AI features. Blocking Google-Extended avoids granting separate permission for Gemini Apps grounding and future model use.
 
 ChatGPT-User is intentionally not listed as a search crawler: OpenAI documents it as a user-triggered fetcher, not the agent that determines ChatGPT Search inclusion. Allowing OAI-SearchBot is the relevant Search setting.
 

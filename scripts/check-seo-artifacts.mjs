@@ -143,8 +143,9 @@ assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), fals
 assert.match(result.robots, /User-agent: OAI-SearchBot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: Claude-SearchBot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: PerplexityBot\nAllow: \/\nDisallow: \/api\//);
-assert.match(result.robots, /Google-Extended is separately allowed for Gemini grounding and model use/);
-assert.match(result.robots, /User-agent: Google-Extended\nAllow: \/\nDisallow: \/api\//);
+assert.match(result.robots, /Google-Extended remains disallowed/);
+assert.match(result.robots, /User-agent: Googlebot\nAllow: \/\nDisallow: \/api\//);
+assert.match(result.robots, /User-agent: Google-Extended\nDisallow: \/\n/);
 assert.match(result.robots, /User-agent: Applebot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: ClaudeBot\nDisallow: \//);
 assert.match(result.robots, /User-agent: GPTBot\nDisallow: \//);
