@@ -74,3 +74,39 @@ export function describeExpansion(family, row) {
     relation: `${labels.c} = ${labels.a} ${operator} ${labels.b}`,
   };
 }
+
+
+/**
+ * Public title for an equation calculator. Internal a/b/c slots must never
+ * leak into the title when human-readable field labels are available.
+ * @param {ReturnType<typeof describeExpansion>} info
+ * @param {"a" | "b" | "c"} target
+ */
+export function expansionCalculatorName(info, target) {
+  const label = info.labels[target];
+  if (!label) throw new Error(`Unknown expansion target "${target}" for ${info.key}.`);
+  return `${info.title ? `${info.title}: ` : ""}${info.relation} — Solve for ${label}`;
+}
+
+/**
+ * Public description for an equation calculator.
+ * @param {ReturnType<typeof describeExpansion>} info
+ * @param {"a" | "b" | "c"} target
+ */
+export function expansionCalculatorDescription(info, target) {
+  const label = info.labels[target];
+  if (!label) throw new Error(`Unknown expansion target "${target}" for ${info.key}.`);
+  return `Formula exercise calculator: ${info.relation}. Solve for ${label}. Enter the other two values to calculate the missing value.`;
+}
+
+/**
+ * Search terms for an equation calculator, using the semantic target.
+ * @param {"product" | "sum" | "ratio"} family
+ * @param {ReturnType<typeof describeExpansion>} info
+ * @param {"a" | "b" | "c"} target
+ */
+export function expansionCalculatorKeywords(family, info, target) {
+  const label = info.labels[target];
+  if (!label) throw new Error(`Unknown expansion target "${target}" for ${info.key}.`);
+  return `math exercise formula ${family} ${info.key} solve ${label.toLowerCase()}${info.title ? ` ${info.title.toLowerCase()}` : ""}`;
+}

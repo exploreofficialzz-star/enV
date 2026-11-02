@@ -14,7 +14,7 @@ const browserAudit = read("scripts/browser-qr-barcode-reader-audit.mjs");
 assert.equal(pkg.dependencies?.["@zxing/browser"], "0.1.5", "ZXing browser package is pinned");
 assert.equal(pkg.dependencies?.["@zxing/library"], "0.21.3", "ZXing core is pinned to the Node 22-compatible release");
 assert.ok(productionPolicy.includes('"ecommerce"') && productionPolicy.includes('"qr"'), "Web QR and E-commerce categories are production-exempt");
-assert.ok(registry.includes('catalogTool.category === "qr"') && registry.includes('catalogTool.category === "ecommerce"'), "Browser registry promotes implemented QR and E-commerce records");
+assert.ok(registry.includes('presentedTool.category === "qr"') && registry.includes('presentedTool.category === "ecommerce"'), "Browser registry promotes generated QR and E-commerce records after shared presentation metadata is applied");
 assert.ok(registry.includes('name: "QR & Barcode Reader"'), "QR payload inspector is presented as the code reader");
 assert.ok(
   generator.includes('const localCategoryEngines = new Set([') &&

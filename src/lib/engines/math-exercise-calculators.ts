@@ -397,6 +397,18 @@ const specs: Spec[] = [
 
 ];
 
+/** Public presentation metadata used by the catalogue, while internal variable keys stay in the engine. */
+export const MATH_EXERCISE_CATALOG = specs.map((spec) => ({
+  key: spec.key,
+  name: spec.name,
+  targetLabels: Object.fromEntries(
+    spec.fields.map((field) => [
+      field.name,
+      spec.labels[field.name] ?? field.label,
+    ]),
+  ),
+}));
+
 
 /** Inputs that cannot be negative (lengths, areas, volumes, density, magnitudes), checked before solving. */
 const NONNEGATIVE: Record<string, string[]> = {
@@ -462,7 +474,7 @@ export function registerMathExerciseCalculators(calculators: Record<string, Calc
       const resultLabel = spec.labels[target] ?? labelOf[target] ?? target;
       calculators[key] = {
         fields: withHints(spec, spec.fields.filter((field) => field.name !== target)),
-        formula: `${spec.formula} · solve for ${target}`,
+        formula: `${spec.formula} · solve for ${resultLabel}`,
         compute: (v) =>
           withLabels(labelOf, () => {
             for (const name of NONNEGATIVE[spec.key] ?? []) {
