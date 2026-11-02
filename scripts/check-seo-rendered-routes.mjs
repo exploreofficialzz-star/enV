@@ -219,7 +219,9 @@ async function auditStaticDiscoveryFiles() {
               continue;
             }
             try {
-              const shardResponse = await fetch(shardUrl, {
+              const parsedShardUrl = new URL(shardUrl);
+              const localShardUrl = new URL(parsedShardUrl.pathname + parsedShardUrl.search, baseUrl);
+              const shardResponse = await fetch(localShardUrl, {
                 redirect: "follow",
                 signal: AbortSignal.timeout(20_000),
               });
