@@ -33,6 +33,12 @@ assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.categories.length > 0);
 assert.ok(result.articles.length > 0);
+const publicToolTitles = result.tools.map(toolSeoTitle);
+const publicToolPaths = result.tools.map(canonicalToolPath);
+const publicGuideTitles = result.guideTools.map(toolGuideSeoTitle);
+assert.equal(new Set(publicToolTitles).size, publicToolTitles.length, "Canonical public tool SEO titles must be unique.");
+assert.equal(new Set(publicToolPaths).size, publicToolPaths.length, "Canonical public tool URLs must be unique.");
+assert.equal(new Set(publicGuideTitles).size, publicGuideTitles.length, "Public tool guide SEO titles must be unique.");
 for (const category of result.categories) {
   const title = categorySeoTitle(category.name);
   assert.ok(title.length <= 65, "Category SEO title exceeds 65 characters for " + category.id);
