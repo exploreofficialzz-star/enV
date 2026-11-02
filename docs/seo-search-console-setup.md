@@ -52,8 +52,6 @@ ChatGPT-User is intentionally not listed as a search crawler: OpenAI documents i
 
 Private account, wallet, settings, and interaction-only routes receive page-level noindex. A robots disallow rule is not a replacement for noindex; crawlers need to be able to fetch a page to see its indexing directive.
 
-Private account, wallet, settings, and interaction-only routes receive page-level noindex. A robots disallow rule is not a replacement for noindex; crawlers need to be able to fetch a page to see its indexing directive.
-
 ## 6. What to measure
 
 Track outcomes by page group, not only by site-wide average:
@@ -78,3 +76,18 @@ Before considering an SEO release complete:
 - Search Console and Bing Webmaster Tools have verified ownership and have accepted the sitemap.
 
 This setup improves crawlability and clarity. It does not promise rankings, indexing, rich results, AI citations, or traffic.
+
+## 8. External release evidence still required
+
+The repository can generate and test discovery files, route metadata, canonical URLs, and crawler policies. It cannot prove that the owner has completed external webmaster verification or that a search provider has accepted a sitemap. Record the following evidence before closing the SEO release:
+
+| External task | Completion evidence |
+| --- | --- |
+| Verify the `envtools.store` Domain property in Google Search Console | Search Console reports the property as verified. |
+| Submit `https://envtools.store/sitemap.xml` to Google Search Console | The Sitemaps report shows the submitted sitemap and a successful read/processing status. |
+| Verify `https://envtools.store` in Bing Webmaster Tools | Bing reports successful site ownership verification. |
+| Submit `https://envtools.store/sitemap.xml` to Bing | Bing reports the sitemap as successfully processed. |
+| Verify the production deployment | Vercel shows a READY production deployment whose Git SHA matches the intended `main` commit; the live domain serves the same robots, sitemap, and llms files as that build. |
+| Establish a search baseline | Record the first available impressions, clicks, indexed-page counts, crawl errors, and query/citation samples by page group. |
+
+Do not place DNS ownership tokens, private API credentials, or account passwords in the repository. HTML verification values may be supplied through the named Vercel environment variables above. A generated sitemap or an allowed crawler is not evidence of indexing, ranking, traffic, or AI citation.
