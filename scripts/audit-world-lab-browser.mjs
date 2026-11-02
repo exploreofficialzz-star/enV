@@ -88,7 +88,9 @@ try{
   await page.getByRole("slider",{name:"Explore collision time"}).fill("2");
   const lateCentres=await page.getByText(/Live centre X, left\/right:/).innerText();
   assert.notEqual(lateCentres,earlyCentres);
-  await page.getByRole("button",{name:"Reset collision"}).click();
+  await page.getByRole("button",{name:"Beginning",exact:true}).click();
+  assert.equal(await page.getByRole("slider",{name:"Explore collision time"}).inputValue(),"0",
+    "Beginning must reset the collision timeline to its start");
 
   // A separately invented high-modulus material must give a real,
   // geometry-dependent elastic response, with a portable assumption trail.
