@@ -60,6 +60,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       { name: "description", content: "Discover practical online tools for calculations, conversions, image and audio work, developer tasks, productivity, business, and more across web and mobile." },
       { name: "robots", content: routeRobotsPolicy(matches) },
+      { name: "env-build-sha", content: __ENV_BUILD_SHA__ },
       { name: "theme-color", content: "#ffffff" },
       ...webmasterVerificationMeta(),
     ],
