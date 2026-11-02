@@ -12,7 +12,7 @@ import { developerActionForLegacySlug, developerModeForLegacySlug, developerStud
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionPage } from "@/components/tools/under-production";
 import { CATEGORY_MAP } from "@/data/categories";
-import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, isIndexableTool } from "@/lib/seo-metadata";
+import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/$category/$slug")({
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
@@ -47,7 +47,7 @@ export const Route = createFileRoute("/tools/$category/$slug")({
     }
     return seoPageHead({
       title: toolSeoTitle(tool),
-      description: tool.description + " Explore the tool's usage guide, supported workflow, and related utilities on enV.",
+      description: toolSeoDescription(tool),
       path: canonicalPath,
       structuredData: toolSchema(tool)
     });

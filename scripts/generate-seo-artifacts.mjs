@@ -45,11 +45,17 @@ export function buildSeoArtifacts() {
   ].join("\n");
 
   const robots = [
+    "# Search and citation crawlers are allowed to discover public enV pages.",
+    "# Private product routes use page-level noindex directives; APIs are not crawlable.",
     "User-agent: *",
     "Allow: /",
     "Disallow: /api/",
     "",
     "User-agent: Googlebot",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Google-Extended",
     "Allow: /",
     "Disallow: /api/",
     "",
@@ -61,7 +67,37 @@ export function buildSeoArtifacts() {
     "Allow: /",
     "Disallow: /api/",
     "",
+    "User-agent: ChatGPT-User",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
     "User-agent: GPTBot",
+    "Disallow: /",
+    "",
+    "User-agent: Claude-SearchBot",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Claude-User",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: ClaudeBot",
+    "Disallow: /",
+    "",
+    "User-agent: PerplexityBot",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Perplexity-User",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Applebot",
+    "Allow: /",
+    "Disallow: /api/",
+    "",
+    "User-agent: Applebot-Extended",
     "Disallow: /",
     "",
     "Sitemap: " + SITE_ORIGIN + "/sitemap.xml",
@@ -71,9 +107,10 @@ export function buildSeoArtifacts() {
   const categoryLinks = categories.map((category) =>
     "- [" + category.name + "](" + SITE_ORIGIN + "/tools/" + category.id + "): " + category.description
   );
-  const featuredTools = tools.slice(0, 50).map((tool) =>
-    "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description
-  );
+  const publicToolLinks = tools.map((tool) => [
+    "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description,
+    "  - [Usage guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
+  ].join("\n"));
   const llms = [
     "# enV",
     "",
@@ -89,8 +126,8 @@ export function buildSeoArtifacts() {
     "## Public tool categories",
     ...categoryLinks,
     "",
-    "## Selected tool pages",
-    ...featuredTools,
+    "## All public tool pages and guides",
+    ...publicToolLinks,
     "",
     "## Documentation and discovery",
     "- Each available tool has a detailed guide at /blog/tool-{tool-id}.",

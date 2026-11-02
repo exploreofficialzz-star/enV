@@ -1,6 +1,7 @@
 import type { CategoryId, ToolMeta } from "@/types/tool";
 import { CATEGORY_MAP } from "@/data/categories";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { toolDocumentationSummary } from "@/lib/tool-documentation";
 
 export const SITE_ORIGIN = "https://envtools.store";
 export const DEFAULT_SOCIAL_IMAGE = SITE_ORIGIN + "/og.jpg";
@@ -80,6 +81,21 @@ export function pageSchema(name: string, description: string, path: string, type
   };
 }
 
+export function toolSearchIntentTerms(tool: ToolMeta): string[] {
+  const category = CATEGORY_MAP[tool.category as CategoryId]?.name ?? tool.category;
+  return [...new Set([
+    tool.name,
+    tool.name + " online",
+    category + " tool",
+    ...tool.keywords,
+    ...tool.tags,
+  ].map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 24);
+}
+
+export function toolSeoDescription(tool: ToolMeta): string {
+  return cleanMetaDescription(toolDocumentationSummary(tool), 160);
+}
+
 export function toolSchema(tool: ToolMeta) {
   const category = CATEGORY_MAP[tool.category as CategoryId];
   return {
@@ -88,6 +104,8 @@ export function toolSchema(tool: ToolMeta) {
     name: tool.name,
     description: tool.description,
     applicationCategory: category?.name ?? tool.category,
+    applicationSubCategory: category?.name ?? tool.category,
+    keywords: toolSearchIntentTerms(tool).join(", "),
     operatingSystem: "Any modern web browser",
     url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug),
     isPartOf: { "@type": "WebSite", name: "enV", url: SITE_ORIGIN },
@@ -146,6 +164,5 @@ export function isIndexableTool(tool: ToolMeta): boolean {
 }
 
 export function toolSeoTitle(tool: ToolMeta): string {
-  const category = CATEGORY_MAP[tool.category as CategoryId]?.name ?? tool.category;
-  return tool.name + " | " + category + " Tool | enV";
+  return tool.name.trim() + " Online | enV";
 }
