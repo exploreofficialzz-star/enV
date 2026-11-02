@@ -2,6 +2,7 @@
 
 const ORIGIN = "https://envtools.store";
 const EXPECTED_HOMEPAGE_TITLE = "enV Digital Toolkit by chAs Technologies | Online Tools";
+const EXPECTED_BUILD_SHA = process.env.GITHUB_SHA?.trim() ?? "";
 const USER_AGENT = "enV-production-seo-smoke/1.0";
 const failures = [];
 const checked = [];
@@ -179,7 +180,7 @@ async function waitForHomepageDeployment() {
   // Wait for a page-level build marker before evaluating production metadata,
   // otherwise a fast smoke can accidentally inspect the previous deployment.
   let last = { status: 0, title: "", url: ORIGIN + "/" };
-  for (let attempt = 1; attempt <= 24; attempt += 1) {
+  for (let attempt = 1; attempt <= 36; attempt += 1) {
     try {
       const response = await fetch(ORIGIN + "/", {
         redirect: "follow",
@@ -189,18 +190,20 @@ async function waitForHomepageDeployment() {
       const html = await response.text();
       const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
       const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
-      last = { status: response.status, title, url: response.url };
-      if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE) {
-        checked.push({ path: "/", status: response.status, title, deploymentVersionConfirmed: true });
+      const buildSha = metaContent(head, "name", "env-build-sha");
+      last = { status: response.status, title, buildSha, url: response.url };
+      const matchingBuild = EXPECTED_BUILD_SHA ? buildSha === EXPECTED_BUILD_SHA : title === EXPECTED_HOMEPAGE_TITLE;
+      if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE && matchingBuild) {
+        checked.push({ path: "/", status: response.status, title, buildSha, deploymentVersionConfirmed: true });
         return true;
       }
     } catch (error) {
       last = { status: 0, title: "", url: ORIGIN + "/", error: String(error) };
     }
-    if (attempt < 24) await new Promise((resolve) => setTimeout(resolve, 5_000));
+    if (attempt < 36) await new Promise((resolve) => setTimeout(resolve, 5_000));
   }
   failures.push(
-    "production did not serve the current homepage build within 120 seconds (expected title="
+    "production did not serve the current homepage build within 180 seconds (expected title="
     + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(last) + ")"
   );
   return false;
@@ -214,6 +217,9 @@ async function checkRenderedRoute(path, schema) {
   const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
   const description = metaContent(head, "name", "description");
   const robots = metaContent(head, "name", "robots").toLowerCase();
+  const buildSha = metaContent(head, "name", "env-build-sha");
+  assert(Boolean(buildSha) && buildSha !== "local", path + " is missing build SHA metadata");
+  if (EXPECTED_BUILD_SHA) assert(buildSha === EXPECTED_BUILD_SHA, path + " is not serving the current GitHub commit (expected " + EXPECTED_BUILD_SHA + ", received " + buildSha + ")");
   const canonicalTags = [...head.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => match[0])
     .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
@@ -238,7 +244,7 @@ async function checkRenderedRoute(path, schema) {
   assert(twitterTitle === title, path + " Twitter title does not match its page title");
   assert(jsonLd.some((json) => json.includes('"@type":"' + schema + '"') || json.includes('"@type": "' + schema + '"')),
     path + " is missing JSON-LD schema type " + schema);
-  checked.push({ path, status: response.status, title, canonical, schema });
+  checked.push({ path, status: response.status, title, canonical, schema, buildSha });
 }
 
 async function main() {
