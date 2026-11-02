@@ -2,6 +2,7 @@ import type { CategoryId, ToolMeta } from "@/types/tool";
 import { CATEGORY_MAP } from "@/data/categories";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { toolDocumentationSummary } from "@/lib/tool-documentation";
+import { developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
 export const SITE_ORIGIN = "https://envtools.store";
 export const DEFAULT_SOCIAL_IMAGE = SITE_ORIGIN + "/og.jpg";
@@ -176,9 +177,17 @@ export function toolGuideSeoTitle(tool: ToolMeta): string {
   return displayName + suffix;
 }
 
+export function canonicalToolPath(tool: ToolMeta): string {
+  if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
+    const studio = developerStudioForLegacySlug(tool.slug);
+    return "/tools/developer/" + studio.slug;
+  }
+  return "/tools/" + tool.category + "/" + tool.slug;
+}
+
 export function toolSchema(tool: ToolMeta) {
   const category = CATEGORY_MAP[tool.category as CategoryId];
-  const path = "/tools/" + tool.category + "/" + tool.slug;
+  const path = canonicalToolPath(tool);
   return withBreadcrumbs({
     "@type": "SoftwareApplication",
     name: tool.name,
@@ -245,7 +254,7 @@ export function technicalArticleSchema(tool: ToolMeta, description: string, path
     about: {
       "@type": "SoftwareApplication",
       name: tool.name,
-      url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug),
+      url: absoluteSiteUrl(canonicalToolPath(tool)),
       keywords: toolSearchIntentTerms(tool).join(", "),
     },
     mainEntityOfPage: absoluteSiteUrl(path),

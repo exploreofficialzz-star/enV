@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
@@ -140,7 +140,7 @@ export function buildSeoArtifacts() {
     tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
     tableCell(toolGuideSeoTitle(tool)),
     tableCell(toolSeoDescription(tool)),
-    "[Open tool](" + SITE_ORIGIN + toolPath(tool) + ") |",
+    "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
   const inventory = [
     "# enV public tool SEO inventory",

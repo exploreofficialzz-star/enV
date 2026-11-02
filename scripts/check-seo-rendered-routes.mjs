@@ -6,6 +6,7 @@ const routes = [
   { path: "/tools", kind: "indexable", schema: "CollectionPage" },
   { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
   { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
+  { path: "/blog/tool-json-formatter", kind: "indexable", schema: "TechArticle", aboutUrl: "https://envtools.store/tools/developer/json-studio" },
   { path: "/about", kind: "indexable", schema: "AboutPage" },
   { path: "/help", kind: "indexable", schema: "CollectionPage" },
   { path: "/contact", kind: "indexable", schema: "ContactPage" },
@@ -64,6 +65,10 @@ for (const route of routes) {
     source.includes('"@type":"' + (route.schema ?? "UNKNOWN") + '"')
     || source.includes('"@type": "' + (route.schema ?? "UNKNOWN") + '"')
   );
+  const hasCanonicalAbout = !route.aboutUrl || jsonLd.some((source) =>
+    source.includes('"@type":"SoftwareApplication"')
+    && source.includes('"url":"' + route.aboutUrl + '"')
+  );
 
   if (!response.ok) failures.push(route.path + ": HTTP " + response.status);
   if (!title || title.length < 8) failures.push(route.path + ": missing or unhelpful title");
@@ -77,6 +82,7 @@ for (const route of routes) {
       failures.push(route.path + ": incorrect canonical URL: " + canonical);
     }
     if (!hasSchema) failures.push(route.path + ": expected JSON-LD schema type " + route.schema);
+    if (!hasCanonicalAbout) failures.push(route.path + ": guide must reference the canonical parent SoftwareApplication URL");
     if (!ogTitle || ogTitle !== title) failures.push(route.path + ": Open Graph title must match the page title");
     if (!ogDescription || ogDescription !== description) failures.push(route.path + ": Open Graph description must match the page description");
     if (!ogUrl || ogUrl !== canonical) failures.push(route.path + ": Open Graph URL must match the canonical URL");
