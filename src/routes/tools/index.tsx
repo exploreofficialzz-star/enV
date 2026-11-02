@@ -69,7 +69,15 @@ function Tools() {
                       <Icon className="size-5" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <h2 className="text-lg font-bold text-accent">{category.name}</h2>
+                      <h2 className="text-lg font-bold text-accent">
+                        <a
+                          href={"/tools/" + category.id}
+                          aria-label={"Browse " + category.name + " tools"}
+                          className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          {category.name}
+                        </a>
+                      </h2>
                       <p className="text-xs text-muted">{category.blurb}</p>
                     </div>
                   </div>
