@@ -22,6 +22,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Check production homepage
         shell: bash
         run: |
@@ -33,6 +41,10 @@ jobs:
             --write-out 'Homepage HTTP %{http_code}; downloaded %{size_download} bytes\n' \
             https://envtools.store/
           test -s /tmp/env-home.html
+
+      - name: Check public production search discovery and rendered metadata
+        if: always()
+        run: node scripts/check-live-seo.mjs
 
       - name: Check Render API readiness and processor health
         if: always()
