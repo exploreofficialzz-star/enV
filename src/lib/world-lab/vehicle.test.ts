@@ -62,7 +62,8 @@ test("fixed-wing takeoff uses computed dynamic pressure and can become airborne"
     takeoffSpeedMps:Math.sqrt((2*1200*9.80665)/(1.225*24*1.4)),maximumCruiseThrustN:4000,
     maximumWheelDriveForceN:10000,motorMaximumPowerW:350000,batteryMaximumCurrentA:700,durationSeconds:60,maximumSpeedMps:100};
   const run=runWorldLabVehicle(context,"wing-takeoff",input);
-  assert.ok(run.preflight.wingLiftAtTakeoffN!>run.preflight.weightN);
+  assert.ok(run.preflight.wingLiftAtTakeoffN! >= run.preflight.weightN - 1e-6,
+    "The declared takeoff speed must match the computed lift-equals-weight threshold");
   assert.ok(run.samples.some(s=>s.airborne));
 });
 
