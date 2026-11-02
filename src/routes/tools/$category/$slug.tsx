@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, notFound } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
 const ArtboardStudio = lazy(() => import("@/components/game-studio/game-studio"));
@@ -15,6 +15,16 @@ import { CATEGORY_MAP } from "@/data/categories";
 import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/$category/$slug")({
+  loader: ({ params }) => {
+    const { category, slug } = params;
+    // Keep known legacy entry points routable; all unknown tool URLs are true 404s.
+    if (category === "developer" && slug === "artboard-studio") return null;
+    if ((category === "business" || category === "calculators") && slug === "break-even-calculator") return null;
+    const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
+    const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
+    if (!matchedTool) throw notFound();
+    return null;
+  },
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
   head: ({ params }) => {
     const category = params.category;
