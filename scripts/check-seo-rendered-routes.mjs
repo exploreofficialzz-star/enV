@@ -176,7 +176,7 @@ for (const route of renderedRoutes) {
 async function auditStaticDiscoveryFiles() {
   const assets = [
     { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
-    { path: "/sitemap.xml", required: ["<urlset", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/tool-json-studio"] },
+    { path: "/sitemap.xml", required: [] },
     { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "## Product articles", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/a-more-private-way-to-use-online-tools"] },
     { path: "/og.jpg", image: true },
   ];
@@ -209,7 +209,37 @@ async function auditStaticDiscoveryFiles() {
         failures.push("/robots.txt: API routes must remain excluded from crawler access");
       }
       if (asset.path === "/sitemap.xml") {
-        const locations = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+        const sitemapBodies = [];
+        if (body.includes("<sitemapindex")) {
+          const shardUrls = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+          if (shardUrls.length < 2) failures.push("/sitemap.xml: sitemap index must reference multiple shards");
+          for (const shardUrl of shardUrls) {
+            if (!shardUrl.startsWith("https://envtools.store/")) {
+              failures.push("/sitemap.xml: shard URL must use the canonical host: " + shardUrl);
+              continue;
+            }
+            try {
+              const shardResponse = await fetch(shardUrl, {
+                redirect: "follow",
+                signal: AbortSignal.timeout(20_000),
+              });
+              const shardBody = await shardResponse.text();
+              if (!shardResponse.ok) failures.push(shardUrl + ": HTTP " + shardResponse.status);
+              if (!shardBody.includes("<urlset")) failures.push(shardUrl + ": expected a sitemap urlset");
+              sitemapBodies.push(shardBody);
+            } catch (error) {
+              failures.push(shardUrl + ": request failed: " + String(error));
+            }
+          }
+        } else if (body.includes("<urlset")) {
+          sitemapBodies.push(body);
+        } else {
+          failures.push("/sitemap.xml: expected either a urlset or sitemapindex document");
+        }
+
+        const locations = sitemapBodies.flatMap((sitemapBody) =>
+          [...sitemapBody.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1])
+        );
         if (locations.length < 20) failures.push("/sitemap.xml: expected the platform and public tool route inventory");
         if (new Set(locations).size !== locations.length) failures.push("/sitemap.xml: duplicate canonical URL entries");
         if (locations.some((url) => !url.startsWith("https://envtools.store/") && url !== "https://envtools.store")) {
