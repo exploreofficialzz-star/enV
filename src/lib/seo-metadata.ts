@@ -207,8 +207,15 @@ export function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength
   return boundedSeoTitle(rawName, suffix, maxTitleLength);
 }
 
-export function toolGuideSeoTitle(tool: ToolMeta): string {
-  return boundedToolSeoTitle(tool.name, " documentation | enV");
+export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
+  const baseTitle = boundedToolSeoTitle(tool.name, " documentation | enV");
+  const collisions = peers
+    .filter((candidate) => boundedToolSeoTitle(candidate.name, " documentation | enV") === baseTitle)
+    .slice()
+    .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
+  if (collisions.length <= 1) return baseTitle;
+  const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
+  return boundedSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") documentation | enV");
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
@@ -226,8 +233,15 @@ export function canonicalToolName(tool: ToolMeta): string {
   return tool.name;
 }
 
-export function toolSeoTitle(tool: ToolMeta): string {
-  return boundedToolSeoTitle(tool.name, " Online | enV");
+export function toolSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
+  const baseTitle = boundedToolSeoTitle(tool.name, " Online | enV");
+  const collisions = peers
+    .filter((candidate) => boundedToolSeoTitle(candidate.name, " Online | enV") === baseTitle)
+    .slice()
+    .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
+  if (collisions.length <= 1) return baseTitle;
+  const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
+  return boundedSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") | enV");
 }
 
 export function toolSchema(tool: ToolMeta) {
