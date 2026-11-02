@@ -8,13 +8,13 @@ import { CATEGORIES } from "@/data/categories";
 import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
-import { isIndexableTool, seoPageHead, categorySchema } from "@/lib/seo-metadata";
+import { isIndexableTool, seoPageHead, categorySchema, canonicalSeoTools } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/")({
   validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
   head: () => {
     const visibleTools = CATEGORIES.flatMap((category) =>
-      getToolsByCategory(category.id).filter(isIndexableTool).slice(0, 3)
+      canonicalSeoTools(getToolsByCategory(category.id).filter(isIndexableTool)).slice(0, 3)
     );
     return seoPageHead({
       title: "All Online Tools | Calculators, Converters and Utilities | enV",
