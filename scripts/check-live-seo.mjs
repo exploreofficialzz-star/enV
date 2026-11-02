@@ -126,6 +126,46 @@ async function checkStaticAssets() {
   checked.push({ path: "/sitemap.xml", status: sitemapResponse.status, urlCount: locations.length, shards: sitemapBodies.length });
 }
 
+async function checkCanonicalHosts() {
+  const aliases = ["www.envtools.store", "envtools.site", "www.envtools.site", "en-v.vercel.app"];
+  for (const host of aliases) {
+    const aliasUrl = "https://" + host + "/robots.txt";
+    let initial;
+    try {
+      initial = await fetch(aliasUrl, {
+        redirect: "manual",
+        headers: { "user-agent": USER_AGENT },
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (error) {
+      failures.push("canonical host alias " + host + " could not be reached: " + String(error));
+      continue;
+    }
+    const location = initial.headers.get("location") ?? "";
+    assert([301, 308].includes(initial.status), host + " should return a permanent redirect (301/308), received " + initial.status);
+    if (location) {
+      let destination;
+      try {
+        destination = new URL(location, aliasUrl);
+      } catch {
+        failures.push(host + " returned an invalid redirect Location: " + location);
+        continue;
+      }
+      assert(destination.origin === ORIGIN, host + " redirects to a non-canonical host: " + destination.origin);
+      assert(destination.pathname === "/robots.txt", host + " does not preserve the requested path in its canonical redirect");
+    } else {
+      failures.push(host + " did not provide a redirect Location header");
+    }
+    try {
+      const finalResponse = await get(aliasUrl, "canonical host alias " + host);
+      assert(finalResponse.url === ORIGIN + "/robots.txt", host + " did not resolve directly to the canonical host (final URL: " + finalResponse.url + ")");
+      checked.push({ path: "https://" + host + "/robots.txt", status: initial.status, finalUrl: finalResponse.url });
+    } catch (error) {
+      failures.push(String(error));
+    }
+  }
+}
+
 async function checkRenderedRoute(path, schema) {
   const response = await get(ORIGIN + path, path);
   const html = await response.text();
@@ -160,6 +200,7 @@ async function checkRenderedRoute(path, schema) {
 async function main() {
   try {
     await checkStaticAssets();
+    await checkCanonicalHosts();
     for (const [path, schema] of [
       ["/", "WebSite"],
       ["/tools", "CollectionPage"],
