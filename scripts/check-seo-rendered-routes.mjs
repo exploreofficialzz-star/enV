@@ -3,7 +3,7 @@
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { isIndexableTool, canonicalSeoTools } from "../src/lib/seo-metadata.ts";
+import { isIndexableTool, canonicalSeoTools, canonicalToolPath, boundedToolSeoTitle, toolSeoTitle, toolGuideSeoTitle } from "../src/lib/seo-metadata.ts";
 import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
@@ -39,6 +39,56 @@ const routes = [
 ];
 
 const routeMap = new Map(routes.map((route) => [route.path, route]));
+const seoCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+for (const tool of getToolsByCategory("accessibility")) seoCandidateMap.set(tool.id, tool);
+const canonicalSeoRecords = canonicalSeoTools([...seoCandidateMap.values()]);
+const canonicalToolPages = canonicalSeoRecords.filter((tool) =>
+  tool.category !== "developer" || tool.tags.includes("developer-studio")
+);
+
+function addTitleCollisionRoutes(tools, suffix, titleForTool, routeForTool, schema) {
+  const groups = new Map();
+  for (const tool of tools) {
+    const key = boundedToolSeoTitle(tool.name, suffix);
+    const group = groups.get(key) ?? [];
+    group.push(tool);
+    groups.set(key, group);
+  }
+  let added = 0;
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    for (const tool of group) {
+      const route = routeForTool(tool);
+      routeMap.set(route.path, {
+        ...route,
+        kind: "indexable",
+        schema,
+        expectedTitle: titleForTool(tool, tools),
+        titleCollision: true,
+      });
+      added += 1;
+    }
+  }
+  return added;
+}
+
+// Render every page participating in a truncated-title collision. This gives
+// real SSR coverage to the title disambiguation logic without fetching the
+// entire, rapidly growing catalogue on every CI run.
+const toolCollisionRoutes = addTitleCollisionRoutes(
+  canonicalToolPages,
+  " Online | enV",
+  toolSeoTitle,
+  (tool) => ({ path: canonicalToolPath(tool) }),
+  "SoftwareApplication",
+);
+const guideCollisionRoutes = addTitleCollisionRoutes(
+  canonicalSeoRecords,
+  " documentation | enV",
+  toolGuideSeoTitle,
+  (tool) => ({ path: "/blog/tool-" + tool.id }),
+  "TechArticle",
+);
 // Generate live coverage from the catalogue so new categories, representative
 // canonical tools and their usage guides automatically enter this rendered audit.
 for (const category of CATEGORIES) {
@@ -153,6 +203,9 @@ for (const route of renderedRoutes) {
   const expectedStatus = route.expectedStatus ?? 200;
   if (response.status !== expectedStatus) failures.push(route.path + ": expected HTTP " + expectedStatus + ", received " + response.status);
   if (!title || title.length < 8) failures.push(route.path + ": missing or unhelpful title");
+  if (route.expectedTitle && title !== route.expectedTitle) {
+    failures.push(route.path + ": rendered title does not match the canonical peer-aware title (expected " + JSON.stringify(route.expectedTitle) + ", received " + JSON.stringify(title) + ")");
+  }
   if (route.kind === "indexable" && title.length > 65) failures.push(route.path + ": SEO title exceeds 65 characters (" + title.length + ")");
   if (route.kind === "indexable") {
     if (!description || description.length < 40 || description.length > 170) {
@@ -289,4 +342,4 @@ if (failures.length) {
   process.stderr.write("Rendered SEO audit failed with " + failures.length + " issue(s):\n" + failures.map((item) => "- " + item).join("\n") + "\n");
   process.exit(1);
 }
-process.stdout.write("PASS: rendered metadata, canonicals, structured data, noindex policies, robots.txt, sitemap.xml and llms.txt.\n");
+process.stdout.write("PASS: rendered metadata, canonicals, structured data, noindex policies, robots.txt, sitemap.xml and llms.txt (" + toolCollisionRoutes + " tool collision routes, " + guideCollisionRoutes + " guide collision routes).\\n");
