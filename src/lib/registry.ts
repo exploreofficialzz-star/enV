@@ -92,11 +92,44 @@ const aBookTool: ToolMeta = {
   isNew: true,
 };
 
+const retiredDesignBuildCalculatorIds = new Set([
+  "math-exp-sum-math-design-build-delivery-effort-a",
+  "math-exp-sum-math-design-build-delivery-effort-b",
+  "math-exp-sum-math-design-build-delivery-effort-c",
+  "math-exp-sum-engineering-design-build-delivery-effort-a",
+  "math-exp-sum-engineering-design-build-delivery-effort-b",
+  "math-exp-sum-engineering-design-build-delivery-effort-c",
+  "math-exp-sum-business-design-build-delivery-effort-a",
+  "math-exp-sum-business-design-build-delivery-effort-b",
+  "math-exp-sum-business-design-build-delivery-effort-c",
+  "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-a",
+  "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-b",
+  "math-exp-sum-science-sum-design-effort-build-effort-delivery-effort-33-c",
+  "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-a",
+  "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-b",
+  "math-exp-sum-engineering-sum-design-effort-build-effort-delivery-effort-83-c",
+  "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-a",
+  "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-b",
+  "math-exp-sum-core-sum-design-effort-build-effort-delivery-effort-133-c",
+  "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-a",
+  "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-b",
+  "math-exp-sum-advanced-sum-design-effort-build-effort-delivery-effort-183-c",
+  "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-a",
+  "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-b",
+  "math-exp-sum-applied-sum-design-effort-build-effort-delivery-effort-233-c",
+  "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-a",
+  "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-b",
+  "math-exp-sum-technical-sum-design-effort-build-effort-delivery-effort-283-c",
+  "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-a",
+  "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-b",
+  "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-c",
+]);
+
 const allTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
   // shared with native clients, so expose these web-ready records as active here
   // without changing the independent Android/iOS catalogues in this browser task.
-  ...catalogTools.map((catalogTool) => {
+  ...catalogTools.filter((catalogTool) => !retiredDesignBuildCalculatorIds.has(catalogTool.id)).map((catalogTool) => {
     const webTool: ToolMeta = (catalogTool.category === "qr" || (catalogTool.category === "ecommerce" && catalogTool.engine.type === "custom"))
       && catalogTool.status === "planned"
       ? { ...catalogTool, status: "active" }

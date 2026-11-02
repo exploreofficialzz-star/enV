@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import mathExpansion from "../../data/math-expansion.json" with { type: "json" };
 import { EXPANSION_FAMILIES, describeExpansion, expansionLabel, parseExpansionRow } from "./expansion-rows.mjs";
+import { getAllTools } from "../registry.ts";
 
 test("four- and five-element rows are read with the right variable in each slot", () => {
   assert.deepEqual(parseExpansionRow(["k", "a", "b", "c"]), { key: "k", title: null, a: "a", b: "b", c: "c" });
@@ -23,6 +24,27 @@ test("the absence-rate row keeps absence rate = absent ÷ enrolled (it used to b
   assert.equal(info.relation, "Absence rate = Absent ÷ Enrolled");
 });
 
+const misplacedDesignBuildKeys = new Set([
+  "math-design-build-delivery-effort",
+  "engineering-design-build-delivery-effort",
+  "business-design-build-delivery-effort",
+  "science-sum-design-effort-build-effort-delivery-effort-33",
+  "engineering-sum-design-effort-build-effort-delivery-effort-83",
+  "core-sum-design-effort-build-effort-delivery-effort-133",
+  "advanced-sum-design-effort-build-effort-delivery-effort-183",
+  "applied-sum-design-effort-build-effort-delivery-effort-233",
+  "technical-sum-design-effort-build-effort-delivery-effort-283",
+  "business-sum-design-effort-build-effort-delivery-effort-333",
+]);
+const misplacedDesignBuildIds = new Set([...misplacedDesignBuildKeys].flatMap((key) => ["a", "b", "c"].map((slot) => `math-exp-sum-${key}-${slot}`)));
+
+test("Design/build effort rows and their generated solve-for tools stay out of Calculators", () => {
+  const expansionRows = (mathExpansion as Record<string, string[][]>).sum.filter((row) => misplacedDesignBuildKeys.has(row[0]));
+  assert.deepEqual(expansionRows, []);
+  const catalogTools = getAllTools().filter((tool) => misplacedDesignBuildIds.has(tool.id));
+  assert.deepEqual(catalogTools, []);
+});
+
 test("every row of every family is parseable and has three distinct, non-empty variables", () => {
   let rows = 0;
   for (const family of EXPANSION_FAMILIES) {
@@ -33,5 +55,5 @@ test("every row of every family is parseable and has three distinct, non-empty v
       assert.ok(row.length === 4 || row.length === 5);
     }
   }
-  assert.equal(rows, 625 + 609 + 622);
+  assert.equal(rows, 625 + 599 + 622);
 });

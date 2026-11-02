@@ -7,6 +7,7 @@ const advancedText = readFileSync(new URL("../src/lib/engines/advanced-calculato
 const mathExerciseText = readFileSync(new URL("../src/lib/engines/math-exercise-calculators.ts", import.meta.url), "utf8");
 const stemText = readFileSync(new URL("../src/lib/engines/stem-calculators.ts", import.meta.url), "utf8");
 const regularText = readFileSync(new URL("../src/lib/engines/regular-calculators.ts", import.meta.url), "utf8");
+const mathExpansion = JSON.parse(readFileSync(new URL("../src/data/math-expansion.json", import.meta.url), "utf8"));
 
 const tools = parseGeneratedCatalog(catalogText);
 const categoryTools = tools.filter((tool) => tool.category === "calculators");
@@ -31,6 +32,16 @@ const nonCalculator = categoryTools.filter((tool) => tool.engine.type !== "calcu
 const allowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine.type === "business" && tool.engine.op === "break-even";
 const unexpectedEngine = nonCalculator.filter((tool) => !allowedBusinessRoute(tool));
 const planned = calculators.filter((tool) => tool.status === "planned");
+const misplacedDesignBuildRows = Object.entries(mathExpansion).flatMap(([family, rows]) => rows
+  .filter((row) => {
+    const variables = row.slice(1).map((value) => String(value).trim().toLowerCase());
+    return (variables.includes("design") && variables.includes("build"))
+      || (variables.includes("design-effort") && variables.includes("build-effort"));
+  })
+  .map((row) => `${family}:${row[0]}`));
+const misplacedDesignBuildTools = categoryTools.filter((tool) =>
+  /(?:^|-)design(?:-effort)?-build(?:-effort)?-delivery-effort-[abc]$/i.test(tool.id),
+);
 
 console.log(`Calculator audit: ${calculators.length} formula-engine tools across ${categoryTools.length} category entries`);
 console.log(`Executable definitions: ${keys.size}`);
@@ -38,8 +49,12 @@ console.log(`Missing definitions: ${missing.length}`);
 console.log(`Intentional break-even business routes: ${nonCalculator.filter(allowedBusinessRoute).length}`);
 console.log(`Unexpected non-calculator engines: ${unexpectedEngine.length}`);
 console.log(`Still Coming Soon: ${planned.length}`);
+console.log(`Misplaced Design/Build expansion rows: ${misplacedDesignBuildRows.length}`);
+console.log(`Misplaced Design/Build calculator records: ${misplacedDesignBuildTools.length}`);
 if (missing.length) console.log("Missing:", missing.map((x) => `${x.id} → ${x.engine.formula}`).join(", "));
 if (unexpectedEngine.length) console.log("Wrong engine:", unexpectedEngine.map((x) => x.id).join(", "));
 if (planned.length) console.log("Planned calculators:", planned.map((x) => x.id).join(", "));
-if (missing.length || unexpectedEngine.length || planned.length) process.exit(1);
+if (misplacedDesignBuildRows.length) console.log("Remove Design/Build expansion rows:", misplacedDesignBuildRows.join(", "));
+if (misplacedDesignBuildTools.length) console.log("Remove Design/Build calculator records:", misplacedDesignBuildTools.map((x) => x.id).join(", "));
+if (missing.length || unexpectedEngine.length || planned.length || misplacedDesignBuildRows.length || misplacedDesignBuildTools.length) process.exit(1);
 console.log("Calculator catalog is fully executable.");
