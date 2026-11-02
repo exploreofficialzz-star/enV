@@ -18,12 +18,12 @@ const routes = [
 ];
 
 function attribute(tag, name) {
-  const match = tag.match(new RegExp("\\\\b" + name + "\\\\s*=\\\\s*(?:\\"([^\\"]*)\\"|'([^']*)')", "i"));
+  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i"));
   return match?.[1] ?? match?.[2] ?? "";
 }
 
 function metaContent(head, key, value) {
-  const tags = [...head.matchAll(/<meta\\b[^>]*>/gi)].map((match) => match[0]);
+  const tags = [...head.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]);
   const tag = tags.find((item) => attribute(item, key).toLowerCase() === value.toLowerCase());
   return tag ? attribute(tag, "content") : "";
 }
@@ -42,15 +42,15 @@ for (const route of routes) {
     continue;
   }
 
-  const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
-  const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+  const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
+  const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
   const description = metaContent(head, "name", "description");
   const robots = metaContent(head, "name", "robots").toLowerCase();
-  const canonicals = [...head.matchAll(/<link\\b[^>]*>/gi)]
+  const canonicals = [...head.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => match[0])
-    .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\\s+/).includes("canonical"));
+    .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
   const canonical = canonicals[0] ? attribute(canonicals[0], "href") : "";
-  const jsonLd = [...head.matchAll(/<script\\b[^>]*type\\s*=\\s*["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)]
+  const jsonLd = [...head.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1]);
   const hasSchema = jsonLd.some((source) =>
     source.includes('"@type":"' + (route.schema ?? "UNKNOWN") + '"')
@@ -84,9 +84,9 @@ for (const route of routes) {
   });
 }
 
-process.stdout.write(JSON.stringify({ checked: report.length, report, failures }, null, 2) + "\\n");
+process.stdout.write(JSON.stringify({ checked: report.length, report, failures }, null, 2) + "\n");
 if (failures.length) {
-  process.stderr.write("Rendered SEO audit failed with " + failures.length + " issue(s):\\n" + failures.map((item) => "- " + item).join("\\n") + "\\n");
+  process.stderr.write("Rendered SEO audit failed with " + failures.length + " issue(s):\n" + failures.map((item) => "- " + item).join("\n") + "\n");
   process.exit(1);
 }
-process.stdout.write("PASS: rendered SEO metadata, canonicals, structured data and noindex policies.\\n");
+process.stdout.write("PASS: rendered SEO metadata, canonicals, structured data and noindex policies.\n");
