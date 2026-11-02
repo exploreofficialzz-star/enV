@@ -28,7 +28,11 @@ export function buildSeoArtifacts() {
   const categories = CATEGORIES
     .filter((category) => tools.some((tool) => tool.category === category.id))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const paths = new Set(["/", "/tools", "/about", "/pricing", "/blog"]);
+  const paths = new Set([
+    "/", "/tools", "/about", "/pricing", "/blog", "/contact", "/help",
+    "/privacy", "/terms", "/disclaimer", "/responsible-use",
+    "/platform/android", "/platform/ios", "/token-guide",
+  ]);
   for (const category of categories) paths.add("/tools/" + category.id);
   for (const tool of tools) {
     paths.add(toolPath(tool));
@@ -122,6 +126,15 @@ export function buildSeoArtifacts() {
     "- [Blogs and guides](" + SITE_ORIGIN + "/blog): Product articles and detailed tool documentation.",
     "- [About enV](" + SITE_ORIGIN + "/about): Platform and company information.",
     "- [Pricing](" + SITE_ORIGIN + "/pricing): Usage and token-pricing explanations.",
+    "- [Help center](" + SITE_ORIGIN + "/help): Tool use, troubleshooting, and support answers.",
+    "- [Contact](" + SITE_ORIGIN + "/contact): Official product and company contact routes.",
+    "- [Privacy](" + SITE_ORIGIN + "/privacy): Data handling and feature processing information.",
+    "- [Terms](" + SITE_ORIGIN + "/terms): Terms for using enV across platforms.",
+    "- [Responsible use](" + SITE_ORIGIN + "/responsible-use): Safe and lawful use guidance.",
+    "- [Disclaimer](" + SITE_ORIGIN + "/disclaimer): Output verification and decision-use limits.",
+    "- [Android](" + SITE_ORIGIN + "/platform/android): Native Android and Web tool handoff information.",
+    "- [iOS](" + SITE_ORIGIN + "/platform/ios): Native iOS and Web tool handoff information.",
+    "- [Token guide](" + SITE_ORIGIN + "/token-guide): Catalogue token estimates and billing classifications.",
     "",
     "## Public tool categories",
     ...categoryLinks,
