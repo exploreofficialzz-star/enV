@@ -142,24 +142,31 @@ async function checkCanonicalHosts() {
       continue;
     }
     const location = initial.headers.get("location") ?? "";
-    assert([301, 308].includes(initial.status), host + " should return a permanent redirect (301/308), received " + initial.status);
+    const redirectProvider = {
+      server: initial.headers.get("server") ?? "",
+      via: initial.headers.get("via") ?? "",
+      vercelId: initial.headers.get("x-vercel-id") ?? "",
+      cloudflareRay: initial.headers.get("cf-ray") ?? "",
+    };
+    const providerSummary = JSON.stringify(redirectProvider);
+    assert([301, 308].includes(initial.status), host + " should return a permanent redirect (301/308), received " + initial.status + " from " + providerSummary);
     if (location) {
       let destination;
       try {
         destination = new URL(location, aliasUrl);
       } catch {
-        failures.push(host + " returned an invalid redirect Location: " + location);
+        failures.push(host + " returned an invalid redirect Location: " + location + " from " + providerSummary);
         continue;
       }
-      assert(destination.origin === ORIGIN, host + " redirects to a non-canonical host: " + destination.origin);
-      assert(destination.pathname === "/robots.txt", host + " does not preserve the requested path in its canonical redirect");
+      assert(destination.origin === ORIGIN, host + " redirects to a non-canonical host: " + destination.origin + " (Location=" + location + "; provider=" + providerSummary + ")");
+      assert(destination.pathname === "/robots.txt", host + " does not preserve the requested path in its canonical redirect (Location=" + location + ")");
     } else {
-      failures.push(host + " did not provide a redirect Location header");
+      failures.push(host + " did not provide a redirect Location header (provider=" + providerSummary + ")");
     }
     try {
       const finalResponse = await get(aliasUrl, "canonical host alias " + host);
-      assert(finalResponse.url === ORIGIN + "/robots.txt", host + " did not resolve directly to the canonical host (final URL: " + finalResponse.url + ")");
-      checked.push({ path: "https://" + host + "/robots.txt", status: initial.status, finalUrl: finalResponse.url });
+      assert(finalResponse.url === ORIGIN + "/robots.txt", host + " did not resolve directly to the canonical host (first Location: " + location + "; final URL: " + finalResponse.url + "; provider=" + providerSummary + ")");
+      checked.push({ path: "https://" + host + "/robots.txt", status: initial.status, firstRedirect: location, finalUrl: finalResponse.url, ...redirectProvider });
     } catch (error) {
       failures.push(String(error));
     }
