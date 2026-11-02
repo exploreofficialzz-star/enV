@@ -180,7 +180,7 @@ export function buildSeoArtifacts() {
     return [
       "| [" + tableCell(tool.name) + "](" + canonical + ")",
       tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
-      tableCell(toolSeoTitle(tool)),
+      tableCell(toolSeoTitle(tool, tools)),
       tableCell(toolSeoDescription(tool)),
       tableCell(toolSearchIntentTerms(tool).join(", ")),
       "[Guide](" + guide + ") |",
@@ -189,7 +189,7 @@ export function buildSeoArtifacts() {
   const guideInventoryRows = guideTools.map((tool) => [
     "| [" + tableCell(tool.name) + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
     tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
-    tableCell(toolGuideSeoTitle(tool)),
+    tableCell(toolGuideSeoTitle(tool, guideTools)),
     tableCell(toolSeoDescription(tool)),
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
