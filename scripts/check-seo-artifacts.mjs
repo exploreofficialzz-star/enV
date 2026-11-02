@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, organizationSchema, websiteSchema } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
@@ -33,6 +33,17 @@ assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.categories.length > 0);
 assert.ok(result.articles.length > 0);
+const organization = organizationSchema();
+const website = websiteSchema();
+assert.equal(organization.name, "chAs Technologies LLC");
+assert.equal(organization.legalName, "chAs Technologies LLC");
+assert.ok(organization.description.includes("enV"));
+assert.ok(organization.brand.alternateName.includes("enV Digital Toolkit"));
+assert.ok(organization.sameAs.includes("https://x.com/chAstechllc"));
+assert.ok(organization.brand.sameAs.includes("https://x.com/envtoolz"));
+const serializedWebsite = JSON.stringify(website);
+assert.ok(serializedWebsite.includes("enV Digital Toolkit"));
+assert.ok(serializedWebsite.includes("enV by chAs Technologies LLC"));
 const publicToolTitles = result.tools.map(toolSeoTitle);
 const publicToolPaths = result.tools.map(canonicalToolPath);
 const publicGuideTitles = result.guideTools.map(toolGuideSeoTitle);
