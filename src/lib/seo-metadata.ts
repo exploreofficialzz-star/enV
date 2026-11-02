@@ -29,6 +29,15 @@ export type SeoPageOptions = {
   structuredData?: Record<string, unknown>;
 };
 
+export function webmasterVerificationMeta() {
+  const google = import.meta.env.VITE_GOOGLE_SITE_VERIFICATION?.trim() ?? "";
+  const bing = import.meta.env.VITE_BING_SITE_VERIFICATION?.trim() ?? "";
+  return [
+    ...(google ? [{ name: "google-site-verification", content: google }] : []),
+    ...(bing ? [{ name: "msvalidate.01", content: bing }] : []),
+  ];
+}
+
 export function seoPageHead(options: SeoPageOptions) {
   const url = absoluteSiteUrl(options.path);
   const image = options.image ?? DEFAULT_SOCIAL_IMAGE;
@@ -36,6 +45,7 @@ export function seoPageHead(options: SeoPageOptions) {
   const type = options.type ?? "website";
   return {
     meta: [
+      ...webmasterVerificationMeta(),
       { title: options.title },
       { name: "description", content: description },
       { name: "robots", content: options.robots ?? "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" },
