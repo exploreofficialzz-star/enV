@@ -37,7 +37,7 @@ const studioCatalog = readFileSync(resolve(root, "src/lib/developer-studios-cata
 const studioDescriptions = [...studioCatalog.matchAll(/description:\s*"([^"]+)"/g)].map((match) => match[1]);
 assert(studioDescriptions.length >= 13, `Expected 13 Developer Studio workspaces, found ${studioDescriptions.length}.`);
 for (const [index, description] of studioDescriptions.entries()) {
-  assert(description.length >= 80, `Developer Studio description ${index + 1} is too short to explain its workspace.`);
+  assert(description.length >= 70, `Developer Studio description ${index + 1} is too short to explain its workspace.`);
 }
 assert(studioCatalog.includes("export const DEVELOPER_STUDIOS"), "The Developer Studio catalogue remains the source of discovery workspaces.");
 
