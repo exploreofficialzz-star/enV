@@ -4,6 +4,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -30,5 +32,19 @@ class MainActivityLaunchTest {
         listOf("Home", "Tools", "Search", "Saved", "Account").forEach { label ->
             composeRule.onNodeWithText(label).assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun launchScreenShowsDevelopmentNoticeAndExitAction() {
+        var exitRequested = false
+        composeRule.setContent {
+            EnVTheme(darkTheme = false) {
+                NativeLaunchScreen(darkMode = false, onExit = { exitRequested = true })
+            }
+        }
+
+        composeRule.onNodeWithText("enV is still under development").assertIsDisplayed()
+        composeRule.onNodeWithText("Exit app").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertTrue(exitRequested) }
     }
 }
