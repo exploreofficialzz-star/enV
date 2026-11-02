@@ -949,11 +949,10 @@ struct NativeWorldLabReplayManifest:Equatable {
     }
     func encodeBounded()throws->Data {
         try validate()
-        let params=Dictionary(uniqueKeysWithValues:parameters)
         let root:[String:Any]=[
             "format":format,"schemaVersion":schemaVersion,"modelId":modelId,
             "modelVersion":modelVersion,"worldEpochUTC":worldEpochUTC,
-            "timezoneDisplay":timezoneDisplay,"parameters":params,
+            "timezoneDisplay":timezoneDisplay,"parameters":parameters,
             "sampleTimesSeconds":sampleTimesSeconds,
             "mandatoryEventTimesSeconds":mandatoryEventTimesSeconds,
             "eventQueuePolicy":eventQueuePolicy,"randomStatePolicy":randomStatePolicy,
