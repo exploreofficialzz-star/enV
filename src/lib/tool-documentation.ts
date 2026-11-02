@@ -441,15 +441,8 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
   if (isCompleteSentence) return description;
 
   const name = tool.name.trim();
-  const specific = toolSpecificGuidance(tool);
-  if (!specific.overview.startsWith("This guide is tailored to the catalogued purpose, category, and execution metadata for ")) {
-    const candidate = name + ": " + specific.overview.replace(/\s+/g, " ").trim();
-    if (candidate.length <= 160) return candidate;
-    const shortened = candidate.slice(0, 159);
-    const boundary = shortened.lastIndexOf(" ");
-    return (boundary > 110 ? shortened.slice(0, boundary) : shortened).trimEnd() + "…";
-  }
-
+  // Guide-specific overview text is rendered in the guide body. Keep the
+  // search snippet independently worded so it is not repeated verbatim.
   const engine = tool.engine.type;
 
   if (engine === "calculator") {
