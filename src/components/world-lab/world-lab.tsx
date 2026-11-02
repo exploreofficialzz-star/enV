@@ -2789,7 +2789,7 @@ export default function WorldLab() {
             <WorldLabReferenceLayersPanel/>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} aria-expanded={seeInside}
-              onClick={() => {const next=seeInside?"normal":"transparent";setSeeInside(!seeInside);setInspectionMode(next);}}>See Inside</button>
+              onClick={() => updateInspectionView({mode:seeInside?"normal":"transparent"})}>See Inside</button>
             <button type="button" className={buttonClass} onClick={() => zoomView(1)}
               aria-label="Zoom in">Zoom in</button>
             <button type="button" className={buttonClass} onClick={() => zoomView(-1)}
