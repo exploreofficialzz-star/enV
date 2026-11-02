@@ -104,8 +104,10 @@ for (const route of renderedRoutes) {
   const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
   const description = metaContent(head, "name", "description");
   const robots = metaContent(head, "name", "robots").toLowerCase();
+  const ogSiteName = metaContent(head, "property", "og:site_name");
   const ogTitle = metaContent(head, "property", "og:title");
   const ogDescription = metaContent(head, "property", "og:description");
+  const twitterSite = metaContent(head, "name", "twitter:site");
   const ogUrl = metaContent(head, "property", "og:url");
   const ogImage = metaContent(head, "property", "og:image");
   const twitterCard = metaContent(head, "name", "twitter:card");
@@ -153,6 +155,8 @@ for (const route of renderedRoutes) {
     }
     if (!hasSchema) failures.push(route.path + ": expected JSON-LD schema type " + route.schema);
     if (!hasCanonicalAbout) failures.push(route.path + ": guide must reference the canonical parent SoftwareApplication URL");
+    if (ogSiteName !== "enV Digital Toolkit") failures.push(route.path + ": Open Graph site name must disambiguate the enV brand");
+    if (twitterSite !== "@envtoolz") failures.push(route.path + ": Twitter site handle must match the official enV account");
     if (!ogTitle || ogTitle !== title) failures.push(route.path + ": Open Graph title must match the page title");
     if (!ogDescription || ogDescription !== description) failures.push(route.path + ": Open Graph description must match the page description");
     if (!ogUrl || ogUrl !== canonical) failures.push(route.path + ": Open Graph URL must match the canonical URL");
