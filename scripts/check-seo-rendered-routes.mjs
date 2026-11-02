@@ -60,9 +60,6 @@ for (const category of CATEGORIES) {
       path: guidePath,
       kind: "indexable",
       schema: "TechArticle",
-      ...(sampleTool.category === "developer" && !sampleTool.tags.includes("developer-studio")
-        ? { aboutUrl: "https://envtools.store" + toolPath(getToolsByCategory("developer").find((tool) => tool.tags.includes("developer-studio") && tool.id === sampleTool.id) ?? sampleTool) }
-        : {}),
     });
   }
 }
