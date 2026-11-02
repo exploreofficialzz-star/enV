@@ -218,7 +218,12 @@ export function normalizeHeadContext(ctx = {}) {
 
 
 function addMissingShareMetaTags(html, tags) {
-  const matches = [...String(html).matchAll(/<meta\b[^>]*>/gi)];
+  const source = String(html);
+  const hasCanonical = /<link\b(?=[^>]*\brel\s*=\s*["']canonical["'])[^>]*>/i.test(source);
+  if (!hasCanonical) {
+    return insertAfterHeadOpen(stripShareMetaTags(source), tags.join(""));
+  }
+  const matches = [...source.matchAll(/<meta\b[^>]*>/gi)];
   const groups = new Map();
   for (const match of matches) {
     const attrs = [...match[0].matchAll(/\b(?:property|name)\s*=\s*["']([^"']+)["']/gi)];

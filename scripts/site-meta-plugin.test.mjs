@@ -20,7 +20,7 @@ function workspace({ card = true } = {}) {
 test("route-specific Open Graph and Twitter metadata is preserved over site-wide defaults", () => {
   const root = workspace();
   try {
-    const html = '<!doctype html><html><head><title>Tool page</title><meta property="og:title" content="Generic enV title"><meta property="og:title" content="JSON Formatter | Developer Tool | enV"><meta property="og:description" content="Format JSON online with readable output."><meta name="twitter:title" content="JSON Formatter | enV"></head><body>Tool</body></html>';
+    const html = '<!doctype html><html><head><title>Tool page</title><link rel="canonical" href="https://envtools.store/tools/developer/json-studio"><meta property="og:title" content="Generic enV title"><meta property="og:title" content="JSON Formatter | Developer Tool | enV"><meta property="og:description" content="Format JSON online with readable output."><meta name="twitter:title" content="JSON Formatter | enV"></head><body>Tool</body></html>';
     const result = injectSiteMetadata(html, { host: "envtools.store", cwd: root });
     assert.equal((result.match(/property="og:title"/g) ?? []).length, 1);
     assert.ok(result.includes('property="og:title" content="JSON Formatter | Developer Tool | enV"'));
