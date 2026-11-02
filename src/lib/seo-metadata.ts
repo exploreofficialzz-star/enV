@@ -192,7 +192,7 @@ function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength = 65):
   const rawName = name.trim();
   // Generated formula tools carry the important differentiator after "Solve for".
   // Preserve that semantic target at the end instead of truncating it away.
-  const solveFor = rawName.match(/^(.*?)(\\s+[—–-]\\s+Solve for\\s+.+)$/i);
+  const solveFor = rawName.match(/^(.*?)(\s+[—–-]\s+Solve for\s+.+)$/i);
   if (solveFor) {
     const prefix = solveFor[1].trim();
     const differentiator = solveFor[2].trimStart();
