@@ -3,7 +3,7 @@
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { isIndexableTool, canonicalSeoTools, canonicalToolPath, boundedToolSeoTitle, toolSeoTitle, toolGuideSeoTitle } from "../src/lib/seo-metadata.ts";
+import { isIndexableTool, canonicalSeoTools, canonicalToolPath, toolSeoTitle, toolGuideSeoTitle } from "../src/lib/seo-metadata.ts";
 import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
@@ -49,7 +49,7 @@ const canonicalToolPages = canonicalSeoRecords.filter((tool) =>
 function addTitleCollisionRoutes(tools, suffix, titleForTool, routeForTool, schema) {
   const groups = new Map();
   for (const tool of tools) {
-    const key = boundedToolSeoTitle(tool.name, suffix);
+    const key = titleForTool(tool);
     const group = groups.get(key) ?? [];
     group.push(tool);
     groups.set(key, group);
@@ -84,7 +84,6 @@ const toolCollisionRoutes = addTitleCollisionRoutes(
 );
 const guideCollisionRoutes = addTitleCollisionRoutes(
   canonicalSeoRecords,
-  " documentation | enV",
   toolGuideSeoTitle,
   (tool) => ({ path: "/blog/tool-" + tool.id }),
   "TechArticle",
