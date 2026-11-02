@@ -208,7 +208,6 @@ object NativeAudioWavProcessor {
         val rms = if (input.frames == 0) 0.0 else sqrt(input.channels.sumOf { channel -> channel.sumOf { it.toDouble() * it } } / (input.frames.toDouble() * input.channels.size))
         val dc = if (input.frames == 0) 0.0 else input.channels.sumOf { channel -> channel.sumOf { it.toDouble() } } / (input.frames.toDouble() * input.channels.size)
         when (operation) {
-            "analyze" -> return NativeAudioWavResult(musicAnalysisReport(input, fileName, bytes.size, peak, rms), durationSeconds = duration)
             "inspector" -> return NativeAudioWavResult("WAV inspector\nDuration: ${fmt(duration)} s\nSample rate: ${input.sampleRateHz} Hz\nChannels: ${input.channels.size}\nFrames per channel: ${input.frames}\nSource encoding: ${input.sourceBits}-bit ${if (input.sourceEncoding == 3) "IEEE float" else "PCM"}\nSource size: ${bytes.size} bytes", durationSeconds = duration)
             "duration" -> return NativeAudioWavResult("Duration: ${fmt(duration)} seconds\nSample rate: ${input.sampleRateHz} Hz", durationSeconds = duration)
             "peak" -> return NativeAudioWavResult("Peak amplitude: ${fmt(peak)}\nPeak level: ${fmt(NativeAudioDsp.amplitudeDbfs(peak))} dBFS\nSource channels: ${input.channels.size}", durationSeconds = duration)
@@ -297,99 +296,6 @@ object NativeAudioWavProcessor {
     }
 
     private data class NativeSpectrum(val centroidHz: Double?, val rolloff85Hz: Double?, val flatness: Double?)
-
-    private fun musicAnalysisReport(input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double): String {
-        val frames = input.frames
-        val rate = input.sampleRateHz
-        val duration = input.durationSeconds
-        var clippedSamples = 0L
-        var totalSamples = 0L
-        val windowFrames = max(1, rate / 10)
-        val windowLevels = mutableListOf<Double>()
-        var silentWindows = 0
-        var totalWindows = 0
-        for (start in 0 until frames step windowFrames) {
-            val stop = min(frames, start + windowFrames)
-            var sumSquares = 0.0
-            var count = 0
-            for (channel in input.channels) for (i in start until stop) {
-                val sample = channel[i].toDouble()
-                sumSquares += sample * sample
-                if (abs(sample) >= 0.999) clippedSamples++
-                totalSamples++
-                count++
-            }
-            val windowRms = if (count > 0) sqrt(sumSquares / count) else 0.0
-            windowLevels += if (windowRms > 0.0) 20.0 * kotlin.math.log10(windowRms) else -120.0
-            if (windowRms < 0.001) silentWindows++
-            totalWindows++
-        }
-        val sortedLevels = windowLevels.sorted()
-        fun percentile(q: Double): Double? {
-            if (sortedLevels.isEmpty()) return null
-            val index = ((sortedLevels.size - 1) * q).roundToInt().coerceIn(0, sortedLevels.lastIndex)
-            return sortedLevels[index]
-        }
-        val p95 = percentile(0.95)
-        val p10 = percentile(0.10)
-        val spread = if (p95 != null && p10 != null) max(0.0, p95 - p10) else null
-        val representative = input.channels.firstOrNull() ?: FloatArray(0)
-        val zcr = if (frames > 1) {
-            var crossings = 0L
-            for (i in 1 until frames) {
-                val previous = representative[i - 1]
-                val current = representative[i]
-                if ((current >= 0f && previous < 0f) || (current < 0f && previous >= 0f)) crossings++
-            }
-            crossings.toDouble() / (frames - 1)
-        } else null
-        val tempo = estimateTempoBpm(representative.copyOfRange(0, min(representative.size, rate * 90)), rate)
-        val key = estimateMusicalKey(representative.copyOfRange(0, min(representative.size, rate * 30)), rate)
-        val spectrum = calculateSpectrum(representative, rate)
-        val json = JSONObject()
-            .put("schema_version", "env.music-analysis.v1")
-            .put("source", JSONObject()
-                .put("file_name", fileName.ifBlank { "audio.wav" })
-                .put("mime_type", "audio/wav")
-                .put("file_size_bytes", fileSizeBytes))
-            .put("metadata", JSONObject()
-                .put("title", JSONObject.NULL).put("artist", JSONObject.NULL).put("album", JSONObject.NULL)
-                .put("album_artist", JSONObject.NULL).put("year", JSONObject.NULL).put("embedded_genre", JSONObject.NULL)
-                .put("track_number", JSONObject.NULL).put("disc_number", JSONObject.NULL).put("composer", JSONObject.NULL)
-                .put("publisher", JSONObject.NULL).put("tagged_bpm", JSONObject.NULL))
-            .put("audio", JSONObject()
-                .put("duration_seconds", duration)
-                .put("sample_rate_hz", rate)
-                .put("channels", input.channels.size)
-                .put("peak_dbfs", jsonNumberOrNull(if (peak > 0) 20.0 * kotlin.math.log10(peak) else Double.NEGATIVE_INFINITY))
-                .put("rms_dbfs", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) else Double.NEGATIVE_INFINITY))
-                .put("estimated_loudness_lufs", jsonNumberOrNull(if (rms > 0) 20.0 * kotlin.math.log10(rms) - 0.691 else Double.NEGATIVE_INFINITY))
-                .put("clipped_sample_percent", if (totalSamples > 0) clippedSamples.toDouble() * 100.0 / totalSamples else 0.0)
-                .put("silence_percent", if (totalWindows > 0) silentWindows.toDouble() * 100.0 / totalWindows else 0.0)
-                .put("windowed_rms_spread_db", jsonNumberOrNull(spread ?: Double.NaN))
-                .put("metric_scope_seconds", min(duration, 30.0)))
-            .put("rhythm", JSONObject()
-                .put("tempo_bpm", tempo?.let { it } ?: JSONObject.NULL)
-                .put("method", "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate")
-                .put("status", if (tempo != null) "estimated" else "unavailable"))
-            .put("tonality", JSONObject()
-                .put("key", key ?: JSONObject.NULL)
-                .put("method", "4096-point chroma-template correlation; best-effort estimate")
-                .put("status", if (key != null) "estimated" else "unavailable"))
-            .put("timbre", JSONObject()
-                .put("spectral_centroid_hz", jsonNumberOrNull(spectrum.centroidHz ?: Double.NaN))
-                .put("spectral_rolloff_85_hz", jsonNumberOrNull(spectrum.rolloff85Hz ?: Double.NaN))
-                .put("spectral_flatness", jsonNumberOrNull(spectrum.flatness ?: Double.NaN))
-                .put("zero_crossing_rate", jsonNumberOrNull(zcr ?: Double.NaN))
-                .put("interpretation", "Signal features do not independently identify genre, instruments, mood or language."))
-            .put("classification", JSONObject()
-                .put("genre", JSONObject.NULL).put("sub_style", JSONObject.NULL)
-                .put("language", JSONArray()).put("mood", JSONArray()).put("instruments", JSONArray())
-                .put("vocal_style", JSONObject.NULL).put("genre_candidates", JSONArray())
-                .put("status", "requires_model")
-                .put("note", "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."))
-        return json.toString(2)
-    }
 
     private fun jsonNumberOrNull(value: Double): Any = if (value.isFinite()) value else JSONObject.NULL
 

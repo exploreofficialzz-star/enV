@@ -2045,7 +2045,7 @@ private extension Double {
 /// Offline native audio estimates and platform guidance. Heavy stem AI and browser-only formats remain web-first.
 enum NativeAudioEngine {
     private static let nativeWavOperations: [String: String] = [
-        "audio-analyze-studio": "analyze", "audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
+"audio-file-inspector": "inspector", "audio-duration-tool": "duration", "audio-trimmer": "trim", "audio-to-wav": "to-wav",
         "audio-peak-meter": "peak", "audio-rms-meter": "rms", "audio-silence-detector": "silence", "audio-dc-offset-checker": "dc-offset",
         "audio-to-mono": "mono", "audio-to-stereo": "stereo", "audio-reverser": "reverse", "audio-normalizer": "normalize",
         "voice-noise-reducer": "voice-noise-reducer", "voice-noise-gate": "voice-noise-gate", "audio-hum-reducer": "audio-hum-reducer",
@@ -2056,7 +2056,7 @@ enum NativeAudioEngine {
     ]
 
     static func operation(for tool: Tool) -> String? {
-        if tool.id == "song-metadata-analyzer" { return "song-metadata-analyzer" }
+        if tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio" { return "song-metadata-analyzer" }
         if tool.id == "music-live-video-studio" { return "live-video-studio" }
         if tool.id == "audio-recorder" { return "record-mic" }
         if let fileOp = nativeWavOperations[tool.id] { return "file:\(fileOp)" }
@@ -2268,7 +2268,6 @@ enum NativeAudioWavProcessor {
         let dc = input.channels.reduce(0.0) { $0 + $1.reduce(0.0) { $0 + Double($1) } } / max(1, Double(input.frames * input.channels.count))
         func number(_ value: Double) -> String { value.isFinite ? String(format: "%.3f", value) : "unavailable" }
         switch operation {
-        case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport(input, fileName: fileName, fileSizeBytes: data.count, peak: peak, rms: rms), outputWav: nil, durationSeconds: duration)
         case "inspector": return NativeAudioWavResult(report: "WAV inspector\nDuration: \(number(duration)) s\nSample rate: \(input.sampleRateHz) Hz\nChannels: \(input.channels.count)\nFrames per channel: \(input.frames)\nSource encoding: \(input.sourceBits)-bit \(input.sourceEncoding == 3 ? "IEEE float" : "PCM")\nSource size: \(data.count) bytes", outputWav: nil, durationSeconds: duration)
         case "duration": return NativeAudioWavResult(report: "Duration: \(number(duration)) seconds\nSample rate: \(input.sampleRateHz) Hz", outputWav: nil, durationSeconds: duration)
         case "peak": return NativeAudioWavResult(report: "Peak amplitude: \(number(peak))\nPeak level: \(number(NativeAudioDsp.amplitudeDbfs(peak))) dBFS\nSource channels: \(input.channels.count)", outputWav: nil, durationSeconds: duration)
@@ -2329,107 +2328,6 @@ enum NativeAudioWavProcessor {
         let centroidHz: Double?
         let rolloff85Hz: Double?
         let flatness: Double?
-    }
-
-    private static func musicAnalysisReport(_ input: NativeDecodedWav, fileName: String, fileSizeBytes: Int, peak: Double, rms: Double) throws -> String {
-        let frames = input.frames, rate = input.sampleRateHz, duration = input.durationSeconds
-        let windowFrames = max(1, rate / 10)
-        var windowLevels: [Double] = []
-        var clipped: Int64 = 0, totalSamples: Int64 = 0, silentWindows = 0, totalWindows = 0
-        for start in stride(from: 0, to: frames, by: windowFrames) {
-            let stop = min(frames, start + windowFrames)
-            var sumSquares = 0.0, count = 0
-            for channel in input.channels {
-                for index in start..<stop {
-                    let sample = Double(channel[index])
-                    sumSquares += sample * sample
-                    if abs(sample) >= 0.999 { clipped += 1 }
-                    totalSamples += 1
-                    count += 1
-                }
-            }
-            let windowRMS = sqrt(sumSquares / Double(max(1, count)))
-            windowLevels.append(windowRMS > 0 ? 20 * log10(windowRMS) : -120)
-            if windowRMS < 0.001 { silentWindows += 1 }
-            totalWindows += 1
-        }
-        let sortedLevels = windowLevels.sorted()
-        func percentile(_ q: Double) -> Double? {
-            guard !sortedLevels.isEmpty else { return nil }
-            let index = min(sortedLevels.count - 1, max(0, Int((Double(sortedLevels.count - 1) * q).rounded())))
-            return sortedLevels[index]
-        }
-        let spread: Double?
-        if let p95 = percentile(0.95), let p10 = percentile(0.10) { spread = max(0, p95 - p10) } else { spread = nil }
-        let representative = input.channels.first ?? []
-        var crossings = 0
-        if representative.count > 1 {
-            for index in 1..<representative.count {
-                let previous = representative[index - 1], current = representative[index]
-                if (current >= 0 && previous < 0) || (current < 0 && previous >= 0) { crossings += 1 }
-            }
-        }
-        let zcr = representative.count > 1 ? Double(crossings) / Double(representative.count - 1) : nil
-        let tempoSamples = Array(representative.prefix(min(representative.count, rate * 90)))
-        let keySamples = Array(representative.prefix(min(representative.count, rate * 30)))
-        let tempo = estimateTempoBPM(tempoSamples, sampleRateHz: rate)
-        let key = estimateMusicalKey(keySamples, sampleRateHz: rate)
-        let spectrum = calculateSpectrum(representative, sampleRateHz: rate)
-        func nullable(_ value: Double?) -> Any {
-            guard let value, value.isFinite else { return NSNull() }
-            return value
-        }
-        let payload: [String: Any] = [
-            "schema_version": "env.music-analysis.v1",
-            "source": [
-                "file_name": fileName.isEmpty ? "audio.wav" : fileName,
-                "mime_type": "audio/wav",
-                "file_size_bytes": fileSizeBytes
-            ],
-            "metadata": [
-                "title": NSNull(), "artist": NSNull(), "album": NSNull(), "album_artist": NSNull(),
-                "year": NSNull(), "embedded_genre": NSNull(), "track_number": NSNull(), "disc_number": NSNull(),
-                "composer": NSNull(), "publisher": NSNull(), "tagged_bpm": NSNull()
-            ],
-            "audio": [
-                "duration_seconds": duration,
-                "sample_rate_hz": rate,
-                "channels": input.channels.count,
-                "peak_dbfs": nullable(peak > 0 ? 20 * log10(peak) : nil),
-                "rms_dbfs": nullable(rms > 0 ? 20 * log10(rms) : nil),
-                "estimated_loudness_lufs": nullable(rms > 0 ? 20 * log10(rms) - 0.691 : nil),
-                "clipped_sample_percent": totalSamples > 0 ? Double(clipped) * 100 / Double(totalSamples) : 0,
-                "silence_percent": totalWindows > 0 ? Double(silentWindows) * 100 / Double(totalWindows) : 0,
-                "windowed_rms_spread_db": nullable(spread),
-                "metric_scope_seconds": min(duration, 30)
-            ],
-            "rhythm": [
-                "tempo_bpm": tempo.map { $0 as Any } ?? NSNull(),
-                "method": "RMS-energy novelty autocorrelation with an approximately 10 ms hop; best-effort estimate",
-                "status": tempo == nil ? "unavailable" : "estimated"
-            ],
-            "tonality": [
-                "key": key.map { $0 as Any } ?? NSNull(),
-                "method": "4096-point chroma-template correlation; best-effort estimate",
-                "status": key == nil ? "unavailable" : "estimated"
-            ],
-            "timbre": [
-                "spectral_centroid_hz": nullable(spectrum.centroidHz),
-                "spectral_rolloff_85_hz": nullable(spectrum.rolloff85Hz),
-                "spectral_flatness": nullable(spectrum.flatness),
-                "zero_crossing_rate": nullable(zcr),
-                "interpretation": "Signal features do not independently identify genre, instruments, mood or language."
-            ],
-            "classification": [
-                "genre": NSNull(), "sub_style": NSNull(), "language": [String](),
-                "mood": [String](), "instruments": [String](), "vocal_style": NSNull(),
-                "genre_candidates": [[String: Any]](), "status": "requires_model",
-                "note": "No trained semantic classifier is configured on this native path. Genre, sub-style, language, mood, instruments and vocal style remain unknown rather than guessed."
-            ]
-        ]
-        let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-        guard let report = String(data: data, encoding: .utf8) else { throw NativeSimpleError.message("Could not encode the analysis report as JSON.") }
-        return report
     }
 
     private static func estimateTempoBPM(_ samples: [Float], sampleRateHz: Int) -> Int? {
