@@ -2,7 +2,7 @@ name: Phase 8 — native iOS accessibility UI tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/world-lab-foundation-20261030]
     paths:
       - "apps/ios/**"
       - "apps/shared/**"

@@ -2,7 +2,7 @@ name: Web and Android CI — authoritative
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/world-lab-foundation-20261030]
     paths:
       - "apps/android/**"
       - "apps/shared/**"

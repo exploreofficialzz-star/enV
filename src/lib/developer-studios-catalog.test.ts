@@ -12,12 +12,12 @@ import {
 
 const legacyDeveloperTools = tools.filter((tool) => tool.category === "developer");
 
-test("Developer Studio workspace catalog exposes all fourteen unique, routable Studios", () => {
-  assert.equal(DEVELOPER_STUDIOS.length, 14);
-  assert.equal(new Set(DEVELOPER_STUDIOS.map((studio) => studio.id)).size, 14);
-  assert.equal(new Set(DEVELOPER_STUDIOS.map((studio) => studio.slug)).size, 14);
+test("Developer Studio workspace catalog exposes all fifteen unique, routable Studios", () => {
+  assert.equal(DEVELOPER_STUDIOS.length, 15);
+  assert.equal(new Set(DEVELOPER_STUDIOS.map((studio) => studio.id)).size, 15);
+  assert.equal(new Set(DEVELOPER_STUDIOS.map((studio) => studio.slug)).size, 15);
   const virtualTools = makeDeveloperStudioTools(tools);
-  assert.equal(virtualTools.length, 14);
+  assert.equal(virtualTools.length, 15);
   for (const studio of DEVELOPER_STUDIOS) {
     assert.ok(studio.name.trim(), `${studio.slug} has a name`);
     assert.ok(studio.description.trim(), `${studio.slug} has a job statement`);
@@ -69,14 +69,14 @@ test("High-value legacy routes resolve to semantically relevant Studio modes", (
   assert.deepEqual(resolve("developer-sql-schema-generator"), { studio: "sql-studio", mode: "schema", action: "encode" });
 });
 
-test("Developer category shows only fourteen Studios while legacy tools remain searchable", () => {
+test("Developer category shows only fifteen Studios while legacy tools remain searchable", () => {
   const categoryTools = getToolsByCategory("developer");
-  assert.equal(categoryTools.length, 14);
+  assert.equal(categoryTools.length, 15);
   assert.ok(categoryTools.every((tool) => tool.tags.includes("developer-studio")));
   assert.deepEqual(categoryTools.map((tool) => tool.id), DEVELOPER_STUDIOS.map((studio) => studio.id), "category discovery contains only the fourteen Studio cards");
 
   const searchIndex = getSearchableTools().filter((tool) => tool.category === "developer");
-  assert.equal(searchIndex.filter((tool) => tool.tags.includes("developer-studio")).length, 14);
+  assert.equal(searchIndex.filter((tool) => tool.tags.includes("developer-studio")).length, 15);
   assert.equal(searchIndex.filter((tool) => !tool.tags.includes("developer-studio")).length, 474);
   assert.ok(searchIndex.some((tool) => tool.slug === "json-diff"), "individual tools remain searchable");
   assert.ok(getToolByPath("developer", "json-diff"), "legacy URLs remain resolvable and redirect at the route layer");
@@ -89,4 +89,7 @@ test("UX/UI Studio exposes dedicated editor modes and keeps its original develop
   assert.ok(["workspace", "components", "icons", "tokens", "presets"].every((key) => studio?.modes.some((mode) => mode.key === key)));
   assert.equal(getToolByPath("developer", "ux-ui-studio")?.id, "ux-ui-studio");
   assert.ok(getSearchableTools().some((tool) => tool.id === "ux-ui-studio"));
+  assert.ok(getToolByPath("developer", "the-world-lab"), "World Lab remains discoverable");
+  assert.ok(getToolByPath("developer", "artboard-studio"), "Artboard remains independently available");
+  assert.ok(getToolByPath("developer", "ux-ui-studio"), "UX/UI remains independently available");
 });

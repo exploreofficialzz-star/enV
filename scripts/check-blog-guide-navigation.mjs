@@ -186,7 +186,10 @@ try {
   // This is a client-side route, so verify the URL change rather than requiring a document-navigation response.
   const articleUrlPromise = page.waitForURL(
     (url) => url.origin === articleUrl.origin && url.pathname === articleUrl.pathname,
-    { timeout: 20_000 },
+    // A hydrated client route may reuse a document whose slow image loads
+    // are unrelated to link correctness. Require the URL commit, then verify
+    // that the actual article heading renders and no page errors occur below.
+    { timeout: 20_000, waitUntil: "commit" },
   );
   await articleLink.click();
   await articleUrlPromise;
