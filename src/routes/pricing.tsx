@@ -1,8 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Bot, Calculator, Coins, FileCog, ShieldCheck, Sparkles, Wallet, Zap, BookOpen } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/pricing")({ component: Pricing });
+export const Route = createFileRoute("/pricing")({
+  head: () => seoPageHead({
+    title: "enV Pricing | Token Usage, Wallet and Tool Costs",
+    description: "Understand how enV explains usage for local utilities, cloud processing, media workflows, and AI tools, including token accounting and wallet safeguards.",
+    path: "/pricing",
+    structuredData: pageSchema("enV pricing", "Usage and token-accounting information for enV tools and services.", "/pricing")
+  }),
+  component: Pricing
+});
 
 const usageExamples = [
   { title: "Local utilities", tokens: "Tool-specific rate", value: "Based on the submitted operation" },

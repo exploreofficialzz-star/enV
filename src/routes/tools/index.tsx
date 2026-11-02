@@ -8,9 +8,21 @@ import { CATEGORIES } from "@/data/categories";
 import { getSearchableTools } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
+import { isIndexableTool, seoPageHead, categorySchema } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/")({
   validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
+  head: () => {
+    const visibleTools = CATEGORIES.flatMap((category) =>
+      getSearchableTools().filter((tool) => tool.category === category.id && isIndexableTool(tool)).slice(0, 3)
+    );
+    return seoPageHead({
+      title: "All Online Tools | Calculators, Converters and Utilities | enV",
+      description: "Browse enV's collection of practical online tools by category. Find calculators, converters, developer utilities, image and audio tools, productivity helpers, and more.",
+      path: "/tools",
+      structuredData: categorySchema("All enV tools", "Browse practical online tools across supported enV categories.", "/tools", visibleTools)
+    });
+  },
   component: Tools,
 });
 

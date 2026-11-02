@@ -11,9 +11,45 @@ import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioMode
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionPage } from "@/components/tools/under-production";
+import { CATEGORY_MAP } from "@/data/categories";
+import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, isIndexableTool } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/$category/$slug")({
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
+  head: ({ params }) => {
+    const category = params.category;
+    const slug = params.slug;
+    if (category === "developer" && slug === "artboard-studio") {
+      return { meta: [{ title: "Studio workspace | enV" }, { name: "robots", content: "noindex,follow" }] };
+    }
+    const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
+    let tool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
+    if (!tool) return { meta: [{ title: "Tool not found | enV" }, { name: "robots", content: "noindex,follow" }] };
+    let canonicalPath = "/tools/" + tool.category + "/" + tool.slug;
+    if (category === "developer" && !tool.tags.includes("developer-studio")) {
+      const studio = developerStudioForLegacySlug(slug);
+      if (studio) {
+        tool = studio;
+        canonicalPath = "/tools/" + studio.category + "/" + studio.slug;
+      }
+    }
+    if (!isIndexableTool(tool)) {
+      return {
+        meta: [
+          { title: tool.name + " | enV" },
+          { name: "description", content: tool.description },
+          { name: "robots", content: "noindex,follow" }
+        ],
+        links: [{ rel: "canonical", href: SITE_ORIGIN + canonicalPath }]
+      };
+    }
+    return seoPageHead({
+      title: toolSeoTitle(tool),
+      description: tool.description + " Explore the tool's usage guide, supported workflow, and related utilities on enV.",
+      path: canonicalPath,
+      structuredData: toolSchema(tool)
+    });
+  },
   component: Tool,
 });
 

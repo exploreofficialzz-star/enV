@@ -17,6 +17,22 @@ function workspace({ card = true } = {}) {
   return root;
 }
 
+test("route-specific Open Graph and Twitter metadata is preserved over site-wide defaults", () => {
+  const root = workspace();
+  try {
+    const html = '<!doctype html><html><head><title>Tool page</title><meta property="og:title" content="Generic enV title"><meta property="og:title" content="JSON Formatter | Developer Tool | enV"><meta property="og:description" content="Format JSON online with readable output."><meta name="twitter:title" content="JSON Formatter | enV"></head><body>Tool</body></html>';
+    const result = injectSiteMetadata(html, { host: "envtools.store", cwd: root });
+    assert.equal((result.match(/property="og:title"/g) ?? []).length, 1);
+    assert.ok(result.includes('property="og:title" content="JSON Formatter | Developer Tool | enV"'));
+    assert.ok(result.includes('property="og:description" content="Format JSON online with readable output."'));
+    assert.ok(result.includes('name="twitter:title" content="JSON Formatter | enV"'));
+    assert.ok(result.includes('property="og:image"'));
+    assert.ok(result.includes('name="twitter:card"'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("host validation accepts Vercel/custom domains and rejects untrusted host syntax", () => {
   assert.equal(publicAppHost("env-toolkit.vercel.app:443"), "env-toolkit.vercel.app");
   assert.equal(publicAppHost("tools.example.com"), "tools.example.com");

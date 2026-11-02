@@ -10,11 +10,25 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { getPopularTools, getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/")({
+  head: () => seoPageHead({
+    title: "enV | Online Tools, Calculators, Converters and Creative Studios",
+    description: "Discover practical online tools for calculations, unit conversion, image and audio work, developer tasks, productivity, business, and creative projects. Explore enV across web, Android, and iOS.",
+    path: "/",
+    structuredData: pageSchema(
+      "enV digital toolkit",
+      "A cross-device toolkit of practical browser-based utilities, calculators, converters, developer workspaces, media tools, and productivity tools.",
+      "/",
+      "WebSite"
+    )
+  }),
+  component: Home
+});
 
 function Home() {
   const navigate = useNavigate();

@@ -23,6 +23,7 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 import type { ToolMeta } from "@/types/tool";
+import { seoPageHead, articleSchema, technicalArticleSchema } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
@@ -49,22 +50,27 @@ export const Route = createFileRoute("/blog/$slug")({
 
     throw notFound();
   },
-  head: ({ loaderData }) => {
-    if (!loaderData) return {};
+  head: ({ loaderData, params }) => {
+    if (!loaderData) return { meta: [{ name: "robots", content: "noindex,follow" }] };
     if (loaderData.kind === "article") {
-      return {
-        meta: [
-          { title: loaderData.article.title + " | enV Blogs & Guides" },
-          { name: "description", content: loaderData.article.summary },
-        ],
-      };
+      const path = "/blog/" + params.slug;
+      return seoPageHead({
+        title: loaderData.article.title + " | enV Blogs & Guides",
+        description: loaderData.article.summary,
+        path,
+        type: "article",
+        structuredData: articleSchema(loaderData.article.title, loaderData.article.summary, path, loaderData.article.category)
+      });
     }
-    return {
-      meta: [
-        { title: loaderData.tool.name + " documentation | enV" },
-        { name: "description", content: toolDocumentationSummary(loaderData.tool) },
-      ],
-    };
+    const path = "/blog/tool-" + loaderData.tool.id;
+    const description = toolDocumentationSummary(loaderData.tool);
+    return seoPageHead({
+      title: loaderData.tool.name + " documentation | enV",
+      description,
+      path,
+      type: "article",
+      structuredData: technicalArticleSchema(loaderData.tool, description, path)
+    });
   },
   component: BlogResourcePage,
 });

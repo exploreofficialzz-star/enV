@@ -8,8 +8,26 @@ import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
 import type { CategoryId } from "@/types/tool";
+import { isIndexableTool, seoPageHead, categorySchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/tools/$category/")({ component: Category });
+export const Route = createFileRoute("/tools/$category/")({
+  head: ({ params }) => {
+    const meta = CATEGORY_MAP[params.category as CategoryId];
+    if (!meta) return { meta: [{ title: "Category not found | enV" }, { name: "robots", content: "noindex,follow" }] };
+    const publicTools = getToolsByCategory(params.category as CategoryId).filter(isIndexableTool);
+    if (publicTools.length === 0) {
+      return { meta: [{ title: meta.name + " tools | enV" }, { name: "description", content: meta.description }, { name: "robots", content: "noindex,follow" }] };
+    }
+    const description = meta.description + " Browse available " + meta.name.toLowerCase() + " tools on enV, with individual tool pages and practical usage guides.";
+    return seoPageHead({
+      title: meta.name + " Tools | Online " + meta.name + " Utilities | enV",
+      description,
+      path: "/tools/" + params.category,
+      structuredData: categorySchema(meta.name + " tools", description, "/tools/" + params.category, publicTools.slice(0, 6))
+    });
+  },
+  component: Category
+});
 
 function Category() {
   const { category } = Route.useParams();

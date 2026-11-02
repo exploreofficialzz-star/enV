@@ -4,6 +4,20 @@ import appCss from "../styles.css?url";
 
 const APP_NAME = "enV — Browser Toolkit";
 
+const NON_INDEXABLE_PATHS = [
+  "/account", "/agent", "/assistant", "/developer", "/favorites", "/feedback",
+  "/forgot-password", "/help-feedback", "/history", "/login", "/pair-native",
+  "/report-bugs", "/reset-password", "/settings", "/signup", "/suggest-tool",
+  "/token-dashboard", "/tokens", "/wallet", "/userbehavior",
+];
+
+function routeRobotsPolicy(matches) {
+  const pathname = matches?.[matches.length - 1]?.pathname ?? "/";
+  const path = pathname.replace(/\/+$/, "") || "/";
+  const privateRoute = NON_INDEXABLE_PATHS.some((prefix) => path === prefix || path.startsWith(prefix + "/"));
+  return path === "/search" || privateRoute ? "noindex,nofollow" : "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1";
+}
+
 // Apply the saved or system theme before the stylesheet can paint the page.
 const INITIAL_THEME_SCRIPT = `(() => {
   let preference = null;
@@ -19,17 +33,47 @@ const INITIAL_THEME_SCRIPT = `(() => {
 
 
 export const Route = createRootRoute({
-  head: () => ({
+  head: ({ matches }) => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: APP_NAME },
+      { name: "description", content: "Discover practical online tools for calculations, conversions, image and audio work, developer tasks, productivity, business, and more across web and mobile." },
+      { name: "robots", content: routeRobotsPolicy(matches) },
       { name: "theme-color", content: "#ffffff" },
     ],
     links: [
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "stylesheet", href: appCss },
     ],
+    scripts: [{
+      type: "application/ld+json",
+      children: JSON.stringify({
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            name: "chAs Technologies LLC",
+            url: "https://envtools.store",
+            logo: "https://envtools.store/chas-technologies-logo-transparent.webp",
+            brand: { "@type": "Brand", name: "enV", url: "https://envtools.store" }
+          },
+          {
+            "@type": "WebSite",
+            name: "enV",
+            alternateName: "enV digital toolkit",
+            url: "https://envtools.store",
+            inLanguage: "en",
+            publisher: { "@type": "Organization", name: "chAs Technologies LLC", url: "https://envtools.store" },
+            potentialAction: {
+              "@type": "SearchAction",
+              target: "https://envtools.store/search?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+          }
+        ]
+      })
+    }],
   }),
   component: () => (
     <html lang="en" suppressHydrationWarning>
