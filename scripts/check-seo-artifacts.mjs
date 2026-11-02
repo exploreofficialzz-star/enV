@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import { toolSeoDescription, toolSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
-import { toolSeoDescription, toolSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const vercelConfig = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
@@ -37,10 +36,6 @@ for (const tool of result.tools) {
   const seoTitle = toolSeoTitle(tool);
   const seoDescription = toolSeoDescription(tool);
   const searchTerms = toolSearchIntentTerms(tool);
-  assert.ok(seoTitle.length <= 65, "Tool title exceeds the recommended length for " + tool.id);
-  assert.ok(seoTitle.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "Tool title must identify " + tool.id);
-  assert.ok(seoDescription.length >= 45 && seoDescription.length <= 160, "Tool description must be useful and bounded for " + tool.id + ": " + seoDescription);
-  assert.ok(searchTerms.length >= 3, "Tool search intent terms are incomplete for " + tool.id);
   const title = toolSeoTitle(tool);
   const description = toolSeoDescription(tool);
   const terms = toolSearchIntentTerms(tool);
