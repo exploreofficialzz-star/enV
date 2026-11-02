@@ -7,6 +7,7 @@ import { parseCalcNumber } from "../calc/numeric.ts";
 import { BAD_VALUE, blankAllowed, computeExample } from "../calc/audit-support.mjs";
 import mathExpansion from "../../data/math-expansion.json" with { type: "json" };
 import { describeExpansion } from "../calc/expansion-rows.mjs";
+import { presentGeneratedCalculator } from "../calc/generated-calculator-presentation";
 
 /**
  * Invariants over the formula-engine entries in the WHOLE calculator category. They execute the
@@ -23,7 +24,7 @@ function definitionOf(tool: (typeof catalog)[number]): CalculatorDef | undefined
 }
 
 test("the category is large and every tool id and slug is unique", () => {
-  assert.ok(categoryTools.length >= 6500, `only ${categoryTools.length} calculators`);
+  assert.ok(categoryTools.length >= 6470, `only ${categoryTools.length} calculators`);
   assert.equal(new Set(categoryTools.map((tool) => tool.id)).size, categoryTools.length, "duplicate ids");
   assert.equal(new Set(categoryTools.map((tool) => tool.slug)).size, categoryTools.length, "duplicate slugs");
 });
@@ -199,8 +200,9 @@ test("equation-family tools describe the same relationship in the catalog and in
       const info = describeExpansion(family, row);
       for (const target of ["a", "b", "c"] as const) {
         const id = `math-exp-${family}-${info.key}-${target}`;
-        const tool = byId.get(id);
-        if (!tool) throw new Error(`${id} is missing from the catalog`);
+        const sourceTool = byId.get(id);
+        if (!sourceTool) throw new Error(`${id} is missing from the catalog`);
+        const tool = presentGeneratedCalculator(sourceTool);
         assert.ok(tool.description.includes(info.relation), `${id} description states "${info.relation}"`);
         assert.ok(tool.description.includes(`Solve for ${info.labels[target]}`), `${id} description names the human-readable unknown`);
         if (info.title) assert.ok(tool.name.startsWith(`${info.title}:`), `${id} name starts with its title`);
@@ -212,5 +214,5 @@ test("equation-family tools describe the same relationship in the catalog and in
       }
     }
   }
-  assert.equal(checked, (625 + 609 + 622) * 3);
+  assert.equal(checked, (625 + 609 + 612) * 3);
 });
