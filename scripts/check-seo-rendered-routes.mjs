@@ -123,11 +123,19 @@ if (underProductionTool) {
 }
 const renderedRoutes = [...routeMap.values()];
 
-function attribute(tag, name) {
-  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i"));
-  return match?.[1] ?? match?.[2] ?? "";
+function decodeHtmlEntities(value) {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&#x27;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
 }
 
+function attribute(tag, name) {
+  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i"));
+  return decodeHtmlEntities(match?.[1] ?? match?.[2] ?? "");
+}
 function metaContent(head, key, value) {
   const tags = [...head.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]);
   const tag = tags.find((item) => attribute(item, key).toLowerCase() === value.toLowerCase());
@@ -149,7 +157,7 @@ for (const route of renderedRoutes) {
   }
 
   const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
-  const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+  const title = decodeHtmlEntities(head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "");
   const description = metaContent(head, "name", "description");
   const robots = metaContent(head, "name", "robots").toLowerCase();
   const ogSiteName = metaContent(head, "property", "og:site_name");
