@@ -9,7 +9,7 @@ import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
 const routes = [
   { path: "/", kind: "indexable", schema: "WebSite" },
-  { path: "/tools", kind: "indexable", schema: "CollectionPage" },
+  { path: "/tools", kind: "indexable", schema: "CollectionPage", categoryDirectory: true },
   { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
   { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
   { path: "/blog/tool-json-formatter", kind: "indexable", schema: "TechArticle", aboutUrl: "https://envtools.store/tools/developer/json-studio", aboutName: "JSON Studio" },
@@ -113,6 +113,15 @@ for (const route of renderedRoutes) {
   const twitterDescription = metaContent(head, "name", "twitter:description");
   const twitterImage = metaContent(head, "name", "twitter:image");
   const ogImageAlt = metaContent(head, "property", "og:image:alt");
+  if (route.categoryDirectory) {
+    const hrefs = [...html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi)]
+      .map((match) => match[1]);
+    const categoryLinks = [...new Set(hrefs.filter((href) => /^\/tools\/[a-z0-9-]+\/?$/i.test(href)))];
+    if (categoryLinks.length < 20) {
+      failures.push(route.path + ": category directory must expose crawlable links to public category landing pages; found " + categoryLinks.length);
+    }
+  }
+
   const canonicals = [...head.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => match[0])
     .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
