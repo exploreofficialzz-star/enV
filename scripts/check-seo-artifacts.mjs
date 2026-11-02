@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 
 const result = buildSeoArtifacts();
+const vercelConfig = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
+const canonicalRedirectHosts = new Set(
+  (vercelConfig.redirects ?? []).flatMap((redirect) =>
+    (redirect.has ?? []).filter((condition) => condition.type === "host").map((condition) => condition.value)
+  )
+);
+for (const host of ["www.envtools.store", "envtools.site", "www.envtools.site", "en-v.vercel.app"]) {
+  assert.ok(canonicalRedirectHosts.has(host), "Missing permanent canonical-host redirect for " + host);
+}
+assert.ok((vercelConfig.redirects ?? []).filter((redirect) =>
+  (redirect.has ?? []).some((condition) => condition.value === "www.envtools.store" || condition.value === "envtools.site" || condition.value === "www.envtools.site" || condition.value === "en-v.vercel.app")
+).every((redirect) => redirect.destination.startsWith("https://envtools.store/") && redirect.permanent === true));
 
 assert.ok(result.urls.includes("/"));
 assert.ok(result.urls.includes("/tools"));

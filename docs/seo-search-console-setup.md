@@ -4,7 +4,7 @@ This runbook covers the external ownership and monitoring steps for the SEO/GEO 
 
 ## 1. Verify the canonical domain
 
-Use https://envtools.store as the canonical site origin. The site currently declares that origin in src/lib/seo-metadata.ts. Keep the www and alternate domains redirected or canonicalized to this origin; do not submit duplicate host properties as separate canonical sites unless they are deliberately separate products.
+Use https://envtools.store as the canonical site origin. The site currently declares that origin in src/lib/seo-metadata.ts. Keep the www and alternate domains redirected or canonicalized to this origin; do not submit duplicate host properties as separate canonical sites unless they are deliberately separate products. The Vercel project configuration also includes permanent host-based redirects for www.envtools.store, envtools.site, www.envtools.site, and en-v.vercel.app. Vercel domain-level redirect settings can run before project routing, so confirm each configured alias ultimately resolves directly to https://envtools.store.
 
 ## 2. Google Search Console
 
