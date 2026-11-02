@@ -12,6 +12,8 @@ const OUTPUTS = [
   ["public/robots.txt", "robots"],
   ["public/sitemap.xml", "sitemap"],
   ["public/llms.txt", "llms"],
+];
+const REPORTS = [
   ["docs/seo-tool-inventory.md", "inventory"],
 ];
 
@@ -203,6 +205,14 @@ async function run() {
     } else {
       await mkdir(dirname(absolutePath), { recursive: true });
       await writeFile(absolutePath, expected, "utf8");
+    }
+  }
+  // The internal inventory is a convenience report, not a crawlable deployment artifact.
+  if (!check) {
+    for (const [path, key] of REPORTS) {
+      const absolutePath = resolve(process.cwd(), path);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, artifacts[key], "utf8");
     }
   }
   if (mismatches.length) throw new Error("SEO artifacts are missing or outdated: " + mismatches.join(", ") + ". Run npm run generate:seo.");
