@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/disclaimer")({ component: Disclaimer });
+export const Route = createFileRoute("/disclaimer")({
+  head: () => seoPageHead({
+    title: "enV Disclaimer | Tool Accuracy and Responsible Decisions",
+    description: "Understand the limits of enV calculators, converters, AI-assisted content, media tools and other outputs, and why important results should be independently verified.",
+    path: "/disclaimer",
+    structuredData: pageSchema("enV Disclaimer", "Limitations, verification guidance, and professional-advice disclaimers for enV.", "/disclaimer", "WebPage")
+  }),
+  component: Disclaimer
+});
 
 function Disclaimer() {
   return (
