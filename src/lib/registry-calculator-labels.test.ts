@@ -53,15 +53,14 @@ test("every generated formula calculator uses the correct human label in its tit
   }
 });
 
-test("all Design / Build / Delivery Effort variants remain calculators and use their actual target labels", () => {
+test("retired Design / Build / Delivery Effort variants stay out of the live calculator catalogue", () => {
   const examples = generated.filter((tool) =>
     tool.id.includes("design-build-delivery-effort") ||
     tool.id.includes("design-effort-build-effort-delivery-effort"),
   );
-  assert.equal(examples.length, 30);
-  assert.ok(examples.every((tool) => tool.category === "calculators"));
-  for (const tool of examples) {
-    assert.match(tool.name, /Solve for (Design(?: effort)?|Build(?: effort)?|Delivery effort)/i);
-    assert.ok(tool.description.includes("Solve for "));
-  }
+  assert.equal(examples.length, 0, "the thirty retired variants must not reappear in the live catalogue");
+  assert.equal(allTools.filter((tool) =>
+    tool.id.includes("design-build-delivery-effort") ||
+    tool.id.includes("design-effort-build-effort-delivery-effort"),
+  ).length, 0);
 });
