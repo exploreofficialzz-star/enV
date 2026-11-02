@@ -16,8 +16,17 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/help")({ component: HelpCenter });
+export const Route = createFileRoute("/help")({
+  head: () => seoPageHead({
+    title: "enV Help Center | Tool Guides and Troubleshooting",
+    description: "Find answers about using enV tools, supported inputs, offline and connected workflows, accounts, privacy, token estimates, common errors, and contacting support.",
+    path: "/help",
+    structuredData: pageSchema("enV Help Center", "Help articles and answers for enV tools, accounts, privacy, connectivity, and support.", "/help", "CollectionPage")
+  }),
+  component: HelpCenter
+});
 
 const topics = [
   {
