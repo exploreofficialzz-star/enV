@@ -132,7 +132,7 @@ object NativeWorldLabReplayCodec {
         append(value.eventQueuePolicy).append('\n').append(value.randomStatePolicy).append('\n')
         append(value.solverStatePolicy).append('\n')
     }
-    private fun fingerprint(value:NativeWorldLabReplayManifest):String {
+    fun fingerprint(value:NativeWorldLabReplayManifest):String {
         var hash=14695981039346656037uL
         canonical(value).toByteArray(Charsets.UTF_8).forEach{byte->
             hash=(hash xor byte.toUByte().toULong())*1099511628211uL
