@@ -210,7 +210,7 @@ export function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength
 export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
   // Formula guides must keep the distinct "Solve for" target visible. The
   // shorter suffix leaves room for both the tool identity and that target.
-  const suffix = /[—–-]\\s*Solve for\\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV";
+  const suffix = /[—–-]\s*Solve for\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV";
   const baseTitle = boundedToolSeoTitle(tool.name, suffix);
   const collisions = peers
     .filter((candidate) => boundedToolSeoTitle(candidate.name, suffix) === baseTitle)
