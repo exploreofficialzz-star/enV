@@ -291,7 +291,7 @@ try{
   assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
     "Removing one run must preserve remaining local scientific history");
   await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
-  await page.getByRole("combobox",{name:"Experiment"}).selectOption("rc-circuit");
+  await page.getByRole("combobox",{name:"Experiment",exact:true}).selectOption("rc-circuit");
   await context.setOffline(true);
   await page.getByRole("button",{name:"Start / Recalculate"}).click();
   await page.getByText("Capacitor voltage",{exact:true}).waitFor();
