@@ -22,6 +22,56 @@ try {
     assert.ok(body.operations.includes("video-merge"));
     assert.ok(body.operations.includes("audio-merge"));
     assert.ok(body.operations.includes("video-replace-audio"));
+    assert.ok(body.operations.includes("audio-loudness-report"));
+    assert.equal(body.capabilities.ebur128_loudness_meter, true, "the processor should expose the actual ebur128 filter capability");
+  });
+
+  await test("FFmpeg EBU R128 report measures known loudness and returns source-byte provenance", async () => {
+    const fixture = "/tmp/env-media-loudness-test.wav";
+    await new Promise((resolve, reject) => execFile("ffmpeg", [
+      "-hide_banner", "-loglevel", "error",
+      "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000:duration=10",
+      "-af", "volume=-2dB", "-c:a", "pcm_s16le", "-y", fixture,
+    ], (error) => error ? reject(error) : resolve()));
+    const input = await fs.readFile(fixture);
+    const form = new FormData();
+    form.append("file", new Blob([input], { type: "audio/wav" }), "reference-tone.wav");
+    form.append("operation", "audio-loudness-report");
+    form.append("outputName", "reference-tone-loudness.json");
+    form.append("params", JSON.stringify({ explicitAudioUploadConsent: true }));
+    const response = await fetch(`http://127.0.0.1:${PORT}/media`, { method: "POST", body: form });
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    assert.match(response.headers.get("content-type") || "", /application\/json/i);
+    assert.equal(body.schema_version, "env.music-loudness-report.v1");
+    assert.equal(body.measurement.status, "measured");
+    assert.ok(Math.abs(body.measurement.integrated_loudness_lufs - (-23)) < 1, `expected a 1 kHz -23 dBFS tone near -23 LUFS, received ${body.measurement.integrated_loudness_lufs}`);
+    assert.ok(Number.isFinite(body.measurement.sample_peak_dbfs));
+    assert.ok(Number.isFinite(body.measurement.true_peak_dbtp));
+    assert.ok(body.measurement.true_peak_dbtp >= body.measurement.sample_peak_dbfs - 0.2, "true peak should not under-report sample peak for this steady tone");
+    assert.equal(body.source.file_size_bytes, input.byteLength);
+    assert.equal(body.source.file_sha256_verified, true);
+    assert.match(body.source.file_sha256, /^[a-f0-9]{64}$/);
+    assert.equal(body.source.sample_rate_hz, 48000);
+    assert.equal(body.source.channels, 1);
+    assert.equal(body.source.duration_seconds, 10);
+    assert.match(body.engine.binary_version, /^ffmpeg version/i);
+    assert.match(body.result_checksum, /^[a-f0-9]{64}$/);
+  });
+
+  await test("rejects loudness uploads without explicit per-request consent", async () => {
+    const fixture = "/tmp/env-media-loudness-test.wav";
+    const input = await fs.readFile(fixture);
+    const form = new FormData();
+    form.append("file", new Blob([input], { type: "audio/wav" }), "must-not-process.wav");
+    form.append("operation", "audio-loudness-report");
+    form.append("outputName", "consent-check.json");
+    form.append("params", "{}");
+    const response = await fetch(`http://127.0.0.1:${PORT}/media`, { method: "POST", body: form });
+    const body = await response.json();
+    assert.equal(response.status, 403);
+    assert.equal(body.error, "AUDIO_UPLOAD_CONSENT_REQUIRED");
+    assert.match(body.message, /explicit per-request audio-upload consent/);
   });
 
   await test("rejects oversized uploads before multipart parsing", async () => {
@@ -102,4 +152,5 @@ try {
   server.kill("SIGTERM");
   await once(server, "exit").catch(() => undefined);
   await fs.rm("/tmp/env-media-test-input.mp4", { force: true });
+  await fs.rm("/tmp/env-media-loudness-test.wav", { force: true });
 }

@@ -1,0 +1,239 @@
+{
+  "schema_version": "env.music-analysis-acceptance.v1",
+  "updated_at": "2026-10-27",
+  "repository": "exploreofficialzz-star/enV",
+  "pull_request": 55,
+  "branch": "fix/music-analyzer-measurement-provenance-20261026",
+  "tested_commit_sha": null,
+  "current_revision_ci": "pending",
+  "status_definitions": {
+    "implemented_pending_ci": "Implementation and regression evidence exist in the branch; the current revision still needs authoritative CI verification.",
+    "not_implemented": "The product capability has not been implemented end to end.",
+    "intentionally_disabled": "The capability remains disabled until the listed license, consent, or deployment gates pass.",
+    "not_run": "No reproducible benchmark/load run and results are recorded."
+  },
+  "gates": [
+    {
+      "id": "local-dsp-worker",
+      "status": "implemented_pending_ci",
+      "scope": "Web local analysis performs browser decoding, then runs deterministic DSP in a dedicated module Worker. Semantic labels remain unknown without a model or human review.",
+      "code_files": [
+        "src/components/engines/music-analyzer-studio.tsx",
+        "src/lib/media/music-analysis.worker.ts",
+        "src/lib/media/music-analysis.worker-client.ts",
+        "src/lib/media/music-analysis-worker-core.ts",
+        "src/lib/engines/music-analysis.ts",
+        "src/lib/engines/music-dataset-analysis.ts"
+      ],
+      "test_files": [
+        "src/lib/media/music-analysis-worker-core.test.ts",
+        "src/lib/engines/audio-studio.test.ts"
+      ],
+      "limitations": [
+        "Browser decode still occurs before channel transfer to the Worker.",
+        "The UI local path remains limited to 25 MiB and two minutes per track.",
+        "No BS.1770/EBU-compliant integrated LUFS, LRA, or true-peak fields are emitted."
+      ]
+    },
+    {
+      "id": "decoded-pcm-budget",
+      "status": "implemented_pending_ci",
+      "scope": "Decoded PCM size is checked before PCM channel copies are transferred to the Worker.",
+      "code_files": [
+        "src/lib/media/music-analysis-batch.ts",
+        "src/components/engines/music-analyzer-studio.tsx"
+      ],
+      "test_files": [
+        "src/lib/media/music-analysis-batch.test.ts"
+      ],
+      "limitations": [
+        "The check runs after browser decoding has allocated its AudioBuffer; it prevents subsequent copies/heavy DSP, not the initial decoder allocation."
+      ]
+    },
+    {
+      "id": "local-batch-lifecycle",
+      "status": "implemented_pending_ci",
+      "scope": "Local browser batch is sequential and bounded, with per-track states, IndexedDB persistence, cancel/retry/priority/pause-after-current, partial failures, resuming after source reselection, per-track report inspection, and local ZIP/JSONL/CSV export.",
+      "code_files": [
+        "src/lib/media/music-analysis-batch.ts",
+        "src/components/engines/music-analyzer-studio.tsx"
+      ],
+      "test_files": [
+        "src/lib/media/music-analysis-batch.test.ts"
+      ],
+      "limitations": [
+        "The batch is browser-local, not a server queue.",
+        "An interrupted active item needs the original source file selected again.",
+        "Browser storage can be evicted; no durable backup is implied.",
+        "A batch accepts at most 20 files and 200 MiB combined, with a 25 MiB per-file and two-minute per-track cap."
+      ]
+    },
+    {
+      "id": "private-result-library",
+      "status": "implemented_pending_ci",
+      "scope": "Authenticated owner-scoped structured-result save/list/detail/paginated-read/delete routes and a PostgreSQL migration exist. Batch UI can save each completed report separately using a persisted idempotency UUID; save requests omit raw source audio.",
+      "code_files": [
+        "src/lib/media/music-dataset-api.server.ts",
+        "src/lib/media/music-dataset-validation.ts",
+        "migrations/0009_music_dataset.sql",
+        "src/components/engines/music-analyzer-studio.tsx"
+      ],
+      "test_files": [
+        "src/lib/engines/audio-studio.test.ts"
+      ],
+      "limitations": [
+        "The database migration and API require configured authentication/database deployment.",
+        "Client SHA-256 remains unverified by the server.",
+        "Real PostgreSQL concurrency/fault-injection tests are not recorded here."
+      ]
+    },
+    {
+      "id": "standards-loudness-and-true-peak",
+      "status": "implemented_pending_ci",
+      "scope": "A separate, opt-in FFmpeg processor operation runs the ebur128 filter with sample+true peak modes for one selected upload and returns a versioned report with integrated LUFS, LRA, sample peak, true peak, processor-calculated source SHA-256 and response checksum. It is not mixed into the local env.music-analysis.v2 RMS-proxy fields.",
+      "code_files": [
+        "scripts/media-processor.mjs",
+        "src/lib/media/music-loudness-report.ts",
+        "src/lib/media/media-backends.ts",
+        "src/components/engines/music-analyzer-studio.tsx"
+      ],
+      "test_files": [
+        "scripts/media-processor.test.mjs",
+        "src/lib/media/music-loudness-report.test.ts",
+        "scripts/check-audio-studios.mjs"
+      ],
+      "limitation": "No current-revision reference-fixture verification of ITU-R BS.1770-5 / EBU R 128 integrated loudness, gating, loudness range, or oversampled true peak.",
+      "next_action": "Run current-revision CI and the processor's synthetic reference-tone integration test. Before any broadcast-compliance claim, validate official licensed reference sequences and exact-build licensing, and verify the configured production processor exposes ebur128.",
+      "limitations": [
+        "The UI requires a separate unchecked-by-default consent checkbox and explicit meter action; ordinary local analysis/batch processing does not upload audio.",
+        "The processor path supports one file per report, is limited to 15 minutes, and is bounded by the configured processor request/upload byte limit. The default same-origin gateway is limited to 4 MiB.",
+        "The regression suite includes a synthetic 1 kHz tone with a numeric LUFS tolerance, but the full official ITU-R BS.1770 / EBU R 128 reference-sequence suite, inter-sample peak cases, silence/gating edge cases and representative multichannel sequences have not been run.",
+        "The actual deployed FFmpeg build identity/license/configuration and processor availability still require deployment-level verification. This meter operation is not a durable background job."
+      ]
+    },
+    {
+      "id": "durable-server-batch-queue",
+      "status": "not_implemented",
+      "scope": "No deployed durable Music Analyzer worker queue with persisted job state, leases/heartbeats, retries, crash recovery or worker process is in place.",
+      "code_files": [
+        "docs/architecture/media-processing-scale-plan.md",
+        "src/lib/media/music-analysis-batch.ts"
+      ],
+      "test_files": [
+        "src/lib/media/music-analysis-batch.test.ts"
+      ],
+      "limitation": "The existing FFmpeg processor is bounded request processing and per-process admission control, not a durable DSP queue.",
+      "next_action": "Integrate a maintained PostgreSQL-backed queue (evaluate pg-boss first), add atomic enqueue/outbox/idempotency, a separately deployed worker, heartbeats/fencing, authenticated job APIs, backpressure and real PostgreSQL fault tests."
+    },
+    {
+      "id": "private-source-audio-storage",
+      "status": "not_implemented",
+      "scope": "The product does not upload original audio for Music Analyzer processing or store it in private object storage.",
+      "code_files": [
+        "src/lib/media/music-dataset-api.server.ts",
+        "docs/music-analysis-production.md",
+        "docs/architecture/media-processing-scale-plan.md"
+      ],
+      "test_files": [
+        "src/lib/engines/audio-studio.test.ts"
+      ],
+      "limitation": "There is no configured Analyzer-specific object-storage provider/lifecycle, short-lived scoped URLs, retention/expiry reconciler or verified deletion path.",
+      "next_action": "Design explicit-consent upload, generated opaque object IDs, private encrypted object storage, scoped signed access, retention/deletion cleanup and object ownership checks before enabling cloud audio processing."
+    },
+    {
+      "id": "server-verified-source-hash",
+      "status": "not_implemented",
+      "scope": "Browser SHA-256 identifies the exact selected bytes locally; private dataset records mark that hash unverified.",
+      "code_files": [
+        "src/lib/media/music-analysis-batch.ts",
+        "src/lib/media/music-dataset-validation.ts",
+        "src/lib/media/music-dataset-api.server.ts"
+      ],
+      "test_files": [
+        "src/lib/engines/audio-studio.test.ts"
+      ],
+      "limitation": "No uploaded/processed source audio is currently hashed authoritatively by a backend worker.",
+      "next_action": "Compute SHA-256 on actual private uploaded bytes in the authorized server processing path and include the verified hash in run provenance; never treat client hashes as verification."
+    },
+    {
+      "id": "native-batch-and-library-parity",
+      "status": "not_implemented",
+      "scope": "Native Android/iOS single-file WAV Analyzer paths exist; the new Web batch dashboard and cloud library controls are not native batch implementations.",
+      "code_files": [
+        "apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt",
+        "apps/ios/enV/ToolViews.swift",
+        "docs/music-analysis-production.md"
+      ],
+      "test_files": [
+        "apps/android/app/src/test/java/com/chastech/env/engine/NativeAudioEngineTest.kt",
+        "apps/ios/enVTests/NativeAudioEngineTests.swift"
+      ],
+      "limitation": "No separate native Android/iOS batch UX, background-policy behavior, device-resume workflow or native cloud dataset-library UX is verified.",
+      "next_action": "Implement platform-native batches with each OS's actual lifecycle/background constraints and test independently on emulators/simulators and physical devices."
+    },
+    {
+      "id": "cloud-run-comparison-and-round-trip-export",
+      "status": "not_implemented",
+      "scope": "Local batch exports contain a manifest and one structured result per completed track; cloud bulk export and run comparisons are not implemented.",
+      "code_files": [
+        "src/components/engines/music-analyzer-studio.tsx",
+        "src/lib/media/music-dataset-api.server.ts"
+      ],
+      "test_files": [
+        "src/lib/media/music-analysis-batch.test.ts",
+        "src/lib/engines/audio-studio.test.ts"
+      ],
+      "limitation": "No durable background cloud export job, short-lived owner-scoped download URL, checksum manifest verification, or compatible-run comparison is present.",
+      "next_action": "Add owner-scoped durable export jobs for JSON/JSONL/CSV/ZIP and comparison semantics that reject unlike measurement definitions unless explicitly labeled."
+    },
+    {
+      "id": "licensed-semantic-benchmark",
+      "status": "intentionally_disabled",
+      "scope": "Genre, sub-style, language, mood, instrument and vocal labels remain unknown in the local no-model analyzer unless human supplied/reviewed.",
+      "code_files": [
+        "src/lib/engines/music-analysis.ts",
+        "docs/architecture/song-metadata-intelligence-analyzer-plan.md"
+      ],
+      "test_files": [
+        "src/lib/engines/audio-studio.test.ts"
+      ],
+      "limitation": "No licensed representative semantic benchmark has been run; accuracy for Afrobeats/Afro-pop, Yoruba singing or Nigerian Pidgin singing is not established.",
+      "next_action": "Approve the precise code/weight/data licenses, create a legally usable human-annotated benchmark, report per-class quality/calibration/abstention and add an explicit consented model path only after release thresholds pass."
+    },
+    {
+      "id": "ten-thousand-job-load",
+      "status": "not_run",
+      "scope": "No 10,000-row/job metadata load test or licensed full-audio throughput benchmark result is recorded.",
+      "code_files": [
+        "docs/music-analysis-production.md",
+        "docs/architecture/media-processing-scale-plan.md"
+      ],
+      "test_files": [
+        "src/lib/media/music-analysis-batch.test.ts"
+      ],
+      "limitation": "Unit tests over batch states are not a 10,000-job load test, and metadata rows do not stand in for actual full-track DSP throughput.",
+      "next_action": "Run 10,000 job metadata/concurrency/fairness/restart tests against real PostgreSQL and separately benchmark real audio duration/bytes, concurrency, RSS, throughput and failure recovery."
+    },
+    {
+      "id": "explicit-consent-remote-meter",
+      "status": "implemented_pending_ci",
+      "scope": "The Web UI has a separate unchecked-by-default consent checkbox, its handler refuses to start without consent, and it sends an explicit per-request flag. The media processor independently rejects the ebur128 operation with HTTP 403 before creating temp files when that flag is absent or false. File change/unmount/cancel aborts the request.",
+      "code_files": [
+        "src/components/engines/music-analyzer-studio.tsx",
+        "src/lib/media/media-backends.ts",
+        "scripts/media-processor.mjs"
+      ],
+      "test_files": [
+        "scripts/check-audio-studios.mjs",
+        "scripts/media-processor.test.mjs",
+        "src/lib/media/music-loudness-report.test.ts"
+      ],
+      "limitations": [
+        "The flag is evidence that the explicit UI flow was selected, not cryptographic proof of the user's legal rights.",
+        "Production endpoint authentication/origin configuration and service/operator retention still require deployment security review.",
+        "Processor input is written to temporary per-request files and removed by the cleanup path. This does not add durable private source-audio object storage or authenticated durable DSP-job lifecycle."
+      ],
+      "next_action": "Run current-head CI, exercise checkbox/cancel and HTTP 403 behavior in a live browser, and verify the deployed endpoint is secured, configured and exposes ebur128. Then complete official reference-sequence loudness validation."
+    }
+  ]
+}
