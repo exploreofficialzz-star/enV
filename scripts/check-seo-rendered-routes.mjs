@@ -163,6 +163,11 @@ for (const route of renderedRoutes) {
   const title = decodeHtmlEntities(head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "");
   const description = metaContent(head, "name", "description");
   const robots = metaContent(head, "name", "robots").toLowerCase();
+  const buildSha = metaContent(head, "name", "env-build-sha");
+  if (!buildSha || buildSha === "local") failures.push(route.path + ": missing Vercel/GitHub build SHA metadata.");
+  if (process.env.GITHUB_SHA && buildSha !== process.env.GITHUB_SHA) {
+    failures.push(route.path + ": rendered build SHA does not match the GitHub commit (expected " + process.env.GITHUB_SHA + ", received " + buildSha + ")");
+  }
   const ogSiteName = metaContent(head, "property", "og:site_name");
   const ogTitle = metaContent(head, "property", "og:title");
   const ogDescription = metaContent(head, "property", "og:description");
@@ -248,6 +253,7 @@ for (const route of renderedRoutes) {
     title,
     descriptionLength: description.length,
     robots,
+    buildSha,
     canonical,
     ogTitle,
     ogUrl,
