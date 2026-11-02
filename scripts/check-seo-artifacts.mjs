@@ -11,6 +11,8 @@ const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slu
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
+assert.ok(rootRouteSource.includes('title: "enV Digital Toolkit by chAs Technologies | Online Tools"'), "Homepage title must identify the enV product and parent brand.");
+assert.ok(rootRouteSource.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must disambiguate the enV brand from unrelated EnvTools products.");
 assert.doesNotMatch(seoHeadSource, /webmasterVerificationMeta\(\)/, "Child routes must not duplicate root verification tags.");
 assert.match(toolRouteSource, /toolSeoTitle\(tool, CANONICAL_SEO_TOOL_PAGES\)/, "Canonical tool route titles must use the full peer collection.");
 assert.match(toolRouteSource, /CANONICAL_SEO_TOOL_PAGES\s*=\s*canonicalSeoTools\([\s\S]*?\.filter\(\(tool\)\s*=>\s*tool\.category\s*!==\s*"developer"\s*\|\|\s*tool\.tags\.includes\("developer-studio"\)\)/, "Tool-route title peers must match the canonical public-tool inventory, excluding legacy Developer aliases.");
