@@ -9,7 +9,7 @@ const NON_INDEXABLE_PATHS = [
   "/account", "/agent", "/assistant", "/developer", "/favorites", "/feedback",
   "/forgot-password", "/help-feedback", "/history", "/login", "/pair-native",
   "/report-bugs", "/reset-password", "/settings", "/signup", "/suggest-tool",
-  "/token-dashboard", "/tokens", "/wallet", "/userbehavior",
+  "/token-dashboard", "/tokens", "/wallet", "/userbehavior", "/updates", "/3d-game-studio",
 ];
 
 function routeRobotsPolicy(matches?: Array<{ pathname: string }>) {
