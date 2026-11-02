@@ -3,7 +3,7 @@
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { isIndexableTool } from "../src/lib/seo-metadata.ts";
+import { isIndexableTool, canonicalSeoTools } from "../src/lib/seo-metadata.ts";
 import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
@@ -42,7 +42,7 @@ const routeMap = new Map(routes.map((route) => [route.path, route]));
 // Generate live coverage from the catalogue so new categories, representative
 // canonical tools and their usage guides automatically enter this rendered audit.
 for (const category of CATEGORIES) {
-  const publicTools = getToolsByCategory(category.id).filter(isIndexableTool);
+  const publicTools = canonicalSeoTools(getToolsByCategory(category.id).filter(isIndexableTool));
   const categoryPath = "/tools/" + category.id;
   routeMap.set(categoryPath, {
     path: categoryPath,
