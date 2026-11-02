@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import appCss from "../styles.css?url";
+import { websiteSchema } from "@/lib/seo-metadata";
 
 const APP_NAME = "enV — Browser Toolkit";
 
@@ -48,31 +49,7 @@ export const Route = createRootRoute({
     ],
     scripts: [{
       type: "application/ld+json",
-      children: JSON.stringify({
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            name: "chAs Technologies LLC",
-            url: "https://envtools.store",
-            logo: "https://envtools.store/chas-technologies-logo-transparent.webp",
-            brand: { "@type": "Brand", name: "enV", url: "https://envtools.store" }
-          },
-          {
-            "@type": "WebSite",
-            name: "enV",
-            alternateName: "enV digital toolkit",
-            url: "https://envtools.store",
-            inLanguage: "en",
-            publisher: { "@type": "Organization", name: "chAs Technologies LLC", url: "https://envtools.store" },
-            potentialAction: {
-              "@type": "SearchAction",
-              target: "https://envtools.store/search?q={search_term_string}",
-              "query-input": "required name=search_term_string"
-            }
-          }
-        ]
-      })
+      children: JSON.stringify(websiteSchema())
     }],
   }),
   component: () => (

@@ -64,7 +64,65 @@ export function organizationSchema() {
     name: "chAs Technologies LLC",
     url: SITE_ORIGIN,
     logo: absoluteSiteUrl("/chas-technologies-logo-transparent.webp"),
-    brand: { "@type": "Brand", name: "enV", url: SITE_ORIGIN },
+    sameAs: [
+      "https://x.com/chAstechllc",
+      "https://www.instagram.com/chastechnologiesllc/",
+      "https://www.tiktok.com/@chastechnologiesllc",
+      "https://www.linkedin.com/in/chas-technologies-llc",
+      "https://www.youtube.com/@chAsTechnologiesLLC",
+      "https://whatsapp.com/channel/0029Vb8F1WH0QeacnxL5sN2L",
+    ],
+    brand: {
+      "@type": "Brand",
+      name: "enV",
+      url: SITE_ORIGIN,
+      sameAs: [
+        "https://x.com/envtoolz",
+        "https://www.instagram.com/envtools.store/",
+        "https://www.tiktok.com/@envtools.store",
+        "https://www.youtube.com/@envtoolz",
+      ],
+    },
+  };
+}
+
+export function websiteSchema() {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      organizationSchema(),
+      {
+        "@type": "WebSite",
+        name: "enV",
+        alternateName: "enV digital toolkit",
+        url: SITE_ORIGIN,
+        inLanguage: "en",
+        publisher: organizationSchema(),
+        potentialAction: {
+          "@type": "SearchAction",
+          target: SITE_ORIGIN + "/search?q={search_term_string}",
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
+}
+
+function withBreadcrumbs(entity: Record<string, unknown>, crumbs: Array<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      entity,
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: crumbs.map((crumb, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: crumb.name,
+          item: absoluteSiteUrl(crumb.path),
+        })),
+      },
+    ],
   };
 }
 
@@ -98,8 +156,8 @@ export function toolSeoDescription(tool: ToolMeta): string {
 
 export function toolSchema(tool: ToolMeta) {
   const category = CATEGORY_MAP[tool.category as CategoryId];
-  return {
-    "@context": "https://schema.org",
+  const path = "/tools/" + tool.category + "/" + tool.slug;
+  return withBreadcrumbs({
     "@type": "SoftwareApplication",
     name: tool.name,
     description: tool.description,
@@ -107,15 +165,19 @@ export function toolSchema(tool: ToolMeta) {
     applicationSubCategory: category?.name ?? tool.category,
     keywords: toolSearchIntentTerms(tool).join(", "),
     operatingSystem: "Any modern web browser",
-    url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug),
+    url: absoluteSiteUrl(path),
     isPartOf: { "@type": "WebSite", name: "enV", url: SITE_ORIGIN },
     provider: organizationSchema(),
-  };
+  }, [
+    { name: "Home", path: "/" },
+    { name: "Tools", path: "/tools" },
+    { name: category?.name ?? tool.category, path: "/tools/" + tool.category },
+    { name: tool.name, path },
+  ]);
 }
 
 export function categorySchema(name: string, description: string, path: string, tools: readonly ToolMeta[]) {
-  return {
-    "@context": "https://schema.org",
+  return withBreadcrumbs({
     "@type": "CollectionPage",
     name,
     description: cleanMetaDescription(description, 300),
@@ -130,12 +192,15 @@ export function categorySchema(name: string, description: string, path: string, 
         url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug),
       })),
     },
-  };
+  }, [
+    { name: "Home", path: "/" },
+    { name: "Tools", path: "/tools" },
+    { name, path },
+  ]);
 }
 
 export function articleSchema(title: string, description: string, path: string, articleSection?: string) {
-  return {
-    "@context": "https://schema.org",
+  return withBreadcrumbs({
     "@type": "Article",
     headline: title,
     description: cleanMetaDescription(description, 300),
@@ -143,20 +208,32 @@ export function articleSchema(title: string, description: string, path: string, 
     articleSection: articleSection ?? "enV Guides",
     publisher: organizationSchema(),
     inLanguage: "en",
-  };
+  }, [
+    { name: "Home", path: "/" },
+    { name: "Blogs & Guides", path: "/blog" },
+    { name: title, path },
+  ]);
 }
 
 export function technicalArticleSchema(tool: ToolMeta, description: string, path: string) {
-  return {
-    "@context": "https://schema.org",
+  return withBreadcrumbs({
     "@type": "TechArticle",
     headline: tool.name + ": documentation and usage guide",
     description: cleanMetaDescription(description, 300),
-    about: { "@type": "SoftwareApplication", name: tool.name, url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug) },
+    about: {
+      "@type": "SoftwareApplication",
+      name: tool.name,
+      url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug),
+      keywords: toolSearchIntentTerms(tool).join(", "),
+    },
     mainEntityOfPage: absoluteSiteUrl(path),
     publisher: organizationSchema(),
     inLanguage: "en",
-  };
+  }, [
+    { name: "Home", path: "/" },
+    { name: "Blogs & Guides", path: "/blog" },
+    { name: tool.name + " guide", path },
+  ]);
 }
 
 export function isIndexableTool(tool: ToolMeta): boolean {
@@ -164,5 +241,12 @@ export function isIndexableTool(tool: ToolMeta): boolean {
 }
 
 export function toolSeoTitle(tool: ToolMeta): string {
-  return tool.name.trim() + " Online | enV";
+  const suffix = " Online | enV";
+  const maxTitleLength = 65;
+  const rawName = tool.name.trim();
+  const maxNameLength = maxTitleLength - suffix.length;
+  const displayName = rawName.length > maxNameLength
+    ? rawName.slice(0, maxNameLength - 1).trimEnd() + "…"
+    : rawName;
+  return displayName + suffix;
 }
