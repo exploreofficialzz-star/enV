@@ -102,48 +102,36 @@ for (const processor of [nativeAndroidWav, nativeIOSAudio]) {
 }
 const musicAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-analysis.ts", import.meta.url), "utf8");
 const toolEngine = fs.readFileSync(new URL("../src/components/tools/tool-engine.tsx", import.meta.url), "utf8");
-const musicAnalysisRoute = fs.readFileSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url), "utf8");
-const musicAnalysisResponse = fs.readFileSync(new URL("../src/lib/media/music-analysis-response.ts", import.meta.url), "utf8");
-const musicAnalysisProfile = fs.readFileSync(new URL("../src/lib/media/music-analysis-profile.ts", import.meta.url), "utf8");
 const sandbox = fs.readFileSync(new URL("../src/components/engines/ai-music-data-sandbox.tsx", import.meta.url), "utf8");
 const sandboxFiles = fs.readFileSync(new URL("../src/lib/engines/music-sandbox-files.ts", import.meta.url), "utf8");
-assert.ok(audioEngine.includes("AiMusicDataSandbox") && toolEngine.includes("AiMusicDataSandbox"), "Both analyzer bookmarks must open the persistent sandbox");
+assert.ok(audioEngine.includes("AiMusicDataSandbox") && toolEngine.includes("AiMusicDataSandbox"), "Both analyzer bookmarks must open the persistent Sandbox");
 for (const marker of ["loadSandbox", "writeSandbox", "importFiles", "exportSandboxZip", "MusicSandboxEditor", "analyzeSandboxAudio"]) assert.ok(sandbox.includes(marker), `Sandbox workflow missing: ${marker}`);
 const sandboxAnalysis = fs.readFileSync(new URL("../src/lib/engines/music-sandbox-analysis.ts", import.meta.url), "utf8");
-for (const marker of ["MAX_DECODE_BYTES", "MAX_SAMPLE_SECONDS", "music-sandbox-audio.ts", "worker.terminate"]) assert.ok(sandboxAnalysis.includes(marker), `Bounded sandbox analysis missing: ${marker}`);
+for (const marker of ["MAX_DECODE_BYTES", "MAX_SAMPLE_SECONDS", "music-sandbox-audio.ts", "worker.terminate"]) assert.ok(sandboxAnalysis.includes(marker), `Bounded Sandbox analysis missing: ${marker}`);
 for (const forbidden of ["decodeAudioData", "song-intelligence", "song-stem-separation", "runAiTask", "fetchAiAvailability", "@xenova", "createLocalSignalLayers"]) {
-  assert.ok(!sandbox.includes(forbidden) && !sandboxFiles.includes(forbidden), `Heavy analysis must stay out of the sandbox import path: ${forbidden}`);
+  assert.ok(!sandbox.includes(forbidden) && !sandboxFiles.includes(forbidden), `Heavy analysis must stay out of the Sandbox import path: ${forbidden}`);
 }
 const localDatasetEngine = fs.readFileSync(new URL("../src/lib/engines/music-dataset-analysis.ts", import.meta.url), "utf8");
 for (const marker of ["env.music-dataset-analysis.v1", "uses_remote_api: false", "uses_hosted_model: false", "chord_estimates", "change_points", "createLocalSignalLayers", "encodeMonoPcm16Wav", "reviewed: false"]) {
   assert.ok(localDatasetEngine.includes(marker), `Local music dataset analysis contract missing: ${marker}`);
 }
-for (const marker of ["normalizeMusicModelClassification", "genre_candidates", "sub_style", "language", "vocal_style"]) {
-  assert.ok(musicAnalysisResponse.includes(marker), `Music Analyzer model normalization contract missing: ${marker}`);
-}
-for (const marker of ["env.music-profile.v1", "tempo_bpm", "genre_candidates", "analysis_status", "embedded_genre"]) {
-  assert.ok(musicAnalysisProfile.includes(marker), `Music Analyzer profile export contract missing: ${marker}`);
-}
 for (const marker of ["schema_version", "spectral_centroid_hz", "silence_percent", "clipped_sample_percent", "requires_model"]) {
-  assert.ok(musicAnalysis.includes(marker), `Music Analyzer signal contract missing: ${marker}`);
-}
-for (const marker of ["MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "MAX_AUDIO_BYTES", "UPSTREAM_TIMEOUT_MS", "MUSIC_ANALYSIS_BUILTIN_LIMIT", "MUSIC_ANALYSIS_ORIGIN_REQUIRED", "MUSIC_ANALYSIS_NO_LABELS", "readBoundedBody", "MUSIC_ANALYSIS_BODY_TOO_LARGE", "MUSIC_ANALYSIS_RATE_LIMITED", "normalizeMusicModelClassification", "AI_LIMITS.audioBytesMax", "music.analysis.classify", "apiUrl(\"/api/ai/run\")"]) {
-  assert.ok(musicAnalysisRoute.includes(marker), `Music Analyzer server contract missing: ${marker}`);
+  assert.ok(musicAnalysis.includes(marker), `Sandbox local signal-analysis contract missing: ${marker}`);
 }
 const androidNativeAudioEngine = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt", import.meta.url), "utf8");
-const androidNativeAudioProcessor = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioWavProcessor.kt", import.meta.url), "utf8");
 const androidNativeAudioForm = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
 const androidNativeAudioTests = fs.readFileSync(new URL("../apps/android/app/src/test/java/com/chastech/env/engine/NativeAudioEngineTest.kt", import.meta.url), "utf8");
 const iosNativeAudioViews = fs.readFileSync(new URL("../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
 const iosNativeAudioTests = fs.readFileSync(new URL("../apps/ios/enVTests/NativeAudioEngineTests.swift", import.meta.url), "utf8");
-assert.ok(androidNativeAudioEngine.includes('"audio-analyze-studio" to "analyze"'), "Android Music Analyzer must have an explicit native operation mapping");
-assert.ok(androidNativeAudioProcessor.includes('"analyze" -> return NativeAudioWavResult(musicAnalysisReport'), "Android WAV processor must calculate a native analysis report");
-assert.ok(androidNativeAudioForm.includes('fileName = selectedName'), "Android Analyzer must preserve the selected source filename");
-assert.ok(androidNativeAudioTests.includes("musicAnalyzerHasAnExplicitNativeWavRoute"), "Android native Analyzer route must be tested");
-assert.ok(iosNativeAudioViews.includes('"audio-analyze-studio": "analyze"'), "iOS Music Analyzer must have an explicit native operation mapping");
-assert.ok(iosNativeAudioViews.includes('case "analyze": return NativeAudioWavResult(report: try musicAnalysisReport'), "iOS WAV processor must calculate a native analysis report");
-assert.ok(iosNativeAudioViews.includes("fileName: selectedName"), "iOS Analyzer must preserve the selected source filename");
-assert.ok(iosNativeAudioTests.includes("testMusicAnalyzerRoutesToNativeWavAndProducesHonestJSON"), "iOS native Analyzer must have a JSON contract test");
+assert.ok(androidNativeAudioEngine.includes('tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio"') && androidNativeAudioEngine.includes('return "song-metadata-analyzer"'), "Android legacy Analyzer alias must map to the Sandbox");
+assert.ok(androidNativeAudioForm.includes('tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio"') && androidNativeAudioForm.includes("NativeMusicDataSandboxScreen"), "Android legacy Analyzer URL must open the Sandbox screen");
+assert.ok(androidNativeAudioTests.includes("legacyAudioAnalyzerAliasRoutesToMusicDataSandbox"), "Android legacy Analyzer alias needs a Sandbox routing test");
+assert.ok(iosNativeAudioViews.includes('tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio"') && iosNativeAudioViews.includes('return "song-metadata-analyzer"'), "iOS legacy Analyzer alias must map to the Sandbox");
+assert.ok(iosNativeAudioTests.includes("testLegacyAudioAnalyzerUrlResolvesToSandboxWorkspace"), "iOS legacy Analyzer alias needs a Sandbox routing test");
+for (const obsolete of ["music.analysis.classify", "MUSIC_ANALYSIS_ENDPOINT", "MUSIC_ANALYSIS_TOKEN", "Identify genre and tags with AI"]) {
+  assert.ok(!fs.readFileSync(new URL("../src/lib/ai/features.ts", import.meta.url), "utf8").includes(obsolete), `Obsolete Song Analyzer classifier still exists: ${obsolete}`);
+}
+assert.ok(!fs.existsSync(new URL("../src/routes/api/music-analysis.ts", import.meta.url)), "Retired standalone music-analysis upload API must be removed");
 const storage = fs.readFileSync(new URL("../src/lib/engines/audio-music-storage.ts", import.meta.url), "utf8");
 for (const marker of ["indexedDB.open", "sourceKey", "deleteStoredMusicTakes", "evicted by the user agent"]) {
   assert.ok(storage.toLowerCase().includes(marker.toLowerCase()), `Music Studio persistence contract missing: ${marker}`);
