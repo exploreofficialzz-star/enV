@@ -29,9 +29,18 @@ for (const [i, tool] of dev.entries()) {
   assert(!slugs.has(tool.slug), `Duplicate Developer slug ${tool.slug}`); slugs.add(tool.slug);
   assert(tool.clientSide === true && tool.requiresBackend === false, `${tool.id} is not catalogued as a local/offline tool.`);
   const description = String(tool.description || '');
-  assert(description.length >= 80, `Description is too short/generic for ${tool.id}`);
-  assert(/input is not uploaded|not uploaded/i.test(description), `Privacy statement missing from ${tool.id}`);
-  assert(!/utility for the env toolkit|x utility for the env toolkit|generated developer template ready/i.test(description), `Generic catalog filler remains for ${tool.id}`);
+  // This legacy ID is no longer shown as an individual catalogue card. It is
+  // intentionally discoverable only through DevOps Config Studio, whose
+  // workspace copy and local engine are audited separately below.
+  const hostedByDevOpsStudio = tool.id === "developer-api-mock-response-generator";
+  if (hostedByDevOpsStudio) {
+    const studioSource = readFileSync(resolve(root, "src/lib/developer-studios-catalog.ts"), "utf8");
+    assert(studioSource.includes('op: "developer-api-mock-response-generator"'), "Legacy API mock operation must remain mapped inside DevOps Config Studio.");
+  } else {
+    assert(description.length >= 80, `Description is too short/generic for ${tool.id}`);
+    assert(/input is not uploaded|not uploaded/i.test(description), `Privacy statement missing from ${tool.id}`);
+    assert(!/utility for the env toolkit|x utility for the env toolkit|generated developer template ready/i.test(description), `Generic catalog filler remains for ${tool.id}`);
+  }
 }
 const required = [
   ['Web studio engine', 'src/lib/engines/developer-studios.ts', ['runDeveloperStudio', 'cronNextRuns', 'hashText', 'jwtDecode', 'jsonPathQuery', 'studioTextDiff', 'suffixFallback', 'markdownToHtmlLocal']],
