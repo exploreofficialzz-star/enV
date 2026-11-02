@@ -2035,7 +2035,7 @@ fun NativeWorldLabForm() {
                     pendingReplayJson=NativeWorldLabReplayCodec.encode(manifest).toString(Charsets.UTF_8)
                     replayExportPicker.launch("world-lab-replay-manifest.json")
                     replayManifestStatus=""
-                }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be created."}){
+                }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be created."}}){
                     Text("Save deterministic replay")
                 }
                 OutlinedButton(onClick={replayImportPicker.launch(arrayOf("application/json"))}){
