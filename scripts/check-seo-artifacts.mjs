@@ -90,9 +90,9 @@ for (const tool of result.tools) {
   const description = toolSeoDescription(tool);
   const terms = toolSearchIntentTerms(tool);
   assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
-  const identifyingName = tool.name.trim().split(/\\s+/)[0].toLowerCase();
+  const identifyingName = tool.name.trim().split(/\s+/)[0].toLowerCase();
   assert.ok(title.toLowerCase().startsWith(identifyingName), "SEO title must preserve the first identifying name token: " + tool.id + " (name=" + JSON.stringify(tool.name) + ", title=" + JSON.stringify(title) + ")");
-  const solveForTarget = tool.name.match(/[—–-]\\s*Solve for\\s+(.+)$/i)?.[1]?.trim();
+  const solveForTarget = tool.name.match(/[—–-]\s*Solve for\s+(.+)$/i)?.[1]?.trim();
   if (solveForTarget) assert.ok(title.toLowerCase().includes("solve for " + solveForTarget.toLowerCase()), "SEO title must preserve its distinct formula target: " + tool.id);
   assert.ok(title.toLowerCase().includes(identifyingName), "SEO title must contain the identifying name token: " + tool.id);
   assert.ok(description.length >= 45 && description.length <= 160, "SEO description must be 45-160 characters for " + tool.id + ": " + description);
@@ -126,9 +126,9 @@ for (const tool of result.guideTools) {
   const guideTitle = toolGuideSeoTitle(tool, result.guideTools);
   const guideDescription = toolSeoDescription(tool);
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
-  const guideIdentifyingName = tool.name.trim().split(/\\s+/)[0].toLowerCase();
+  const guideIdentifyingName = tool.name.trim().split(/\s+/)[0].toLowerCase();
   assert.ok(guideTitle.toLowerCase().startsWith(guideIdentifyingName), "Guide title must preserve the first identifying name token: " + tool.id + " (name=" + JSON.stringify(tool.name) + ", title=" + JSON.stringify(guideTitle) + ")");
-  const guideSolveForTarget = tool.name.match(/[—–-]\\s*Solve for\\s+(.+)$/i)?.[1]?.trim();
+  const guideSolveForTarget = tool.name.match(/[—–-]\s*Solve for\s+(.+)$/i)?.[1]?.trim();
   if (guideSolveForTarget) assert.ok(guideTitle.toLowerCase().includes("solve for " + guideSolveForTarget.toLowerCase()), "Guide title must preserve its distinct formula target: " + tool.id);
   assert.ok(guideDescription.length >= 45 && guideDescription.length <= 160, "Guide SEO description must be 45-160 characters for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideTitle)), "Inventory misses guide title for " + tool.id);
