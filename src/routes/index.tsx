@@ -24,7 +24,7 @@ export const Route = createFileRoute("/")({
       "enV digital toolkit",
       "A cross-device toolkit of practical browser-based utilities, calculators, converters, developer workspaces, media tools, and productivity tools.",
       "/",
-      "WebSite"
+      "WebPage"
     )
   }),
   component: Home

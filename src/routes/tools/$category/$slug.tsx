@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ToolViewAnalytics } from "@/components/tools/tool-view-analytics";
 import { ToolShell } from "@/components/tools/tool-shell";
 import { ToolEngine } from "@/components/tools/tool-engine";
-import { getToolByPath } from "@/lib/registry";
+import { getToolByPath, getToolById } from "@/lib/registry";
 import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioModeAllowed } from "@/lib/business-studios-catalog";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 import { isToolUnderProduction } from "@/lib/production-notice";
@@ -23,14 +23,16 @@ export const Route = createFileRoute("/tools/$category/$slug")({
       return { meta: [{ title: "Studio workspace | enV" }, { name: "robots", content: "noindex,follow" }] };
     }
     const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
-    let tool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
-    if (!tool) return { meta: [{ title: "Tool not found | enV" }, { name: "robots", content: "noindex,follow" }] };
+    const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
+    if (!matchedTool) return { meta: [{ title: "Tool not found | enV" }, { name: "robots", content: "noindex,follow" }] };
+    let tool = matchedTool;
     let canonicalPath = "/tools/" + tool.category + "/" + tool.slug;
     if (category === "developer" && !tool.tags.includes("developer-studio")) {
       const studio = developerStudioForLegacySlug(slug);
-      if (studio) {
-        tool = studio;
-        canonicalPath = "/tools/" + studio.category + "/" + studio.slug;
+      const studioTool = getToolById(studio.id);
+      if (studioTool) {
+        tool = studioTool;
+        canonicalPath = "/tools/" + studioTool.category + "/" + studioTool.slug;
       }
     }
     if (!isIndexableTool(tool)) {
