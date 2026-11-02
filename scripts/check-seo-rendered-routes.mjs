@@ -47,6 +47,13 @@ for (const route of routes) {
   const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
   const description = metaContent(head, "name", "description");
   const robots = metaContent(head, "name", "robots").toLowerCase();
+  const ogTitle = metaContent(head, "property", "og:title");
+  const ogDescription = metaContent(head, "property", "og:description");
+  const ogUrl = metaContent(head, "property", "og:url");
+  const ogImage = metaContent(head, "property", "og:image");
+  const twitterCard = metaContent(head, "name", "twitter:card");
+  const twitterTitle = metaContent(head, "name", "twitter:title");
+  const twitterDescription = metaContent(head, "name", "twitter:description");
   const canonicals = [...head.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => match[0])
     .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
@@ -70,6 +77,13 @@ for (const route of routes) {
       failures.push(route.path + ": incorrect canonical URL: " + canonical);
     }
     if (!hasSchema) failures.push(route.path + ": expected JSON-LD schema type " + route.schema);
+    if (!ogTitle || ogTitle !== title) failures.push(route.path + ": Open Graph title must match the page title");
+    if (!ogDescription || ogDescription !== description) failures.push(route.path + ": Open Graph description must match the page description");
+    if (!ogUrl || ogUrl !== canonical) failures.push(route.path + ": Open Graph URL must match the canonical URL");
+    if (!ogImage || !ogImage.startsWith("https://envtools.store/")) failures.push(route.path + ": Open Graph image must use the canonical host");
+    if (twitterCard !== "summary_large_image") failures.push(route.path + ": Twitter card must use summary_large_image");
+    if (twitterTitle !== title) failures.push(route.path + ": Twitter title must match the page title");
+    if (twitterDescription !== description) failures.push(route.path + ": Twitter description must match the page description");
   } else if (!robots.includes("noindex")) {
     failures.push(route.path + ": private or interaction-only route must be marked noindex");
   }
@@ -81,6 +95,10 @@ for (const route of routes) {
     descriptionLength: description.length,
     robots,
     canonical,
+    ogTitle,
+    ogUrl,
+    ogImage,
+    twitterCard,
     schema: hasSchema ? route.schema : null,
   });
 }
