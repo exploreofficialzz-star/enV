@@ -55,6 +55,8 @@ export function buildSeoArtifacts() {
 
   const robots = [
     "# Search and citation crawlers are allowed to discover public enV pages.",
+    "# Google-Extended is separately allowed for Gemini grounding and model use; this is not Google Search indexing.",
+    "# GPTBot, ClaudeBot and Applebot-Extended remain disallowed for training-related access.",
     "# Private product routes use page-level noindex directives; APIs are not crawlable.",
     "User-agent: *",
     "Allow: /",
@@ -73,10 +75,6 @@ export function buildSeoArtifacts() {
     "Disallow: /api/",
     "",
     "User-agent: OAI-SearchBot",
-    "Allow: /",
-    "Disallow: /api/",
-    "",
-    "User-agent: ChatGPT-User",
     "Allow: /",
     "Disallow: /api/",
     "",

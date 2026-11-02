@@ -40,7 +40,17 @@ DNS verification is often preferable because it is independent of application de
 
 The generated robots policy allows search/citation crawlers such as Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot, PerplexityBot, and Applebot to access public pages while keeping /api/ routes out of crawl paths.
 
-Training-oriented crawler controls are separate: GPTBot, ClaudeBot, and Applebot-Extended are disallowed. Do not assume that a user-facing search crawler and a model-training crawler have the same purpose or robots token.
+The crawler tokens have different purposes:
+
+- OAI-SearchBot is the crawler OpenAI uses to surface pages in ChatGPT Search. GPTBot is a separate training crawler and remains disallowed.
+- Claude-SearchBot is used to improve Claude search results; Claude-User supports user-directed retrieval. ClaudeBot is a separate training crawler and remains disallowed.
+- PerplexityBot supports Perplexity search discovery; Perplexity-User is for user-directed requests.
+- Applebot supports Apple search discovery. Applebot-Extended is a separate extended/model-related control and remains disallowed.
+- Google-Extended is explicitly allowed. It is not a Google Search crawler and does not affect Google Search indexing or rankings. This setting permits Google to use crawled enV content for Gemini Apps grounding and future Gemini model training. Keep this allow rule only while that use is acceptable to the company.
+
+ChatGPT-User is intentionally not listed as a search crawler: OpenAI documents it as a user-triggered fetcher, not the agent that determines ChatGPT Search inclusion. Allowing OAI-SearchBot is the relevant Search setting.
+
+Private account, wallet, settings, and interaction-only routes receive page-level noindex. A robots disallow rule is not a replacement for noindex; crawlers need to be able to fetch a page to see its indexing directive.
 
 Private account, wallet, settings, and interaction-only routes receive page-level noindex. A robots disallow rule is not a replacement for noindex; crawlers need to be able to fetch a page to see its indexing directive.
 
