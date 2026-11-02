@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Folder } from "lucide-react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { getToolsByCategory } from "@/lib/registry";
@@ -11,6 +11,10 @@ import type { CategoryId } from "@/types/tool";
 import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/$category/")({
+  loader: ({ params }) => {
+    if (!CATEGORY_MAP[params.category as CategoryId]) throw notFound();
+    return null;
+  },
   head: ({ params }) => {
     const meta = CATEGORY_MAP[params.category as CategoryId];
     if (!meta) return { meta: [{ title: "Category not found | enV" }, { name: "robots", content: "noindex,follow" }] };
