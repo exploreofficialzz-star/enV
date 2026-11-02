@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/production-live-smoke.yml"
+      - "scripts/check-live-seo.mjs"
   workflow_dispatch:
   schedule:
     - cron: "*/30 * * * *"
