@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { canonicalSeoTools, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
@@ -83,7 +83,8 @@ export function buildSitemapArtifacts(inputPaths) {
 export function buildSeoArtifacts() {
   const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
-  const guideTools = [...toolMap.values()].filter(isPublicTool).sort((a, b) => a.name.localeCompare(b.name));
+  const eligibleToolRecords = [...toolMap.values()].filter(isPublicTool);
+  const guideTools = canonicalSeoTools(eligibleToolRecords).sort((a, b) => a.name.localeCompare(b.name));
   // Legacy Developer utility URLs canonicalize to one of the public Studio routes.
   // Keep their standalone task guides discoverable, but do not list the alias paths as canonical tools.
   const tools = guideTools.filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
@@ -197,8 +198,11 @@ export function buildSeoArtifacts() {
     "",
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
     "",
+    "- Eligible catalog records considered: " + eligibleToolRecords.length,
     "- Canonical public tool pages included: " + tools.length,
-    "- Public tool guides included: " + guideTools.length,
+    "- Canonical public tool guides included: " + guideTools.length,
+    "- Identical generated equation variants remain usable in enV but are consolidated to one canonical search page and guide.",
+    "- Generic Input A/Input B placeholder equations are not published as search landing pages.",
     "- Tool categories included: " + categories.length,
     "- Canonical host: " + SITE_ORIGIN,
     "- Each row links to the canonical tool page and its detailed usage guide.",
