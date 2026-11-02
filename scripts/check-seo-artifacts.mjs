@@ -81,7 +81,7 @@ assert.ok(result.urls.some((path) => path.startsWith("/blog/tool-")));
 assert.equal(result.urls.length, new Set(result.urls).size, "Sitemap routes must be unique.");
 assert.ok(result.urls.every((path) => !["/wallet", "/account", "/settings", "/login", "/search"].includes(path)));
 for (const tool of result.tools) {
-  const title = toolSeoTitle(tool);
+  const title = toolSeoTitle(tool, result.tools);
   const description = toolSeoDescription(tool);
   const terms = toolSearchIntentTerms(tool);
   assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
@@ -115,7 +115,7 @@ for (const article of result.articles) {
   assert.ok(result.llms.includes("https://envtools.store/blog/" + article.slug), "Missing article in llms.txt for " + article.slug);
 }
 for (const tool of result.guideTools) {
-  const guideTitle = toolGuideSeoTitle(tool);
+  const guideTitle = toolGuideSeoTitle(tool, result.guideTools);
   const guideDescription = toolSeoDescription(tool);
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
   assert.ok(guideTitle.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "Guide title must identify " + tool.id);
