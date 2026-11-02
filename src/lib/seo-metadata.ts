@@ -49,6 +49,7 @@ export function seoPageHead(options: SeoPageOptions) {
       { title: options.title },
       { name: "description", content: description },
       { name: "robots", content: options.robots ?? "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" },
+      { name: "env-build-sha", content: __ENV_BUILD_SHA__ },
       { property: "og:type", content: type },
       { property: "og:site_name", content: "enV Digital Toolkit" },
       { property: "og:title", content: options.title },
