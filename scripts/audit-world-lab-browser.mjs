@@ -88,7 +88,7 @@ try{
   await page.getByRole("slider",{name:"Explore collision time"}).fill("2");
   const lateCentres=await page.getByText(/Live centre X, left\/right:/).innerText();
   assert.notEqual(lateCentres,earlyCentres);
-  await page.getByRole("button",{name:"Beginning",exact:true}).click();
+  await page.getByLabel("Object-to-object impact").getByRole("button",{name:"Beginning",exact:true}).click();
   assert.equal(await page.getByRole("slider",{name:"Explore collision time"}).inputValue(),"0",
     "Beginning must reset the collision timeline to its start");
 

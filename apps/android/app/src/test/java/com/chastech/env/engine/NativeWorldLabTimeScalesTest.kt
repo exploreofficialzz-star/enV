@@ -71,7 +71,8 @@ PREDICTIONS:
         assertTrue(result.tcgMjd>result.ttMjd)
         val expectedDeltaSeconds=(result.ttMjd-NativeWorldLabTimeScales.IAU_REFERENCE_MJD)*
             NativeWorldLabTimeScales.IAU_LG/(1.0-NativeWorldLabTimeScales.IAU_LG)*86400.0
-        assertEquals(expectedDeltaSeconds,(result.tcgMjd-result.ttMjd)*86400.0,1e-8)
+        // MJD doubles near 61,000 have sub-microsecond quantization after subtraction.
+        assertEquals(expectedDeltaSeconds,(result.tcgMjd-result.ttMjd)*86400.0,1e-6)
         assertTrue(expectedDeltaSeconds>1.0)
     }
     @Test fun conversionsFailClosedOutsideDataValidity(){
