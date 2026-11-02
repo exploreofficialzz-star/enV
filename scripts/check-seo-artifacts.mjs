@@ -90,7 +90,7 @@ for (const tool of result.tools) {
   const description = toolSeoDescription(tool);
   const terms = toolSearchIntentTerms(tool);
   assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
-  assert.ok(title.toLowerCase().startsWith(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "SEO title must preserve the tool name at the front: " + tool.id);
+  assert.ok(title.toLowerCase().startsWith(tool.name.trim().toLowerCase().slice(0, Math.min(12, tool.name.trim().length))), "SEO title must preserve the tool name at the front: " + tool.id + " (name=" + JSON.stringify(tool.name) + ", title=" + JSON.stringify(title) + ")");
   assert.ok(title.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "SEO title must identify " + tool.id);
   assert.ok(description.length >= 45 && description.length <= 160, "SEO description must be 45-160 characters for " + tool.id + ": " + description);
   assert.ok(terms.length >= 3 && terms[0] === tool.name, "Search-intent seed coverage is incomplete for " + tool.id);
@@ -123,7 +123,7 @@ for (const tool of result.guideTools) {
   const guideTitle = toolGuideSeoTitle(tool, result.guideTools);
   const guideDescription = toolSeoDescription(tool);
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
-  assert.ok(guideTitle.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "Guide title must identify " + tool.id);
+  assert.ok(guideTitle.toLowerCase().includes(tool.name.trim().toLowerCase().slice(0, Math.min(12, tool.name.trim().length))), "Guide title must identify " + tool.id + " (name=" + JSON.stringify(tool.name) + ", title=" + JSON.stringify(guideTitle) + ")");
   assert.ok(guideDescription.length >= 45 && guideDescription.length <= 160, "Guide SEO description must be 45-160 characters for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideTitle)), "Inventory misses guide title for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideDescription)), "Inventory misses guide description for " + tool.id);
