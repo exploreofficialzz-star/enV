@@ -215,7 +215,7 @@ export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [
     .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
   if (collisions.length <= 1) return baseTitle;
   const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
-  return boundedSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") documentation | enV");
+  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") documentation | enV");
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
@@ -241,7 +241,7 @@ export function toolSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]
     .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
   if (collisions.length <= 1) return baseTitle;
   const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
-  return boundedSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") | enV");
+  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") | enV");
 }
 
 export function toolSchema(tool: ToolMeta) {
