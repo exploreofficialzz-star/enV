@@ -1,7 +1,9 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import appCss from "../styles.css?url";
-import { webmasterVerificationMeta, websiteSchema } from "@/lib/seo-metadata";
+import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib/seo-metadata";
+import { getToolByPath } from "@/lib/registry";
+import { businessStudioAnchorSlug } from "@/lib/business-studios-catalog";
 
 const APP_NAME = "enV — Browser Toolkit";
 
@@ -18,7 +20,15 @@ function routeRobotsPolicy(matches?: Array<{ pathname: string; routeId?: string 
   const hasPageRoute = matches?.some((match) => Boolean(match.routeId) && match.routeId !== "__root__") ?? false;
   const notFoundRoute = matches?.some((match) => /not.?found/i.test(match.routeId ?? "")) ?? false;
   const privateRoute = NON_INDEXABLE_PATHS.some((prefix) => path === prefix || path.startsWith(prefix + "/"));
+  const toolRoute = path.match(/^\/tools\/([^/]+)\/([^/]+)$/);
   if (!hasPageRoute || notFoundRoute || path === "/search" || privateRoute) return "noindex,nofollow";
+  if (toolRoute) {
+    const [, category, slug] = toolRoute;
+    const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
+    const tool = getToolByPath(category, slug)
+      ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
+    if (!tool || !isIndexableTool(tool)) return "noindex,nofollow";
+  }
   return "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1";
 }
 

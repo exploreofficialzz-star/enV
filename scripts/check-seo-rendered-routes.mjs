@@ -2,8 +2,9 @@
 
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
-import { getToolsByCategory, toolPath } from "../src/lib/registry.ts";
+import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { isIndexableTool } from "../src/lib/seo-metadata.ts";
+import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
 const routes = [
@@ -66,6 +67,11 @@ for (const category of CATEGORIES) {
 for (const article of BLOG_ARTICLES) {
   const articlePath = "/blog/" + article.slug;
   routeMap.set(articlePath, { path: articlePath, kind: "indexable", schema: "Article" });
+}
+const underProductionTool = getSearchableTools().find(isToolUnderProduction);
+if (underProductionTool) {
+  const path = toolPath(underProductionTool);
+  routeMap.set(path, { path, kind: "noindex" });
 }
 const renderedRoutes = [...routeMap.values()];
 
