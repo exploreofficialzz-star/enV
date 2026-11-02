@@ -29,6 +29,7 @@ const routes = [
   { path: "/3d-game-studio", kind: "noindex" },
   { path: "/this-route-does-not-exist-seo-audit", kind: "noindex", expectedStatus: 404 },
   { path: "/tools/developer/this-tool-does-not-exist-seo-audit", kind: "noindex", expectedStatus: 404 },
+  { path: "/tools/unknown-category-seo-audit", kind: "noindex", expectedStatus: 404 },
 ];
 
 function attribute(tag, name) {
