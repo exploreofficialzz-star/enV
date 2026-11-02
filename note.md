@@ -57,7 +57,7 @@ The chapter map predates some of the later specialist modules in the PR and must
 - [ ] Complete robust 3D solid/assembly/group authoring: constraints, mates/joints, snapping, measuring, hierarchy, reusable components, ports/connections, transforms, undo/redo and safe project revisions.
 - [ ] Bring Android and iOS authoring and visual interaction to tested functional parity with the Web editor while keeping each implementation native.
 - [ ] Complete accessible observer movement, camera gestures, keyboard alternatives, responsive layouts, renderer fallback and low-end device performance.
-- [ ] Preserve Artboard Studio, UX/UI Studio and existing project routes/formats until compatible import/export, migration, replacement parity and user-data recovery are proven. Do not remove legacy studios as part of this incomplete tranche.
+- [x] Replace the Artboard Studio catalog entry and launch routes with The World Lab across Web, Android and iOS. The old Web Artboard URL redirects to World Lab. Keep existing Artboard project files recoverable until their import/migration path has been verified; replacing the studio entry does not authorize deleting user data.
 
 ### Generalized and validated scientific systems
 
@@ -94,4 +94,4 @@ The chapter map predates some of the later specialist modules in the PR and must
 
 ## 7. Release rule
 
-**Do not call World Lab production-ready, universal, scientifically validated across the 205 chapters, or a full Artboard replacement while the above gates remain open.** Keep capability labels honest, preserve the existing studios and user projects, and update this note plus the acceptance CSVs as evidence is completed.
+**The World Lab is the replacement studio entry for Artboard Studio, but it is not yet production-ready, universal, or scientifically validated across the 205 chapters while the above gates remain open.** Keep capability labels honest, preserve existing user project files, and update this note plus the acceptance CSVs as evidence is completed.
