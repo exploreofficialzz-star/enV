@@ -287,14 +287,3 @@ export function isIndexableTool(tool: ToolMeta): boolean {
   return (tool.status === "active" || tool.status === "beta") && !isToolUnderProduction(tool);
 }
 
-export function toolSeoTitle(tool: ToolMeta): string {
-  const category = CATEGORY_MAP[tool.category as CategoryId]?.name ?? tool.category;
-  const suffix = " | " + category + " Tool | enV";
-  const maxTitleLength = 65;
-  const rawName = tool.name.trim();
-  const maxNameLength = Math.max(20, maxTitleLength - suffix.length);
-  const displayName = rawName.length > maxNameLength
-    ? rawName.slice(0, maxNameLength - 1).trimEnd() + "…"
-    : rawName;
-  return displayName + suffix;
-}
