@@ -2,7 +2,8 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import appCss from "../styles.css?url";
 import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib/seo-metadata";
-import { getToolByPath } from "@/lib/registry";
+import { getToolByPath, getToolsByCategory } from "@/lib/registry";
+import type { CategoryId } from "@/types/tool";
 import { businessStudioAnchorSlug } from "@/lib/business-studios-catalog";
 
 const APP_NAME = "enV — Browser Toolkit";
@@ -21,7 +22,12 @@ function routeRobotsPolicy(matches?: Array<{ pathname: string; routeId?: string 
   const notFoundRoute = matches?.some((match) => /not.?found/i.test(match.routeId ?? "")) ?? false;
   const privateRoute = NON_INDEXABLE_PATHS.some((prefix) => path === prefix || path.startsWith(prefix + "/"));
   const toolRoute = path.match(/^\/tools\/([^/]+)\/([^/]+)$/);
+  const categoryRoute = path.match(/^\/tools\/([^/]+)$/);
   if (!hasPageRoute || notFoundRoute || path === "/search" || privateRoute) return "noindex,nofollow";
+  if (categoryRoute) {
+    const [, category] = categoryRoute;
+    if (!getToolsByCategory(category as CategoryId).some(isIndexableTool)) return "noindex,nofollow";
+  }
   if (toolRoute) {
     const [, category, slug] = toolRoute;
     const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
