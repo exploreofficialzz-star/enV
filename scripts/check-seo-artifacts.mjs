@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, categorySchema } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
@@ -94,7 +94,11 @@ if (legacyDeveloperTool) {
   const schema = categorySchema("Developer", "Developer tools", "/tools/developer", [legacyDeveloperTool]);
   const serialized = JSON.stringify(schema);
   assert.ok(serialized.includes("https://envtools.store" + canonicalToolPath(legacyDeveloperTool)), "Developer ItemList must use the Studio canonical URL.");
+  assert.ok(serialized.includes('"name":"' + canonicalToolName(legacyDeveloperTool) + '"'), "Developer ItemList must display the canonical Studio name.");
   assert.ok(!serialized.includes("https://envtools.store/tools/developer/" + legacyDeveloperTool.slug), "Developer ItemList must not expose a legacy alias URL.");
+  const guideSchema = JSON.stringify(technicalArticleSchema(legacyDeveloperTool, "Guide description.", "/blog/tool-" + legacyDeveloperTool.id));
+  assert.ok(guideSchema.includes('"name":"' + canonicalToolName(legacyDeveloperTool) + '"'), "Legacy guide SoftwareApplication must use the canonical Studio name.");
+  assert.ok(guideSchema.includes('"url":"https://envtools.store' + canonicalToolPath(legacyDeveloperTool) + '"'), "Legacy guide SoftwareApplication must use the canonical Studio URL.");
 }
 assert.ok(result.sitemap.includes("<urlset"));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);

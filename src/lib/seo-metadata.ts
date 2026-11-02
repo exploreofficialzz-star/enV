@@ -195,6 +195,13 @@ export function canonicalToolPath(tool: ToolMeta): string {
   return "/tools/" + tool.category + "/" + tool.slug;
 }
 
+export function canonicalToolName(tool: ToolMeta): string {
+  if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
+    return developerStudioForLegacySlug(tool.slug).name;
+  }
+  return tool.name;
+}
+
 export function toolSeoTitle(tool: ToolMeta): string {
   return boundedSeoTitle(tool.name, " Online | enV");
 }
@@ -233,7 +240,7 @@ export function categorySchema(name: string, description: string, path: string, 
       itemListElement: tools.map((tool, index) => ({
         "@type": "ListItem",
         position: index + 1,
-        name: tool.name,
+        name: canonicalToolName(tool),
         url: absoluteSiteUrl(canonicalToolPath(tool)),
       })),
     },
@@ -267,7 +274,7 @@ export function technicalArticleSchema(tool: ToolMeta, description: string, path
     description: cleanMetaDescription(description, 300),
     about: {
       "@type": "SoftwareApplication",
-      name: tool.name,
+      name: canonicalToolName(tool),
       url: absoluteSiteUrl(canonicalToolPath(tool)),
       keywords: toolSearchIntentTerms(tool).join(", "),
     },

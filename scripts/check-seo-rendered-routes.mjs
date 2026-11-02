@@ -6,7 +6,7 @@ const routes = [
   { path: "/tools", kind: "indexable", schema: "CollectionPage" },
   { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
   { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
-  { path: "/blog/tool-json-formatter", kind: "indexable", schema: "TechArticle", aboutUrl: "https://envtools.store/tools/developer/json-studio" },
+  { path: "/blog/tool-json-formatter", kind: "indexable", schema: "TechArticle", aboutUrl: "https://envtools.store/tools/developer/json-studio", aboutName: "JSON Studio" },
   { path: "/about", kind: "indexable", schema: "AboutPage" },
   { path: "/pricing", kind: "indexable", schema: "WebPage" },
   { path: "/help", kind: "indexable", schema: "CollectionPage" },
@@ -82,6 +82,7 @@ for (const route of routes) {
   const hasCanonicalAbout = !route.aboutUrl || jsonLd.some((source) =>
     source.includes('"@type":"SoftwareApplication"')
     && source.includes('"url":"' + route.aboutUrl + '"')
+    && source.includes('"name":"' + route.aboutName + '"')
   );
 
   const expectedStatus = route.expectedStatus ?? 200;

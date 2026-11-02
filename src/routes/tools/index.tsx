@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { CATEGORIES } from "@/data/categories";
-import { getSearchableTools } from "@/lib/registry";
+import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
 import { isIndexableTool, seoPageHead, categorySchema } from "@/lib/seo-metadata";
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/tools/")({
   validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
   head: () => {
     const visibleTools = CATEGORIES.flatMap((category) =>
-      getSearchableTools().filter((tool) => tool.category === category.id && isIndexableTool(tool)).slice(0, 3)
+      getToolsByCategory(category.id).filter(isIndexableTool).slice(0, 3)
     );
     return seoPageHead({
       title: "All Online Tools | Calculators, Converters and Utilities | enV",
