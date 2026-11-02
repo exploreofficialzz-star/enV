@@ -26,6 +26,6 @@ test("depth labels remain illustrative and bounded",()=>{
  assert.throws(()=>illustrativeLayerForDepth(Infinity),/Invalid/);
  assert.equal(OBSERVER_BOUNDS_METRES.minHeight,-6371000);
  assert.match(illustrativeLayerForDepth(3000000),/outer core/i);
- assert.match(illustrativeLayerForDepth(6000000),/inner core/);
+ assert.match(illustrativeLayerForDepth(6000000),/inner core/i);
  assert.throws(()=>illustrativeLayerForDepth(6371001),/Invalid/);
 });

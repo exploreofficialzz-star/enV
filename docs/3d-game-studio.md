@@ -1,6 +1,8 @@
-# enV 3D Game Studio: implementation status
+# Legacy 3D Game Studio implementation notes
 
-Artboard Studio is a standalone tool in the Developer catalog at `/tools/developer/artboard-studio`; the existing `/3d-game-studio` link remains available. It uses the canonical enV logo, fonts, color tokens, and a screen-fitting interface. On smaller screens, View, Objects, Assets, and Inspect switch between the viewport and compact panels; scene and asset lists are paged rather than scrolled.
+> **Superseded as a standalone studio.** The Artboard Studio catalog entry and launchers have been replaced by The World Lab across Web, Android and iOS. The former Web URL `/tools/developer/artboard-studio` redirects to `/tools/developer/the-world-lab`. This file is retained as historical engineering documentation for the earlier Babylon/Godot game-preview code; it is not the current World Lab feature specification.
+
+The legacy 3D game-preview code and project format described below are retained for historical reference and potential project-data migration. The user-facing Developer workspace is The World Lab.
 
 ## What works
 
