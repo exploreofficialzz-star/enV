@@ -137,8 +137,7 @@ function withBreadcrumbs(entity: Record<string, unknown>, crumbs: Array<{ name: 
 }
 
 export function pageSchema(name: string, description: string, path: string, type = "WebPage") {
-  return {
-    "@context": "https://schema.org",
+  return withBreadcrumbs({
     "@type": type,
     name,
     description: cleanMetaDescription(description, 300),
@@ -146,7 +145,9 @@ export function pageSchema(name: string, description: string, path: string, type
     isPartOf: { "@type": "WebSite", name: "enV", url: SITE_ORIGIN },
     publisher: organizationSchema(),
     inLanguage: "en",
-  };
+  }, path === "/"
+    ? [{ name, path }]
+    : [{ name: "Home", path: "/" }, { name, path }]);
 }
 
 export function toolSearchIntentTerms(tool: ToolMeta): string[] {
@@ -251,10 +252,11 @@ export function isIndexableTool(tool: ToolMeta): boolean {
 }
 
 export function toolSeoTitle(tool: ToolMeta): string {
-  const suffix = " Online | enV";
+  const category = CATEGORY_MAP[tool.category as CategoryId]?.name ?? tool.category;
+  const suffix = " | " + category + " Tool | enV";
   const maxTitleLength = 65;
   const rawName = tool.name.trim();
-  const maxNameLength = maxTitleLength - suffix.length;
+  const maxNameLength = Math.max(20, maxTitleLength - suffix.length);
   const displayName = rawName.length > maxNameLength
     ? rawName.slice(0, maxNameLength - 1).trimEnd() + "…"
     : rawName;
