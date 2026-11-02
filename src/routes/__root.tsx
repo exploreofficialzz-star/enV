@@ -1,7 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import appCss from "../styles.css?url";
-import { websiteSchema } from "@/lib/seo-metadata";
+import { webmasterVerificationMeta, websiteSchema } from "@/lib/seo-metadata";
 
 const APP_NAME = "enV — Browser Toolkit";
 
@@ -42,6 +42,7 @@ export const Route = createRootRoute({
       { name: "description", content: "Discover practical online tools for calculations, conversions, image and audio work, developer tasks, productivity, business, and more across web and mobile." },
       { name: "robots", content: routeRobotsPolicy(matches) },
       { name: "theme-color", content: "#ffffff" },
+      ...webmasterVerificationMeta(),
     ],
     links: [
       { rel: "icon", type: "image/png", href: "/favicon.png" },
