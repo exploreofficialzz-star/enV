@@ -141,7 +141,10 @@ function forces(i:VehicleInput,s:DynamicState,time:number):ForceState {
   const dragX=speed>1e-12?dragMagnitude*s.vx/speed:0;
   const dragZ=speed>1e-12?dragMagnitude*s.vz/speed:0;
   let wheelForce=motorAvailable&&!airborne?Math.min(i.driveThrottle*i.maximumWheelDriveForceN,i.tireFrictionCoefficient*normal,i.motorMaximumCurrentA*i.motorForceConstantNPerA,i.motorMaximumPowerW*i.motorEfficiency/Math.max(s.vx,0.5)):0;
-  let cruiseThrust=motorAvailable&&airborne&&i.mode!=="road-only"?i.maximumCruiseThrustN*i.driveThrottle:0;
+  // A fixed-wing propeller produces thrust during the takeoff roll as well as in flight.
+  // Rotorcraft horizontal cruise thrust remains flight-only; rotor thrust handles vertical lift.
+  const cruisePropulsionAvailable=i.mode==="fixed-wing"||(airborne&&i.mode==="rotorcraft");
+  let cruiseThrust=motorAvailable&&cruisePropulsionAvailable?i.maximumCruiseThrustN*i.driveThrottle:0;
   const requestedWheelMechanical=wheelForce*Math.max(s.vx,0.5);
   const requestedWheelCurrent=wheelForce/i.motorForceConstantNPerA;
   const requestedCruiseMechanical=cruiseThrust*Math.max(speed,0.5);

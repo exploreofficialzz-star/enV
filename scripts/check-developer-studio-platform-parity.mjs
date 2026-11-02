@@ -22,7 +22,7 @@ function extractDefinitions(source, studioPattern, modePattern, label) {
 
 const studioId = '((?:[a-z0-9-]+-studio|the-world-lab))';
 const web = extractDefinitions(webSource, new RegExp('\\bid:\\s*"' + studioId + '"\\s*,\\s*slug:', 'g'), /\{\s*key:\s*"([a-z0-9-]+)"\s*,\s*label:/g, 'Web TypeScript');
-const android = extractDefinitions(kotlinSource, new RegExp('NativeDeveloperStudioSpec\\(' + studioId, 'g'), /NativeDeveloperStudioMode\("([a-z0-9-]+)"\s*,/g, 'Android Kotlin');
+const android = extractDefinitions(kotlinSource, new RegExp('NativeDeveloperStudioSpec\\("' + studioId + '"', 'g'), /NativeDeveloperStudioMode\("([a-z0-9-]+)"\s*,/g, 'Android Kotlin');
 const ios = extractDefinitions(swiftSource, new RegExp('\\.init\\(id:\\s*"' + studioId, 'g'), /\.init\("([a-z0-9-]+)"\s*,/g, 'iOS Swift');
 
 assert.equal(web.size, 14, 'Web must define all fourteen Developer Studios');

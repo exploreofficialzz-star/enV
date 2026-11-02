@@ -56,14 +56,11 @@ test("fixed-wing takeoff is blocked when modeled wing lift at takeoff speed is b
 });
 
 test("fixed-wing takeoff uses computed dynamic pressure and can become airborne",()=>{
-  // Match the declared takeoff speed to the computed lift-equals-weight boundary;
-  // otherwise ground contact force falls to zero before the configured speed is reached.
-  const input:VehicleInput={...base,mode:"fixed-wing",massKg:1200,wingAreaM2:24,wingLiftCoefficient:1.4,
-    takeoffSpeedMps:Math.sqrt((2*1200*9.80665)/(1.225*24*1.4)),maximumCruiseThrustN:4000,
+  const input:VehicleInput={...base,mode:"fixed-wing",massKg:1200,wingAreaM2:24,wingLiftCoefficient:1.4,takeoffSpeedMps:25,maximumCruiseThrustN:4000,
     maximumWheelDriveForceN:10000,motorMaximumPowerW:350000,batteryMaximumCurrentA:700,durationSeconds:60,maximumSpeedMps:100};
   const run=runWorldLabVehicle(context,"wing-takeoff",input);
-  assert.ok(run.preflight.wingLiftAtTakeoffN! >= run.preflight.weightN - 1e-6,
-    "The declared takeoff speed must match the computed lift-equals-weight threshold");
+  assert.ok(run.preflight.wingLiftAtTakeoffN!>run.preflight.weightN);
+  assert.ok(run.samples.some(s=>!s.airborne&&s.cruiseThrustN>0), "Propeller thrust must remain available during the takeoff roll");
   assert.ok(run.samples.some(s=>s.airborne));
 });
 
