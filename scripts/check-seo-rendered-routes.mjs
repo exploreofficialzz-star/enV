@@ -152,7 +152,7 @@ async function auditStaticDiscoveryFiles() {
       if (!body.trim() || body.trimStart().startsWith("<!doctype html")) {
         failures.push(asset.path + ": expected a static discovery file, not an HTML fallback");
       }
-      if (asset.path === "/sitemap.xml" && !/(application|text)\\/xml/.test(contentType)) {
+      if (asset.path === "/sitemap.xml" && !/(application|text)\/xml/.test(contentType)) {
         failures.push("/sitemap.xml: expected an XML content type, received " + contentType);
       }
       for (const phrase of asset.required) {
