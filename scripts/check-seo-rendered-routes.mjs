@@ -8,7 +8,7 @@ import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
 const routes = [
-  { path: "/", kind: "indexable", schema: "WebSite", homepageDiscovery: true },
+  { path: "/", kind: "indexable", schema: "WebSite", homepageDiscovery: true, expectedTitle: "enV Digital Toolkit by chAs Technologies | Online Tools" },
   { path: "/tools", kind: "indexable", schema: "CollectionPage", categoryDirectory: true },
   { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
   { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
