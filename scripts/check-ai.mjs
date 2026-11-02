@@ -103,7 +103,16 @@ for (const file of everySource) {
     for (const name of SECRET_NAMES) if (text.includes(name)) fail(`${p} references secret ${name}; secrets are read only by src/lib/ai/server/config.ts`);
   }
   if (!inProviders && !isTest(file)) {
-    for (const specifier of specifiersOf(text)) if (PROVIDER_SDKS.some((re) => re.test(specifier))) fail(`${p} imports a provider SDK (${specifier}); use the adapters`);
+    for (const specifier of specifiersOf(text)) {
+      // Transformers.js is an inference runtime, not a hosted-provider client.
+      // This one isolated worker runs the music sound/speech models in-browser;
+      // user audio is not submitted to a hosted inference API.
+      const approvedLocalModelWorker = p === "src/workers/song-intelligence.worker.ts"
+        && specifier === "@huggingface/transformers";
+      if (!approvedLocalModelWorker && PROVIDER_SDKS.some((re) => re.test(specifier))) {
+        fail(`${p} imports a provider SDK (${specifier}); use the adapters`);
+      }
+    }
   }
 }
 
