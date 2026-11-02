@@ -188,7 +188,7 @@ export function categorySeoTitle(name: string): string {
   return boundedSeoTitle(name, " | enV");
 }
 
-function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength = 65): string {
+export function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength = 65): string {
   const rawName = name.trim();
   // Generated formula tools carry the important differentiator after "Solve for".
   // Preserve that semantic target at the end instead of truncating it away.
