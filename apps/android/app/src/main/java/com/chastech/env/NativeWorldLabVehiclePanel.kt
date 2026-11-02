@@ -122,10 +122,10 @@ fun NativeWorldLabVehiclePanel(project:NativeWorldLabProject,onProblem:(String)-
         Button(enabled=!busy,onClick={
             val input=runCatching {
                 NativeWorldLabVehicleInput(
-                    mode=mode,massKg=mass.toDouble(),driveThrottle=drive,durationSeconds=duration.toDouble(),
+                    mode=mode,massKg=mass.toDouble(),driveThrottle=drive.toDouble(),durationSeconds=duration.toDouble(),
                     rotorDiskAreaM2=if(mode=="rotorcraft")rotorArea.toDouble() else null,
                     rotorMaxThrustN=if(mode=="rotorcraft")rotorThrust.toDouble() else null,
-                    rotorThrottle=rotorThrottle,
+                    rotorThrottle=rotorThrottle.toDouble(),
                     wingAreaM2=if(mode=="fixed-wing")wingArea.toDouble() else null,
                     wingLiftCoefficient=if(mode=="fixed-wing")wingLift.toDouble() else null,
                     takeoffSpeedMps=if(mode=="fixed-wing")takeoffSpeed.toDouble() else null,
