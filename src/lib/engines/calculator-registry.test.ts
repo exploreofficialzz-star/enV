@@ -24,7 +24,7 @@ function definitionOf(tool: (typeof catalog)[number]): CalculatorDef | undefined
 }
 
 test("the category is large and every tool id and slug is unique", () => {
-  assert.ok(categoryTools.length >= 6470, `only ${categoryTools.length} calculators`);
+  assert.ok(categoryTools.length >= 6500, `only ${categoryTools.length} calculators`);
   assert.equal(new Set(categoryTools.map((tool) => tool.id)).size, categoryTools.length, "duplicate ids");
   assert.equal(new Set(categoryTools.map((tool) => tool.slug)).size, categoryTools.length, "duplicate slugs");
 });
@@ -214,5 +214,5 @@ test("equation-family tools describe the same relationship in the catalog and in
       }
     }
   }
-  assert.equal(checked, (625 + 609 + 612) * 3);
+  assert.equal(checked, (625 + 609 + 622) * 3);
 });
