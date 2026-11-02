@@ -443,7 +443,7 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
   const name = tool.name.trim();
   const specific = toolSpecificGuidance(tool);
   if (!specific.overview.startsWith("This guide is tailored to the catalogued purpose, category, and execution metadata for ")) {
-    const candidate = name + ": " + specific.overview.replace(/\\s+/g, " ").trim();
+    const candidate = name + ": " + specific.overview.replace(/\s+/g, " ").trim();
     if (candidate.length <= 160) return candidate;
     const shortened = candidate.slice(0, 159);
     const boundary = shortened.lastIndexOf(" ");
