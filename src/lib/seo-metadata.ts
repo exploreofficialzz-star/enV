@@ -188,8 +188,27 @@ export function categorySeoTitle(name: string): string {
   return boundedSeoTitle(name, " | enV");
 }
 
+function boundedToolSeoTitle(name: string, suffix: string, maxTitleLength = 65): string {
+  const rawName = name.trim();
+  // Generated formula tools carry the important differentiator after "Solve for".
+  // Preserve that semantic target at the end instead of truncating it away.
+  const solveFor = rawName.match(/^(.*?)(\\s+[—–-]\\s+Solve for\\s+.+)$/i);
+  if (solveFor) {
+    const prefix = solveFor[1].trim();
+    const differentiator = solveFor[2].trimStart();
+    const prefixBudget = maxTitleLength - suffix.length - differentiator.length - 1;
+    if (prefixBudget >= 12) {
+      const shortPrefix = prefix.length > prefixBudget
+        ? prefix.slice(0, prefixBudget - 1).trimEnd() + "…"
+        : prefix;
+      return shortPrefix + " " + differentiator + suffix;
+    }
+  }
+  return boundedSeoTitle(rawName, suffix, maxTitleLength);
+}
+
 export function toolGuideSeoTitle(tool: ToolMeta): string {
-  return boundedSeoTitle(tool.name, " documentation | enV");
+  return boundedToolSeoTitle(tool.name, " documentation | enV");
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
@@ -208,7 +227,7 @@ export function canonicalToolName(tool: ToolMeta): string {
 }
 
 export function toolSeoTitle(tool: ToolMeta): string {
-  return boundedSeoTitle(tool.name, " Online | enV");
+  return boundedToolSeoTitle(tool.name, " Online | enV");
 }
 
 export function toolSchema(tool: ToolMeta) {
