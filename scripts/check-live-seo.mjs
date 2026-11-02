@@ -192,6 +192,10 @@ async function checkRenderedRoute(path, schema) {
     .map((match) => match[1]);
 
   assert(title.length >= 8 && title.length <= 65, path + " title is missing or exceeds 65 characters (" + title.length + ")");
+  if (path === "/") {
+    assert(title === "enV Digital Toolkit by chAs Technologies | Online Tools", "Homepage title must disambiguate the enV brand: " + title);
+    assert(description.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must identify the parent brand.");
+  }
   assert(description.length >= 40 && description.length <= 170, path + " has an invalid description length (" + description.length + ")");
   assert(robots && !robots.includes("noindex"), path + " should be indexable but has robots=" + robots);
   assert(canonicalTags.length === 1, path + " should have exactly one canonical link (found " + canonicalTags.length + ")");
