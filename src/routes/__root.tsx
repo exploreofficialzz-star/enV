@@ -11,7 +11,7 @@ const NON_INDEXABLE_PATHS = [
   "/token-dashboard", "/tokens", "/wallet", "/userbehavior",
 ];
 
-function routeRobotsPolicy(matches) {
+function routeRobotsPolicy(matches?: Array<{ pathname: string }>) {
   const pathname = matches?.[matches.length - 1]?.pathname ?? "/";
   const path = pathname.replace(/\/+$/, "") || "/";
   const privateRoute = NON_INDEXABLE_PATHS.some((prefix) => path === prefix || path.startsWith(prefix + "/"));
