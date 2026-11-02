@@ -100,7 +100,7 @@ object NativeWorldLabReplayCodec {
     }
 
     fun create(input:NativeLabInput,worldEpochUTC:String,timezoneDisplay:String,
-        sampleTimesSeconds:List<Double>=(0..120).map{it/10.0}):NativeWorldLabReplayManifest {
+        sampleTimesSeconds:List<Double> = (0..120).map{it/10.0}):NativeWorldLabReplayManifest {
         val (modelId,params)=parameters(input)
         val base=NativeWorldLabReplayManifest(FORMAT,1,modelId,VERSION,worldEpochUTC,timezoneDisplay,
             params,sampleTimesSeconds,emptyList(),policyEvents,policyRandom,policySolver,"0000000000000000")
