@@ -4,6 +4,7 @@ import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
+const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
 const toolDocumentationSource = readFileSync(new URL("../src/lib/tool-documentation.ts", import.meta.url), "utf8");
 assert.doesNotMatch(toolDocumentationSource, /catalogue lists these related search terms for discovery/, "Raw keyword lists must not be rendered as guide copy.");
 const vercelConfig = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
@@ -51,9 +52,9 @@ for (const tool of result.tools) {
   assert.ok(terms.length >= 3 && terms[0] === tool.name, "Search-intent seed coverage is incomplete for " + tool.id);
   assert.ok(result.inventory.includes("https://envtools.store/tools/" + tool.category + "/" + tool.slug), "Inventory misses tool " + tool.id);
   assert.ok(result.inventory.includes("https://envtools.store/blog/tool-" + tool.id), "Inventory misses guide " + tool.id);
-  assert.ok(result.inventory.includes(title), "Inventory misses SEO title for " + tool.id);
-  assert.ok(result.inventory.includes(description), "Inventory misses SEO description for " + tool.id);
-  assert.ok(result.inventory.includes(terms.join(", ")), "Inventory misses search-intent terms for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(title)), "Inventory misses SEO title for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(description)), "Inventory misses SEO description for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(terms.join(", ")) ), "Inventory misses search-intent terms for " + tool.id);
   const route = "/tools/" + tool.category + "/" + tool.slug;
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
@@ -74,8 +75,8 @@ for (const tool of result.guideTools) {
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
   assert.ok(guideTitle.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "Guide title must identify " + tool.id);
   assert.ok(guideDescription.length >= 45 && guideDescription.length <= 160, "Guide SEO description must be 45-160 characters for " + tool.id);
-  assert.ok(result.inventory.includes(guideTitle), "Inventory misses guide title for " + tool.id);
-  assert.ok(result.inventory.includes(guideDescription), "Inventory misses guide description for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(guideTitle)), "Inventory misses guide title for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(guideDescription)), "Inventory misses guide description for " + tool.id);
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(guide), "Missing public guide sitemap entry for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing public guide in llms.txt for " + tool.id);
