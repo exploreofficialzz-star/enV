@@ -243,7 +243,7 @@ object NativeWorldLabVehicle {
             val force = calculateForces(i, state, time, weight)
             if (force.airborne && !lastAirborne) events += "Takeoff at %.2f s.".format(time)
             if (!force.airborne && lastAirborne) events += "Touchdown at %.2f s.".format(time)
-            if (force.powerLimited && !powerLimitAdded) {
+            if (force.limited && !powerLimitAdded) {
                 events += "Battery current, internal resistance or power limits reduced propulsion at %.2f s.".format(time)
                 powerLimitAdded = true
             }
@@ -257,7 +257,7 @@ object NativeWorldLabVehicle {
                 force.wheel, force.cruise, force.rotor, force.wing, force.drag,
                 force.normal, force.load, force.current, force.voltage, force.power,
                 state.soc, state.batteryK, state.motorK, force.airborne,
-                force.powerLimited, force.motorAvailable, state.energyWh,
+                force.limited, force.motorAvailable, state.energyWh,
             )
             if (step == stepCount || state.failure != null) break
             val dragX = if (speed > 1e-12) force.drag * state.vx / speed else 0.0
