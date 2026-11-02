@@ -89,6 +89,9 @@ function Home() {
           <span className="sm:hidden">everyday work.</span>
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
+        <p className="mt-3 w-full max-w-3xl self-start text-left text-sm leading-6 text-muted sm:text-base">
+          Browse practical online calculators, unit converters, developer utilities, image and audio tools, and productivity workspaces across Web, Android, and iOS.
+        </p>
       </section>
       <ToolSection title="Trending tools" tools={trending} />
       </div>
