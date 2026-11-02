@@ -4,6 +4,8 @@ import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import { toolSeoDescription, toolSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
+const toolDocumentationSource = readFileSync(new URL("../src/lib/tool-documentation.ts", import.meta.url), "utf8");
+assert.doesNotMatch(toolDocumentationSource, /catalogue lists these related search terms for discovery/, "Raw keyword lists must not be rendered as guide copy.");
 const vercelConfig = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
 const canonicalRedirectHosts = new Set(
   (vercelConfig.redirects ?? []).flatMap((redirect) =>
