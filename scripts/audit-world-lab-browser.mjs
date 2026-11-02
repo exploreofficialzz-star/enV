@@ -381,7 +381,9 @@ try{
   assert.ok(Math.abs(groupRun.totalDissipatedEnergyJ)<1e-10);
   await page.getByRole("slider",{name:"Explore group collision time"}).fill("2.5");
   await page.getByText("Impacts completed at this moment: 2").waitFor();
-  await page.getByRole("button",{name:"Reset group impact"}).click();
+  const groupImpact=page.locator('[aria-label="Multiple moving sphere impact experiment"]');
+  await groupImpact.getByRole("button",{name:"Beginning",exact:true}).click();
+  assert.equal(await page.getByRole("slider",{name:"Explore group collision time"}).inputValue(),"0");
   // Persist newly authored spheres before requesting a destructive legacy import.
   await page.getByRole("button",{name:"Save on device"}).click();
   await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
