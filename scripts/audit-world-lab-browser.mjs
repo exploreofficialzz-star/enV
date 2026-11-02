@@ -246,8 +246,12 @@ try{
   assert.equal(evidence.inputEvidence,"hypothetical-user-assumed");
   assert.equal(evidence.assumedMassSource.assumedDensityKgM3,2);
   await page.getByRole("button",{name:"Pause"}).click();
-  await page.getByLabel(/Object opacity:/).fill("35");
-  assert.equal(await page.getByLabel(/Object opacity:/).inputValue(),"35");
+  const targetOpacity=page.getByLabel(/Selected target opacity:/);
+  await targetOpacity.fill("35");
+  assert.equal(await targetOpacity.inputValue(),"35");
+  const partOpacity=page.getByLabel(/Selected part opacity:/);
+  await partOpacity.fill("40");
+  assert.equal(await partOpacity.inputValue(),"40");
   await page.getByRole("button",{name:"Start / Recalculate"}).click();
   await page.getByText("Mechanical energy",{exact:true}).waitFor();
   await page.getByText("Position over simulated time").waitFor();
