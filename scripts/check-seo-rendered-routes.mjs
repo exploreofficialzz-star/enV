@@ -175,7 +175,7 @@ for (const route of renderedRoutes) {
     const requiredIntro = "Browse practical online calculators, unit converters, developer utilities, image and audio tools, and productivity workspaces across Web, Android, and iOS.";
     if (!html.includes(requiredIntro)) failures.push(route.path + ": homepage must explain the platform's tool categories in rendered content.");
     const requiredExploreLinks = ["/tools", "/blog", "/help", "/about", "/contact", "/pricing"];
-    const renderedHrefs = [...html.matchAll(/<a\\b[^>]*href\\s*=\\s*["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+    const renderedHrefs = [...html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
     for (const href of requiredExploreLinks) {
       if (!renderedHrefs.includes(href)) failures.push(route.path + ": footer/home discovery link is missing: " + href);
     }
