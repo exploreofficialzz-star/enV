@@ -8,6 +8,10 @@ assert.ok(result.urls.includes("/tools"));
 assert.ok(result.urls.includes("/about"));
 assert.ok(result.urls.includes("/pricing"));
 assert.ok(result.urls.includes("/blog"));
+for (const path of [
+  "/contact", "/help", "/privacy", "/terms", "/disclaimer",
+  "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
+]) assert.ok(result.urls.includes(path), "Missing public informational route " + path);
 assert.ok(result.tools.length > 0);
 assert.ok(result.categories.length > 0);
 assert.ok(result.urls.some((path) => path.startsWith("/tools/") && path.split("/").length === 4));
@@ -38,6 +42,10 @@ assert.match(result.robots, /Sitemap: https:\/\/envtools\.store\/sitemap\.xml/);
 assert.match(result.llms, /^# enV/m);
 assert.match(result.llms, /## Public tool categories/);
 assert.match(result.llms, /## All public tool pages and guides/);
+for (const path of [
+  "/contact", "/help", "/privacy", "/terms", "/disclaimer",
+  "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
+]) assert.ok(result.llms.includes("https://envtools.store" + path), "Missing llms.txt informational route " + path);
 assert.match(result.llms, /\/sitemap\.xml/);
 assert.match(result.llms, /Do not assume a tool is available/);
 
