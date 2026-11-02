@@ -80,7 +80,7 @@ export const Route = createFileRoute("/tools/$category/$slug")({
       };
     }
     return seoPageHead({
-      title: toolSeoTitle(tool),
+      title: toolSeoTitle(tool, CANONICAL_SEO_TOOL_PAGES),
       description: toolSeoDescription(tool),
       path: canonicalPath,
       structuredData: toolSchema(tool)
