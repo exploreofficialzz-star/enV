@@ -99,7 +99,7 @@ export const Route = createFileRoute("/blog/$slug")({
       };
     }
     return seoPageHead({
-      title: toolGuideSeoTitle(loaderData.tool),
+      title: toolGuideSeoTitle(loaderData.tool, CANONICAL_SEO_GUIDES),
       description,
       path,
       type: "article",
