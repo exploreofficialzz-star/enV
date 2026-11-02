@@ -99,13 +99,16 @@ for (const category of CATEGORIES) {
   });
   const sampleTool = publicTools[0];
   if (sampleTool) {
-    routeMap.set(toolPath(sampleTool), {
-      path: toolPath(sampleTool),
+    const sampleToolPath = toolPath(sampleTool);
+    routeMap.set(sampleToolPath, {
+      ...(routeMap.get(sampleToolPath) ?? {}),
+      path: sampleToolPath,
       kind: "indexable",
       schema: "SoftwareApplication",
     });
     const guidePath = "/blog/tool-" + sampleTool.id;
     routeMap.set(guidePath, {
+      ...(routeMap.get(guidePath) ?? {}),
       path: guidePath,
       kind: "indexable",
       schema: "TechArticle",
