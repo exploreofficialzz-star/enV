@@ -8,10 +8,21 @@ const routes = [
   { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
   { path: "/blog/tool-json-formatter", kind: "indexable", schema: "TechArticle", aboutUrl: "https://envtools.store/tools/developer/json-studio" },
   { path: "/about", kind: "indexable", schema: "AboutPage" },
+  { path: "/pricing", kind: "indexable", schema: "WebPage" },
   { path: "/help", kind: "indexable", schema: "CollectionPage" },
   { path: "/contact", kind: "indexable", schema: "ContactPage" },
   { path: "/privacy", kind: "indexable", schema: "WebPage" },
+  { path: "/terms", kind: "indexable", schema: "WebPage" },
+  { path: "/disclaimer", kind: "indexable", schema: "WebPage" },
+  { path: "/responsible-use", kind: "indexable", schema: "WebPage" },
+  { path: "/platform/android", kind: "indexable", schema: "WebPage" },
+  { path: "/platform/ios", kind: "indexable", schema: "WebPage" },
   { path: "/token-guide", kind: "indexable", schema: "WebPage" },
+  { path: "/tools/calculators", kind: "indexable", schema: "CollectionPage" },
+  { path: "/tools/developer", kind: "indexable", schema: "CollectionPage" },
+  { path: "/tools/business", kind: "indexable", schema: "CollectionPage" },
+  { path: "/blog", kind: "indexable", schema: "CollectionPage" },
+  { path: "/blog/a-more-private-way-to-use-online-tools", kind: "indexable", schema: "Article" },
   { path: "/search?q=json", kind: "noindex" },
   { path: "/wallet", kind: "noindex" },
   { path: "/updates", kind: "noindex" },
@@ -55,6 +66,8 @@ for (const route of routes) {
   const twitterCard = metaContent(head, "name", "twitter:card");
   const twitterTitle = metaContent(head, "name", "twitter:title");
   const twitterDescription = metaContent(head, "name", "twitter:description");
+  const twitterImage = metaContent(head, "name", "twitter:image");
+  const ogImageAlt = metaContent(head, "property", "og:image:alt");
   const canonicals = [...head.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => match[0])
     .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
@@ -88,9 +101,11 @@ for (const route of routes) {
     if (!ogDescription || ogDescription !== description) failures.push(route.path + ": Open Graph description must match the page description");
     if (!ogUrl || ogUrl !== canonical) failures.push(route.path + ": Open Graph URL must match the canonical URL");
     if (!ogImage || !ogImage.startsWith("https://envtools.store/")) failures.push(route.path + ": Open Graph image must use the canonical host");
+    if (!ogImageAlt.trim()) failures.push(route.path + ": Open Graph image must have descriptive alt text");
     if (twitterCard !== "summary_large_image") failures.push(route.path + ": Twitter card must use summary_large_image");
     if (twitterTitle !== title) failures.push(route.path + ": Twitter title must match the page title");
     if (twitterDescription !== description) failures.push(route.path + ": Twitter description must match the page description");
+    if (twitterImage !== ogImage) failures.push(route.path + ": Twitter image must match the Open Graph image");
   } else if (!robots.includes("noindex")) {
     failures.push(route.path + ": private or interaction-only route must be marked noindex");
   }
@@ -105,6 +120,7 @@ for (const route of routes) {
     ogTitle,
     ogUrl,
     ogImage,
+    ogImageAlt,
     twitterCard,
     schema: hasSchema ? route.schema : null,
   });
@@ -115,6 +131,7 @@ async function auditStaticDiscoveryFiles() {
     { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
     { path: "/sitemap.xml", required: ["<urlset", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/tool-json-studio"] },
     { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "https://envtools.store/tools/developer/json-studio"] },
+    { path: "/og.jpg", image: true },
   ];
   for (const asset of assets) {
     try {
@@ -122,10 +139,21 @@ async function auditStaticDiscoveryFiles() {
         redirect: "follow",
         signal: AbortSignal.timeout(20_000),
       });
-      const body = await response.text();
+      const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
       if (!response.ok) failures.push(asset.path + ": HTTP " + response.status);
+      if (asset.image) {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!contentType.startsWith("image/")) failures.push(asset.path + ": expected an image content type, received " + contentType);
+        if (bytes.length < 1_024) failures.push(asset.path + ": social preview image is unexpectedly small or empty");
+        report.push({ path: asset.path, status: response.status, contentType, contentLength: bytes.length });
+        continue;
+      }
+      const body = await response.text();
       if (!body.trim() || body.trimStart().startsWith("<!doctype html")) {
         failures.push(asset.path + ": expected a static discovery file, not an HTML fallback");
+      }
+      if (asset.path === "/sitemap.xml" && !/(application|text)\\/xml/.test(contentType)) {
+        failures.push("/sitemap.xml: expected an XML content type, received " + contentType);
       }
       for (const phrase of asset.required) {
         if (!body.includes(phrase)) failures.push(asset.path + ": missing required content " + phrase);
