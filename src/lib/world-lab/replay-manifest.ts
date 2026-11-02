@@ -47,7 +47,7 @@ export function createReplayManifest(input:ModelInput,options:Readonly<{worldEpo
    samples.some((t,i)=>!Number.isFinite(t)||t<0||(i>0&&t<=samples[i-1])))throw new Error("Replay sample axis must increase from zero through at most 12 seconds.");
  const raw=input as unknown as Record<string,unknown>;
  const parameters=Object.fromEntries(KEYS[input.kind].map(k=>[k,Number(raw[k])]));
- const base={format:FORMAT as const,schemaVersion:1 as const,modelId:input.kind,modelVersion:MODEL_VERSION,
+ const base:Omit<WorldLabReplayManifest,"inputFingerprint">={format:FORMAT,schemaVersion:1,modelId:input.kind,modelVersion:MODEL_VERSION,
    worldEpochUTC:new Date(options.worldEpochUTC).toISOString(),timezoneDisplay:options.timezoneDisplay,
    parameters,sampleTimesSeconds:samples,mandatoryEventTimesSeconds:[] as readonly number[],
    eventQueuePolicy:EVENT,randomStatePolicy:RANDOM,solverStatePolicy:SOLVER};
