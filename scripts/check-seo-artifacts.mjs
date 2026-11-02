@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
@@ -49,6 +49,16 @@ assert.ok(organization.brand.sameAs.includes("https://x.com/envtoolz"));
 const serializedWebsite = JSON.stringify(website);
 assert.ok(serializedWebsite.includes("enV Digital Toolkit"));
 assert.ok(serializedWebsite.includes("enV by chAs Technologies LLC"));
+const longTargetX = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Determinant", " Online | enV");
+const longTargetY = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Inverse", " Online | enV");
+const guideTargetX = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Determinant", " documentation | enV");
+const guideTargetY = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Inverse", " documentation | enV");
+assert.notEqual(longTargetX, longTargetY, "Long formula tool titles must preserve distinct solve-for targets.");
+assert.notEqual(guideTargetX, guideTargetY, "Long formula guide titles must preserve distinct solve-for targets.");
+for (const title of [longTargetX, longTargetY, guideTargetX, guideTargetY]) {
+  assert.ok(title.length <= 65, "Semantic tool and guide titles must stay within the title limit.");
+  assert.match(title, /Solve for (Determinant|Inverse)/, "Semantic solve-for context must survive title shortening.");
+}
 const publicToolTitles = result.tools.map(toolSeoTitle);
 const publicToolPaths = result.tools.map(canonicalToolPath);
 const publicGuideTitles = result.guideTools.map(toolGuideSeoTitle);
