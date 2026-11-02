@@ -131,7 +131,7 @@ async function auditStaticDiscoveryFiles() {
   const assets = [
     { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
     { path: "/sitemap.xml", required: ["<urlset", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/tool-json-studio"] },
-    { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "https://envtools.store/tools/developer/json-studio"] },
+    { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "## Product articles", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/a-more-private-way-to-use-online-tools"] },
     { path: "/og.jpg", image: true },
   ];
   for (const asset of assets) {
