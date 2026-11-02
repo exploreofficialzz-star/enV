@@ -16,7 +16,8 @@ import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription,
 
 const seoToolCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
 for (const tool of getToolsByCategory("accessibility")) seoToolCandidateMap.set(tool.id, tool);
-const CANONICAL_SEO_TOOL_PAGES = canonicalSeoTools([...seoToolCandidateMap.values()]);
+const CANONICAL_SEO_TOOL_PAGES = canonicalSeoTools([...seoToolCandidateMap.values()])
+  .filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
 
 export const Route = createFileRoute("/tools/$category/$slug")({
   loader: ({ params }) => {
