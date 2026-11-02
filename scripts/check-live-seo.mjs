@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const ORIGIN = "https://envtools.store";
+const EXPECTED_HOMEPAGE_TITLE = "enV Digital Toolkit by chAs Technologies | Online Tools";
 const USER_AGENT = "enV-production-seo-smoke/1.0";
 const failures = [];
 const checked = [];
@@ -173,6 +174,38 @@ async function checkCanonicalHosts() {
   }
 }
 
+async function waitForHomepageDeployment() {
+  // The live smoke is triggered by a Git push while Vercel builds in parallel.
+  // Wait for a page-level build marker before evaluating production metadata,
+  // otherwise a fast smoke can accidentally inspect the previous deployment.
+  let last = { status: 0, title: "", url: ORIGIN + "/" };
+  for (let attempt = 1; attempt <= 24; attempt += 1) {
+    try {
+      const response = await fetch(ORIGIN + "/", {
+        redirect: "follow",
+        headers: { "user-agent": USER_AGENT },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const html = await response.text();
+      const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
+      const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+      last = { status: response.status, title, url: response.url };
+      if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE) {
+        checked.push({ path: "/", status: response.status, title, deploymentVersionConfirmed: true });
+        return true;
+      }
+    } catch (error) {
+      last = { status: 0, title: "", url: ORIGIN + "/", error: String(error) };
+    }
+    if (attempt < 24) await new Promise((resolve) => setTimeout(resolve, 5_000));
+  }
+  failures.push(
+    "production did not serve the current homepage build within 120 seconds (expected title="
+    + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(last) + ")"
+  );
+  return false;
+}
+
 async function checkRenderedRoute(path, schema) {
   const response = await get(ORIGIN + path, path);
   const html = await response.text();
@@ -193,7 +226,7 @@ async function checkRenderedRoute(path, schema) {
 
   assert(title.length >= 8 && title.length <= 65, path + " title is missing or exceeds 65 characters (" + title.length + ")");
   if (path === "/") {
-    assert(title === "enV Digital Toolkit by chAs Technologies | Online Tools", "Homepage title must disambiguate the enV brand: " + title);
+    assert(title === EXPECTED_HOMEPAGE_TITLE, "Homepage title must disambiguate the enV brand: " + title);
     assert(description.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must identify the parent brand.");
   }
   assert(description.length >= 40 && description.length <= 170, path + " has an invalid description length (" + description.length + ")");
@@ -210,6 +243,7 @@ async function checkRenderedRoute(path, schema) {
 
 async function main() {
   try {
+    await waitForHomepageDeployment();
     await checkStaticAssets();
     await checkCanonicalHosts();
     for (const [path, schema] of [
