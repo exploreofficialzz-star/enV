@@ -1055,7 +1055,7 @@ export function getToolDocumentation(tool: ToolMeta): ToolDocumentationSection[]
         "Use the exact units, syntax, source type, and options requested by the form. Required fields should be completed before running the operation. If the page returns a validation message, correct the named field or format instead of trying unrelated inputs.",
         specific.validation,
         tool.keywords.length > 0
-          ? "The catalogue associates this tool with these search topics: " + tool.keywords.slice(0, 12).join(", ") + ". These terms improve discovery; they are not a list of accepted input fields or supported formats."
+          ? "The catalogue lists these related search terms for discovery: " + tool.keywords.slice(0, 12).join(", ") + ". They describe related topics; they are not a list of accepted input fields or supported formats."
           : "No separate keyword list is published for this tool. Use its name, description, field labels, and in-tool examples to identify the intended input.",
       ],
     },
