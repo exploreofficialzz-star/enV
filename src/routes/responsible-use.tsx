@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/responsible-use")({ component: ResponsibleUse });
+export const Route = createFileRoute("/responsible-use")({
+  head: () => seoPageHead({
+    title: "enV Responsible Use Policy | Safe and Lawful Tool Use",
+    description: "Read enV's responsible-use rules for lawful tool use, privacy, consent, authorized security testing, AI output review, and reporting safety or privacy concerns.",
+    path: "/responsible-use",
+    structuredData: pageSchema("enV Responsible Use Policy", "Responsible-use expectations for people using enV tools and connected features.", "/responsible-use", "WebPage")
+  }),
+  component: ResponsibleUse
+});
 
 function ResponsibleUse() {
   return (
