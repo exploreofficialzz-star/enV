@@ -12,11 +12,14 @@ const NON_INDEXABLE_PATHS = [
   "/token-dashboard", "/tokens", "/wallet", "/userbehavior", "/updates", "/3d-game-studio",
 ];
 
-function routeRobotsPolicy(matches?: Array<{ pathname: string }>) {
+function routeRobotsPolicy(matches?: Array<{ pathname: string; routeId?: string }>) {
   const pathname = matches?.[matches.length - 1]?.pathname ?? "/";
   const path = pathname.replace(/\/+$/, "") || "/";
+  const hasPageRoute = matches?.some((match) => Boolean(match.routeId) && match.routeId !== "__root__") ?? false;
+  const notFoundRoute = matches?.some((match) => /not.?found/i.test(match.routeId ?? "")) ?? false;
   const privateRoute = NON_INDEXABLE_PATHS.some((prefix) => path === prefix || path.startsWith(prefix + "/"));
-  return path === "/search" || privateRoute ? "noindex,nofollow" : "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1";
+  if (!hasPageRoute || notFoundRoute || path === "/search" || privateRoute) return "noindex,nofollow";
+  return "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1";
 }
 
 // Apply the saved or system theme before the stylesheet can paint the page.
@@ -34,7 +37,7 @@ const INITIAL_THEME_SCRIPT = `(() => {
 
 
 export const Route = createRootRoute({
-  head: ({ matches }: { matches: Array<{ pathname: string }> }) => ({
+  head: ({ matches }: { matches: Array<{ pathname: string; routeId?: string }> }) => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },

@@ -15,6 +15,7 @@ const routes = [
   { path: "/wallet", kind: "noindex" },
   { path: "/updates", kind: "noindex" },
   { path: "/3d-game-studio", kind: "noindex" },
+  { path: "/this-route-does-not-exist-seo-audit", kind: "noindex" },
 ];
 
 function attribute(tag, name) {
