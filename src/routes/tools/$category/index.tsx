@@ -8,7 +8,7 @@ import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
 import type { CategoryId } from "@/types/tool";
-import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle } from "@/lib/seo-metadata";
+import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle, canonicalSeoTools } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/$category/")({
   loader: ({ params }) => {
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/tools/$category/")({
   head: ({ params }) => {
     const meta = CATEGORY_MAP[params.category as CategoryId];
     if (!meta) return { meta: [{ title: "Category not found | enV" }, { name: "robots", content: "noindex,follow" }] };
-    const publicTools = getToolsByCategory(params.category as CategoryId).filter(isIndexableTool);
+    const publicTools = canonicalSeoTools(getToolsByCategory(params.category as CategoryId).filter(isIndexableTool));
     if (publicTools.length === 0) {
       return { meta: [{ title: meta.name + " tools | enV" }, { name: "description", content: meta.description }, { name: "robots", content: "noindex,follow" }] };
     }
