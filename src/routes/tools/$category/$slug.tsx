@@ -6,13 +6,17 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ToolViewAnalytics } from "@/components/tools/tool-view-analytics";
 import { ToolShell } from "@/components/tools/tool-shell";
 import { ToolEngine } from "@/components/tools/tool-engine";
-import { getToolByPath, getToolById } from "@/lib/registry";
+import { getToolByPath, getToolById, getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioModeAllowed } from "@/lib/business-studios-catalog";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionPage } from "@/components/tools/under-production";
 import { CATEGORY_MAP } from "@/data/categories";
-import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool } from "@/lib/seo-metadata";
+import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool, canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath } from "@/lib/seo-metadata";
+
+const seoToolCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+for (const tool of getToolsByCategory("accessibility")) seoToolCandidateMap.set(tool.id, tool);
+const CANONICAL_SEO_TOOL_PAGES = canonicalSeoTools([...seoToolCandidateMap.values()]);
 
 export const Route = createFileRoute("/tools/$category/$slug")({
   loader: ({ params }) => {
@@ -53,6 +57,26 @@ export const Route = createFileRoute("/tools/$category/$slug")({
           { name: "robots", content: "noindex,follow" }
         ],
         links: [{ rel: "canonical", href: SITE_ORIGIN + canonicalPath }]
+      };
+    }
+    const canonicalSeoTool = canonicalSeoToolFor(tool, CANONICAL_SEO_TOOL_PAGES);
+    if (!canonicalSeoTool) {
+      return {
+        meta: [
+          { title: tool.name + " | enV" },
+          { name: "description", content: tool.description },
+          { name: "robots", content: "noindex,follow" }
+        ]
+      };
+    }
+    if (canonicalSeoTool.id !== tool.id) {
+      return {
+        meta: [
+          { title: tool.name + " | enV" },
+          { name: "description", content: tool.description },
+          { name: "robots", content: "noindex,follow" }
+        ],
+        links: [{ rel: "canonical", href: SITE_ORIGIN + canonicalToolPath(canonicalSeoTool) }]
       };
     }
     return seoPageHead({
