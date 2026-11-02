@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, organizationSchema, websiteSchema } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
@@ -68,6 +68,12 @@ for (const tool of result.tools) {
   assert.ok(title.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "SEO title must identify " + tool.id);
   assert.ok(description.length >= 45 && description.length <= 160, "SEO description must be 45-160 characters for " + tool.id + ": " + description);
   assert.ok(terms.length >= 3 && terms[0] === tool.name, "Search-intent seed coverage is incomplete for " + tool.id);
+  const applicationSchema = JSON.stringify(toolSchema(tool));
+  assert.ok(applicationSchema.includes('"@type":"SoftwareApplication"'), "Missing SoftwareApplication schema for " + tool.id);
+  assert.ok(applicationSchema.includes('"name":"' + canonicalToolName(tool) + '"'), "SoftwareApplication schema has the wrong canonical name for " + tool.id);
+  assert.ok(applicationSchema.includes('"url":"https://envtools.store' + canonicalToolPath(tool) + '"'), "SoftwareApplication schema has the wrong canonical URL for " + tool.id);
+  assert.ok(applicationSchema.includes('"description":"' + tool.description.replaceAll('"', '\\"') + '"'), "SoftwareApplication schema must describe the actual tool for " + tool.id);
+  assert.ok(applicationSchema.includes(tool.name), "SoftwareApplication schema must preserve the tool's catalogued name or search identity for " + tool.id);
   assert.ok(result.inventory.includes("https://envtools.store/tools/" + tool.category + "/" + tool.slug), "Inventory misses tool " + tool.id);
   assert.ok(result.inventory.includes("https://envtools.store/blog/tool-" + tool.id), "Inventory misses guide " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(title)), "Inventory misses SEO title for " + tool.id);
@@ -96,6 +102,11 @@ for (const tool of result.guideTools) {
   assert.ok(result.inventory.includes(inventoryCell(guideTitle)), "Inventory misses guide title for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideDescription)), "Inventory misses guide description for " + tool.id);
   const guide = "/blog/tool-" + tool.id;
+  const guideSchema = JSON.stringify(technicalArticleSchema(tool, guideDescription, guide));
+  assert.ok(guideSchema.includes('"@type":"TechArticle"'), "Missing TechArticle schema for " + tool.id);
+  assert.ok(guideSchema.includes('"name":"' + canonicalToolName(tool) + '"'), "Guide schema has the wrong canonical tool name for " + tool.id);
+  assert.ok(guideSchema.includes('"url":"https://envtools.store' + canonicalToolPath(tool) + '"'), "Guide schema has the wrong canonical tool URL for " + tool.id);
+  assert.ok(guideSchema.includes('"mainEntityOfPage":"https://envtools.store' + guide + '"'), "Guide schema has the wrong canonical guide URL for " + tool.id);
   assert.ok(result.urls.includes(guide), "Missing public guide sitemap entry for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing public guide in llms.txt for " + tool.id);
   if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
