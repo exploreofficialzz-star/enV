@@ -38,6 +38,11 @@ assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.categories.length > 0);
 assert.ok(result.articles.length > 0);
+assert.ok(!result.guideTools.some((tool) => tool.engine.type === "calculator" && /^exp-product-general-product-relation-\\d+-[abc]$/.test(tool.engine.formula ?? "")), "Generic Input A/Input B equations must not be indexed.");
+const expansionFingerprints = result.guideTools
+  .filter((tool) => tool.engine.type === "calculator" && /^exp-(product|sum|ratio)-/.test(tool.engine.formula ?? ""))
+  .map((tool) => [tool.category, tool.name.trim().toLocaleLowerCase(), tool.description.trim().toLocaleLowerCase()].join("|"));
+assert.equal(new Set(expansionFingerprints).size, expansionFingerprints.length, "Generated equation search pages must be unique by equation and description.");
 const organization = organizationSchema();
 const website = websiteSchema();
 assert.equal(organization.name, "chAs Technologies LLC");
@@ -62,35 +67,6 @@ for (const title of [longTargetX, longTargetY, guideTargetX, guideTargetY]) {
 const publicToolTitles = result.tools.map(toolSeoTitle);
 const publicToolPaths = result.tools.map(canonicalToolPath);
 const publicGuideTitles = result.guideTools.map(toolGuideSeoTitle);
-const titleGroups = new Map();
-result.tools.forEach((tool, index) => {
-  const title = publicToolTitles[index];
-  const group = titleGroups.get(title) ?? [];
-  group.push(tool);
-  titleGroups.set(title, group);
-});
-const duplicateTitleGroups = [...titleGroups.entries()]
-  .filter(([, group]) => group.length > 1)
-  .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
-if (duplicateTitleGroups.length) {
-  process.stdout.write("Duplicate public SEO title diagnostics: " + JSON.stringify(
-    duplicateTitleGroups.slice(0, 35).map(([title, group]) => ({
-      title,
-      count: group.length,
-      tools: group.slice(0, 8).map((tool) => ({
-        id: tool.id,
-        slug: tool.slug,
-        name: tool.name,
-        category: tool.category,
-        engine: tool.engine.type,
-        formula: tool.engine.formula ?? tool.engine.id ?? "",
-        keywords: tool.keywords.slice(0, 8),
-      })),
-    })),
-    null,
-    2,
-  ) + "\\n");
-}
 assert.equal(new Set(publicToolTitles).size, publicToolTitles.length, "Canonical public tool SEO titles must be unique.");
 assert.equal(new Set(publicToolPaths).size, publicToolPaths.length, "Canonical public tool URLs must be unique.");
 assert.equal(new Set(publicGuideTitles).size, publicGuideTitles.length, "Public tool guide SEO titles must be unique.");
