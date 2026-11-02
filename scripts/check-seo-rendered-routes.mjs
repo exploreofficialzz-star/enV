@@ -46,7 +46,7 @@ const canonicalToolPages = canonicalSeoRecords.filter((tool) =>
   tool.category !== "developer" || tool.tags.includes("developer-studio")
 );
 
-function addTitleCollisionRoutes(tools, suffix, titleForTool, routeForTool, schema) {
+function addTitleCollisionRoutes(tools, titleForTool, routeForTool, schema) {
   const groups = new Map();
   for (const tool of tools) {
     const key = titleForTool(tool);
@@ -77,7 +77,6 @@ function addTitleCollisionRoutes(tools, suffix, titleForTool, routeForTool, sche
 // entire, rapidly growing catalogue on every CI run.
 const toolCollisionRoutes = addTitleCollisionRoutes(
   canonicalToolPages,
-  " Online | enV",
   toolSeoTitle,
   (tool) => ({ path: canonicalToolPath(tool) }),
   "SoftwareApplication",
