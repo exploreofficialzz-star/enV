@@ -8,7 +8,7 @@ import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
 const routes = [
-  { path: "/", kind: "indexable", schema: "WebSite" },
+  { path: "/", kind: "indexable", schema: "WebSite", homepageDiscovery: true },
   { path: "/tools", kind: "indexable", schema: "CollectionPage", categoryDirectory: true },
   { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
   { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
@@ -115,6 +115,16 @@ for (const route of renderedRoutes) {
   const twitterDescription = metaContent(head, "name", "twitter:description");
   const twitterImage = metaContent(head, "name", "twitter:image");
   const ogImageAlt = metaContent(head, "property", "og:image:alt");
+  if (route.homepageDiscovery) {
+    const requiredIntro = "Browse practical online calculators, unit converters, developer utilities, image and audio tools, and productivity workspaces across Web, Android, and iOS.";
+    if (!html.includes(requiredIntro)) failures.push(route.path + ": homepage must explain the platform's tool categories in rendered content.");
+    const requiredExploreLinks = ["/tools", "/blog", "/help", "/about", "/contact", "/pricing"];
+    const renderedHrefs = [...html.matchAll(/<a\\b[^>]*href\\s*=\\s*["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+    for (const href of requiredExploreLinks) {
+      if (!renderedHrefs.includes(href)) failures.push(route.path + ": footer/home discovery link is missing: " + href);
+    }
+  }
+
   if (route.categoryDirectory) {
     const hrefs = [...html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi)]
       .map((match) => match[1]);
