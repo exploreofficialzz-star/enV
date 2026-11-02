@@ -53,7 +53,7 @@ PREDICTIONS:
         assertEquals(reference,NativeWorldLabTimeScales.tcgMjdToTtMjd(reference),0.0)
         assertEquals(reference+1.0/(1.0-NativeWorldLabTimeScales.IAU_LG),
             NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1.0),1e-11)
-        assertEquals(reference-NativeWorldLabTimeScales.IAU_TDB0_SECONDS/86400.0,
+        assertEquals(reference+NativeWorldLabTimeScales.IAU_TDB0_SECONDS/86400.0,
             NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),1e-11)
         listOf(-1_000_000.0,reference,1_000_000.0,100_000_000.0).forEach { value ->
             assertEquals(value,NativeWorldLabTimeScales.tcgMjdToTtMjd(
@@ -69,7 +69,10 @@ PREDICTIONS:
         val result=NativeWorldLabTimeScales.utcToTcg("2026-11-01T12:00:00Z")
         assertEquals("IAU 2000 Resolution B1.9",result.source)
         assertTrue(result.tcgMjd>result.ttMjd)
-        assertTrue((result.tcgMjd-result.ttMjd)*86400.0<0.01)
+        val expectedDeltaSeconds=(result.ttMjd-NativeWorldLabTimeScales.IAU_REFERENCE_MJD)*
+            NativeWorldLabTimeScales.IAU_LG/(1.0-NativeWorldLabTimeScales.IAU_LG)*86400.0
+        assertEquals(expectedDeltaSeconds,(result.tcgMjd-result.ttMjd)*86400.0,1e-8)
+        assertTrue(expectedDeltaSeconds>1.0)
     }
     @Test fun conversionsFailClosedOutsideDataValidity(){
         assertThrows(IllegalArgumentException::class.java){

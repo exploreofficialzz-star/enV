@@ -31,9 +31,12 @@ class NativeWorldLabDemoCheckpointTest {
  }
  @Test fun rejectsWrongVersionTamperingAndUnknownFields(){
   val valid=NativeWorldLabDemoCheckpointCodec.encode(NativeWorldLabDemoCheckpoint("heat",2.0,1.0,4.0,1000.0,0.02))
-  assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(valid.replace("\"schemaVersion\": 1","\"schemaVersion\": 9"))}
-  assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(valid.replace("\"timeSeconds\": 2.0","\"timeSeconds\": 999.0"))}
-  assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(valid.dropLast(1)+",\"code\":\"unsafe\"}")}
+  val wrongVersion=org.json.JSONObject(valid).put("schemaVersion",9).toString()
+  assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(wrongVersion)}
+  val changedTime=org.json.JSONObject(valid).put("timeSeconds",999.0).toString()
+  assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(changedTime)}
+  val unknownField=org.json.JSONObject(valid).put("code","unsafe").toString()
+  assertThrows(IllegalArgumentException::class.java){NativeWorldLabDemoCheckpointCodec.decode(unknownField)}
  }
  @Test fun versionTwoClockCheckpointRemainsReadableWithoutSolverStep(){
   val json="""{"format":"env-world-lab-native-demo-checkpoint","schemaVersion":2,"modelVersion":"1.0.0","modelId":"spring","timeSeconds":2.0,"massKg":1.0,"springNPerM":4.0,"resistanceOhm":1000.0,"diffusivityM2PerS":0.02,"wallTimeUTC":"2026-11-01T12:00:00Z","worldEpochUTC":"2020-01-01T00:00:00Z","solverInternalTimeSeconds":2.0,"displaySampleTimeSeconds":2.0,"playbackRate":1.0,"playbackDirection":"forward","timezoneDisplay":"UTC"}"""

@@ -93,10 +93,11 @@ class NativeWorldLabFieldLayerTest {
         val values=(0 until 48).map{index->
             when(index%3){0->1.0;1->0.0;else->0.0}
         }
-        val invalid=NativeWorldLabFieldLayerCodec.decode(field(
-            kind="vector",renderer="streamlines",values=values,interpolation="nearest"
-        ))
-        assertThrows(IllegalArgumentException::class.java){invalid.vectorStreamlines(0.0)}
+        assertThrows(IllegalArgumentException::class.java){
+            NativeWorldLabFieldLayerCodec.decode(field(
+                kind="vector",renderer="streamlines",values=values,interpolation="nearest"
+            ))
+        }
         val layer=NativeWorldLabFieldLayerCodec.decode(field(
             kind="vector",renderer="streamlines",values=values,interpolation="linear",validated=true
         ))

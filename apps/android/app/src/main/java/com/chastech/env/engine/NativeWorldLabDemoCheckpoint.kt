@@ -1,5 +1,6 @@
 package com.chastech.env.engine
 import org.json.JSONObject
+import java.time.DateTimeException
 import java.time.Instant
 import java.time.ZoneId
 
@@ -73,7 +74,11 @@ object NativeWorldLabDemoCheckpointCodec {
    require(v.playbackDirection in setOf("forward","reverse-recording"))
    if(v.solverStepSeconds!=null)require(v.solverStepSeconds.isFinite()&&v.solverStepSeconds in 1e-9..12.0)
    require(!v.timezoneDisplay.isNullOrBlank()&&v.timezoneDisplay.length<=120)
-   ZoneId.of(v.timezoneDisplay)
+   try {
+    ZoneId.of(v.timezoneDisplay)
+   } catch (cause: DateTimeException) {
+    throw IllegalArgumentException("Timezone display must be a valid IANA timezone.",cause)
+   }
   }
  }
 }

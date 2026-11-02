@@ -326,7 +326,11 @@ object NativeWorldLabVehicle {
             i.driveThrottle * i.maxWheelForceN,
             min(i.tireFriction * normal, min(i.motorMaxCurrentA * i.motorForceConstantNPerA, i.motorMaxPowerW * i.motorEfficiency / max(s.vx, 0.5))),
         ) else 0.0
-        var cruise = if (motorAvailable && airborne && i.mode != "road-only") i.maxCruiseThrustN * i.driveThrottle else 0.0
+        // Fixed-wing propellers provide thrust during the takeoff roll as well as in flight.
+        // Rotorcraft horizontal cruise thrust remains flight-only; rotor thrust handles lift.
+        val cruisePropulsionAvailable = i.mode == "fixed-wing" ||
+            (airborne && i.mode == "rotorcraft")
+        var cruise = if (motorAvailable && cruisePropulsionAvailable) i.maxCruiseThrustN * i.driveThrottle else 0.0
         val wheelP = wheel * max(s.vx, 0.5)
         val wheelI = wheel / i.motorForceConstantNPerA
         val cruiseP = cruise * max(speed, 0.5) / i.cruiseEfficiency
