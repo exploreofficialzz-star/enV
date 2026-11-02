@@ -12,7 +12,7 @@ const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", im
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
 assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_SHA__'), "Every route must expose the source revision used to build it.");
-assert.ok(seoMetadataSource.includes('name: "env-build-sha", content: __ENV_BUILD_SHA__'), "SEO-managed pages must expose the source revision used to build them.");
+assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker must be emitted once by the root document.");
 assert.ok(rootRouteSource.includes('title: "enV Digital Toolkit by chAs Technologies | Online Tools"'), "Homepage title must identify the enV product and parent brand.");
 assert.ok(rootRouteSource.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must disambiguate the enV brand from unrelated EnvTools products.");
 assert.doesNotMatch(seoHeadSource, /webmasterVerificationMeta\(\)/, "Child routes must not duplicate root verification tags.");
