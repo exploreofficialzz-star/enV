@@ -67,6 +67,8 @@ jobs:
         run: npm ci
       - name: Build real enV web app
         run: npm run build
+      - name: Verify catalog-wide SEO metadata and generated artifacts
+        run: npm run check:seo
       - name: Configure Chromium for Playwright
         run: |
           browser_path="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
