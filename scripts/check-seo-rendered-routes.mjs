@@ -342,4 +342,4 @@ if (failures.length) {
   process.stderr.write("Rendered SEO audit failed with " + failures.length + " issue(s):\n" + failures.map((item) => "- " + item).join("\n") + "\n");
   process.exit(1);
 }
-process.stdout.write("PASS: rendered metadata, canonicals, structured data, noindex policies, robots.txt, sitemap.xml and llms.txt (" + toolCollisionRoutes + " tool collision routes, " + guideCollisionRoutes + " guide collision routes).\\n");
+process.stdout.write("PASS: rendered metadata, canonicals, structured data, noindex policies, robots.txt, sitemap.xml and llms.txt (" + toolCollisionRoutes + " tool collision routes, " + guideCollisionRoutes + " guide collision routes).\n");
