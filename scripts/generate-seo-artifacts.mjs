@@ -5,12 +5,14 @@ import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { isToolUnderProduction } from "../src/lib/production-notice.ts";
+import { toolSeoTitle, toolSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
 const OUTPUTS = [
   ["public/robots.txt", "robots"],
   ["public/sitemap.xml", "sitemap"],
   ["public/llms.txt", "llms"],
+  ["docs/seo-tool-inventory.md", "inventory"],
 ];
 
 function escapeXml(value) {
@@ -115,6 +117,36 @@ export function buildSeoArtifacts() {
     "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description,
     "  - [Usage guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
   ].join("\n"));
+  const tableCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
+  const inventoryRows = tools.map((tool) => {
+    const canonical = SITE_ORIGIN + toolPath(tool);
+    const guide = SITE_ORIGIN + "/blog/tool-" + tool.id;
+    return [
+      "| [" + tableCell(tool.name) + "](" + canonical + ")",
+      tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
+      tableCell(toolSeoTitle(tool)),
+      tableCell(toolSeoDescription(tool)),
+      tableCell(toolSearchIntentTerms(tool).join(", ")),
+      "[Guide](" + guide + ") |",
+    ].join(" | ");
+  });
+  const inventory = [
+    "# enV public tool SEO inventory",
+    "",
+    "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
+    "",
+    "- Public tools included: " + tools.length,
+    "- Tool categories included: " + categories.length,
+    "- Canonical host: " + SITE_ORIGIN,
+    "- Each row links to the canonical tool page and its detailed usage guide.",
+    "- Search-intent terms are seeded from each tool's name, category, keywords, and tags in the product catalogue. They are not keyword-volume estimates or claims that every phrase has search demand.",
+    "",
+    "| Tool | Category | SEO title | Meta description | Catalogue search-intent seeds | Usage guide |",
+    "|---|---|---|---|---|---|",
+    ...inventoryRows,
+    "",
+  ].join("\n");
+
   const llms = [
     "# enV",
     "",
@@ -154,7 +186,7 @@ export function buildSeoArtifacts() {
     "",
   ].join("\n");
 
-  return { sitemap, robots, llms, urls: [...paths], tools, categories };
+  return { sitemap, robots, llms, inventory, urls: [...paths], tools, categories };
 }
 
 async function run() {

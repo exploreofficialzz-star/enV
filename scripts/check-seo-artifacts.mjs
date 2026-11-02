@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import { toolSeoDescription, toolSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolSearchIntentTerms } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const vercelConfig = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
@@ -40,6 +41,14 @@ for (const tool of result.tools) {
   assert.ok(seoTitle.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "Tool title must identify " + tool.id);
   assert.ok(seoDescription.length >= 45 && seoDescription.length <= 160, "Tool description must be useful and bounded for " + tool.id + ": " + seoDescription);
   assert.ok(searchTerms.length >= 3, "Tool search intent terms are incomplete for " + tool.id);
+  const title = toolSeoTitle(tool);
+  const description = toolSeoDescription(tool);
+  const terms = toolSearchIntentTerms(tool);
+  assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
+  assert.ok(description.length >= 45 && description.length <= 160, "SEO description must be 45-160 characters for " + tool.id + ": " + description);
+  assert.ok(terms.length >= 3, "Search-intent seed coverage is incomplete for " + tool.id);
+  assert.ok(result.inventory.includes("https://envtools.store/tools/" + tool.category + "/" + tool.slug), "Inventory misses tool " + tool.id);
+  assert.ok(result.inventory.includes("https://envtools.store/blog/tool-" + tool.id), "Inventory misses guide " + tool.id);
   const route = "/tools/" + tool.category + "/" + tool.slug;
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
@@ -48,6 +57,8 @@ for (const tool of result.tools) {
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
 assert.ok(result.sitemap.includes("<urlset"));
+assert.match(result.inventory, /^# enV public tool SEO inventory/m);
+assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
 assert.match(result.robots, /User-agent: OAI-SearchBot\nAllow: \/\nDisallow: \/api\//);
