@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, categorySchema } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
@@ -36,7 +36,7 @@ assert.ok(result.articles.length > 0);
 for (const category of result.categories) {
   const title = categorySeoTitle(category.name);
   assert.ok(title.length <= 65, "Category SEO title exceeds 65 characters for " + category.id);
-  assert.ok(title.includes(category.name), "Category SEO title must identify " + category.id);
+  assert.ok(title.startsWith(category.name), "Category SEO title must identify " + category.id);
 }
 assert.ok(result.urls.some((path) => path.startsWith("/tools/") && path.split("/").length === 4));
 assert.ok(result.urls.some((path) => path.startsWith("/blog/tool-")));
@@ -47,6 +47,7 @@ for (const tool of result.tools) {
   const description = toolSeoDescription(tool);
   const terms = toolSearchIntentTerms(tool);
   assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
+  assert.ok(title.toLowerCase().startsWith(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "SEO title must preserve the tool name at the front: " + tool.id);
   assert.ok(title.toLowerCase().includes(tool.name.toLowerCase().slice(0, Math.min(12, tool.name.length))), "SEO title must identify " + tool.id);
   assert.ok(description.length >= 45 && description.length <= 160, "SEO description must be 45-160 characters for " + tool.id + ": " + description);
   assert.ok(terms.length >= 3 && terms[0] === tool.name, "Search-intent seed coverage is incomplete for " + tool.id);
@@ -82,10 +83,18 @@ for (const tool of result.guideTools) {
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing public guide in llms.txt for " + tool.id);
   if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
     assert.ok(!result.urls.includes("/tools/developer/" + tool.slug), "Legacy Developer alias must not be listed as a canonical tool URL: " + tool.id);
+    assert.equal(canonicalToolPath(tool), "/tools/developer/" + (tool.id === "artboard-studio" ? "artboard-studio" : canonicalToolPath(tool).split("/").at(-1)), "Legacy Developer guide must have a canonical Studio destination.");
   }
 }
 assert.ok(!result.urls.includes("/tools/developer/artboard-studio"), "Retired Artboard route must not be listed in the sitemap.");
 assert.ok(!result.urls.includes("/blog/tool-artboard-studio"), "Retired Artboard guide must not be listed in the sitemap.");
+const legacyDeveloperTool = result.guideTools.find((tool) => tool.category === "developer" && !tool.tags.includes("developer-studio"));
+if (legacyDeveloperTool) {
+  const schema = categorySchema("Developer", "Developer tools", "/tools/developer", [legacyDeveloperTool]);
+  const serialized = JSON.stringify(schema);
+  assert.ok(serialized.includes("https://envtools.store" + canonicalToolPath(legacyDeveloperTool)), "Developer ItemList must use the Studio canonical URL.");
+  assert.ok(!serialized.includes("https://envtools.store/tools/developer/" + legacyDeveloperTool.slug), "Developer ItemList must not expose a legacy alias URL.");
+}
 assert.ok(result.sitemap.includes("<urlset"));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);

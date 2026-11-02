@@ -180,7 +180,7 @@ export function articleSeoTitle(title: string): string {
 }
 
 export function categorySeoTitle(name: string): string {
-  return boundedSeoTitle(name, " Tools | enV");
+  return boundedSeoTitle(name, " | enV");
 }
 
 export function toolGuideSeoTitle(tool: ToolMeta): string {
@@ -193,6 +193,10 @@ export function canonicalToolPath(tool: ToolMeta): string {
     return "/tools/developer/" + studio.slug;
   }
   return "/tools/" + tool.category + "/" + tool.slug;
+}
+
+export function toolSeoTitle(tool: ToolMeta): string {
+  return boundedSeoTitle(tool.name, " Online | enV");
 }
 
 export function toolSchema(tool: ToolMeta) {
@@ -230,7 +234,7 @@ export function categorySchema(name: string, description: string, path: string, 
         "@type": "ListItem",
         position: index + 1,
         name: tool.name,
-        url: absoluteSiteUrl("/tools/" + tool.category + "/" + tool.slug),
+        url: absoluteSiteUrl(canonicalToolPath(tool)),
       })),
     },
   }, [
