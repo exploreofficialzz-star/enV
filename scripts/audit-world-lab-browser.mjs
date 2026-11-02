@@ -332,7 +332,9 @@ try{
   await page.getByRole("slider",{name:"Explore three-dimensional impact time"}).fill("2");
   const laterSphereCoords=await page.getByText(/Computed world coordinates, first/).innerText();
   assert.notEqual(earlySphereCoords,laterSphereCoords);
-  await page.getByRole("button",{name:"Reset 3D impact"}).click();
+  await page.getByLabel("Verified three-dimensional impact results")
+    .getByRole("button",{name:"Beginning",exact:true}).click();
+  assert.equal(await page.getByRole("slider",{name:"Explore three-dimensional impact time"}).inputValue(),"0");
   // A full three-sphere chain now uses THREE real movable scene objects.
   // The event solver must find two distinct sequential contacts, not fake a
   // single two-sphere trajectory as multi-body physics.
