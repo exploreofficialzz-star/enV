@@ -266,6 +266,7 @@ export function buildSeoArtifacts() {
   ].join("\n");
 
   return {
+    eligibleToolCount: eligibleToolRecords.length,
     sitemap,
     sitemapFiles: sitemapArtifacts.files,
     sitemapUrlCount: sitemapArtifacts.totalUrls,
