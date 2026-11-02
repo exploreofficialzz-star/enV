@@ -318,3 +318,79 @@ export function isIndexableTool(tool: ToolMeta): boolean {
   return (tool.status === "active" || tool.status === "beta") && !isToolUnderProduction(tool);
 }
 
+function expansionSeoFingerprint(tool: ToolMeta): string | null {
+  if (tool.engine.type !== "calculator") return null;
+  const formula = tool.engine.formula ?? "";
+  if (!/^exp-(product|sum|ratio)-/.test(formula)) return null;
+  const normalize = (value: string) => value.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+  return [
+    tool.category,
+    tool.engine.type,
+    normalize(tool.name),
+    normalize(tool.description),
+  ].join("|");
+}
+
+function isGenericExpansionPlaceholder(tool: ToolMeta): boolean {
+  return tool.engine.type === "calculator"
+    && /^exp-product-general-product-relation-\d+-[abc]$/.test(tool.engine.formula ?? "");
+}
+
+function expansionCanonicalPriority(tool: ToolMeta): number {
+  if (tool.engine.type !== "calculator") return 99;
+  const familyKey = (tool.engine.formula ?? "").replace(/^exp-(product|sum|ratio)-/, "");
+  const prefix = familyKey.split("-")[0];
+  const priorities: Record<string, number> = {
+    math: 0,
+    science: 1,
+    engineering: 2,
+    business: 3,
+    advanced: 4,
+    applied: 5,
+    technical: 6,
+    core: 7,
+  };
+  return priorities[prefix] ?? 20;
+}
+
+/**
+ * Return one public SEO page per distinct generated equation. The underlying
+ * catalog entries remain available in the app; only pages with identical
+ * equation labels and descriptions are consolidated for search indexing.
+ * Generic Input A/Input B placeholders are not useful standalone search pages.
+ */
+export function canonicalSeoTools(tools: readonly ToolMeta[]): ToolMeta[] {
+  const uniqueById = new Map(tools.map((tool) => [tool.id, tool]));
+  const candidates = [...uniqueById.values()]
+    .filter(isIndexableTool)
+    .filter((tool) => !isGenericExpansionPlaceholder(tool));
+  const expansionWinners = new Map<string, ToolMeta>();
+
+  for (const tool of candidates) {
+    const fingerprint = expansionSeoFingerprint(tool);
+    if (!fingerprint) continue;
+    const current = expansionWinners.get(fingerprint);
+    if (!current) {
+      expansionWinners.set(fingerprint, tool);
+      continue;
+    }
+    const priority = expansionCanonicalPriority(tool);
+    const currentPriority = expansionCanonicalPriority(current);
+    if (priority < currentPriority || (priority === currentPriority && tool.id.localeCompare(current.id) < 0)) {
+      expansionWinners.set(fingerprint, tool);
+    }
+  }
+
+  return candidates.filter((tool) => {
+    const fingerprint = expansionSeoFingerprint(tool);
+    return !fingerprint || expansionWinners.get(fingerprint)?.id === tool.id;
+  });
+}
+
+export function canonicalSeoToolFor(tool: ToolMeta, canonicalTools: readonly ToolMeta[]): ToolMeta | undefined {
+  if (!isIndexableTool(tool) || isGenericExpansionPlaceholder(tool)) return undefined;
+  const fingerprint = expansionSeoFingerprint(tool);
+  if (!fingerprint) return canonicalTools.find((candidate) => candidate.id === tool.id);
+  return canonicalTools.find((candidate) => expansionSeoFingerprint(candidate) === fingerprint);
+}
+
