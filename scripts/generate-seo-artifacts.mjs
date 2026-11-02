@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
@@ -8,6 +8,8 @@ import { canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, t
 import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
+const SITEMAP_MAX_URLS = 40_000;
+const SITEMAP_MAX_BYTES = 48 * 1024 * 1024;
 const OUTPUTS = [
   ["public/robots.txt", "robots"],
   ["public/sitemap.xml", "sitemap"],
@@ -23,6 +25,59 @@ function escapeXml(value) {
 
 function isPublicTool(tool) {
   return isIndexableTool(tool);
+}
+
+function buildUrlSet(paths) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...paths.map((path) => "  <url><loc>" + escapeXml(SITE_ORIGIN + path) + "</loc></url>"),
+    "</urlset>",
+    "",
+  ].join("\n");
+}
+
+export function buildSitemapArtifacts(inputPaths) {
+  const sortedPaths = [...new Set(inputPaths)].sort();
+  const files = [];
+  for (let offset = 0; offset < sortedPaths.length; offset += SITEMAP_MAX_URLS) {
+    const paths = sortedPaths.slice(offset, offset + SITEMAP_MAX_URLS);
+    const number = String(files.length + 1).padStart(3, "0");
+    const content = buildUrlSet(paths);
+    const bytes = Buffer.byteLength(content, "utf8");
+    if (paths.length > 50_000 || bytes > SITEMAP_MAX_BYTES) {
+      throw new Error(
+        "Generated sitemap shard exceeds protocol limits (" + paths.length +
+        " URLs, " + bytes + " bytes). Reduce the shard size before publishing.",
+      );
+    }
+    files.push({
+      path: "public/sitemaps/sitemap-" + number + ".xml",
+      url: SITE_ORIGIN + "/sitemaps/sitemap-" + number + ".xml",
+      content,
+      count: paths.length,
+    });
+  }
+
+  if (files.length <= 1) {
+    return {
+      sitemap: files[0]?.content ?? buildUrlSet([]),
+      files: [],
+      totalUrls: sortedPaths.length,
+    };
+  }
+
+  const sitemapIndex = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...files.map((file) => "  <sitemap><loc>" + escapeXml(file.url) + "</loc></sitemap>"),
+    "</sitemapindex>",
+    "",
+  ].join("\n");
+  if (Buffer.byteLength(sitemapIndex, "utf8") > SITEMAP_MAX_BYTES) {
+    throw new Error("Generated sitemap index exceeds the 50 MB protocol limit.");
+  }
+  return { sitemap: sitemapIndex, files, totalUrls: sortedPaths.length };
 }
 
 export function buildSeoArtifacts() {
@@ -45,13 +100,8 @@ export function buildSeoArtifacts() {
   for (const tool of guideTools) paths.add("/blog/tool-" + tool.id);
   for (const article of BLOG_ARTICLES) paths.add("/blog/" + article.slug);
 
-  const sitemap = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...[...paths].sort().map((path) => "  <url><loc>" + escapeXml(SITE_ORIGIN + path) + "</loc></url>"),
-    "</urlset>",
-    "",
-  ].join("\n");
+  const sitemapArtifacts = buildSitemapArtifacts([...paths]);
+  const sitemap = sitemapArtifacts.sitemap;
 
   const robots = [
     "# Search and citation crawlers are allowed to discover public enV pages.",
@@ -212,7 +262,19 @@ export function buildSeoArtifacts() {
     "",
   ].join("\n");
 
-  return { sitemap, robots, llms, inventory, urls: [...paths], tools, guideTools, categories, articles: BLOG_ARTICLES };
+  return {
+    sitemap,
+    sitemapFiles: sitemapArtifacts.files,
+    sitemapUrlCount: sitemapArtifacts.totalUrls,
+    robots,
+    llms,
+    inventory,
+    urls: [...paths],
+    tools,
+    guideTools,
+    categories,
+    articles: BLOG_ARTICLES,
+  };
 }
 
 async function run() {
@@ -239,11 +301,36 @@ async function run() {
       await writeFile(absolutePath, artifacts[key], "utf8");
     }
   }
+  const sitemapDirectory = resolve(process.cwd(), "public/sitemaps");
+  const expectedShardNames = new Set(artifacts.sitemapFiles.map((file) => file.path.split("/").pop()));
+  if (check) {
+    for (const file of artifacts.sitemapFiles) {
+      const actual = await readFile(resolve(process.cwd(), file.path), "utf8").catch(() => "");
+      if (actual !== file.content) mismatches.push(file.path);
+    }
+    const existing = await readdir(sitemapDirectory).catch(() => []);
+    for (const name of existing) {
+      if (/^sitemap-\d+\.xml$/.test(name) && !expectedShardNames.has(name)) {
+        mismatches.push("public/sitemaps/" + name + " (stale)");
+      }
+    }
+  } else {
+    if (artifacts.sitemapFiles.length) await mkdir(sitemapDirectory, { recursive: true });
+    for (const file of artifacts.sitemapFiles) {
+      await writeFile(resolve(process.cwd(), file.path), file.content, "utf8");
+    }
+    const existing = await readdir(sitemapDirectory).catch(() => []);
+    for (const name of existing) {
+      if (/^sitemap-\d+\.xml$/.test(name) && !expectedShardNames.has(name)) {
+        await unlink(resolve(sitemapDirectory, name));
+      }
+    }
+  }
   if (mismatches.length) throw new Error("SEO artifacts are missing or outdated: " + mismatches.join(", ") + ". Run npm run generate:seo.");
   if (check) {
-    process.stdout.write("SEO artifacts are current (" + artifacts.urls.length + " public URLs, " + artifacts.tools.length + " public tools).\n");
+    process.stdout.write("SEO artifacts are current (" + artifacts.sitemapUrlCount + " public URLs across " + Math.max(1, artifacts.sitemapFiles.length) + " sitemap file(s), " + artifacts.tools.length + " public tools).\n");
   } else {
-    process.stdout.write("Generated robots.txt, sitemap.xml and llms.txt (" + artifacts.urls.length + " public URLs, " + artifacts.tools.length + " public tools).\n");
+    process.stdout.write("Generated robots.txt, sitemap.xml" + (artifacts.sitemapFiles.length ? " and " + artifacts.sitemapFiles.length + " sitemap shard(s)" : "") + ", plus llms.txt (" + artifacts.sitemapUrlCount + " public URLs, " + artifacts.tools.length + " public tools).\n");
   }
 }
 

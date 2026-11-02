@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
+import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
@@ -100,7 +100,14 @@ if (legacyDeveloperTool) {
   assert.ok(guideSchema.includes('"name":"' + canonicalToolName(legacyDeveloperTool) + '"'), "Legacy guide SoftwareApplication must use the canonical Studio name.");
   assert.ok(guideSchema.includes('"url":"https://envtools.store' + canonicalToolPath(legacyDeveloperTool) + '"'), "Legacy guide SoftwareApplication must use the canonical Studio URL.");
 }
-assert.ok(result.sitemap.includes("<urlset"));
+assert.ok(result.sitemap.includes(result.sitemapFiles.length ? "<sitemapindex" : "<urlset"));
+assert.equal(result.sitemapUrlCount, result.urls.length);
+assert.ok(result.sitemapFiles.every((file) => file.count <= 40_000 && file.content.includes("<urlset")));
+const largeSitemap = buildSitemapArtifacts(Array.from({ length: 80_001 }, (_, index) => "/scale-test/" + index));
+assert.match(largeSitemap.sitemap, /<sitemapindex/);
+assert.equal(largeSitemap.files.length, 3);
+assert.deepEqual(largeSitemap.files.map((file) => file.count), [40_000, 40_000, 1]);
+assert.ok(largeSitemap.files.every((file) => file.content.includes("<urlset")));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
