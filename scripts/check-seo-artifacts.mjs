@@ -65,9 +65,9 @@ for (const title of [longTargetX, longTargetY, guideTargetX, guideTargetY]) {
   assert.ok(title.length <= 65, "Semantic tool and guide titles must stay within the title limit.");
   assert.match(title, /Solve for (Determinant|Inverse)/, "Semantic solve-for context must survive title shortening.");
 }
-const publicToolTitles = result.tools.map(toolSeoTitle);
+const publicToolTitles = result.tools.map((tool) => toolSeoTitle(tool, result.tools));
 const publicToolPaths = result.tools.map(canonicalToolPath);
-const publicGuideTitles = result.guideTools.map(toolGuideSeoTitle);
+const publicGuideTitles = result.guideTools.map((tool) => toolGuideSeoTitle(tool, result.guideTools));
 assert.equal(new Set(publicToolTitles).size, publicToolTitles.length, "Canonical public tool SEO titles must be unique.");
 assert.equal(new Set(publicToolPaths).size, publicToolPaths.length, "Canonical public tool URLs must be unique.");
 assert.equal(new Set(publicGuideTitles).size, publicGuideTitles.length, "Public tool guide SEO titles must be unique.");
