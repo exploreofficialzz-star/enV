@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/terms")({ component: Terms });
+export const Route = createFileRoute("/terms")({
+  head: () => seoPageHead({
+    title: "enV Terms of Use | Web, Android and iOS",
+    description: "Review the terms for using enV across Web, Android and iOS, including eligibility, accounts, user content, tool outputs, connected services, and responsible use.",
+    path: "/terms",
+    structuredData: pageSchema("enV Terms of Use", "Terms governing use of the enV toolkit and its connected features.", "/terms", "WebPage")
+  }),
+  component: Terms
+});
 
 function Terms() {
   return (
