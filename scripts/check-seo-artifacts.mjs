@@ -83,7 +83,8 @@ for (const tool of result.guideTools) {
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing public guide in llms.txt for " + tool.id);
   if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
     assert.ok(!result.urls.includes("/tools/developer/" + tool.slug), "Legacy Developer alias must not be listed as a canonical tool URL: " + tool.id);
-    assert.equal(canonicalToolPath(tool), "/tools/developer/" + (tool.id === "artboard-studio" ? "artboard-studio" : canonicalToolPath(tool).split("/").at(-1)), "Legacy Developer guide must have a canonical Studio destination.");
+    assert.notEqual(canonicalToolPath(tool), "/tools/developer/" + tool.slug, "Legacy Developer guide must not canonicalize to its retired alias route: " + tool.id);
+    assert.ok(result.tools.some((studio) => canonicalToolPath(tool) === "/tools/" + studio.category + "/" + studio.slug), "Legacy Developer guide must resolve to an indexable Studio page: " + tool.id);
   }
 }
 assert.ok(!result.urls.includes("/tools/developer/artboard-studio"), "Retired Artboard route must not be listed in the sitemap.");
