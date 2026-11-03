@@ -15322,7 +15322,7 @@ private struct NativeABookView: View {
                 .background(LinearGradient(colors: [Color.envSurface2, Color.envCard], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorder, lineWidth: 1))
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 10) {
                     welcomeFeature("Write", description: "Capture and organise your notes.", symbol: "square.and.pencil")
                     welcomeFeature("Collect", description: "Keep related files together.", symbol: "paperclip")
                     welcomeFeature("PDF tools", description: "Process supported PDFs locally.", symbol: "doc.richtext")
@@ -15438,7 +15438,7 @@ private struct NativeABookView: View {
     private func returnToStart() {
         Task {
             await autosave()
-            showWelcome = true
+            if errorText.isEmpty { showWelcome = true }
         }
     }
 
