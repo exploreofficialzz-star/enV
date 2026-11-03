@@ -32,16 +32,16 @@ class NativeAudioEngineTest {
     }
 
     @Test
-    fun musicAnalyzerHasAnExplicitNativeWavRoute() {
+    fun legacyAudioAnalyzerAliasRoutesToMusicDataSandbox() {
         val analyzer = ToolRecord(
             id = "audio-analyze-studio",
-            name = "Music Analyzer",
+            name = "AI Music Data Sandbox",
             slug = "audio-analyze-studio",
-            description = "Analyze WAV audio measurements locally.",
+            description = "Prepare and review music metadata locally for datasets.",
             category = "audio",
-            keywords = listOf("music", "analysis", "wav"),
-            tags = listOf("audio-studio"),
-            icon = "activity",
+            keywords = listOf("music", "dataset", "sandbox", "metadata"),
+            tags = listOf("song", "audio"),
+            icon = "AudioLines",
             popularity = 80,
             featured = false,
             clientSide = true,
@@ -51,7 +51,7 @@ class NativeAudioEngineTest {
             related = emptyList(),
             engine = EngineInfo(type = "audio", id = "audio-analyze-studio")
         )
-        assertEquals("file:analyze", NativeAudioEngine.operationFor(analyzer))
+        assertEquals("song-metadata-analyzer", NativeAudioEngine.operationFor(analyzer))
         assertTrue(NativeAudioEngine.supports(analyzer))
     }
 
@@ -165,12 +165,12 @@ class NativeAudioEngineTest {
 
 
     @Test
-    fun songMetadataAnalyzerRoutesToItsDedicatedNativeScreen() {
+    fun aiMusicDataSandboxRoutesToItsNativeWorkspace() {
         val analyzer = ToolRecord(
             id = "song-metadata-analyzer",
-            name = "Song Metadata Analyzer",
-            slug = "song-metadata-analyzer",
-            description = "Inspect song metadata and audio signals locally.",
+            name = "AI Music Data Sandbox",
+            slug = "ai-music-data-sandbox",
+            description = "Prepare and review music metadata locally for datasets.",
             category = "audio",
             keywords = listOf("song", "metadata", "music", "analysis"),
             tags = listOf("song", "audio"),

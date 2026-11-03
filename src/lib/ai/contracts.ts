@@ -12,7 +12,6 @@ export const AI_TASK_IDS = [
   "developer.json.explain",
   "image.alt.generate",
   "video.transcript.generate",
-  "music.analysis.classify",
   "audio.music.analyze",
   "assistant.chat",
 ] as const;
@@ -82,18 +81,6 @@ export interface TranscriptResult {
   durationSeconds: number | null;
   segments: { start: number; end: number; text: string }[];
 }
-export interface MusicClassificationResult {
-  genre: string | null;
-  sub_style: string | null;
-  language: string[];
-  mood: string[];
-  instruments: string[];
-  vocal_style: string | null;
-  genre_candidates: { label: string; score: number | null }[];
-  status: "model_completed";
-  note: string;
-}
-
 export interface MusicAnalysisResult {
   genre: string | null;
   sub_style: string | null;
@@ -122,7 +109,6 @@ export interface AiTaskResultMap {
   "developer.json.explain": JsonExplainResult;
   "image.alt.generate": AltTextResult;
   "video.transcript.generate": TranscriptResult;
-  "music.analysis.classify": MusicClassificationResult;
   "audio.music.analyze": MusicAnalysisResult;
   "assistant.chat": AssistantChatResult;
 }
