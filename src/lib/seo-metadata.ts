@@ -44,6 +44,17 @@ export function seoPageHead(options: SeoPageOptions) {
   const image = options.image ?? DEFAULT_SOCIAL_IMAGE;
   const description = cleanMetaDescription(options.description);
   const type = options.type ?? "website";
+  // Structured data can include public user-generated content (e.g. comments).
+  // Escape HTML-significant characters and JavaScript line separators so content
+  // cannot terminate the JSON-LD script element when the HTML is rendered.
+  const structuredDataJson = options.structuredData
+    ? JSON.stringify(options.structuredData)
+        .replace(/</g, "\\u003c")
+        .replace(/>/g, "\\u003e")
+        .replace(/&/g, "\\u0026")
+        .replace(/\\u2028/g, "\\u2028")
+        .replace(/\\u2029/g, "\\u2029")
+    : null;
   return {
     meta: [
       { title: options.title },
@@ -63,8 +74,8 @@ export function seoPageHead(options: SeoPageOptions) {
       { name: "twitter:image", content: image },
     ],
     links: [{ rel: "canonical", href: url }],
-    scripts: options.structuredData
-      ? [{ type: "application/ld+json", children: JSON.stringify(options.structuredData) }]
+    scripts: structuredDataJson
+      ? [{ type: "application/ld+json", children: structuredDataJson }]
       : [],
   };
 }
