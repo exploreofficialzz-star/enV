@@ -2,7 +2,7 @@
 
 ## Scope
 
-Tools are available directly only in these six exempt category IDs: `accessibility`, `audio`, `business`, `calculators`, `developer`, and `video`. Every other catalog category is marked **Under production** and opening those entries is intercepted before the tool engine is mounted.
+Tools in these ten implemented categories are available directly: `accessibility`, `audio`, `business`, `calculators`, `datetime`, `developer`, `design`, `ecommerce`, `qr`, and `video`. A book (`a-book`) is an explicit tool-ID exception in the otherwise restricted `productivity` category. This exception does not open the entire Productivity category; other unreleased tools remain **Under production** and are intercepted before their engines mount.
 
 ## Platform behavior
 
@@ -10,7 +10,7 @@ Tools are available directly only in these six exempt category IDs: `accessibili
 - **Android:** native tool-entry callbacks check the category before creating a detail-stack entry. Restricted tools show a Material 3 `AlertDialog`; card and search-result surfaces label them **Under production**.
 - **iOS:** native tool cards and discovery/search suggestions show a SwiftUI alert and do not navigate for restricted categories. Tool destinations also have a guarded fallback notice for entry paths outside the cards.
 
-The category allowlist is intentionally duplicated in each platform's native language; the audit script verifies the three declarations remain identical and checks that the catalog is gated by the same policy.
+The category allowlist and the A book tool-ID exception are intentionally mirrored in Web, Android and iOS. The audit script verifies category parity, the single tool-specific exception, A book's platform registrations and the shared entry-point guards.
 
 ## Verification
 

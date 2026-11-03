@@ -1,6 +1,6 @@
 # A book — enV Toolkit Architecture
 
-**Status:** Cross-platform implementation in progress — not production-ready or merged  
+**Status:** Core local implementation integrated into enV main; feature development and production verification remain in progress  
 **Tool ID:** a-book  
 **Route slug:** a-book  
 **Catalog category:** productivity  
@@ -8,11 +8,11 @@
 **Platforms:** Web, Android, iOS  
 **Architecture mode:** Local-only user content; no cloud storage or sync
 
-## 0. Verified implementation snapshot — 2026-11-01
+## 0. Implementation inventory — reconciled against main on 2026-11-03
 
-This section records code that exists in the current implementation branch. It is not a release certification. The native and Web CI pipelines, device tests, accessibility checks and privacy verification must pass before the tool can be called production-ready.
+This section records functionality integrated into main. It is not a release certification or evidence that all release gates have passed. The native and Web CI pipelines, device tests, accessibility checks and privacy verification must pass before the tool can be called production-ready.
 
-| Platform | Implemented in the branch | Not yet implemented or not yet verified |
+| Platform | Implemented in main | Not yet implemented or not yet verified |
 |---|---|---|
 | Web | React tool route; IndexedDB notes, attachments and revision stores; local autosave, search/filter, pin/archive/trash/restore, revision restore; local backup export/import; PDF.js local page rendering, page navigation/zoom, per-page selectable text and local extracted-text search/batch `.txt` ZIP export; local PDF inspect, rotate, page extraction, merge, split, and multi-file batch rotate/extract/split using pdf-lib/fflate. | OPFS storage, verified offline PWA startup, rich-text AST editor, scanned-PDF OCR, PDF annotations and library-wide indexed PDF search are not currently implemented. |
 | Android | Native Kotlin/Jetpack Compose screen; SQLiteOpenHelper persistence, app-private attachment files, note/revision/trash/restore, local ZIP backup/restore; PDFBox text extraction, rotation, merge, split, and multi-file batch rotation/extract/split; bundled ML Kit Latin-script OCR (up to 100 pages per operation); cancellable coroutine-backed PDF tasks with note/attachment switching and disposal cancellation. The A Book database, SQLite WAL/SHM/journal sidecars and attachment directory are excluded from cloud backup and device transfer. | The store is SQLiteOpenHelper rather than Room and still needs stronger migration/persistence tests. Rich-text parity, PDF annotation and production real-device coverage are not currently implemented or verified. |
@@ -32,7 +32,7 @@ This section records code that exists in the current implementation branch. It i
 - PDF capabilities differ by platform. A platform must not display an action as available unless its native/local implementation and tests support that action.
 - The product catalogue/native execution matrix records platform availability; catalogue presence is not proof of runtime correctness.
 
-**Release gate:** Web typecheck/tests/build, Android unit/lint/emulator build and launch, iOS simulator build/tests, backup interoperability, malformed-archive tests, local-only network inspection and accessibility verification must pass on the final PR head. The external Vercel build check is subject to the connected Vercel account's build quota and must be green or explicitly resolved before merging.
+**Release gate:** Web typecheck/tests/build, Android unit/lint/emulator build and launch, iOS simulator build/tests, backup interoperability, malformed-archive tests, local-only network inspection and accessibility verification must pass on the final release candidate. Recheck the connected Vercel deployment status; quota or provider failures must remain explicit blockers and must not be reported as successful builds.
 
 ## 1. Product boundary
 
@@ -414,7 +414,7 @@ The generic tool route must not be used as an excuse to embed the Web applicatio
 - Real devices required before declaring camera, microphone, widget, stylus and large-PDF performance production-ready.
 
 ### Release criteria
-Do not mark the tool active or production-ready until all three platform entry points work, core mutations have durable local persistence, import/export and recovery tests pass, PDF/document processing is genuinely local on each claimed platform, privacy/network tests confirm no content upload, and Web/Android/iOS platform tests pass. A passing catalog check alone is not feature verification.
+A book remains directly accessible as an implemented enV tool while the remaining work is completed. Do not call the full experience production-ready until all three platform entry points work, core mutations have durable local persistence, import/export and recovery tests pass, PDF/document processing is genuinely local on each claimed platform, privacy/network tests confirm no content upload, and Web/Android/iOS platform tests pass. A passing catalog check alone is not feature verification.
 
 ## 14. Remaining implementation and release blockers
 
@@ -429,9 +429,9 @@ The following are actual gaps after the current cross-platform implementation. T
 7. **PDF/OCR verification:** maintain the real platform capability gates. Validate password-protected, malformed, image-heavy and large files; page geometry and rotations; text extraction correctness; OCR model availability and supported languages. Android's bundled ML Kit OCR currently supports Latin script, while iOS uses Vision. Web PDF OCR is not available yet.
 8. **Data integrity and recovery:** add persistence tests for account/profile isolation, autosave during rapid edits, app termination, attachment deletion, revision pruning, quota failure and backup restoration. Browser data may be evicted or cleared; the user-controlled archive remains the recovery mechanism.
 9. **Release validation:** final-head Web build/typecheck/tests, Android unit/lint/emulator launch, iOS simulator build/XCTest, rendered accessibility audits and local-only network inspection must all pass. Real-device tests remain necessary for native document pickers, OCR availability, large PDFs and storage behavior.
-10. **External deployment:** the connected Vercel status has reported an account build-rate-limit failure. Resolve the provider quota or explicitly restore a successful deployment check before merging; do not hide this external gate as a code success.
+10. **External deployment:** recheck the latest connected Vercel result for the release candidate. Resolve provider quota/build failures or report the deployment as blocked; do not hide an external gate as a code success.
 
-Already implemented in this branch: local notes and attachments, autosave, search/filter, pin/archive/trash/restore, revision history, full-library `.abook` backup/restore, Markdown and legacy JSON export/import, guarded ZIP parsing/import quotas, platform routes, local PDF inspect/rotate/merge/split/page extraction, multi-file batch rotation/extraction/splitting across Web/Android/iOS, Web PDF.js selectable-text extraction/search and batch text export, native Android/iOS PDF text/OCR where documented above, and local-only backup exclusions. These features still require the final-head release tests listed here.
+Already integrated in main: local notes and attachments, autosave, search/filter, pin/archive/trash/restore, revision history, full-library `.abook` backup/restore, Markdown and legacy JSON export/import, guarded ZIP parsing/import quotas, platform routes, local PDF inspect/rotate/merge/split/page extraction, multi-file batch rotation/extraction/splitting across Web/Android/iOS, Web PDF.js selectable-text extraction/search and batch text export, native Android/iOS PDF text/OCR where documented above, and local-only backup exclusions. These features still require the final-head release tests listed here.
 
 No cloud provider, cloud bucket, database credential, upload token, cloud backup subscription or server-side A book infrastructure needs to be provisioned.
 
@@ -459,5 +459,5 @@ A book is an enV Toolkit tool with independent Web, native Android and native iO
 
 There is no cloud storage provider, server-side content database, upload API, synchronization service, remote processing or cloud backup in this release.
 
-**Implementation status:** Functional code exists across all three platforms, but this branch remains under implementation and verification. Do not declare A book production-ready or merge it until the release gates in Section 0 are satisfied.
+**Implementation status:** Functional code is integrated in main across all three platforms, and A book is enabled as a tool-specific exception in the production gate. Feature development and final verification remain open; do not declare the full experience production-ready until the release gates in Section 0 are satisfied.
 
