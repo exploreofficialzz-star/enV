@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Ban, Eye, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { recordAnalyticsEvent } from "@/lib/analytics/client";
 
 type CommunityComment = {
@@ -55,10 +56,13 @@ function compactCount(value: number) {
   return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(Math.max(0, value));
 }
 
-export function ToolCommunityPanel({ toolId }: { toolId: string }) {
+export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { toolId: string; discussionHref: string; initialFeed?: CommunityFeed | null }) {
   const featureEnabled = import.meta.env.VITE_COMMUNITY_ENABLED === "true";
+  const { user, isPending: authPending } = useCurrentUserState();
+  const accountUser = user && !user.isDevFallback ? user : null;
+  const accountDisplayName = accountUser?.displayName?.trim() || "enV member";
   const [visitorId, setVisitorId] = useState<string | null>(null);
-  const [feed, setFeed] = useState<CommunityFeed | null>(null);
+  const [feed, setFeed] = useState<CommunityFeed | null>(initialFeed ?? null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -71,6 +75,19 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
   const [reportReason, setReportReason] = useState<(typeof reportReasons)[number][0]>("spam");
   const [notice, setNotice] = useState("");
   const [problem, setProblem] = useState("");
+  useEffect(() => {
+    if (authPending) return;
+    if (accountUser) {
+      setIdentityMode("public");
+      setDisplayName(accountDisplayName);
+    } else {
+      setIdentityMode("anonymous");
+      setDisplayName("");
+    }
+  }, [authPending, accountUser?.id, accountDisplayName]);
+  useEffect(() => {
+    setFeed(initialFeed ?? null);
+  }, [toolId, initialFeed]);
   const comments = feed?.comments ?? [];
   const roots = useMemo(() => comments.filter((comment) => !comment.parentId), [comments]);
 
@@ -193,7 +210,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
         idempotencyKey: newIdempotencyKey(),
         body,
         identityMode,
-        displayName: identityMode === "public" ? displayName.trim() : null,
+        displayName: identityMode === "public" ? (accountUser ? accountDisplayName : displayName.trim()) : null,
         parentId: replyTarget,
       });
       recordAnalyticsEvent({ name: "comment_created", toolId, outcome: "success", properties: { action: replyTarget ? "reply" : "comment" } });
@@ -297,17 +314,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
   return (
     <>
       <section className="mt-5 rounded-2xl border border-border bg-surface px-3 py-3 shadow-sm" aria-label="Tool engagement">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1 text-xs text-muted">
-          <span className="inline-flex items-center gap-1.5" aria-label={compactCount(likes + dislikes) + " reactions"}>
-            <ThumbsUp className="size-3.5 text-accent" aria-hidden="true" />
-            <ThumbsDown className="size-3.5" aria-hidden="true" />
-            <span>{compactCount(likes + dislikes)}</span>
-          </span>
-          <span className="inline-flex items-center gap-3">
-            <span className="inline-flex items-center gap-1"><MessageCircle className="size-3.5" aria-hidden="true" />{compactCount(commentCount)}</span>
-            <span className="inline-flex items-center gap-1"><Eye className="size-3.5" aria-hidden="true" />{compactCount(views)}</span>
-          </span>
-        </div>
+        <span className="sr-only">{compactCount(views)} views</span>
         <div className="grid grid-cols-3 gap-2">
           <button type="button" aria-label={"Like, " + likes} aria-pressed={feed?.myReaction === "like"} disabled={!visitorId || loading} onClick={() => void reactTo("like")} className={"flex min-w-0 items-center justify-center gap-2 rounded-full px-2 py-3 text-sm font-semibold transition-colors disabled:opacity-50 " + (feed?.myReaction === "like" ? "bg-accent/10 text-accent" : "bg-surface-2 text-fg hover:bg-surface-3")}>
             <ThumbsUp className="size-5 shrink-0" aria-hidden="true" /><span>{compactCount(likes)}</span>
@@ -331,6 +338,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
                 <p className="text-xs text-muted">{compactCount(commentCount)}</p>
               </div>
               <div className="flex items-center gap-2">
+                <a href={discussionHref} className="hidden text-xs font-medium text-accent underline underline-offset-4 sm:inline">Public discussion page</a>
                 <button type="button" aria-label="Refresh comments" onClick={() => visitorId && void refresh(visitorId)} disabled={loading || !visitorId} className="rounded-full p-2 text-muted hover:bg-surface-2 disabled:opacity-50"><RefreshCw className="size-4" /></button>
                 <button type="button" aria-label="Close comments" onClick={() => setCommentsOpen(false)} className="rounded-full p-2 text-muted hover:bg-surface-2"><X className="size-5" /></button>
               </div>
@@ -361,13 +369,28 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
               />
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <label className="sr-only" htmlFor={"community-identity-" + toolId}>Display identity</label>
-                <select id={"community-identity-" + toolId} value={identityMode} onChange={(event) => setIdentityMode(event.target.value as "anonymous" | "public")} className="min-h-9 rounded-md border border-border bg-surface px-2 text-xs text-fg">
-                  <option value="anonymous">Anonymous</option>
-                  <option value="public">Display name</option>
+                <select
+                  id={"community-identity-" + toolId}
+                  value={identityMode}
+                  disabled={authPending}
+                  onChange={(event) => setIdentityMode(event.target.value as "anonymous" | "public")}
+                  className="min-h-9 max-w-full rounded-md border border-border bg-surface px-2 text-xs text-fg"
+                >
+                  {accountUser ? (
+                    <>
+                      <option value="public">Display as {accountDisplayName}</option>
+                      <option value="anonymous">Anonymous</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="anonymous">Anonymous</option>
+                      <option value="public">Display name</option>
+                    </>
+                  )}
                 </select>
-                {identityMode === "public" ? <input value={displayName} onChange={(event) => setDisplayName(event.target.value.slice(0, 32))} minLength={2} maxLength={32} required aria-label="Display name" placeholder="Display name" className="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-xs text-fg" /> : null}
+                {identityMode === "public" && !accountUser ? <input value={displayName} onChange={(event) => setDisplayName(event.target.value.slice(0, 32))} minLength={2} maxLength={32} required aria-label="Display name" placeholder="Choose a display name" className="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-xs text-fg" /> : null}
                 <span className="ml-auto text-[11px] text-muted">{body.length}/2000</span>
-                <Button type="submit" size="sm" disabled={sending || !visitorId || !body.trim() || (identityMode === "public" && displayName.trim().length < 2)}>
+                <Button type="submit" size="sm" disabled={sending || authPending || !visitorId || !body.trim() || (identityMode === "public" && !accountUser && displayName.trim().length < 2)}>
                   <Send className="mr-1 size-3.5" />{sending ? "Posting…" : "Post"}
                 </Button>
               </div>
