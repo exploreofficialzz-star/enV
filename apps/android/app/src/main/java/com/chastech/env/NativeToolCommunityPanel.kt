@@ -108,7 +108,7 @@ private object NativeCommunityApi {
     }
 
     fun feed(toolId: String, visitorId: String): NativeCommunityFeed {
-        val data = request("/api/community?toolId=\${java.net.URLEncoder.encode(toolId, "UTF-8")}&visitorId=\${java.net.URLEncoder.encode(visitorId, "UTF-8")}")
+        val data = request("/api/community?toolId=${java.net.URLEncoder.encode(toolId, "UTF-8")}&visitorId=${java.net.URLEncoder.encode(visitorId, "UTF-8")}")
         val counts = data.optJSONObject("counts") ?: JSONObject()
         val rows = data.optJSONArray("comments") ?: JSONArray()
         val comments = (0 until rows.length()).mapNotNull { index ->
@@ -261,8 +261,8 @@ fun NativeToolCommunityPanel(toolId: String) {
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("👍 \${current?.likes ?: 0}  👎 \${current?.dislikes ?: 0}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("💬 \${current?.commentCount ?: 0}   👁 \${current?.views ?: 0}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("👍 ${compactCommunityCount(current?.likes ?: 0)}  👎 ${compactCommunityCount(current?.dislikes ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("💬 ${compactCommunityCount(current?.commentCount ?: 0)}   👁 ${compactCommunityCount(current?.views ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
@@ -271,7 +271,7 @@ fun NativeToolCommunityPanel(toolId: String) {
                     modifier = Modifier.weight(1f),
                     shape = CircleShape,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
-                ) { Text("👍 \${current?.likes ?: 0}", maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+                ) { Text("👍 ${compactCommunityCount(current?.likes ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge, color = if (current?.myReaction == "like") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
                 OutlinedButton(
                     onClick = {
                         showComments = true
@@ -280,14 +280,14 @@ fun NativeToolCommunityPanel(toolId: String) {
                     modifier = Modifier.weight(1f),
                     shape = CircleShape,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
-                ) { Text("💬 \${current?.commentCount ?: 0}", maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+                ) { Text("💬 ${compactCommunityCount(current?.commentCount ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge) }
                 OutlinedButton(
                     onClick = { sendReaction("dislike") },
                     enabled = !loading,
                     modifier = Modifier.weight(1f),
                     shape = CircleShape,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
-                ) { Text("👎 \${current?.dislikes ?: 0}", maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+                ) { Text("👎 ${compactCommunityCount(current?.dislikes ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge, color = if (current?.myReaction == "dislike") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
             }
             if (error != null && !showComments) {
                 Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -309,7 +309,7 @@ fun NativeToolCommunityPanel(toolId: String) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text("Comments", style = MaterialTheme.typography.titleLarge)
-                            Text("\${current?.commentCount ?: 0}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${compactCommunityCount(current?.commentCount ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Row {
                             TextButton(onClick = ::refresh, enabled = !loading) { Text("Refresh") }
