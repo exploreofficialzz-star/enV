@@ -10,6 +10,7 @@ import { getToolByPath, getToolById, getSearchableTools, getToolsByCategory } fr
 import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioModeAllowed } from "@/lib/business-studios-catalog";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { loadPublicCommunityToolFeed } from "@/lib/community/public-feed.functions";
 import { UnderProductionPage } from "@/components/tools/under-production";
 import { CATEGORY_MAP } from "@/data/categories";
 import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool, canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath } from "@/lib/seo-metadata";
@@ -20,15 +21,17 @@ const CANONICAL_SEO_TOOL_PAGES = canonicalSeoTools([...seoToolCandidateMap.value
   .filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
 
 export const Route = createFileRoute("/tools/$category/$slug")({
-  loader: ({ params }) => {
+  loader: async ({ params }) => {
     const { category, slug } = params;
     // Keep known legacy entry points routable; all unknown tool URLs are true 404s.
-    if (category === "developer" && slug === "artboard-studio") return null;
-    if ((category === "business" || category === "calculators") && slug === "break-even-calculator") return null;
+    if (category === "developer" && slug === "artboard-studio") return { communityFeed: null };
+    if ((category === "business" || category === "calculators") && slug === "break-even-calculator") return { communityFeed: null };
     const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
     const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
     if (!matchedTool) throw notFound();
-    return null;
+    if (isToolUnderProduction(matchedTool) || !isIndexableTool(matchedTool)) return { communityFeed: null };
+    const communityFeed = await loadPublicCommunityToolFeed({ data: { toolId: matchedTool.id } });
+    return { communityFeed };
   },
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
   head: ({ params }) => {
@@ -93,6 +96,7 @@ export const Route = createFileRoute("/tools/$category/$slug")({
 function Tool() {
   const { category, slug } = Route.useParams();
   const { mode, action, op } = Route.useSearch();
+  const { communityFeed } = Route.useLoaderData();
   if (category === "developer" && slug === "artboard-studio") return <AppShell><ToolViewAnalytics toolId="artboard-studio" /><Suspense fallback={<p>Loading Artboard Studio…</p>}><ArtboardStudio /></Suspense></AppShell>;
   if ((category === "business" || category === "calculators") && slug === "break-even-calculator") {
     return <Navigate to="/tools/$category/$slug" params={{ category: "business", slug: "finance-studio" }} search={{ mode: "break-even", action: undefined, op: undefined }} replace />;
@@ -109,5 +113,5 @@ function Tool() {
   if (isToolUnderProduction(tool)) return <AppShell><UnderProductionPage toolName={tool.name} /></AppShell>;
   const studioDefaultMode = category === "business" ? businessStudioDefaultMode(slug) : undefined;
   const resolvedMode = studioDefaultMode ? (mode && businessStudioModeAllowed(slug, mode) ? mode : studioDefaultMode) : mode;
-  return <AppShell><ToolViewAnalytics toolId={tool.id} /><ToolShell tool={tool}><ToolEngine tool={tool} initialMode={resolvedMode} initialAction={action} initialOp={op} /></ToolShell></AppShell>;
+  return <AppShell><ToolViewAnalytics toolId={tool.id} /><ToolShell tool={tool} initialCommunityFeed={communityFeed}><ToolEngine tool={tool} initialMode={resolvedMode} initialAction={action} initialOp={op} /></ToolShell></AppShell>;
 }
