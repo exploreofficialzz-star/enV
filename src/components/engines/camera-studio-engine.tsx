@@ -8,6 +8,7 @@ import {
   FlashlightOff,
   Grid2X2,
   Image as ImageIcon,
+  Mic,
   Settings2,
   SwitchCamera,
   Video,
