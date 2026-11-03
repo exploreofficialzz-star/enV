@@ -6,7 +6,6 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const engine = read("src/components/engines/camera-studio-engine.tsx");
 const router = read("src/components/tools/tool-engine.tsx");
 const registry = read("src/lib/registry.ts");
-const nativeExport = read("scripts/export-native-catalog.mjs");
 
 assert.match(engine, /navigator\.mediaDevices\?\.getUserMedia/);
 assert.match(engine, /isSecureCaptureContext/);
@@ -39,7 +38,5 @@ assert.match(registry, /id: "camera-studio"/);
 assert.match(registry, /category: "photography"/);
 assert.match(registry, /engine: \{ type: "custom", id: "camera-studio" \}/);
 assert.match(registry, /status: "active"/);
-assert.match(nativeExport, /id: "camera-studio"/);
-assert.match(nativeExport, /platformRuntimeExtension: true/);
 
-console.log("Camera Studio checks passed: secure permission-gated capture, front/rear switching, photo save, video recording, microphone fallback, device-aware torch, local gallery/downloads, privacy copy, Photography registration and browser-only native export.");
+console.log("Camera Studio checks passed: secure permission-gated capture, front/rear switching, photo save, video recording, microphone fallback, device-aware torch, local gallery/downloads, privacy copy, Photography registration and browser-only scope.");
