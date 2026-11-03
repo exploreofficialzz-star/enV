@@ -441,6 +441,8 @@ final class NativeWorldLabVehicleTests:XCTestCase {
         input.durationSeconds=60
         input.maxSpeedMps=100
         let run=try NativeWorldLabVehicle.evaluate(project(),"wing-takeoff",input)
+        XCTAssertTrue(run.samples.contains(where:{!$0.airborne && $0.cruiseThrustN>0}),
+            "Fixed-wing propeller thrust must remain available during the takeoff roll.")
         XCTAssertTrue(run.samples.contains(where:{$0.airborne}))
     }
 
