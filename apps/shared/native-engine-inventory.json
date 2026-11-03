@@ -1,5 +1,5 @@
 {
-  "catalogVersion": "c312e2fec397",
+  "catalogVersion": "47f7b208f5a8",
   "baseCatalogVersion": "58f9a538e469",
   "runtimeExtensionIds": [
     "a-book",
@@ -103,12 +103,12 @@
     },
     {
       "family": "custom",
-      "total": 1665,
-      "active": 1665,
+      "total": 1666,
+      "active": 1666,
       "planned": 0,
-      "androidImplemented": 55,
-      "iosImplemented": 55,
-      "uniqueConfigurations": 1662
+      "androidImplemented": 56,
+      "iosImplemented": 56,
+      "uniqueConfigurations": 1663
     },
     {
       "family": "datetime",
@@ -8007,7 +8007,8 @@
     "youtube-rpm-calculator",
     "youtube-shorts-calculator",
     "youtube-title-helper",
-    "z-score-calculator"
+    "z-score-calculator",
+    "zip-any-file"
   ],
   "iosToolIds": [
     "a-book",
@@ -15761,14 +15762,15 @@
     "youtube-rpm-calculator",
     "youtube-shorts-calculator",
     "youtube-title-helper",
-    "z-score-calculator"
+    "z-score-calculator",
+    "zip-any-file"
   ],
   "summary": {
-    "totalTools": 10002,
-    "activeTools": 10002,
+    "totalTools": 10003,
+    "activeTools": 10003,
     "plannedTools": 0,
     "engineFamilies": 27,
-    "androidImplemented": 7752,
-    "iosImplemented": 7752
+    "androidImplemented": 7753,
+    "iosImplemented": 7753
   }
 }
