@@ -1,0 +1,481 @@
+import assert from "node:assert/strict";
+import { chromium } from "playwright";
+const origin=process.env.ENV_WORLD_LAB_AUDIT_ORIGIN||"http://127.0.0.1:8080";
+const browser=await chromium.launch({
+  headless:true,
+  args:["--no-sandbox","--enable-webgl","--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader"],
+});
+const context=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true,reducedMotion:"reduce"});
+const page=await context.newPage();
+const pageErrors=[];
+page.on("pageerror",err=>pageErrors.push(err.message));
+try{
+  await page.goto(origin+"/tools/developer/the-world-lab",{waitUntil:"domcontentloaded",timeout:90000});
+  await page.getByRole("heading",{name:"The World Lab"}).waitFor({timeout:90000});
+  await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
+  await page.getByRole("button",{name:"Add cube"}).click();
+  await page.getByRole("button",{name:"Add sphere"}).click();
+
+  // End-to-end authored digital device: connect a new hypothetical gate to an
+  // indicator, modify its truth table, and verify the live calculated output.
+  await page.getByRole("button",{name:"Start an invented logic circuit"}).click();
+  await page.getByText("Create another invented gate").click();
+  await page.getByRole("textbox",{name:"Device name"}).fill("Invented child gate");
+  await page.getByRole("combobox",{name:"Input 2"}).selectOption("invented_gate");
+  await page.getByRole("button",{name:"Connect invented gate"}).click();
+  await page.locator("summary").filter({hasText:"Invented child gate"}).click();
+  await page.getByRole("combobox",{
+    name:"Output for Invented child gate input row 1",
+  }).selectOption("1");
+  const indicator=page.getByRole("combobox",{name:"Wire Indicator Q to digital node"});
+  await indicator.selectOption({label:"Invented child gate"});
+  // Wait for the computed Boolean value after React commits the new wiring.
+  await indicator.locator("..").locator("strong").getByText("1",{exact:true})
+    .waitFor({state:"visible",timeout:10000});
+  await page.getByRole("button",{name:"Test every switch combination"}).click();
+  await page.getByText(/Verified 4 mathematical input combinations/).waitFor();
+
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Cube"});
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
+  await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("1");
+  await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("1");
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("3");
+  assert.equal(await page.getByRole("spinbutton",{name:"Position X (m)"}).inputValue(),"3");
+  await page.getByRole("button",{name:"Focus selected object"}).click();
+  await page.getByText("Volume:").waitFor();
+  assert.match(await page.getByText("Volume:").locator("..").innerText(),/2\.0000 m³/);
+  await page.getByRole("button",{name:"See Inside"}).click();
+  await page.getByText(/Surface \/ land or ocean interface.*illustrative, not mapped/).waitFor();
+  const currentWorkspacePath = new URL(page.url()).pathname;
+  await page.getByRole("button",{name:"Zoom in"}).click();
+  await page.getByRole("button",{name:"Zoom out"}).click();
+  assert.equal(new URL(page.url()).pathname, currentWorkspacePath,
+    "Camera movement must stay inside the same World Lab workspace");
+  // A real camera displacement must reveal lower strata without switching views.
+  await page.locator('canvas[aria-label^="Interactive 3D illustrative environment"]').focus();
+  for (let n = 0; n < 10; n++) await page.keyboard.press("PageDown");
+  await page.getByText(/Illustrative sediment.*illustrative, not mapped/).waitFor({ timeout: 10000 });
+  for (let n = 0; n < 10; n++) await page.keyboard.press("PageUp");
+  await page.getByText(/Surface \/ land or ocean interface.*illustrative, not mapped/).waitFor({ timeout: 10000 });
+  await page.getByRole("textbox",{name:"Material name"}).fill("Invented foam");
+  await page.getByRole("spinbutton",{name:/Assumed density/}).fill("2");
+  await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("50");
+  await page.getByRole("button",{name:"Record hypothetical material"}).click();
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+
+  // In the SAME 3D scene, invent mass for the second shape and run a
+  // central two-object impact. Prove momentum conservation and time playback.
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Cube"});
+  await page.getByRole("combobox",{name:"Other solid to collide with"}).selectOption({index:1});
+  await page.getByRole("spinbutton",{name:"Collision restitution",exact:true}).fill("1");
+  await page.getByRole("button",{name:"Calculate two-body collision"}).click();
+  await page.getByText(/Impact time: 1.2500 s/).waitFor();
+  const impactDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export collision evidence"}).click();
+  let impactJson="";
+  for await(const fragment of await (await impactDownload).createReadStream())
+    impactJson+=fragment.toString();
+  const impactEvidence=JSON.parse(impactJson);
+  assert.equal(impactEvidence.format,"env-world-lab-object-collision");
+  assert.equal(impactEvidence.leftMassKg>0,true);
+  assert.ok(Math.abs(impactEvidence.impactTimeSeconds-1.25)<1e-10);
+  assert.ok(Math.abs(impactEvidence.momentumAfterKgMps-
+    impactEvidence.momentumBeforeKgMps)<1e-10);
+  assert.ok(Math.abs(impactEvidence.dissipatedEnergyJ)<1e-10);
+  const earlyCentres=await page.getByText(/Live centre X, left\/right:/).innerText();
+  await page.getByRole("slider",{name:"Explore collision time"}).fill("2");
+  const lateCentres=await page.getByText(/Live centre X, left\/right:/).innerText();
+  assert.notEqual(lateCentres,earlyCentres);
+  await page.getByLabel("Object-to-object impact").getByRole("button",{name:"Beginning",exact:true}).click();
+  assert.equal(await page.getByRole("slider",{name:"Explore collision time"}).inputValue(),"0",
+    "Beginning must reset the collision timeline to its start");
+
+  // A separately invented high-modulus material must give a real,
+  // geometry-dependent elastic response, with a portable assumption trail.
+  await page.getByRole("textbox",{name:"Material name"}).fill("Invented stiff matter");
+  await page.getByRole("spinbutton",{name:/Assumed density/}).fill("2");
+  await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("200000000000");
+  await page.getByRole("button",{name:"Record hypothetical material"}).click();
+  await page.getByRole("combobox",{name:"Material assumption"})
+    .selectOption({label:"Invented stiff matter"});
+  await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("0.1");
+  await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("0.05");
+  await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("1000");
+  await page.getByRole("button",{name:"Calculate elastic bending"}).click();
+  await page.getByText(/Free-end deflection:/).waitFor();
+  const structuralDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export assumed bending evidence"}).click();
+  const structuralStream=await (await structuralDownload).createReadStream();
+  let structuralJson="";
+  for await(const chunk of structuralStream)structuralJson+=chunk.toString();
+  const structural=JSON.parse(structuralJson);
+  assert.equal(structural.format,"env-world-lab-structural-bending");
+  assert.equal(structural.materialEvidence,"hypothetical-user-assumed");
+  assert.ok(Math.abs(structural.maximumTipDeflectionM-0.0032)<1e-12);
+  assert.ok(Math.abs(structural.maximumBendingStressPa-24e6)<1e-4);
+  await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("2000");
+  await page.getByRole("button",{name:"Export assumed bending evidence"})
+    .waitFor({state:"hidden"});
+
+  await page.getByRole("button",{name:"Revise assumptions for Invented stiff matter"}).click();
+  await page.getByRole("spinbutton",{name:/Assumed Young's modulus/}).fill("100000000000");
+  await page.getByRole("button",{name:"Save revised assumptions"}).click();
+  await page.getByRole("spinbutton",{name:"Cantilever end load"}).fill("1000");
+  await page.getByRole("button",{name:"Calculate elastic bending"}).click();
+  const revisionExport=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export assumed bending evidence"}).click();
+  let revisedJson="";
+  for await(const part of await (await revisionExport).createReadStream())
+    revisedJson+=part.toString();
+  const revisedBeam=JSON.parse(revisedJson);
+  assert.equal(revisedBeam.materialId,structural.materialId);
+  // Unsaved Web edits retain their saved baseline revision. The evidence
+  // records the exact physical assumptions and must not reuse stale outputs.
+  assert.equal(structural.assumedYoungModulusPa,2e11);
+  assert.equal(revisedBeam.assumedYoungModulusPa,1e11);
+  assert.ok(Math.abs(revisedBeam.maximumTipDeflectionM-0.0064)<1e-12);
+
+  // Restore the main reference project before the existing motion scenarios.
+  await page.getByRole("spinbutton",{name:"Size Y (m)"}).fill("1");
+  await page.getByRole("spinbutton",{name:"Size Z (m)"}).fill("1");
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+
+
+  // A user-invented Boolean indicator must drive the same measured-by-model
+  // electromechanical solver, with portable source-revision evidence.
+  await page.getByRole("button",{name:"Drive with invented logic: Indicator Q"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByText("Invented logic output: 1 (assumed Boolean)").waitFor();
+  const linkedEvent=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export linked digital-to-motion evidence"}).click();
+  const linkedStream=await (await linkedEvent).createReadStream();
+  let linkedJson="";
+  for await(const chunk of linkedStream)linkedJson+=chunk.toString();
+  const linked=JSON.parse(linkedJson);
+  assert.equal(linked.format,"env-world-lab-digital-motor-run");
+  assert.equal(linked.logicBit,1);
+  assert.equal(linked.motor.input.supplyVoltageV,24);
+  assert.equal(linked.projectRevision,linked.motor.source.projectRevision);
+  assert.ok(linked.motor.samples.some(s=>s.heightM>0&&s.coilCurrentA>0));
+
+  await page.getByRole("button",{name:"Drop this solid"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  await page.getByText(/Model result.*hypothetical user assumed/).waitFor();
+  const beforeDropHeight = await page.getByText("Height above surface").locator("..").innerText();
+  await page.getByLabel("Explore drop time").fill("1");
+  const afterDropHeight = await page.getByText("Height above surface").locator("..").innerText();
+  assert.notEqual(afterDropHeight, beforeDropHeight, "Time scrubbing must change calculated physical position");
+  const dropExportPromise = page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export drop evidence"}).click();
+  const dropStream = await (await dropExportPromise).createReadStream();
+  let dropJson = "";
+  for await (const chunk of dropStream) dropJson += chunk.toString();
+  const dropEvidence = JSON.parse(dropJson);
+  assert.equal(dropEvidence.format, "env-world-lab-drop-run");
+  assert.equal(dropEvidence.inputEvidence, "hypothetical-user-assumed");
+  assert.equal(dropEvidence.source.materialName, "Invented foam");
+  assert.ok(dropEvidence.samples.length > 100);
+  await page.getByRole("button",{name:"Reset drop"}).click();
+  await page.getByText(/Height above surface/).waitFor();
+  await page.getByRole("button",{name:"Play drop"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  // Changing invented geometry must invalidate old computed results, even when
+  // the user returns the dimensions to their original numerical values.
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.1");
+  await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
+  await page.getByRole("button",{name:"Power this solid"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByText(/Computed hypothetical electromechanical system/).waitFor();
+  const numericalStatus=page.getByText(/Numerical self-check: (within internal tolerance|outside internal tolerance|not available)/);
+  await numericalStatus.waitFor();
+  assert.match(await numericalStatus.innerText(),/internal tolerance|not available/,
+    "The user must see the actual result of the bounded numerical self-check");
+  const motorBefore=await page.getByText("Height above ground").locator("..").innerText();
+  await page.getByLabel("Explore motor time").fill("2");
+  const motorAfter=await page.getByText("Height above ground").locator("..").innerText();
+  assert.notEqual(motorAfter,motorBefore,"Electrical power must change modeled vertical motion");
+  const motorExportEvent=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export motor evidence"}).click();
+  const motorStream=await (await motorExportEvent).createReadStream();
+  let motorJson="";
+  for await(const part of motorStream)motorJson+=part.toString();
+  const motor=JSON.parse(motorJson);
+  assert.equal(motor.format,"env-world-lab-actuator-run");
+  assert.equal(motor.source.materialName,"Invented foam");
+  assert.equal(motor.source.inputEvidence,"hypothetical-user-assumed");
+  assert.ok(motor.samples.length>500);
+  assert.ok(motor.samples.some(s=>s.motorForceN>0 && s.resistiveHeatW>0));
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2.2");
+  await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await numericalStatus.waitFor({state:"hidden"});
+  await page.getByRole("spinbutton",{name:"Size X (m)"}).fill("2");
+  // A result belongs to its exact test settings, not just its material geometry.
+  await page.getByRole("button",{name:"Power this solid"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByText("Adjust electrical power and force").click();
+  await page.getByRole("spinbutton",{name:"Actuator supply voltage"}).fill("22");
+  await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await page.getByRole("button",{name:"Power this solid"}).click();
+  await page.getByRole("button",{name:"Pause motor"}).click();
+  await page.getByRole("spinbutton",{name:"Actuator force constant"}).fill("6");
+  await page.getByRole("button",{name:"Play motor"}).waitFor({state:"hidden"});
+  await page.getByRole("button",{name:"Drop this solid"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  await page.getByText("Change test conditions").click();
+  await page.getByRole("spinbutton",{name:"Drop release height in metres"}).fill("6");
+  await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
+  await page.getByRole("button",{name:"Drop this solid"}).click();
+  await page.getByRole("button",{name:"Pause drop"}).click();
+  await page.getByRole("spinbutton",{name:"Drop restitution"}).fill("0.5");
+  await page.getByRole("button",{name:"Play drop"}).waitFor({state:"hidden"});
+  assert.equal(new URL(page.url()).pathname,currentWorkspacePath,
+    "Physical simulation must occur in the same digital world workspace");
+  await page.getByRole("button",{name:"Test this solid as spring mass"}).click();
+  await page.getByText("Derived from an invented solid").waitFor();
+  const evidenceDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export recorded run JSON"}).click();
+  const evidenceStream=await (await evidenceDownload).createReadStream();
+  let evidenceJson="";
+  for await(const chunk of evidenceStream)evidenceJson+=chunk.toString();
+  const evidence=JSON.parse(evidenceJson);
+  assert.equal(evidence.inputs.massKg,4);
+  assert.equal(evidence.assumedMassSource.materialName,"Invented foam");
+  assert.equal(evidence.inputEvidence,"hypothetical-user-assumed");
+  assert.equal(evidence.assumedMassSource.assumedDensityKgM3,2);
+  await page.getByRole("button",{name:"Pause"}).click();
+  const targetOpacity=page.getByLabel(/Selected target opacity:/);
+  await targetOpacity.fill("35");
+  assert.equal(await targetOpacity.inputValue(),"35");
+  const partOpacity=page.getByLabel(/Selected part opacity:/);
+  await partOpacity.fill("40");
+  assert.equal(await partOpacity.inputValue(),"40");
+  await page.getByRole("button",{name:"Start / Recalculate"}).click();
+  await page.getByText("Mechanical energy",{exact:true}).waitFor();
+  await page.getByText("Position over simulated time").waitFor();
+  await page.getByRole("combobox",{name:"Compare to run"}).selectOption({index:1});
+  await page.getByText("Difference at selected time").waitFor();
+  await page.getByRole("button",{name:"Pause"}).click();
+  await page.getByLabel("Playback speed (wall-clock rate)").selectOption("0.1");
+  await page.getByRole("button",{name:"Next step",exact:true}).click();
+  await page.getByRole("combobox",{name:"Experiment",exact:true}).selectOption("heat-rod");
+  await page.getByRole("button",{name:"Start / Recalculate"}).click();
+  await page.getByText("Mean temperature",{exact:true}).waitFor();
+  await page.getByText(/The 3D rod colors encode calculated temperatures/).waitFor();
+  await page.getByRole("button",{name:"Pause"}).click();
+  const downloadEvent=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export project"}).click();
+  const exported=await downloadEvent;
+  const stream=await exported.createReadStream();
+  let json="";
+  for await(const chunk of stream)json+=chunk.toString();
+  const data=JSON.parse(json);
+  assert.equal(data.format,"env-world-lab");
+  assert.equal(data.entities.length,2);
+  assert.equal(data.world.representation,"representative-not-measured");
+  assert.equal(data.entities[0].scientificRole,"visual-only");
+  assert.deepEqual(data.entities[0].dimensionsMeters,[2,1,1]);
+  assert.equal(data.entities[0].positionMeters[0],3);
+  await page.getByRole("button",{name:"Save on device"}).click();
+  await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
+  await page.reload({waitUntil:"domcontentloaded"});
+  await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({timeout:90000});
+  await page.getByRole("combobox",{name:"Open recorded run (local device)"}).waitFor({state:"visible"});
+  assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
+    "Saved project must restore its scientific run history after reload");
+  page.once("dialog",dialog=>dialog.accept());
+  await page.getByRole("button",{name:"Delete selected run"}).click();
+  await page.getByText(/Deleted the selected local experiment/).waitFor();
+  assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
+    "Removing one run must preserve remaining local scientific history");
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Sphere"});
+  await page.getByRole("combobox",{name:"Experiment",exact:true}).selectOption("rc-circuit");
+  await context.setOffline(true);
+  await page.getByRole("button",{name:"Start / Recalculate"}).click();
+  await page.getByText("Capacitor voltage",{exact:true}).waitFor();
+  await context.setOffline(false);
+
+  // Off-axis impact of two independently invented spheres in the same Babylon
+  // scene, checked against conservation and a real timestamped JSON artifact.
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("0");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("3");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("1");
+  await page.getByRole("combobox",{name:"Material assumption"})
+    .selectOption({label:"Invented foam"});
+  // First sphere is second in the project; the new one is third.
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:2});
+  await page.getByRole("combobox",{name:"Other sphere for 3D impact"})
+    .selectOption({index:1});
+  await page.getByRole("button",{name:"Calculate three-dimensional sphere impact"}).click();
+  await page.getByText(/Contact normal X\/Y\/Z:/).waitFor();
+  const spatialDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export 3D impact evidence"}).click();
+  let spatialJson="";
+  for await(const chunk of await (await spatialDownload).createReadStream())
+    spatialJson+=chunk.toString();
+  const spatial=JSON.parse(spatialJson);
+  assert.equal(spatial.format,"env-world-lab-sphere-impact-3d");
+  assert.equal(spatial.assumptionEvidence,"hypothetical-user-assumed");
+  assert.ok(Math.abs(spatial.impactTimeSeconds-(3-Math.sqrt(0.75))/2)<1e-8);
+  for(let i=0;i<3;i++){
+    assert.ok(Math.abs(spatial.momentumBeforeKgMps[i]-spatial.momentumAfterKgMps[i])<1e-8);
+    assert.ok(Math.abs(spatial.angularMomentumBeforeKgM2PerS[i]-
+      spatial.angularMomentumAfterKgM2PerS[i])<1e-8);
+  }
+  assert.ok(Math.abs(spatial.energyBeforeJ-spatial.energyAfterJ-
+    spatial.dissipatedEnergyJ)<1e-8);
+  const earlySphereCoords=await page.getByText(/Computed world coordinates, first/).innerText();
+  await page.getByRole("slider",{name:"Explore three-dimensional impact time"}).fill("2");
+  const laterSphereCoords=await page.getByText(/Computed world coordinates, first/).innerText();
+  assert.notEqual(earlySphereCoords,laterSphereCoords);
+  await page.getByLabel("Verified three-dimensional impact results")
+    .getByRole("button",{name:"Beginning",exact:true}).click();
+  assert.equal(await page.getByRole("slider",{name:"Explore three-dimensional impact time"}).inputValue(),"0");
+  // A full three-sphere chain now uses THREE real movable scene objects.
+  // The event solver must find two distinct sequential contacts, not fake a
+  // single two-sphere trajectory as multi-body physics.
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:2});
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("-4");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:3});
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("-1");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
+  await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({index:4});
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("2");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.5");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0");
+  await page.getByRole("combobox",{name:"Material assumption"}).selectOption({label:"Invented foam"});
+  await page.getByRole("button",{name:"Calculate all sphere contacts"}).click();
+  try{
+    await page.getByText("Actual computed contacts: 2").waitFor({timeout:10000});
+  }catch(error){
+    const panel=await page.locator('[aria-label="Multiple moving sphere impact experiment"]')
+      .innerText().catch(()=>"<panel missing>");
+    const status=await page.locator("body").innerText();
+    console.error("MULTI_SPHERE_BROWSER_DIAGNOSTIC:",JSON.stringify({
+      panel:panel.slice(-2200),errors:status.match(/(unsupported|separated|overlap|Error:|invalid|computed contacts|group collision)/gi)?.slice(-24),
+    }));
+    throw error;
+  }
+  const groupDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export group impact evidence"}).click();
+  let groupJson="";
+  for await(const segment of await (await groupDownload).createReadStream())
+    groupJson+=segment.toString();
+  const groupRun=JSON.parse(groupJson);
+  assert.equal(groupRun.format,"env-world-lab-multi-sphere-impact");
+  assert.equal(groupRun.initial.length,3);
+  assert.equal(groupRun.events.length,2);
+  assert.equal(groupRun.materialEvidence,"hypothetical-user-assumed");
+  assert.ok(Math.abs(groupRun.events[0].atSeconds-1)<1e-8);
+  assert.ok(Math.abs(groupRun.events[1].atSeconds-2)<1e-8);
+  assert.ok(Math.abs(groupRun.totalInitialEnergyJ-groupRun.totalFinalEnergyJ)<1e-8);
+  assert.ok(Math.abs(groupRun.totalDissipatedEnergyJ)<1e-10);
+  await page.getByRole("slider",{name:"Explore group collision time"}).fill("2.5");
+  await page.getByText("Impacts completed at this moment: 2").waitFor();
+  const groupImpact=page.locator('[aria-label="Multiple moving sphere impact experiment"]');
+  await groupImpact.getByRole("button",{name:"Beginning",exact:true}).click();
+  assert.equal(await page.getByRole("slider",{name:"Explore group collision time"}).inputValue(),"0");
+  // Persist newly authored spheres before requesting a destructive legacy import.
+  await page.getByRole("button",{name:"Save on device"}).click();
+  await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
+  const legacy={format:"env-3d-game",version:1,id:"old",name:"Old",assets:[],objects:[{
+    id:"old-cube",name:"Old cube",kind:"box",position:{x:0,y:0.5,z:0},rotation:{x:0,y:0,z:0},
+    scale:{x:2,y:2,z:2},color:"#778899",visible:true,locked:false,collider:true,player:false,speed:3,
+  }]};
+  await page.getByLabel("Import World Lab or legacy 3D project").setInputFiles({
+    name:"legacy.env3d.json",mimeType:"application/json",buffer:Buffer.from(JSON.stringify(legacy)),
+  });
+  await page.getByText(/Legacy import notices/).waitFor();
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Old cube"});
+  assert.match(await page.getByText("Volume:").locator("..").innerText(),/8\.0000 m³/);
+  // Verify multi-part grid snapping and real centre-distance measurements.
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("0.24");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("0.74");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("0.24");
+  await page.getByRole("button",{name:"Add sphere"}).click();
+  await page.getByRole("spinbutton",{name:"Position X (m)"}).fill("3.24");
+  await page.getByRole("spinbutton",{name:"Position Y (m)"}).fill("-0.24");
+  await page.getByRole("spinbutton",{name:"Position Z (m)"}).fill("2.49");
+  const cad=page.locator('[aria-label="Parametric CAD tools"]');
+  await cad.getByRole("checkbox",{name:/Old cube/}).check();
+  await cad.getByRole("checkbox",{name:/Sphere/}).check();
+  await cad.getByRole("spinbutton",{name:"CAD grid spacing (m)"}).fill("0.5");
+  await cad.getByRole("button",{name:"Snap selected to grid"}).click();
+  await cad.getByText("Centre-to-centre: 3.9370 m").waitFor();
+  await cad.getByText("Horizontal distance: 3.9051 m").waitFor();
+  await page.getByRole("combobox",{name:"Select a shape"}).selectOption({label:"Old cube"});
+  assert.equal(await page.getByRole("spinbutton",{name:"Position X (m)"}).inputValue(),"0");
+  assert.equal(await page.getByRole("spinbutton",{name:"Position Y (m)"}).inputValue(),"0.5");
+  assert.equal(await page.getByRole("spinbutton",{name:"Position Z (m)"}).inputValue(),"0");
+
+  // Portable export verifies that sketch base centres and rotations move solids.
+  await cad.getByRole("spinbutton",{name:"Sketch base centre X (m)"}).fill("10");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Y (m)"}).fill("2");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Z (m)"}).fill("-3");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation X (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Y (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Z (degrees)"}).fill("90");
+  await cad.getByRole("spinbutton",{name:"Sketch rectangle width (m)"}).fill("2");
+  await cad.getByRole("spinbutton",{name:"Sketch rectangle depth (m)"}).fill("4");
+  await cad.getByRole("spinbutton",{name:"Sketch extrusion height (m)"}).fill("6");
+  await cad.getByRole("button",{name:"Extrude rectangle"}).click();
+  const rectangleDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export project"}).click();
+  const rectangleStream=await (await rectangleDownload).createReadStream();
+  let rectangleJson="";
+  for await(const chunk of rectangleStream)rectangleJson+=chunk.toString();
+  const rectangleProject=JSON.parse(rectangleJson);
+  const rectangle=rectangleProject.entities.find((entity)=>entity.name==="Extruded rectangular profile");
+  assert.ok(rectangle,"Positioned rectangle extrusion is present in the portable project");
+  assert.ok(Math.abs(rectangle.positionMeters[0]-7)<1e-10);
+  assert.ok(Math.abs(rectangle.positionMeters[1]-2)<1e-10);
+  assert.ok(Math.abs(rectangle.positionMeters[2]+3)<1e-10);
+  assert.deepEqual(rectangle.dimensionsMeters,[2,6,4]);
+  assert.ok(Math.abs(rectangle.rotationRadians[2]-Math.PI/2)<1e-10);
+
+  await cad.getByRole("spinbutton",{name:"Sketch base centre X (m)"}).fill("1");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Y (m)"}).fill("2");
+  await cad.getByRole("spinbutton",{name:"Sketch base centre Z (m)"}).fill("3");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation X (degrees)"}).fill("90");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Y (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch orientation Z (degrees)"}).fill("0");
+  await cad.getByRole("spinbutton",{name:"Sketch circle radius (m)"}).fill("0.5");
+  await cad.getByRole("spinbutton",{name:"Sketch extrusion height (m)"}).fill("2");
+  await cad.getByRole("button",{name:"Extrude circle"}).click();
+  const circleDownload=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Export project"}).click();
+  const circleStream=await (await circleDownload).createReadStream();
+  let circleJson="";
+  for await(const chunk of circleStream)circleJson+=chunk.toString();
+  const circleProject=JSON.parse(circleJson);
+  const circle=circleProject.entities.find((entity)=>entity.name==="Extruded circular profile");
+  assert.ok(circle,"Positioned circular extrusion is present in the portable project");
+  assert.equal(circle.shape,"cylinder");
+  assert.ok(Math.abs(circle.positionMeters[0]-1)<1e-10);
+  assert.ok(Math.abs(circle.positionMeters[1]-2)<1e-10);
+  assert.ok(Math.abs(circle.positionMeters[2]-4)<1e-10);
+  assert.deepEqual(circle.dimensionsMeters,[1,2,1]);
+  assert.ok(Math.abs(circle.rotationRadians[0]-Math.PI/2)<1e-10);
+
+  assert.deepEqual(pageErrors,[],"No unhandled browser page errors");
+  await page.setViewportSize({width:390,height:780});
+  await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
+  const viewport=await page.evaluate(()=>({
+    documentWidth:document.documentElement.scrollWidth,viewportWidth:window.innerWidth,
+  }));
+  assert.ok(viewport.documentWidth<=viewport.viewportWidth+3,
+    "Mobile layout horizontally overflows: "+JSON.stringify(viewport));
+  console.log("WORLD_LAB_BROWSER_PASS: creation, inspect, experiments, see-inside, multi-part CAD snap/measurement, positioned sketch extrusions, export/reload, offline, legacy import, mobile");
+}finally{
+  await context.close();
+  await browser.close();
+}

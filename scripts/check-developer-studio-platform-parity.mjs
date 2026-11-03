@@ -20,11 +20,22 @@ function extractDefinitions(source, studioPattern, modePattern, label) {
   }));
 }
 
-const web = extractDefinitions(webSource, /\bid:\s*"([a-z0-9-]+-studio)"\s*,\s*slug:/g, /\{\s*key:\s*"([a-z0-9-]+)"\s*,\s*label:/g, 'Web TypeScript');
-const android = extractDefinitions(kotlinSource, /NativeDeveloperStudioSpec\("([a-z0-9-]+-studio)"/g, /NativeDeveloperStudioMode\("([a-z0-9-]+)"\s*,/g, 'Android Kotlin');
-const ios = extractDefinitions(swiftSource, /\.init\(id:\s*"([a-z0-9-]+-studio)"/g, /\.init\("([a-z0-9-]+)"\s*,/g, 'iOS Swift');
+const studioId = '((?:[a-z0-9-]+-studio|the-world-lab))';
+const web = extractDefinitions(webSource, new RegExp('\\bid:\\s*"' + studioId + '"\\s*,\\s*slug:', 'g'), /\{\s*key:\s*"([a-z0-9-]+)"\s*,\s*label:/g, 'Web TypeScript');
+const android = extractDefinitions(kotlinSource, new RegExp('NativeDeveloperStudioSpec\\("' + studioId + '"', 'g'), /NativeDeveloperStudioMode\("([a-z0-9-]+)"\s*,/g, 'Android Kotlin');
+const ios = extractDefinitions(swiftSource, new RegExp('\\.init\\(id:\\s*"' + studioId, 'g'), /\.init\("([a-z0-9-]+)"\s*,/g, 'iOS Swift');
 
 assert.equal(web.size, 14, 'Web must define all fourteen Developer Studios');
+const worldLabWeb = readFileSync('src/lib/developer-studios-catalog.ts', 'utf8');
+const worldLabAndroid = readFileSync('apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', 'utf8');
+const worldLabIos = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
+const nativeKotlin = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeWorldLab.kt', 'utf8');
+const nativeSwift = readFileSync('apps/ios/enV/NativeWorldLabView.swift', 'utf8');
+assert.ok(worldLabWeb.includes('id: "the-world-lab"'), 'World Lab must be a separate discoverable workspace');
+assert.ok(worldLabAndroid.includes('"the-world-lab" -> NativeWorldLabForm()'), 'Android must launch the World Lab native workspace');
+assert.ok(worldLabIos.includes('tool.id == "the-world-lab"') && worldLabIos.includes('NativeWorldLabView()'), 'iOS must launch World Lab as a native editor');
+assert.ok(nativeKotlin.includes('NativeWorldLabScience.evaluate('), 'Android science UI must call a real solver');
+assert.ok(nativeSwift.includes('NativeWorldLabScience.evaluate('), 'iOS science UI must call a real solver');
 assert.deepEqual([...android.keys()].sort(), [...web.keys()].sort(), 'Android Studio IDs must match Web');
 assert.deepEqual([...ios.keys()].sort(), [...web.keys()].sort(), 'iOS Studio IDs must match Web');
 for (const [id, modes] of web) {
@@ -42,8 +53,9 @@ assert.ok(webRegistry.includes('makeDeveloperStudioTools(allTools)'), 'UX/UI Stu
 assert.ok(webRoute.includes('getToolByPath(category, slug)'), 'The public tools route must resolve the Studio slug');
 assert.ok(webDispatcher.includes('tool.slug === "ux-ui-studio" ? <UxUiStudioEngine />'), 'Web route must launch the dedicated UX/UI editor');
 assert.ok(androidMain.includes('"ux-ui-studio" -> NativeUxUiStudioForm()'), 'Android route must launch the native Kotlin UX/UI editor');
-assert.ok(androidMain.includes('"artboard-studio" ->') && androidMain.includes('NativeGamePreviewActivity::class.java'), 'Android must expose the separate Artboard Studio preview');
-assert.ok(iosTools.includes('tool.id == "artboard-studio"') && iosTools.includes('NativeGamePreview()'), 'iOS must expose the separate Artboard Studio preview');
+assert.ok(androidMain.includes('"the-world-lab" -> NativeWorldLabForm()') && !androidMain.includes('"artboard-studio" ->'), 'Android must replace the Artboard launcher with the World Lab native workspace');
+assert.ok(iosTools.includes('tool.id == "the-world-lab"') && iosTools.includes('NativeWorldLabView()') && !iosTools.includes('tool.id == "artboard-studio"'), 'iOS must replace the Artboard launcher with the World Lab native workspace');
+assert.ok(webRoute.includes('slug === "artboard-studio"') && webRoute.includes('slug: "the-world-lab"'), 'Legacy Artboard web URLs must redirect to World Lab');
 assert.ok(iosTools.includes('if tool.id == "ux-ui-studio"') && iosTools.includes('NativeUxUiStudioView()'), 'iOS route must launch the native SwiftUI UX/UI editor');
 assert.match(webUx, /PDFDocument\.create\(\)/, 'Web UX/UI Studio must create a downloadable PDF');
 assert.match(webUx, /api\.iconify\.design\/search/, 'Web UX/UI Studio must search the icon catalogue on demand');
