@@ -26,7 +26,7 @@ export function sanitizeArchivePath(input: string): string | null {
 
 export function formatArchiveBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";
-  if (bytes < 1024) return \`\${Math.round(bytes)} B\`;
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let value = bytes;
   let unit = -1;
@@ -34,5 +34,5 @@ export function formatArchiveBytes(bytes: number): string {
     value /= 1024;
     unit += 1;
   } while (value >= 1024 && unit < units.length - 1);
-  return \`\${value.toFixed(value >= 10 ? 1 : 2)} \${units[unit]}\`;
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unit]}`;
 }
