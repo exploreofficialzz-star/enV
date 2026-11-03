@@ -10,11 +10,11 @@ const nativeExport = read("scripts/export-native-catalog.mjs");
 
 assert.match(engine, /navigator\.mediaDevices\?\.getUserMedia/);
 assert.match(engine, /isSecureCaptureContext/);
-assert.match(engine, /getSettings\\(\\)\\.facingMode/);
+assert.match(engine, /getSettings\(\)\.facingMode/);
 assert.match(engine, /const applyZoom/);
 assert.match(engine, /const applyExposure/);
-assert.match(engine, /zoom\\?: NumericRange/);
-assert.match(engine, /exposureCompensation\\?: NumericRange/);
+assert.match(engine, /zoom\?: NumericRange/);
+assert.match(engine, /exposureCompensation\?: NumericRange/);
 assert.match(engine, /facingMode: \{ ideal: nextFacing \}/);
 assert.match(engine, /video\.videoWidth/);
 assert.match(engine, /canvas\.toBlob/);
