@@ -4736,7 +4736,7 @@ struct NativeWorldLabEntryView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(canvasColor)
                         .padding(10)
-                        .offset(y: -geometry.size.height * 0.16)
+                        .offset(y: -geometry.size.height * 0.04)
                     }
                 }
                 .ignoresSafeArea()

@@ -42,7 +42,7 @@ try{
     };
   });
   const desktopEntryLayout=await readEntryLayout();
-  assert.ok(desktopEntryLayout.contentCenterRatio>=0.315 && desktopEntryLayout.contentCenterRatio<=0.365,
+  assert.ok(desktopEntryLayout.contentCenterRatio>=0.445 && desktopEntryLayout.contentCenterRatio<=0.475,
     "The entry composition must sit in the upper third like the supplied screenshot");
   assert.ok(desktopEntryLayout.titleBottom<=desktopEntryLayout.artworkTop,
     "The exact title wordmark must sit above the Saturn/logo artwork");
@@ -69,6 +69,8 @@ try{
   assert.equal(desktopEntryLayout.hasFooter,false,"The reference entry must not show the app footer");
   await page.setViewportSize({width:390,height:844});
   const mobileEntryLayout=await readEntryLayout();
+  assert.ok(mobileEntryLayout.contentCenterRatio>=0.445 && mobileEntryLayout.contentCenterRatio<=0.475,
+    "The mobile entry composition must match the reference's slightly-above-centre placement");
   assert.ok(mobileEntryLayout.titleBottom<=mobileEntryLayout.artworkTop,
     "The mobile World Lab heading must not be covered by its artwork");
   assert.ok(mobileEntryLayout.artworkBottom<=mobileEntryLayout.buttonTop,

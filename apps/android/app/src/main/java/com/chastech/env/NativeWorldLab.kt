@@ -2531,7 +2531,7 @@ fun NativeWorldLabEntryForm() {
             modifier = Modifier.fillMaxSize().padding(10.dp).background(canvas)
         ) {
             Column(
-                modifier = Modifier.align(Alignment.Center).offset(y = -(maxHeight * 0.16f)),
+                modifier = Modifier.align(Alignment.Center).offset(y = -(maxHeight * 0.04f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(

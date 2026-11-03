@@ -21,7 +21,7 @@
     width: min(100%, 360px);
     flex-direction: column;
     align-items: center;
-    transform: translateY(-16svh);
+    transform: translateY(-4svh);
   }
 
   .world-lab-entry__title {
