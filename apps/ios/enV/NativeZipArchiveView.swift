@@ -338,10 +338,11 @@ struct NativeZipArchiveScreen: View {
                         }
                         let unpacked = UInt64(entry.uncompressedSize)
                         let packed = UInt64(entry.compressedSize)
-                        expanded += unpacked
-                        if expanded > expandedSizeLimit {
+                        let nextExpanded = expanded.addingReportingOverflow(unpacked)
+                        if nextExpanded.overflow || nextExpanded.partialValue > expandedSizeLimit {
                             throw NSError(domain: "enVZip", code: 5, userInfo: [NSLocalizedDescriptionKey: "The archive expands beyond the 100 GB safety limit."])
                         }
+                        expanded = nextExpanded.partialValue
                         if unpacked >= 1024 * 1024 * 1024, packed > 0, unpacked / packed > 1000 {
                             throw NSError(domain: "enVZip", code: 6, userInfo: [NSLocalizedDescriptionKey: "This archive has an extreme compression ratio and was blocked as a possible ZIP bomb."])
                         }
@@ -349,8 +350,9 @@ struct NativeZipArchiveScreen: View {
                         if entry.type == .directory {
                             try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
                         } else {
-                            try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                            try archive.extract(entry, to: target, bufferSize: 1024 * 1024)
+                            let outputURL = Self.nonOverwritingURL(target)
+                            try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                            try archive.extract(entry, to: outputURL, bufferSize: 1024 * 1024)
                         }
                     }
                 }.value
@@ -361,6 +363,20 @@ struct NativeZipArchiveScreen: View {
                 status = ""
             }
             isWorking = false
+        }
+    }
+
+    private static func nonOverwritingURL(_ requested: URL) -> URL {
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: requested.path) else { return requested }
+        let suffix = requested.pathExtension
+        let base = suffix.isEmpty ? requested.lastPathComponent : requested.deletingPathExtension().lastPathComponent
+        var index = 2
+        while true {
+            let name = suffix.isEmpty ? base + " (" + String(index) + ")" : base + " (" + String(index) + ")." + suffix
+            let candidate = requested.deletingLastPathComponent().appendingPathComponent(name)
+            if !manager.fileExists(atPath: candidate.path) { return candidate }
+            index += 1
         }
     }
 

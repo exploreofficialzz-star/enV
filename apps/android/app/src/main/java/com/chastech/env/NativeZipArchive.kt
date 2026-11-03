@@ -40,8 +40,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.lingala.zip4j.io.inputstream.ZipInputStream
 import net.lingala.zip4j.io.outputstream.ZipOutputStream
-import net.lingala.zip4j.model.CompressionLevel
-import net.lingala.zip4j.model.CompressionMethod
+import net.lingala.zip4j.model.enums.CompressionLevel
+import net.lingala.zip4j.model.enums.CompressionMethod
 import net.lingala.zip4j.model.ZipParameters
 import java.io.IOException
 import java.util.Locale
@@ -123,13 +123,17 @@ fun NativeZipArchiveScreen() {
                         ZipOutputStream(output).use { zip ->
                             selectedFiles.forEachIndexed { index, uri ->
                                 val name = names[index]
+                                val safeName = safeNativeArchivePath(name)?.joinToString("/")
+                                    ?: throw IOException("Unsafe source file name rejected: " + name)
                                 val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
-                                val stored = extension in nativePrecompressedExtensions
+                                val sourceSize = uriSize(context, uri)
+                                val stored = extension in nativePrecompressedExtensions && sourceSize > 0L
                                 val parameters = ZipParameters().apply {
-                                    fileNameInZip = name
+                                    fileNameInZip = safeName
                                     isSourceExternalStream = true
                                     compressionMethod = if (stored) CompressionMethod.STORE else CompressionMethod.DEFLATE
-                                    if (!stored) compressionLevel = if (compressionMaximum) CompressionLevel.MAXIMUM else CompressionLevel.NORMAL
+                                    if (stored) entrySize = sourceSize
+                                    else compressionLevel = if (compressionMaximum) CompressionLevel.MAXIMUM else CompressionLevel.NORMAL
                                 }
                                 zip.putNextEntry(parameters)
                                 context.contentResolver.openInputStream(uri)?.use { input ->
@@ -145,7 +149,6 @@ fun NativeZipArchiveScreen() {
                                 } ?: throw IOException("Could not read " + name + ".")
                                 zip.closeEntry()
                             }
-                            zip.finish()
                         }
                         progress = 1f
                         "ZIP archive created successfully."
@@ -269,7 +272,13 @@ fun NativeZipArchiveScreen() {
                 }
             }
         }
-        if (busy) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+        if (busy) {
+            if (mode == "compress") {
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (failure.isNotBlank()) Text(failure, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(16.dp)) {

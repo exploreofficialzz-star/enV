@@ -25,6 +25,25 @@ function downloadBlob(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+async function createNonOverwritingFile(parent: DirectoryHandle, requested: string) {
+  const dot = requested.lastIndexOf(".");
+  const base = dot > 0 ? requested.slice(0, dot) : requested;
+  const extension = dot > 0 ? requested.slice(dot) : "";
+  for (let suffix = 1; suffix <= 10_000; suffix += 1) {
+    const candidate = suffix === 1 ? requested : `${base} (${suffix})${extension}`;
+    try {
+      await parent.getFileHandle(candidate);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "NotFoundError") {
+        return parent.getFileHandle(candidate, { create: true });
+      }
+      if (error instanceof DOMException && error.name === "TypeMismatchError") continue;
+      throw error;
+    }
+  }
+  throw new Error("A safe file name could not be created in the selected folder.");
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof DOMException && error.name === "AbortError") return "The operation was cancelled.";
   return error instanceof Error ? error.message : "The archive could not be processed. Check the file and try again.";
@@ -65,7 +84,7 @@ export function ZipArchiveEngine() {
     try {
       if (canUseSavePicker) {
         const handle = await archiveWindow().showSaveFilePicker!({
-          suggestedName: \`\${archiveName.trim() || "enV-archive"}.zip\`,
+          suggestedName: `${archiveName.trim() || "enV-archive"}.zip`,
           types: [{ description: "ZIP archive", accept: { "application/zip": [".zip"] } }],
         });
         output = await handle.createWritable();
@@ -80,7 +99,6 @@ export function ZipArchiveEngine() {
       }
 
       const writer = new ZipWriter(output, {
-        zip64: true,
         level: compression === "maximum" ? 9 : 6,
         useWebWorkers: true,
         keepOrder: true,
@@ -89,18 +107,18 @@ export function ZipArchiveEngine() {
       const paths = new Set<string>();
       for (const file of files) {
         const proposedPath = sanitizeArchivePath((file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name);
-        if (!proposedPath) throw new Error(\`“\${file.name}” has an unsafe file name and was not added.\`);
-        if (paths.has(proposedPath)) throw new Error(\`Two selected files have the same archive path: \${proposedPath}\`);
+        if (!proposedPath) throw new Error(`“${file.name}” has an unsafe file name and was not added.`);
+        if (paths.has(proposedPath)) throw new Error(`Two selected files have the same archive path: ${proposedPath}`);
         paths.add(proposedPath);
         const stored = shouldStoreWithoutCompression(file.name);
         await writer.add(proposedPath, file.stream(), {
           level: stored ? 0 : compression === "maximum" ? 9 : 6,
-          passThrough: stored,
+          compressionMethod: stored ? 0 : 8,
           lastModDate: new Date(file.lastModified),
           onprogress: (current: number) => {
             const fraction = totalBytes ? (completedBytes + current) / totalBytes : 1;
             setProgress(Math.min(99, Math.round(fraction * 100)));
-            setStatus(\`Adding \${file.name}\`);
+            setStatus(`Adding ${file.name}`);
           },
         });
         completedBytes += file.size;
@@ -109,7 +127,7 @@ export function ZipArchiveEngine() {
       await writer.close();
       setProgress(100);
       setStatus("Your ZIP archive is ready.");
-      if (!hasDiskHandle) downloadBlob(new Blob(bufferedChunks, { type: "application/zip" }), \`\${archiveName.trim() || "enV-archive"}.zip\`);
+      if (!hasDiskHandle) downloadBlob(new Blob(bufferedChunks, { type: "application/zip" }), `${archiveName.trim() || "enV-archive"}.zip`);
       setFiles([]);
     } catch (cause) {
       try { await output?.abort?.(cause); } catch { /* The browser may already have closed the stream. */ }
@@ -136,7 +154,7 @@ export function ZipArchiveEngine() {
 
       const planned = entries.map((entry) => {
         const path = sanitizeArchivePath(entry.filename);
-        if (!path && !entry.directory) throw new Error(\`Unsafe archive path rejected: \${entry.filename}\`);
+        if (!path && !entry.directory) throw new Error(`Unsafe archive path rejected: ${entry.filename}`);
         return { entry, path };
       }).filter((item): item is { entry: (typeof entries)[number]; path: string } => Boolean(item.path) && !item.entry.directory);
 
@@ -155,10 +173,17 @@ export function ZipArchiveEngine() {
       }
 
       let completedBytes = 0;
+      let actualExpandedBytes = 0;
       for (const [index, item] of planned.entries()) {
         if (!destination) {
           const chunks: Uint8Array[] = [];
-          const writable = new WritableStream<Uint8Array>({ write(chunk) { chunks.push(chunk.slice()); } });
+          const writable = new WritableStream<Uint8Array>({
+            write(chunk) {
+              actualExpandedBytes += chunk.byteLength;
+              if (actualExpandedBytes > MAX_BROWSER_BUFFER_BYTES) throw new Error("This archive expands beyond the browser's safe download limit.");
+              chunks.push(chunk.slice());
+            },
+          });
           await item.entry.getData(writable, {
             checkCrc32: true,
             onprogress: (current: number) => {
@@ -171,25 +196,36 @@ export function ZipArchiveEngine() {
           const parts = item.path.split("/");
           let parent = destination;
           for (const folder of parts.slice(0, -1)) parent = await parent.getDirectoryHandle(folder, { create: true });
-          const fileHandle = await parent.getFileHandle(parts[parts.length - 1], { create: true });
+          const fileHandle = await createNonOverwritingFile(parent, parts[parts.length - 1]);
           const writable = await fileHandle.createWritable();
+          const meter = new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) {
+              actualExpandedBytes += chunk.byteLength;
+              if (actualExpandedBytes > MAX_EXTRACT_BYTES) throw new Error("The archive expands beyond the 100 GB safety limit.");
+              controller.enqueue(chunk);
+            },
+          });
           try {
-            await item.entry.getData(writable, {
+            await Promise.all([
+              meter.readable.pipeTo(writable),
+              item.entry.getData(meter.writable, {
               checkCrc32: true,
               onprogress: (current: number) => {
                 const fraction = totalUncompressed ? (completedBytes + current) / totalUncompressed : 1;
                 setProgress(Math.min(99, Math.round(fraction * 100)));
-                setStatus(\`Extracting \${item.path}\`);
+                setStatus(`Extracting ${item.path}`);
               },
-            });
+            }),
+            ]);
           } catch (cause) {
-            await writable.abort(cause);
+            try { await meter.writable.abort(cause); } catch { /* The extraction stream may already be closed. */ }
+            try { await writable.abort(cause); } catch { /* The destination may already be closed. */ }
             throw cause;
           }
         }
         completedBytes += item.entry.uncompressedSize || 0;
         setProgress(Math.min(99, Math.round((completedBytes / Math.max(1, totalUncompressed)) * 100)));
-        setStatus(\`Extracted \${index + 1} of \${planned.length}\`);
+        setStatus(`Extracted ${index + 1} of ${planned.length}`);
       }
       setProgress(100);
       setStatus("Extraction completed. Your files were saved locally.");
@@ -217,10 +253,10 @@ export function ZipArchiveEngine() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface-2 p-1" role="tablist" aria-label="Archive action">
-        <button type="button" role="tab" aria-selected={mode === "compress"} onClick={() => setTab("compress")} className={\`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors \${mode === "compress" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}\`}>
+        <button type="button" role="tab" aria-selected={mode === "compress"} onClick={() => setTab("compress")} className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${mode === "compress" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}>
           <span className="inline-flex items-center justify-center gap-2"><FileArchive className="size-4" /> Compress</span>
         </button>
-        <button type="button" role="tab" aria-selected={mode === "extract"} onClick={() => setTab("extract")} className={\`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors \${mode === "extract" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}\`}>
+        <button type="button" role="tab" aria-selected={mode === "extract"} onClick={() => setTab("extract")} className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${mode === "extract" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}>
           <span className="inline-flex items-center justify-center gap-2"><FolderOpen className="size-4" /> Extract</span>
         </button>
       </div>
@@ -235,11 +271,11 @@ export function ZipArchiveEngine() {
                 <button type="button" onClick={() => setFiles([])} disabled={busy} className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-fg disabled:opacity-50"><Trash2 className="size-3.5" /> Clear</button>
               </div>
               <ul className="max-h-56 divide-y divide-border overflow-y-auto">
-                {files.map((file, index) => <li key={\`\${file.name}-\${file.lastModified}-\${index}\`} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                {files.map((file, index) => <li key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                   <FilePlus2 className="size-4 shrink-0 text-muted" />
                   <span className="min-w-0 flex-1 truncate text-fg">{file.name}</span>
                   <span className="shrink-0 text-xs text-muted">{formatArchiveBytes(file.size)}</span>
-                  <button type="button" aria-label={\`Remove \${file.name}\`} disabled={busy} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded p-1 text-muted hover:text-fg disabled:opacity-50"><Trash2 className="size-3.5" /></button>
+                  <button type="button" aria-label={`Remove ${file.name}`} disabled={busy} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded p-1 text-muted hover:text-fg disabled:opacity-50"><Trash2 className="size-3.5" /></button>
                 </li>)}
               </ul>
             </div>
@@ -254,10 +290,10 @@ export function ZipArchiveEngine() {
           <div className="space-y-2">
             <span className="block text-sm font-medium text-fg">Compression</span>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" disabled={busy} onClick={() => setCompression("balanced")} className={\`rounded-xl border px-3 py-3 text-left \${compression === "balanced" ? "border-fg bg-surface-2 text-fg" : "border-border bg-surface text-muted"}\`}>
+              <button type="button" disabled={busy} onClick={() => setCompression("balanced")} className={`rounded-xl border px-3 py-3 text-left ${compression === "balanced" ? "border-fg bg-surface-2 text-fg" : "border-border bg-surface text-muted"}`}>
                 <span className="block text-sm font-medium">Balanced</span><span className="mt-1 block text-xs">Good size and speed</span>
               </button>
-              <button type="button" disabled={busy} onClick={() => setCompression("maximum")} className={\`rounded-xl border px-3 py-3 text-left \${compression === "maximum" ? "border-fg bg-surface-2 text-fg" : "border-border bg-surface text-muted"}\`}>
+              <button type="button" disabled={busy} onClick={() => setCompression("maximum")} className={`rounded-xl border px-3 py-3 text-left ${compression === "maximum" ? "border-fg bg-surface-2 text-fg" : "border-border bg-surface text-muted"}`}>
                 <span className="block text-sm font-medium">Maximum</span><span className="mt-1 block text-xs">More CPU time, smaller when possible</span>
               </button>
             </div>
@@ -281,7 +317,7 @@ export function ZipArchiveEngine() {
 
       {busy || progress > 0 ? <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3" aria-live="polite">
         <div className="flex items-center justify-between text-xs"><span className="text-muted">{status || "Processing locally…"}</span><span className="font-medium text-fg tabular-nums">{progress}%</span></div>
-        <div className="h-2 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-fg transition-[width]" style={{ width: \`\${progress}%\` }} /></div>
+        <div className="h-2 overflow-hidden rounded-full bg-border"><div className="h-full rounded-full bg-fg transition-[width]" style={{ width: `${progress}%` }} /></div>
       </div> : null}
       {status && !busy ? <p className="flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-3 text-sm text-fg" role="status"><Check className="size-4 shrink-0" /> {status}</p> : null}
       {error ? <p className="rounded-xl border border-border px-3 py-3 text-sm text-fg" role="alert">{error}</p> : null}
