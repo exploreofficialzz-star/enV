@@ -1,5 +1,7 @@
 package com.chastech.env
 
+import com.chastech.env.billing.OfflineWalletNativeApi
+
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +67,8 @@ private data class NativeCommunityFeed(
     val myReaction: String?,
 )
 
+private data class NativeCommunityIdentityState(val signedIn: Boolean, val displayName: String?)
+
 private fun compactCommunityCount(value: Int): String {
     val count = value.coerceAtLeast(0).toLong()
     if (count < 1_000) return count.toString()
@@ -78,6 +82,17 @@ private fun compactCommunityCount(value: Int): String {
 
 private object NativeCommunityApi {
     private val base get() = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
+    @Volatile private var bearerToken: String? = null
+
+    fun configureAuth(token: String?) { bearerToken = token }
+
+    fun identity(): NativeCommunityIdentityState {
+        val data = request("/api/community/identity")
+        return NativeCommunityIdentityState(
+            signedIn = data.optBoolean("signedIn"),
+            displayName = data.optString("displayName").takeIf { it.isNotBlank() && it != "null" },
+        )
+    }
 
     private fun request(path: String, method: String = "GET", body: JSONObject? = null): JSONObject {
         require(base.startsWith("https://")) { "enV engagement requires a secure API connection." }
@@ -86,6 +101,7 @@ private object NativeCommunityApi {
             connectTimeout = 15_000
             readTimeout = 25_000
             setRequestProperty("Accept", "application/json")
+            bearerToken?.let { setRequestProperty("Authorization", "Bearer $it") }
             if (body != null) {
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -149,11 +165,15 @@ fun NativeToolCommunityPanel(toolId: String) {
     var showComments by rememberSaveable(toolId) { mutableStateOf(false) }
     var commentText by rememberSaveable(toolId) { mutableStateOf("") }
     var publicIdentity by rememberSaveable(toolId) { mutableStateOf(false) }
+    var accountSignedIn by rememberSaveable(toolId) { mutableStateOf(false) }
+    var identityLoading by rememberSaveable(toolId) { mutableStateOf(true) }
+    var identityMenuOpen by remember { mutableStateOf(false) }
     var displayName by rememberSaveable(toolId) { mutableStateOf("") }
     var replyTo by rememberSaveable(toolId) { mutableStateOf<String?>(null) }
     var reportMenuFor by remember { mutableStateOf<String?>(null) }
     var notice by remember(toolId) { mutableStateOf<String?>(null) }
     var error by remember(toolId) { mutableStateOf<String?>(null) }
+    val accountBearerToken = remember { OfflineWalletNativeApi.communityBearerToken(context) }
 
     fun refresh() {
         scope.launch {
@@ -173,7 +193,22 @@ fun NativeToolCommunityPanel(toolId: String) {
         }
     }
 
-    LaunchedEffect(toolId) { refresh() }
+    LaunchedEffect(toolId) {
+        NativeCommunityApi.configureAuth(accountBearerToken)
+        try {
+            val identity = withContext(Dispatchers.IO) { NativeCommunityApi.identity() }
+            accountSignedIn = identity.signedIn
+            displayName = identity.displayName.orEmpty()
+            publicIdentity = identity.signedIn
+        } catch (_: Exception) {
+            accountSignedIn = false
+            displayName = ""
+            publicIdentity = false
+        } finally {
+            identityLoading = false
+        }
+        refresh()
+    }
     if (!enabled) return
 
     fun sendReaction(reaction: String) {
@@ -259,10 +294,6 @@ fun NativeToolCommunityPanel(toolId: String) {
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("👍 ${compactCommunityCount(current?.likes ?: 0)}  👎 ${compactCommunityCount(current?.dislikes ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("💬 ${compactCommunityCount(current?.commentCount ?: 0)}   👁 ${compactCommunityCount(current?.views ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { sendReaction("like") },
@@ -370,10 +401,40 @@ fun NativeToolCommunityPanel(toolId: String) {
                         label = { Text(if (replyTo == null) "Write a comment" else "Write a reply") },
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { publicIdentity = !publicIdentity }) {
-                            Text(if (publicIdentity) "Display name" else "Anonymous")
+                        Box {
+                            TextButton(onClick = { identityMenuOpen = true }, enabled = !identityLoading) {
+                                Text(
+                                    when {
+                                        publicIdentity && accountSignedIn -> "Display as ${displayName.ifBlank { "enV member" }}"
+                                        publicIdentity -> "Display name"
+                                        else -> "Anonymous"
+                                    },
+                                    maxLines = 1,
+                                )
+                            }
+                            DropdownMenu(expanded = identityMenuOpen, onDismissRequest = { identityMenuOpen = false }) {
+                                if (accountSignedIn) {
+                                    DropdownMenuItem(
+                                        text = { Text("Display as ${displayName.ifBlank { "enV member" }}") },
+                                        onClick = { publicIdentity = true; identityMenuOpen = false },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Anonymous") },
+                                        onClick = { publicIdentity = false; identityMenuOpen = false },
+                                    )
+                                } else {
+                                    DropdownMenuItem(
+                                        text = { Text("Anonymous") },
+                                        onClick = { publicIdentity = false; identityMenuOpen = false },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Display name") },
+                                        onClick = { publicIdentity = true; identityMenuOpen = false },
+                                    )
+                                }
+                            }
                         }
-                        if (publicIdentity) {
+                        if (publicIdentity && !accountSignedIn) {
                             OutlinedTextField(
                                 value = displayName,
                                 onValueChange = { displayName = it.take(32) },
@@ -386,7 +447,7 @@ fun NativeToolCommunityPanel(toolId: String) {
                         }
                         Button(
                             onClick = ::submitComment,
-                            enabled = !sending && commentText.isNotBlank() && (!publicIdentity || displayName.trim().length >= 2),
+                            enabled = !sending && !identityLoading && commentText.isNotBlank() && (!publicIdentity || accountSignedIn || displayName.trim().length >= 2),
                         ) { Text(if (sending) "Posting…" else "Post") }
                     }
                     notice?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
