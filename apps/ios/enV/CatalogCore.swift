@@ -137,6 +137,7 @@ struct Tool: Decodable, Identifiable, Hashable {
 
     var isPlanned: Bool { status.lowercased() == "planned" }
     var isUnderProduction: Bool {
+        !["a-book"].contains(id.lowercased()) &&
         !["accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video"].contains(category.lowercased())
     }
     var searchText: String {
