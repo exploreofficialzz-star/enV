@@ -338,7 +338,7 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
                 <p className="text-xs text-muted">{compactCount(commentCount)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <a href={discussionHref} className="hidden text-xs font-medium text-accent underline underline-offset-4 sm:inline">Public discussion page</a>
+                <a href={discussionHref} className="text-xs font-medium text-accent underline underline-offset-4">Public discussion page</a>
                 <button type="button" aria-label="Refresh comments" onClick={() => visitorId && void refresh(visitorId)} disabled={loading || !visitorId} className="rounded-full p-2 text-muted hover:bg-surface-2 disabled:opacity-50"><RefreshCw className="size-4" /></button>
                 <button type="button" aria-label="Close comments" onClick={() => setCommentsOpen(false)} className="rounded-full p-2 text-muted hover:bg-surface-2"><X className="size-5" /></button>
               </div>
