@@ -9,6 +9,7 @@ const read = (path) => readFile(resolve(root, path), "utf8");
 const [
   web, android, ios, androidWallet, iosWallet, server, identityRoute,
   publicFeed, publicIndex, publicDetail, toolRoute, footer, seoGenerator, seoMetadata,
+  toolShell, androidDetail,
 ] = await Promise.all([
   read("src/components/tools/tool-community-panel.tsx"),
   read("apps/android/app/src/main/java/com/chastech/env/NativeToolCommunityPanel.kt"),
@@ -24,6 +25,8 @@ const [
   read("src/components/layout/footer.tsx"),
   read("scripts/generate-seo-artifacts.mjs"),
   read("src/lib/seo-metadata.ts"),
+  read("src/components/tools/tool-shell.tsx"),
+  read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"),
 ]);
 
 function assertOrdered(source, like, comments, dislike, platform) {
@@ -38,13 +41,42 @@ test("Web, Android and iOS use the compact Like / Comments / Dislike action orde
   assertOrdered(ios, 'await react("like")', "showingComments = true", 'await react("dislike")', "iOS");
 });
 
-test("the duplicated reaction/count strip is removed on all three products", () => {
+test("views are visible once in the compact engagement row without a duplicate stats strip", () => {
   assert.doesNotMatch(web, /aria-label=\{compactCount\(likes \+ dislikes\) \+ " reactions"\}/);
-  assert.doesNotMatch(android, /Text\("👍 \$\{compactCommunityCount\(current\?\.likes \?\? 0\)\} {2}👎/);
-  assert.doesNotMatch(android, /Text\("💬 \$\{compactCommunityCount\(current\?\.commentCount \?\? 0\)\} {3}👁/);
+  assert.doesNotMatch(android, /Text\("💬.*👁/);
+  assert.match(web, /grid grid-cols-4 gap-2/);
+  assert.match(web, /aria-label=\{compactCount\(views\) \+ " views"\}/);
+  assert.equal((web.match(/<Eye\b/g) ?? []).length, 1, "Web renders one visible eye metric");
+  assert.match(android, /👁 .*current\?\.views \?: 0/);
+  assert.equal((android.match(/👁 .*current\?\.views \?: 0/g) ?? []).length, 1, "Android renders one view metric");
   const iosPanel = ios.split("struct ToolCommunityPanel: View")[1]?.split("struct ToolDestinationView: View")[0] ?? "";
-  assert.doesNotMatch(iosPanel, /Image\(systemName: "hand\.thumbsup\.fill"\)/);
-  assert.doesNotMatch(iosPanel, /Image\(systemName: "eye"\)/);
+  assert.match(iosPanel, /Label\(compactCount\(feed\?\.counts\.views \?\? 0\), systemImage: "eye"\)/);
+  assert.equal((iosPanel.match(/systemImage: "eye"/g) ?? []).length, 1, "iOS renders one visible eye metric");
+});
+test("engagement controls are combined with each platform's tool-interface card", () => {
+  const webCardStart = toolShell.indexOf('<section\n        ref={toolInterfaceRef}');
+  const webCardEnd = toolShell.indexOf('\n      </section>', webCardStart);
+  const webPanelAt = toolShell.indexOf('<ToolCommunityPanel');
+  assert.ok(webCardStart >= 0 && webPanelAt > webCardStart && webPanelAt < webCardEnd,
+    "Web engagement panel is inside the tool-interface card");
+  assert.match(web, /className="mt-5 border-t border-border pt-4"/);
+  assert.equal((toolShell.match(/<ToolCommunityPanel/g) ?? []).length, 1,
+    "Web renders one engagement panel per tool detail page");
+
+  assert.match(androidDetail,
+    /NativeToolInterfaceContent\(tool, backend, supported, onRelatedTool\)\s*if \(!isFullscreen\) NativeToolCommunityPanel\(tool\.id\)/);
+  assert.equal((androidDetail.match(/NativeToolCommunityPanel\(tool\.id\)/g) ?? []).length, 1,
+    "Android mounts engagement once inside the tool card");
+  assert.match(android, /Column\(\s*modifier = Modifier\.fillMaxWidth\(\)\.padding\(top = 12\.dp\)/);
+  assert.doesNotMatch(android, /CardDefaults\.cardColors/);
+
+  const iosToolInterface = ios.split("private var toolInterface: some View {")[1]?.split("private func toolHeading")[0] ?? "";
+  assert.match(iosToolInterface, /if !isToolFullscreen\s*\{\s*ToolCommunityPanel\(toolID: tool\.id\)/);
+  assert.equal((ios.match(/ToolCommunityPanel\(toolID: tool\.id\)/g) ?? []).length, 1,
+    "iOS mounts engagement once inside the tool card");
+  const iosPanel = ios.split("struct ToolCommunityPanel: View")[1]?.split("struct ToolDestinationView: View")[0] ?? "";
+  assert.doesNotMatch(iosPanel, /\.background\(Color\.envCard, in: RoundedRectangle\(cornerRadius: 16\)\)/,
+    "iOS engagement does not create a second nested card");
 });
 
 test("comments open in overlays with replies and moderation controls", () => {
@@ -150,7 +182,7 @@ test("engagement counters remain wired to likes, dislikes, comments and views", 
   assert.match(iosPanel, /counts\.likes/);
   assert.match(iosPanel, /counts\.dislikes/);
   assert.match(iosPanel, /counts\.comments/);
-  // Views remain a backend metric, not a fourth visible action in the compact UI.
+  assert.match(iosPanel, /counts\.views/);
   assert.match(server, /views:num\(views\[0\]\?\.total\)/);
   assert.match(server, /views30Days:num\(views\[0\]\?\.recent\)/);
 });

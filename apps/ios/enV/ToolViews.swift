@@ -220,9 +220,6 @@ struct ToolDetailView: View {
                 }
                 .padding(.top, 40)
 
-                ToolCommunityPanel(toolID: tool.id)
-                    .padding(.top, 26)
-
                 if !allRelatedTools.isEmpty {
                     enVCharacterSpacedText("Related tools")
                         .font(.envScaled(size: 18, weight: .semibold))
@@ -307,6 +304,9 @@ struct ToolDetailView: View {
                             .accessibilityHint("Opens this tool in your default web browser")
                     }
                 }
+            }
+            if !isToolFullscreen {
+                ToolCommunityPanel(toolID: tool.id)
             }
         }
         .padding(isToolFullscreen ? 12 : (compact ? 16 : 24))
@@ -613,6 +613,13 @@ struct ToolCommunityPanel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(loading)
+                Label(compactCount(feed?.counts.views ?? 0), systemImage: "eye")
+                    .font(.envScaled(size: 12, weight: .medium))
+                    .foregroundStyle(Color.envMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background(Color.envSurface2, in: Capsule())
+                    .accessibilityLabel("\(compactCount(feed?.counts.views ?? 0)) views")
             }
         }
     }
@@ -750,6 +757,7 @@ struct ToolCommunityPanel: View {
         Group {
             if enabled {
                 VStack(alignment: .leading, spacing: 8) {
+                    Divider().overlay(Color.envBorder.opacity(0.6))
                     reactionBar
                     if let errorMessage {
                         enVCharacterSpacedText(errorMessage)
@@ -757,9 +765,7 @@ struct ToolCommunityPanel: View {
                             .foregroundStyle(Color.red)
                     }
                 }
-                .padding(12)
-                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+                .padding(.top, 8)
                 .fullScreenCover(isPresented: $showingComments) {
                     commentsOverlay
                 }
@@ -911,8 +917,8 @@ struct ToolDestinationView: View {
     let tool: Tool
 
     @ViewBuilder var body: some View {
-        if tool.id == "the-world-lab" {
-            NativeWorldLabView()
+        if tool.id == "artboard-studio" {
+            NativeGamePreview()
         } else if tool.id == "ux-ui-studio" {
             NativeUxUiStudioView()
         } else if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
