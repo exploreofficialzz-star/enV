@@ -7,6 +7,7 @@ import {
   addAttachments,
   createNote,
   getLocalStorageStatus,
+  getABookStorageNotice,
   deleteAttachment,
   listAttachments,
   listNotes,
@@ -20,6 +21,7 @@ import {
   setNoteArchived,
   trashNote,
   type ABookAttachment,
+  type ABookStorageNotice,
   type ABookNote,
   type ABookRevision,
 } from "@/lib/a-book/local-store";
@@ -91,6 +93,7 @@ export function ABookEngine() {
   const [mobilePanel, setMobilePanel] = useState<"notes" | "editor">("notes");
   const [showWelcome, setShowWelcome] = useState(true);
   const [storageMessage, setStorageMessage] = useState("Saved on this device");
+  const [storageNotice, setStorageNotice] = useState<ABookStorageNotice>(null);
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
   const [pdfText, setPdfText] = useState("");
@@ -216,6 +219,7 @@ export function ABookEngine() {
     let mounted = true;
     window.clearTimeout(saveTimer.current);
     setIsReady(false);
+    setStorageNotice(null);
     setStorageMessage(authPending ? "Checking local library…" : "Opening local library…");
 
     void (async () => {
@@ -262,10 +266,9 @@ export function ABookEngine() {
         setIsReady(true);
         setError("");
         const storageStatus = await getLocalStorageStatus();
-        if (mounted && !storageStatus.persistent) {
-          setStorageMessage("Saved locally · browser data may be cleared; export a backup");
-        } else if (mounted) {
-          setStorageMessage("Saved on this device");
+        if (mounted) {
+          setStorageNotice(getABookStorageNotice(storageStatus));
+          setStorageMessage("Local library ready");
         }
       } catch (cause) {
         if (!mounted) return;
@@ -780,7 +783,10 @@ export function ABookEngine() {
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
-        <span className="text-xs text-muted" role="status">{storageMessage}</span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs text-muted" role="status">{storageMessage}</span>
+          {storageNotice ? <span className={storageNotice.warning ? "text-xs text-amber-700 dark:text-amber-300" : "text-xs text-muted"}>{storageNotice.message}</span> : null}
+        </div>
         <Button type="button" size="sm" variant="outline" onClick={() => importInput.current?.click()}>Restore a local backup</Button>
       </div>
     </section>
@@ -794,7 +800,10 @@ export function ABookEngine() {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => void returnToEntry()}>A book home</Button>
-        <span className="text-xs text-muted" role="status">{storageMessage}</span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs text-muted" role="status">{storageMessage}</span>
+          {storageNotice ? <span className={storageNotice.warning ? "max-w-sm text-xs text-amber-700 dark:text-amber-300" : "max-w-sm text-xs text-muted"}>{storageNotice.message}</span> : null}
+        </div>
         <Button type="button" variant="outline" onClick={exportNotesJson}>Export backup</Button>
         <Button type="button" variant="outline" onClick={() => importInput.current?.click()}>Import backup</Button>
         <input ref={importInput} type="file" accept=".abook,.zip,application/zip,application/json,.json" className="hidden" onChange={(event) => void importNotes(event.target.files?.[0])} />
