@@ -130,7 +130,6 @@ fun NativeZipArchiveScreen() {
                                     compressionMethod = if (stored) CompressionMethod.STORE else CompressionMethod.DEFLATE
                                     if (!stored) compressionLevel = if (compressionMaximum) CompressionLevel.MAXIMUM else CompressionLevel.NORMAL
                                 }
-                                parameters.setSourceExternalStream(true)
                                 zip.putNextEntry(parameters)
                                 context.contentResolver.openInputStream(uri)?.use { input ->
                                     val buffer = ByteArray(ARCHIVE_BUFFER_SIZE)
