@@ -90,6 +90,13 @@ test("comments retain verified account identity, guest anonymity and guest displ
   assert.match(server, /userId \? await accountDisplayName\(userId\) : body\.displayName/);
 });
 
+test("comment composers disclose public visibility before submission on every product", () => {
+  const notice = "Comments are public and may appear in search results. Do not include private information.";
+  assert.ok(web.includes(notice));
+  assert.ok(android.includes(notice));
+  assert.ok(ios.includes(notice));
+});
+
 test("public discussion index and per-tool pages expose public comments for search discovery", () => {
   assert.match(publicFeed, /loadPublicCommunityIndex/);
   assert.match(publicFeed, /loadPublicCommunityToolFeed/);
