@@ -30,6 +30,7 @@ import { AudioEngine } from "@/components/engines/audio-engine";
 import { NetworkEngine } from "@/components/engines/network-engine";
 import { AiEngine } from "@/components/engines/ai-engine";
 import { VideoEngine } from "@/components/engines/video-engine";
+import { CameraStudioEngine } from "@/components/engines/camera-studio-engine";
 import { UrlMediaEngine } from "@/components/engines/url-media-engine";
 import { UrlMediaInfoEngine } from "@/components/engines/url-media-info-engine";
 import { WebDesignEngine } from "@/components/engines/webdesign-engine";
@@ -64,6 +65,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
     };
   }, [tool.id]);
 
+  if (tool.id === "camera-studio") return <CameraStudioEngine />;
   // Mockups are backed by the shared mockup engine, including catalog entries that
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
