@@ -4301,7 +4301,10 @@ enum NativeWorldLabVehicle {
         let normal=airborne ? 0 : max(0,weight-wing-rotor)
         let drag=0.5*i.airDensityKgM3*i.dragCoefficient*i.frontalAreaM2*speed*speed
         var wheel=available && !airborne ? min(i.driveThrottle*i.maxWheelForceN,min(i.tireFriction*normal,min(i.motorMaxCurrentA*i.motorForceConstantNPerA,i.motorMaxPowerW*i.motorEfficiency/max(s.vx,0.5)))):0
-        var cruise=available && airborne && i.mode != .roadOnly ? i.maxCruiseThrustN*i.driveThrottle:0
+        // Fixed-wing propellers provide thrust throughout the takeoff roll, not only after liftoff.
+        // Rotorcraft horizontal cruise thrust remains flight-only; rotor thrust provides vertical lift.
+        let cruisePropulsionAvailable = i.mode == .fixedWing || (airborne && i.mode == .rotorcraft)
+        var cruise=available && cruisePropulsionAvailable ? i.maxCruiseThrustN*i.driveThrottle:0
         let wheelP=wheel*max(s.vx,0.5),wheelI=wheel/i.motorForceConstantNPerA
         let cruiseP=cruise*max(speed,0.5)/i.cruiseEfficiency
         let motorP=max(wheelP/i.motorEfficiency,wheelI*wheelI*i.motorWindingResistanceOhm)+cruiseP
