@@ -40,8 +40,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.lingala.zip4j.io.inputstream.ZipInputStream
 import net.lingala.zip4j.io.outputstream.ZipOutputStream
-import net.lingala.zip4j.model.CompressionLevel
-import net.lingala.zip4j.model.CompressionMethod
+import net.lingala.zip4j.model.enums.CompressionLevel
+import net.lingala.zip4j.model.enums.CompressionMethod
 import net.lingala.zip4j.model.ZipParameters
 import java.io.IOException
 import java.util.Locale
@@ -127,10 +127,10 @@ fun NativeZipArchiveScreen() {
                                 val stored = extension in nativePrecompressedExtensions
                                 val parameters = ZipParameters().apply {
                                     fileNameInZip = name
-                                    isSourceExternalStream = true
                                     compressionMethod = if (stored) CompressionMethod.STORE else CompressionMethod.DEFLATE
                                     if (!stored) compressionLevel = if (compressionMaximum) CompressionLevel.MAXIMUM else CompressionLevel.NORMAL
                                 }
+                                parameters.setSourceExternalStream(true)
                                 zip.putNextEntry(parameters)
                                 context.contentResolver.openInputStream(uri)?.use { input ->
                                     val buffer = ByteArray(ARCHIVE_BUFFER_SIZE)
@@ -145,7 +145,6 @@ fun NativeZipArchiveScreen() {
                                 } ?: throw IOException("Could not read " + name + ".")
                                 zip.closeEntry()
                             }
-                            zip.finish()
                         }
                         progress = 1f
                         "ZIP archive created successfully."
@@ -208,7 +207,6 @@ fun NativeZipArchiveScreen() {
                                         status = "Extracted " + entries + " item(s)"
                                     }
                                 } ?: throw IOException("Could not write " + outputName + ".")
-                                zip.closeEntry()
                             }
                         }
                         progress = 1f
