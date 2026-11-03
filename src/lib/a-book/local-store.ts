@@ -672,7 +672,68 @@ export async function permanentlyDeleteNote(noteId: string): Promise<void> {
   await done;
 }
 
-export async function getLocalStorageStatus(): Promise<{ persistent: boolean; quota?: number; usage?: number }> {
+export type ABookLocalStorageStatus = {
+  persistent: boolean;
+  quota?: number;
+  usage?: number;
+};
+
+export type ABookStorageNotice = {
+  message: string;
+  warning: boolean;
+} | null;
+
+export function formatABookStorageBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "unknown size";
+  if (bytes < 1024) return Math.round(bytes) + " B";
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return value.toFixed(value >= 10 ? 0 : 1) + " " + units[unit];
+}
+
+/** Describe the browser-wide estimate without implying it belongs only to A book. */
+export function getABookStorageNotice(status: ABookLocalStorageStatus): ABookStorageNotice {
+  const hasEstimate = Number.isFinite(status.quota) && Number(status.quota) > 0
+    && Number.isFinite(status.usage) && Number(status.usage) >= 0;
+
+  if (!hasEstimate) {
+    return status.persistent
+      ? null
+      : { message: "Browser storage may be cleared. Export a local backup regularly.", warning: true };
+  }
+
+  const quota = Number(status.quota);
+  const usage = Number(status.usage);
+  const remaining = Math.max(0, quota - usage);
+  // Estimates are browser-wide and approximate. Warn at 10% remaining, with
+  // a 25 MB floor and 250 MB ceiling to avoid noisy warnings on tiny/huge quotas.
+  const warningThreshold = Math.max(25 * 1024 * 1024, Math.min(250 * 1024 * 1024, quota * 0.1));
+
+  if (remaining <= warningThreshold) {
+    return {
+      message: "Low browser storage: about " + formatABookStorageBytes(remaining)
+        + " remaining. Export a local backup or free browser storage.",
+      warning: true,
+    };
+  }
+
+  const estimate = "Browser storage estimate: about " + formatABookStorageBytes(usage)
+    + " of " + formatABookStorageBytes(quota) + " used.";
+  return status.persistent
+    ? { message: estimate, warning: false }
+    : {
+        message: "Browser data may be cleared. " + estimate + " Export a local backup regularly.",
+        warning: true,
+      };
+}
+
+export async function getLocalStorageStatus(): Promise<ABookLocalStorageStatus> {
   if (typeof navigator === "undefined") return { persistent: false };
   let persistent = false;
   try {
