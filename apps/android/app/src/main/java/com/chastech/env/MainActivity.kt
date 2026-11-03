@@ -281,8 +281,11 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
 }
 
 private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video")
+private val productionExemptToolIds = setOf("a-book")
 
-private fun ToolRecord.isUnderProduction(): Boolean = !productionExemptCategories.contains(category.lowercase(Locale.ROOT))
+private fun ToolRecord.isUnderProduction(): Boolean =
+    !productionExemptToolIds.contains(id.lowercase(Locale.ROOT)) &&
+        !productionExemptCategories.contains(category.lowercase(Locale.ROOT))
 
 private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 
