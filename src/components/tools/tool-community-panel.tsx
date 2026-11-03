@@ -357,6 +357,7 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
                   <button type="button" onClick={() => setReplyTarget(null)} className="font-medium text-accent">Cancel</button>
                 </div>
               ) : null}
+              <p className="mb-2 text-[11px] leading-4 text-muted">Comments are public and may appear in search results. Do not include private information.</p>
               <textarea
                 value={body}
                 onChange={(event) => setBody(event.target.value.slice(0, 2000))}
