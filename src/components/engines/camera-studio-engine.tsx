@@ -245,9 +245,15 @@ export function CameraStudioEngine() {
       }
       streamRef.current = stream;
       setCameraStream(stream);
-      setFacing(nextFacing);
-      setNotice(nextFacing === "user" ? "Front camera ready." : "Rear camera ready.");
       const videoTrack = stream.getVideoTracks()[0];
+      const facingSetting = videoTrack?.getSettings().facingMode;
+      const activeFacing: FacingMode = facingSetting === "user"
+        ? "user"
+        : facingSetting === "environment"
+          ? "environment"
+          : nextFacing;
+      setFacing(activeFacing);
+      setNotice(activeFacing === "user" ? "Front camera ready." : "Rear camera ready.");
       videoTrack?.addEventListener("ended", () => {
         if (mountedRef.current && requestId === requestIdRef.current) {
           setCameraError("The camera stopped. The active recording was stopped so the clip can be finalized.");
