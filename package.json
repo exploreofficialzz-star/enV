@@ -99,8 +99,6 @@
     "check:ux-ui-studio": "node scripts/check-ux-ui-studio-responsive.mjs && node --experimental-strip-types --test src/lib/engines/ux-ui-studio-*.test.ts src/lib/engines/studio-image-mask.test.ts src/lib/engines/studio-font-metadata.test.ts",
     "audit:ux-ui-studio:browser": "node scripts/audit-ux-ui-studio-browser.mjs",
     "check:modal-moss": "node scripts/check-modal-moss-music.mjs",
-    "test:song-analyzer": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/media/song-metadata-analyzer.test.ts src/lib/media/song-file-metadata.test.ts src/lib/media/song-audio-export.test.ts src/lib/media/local-song-client.test.ts src/lib/media/song-backend.test.ts src/lib/media/song-intelligence.test.ts src/lib/media/song-stem-separation.test.ts src/lib/media/spleeter-audio.test.ts src/lib/engines/music-dataset-analysis.test.ts src/lib/engines/music-sandbox.test.ts src/lib/engines/music-sandbox-analysis.test.ts",
-    "audit:song-analyzer:browser": "node --experimental-strip-types scripts/audit-song-analyzer-browser.mjs",
     "check:qr-barcode": "node scripts/check-qr-barcode.mjs",
     "audit:qr-barcode:browser": "node scripts/browser-qr-barcode-reader-audit.mjs",
     "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/css-shadow.test.ts src/lib/engines/css-text-shadow.test.ts src/lib/engines/design-component-a11y.test.ts src/lib/engines/css-border.test.ts src/lib/engines/design-layer-utils.test.ts src/lib/engines/palette-image.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/svg-backgrounds.test.ts src/lib/engines/design-contrast.test.ts src/lib/engines/design-explorer.test.ts src/lib/production-notice.test.ts && node scripts/check-design.mjs",
@@ -111,7 +109,9 @@
     "audit:seo:rendered": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-seo-rendered-routes.mjs",
     "world-lab:worker": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/world-lab-worker.mjs",
     "world-lab:worker:once": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/world-lab-worker.mjs --once",
-    "test:world-lab": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/world-lab/*.test.ts"
+    "test:world-lab": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/world-lab/*.test.ts",
+    "test:music-data-sandbox": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/engines/music-sandbox.test.ts src/lib/engines/music-sandbox-analysis.test.ts src/lib/registry-music-sandbox.test.ts",
+    "audit:music-data-sandbox:browser": "node --experimental-strip-types scripts/audit-ai-music-data-sandbox-browser.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
