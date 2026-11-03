@@ -839,7 +839,9 @@ fun NativeABookScreen(){
         val result=withContext(Dispatchers.IO){runCatching{
             val old=db.notes(true,true).firstOrNull{it.id==id}
             val tagData=JSONArray(tags.split(",").map{it.trim()}.filter{it.isNotEmpty()}.take(50)).toString()
-            db.save(ABookNoteRecord(id,title,body,notebook.ifBlank{"Inbox"},tagData,old?.pinned?:false,old?.archived?:false,old?.deletedAt,old?.createdAt?:System.currentTimeMillis(),System.currentTimeMillis(),old?.revision?:0))
+            val normalizedNotebook=notebook.ifBlank{"Inbox"}
+            if(old!=null&&old.title==title&&old.body==body&&old.notebook==normalizedNotebook&&old.tags==tagData) old
+            else db.save(ABookNoteRecord(id,title,body,normalizedNotebook,tagData,old?.pinned?:false,old?.archived?:false,old?.deletedAt,old?.createdAt?:System.currentTimeMillis(),System.currentTimeMillis(),old?.revision?:0))
         }}
         result.fold({status="Saved on this device";notes=db.notes(archived,showTrash)},{error=it.message?:"Local save failed";status="Not saved"})
     }
