@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Ban, Eye, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { Ban, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { recordAnalyticsEvent } from "@/lib/analytics/client";
