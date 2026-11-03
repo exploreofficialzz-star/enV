@@ -58,7 +58,11 @@ final class NativeWorldLabInspectionTests:XCTestCase {
 
 
     func testObliqueCutawayUsesNormalizedNormalAndProjectedBounds() throws {
-        let project=try fixture()
+        var data=try NativeWorldLabEditor.blank(title:"Oblique cutaway")
+        data=try NativeWorldLabEditor.addSolid(data,shape:"box",id:"box-a")
+        data=try NativeWorldLabEditor.positionSolid(data,id:"box-a",positionMeters:[-0.5,-0.5,0])
+        data=try NativeWorldLabEditor.resizeSolid(data,id:"box-a",dimensionsMeters:[1,1,1])
+        let project=try NativeWorldLabProject.decode(data)
         let settings=NativeWorldLabInspectionSettings(mode:.cutaway,normal:[1,1,0],
             cutawayFraction:0.5)
         try settings.validate()
@@ -193,9 +197,8 @@ final class NativeWorldLabFieldLayerTests:XCTestCase {
 
     func testStreamlinesRequireValidatedInterpolationAndIntegrateRecordedVectors() throws {
         let vectors=(0..<48).map{index -> Any in index%3==0 ? 1.0 : 0.0}
-        let invalid=try NativeWorldLabFieldLayerCodec.decode(
-            makeField(kind:"vector",renderer:"streamlines",values:vectors,interpolation:"nearest"))
-        XCTAssertThrowsError(try invalid.vectorStreamlines(0))
+        XCTAssertThrowsError(try NativeWorldLabFieldLayerCodec.decode(
+            makeField(kind:"vector",renderer:"streamlines",values:vectors,interpolation:"nearest")))
         let layer=try NativeWorldLabFieldLayerCodec.decode(
             makeField(kind:"vector",renderer:"streamlines",values:vectors,interpolation:"linear",validated:true))
         let frame=try layer.vectorStreamlines(0)

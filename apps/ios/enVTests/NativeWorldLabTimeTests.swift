@@ -86,8 +86,9 @@ final class NativeWorldLabRecordedTimeTests:XCTestCase {
             elapsedSeconds:2,paused:true)
         XCTAssertEqual(paused.simulationTimeSeconds,initial.simulationTimeSeconds,accuracy:0)
         XCTAssertEqual(paused.worldDateUTC,initial.worldDateUTC)
-        XCTAssertEqual(ISO8601DateFormatter().date(from:paused.wallTimeUTC)?.timeIntervalSince1970 ?? 0,
-            ISO8601DateFormatter().date(from:initial.wallTimeUTC)!.timeIntervalSince1970+2,accuracy:0.001)
+        let pausedWall=try XCTUnwrap(NativeWorldLabRecordedTime.parseUTC(paused.wallTimeUTC))
+        let initialWall=try XCTUnwrap(NativeWorldLabRecordedTime.parseUTC(initial.wallTimeUTC))
+        XCTAssertEqual(pausedWall.timeIntervalSince1970,initialWall.timeIntervalSince1970+2,accuracy:0.001)
     }
     func testPlaybackRespectsRateMandatoryEventsAndCachedReverse()throws {
         let initial=try state()
@@ -386,7 +387,7 @@ extension NativeWorldLabTimeCheckpointTests {
         XCTAssertEqual(try NativeWorldLabTimeScales.ttMjdToTcgMjd(reference+1),
             reference+1/(1-NativeWorldLabTimeScales.iauLG),accuracy:1e-11)
         XCTAssertEqual(try NativeWorldLabTimeScales.tcbMjdToTdbMjd(reference),
-            reference-NativeWorldLabTimeScales.iauTDB0Seconds/86400,accuracy:1e-11)
+            reference+NativeWorldLabTimeScales.iauTDB0Seconds/86400,accuracy:1e-11)
         for value in [-1_000_000.0,reference,1_000_000.0,100_000_000.0] {
             XCTAssertEqual(try NativeWorldLabTimeScales.tcgMjdToTtMjd(
                 NativeWorldLabTimeScales.ttMjdToTcgMjd(value)),value,accuracy:2e-8)
@@ -399,7 +400,9 @@ extension NativeWorldLabTimeCheckpointTests {
         let result=try NativeWorldLabTimeScales.utcToTcg("2026-11-01T12:00:00Z")
         XCTAssertEqual(result.source,"IAU 2000 Resolution B1.9")
         XCTAssertGreaterThan(result.tcgMjd,result.ttMjd)
-        XCTAssertLessThan((result.tcgMjd-result.ttMjd)*86400,0.01)
+        let expectedOffsetSeconds=(result.ttMjd-NativeWorldLabTimeScales.iauReferenceMJD)
+            *NativeWorldLabTimeScales.iauLG/(1-NativeWorldLabTimeScales.iauLG)*86400
+        XCTAssertEqual((result.tcgMjd-result.ttMjd)*86400,expectedOffsetSeconds,accuracy:0.01)
     }
 }
 

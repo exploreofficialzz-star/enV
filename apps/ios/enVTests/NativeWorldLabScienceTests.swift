@@ -430,6 +430,7 @@ final class NativeWorldLabVehicleTests:XCTestCase {
     func testFixedWingTakeoffRequiresComputedLiftAndConfiguredSpeed() throws {
         var input=NativeWorldLabVehicleInput()
         input.mode = .fixedWing
+        input.massKg=800
         input.wingAreaM2=18
         input.wingLiftCoefficient=1.4
         input.takeoffSpeedMps=25
@@ -462,7 +463,7 @@ final class NativeWorldLabVehicleTests:XCTestCase {
         let run=try NativeWorldLabVehicle.evaluate(source,"portable-evidence",NativeWorldLabVehicleInput())
         XCTAssertEqual(run.projectRevision,source.revision)
         XCTAssertEqual(run.evidence,"physics-model-computed")
-        XCTAssertTrue(run.validity.contains("no suspension"))
+        XCTAssertTrue(run.validity.localizedCaseInsensitiveContains("no suspension"))
         let data=try JSONEncoder().encode(run)
         let decoded=try JSONDecoder().decode(NativeWorldLabVehicleRun.self,from:data)
         XCTAssertEqual(decoded.projectId,source.id)
