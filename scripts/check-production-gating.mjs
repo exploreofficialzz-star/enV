@@ -10,6 +10,9 @@ const expectedNativeExempt = ["accessibility", "audio", "business", "calculators
 const webPolicy = fs.readFileSync(new URL("../src/lib/production-notice.ts", import.meta.url), "utf8");
 const android = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
 const ios = fs.readFileSync(new URL("../apps/ios/enV/CatalogCore.swift", import.meta.url), "utf8");
+const webRegistry = fs.readFileSync(new URL("../src/lib/registry.ts", import.meta.url), "utf8");
+const androidCatalog = fs.readFileSync(new URL("../apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt", import.meta.url), "utf8");
+const iosCatalog = fs.readFileSync(new URL("../apps/ios/enV/CatalogCore.swift", import.meta.url), "utf8");
 const webCard = fs.readFileSync(new URL("../src/components/tools/tool-card.tsx", import.meta.url), "utf8");
 const webSearch = fs.readFileSync(new URL("../src/components/tools/search-box.tsx", import.meta.url), "utf8");
 const webHome = fs.readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
@@ -27,9 +30,18 @@ function quotedValues(source, pattern, description) {
 const webExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_CATEGORIES\s*=\s*new Set<CategoryId>\(\[([\s\S]*?)\]\)/, "Web");
 const androidExempt = quotedValues(android, /productionExemptCategories\s*=\s*setOf\(([^)]*)\)/, "Android");
 const iosExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(category\.lowercased\(\)\)/, "iOS");
+const webToolExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_TOOL_IDS\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)/, "Web tool");
+const androidToolExempt = quotedValues(android, /productionExemptToolIds\\s*=\\s*setOf\\(([^)]*)\\)/, "Android tool");
+const iosToolExempt = quotedValues(ios, /!\\[([^\\]]+)\\]\\.contains\\(id\\.lowercased\\(\\)\\)/, "iOS tool");
 assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the implemented Web-ready categories");
 assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented native categories");
 assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented native categories");
+assert.deepEqual(webToolExempt, ["a-book"], "Web must expose only the A book tool-specific exception");
+assert.deepEqual(androidToolExempt, ["a-book"], "Android must expose only the A book tool-specific exception");
+assert.deepEqual(iosToolExempt, ["a-book"], "iOS must expose only the A book tool-specific exception");
+assert.ok(webRegistry.includes('id: "a-book"'), "Web registry includes A book");
+assert.ok(androidCatalog.includes('id = "a-book"'), "Android catalog extension includes A book");
+assert.ok(iosCatalog.includes('id: "a-book"'), "iOS catalog extension includes A book");
 
 assert.ok(Array.isArray(tools) && tools.length > 0, "catalog tools load");
 const categories = new Set(tools.map((tool) => tool.category));
@@ -45,4 +57,4 @@ assert.ok(android.includes("candidate?.isUnderProduction() == true") && android.
 assert.ok(android.includes('Text("Under production"') && android.includes('if (tool.isUnderProduction()) Text("Under production"'), "Android card and search surfaces are labeled");
 assert.ok(ios.includes("var isUnderProduction: Bool") && iosCards.includes("if tool.isUnderProduction") && iosDestinations.includes("ToolDestinationView(tool: $0)"), "iOS cards and destinations apply production policy");
 
-console.log(`Production-gating audit PASS: ${tools.length} catalog tools scanned; Web exposes ${expectedWebExempt.length} implemented categories and Android/iOS expose ${expectedNativeExempt.length} native categories; ${restricted.length} other tools remain restricted.`);
+console.log(`Production-gating audit PASS: ${tools.length} base catalog tools scanned; Web/Android/iOS expose ${expectedWebExempt.length} implemented categories plus the A book tool-only exception; ${restricted.length} other base-catalog tools remain category-gated.`);
