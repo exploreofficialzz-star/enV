@@ -36,7 +36,7 @@ function CommunityIndexPage() {
   const discussions = Route.useLoaderData();
   return (
     <AppShell>
-    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">Home</Link>
         <span aria-hidden="true"> / </span>
@@ -74,7 +74,7 @@ function CommunityIndexPage() {
           No public discussions yet. Open a tool and start a conversation.
         </p>
       )}
-    </main>
+    </section>
     </AppShell>
   );
 }
