@@ -138,5 +138,7 @@ test("engagement counters remain wired to likes, dislikes, comments and views", 
   assert.match(iosPanel, /counts\.likes/);
   assert.match(iosPanel, /counts\.dislikes/);
   assert.match(iosPanel, /counts\.comments/);
-  assert.match(iosPanel, /counts\.views/);
+  // Views remain a backend metric, not a fourth visible action in the compact UI.
+  assert.match(server, /views:num\\(views\\[0\\]\\?\\.total\\)/);
+  assert.match(server, /views30Days:num\\(views\\[0\\]\\?\\.recent\\)/);
 });
