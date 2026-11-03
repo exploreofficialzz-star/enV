@@ -1,8 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { loadPublicCommunityToolFeed } from "@/lib/community/public-feed.functions";
 import { getToolByPath } from "@/lib/registry";
-import { isIndexableTool } from "@/lib/seo-metadata";
-import { SITE_ORIGIN, seoPageHead } from "@/lib/seo-metadata";
+import { isIndexableTool, SITE_ORIGIN, seoPageHead } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/community/tools/$category/$slug")({
   loader: async ({ params }) => {
