@@ -2527,12 +2527,11 @@ fun NativeWorldLabEntryForm() {
     val buttonInk = Color(0xFF101729)
 
     Surface(modifier = Modifier.fillMaxSize(), color = outer) {
-        Box(
-            modifier = Modifier.fillMaxSize().padding(10.dp).background(canvas),
-            contentAlignment = Alignment.Center
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().padding(10.dp).background(canvas)
         ) {
             Column(
-                modifier = Modifier.offset(y = (-27).dp),
+                modifier = Modifier.align(Alignment.Center).offset(y = -(maxHeight * 0.16f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(

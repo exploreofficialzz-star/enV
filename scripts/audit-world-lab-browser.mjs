@@ -16,6 +16,8 @@ try{
   await page.getByRole("button",{name:"Enter"}).waitFor({state:"visible",timeout:90000});
   await page.locator('.world-lab-entry[data-world-lab-entry-ready="true"]').waitFor({state:"visible",timeout:90000});
   const readEntryLayout=()=>page.locator(".world-lab-entry").evaluate((root)=>{
+    const content=root.querySelector(".world-lab-entry__content")?.getBoundingClientRect();
+    const entry=root.getBoundingClientRect();
     const title=root.querySelector("h1")?.getBoundingClientRect();
     const artwork=root.querySelector(".world-lab-entry__artwork")?.getBoundingClientRect();
     const planet=root.querySelector(".world-lab-entry__planet")?.getBoundingClientRect();
@@ -23,6 +25,7 @@ try{
     const button=root.querySelector("button")?.getBoundingClientRect();
     const buttonStyle=button?getComputedStyle(root.querySelector("button")):null;
     return {
+      contentCenterRatio:content&&entry.height?(content.top+content.height/2-entry.top)/entry.height:null,
       titleBottom:title?.bottom,artworkTop:artwork?.top,
       artworkBottom:artwork?.bottom,buttonTop:button?.top,
       buttonWidth:button?.width,buttonHeight:button?.height,
@@ -39,6 +42,8 @@ try{
     };
   });
   const desktopEntryLayout=await readEntryLayout();
+  assert.ok(desktopEntryLayout.contentCenterRatio>=0.315 && desktopEntryLayout.contentCenterRatio<=0.365,
+    "The entry composition must sit in the upper third like the supplied screenshot");
   assert.ok(desktopEntryLayout.titleBottom<=desktopEntryLayout.artworkTop,
     "The exact title wordmark must sit above the Saturn/logo artwork");
   assert.ok(desktopEntryLayout.artworkBottom<=desktopEntryLayout.buttonTop,

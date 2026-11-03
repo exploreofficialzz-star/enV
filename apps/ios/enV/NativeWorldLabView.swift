@@ -4679,16 +4679,20 @@ private struct NativeWorldLabFieldImportPanel:View {
 struct NativeWorldLabEntryView: View {
     @State private var entered = false
 
+    private let outerColor = Color(red: 241.0 / 255.0, green: 244.0 / 255.0, blue: 249.0 / 255.0)
+    private let canvasColor = Color(red: 249.0 / 255.0, green: 250.0 / 255.0, blue: 252.0 / 255.0)
+    private let buttonColor = Color(red: 219.0 / 255.0, green: 234.0 / 255.0, blue: 255.0 / 255.0)
+    private let buttonInk = Color(red: 16.0 / 255.0, green: 23.0 / 255.0, blue: 41.0 / 255.0)
+
     var body: some View {
         Group {
             if entered {
                 NativeWorldLabView()
             } else {
-                ZStack {
-                    Color(red: 241 / 255, green: 244 / 255, blue: 249 / 255)
-                        .ignoresSafeArea()
+                GeometryReader { geometry in
+                    ZStack {
+                        outerColor.ignoresSafeArea()
 
-                    VStack(spacing: 0) {
                         VStack(spacing: 0) {
                             Image("WorldLabTitle")
                                 .resizable()
@@ -4721,20 +4725,21 @@ struct NativeWorldLabEntryView: View {
                             } label: {
                                 Text("Enter")
                                     .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(Color(red: 16 / 255, green: 23 / 255, blue: 41 / 255))
+                                    .foregroundStyle(buttonInk)
                                     .frame(width: 214, height: 52)
-                                    .background(Color(red: 219 / 255, green: 234 / 255, blue: 255 / 255))
+                                    .background(buttonColor)
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Enter")
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .offset(y: -27)
+                        .background(canvasColor)
+                        .padding(10)
+                        .offset(y: -geometry.size.height * 0.16)
                     }
-                    .background(Color(red: 249 / 255, green: 250 / 255, blue: 252 / 255))
-                    .padding(10)
                 }
+                .ignoresSafeArea()
             }
         }
         .toolbar(entered ? .automatic : .hidden, for: .navigationBar)

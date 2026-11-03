@@ -123,3 +123,8 @@ assert.ok(nativeKotlin.includes('R.drawable.world_lab_title') && nativeKotlin.in
 assert.ok(nativeKotlin.includes('Color(0xFFDBEAFF)') && nativeKotlin.includes('Color(0xFFF9FAFC)'), 'Android entry colors must match the screenshot');
 assert.ok(nativeSwift.includes('Image("WorldLabTitle")') && nativeSwift.includes('Image("WorldLabLogo")') && nativeSwift.includes('🪐'), 'iOS must use the exact wordmark, original logo and Saturn artwork');
 assert.ok(nativeSwift.includes('219 / 255') && nativeSwift.includes('249 / 255'), 'iOS entry colors must match the screenshot');
+
+const worldLabEntryCss = readFileSync('src/components/world-lab/world-lab-entry.css', 'utf8');
+assert.ok(worldLabEntryCss.includes('translateY(-16svh)'), 'Web World Lab entry must align the group in the upper third of the screen');
+assert.ok(nativeKotlin.includes('maxHeight * 0.16f'), 'Android World Lab entry must use the same proportional upper-third placement');
+assert.ok(nativeSwift.includes('geometry.size.height * 0.16'), 'iOS World Lab entry must use the same proportional upper-third placement');
