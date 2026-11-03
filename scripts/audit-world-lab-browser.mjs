@@ -12,6 +12,7 @@ page.on("pageerror",err=>pageErrors.push(err.message));
 try{
   await page.goto(origin+"/tools/developer/the-world-lab",{waitUntil:"domcontentloaded",timeout:90000});
   await page.getByRole("heading",{name:"The World Lab"}).waitFor({timeout:90000});
+  await page.getByRole("button",{name:"Enter the Lab"}).click();
   await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
   await page.getByRole("button",{name:"Add cube"}).click();
   await page.getByRole("button",{name:"Add sphere"}).click();

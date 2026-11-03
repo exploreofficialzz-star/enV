@@ -1,8 +1,6 @@
 import { createFileRoute, Navigate, notFound } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
-
-const WorldLab = lazy(() => import("@/components/world-lab/world-lab"));
 import { AppShell } from "@/components/layout/app-shell";
+import { WorldLabEntry } from "@/components/world-lab/world-lab-entry";
 import { ToolViewAnalytics } from "@/components/tools/tool-view-analytics";
 import { ToolShell } from "@/components/tools/tool-shell";
 import { ToolEngine } from "@/components/tools/tool-engine";
@@ -98,7 +96,7 @@ function Tool() {
   const { mode, action, op } = Route.useSearch();
   const { communityFeed } = Route.useLoaderData();
   if (category === "developer" && slug === "artboard-studio") return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: "the-world-lab" }} search={{ mode: undefined, action: undefined, op: undefined }} replace />;
-  if (category === "developer" && slug === "the-world-lab") return <AppShell><ToolViewAnalytics toolId="the-world-lab" /><Suspense fallback={<p className="p-5">Loading The World Lab…</p>}><WorldLab /></Suspense></AppShell>;
+  if (category === "developer" && slug === "the-world-lab") return <AppShell><ToolViewAnalytics toolId="the-world-lab" /><WorldLabEntry /></AppShell>;
   if ((category === "business" || category === "calculators") && slug === "break-even-calculator") {
     return <Navigate to="/tools/$category/$slug" params={{ category: "business", slug: "finance-studio" }} search={{ mode: "break-even", action: undefined, op: undefined }} replace />;
   }
