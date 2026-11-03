@@ -16,6 +16,28 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = aw
 // A book is a local-only native/web tool; keep this extension exported to every platform.
 const runtimeCatalogExtensions = [
   {
+    id: "camera-studio",
+    name: "Camera Studio",
+    slug: "camera-studio",
+    description: "Take photos and record videos with a familiar camera, natural photo looks, front/rear switching and simple creator controls. Captures stay on your device unless you download or share them.",
+    category: "photography",
+    subcategory: "Camera",
+    keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "filters", "creator", "recording", "capture"],
+    tags: ["camera", "photo", "video", "creator"],
+    icon: "Camera",
+    iconBackground: "#171b1e",
+    iconAccent: "#2ec4b6",
+    popularity: 1200,
+    featured: true,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "active",
+    related: [],
+    engine: { type: "custom", id: "camera-studio" },
+    platformRuntimeExtension: true,
+  },
+  {
     id: "song-metadata-analyzer",
     name: "Song Metadata Analyzer",
     slug: "song-metadata-analyzer",
