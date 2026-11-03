@@ -515,7 +515,7 @@ private enum NativeCommunityClient {
     private static func perform(_ originalRequest: URLRequest) async throws -> Data {
         var request = originalRequest
         if let bearer = OfflineWalletNativeAPI.communityBearerToken() {
-            request.setValue("Bearer \\(bearer)", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
