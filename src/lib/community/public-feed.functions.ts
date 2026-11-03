@@ -15,7 +15,7 @@ export type PublicCommunityComment = {
 export type PublicCommunityFeed = {
   toolId: string;
   counts: { comments: number; likes: number; dislikes: number; views: number; views30Days: number };
-  myReaction: null;
+  myReaction: "like" | "dislike" | null;
   comments: PublicCommunityComment[];
   generatedAt: string;
 };
