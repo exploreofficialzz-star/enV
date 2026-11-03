@@ -181,6 +181,17 @@ import java.time.LocalDate
 import java.time.Year
 
 class MainActivity : ComponentActivity() {
+    /**
+     * Exit the Android app task from the development launch screen.
+     *
+     * finishAndRemoveTask() closes the activity stack and removes the task from
+     * Recents; it does not navigate into the catalog or another app destination.
+     */
+    internal fun requestAppExit() {
+        if (isFinishing || isDestroyed) return
+        finishAndRemoveTask()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val favorites = FavoritesStore(applicationContext)
@@ -207,7 +218,7 @@ class MainActivity : ComponentActivity() {
                         themeMode = "system"
                         favorites.setThemeMode(themeMode)
                     },
-                    onExit = { finishAffinity() },
+                    onExit = ::requestAppExit,
                 )
             }
         }
@@ -219,6 +230,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
+    var exitRequested by remember { mutableStateOf(false) }
     var retryCount by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(retryCount) {
         loadFailed = false
@@ -228,12 +240,26 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
-        result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
+        // An Exit tap must win over a catalog load that is already in flight.
+        // Otherwise the async completion can replace the splash with EnVApp
+        // during the same interaction that is closing the Android task.
+        if (!exitRequested) {
+            result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
+        }
     }
+
+    val requestExit = {
+        if (!exitRequested) {
+            exitRequested = true
+            onExit()
+        }
+    }
+
     when {
+        exitRequested -> NativeLaunchScreen(darkMode) {}
         catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme)
         loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
-        else -> NativeLaunchScreen(darkMode, onExit)
+        else -> NativeLaunchScreen(darkMode, requestExit)
     }
 }
 
