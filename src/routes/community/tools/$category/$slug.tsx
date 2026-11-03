@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { AppShell } from "@/components/layout/app-shell";
 import { loadPublicCommunityToolFeed } from "@/lib/community/public-feed.functions";
 import { getToolByPath } from "@/lib/registry";
 import { isIndexableTool, SITE_ORIGIN, seoPageHead } from "@/lib/seo-metadata";
@@ -60,6 +61,7 @@ function PublicToolDiscussionPage() {
   const toolUrl = "/tools/" + tool.category + "/" + tool.slug;
   const roots = feed?.comments.filter((comment) => !comment.parentId) ?? [];
   return (
+    <AppShell>
     <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">Home</Link>
@@ -109,5 +111,6 @@ function PublicToolDiscussionPage() {
         Join the discussion from the <Link to={toolUrl} className="font-semibold text-accent underline underline-offset-4">{tool.name} page</Link>.
       </p>
     </main>
+    </AppShell>
   );
 }
