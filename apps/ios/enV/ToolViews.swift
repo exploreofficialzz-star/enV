@@ -15041,6 +15041,7 @@ private struct ABookArchiveDocument: FileDocument {
 }
 private struct NativeABookView: View {
     private let store = ABookLocalStore.shared
+    @State private var showWelcome = true
     @State private var notes: [ABookNativeNote] = []
     @State private var selectedID: UUID?
     @State private var title = ""
@@ -15078,7 +15079,72 @@ private struct NativeABookView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Group {
+            if showWelcome {
+                welcomeView
+            } else {
+                workspaceView
+            }
+        }
+        .padding(12)
+        .onAppear { reload() }
+        .task(id: saveKey) { await autosave() }
+        .fileImporter(isPresented: $importingArchive, allowedContentTypes: [.item]) { result in
+            switch result {
+            case .success(let url):
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let count = try store.importBackupArchive(Data(contentsOf: url))
+                    showTrash = false
+                    showArchived = false
+                    reload()
+                    status = "Imported " + String(count) + " notes and attachments on this device"
+                    errorText = ""
+                } catch { showError(error) }
+            case .failure(let error): showError(error)
+            }
+        }
+        .fileImporter(isPresented: $importingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                guard let selectedID else { return }
+                do {
+                    let imported = try store.importFiles(noteID: selectedID, urls: urls)
+                    attachments = try store.attachments(noteID: selectedID)
+                    status = "Saved " + String(imported.count) + " files on this device"
+                    errorText = ""
+                } catch { showError(error) }
+            case .failure(let error): showError(error)
+            }
+        }
+        .fileExporter(isPresented: $exportingNote, document: ABookTextDocument(text: markdownText),
+                      contentType: .plainText, defaultFilename: safeFilename(title) + ".md") { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+        .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
+                      contentType: .pdf, defaultFilename: pdfName) { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
+                      contentType: .zip, defaultFilename: archiveFilename) { result in
+            if case .failure(let error) = result { showError(error) }
+        }
+        .onDisappear {
+            pdfProcessingTask?.cancel()
+            pdfProcessingTask = nil
+            pdfProcessingID = nil
+        }
+        .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
+            Button("Delete permanently", role: .destructive) { permanentlyDeleteSelectedNote() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the note, its revision history and its attached files from this device. This cannot be undone.")
+        }
+    }
+
+    private var workspaceView: some View {
+                VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("A book").font(.title2.weight(.semibold))
@@ -15091,16 +15157,10 @@ private struct NativeABookView: View {
                 Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
-                Button {
-                    showTrash = false
-                    showArchived = false
-                    selectedPDFIDs = []
-                    let now = Date()
-                    let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
-                                               pinned: false, archived: false, deletedAt: nil, createdAt: now, updatedAt: now, revision: 0)
-                    do { let saved = try store.save(note); reload(preferred: saved.id, includeDeleted: false, includeArchived: false) } catch { showError(error) }
-                } label: { Label("New note", systemImage: "plus") }
-                .buttonStyle(.borderedProminent)
+                Button(action: createNoteAndEnterWorkspace) { Label("New note", systemImage: "plus") }
+                    .buttonStyle(.borderedProminent)
+                Button(action: returnToStart) { Label("Start page", systemImage: "house") }
+                    .buttonStyle(.bordered)
                 Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
                 Button("Export backup") {
                     do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
@@ -15214,61 +15274,133 @@ private struct NativeABookView: View {
                     }
                 }
             }
-        }
-        .padding(12)
-        .onAppear { reload() }
-        .task(id: saveKey) { await autosave() }
-        .fileImporter(isPresented: $importingArchive, allowedContentTypes: [.item]) { result in
-            switch result {
-            case .success(let url):
-                let access = url.startAccessingSecurityScopedResource()
-                defer { if access { url.stopAccessingSecurityScopedResource() } }
-                do {
-                    let count = try store.importBackupArchive(Data(contentsOf: url))
-                    showTrash = false
-                    showArchived = false
-                    reload()
-                    status = "Imported " + String(count) + " notes and attachments on this device"
-                    errorText = ""
-                } catch { showError(error) }
-            case .failure(let error): showError(error)
+                }
+    }
+
+    private var welcomeView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("enV WORKSPACE").font(.caption2.weight(.semibold)).tracking(1.2).foregroundStyle(Color.envAccent)
+                        Text("A book").font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
+                    }
+                    Spacer()
+                    Text("PRIVATE · LOCAL ONLY")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.envAccent)
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(Color.envAccent.opacity(0.10), in: Capsule())
+                }
+                VStack(alignment: .leading, spacing: 14) {
+                    Image(systemName: "book.closed.fill")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(Color.envAccent)
+                        .frame(width: 52, height: 52)
+                        .background(Color.envAccent.opacity(0.10), in: RoundedRectangle(cornerRadius: 15))
+                    Text("Give every good idea a place to land.")
+                        .font(.system(size: 27, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.envInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Write notes, keep documents close, and work with PDFs in one calm space designed for everyday use.")
+                        .font(.subheadline).foregroundStyle(Color.envMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 10) {
+                        Button(action: createNoteAndEnterWorkspace) {
+                            Label("Create a note", systemImage: "plus").frame(maxWidth: .infinity)
+                        }.buttonStyle(.borderedProminent)
+                        Button(action: openLibrary) {
+                            Label("Open library", systemImage: "books.vertical").frame(maxWidth: .infinity)
+                        }.buttonStyle(.bordered)
+                    }
+                    .controlSize(.large)
+                    Text("Notes, attachments and PDF work stay on this device. No cloud sync or content upload.")
+                        .font(.caption).foregroundStyle(Color.envMuted)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(LinearGradient(colors: [Color.envSurface2, Color.envCard], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorder, lineWidth: 1))
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 10) {
+                    welcomeFeature("Write", description: "Capture and organise your notes.", symbol: "square.and.pencil")
+                    welcomeFeature("Collect", description: "Keep related files together.", symbol: "paperclip")
+                    welcomeFeature("PDF tools", description: "Process supported PDFs locally.", symbol: "doc.richtext")
+                }
+
+                if !notes.isEmpty {
+                    TextField("Search your library", text: $query)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Search your local library")
+                }
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Your local library").font(.headline).foregroundStyle(Color.envInk)
+                        Text(String(notes.count) + (notes.count == 1 ? " active note" : " active notes"))
+                            .font(.caption).foregroundStyle(Color.envMuted)
+                    }
+                    Spacer()
+                    Text(status).font(.caption2).foregroundStyle(Color.envMuted).multilineTextAlignment(.trailing)
+                }
+                if !errorText.isEmpty {
+                    Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                }
+                if filteredNotes.isEmpty {
+                    Text(notes.isEmpty
+                         ? "Your library is ready for its first note. Create a note or restore a backup saved on this device."
+                         : "No notes match that search. Try another title, notebook, tag or phrase.")
+                        .font(.subheadline).foregroundStyle(Color.envMuted)
+                        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(filteredNotes.prefix(3)) { note in
+                            Button {
+                                select(note)
+                                showWelcome = false
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(note.title.isEmpty ? "Untitled note" : note.title)
+                                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                    Text(note.body.isEmpty ? "No preview yet. Open this note to continue writing." : String(note.body.prefix(110)))
+                                        .font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(13)
+                                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                HStack(spacing: 10) {
+                    Button { importingArchive = true } label: { Label("Restore backup", systemImage: "square.and.arrow.down") }
+                        .buttonStyle(.bordered)
+                    Button {
+                        do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
+                        catch { showError(error) }
+                    } label: { Label("Export backup", systemImage: "square.and.arrow.up") }
+                        .buttonStyle(.bordered)
+                }
+                .controlSize(.regular)
             }
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
         }
-        .fileImporter(isPresented: $importingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls):
-                guard let selectedID else { return }
-                do {
-                    let imported = try store.importFiles(noteID: selectedID, urls: urls)
-                    attachments = try store.attachments(noteID: selectedID)
-                    status = "Saved " + String(imported.count) + " files on this device"
-                    errorText = ""
-                } catch { showError(error) }
-            case .failure(let error): showError(error)
-            }
+        .accessibilityLabel("A book start page")
+    }
+
+    private func welcomeFeature(_ title: String, description: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.envAccent)
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            Text(description).font(.caption).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
         }
-        .fileExporter(isPresented: $exportingNote, document: ABookTextDocument(text: markdownText),
-                      contentType: .plainText, defaultFilename: safeFilename(title) + ".md") { result in
-            if case .failure(let error) = result { showError(error) }
-        }
-        .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
-                      contentType: .pdf, defaultFilename: pdfName) { result in
-            if case .failure(let error) = result { showError(error) }
-        }        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
-                      contentType: .zip, defaultFilename: archiveFilename) { result in
-            if case .failure(let error) = result { showError(error) }
-        }
-        .onDisappear {
-            pdfProcessingTask?.cancel()
-            pdfProcessingTask = nil
-            pdfProcessingID = nil
-        }
-        .confirmationDialog("Permanently delete this note?", isPresented: $confirmPermanentDelete, titleVisibility: .visible) {
-            Button("Delete permanently", role: .destructive) { permanentlyDeleteSelectedNote() }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This removes the note, its revision history and its attached files from this device. This cannot be undone.")
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.envBorder, lineWidth: 1))
     }
 
     private var activePDFID: UUID? { activePDFSelection }
@@ -15279,6 +15411,35 @@ private struct NativeABookView: View {
     }
     private var markdownText: String {
         "# " + (title.isEmpty ? "Untitled note" : title) + "\n\n" + bodyText + "\n\nNotebook: " + notebook + "\nTags: " + tags + "\n"
+    }
+
+    private func createNoteAndEnterWorkspace() {
+        showTrash = false
+        showArchived = false
+        selectedPDFIDs = []
+        let now = Date()
+        let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
+                                   pinned: false, archived: false, deletedAt: nil,
+                                   createdAt: now, updatedAt: now, revision: 0)
+        do {
+            let saved = try store.save(note)
+            reload(preferred: saved.id, includeDeleted: false, includeArchived: false)
+            showWelcome = false
+        } catch { showError(error) }
+    }
+
+    private func openLibrary() {
+        showTrash = false
+        showArchived = false
+        reload(includeDeleted: false, includeArchived: false)
+        showWelcome = false
+    }
+
+    private func returnToStart() {
+        Task {
+            await autosave()
+            if errorText.isEmpty { showWelcome = true }
+        }
     }
 
     private func safeFilename(_ value: String) -> String {
@@ -15337,6 +15498,15 @@ private struct NativeABookView: View {
                                       createdAt: notes.first(where: { $0.id == id })?.createdAt ?? Date(),
                                       updatedAt: Date(), revision: notes.first(where: { $0.id == id })?.revision ?? 0)
         do {
+            if let baseline = notes.first(where: { $0.id == id }),
+               baseline.title == current.title,
+               baseline.body == current.body,
+               baseline.notebook == (current.notebook.isEmpty ? "Inbox" : current.notebook),
+               baseline.tags == current.tags {
+                status = "Saved on this device"
+                errorText = ""
+                return
+            }
             let saved = try store.save(current)
             notes = try store.notes(includeArchived: showArchived, includeDeleted: showTrash)
             if let index = notes.firstIndex(where: { $0.id == id }) { notes[index] = saved }

@@ -496,6 +496,7 @@ fun NativeABookScreen(){
     fun cancelPdfProcessing(){pdfProcessingJob?.cancel();pdfProcessingJob=null}
     fun launchPdfProcessing(block:suspend ()->Unit){cancelPdfProcessing();pdfProcessingJob=scope.launch{block()}}
     var notes by remember{mutableStateOf(db.notes())}
+    var showWelcome by rememberSaveable{mutableStateOf(true)}
     var selected by rememberSaveable{mutableStateOf<String?>(null)}
     var title by rememberSaveable{mutableStateOf("")}
     var body by rememberSaveable{mutableStateOf("")}
@@ -538,6 +539,21 @@ fun NativeABookScreen(){
         selected=n?.id;title=n?.title.orEmpty();body=n?.body.orEmpty();notebook=n?.notebook?:"Inbox"
         tags=n?.let{runCatching{JSONArray(it.tags).let{a->(0 until a.length()).joinToString(", "){i->a.getString(i)}}}.getOrDefault("")}.orEmpty()
         files=n?.let{db.attachments(it.id)}?:emptyList();revisions=n?.let{db.revisions(it.id)}?:emptyList()
+    }
+
+    fun createNoteAndOpen(){
+        showTrash=false;archived=false;selectedPdfIds=emptySet()
+        val id=UUID.randomUUID().toString();val now=System.currentTimeMillis()
+        try{
+            db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0))
+            reload(id,false)
+            showWelcome=false
+        }catch(failure:Throwable){error=failure.message?: "Could not create a local note."}
+    }
+    fun openLibrary(){
+        showTrash=false;archived=false
+        showWelcome=false
+        reload(null,false)
     }
 
     fun removeAttachment(record:ABookFileRecord){
@@ -823,20 +839,88 @@ fun NativeABookScreen(){
         val result=withContext(Dispatchers.IO){runCatching{
             val old=db.notes(true,true).firstOrNull{it.id==id}
             val tagData=JSONArray(tags.split(",").map{it.trim()}.filter{it.isNotEmpty()}.take(50)).toString()
-            db.save(ABookNoteRecord(id,title,body,notebook.ifBlank{"Inbox"},tagData,old?.pinned?:false,old?.archived?:false,old?.deletedAt,old?.createdAt?:System.currentTimeMillis(),System.currentTimeMillis(),old?.revision?:0))
+            val normalizedNotebook=notebook.ifBlank{"Inbox"}
+            if(old!=null&&old.title==title&&old.body==body&&old.notebook==normalizedNotebook&&old.tags==tagData) old
+            else db.save(ABookNoteRecord(id,title,body,normalizedNotebook,tagData,old?.pinned?:false,old?.archived?:false,old?.deletedAt,old?.createdAt?:System.currentTimeMillis(),System.currentTimeMillis(),old?.revision?:0))
         }}
         result.fold({status="Saved on this device";notes=db.notes(archived,showTrash)},{error=it.message?:"Local save failed";status="Not saved"})
     }
     DisposableEffect(Unit){onDispose{pdfProcessingJob?.cancel()}}
     LaunchedEffect(selected){cancelPdfProcessing();selectedPdfIds=emptySet();files=selected?.let{withContext(Dispatchers.IO){db.attachments(it)}}?:emptyList();activePdf=null;pdfText=""}
     val filtered=notes.filter{n->val q=search.trim().lowercase(Locale.ROOT);q.isEmpty()||(n.title+" "+n.body+" "+n.tags+" "+n.notebook).lowercase(Locale.ROOT).contains(q)}
+    if(showWelcome){
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)){
+            Card(Modifier.fillMaxWidth()){
+                Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+                    Text("enV WORKSPACE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+                    Text("A book",style=MaterialTheme.typography.headlineMedium)
+                    Text("Give every good idea a place to land.",style=MaterialTheme.typography.titleLarge)
+                    Text("Write notes, keep documents close, and work with PDFs in one calm space designed for everyday use.",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                        Button(onClick={createNoteAndOpen()},modifier=Modifier.weight(1f)){Text("Create note")}
+                        OutlinedButton(onClick={openLibrary()},modifier=Modifier.weight(1f)){Text("Open library")}
+                    }
+                    Text("PRIVATE · LOCAL ONLY · NO CLOUD SYNC",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+                    Text("Your notes, attachments and PDF work stay on this device.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                Card(Modifier.fillMaxWidth()){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                        Text("WRITE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+                        Text("Capture and organise notes.",style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Card(Modifier.fillMaxWidth()){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                        Text("COLLECT",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+                        Text("Keep related files together.",style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Card(Modifier.fillMaxWidth()){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                        Text("PDF TOOLS",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
+                        Text("Process supported PDFs locally.",style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            if(notes.isNotEmpty()){
+                OutlinedTextField(search,{search=it},label={Text("Search your library")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+                Text("Your local library",style=MaterialTheme.typography.titleMedium)
+                Text(notes.size.toString()+" "+(if(notes.size==1)"note" else "notes"),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if(filtered.isEmpty()){
+                Card(Modifier.fillMaxWidth()){
+                    Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                        Text(if(notes.isEmpty())"Your library is ready." else "No notes match that search.",style=MaterialTheme.typography.titleSmall)
+                        Text(if(notes.isEmpty())"Create your first note or restore a backup saved on this device." else "Try another title, notebook, tag or phrase.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }else{
+                filtered.take(3).forEach{n->
+                    Card(Modifier.fillMaxWidth().clickable{showWelcome=false;reload(n.id,false)}){
+                        Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                            Text(n.title.ifBlank{"Untitled note"},style=MaterialTheme.typography.titleSmall)
+                            Text(n.body.ifBlank{"No preview yet. Open this note to continue writing."}.take(110),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2)
+                        }
+                    }
+                }
+            }
+            if(error.isNotBlank())Text(error,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+            Text(status,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick={importArchivePicker.launch(arrayOf("*/*"))}){Text("Restore a local backup")}
+        }
+    }else{
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text("A book",style=MaterialTheme.typography.headlineSmall)
         Text("Private notes and PDFs stored on this device.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Text(status,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(error.isNotBlank())Text(error,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
         FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-            Button(onClick={showTrash=false;archived=false;selectedPdfIds=emptySet();val id=UUID.randomUUID().toString();val now=System.currentTimeMillis();db.save(ABookNoteRecord(id,"","","Inbox","[]",false,false,null,now,now,0));reload(id,false)}){Text("New note")}
+            Button(onClick={createNoteAndOpen()}){Text("New note")}
+            OutlinedButton(onClick={showWelcome=true}){Text("Start page")}
             OutlinedButton(onClick={exportMarkdown.launch("${title.ifBlank{"note"}}.md")},enabled=selected!=null){Text("Export .md")}
             OutlinedButton(onClick={startLocalBackup()}){Text("Export backup")}
             OutlinedButton(onClick={importArchivePicker.launch(arrayOf("*/*"))}){Text("Import backup")}
@@ -932,6 +1016,7 @@ fun NativeABookScreen(){
             if(pendingPdf!=null)Button(onClick={exportPdf.launch("a-book-edited.pdf")}){Text("Save edited PDF")}
         }else Text("Create a note to start your local library.",style=MaterialTheme.typography.bodySmall)
         Text("PDF text extraction, rotation and OCR run locally. Files are not uploaded.",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
     }
     if(confirmPermanentDelete){
         AlertDialog(

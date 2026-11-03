@@ -89,6 +89,7 @@ export function ABookEngine() {
   const [showArchived, setShowArchived] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"notes" | "editor">("notes");
+  const [showWelcome, setShowWelcome] = useState(true);
   const [storageMessage, setStorageMessage] = useState("Saved on this device");
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
@@ -345,9 +346,30 @@ export function ABookEngine() {
       const note = await persistNote(createNote());
       await refresh(note.id, false, false);
       setMobilePanel("editor");
+      setShowWelcome(false);
       setError("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create a local note.");
+    }
+  }
+
+  async function enterRecentNote(note: ABookNote) {
+    await selectNote(note);
+    if (currentRef.current?.id === note.id) setShowWelcome(false);
+  }
+
+  function openLibrary() {
+    setShowWelcome(false);
+    setMobilePanel("notes");
+  }
+
+  async function returnToEntry() {
+    try {
+      await flushCurrentDraft();
+      setMobilePanel("notes");
+      setShowWelcome(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The current note could not be saved.");
     }
   }
 
@@ -649,6 +671,121 @@ export function ABookEngine() {
     </section>;
   }
 
+  if (showWelcome) return (
+    <section className="mx-auto w-full max-w-5xl space-y-6 py-2" aria-label="A book start page" data-local-only="true">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground shadow-sm">
+            <span className="text-2xl font-semibold">A</span>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">enV workspace</p>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">A book</h1>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-xs font-medium text-muted">
+          <span className="size-2 rounded-full bg-accent" aria-hidden="true" />
+          Private · local only
+        </span>
+      </header>
+
+      {error ? <div role="alert" className="rounded-xl border border-red-500/40 bg-red-500/5 p-3 text-sm text-red-700 dark:text-red-300">{error}</div> : null}
+      <input ref={importInput} type="file" accept=".abook,.zip,application/zip,application/json,.json" className="hidden" onChange={(event) => void importNotes(event.target.files?.[0])} />
+
+      <div className="grid overflow-hidden rounded-3xl border border-border bg-surface shadow-sm lg:grid-cols-[1.25fr_0.75fr]">
+        <div className="flex flex-col items-start justify-center p-6 sm:p-9 lg:p-10">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Your private writing space</p>
+          <h2 className="mt-4 max-w-xl text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
+            Give every good idea a place to land.
+          </h2>
+          <p className="mt-4 max-w-xl text-sm leading-6 text-muted sm:text-base">
+            Write notes, keep useful documents close, and work with PDFs in one calm workspace designed for everyday use.
+          </p>
+          <div className="mt-7 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <Button type="button" size="lg" onClick={() => void createNewNote()} className="min-h-12">Create a note</Button>
+            <Button type="button" size="lg" variant="outline" onClick={openLibrary} className="min-h-12">
+              Open my library <span className="ml-1 text-muted">({notes.length})</span>
+            </Button>
+          </div>
+          <p className="mt-5 text-xs leading-5 text-muted">
+            Notes and attachments stay in this device's local storage. A book does not upload your library or use cloud sync.
+          </p>
+        </div>
+        <div className="flex min-h-[220px] items-center justify-center bg-surface-2 p-6 sm:min-h-[280px]">
+          <div className="w-full max-w-xs rotate-1 rounded-2xl border border-border bg-surface p-5 shadow-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">A book</span>
+              <span className="rounded-full bg-surface-2 px-2 py-1 text-[10px] font-medium text-muted">LOCAL NOTE</span>
+            </div>
+            <div className="mt-7 space-y-3">
+              <div className="h-3 w-3/4 rounded-full bg-foreground/80" />
+              <div className="h-2 w-full rounded-full bg-border" />
+              <div className="h-2 w-11/12 rounded-full bg-border" />
+              <div className="h-2 w-2/3 rounded-full bg-border" />
+            </div>
+            <div className="mt-8 flex items-center justify-between border-t border-border pt-3 text-xs text-muted">
+              <span>Notes · Files · PDFs</span><span aria-hidden="true">✦</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-sm font-semibold text-foreground">Write & organise</p>
+          <p className="mt-2 text-sm leading-5 text-muted">Capture ideas, search your notes, and keep notebooks tidy.</p>
+        </article>
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-sm font-semibold text-foreground">Keep files close</p>
+          <p className="mt-2 text-sm leading-5 text-muted">Attach useful documents to the note they belong to.</p>
+        </article>
+        <article className="rounded-2xl border border-border bg-surface p-4">
+          <p className="text-sm font-semibold text-foreground">Work with PDFs</p>
+          <p className="mt-2 text-sm leading-5 text-muted">Use supported PDF tools on your device, without content upload.</p>
+        </article>
+      </div>
+
+      <section className="space-y-3" aria-labelledby="a-book-recent-heading">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h3 id="a-book-recent-heading" className="text-base font-semibold text-foreground">Pick up where you left off</h3>
+            <p className="mt-1 text-xs text-muted">{notes.length} active {notes.length === 1 ? "note" : "notes"} in this local library</p>
+          </div>
+          {notes.length ? <button type="button" onClick={openLibrary} className="text-sm font-medium text-accent underline-offset-4 hover:underline">View library</button> : null}
+        </div>
+        {notes.length ? (
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your local library" aria-label="Search your local library" className="min-h-11 w-full rounded-xl border border-border bg-surface px-4 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring" />
+        ) : null}
+        {visibleNotes.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleNotes.slice(0, 3).map((note) => (
+              <button key={note.id} type="button" onClick={() => void enterRecentNote(note)} className="min-h-28 rounded-2xl border border-border bg-surface p-4 text-left transition hover:border-accent/60 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">Recent note</span>
+                <span className="mt-2 block truncate text-sm font-semibold text-foreground">{note.title || "Untitled note"}</span>
+                <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted">{note.body.trim() || "No preview yet. Open this note to continue writing."}</span>
+              </button>
+            ))}
+          </div>
+        ) : notes.length ? (
+          <div className="rounded-2xl border border-dashed border-border bg-surface p-5">
+            <p className="text-sm font-medium text-foreground">No notes match that search.</p>
+            <p className="mt-1 text-sm text-muted">Try another title, notebook, tag or phrase.</p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border bg-surface p-5">
+            <p className="text-sm font-medium text-foreground">Your library is ready for its first note.</p>
+            <p className="mt-1 text-sm text-muted">Create a note to get started, or restore a backup saved on this device.</p>
+          </div>
+        )}
+      </section>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
+        <span className="text-xs text-muted" role="status">{storageMessage}</span>
+        <Button type="button" size="sm" variant="outline" onClick={() => importInput.current?.click()}>Restore a local backup</Button>
+      </div>
+    </section>
+  );
+
   return <section className="space-y-4" aria-label="A book local notes workspace" data-local-only="true">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -656,6 +793,7 @@ export function ABookEngine() {
         <p className="mt-1 text-sm text-muted">Notes and files stay on this device.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={() => void returnToEntry()}>A book home</Button>
         <span className="text-xs text-muted" role="status">{storageMessage}</span>
         <Button type="button" variant="outline" onClick={exportNotesJson}>Export backup</Button>
         <Button type="button" variant="outline" onClick={() => importInput.current?.click()}>Import backup</Button>
