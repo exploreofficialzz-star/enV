@@ -9,8 +9,13 @@
     justify-content: center;
     padding: 32px 20px 48px;
     overflow: visible;
-    color: var(--color-fg);
-    background: var(--color-bg);
+    color: #000;
+    background: #fff;
+  }
+
+  .dark .world-lab-entry {
+    color: #fff;
+    background: #000;
   }
 
   .world-lab-entry__inner {
@@ -27,8 +32,9 @@
 
   .world-lab-entry__title {
     width: 100%;
+    max-width: 100%;
     margin: 0;
-    color: var(--color-fg);
+    color: inherit;
     font-family: "Aguafina Script", cursive;
     font-size: clamp(46px, 13vw, 56px);
     font-weight: 400;
@@ -53,6 +59,7 @@
     font-family: system-ui, sans-serif;
     font-size: clamp(72px, 20vw, 90px);
     line-height: 1;
+    filter: grayscale(1);
   }
 
   .world-lab-entry__brand {
@@ -76,15 +83,21 @@
     align-items: center;
     justify-content: center;
     margin-top: 2px;
-    border: 1px solid var(--color-fg);
+    border: 1px solid #000;
     border-radius: 24px;
-    color: var(--color-bg);
-    background: var(--color-fg);
+    color: #fff;
+    background: #000;
     box-shadow: none;
     font-size: 1.05rem;
     font-weight: 700;
     line-height: 1;
     transition: opacity 150ms ease;
+  }
+
+  .dark .world-lab-entry__cta {
+    border-color: #fff;
+    color: #000;
+    background: #fff;
   }
 
   .world-lab-entry__cta:hover {
@@ -95,16 +108,25 @@
     display: grid;
     min-height: clamp(540px, calc(100svh - 176px), 850px);
     place-items: center;
-    background: var(--color-bg);
+    background: #fff;
+  }
+
+  .dark .world-lab-entry__loading {
+    background: #000;
   }
 
   .world-lab-entry__loading-mark {
     width: 30px;
     height: 30px;
-    border: 2px solid var(--color-border);
-    border-top-color: var(--color-fg);
+    border: 2px solid #b8b8b8;
+    border-top-color: #000;
     border-radius: 50%;
     animation: world-lab-entry-spin .8s linear infinite;
+  }
+
+  .dark .world-lab-entry__loading-mark {
+    border-color: #555;
+    border-top-color: #fff;
   }
 
   @keyframes world-lab-entry-spin {

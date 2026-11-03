@@ -13,16 +13,32 @@ try{
   await page.goto(origin+"/tools/developer/the-world-lab",{waitUntil:"domcontentloaded",timeout:90000});
   await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
   await page.getByRole("button",{name:"Enter"}).waitFor({state:"visible",timeout:90000});
-  const entryLayout=await page.locator(".world-lab-entry").evaluate((root)=>{
+  const readEntryLayout=()=>page.locator(".world-lab-entry").evaluate((root)=>{
     const title=root.querySelector("h1")?.getBoundingClientRect();
     const artwork=root.querySelector(".world-lab-entry__artwork")?.getBoundingClientRect();
     const button=root.querySelector("button")?.getBoundingClientRect();
-    return {titleBottom:title?.bottom,artworkTop:artwork?.top,artworkBottom:artwork?.bottom,buttonTop:button?.top};
+    return {
+      titleBottom:title?.bottom,artworkTop:artwork?.top,
+      artworkBottom:artwork?.bottom,buttonTop:button?.top,
+    };
   });
-  assert.ok(entryLayout.titleBottom<=entryLayout.artworkTop,
+  const desktopEntryLayout=await readEntryLayout();
+  assert.ok(desktopEntryLayout.titleBottom<=desktopEntryLayout.artworkTop,
     "The World Lab heading must not be covered by its artwork");
-  assert.ok(entryLayout.artworkBottom<=entryLayout.buttonTop,
+  assert.ok(desktopEntryLayout.artworkBottom<=desktopEntryLayout.buttonTop,
     "The World Lab artwork must not cover the Enter button");
+  await page.setViewportSize({width:390,height:844});
+  const mobileEntryLayout=await readEntryLayout();
+  assert.ok(mobileEntryLayout.titleBottom<=mobileEntryLayout.artworkTop,
+    "The mobile World Lab heading must not be covered by its artwork");
+  assert.ok(mobileEntryLayout.artworkBottom<=mobileEntryLayout.buttonTop,
+    "The mobile World Lab artwork must not cover the Enter button");
+  const entryViewport=await page.evaluate(()=>({
+    documentWidth:document.documentElement.scrollWidth,viewportWidth:window.innerWidth,
+  }));
+  assert.ok(entryViewport.documentWidth<=entryViewport.viewportWidth+3,
+    "The World Lab entry must not horizontally overflow on mobile");
+  await page.setViewportSize({width:1280,height:900});
   await page.getByRole("button",{name:"Enter"}).click();
   await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
   await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
