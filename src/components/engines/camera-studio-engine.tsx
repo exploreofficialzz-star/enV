@@ -61,6 +61,21 @@ function recorderMimeType() {
   return options.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
+
+function downloadRecoveredRecording(blob: Blob) {
+  const extension = blob.type.includes("mp4") ? "mp4" : "webm";
+  const filename = `env-camera-recovered-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function cameraErrorMessage(error: unknown) {
   const name = error instanceof DOMException ? error.name : "";
   if (name === "NotAllowedError" || name === "PermissionDeniedError") {
@@ -125,9 +140,8 @@ export function CameraStudioEngine() {
       if (recordingTimerRef.current !== null) window.clearInterval(recordingTimerRef.current);
       const recorder = recorderRef.current;
       if (recorder && recorder.state !== "inactive") {
-        recorder.ondataavailable = null;
-        recorder.onstop = null;
-        recorder.onerror = null;
+        // Keep the recorder callbacks attached: onstop downloads a recovery copy
+        // if navigation unmounts this screen before the user can save the clip.
         try { recorder.stop(); } catch { /* The browser may already have stopped it. */ }
       }
       streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -155,6 +169,17 @@ export function CameraStudioEngine() {
     setTorchAvailable(Boolean(capabilities?.torch));
     setTorchEnabled(false);
   }, [cameraStream]);
+
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "A recording is in progress. Stop it to save your clip before leaving.";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [isRecording]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -368,7 +393,10 @@ export function CameraStudioEngine() {
         microphoneRef.current = null;
         recorderRef.current = null;
         recordingStartedRef.current = null;
-        if (!mountedRef.current) return;
+        if (!mountedRef.current) {
+          if (recording.size > 0) downloadRecoveredRecording(recording);
+          return;
+        }
         setIsRecording(false);
         if (recording.size > 0) {
           setCameraError(null);
@@ -397,7 +425,7 @@ export function CameraStudioEngine() {
     const nextValue = !torchEnabled;
     try {
       await track.applyConstraints({
-        advanced: [{ torch: nextValue } as MediaTrackConstraintSet],
+        advanced: [{ torch: nextValue } as unknown as MediaTrackConstraintSet],
       });
       setTorchEnabled(nextValue);
     } catch {
