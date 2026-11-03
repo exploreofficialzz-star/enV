@@ -14,8 +14,8 @@ android {
         targetSdk = 36
         buildConfigField("String", "ENV_API_BASE_URL", "\"${providers.gradleProperty("ENV_API_BASE_URL").orNull ?: "https://env-q3mq.onrender.com"}\"")
         buildConfigField("boolean", "ANALYTICS_ENABLED", providers.gradleProperty("envAnalyticsEnabled").orNull ?: "false")
-        versionCode = 6
-        versionName = "1.1.0"
+        versionCode = 7
+        versionName = "1.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -31,14 +31,28 @@ android {
     }
 
     val keystorePath = System.getenv("ANDROID_KEYSTORE_FILE")
-    val hasReleaseKey = !keystorePath.isNullOrBlank()
+    val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val keyAliasValue = System.getenv("ANDROID_KEY_ALIAS")
+    val keyPasswordValue = System.getenv("ANDROID_KEY_PASSWORD")
+    val releaseSigningValues = listOf(keystorePath, keystorePassword, keyAliasValue, keyPasswordValue)
+    val hasReleaseKey = releaseSigningValues.all { !it.isNullOrBlank() }
+    val hasPartialReleaseKey = releaseSigningValues.any { !it.isNullOrBlank() }
+    val requiresProductionSigning = providers.gradleProperty("envRequireProductionSigning").orNull == "true"
+
+    if (hasPartialReleaseKey && !hasReleaseKey) {
+        throw GradleException("Android release signing is incomplete. Set ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD.")
+    }
+    if (requiresProductionSigning && !hasReleaseKey) {
+        throw GradleException("This upload build requires the production Android signing keystore and all signing credentials.")
+    }
+
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {
                 storeFile = file(keystorePath!!)
-                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                storePassword = keystorePassword
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
             }
         }
     }
