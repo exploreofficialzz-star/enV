@@ -65,8 +65,7 @@ test("comments open in overlays with replies and moderation controls", () => {
 test("signed-in commenters can select account name or Anonymous; guests are always Anonymous", () => {
   assert.match(web, /useCurrentUserState/);
   assert.match(web, /accountUser/);
-  assert.match(web, /setIdentityMode\("public"\)/);
-  assert.match(web, /setIdentityMode\("anonymous"\)/);
+  assert.match(web, /setIdentityMode\(accountUser \? "public" : "anonymous"\)/);
   assert.doesNotMatch(web, /Choose a display name/);
   assert.match(web, /identityMode: accountUser \? identityMode : "anonymous"/);
   assert.match(web, /aria-label="Display identity">Anonymous/);
