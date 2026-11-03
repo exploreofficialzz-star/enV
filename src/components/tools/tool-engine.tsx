@@ -50,6 +50,7 @@ import { EventTemplateEngine } from "@/components/engines/event-template-engine"
 import { ABookEngine } from "@/components/engines/a-book-engine";
 import { MusicDownloaderEngine } from "@/components/engines/music-downloader-engine";
 import { AiMusicDataSandbox } from "@/components/engines/ai-music-data-sandbox";
+import { ZipArchiveEngine } from "@/components/engines/zip-archive-engine";
 import { isEventTemplateTool } from "@/lib/events/event-templates";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
@@ -71,6 +72,7 @@ function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: Tool
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
   if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
   if (tool.id === "a-book") return <ABookEngine />;
+  if (tool.id === "zip-any-file") return <ZipArchiveEngine />;
   if (tool.id === "music-downloader") return <MusicDownloaderEngine />;
   if (tool.id === "song-metadata-analyzer") return <AiMusicDataSandbox />;
   // The reader extends the existing payload inspector route with real QR and barcode decoding.

@@ -18,10 +18,26 @@ const MUSIC_DOWNLOADER_META = {
   tags: ["music", "download", "album", "playlist", "offline", "online", "audio"],
   detailShard: "00",
 };
+const ZIP_ARCHIVE_META = {
+  id: "zip-any-file",
+  name: "Zip any file",
+  slug: "zip-any-file",
+  description: "Compress one file or a whole selection into a ZIP/ZIP64 archive, or safely extract an archive. Files stay on this device.",
+  category: "productivity",
+  icon: "Archive",
+  popularity: 1450,
+  featured: true,
+  clientSide: true,
+  status: "active",
+  isNew: true,
+  keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"],
+  tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
+  detailShard: "00",
+};
 export const CATALOG_COUNTS = {
   ...homeTools.counts,
-  total: homeTools.counts.total + 1,
-  active: homeTools.counts.active + 1,
+  total: homeTools.counts.total + 2,
+  active: homeTools.counts.active + 2,
 };
 const CATALOG_ROOT = `/catalog-runtime/${homeTools.version}`;
 
@@ -72,7 +88,9 @@ export function loadToolIndex(): Promise<readonly ToolSummary[]> {
       .then((data) => {
         if (!Array.isArray(data))
           throw new Error("The tool list response was invalid. Retry to load it again.");
-        toolIndex = data.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id) ? data : [...data, MUSIC_DOWNLOADER_META];
+        toolIndex = data.slice();
+        if (!toolIndex.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id)) toolIndex.push(MUSIC_DOWNLOADER_META);
+        if (!toolIndex.some((tool) => tool.id === ZIP_ARCHIVE_META.id)) toolIndex.push(ZIP_ARCHIVE_META);
         return toolIndex;
       })
       .catch((error: unknown) => {
@@ -94,7 +112,9 @@ export function loadSearchIndex(): Promise<readonly SearchTool[]> {
       .then((data) => {
         if (!Array.isArray(data))
           throw new Error("The search index response was invalid. Retry to search tools.");
-        searchIndex = data.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id) ? data : [...data, MUSIC_DOWNLOADER_META];
+        searchIndex = data.slice();
+        if (!searchIndex.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id)) searchIndex.push(MUSIC_DOWNLOADER_META);
+        if (!searchIndex.some((tool) => tool.id === ZIP_ARCHIVE_META.id)) searchIndex.push(ZIP_ARCHIVE_META);
         return searchIndex;
       })
       .catch((error: unknown) => {

@@ -232,6 +232,35 @@ fun Catalog.withABook(): Catalog {
     )
 }
 
+/** Registers the local ZIP64 archive tool without changing the shared web catalogue. */
+fun Catalog.withZipArchive(): Catalog {
+    if (tools.any { it.id == "zip-any-file" }) return this
+    val tool = ToolRecord(
+        id = "zip-any-file",
+        name = "Zip any file",
+        slug = "zip-any-file",
+        description = "Compress one file or many files into a ZIP/ZIP64 archive, or safely extract archives locally on this device.",
+        category = "productivity",
+        keywords = listOf("zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"),
+        tags = listOf("zip", "archive", "compression", "extract", "offline", "local", "files"),
+        icon = "Archive",
+        popularity = 1450,
+        featured = true,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = listOf("file-converter", "pdf-merger", "document-editor"),
+        engine = EngineInfo("custom", "zip-any-file"),
+        subcategory = "Files & storage",
+    )
+    val updated = tools + tool
+    return copy(
+        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+    )
+}
+
 private val webSearchSynonyms = mapOf(
     "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
     "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),

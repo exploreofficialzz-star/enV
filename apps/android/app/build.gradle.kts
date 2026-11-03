@@ -86,6 +86,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("net.lingala.zip4j:zip4j:2.11.6")
     implementation("com.caverock:androidsvg-aar:1.4")
     implementation("androidx.browser:browser:1.8.0")
     implementation("androidx.camera:camera-camera2:1.4.2")

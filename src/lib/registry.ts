@@ -93,6 +93,27 @@ const aBookTool: ToolMeta = {
   isNew: true,
 };
 
+const zipAnyFileTool: ToolMeta = {
+  id: "zip-any-file",
+  name: "Zip any file",
+  slug: "zip-any-file",
+  description: "Compress one file or a whole selection into a ZIP/ZIP64 archive, or safely extract an archive. Files stay on this device.",
+  category: "productivity",
+  subcategory: "Files & storage",
+  keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files", "store", "share"],
+  tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
+  icon: "Archive",
+  popularity: 1450,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: ["file-converter", "pdf-merger", "document-editor"],
+  engine: { type: "custom", id: "zip-any-file" },
+  isNew: true,
+};
+
 const retiredDesignBuildCalculatorIds = new Set([
   "math-exp-sum-math-design-build-delivery-effort-a",
   "math-exp-sum-math-design-build-delivery-effort-b",
@@ -157,6 +178,7 @@ const allTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
 ];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));

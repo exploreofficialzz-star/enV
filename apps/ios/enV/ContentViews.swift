@@ -621,7 +621,7 @@ struct HomeView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
+            .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
         .id(homeNavigationReset)
@@ -1091,12 +1091,12 @@ struct ToolsView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
+            .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
         .id(toolsNavigationReset)
         .navigationDestination(isPresented: $showSearchNavigation) {
-            if let searchNavigationTool { ToolDestinationView(tool: searchNavigationTool) }
+            if let searchNavigationTool { NativeArchiveToolDestinationView(tool: searchNavigationTool) }
         }
         .onChange(of: toolsNavigationReset) { _ in
             toolsQuery = ""
@@ -1174,7 +1174,7 @@ struct CategoryView: View {
         .modifier(Screen())
         .navigationTitle(store.category(named: categoryID)?.name ?? "Category")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
+        .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
     }
 }
 
@@ -1317,10 +1317,10 @@ struct SearchResultsView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showSearchNavigation) {
-            if let searchNavigationTool { ToolDestinationView(tool: searchNavigationTool) }
+            if let searchNavigationTool { NativeArchiveToolDestinationView(tool: searchNavigationTool) }
         }
         .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-        .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
+        .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
         .onChange(of: text) { _ in visibleCount = 24 }
     }
 }
@@ -1343,7 +1343,7 @@ struct SavedView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
+            .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
     }

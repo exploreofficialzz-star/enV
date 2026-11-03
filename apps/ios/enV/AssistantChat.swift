@@ -302,7 +302,7 @@ struct AssistantChatView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
-            .navigationDestination(for: Tool.self) { ToolDestinationView(tool: $0) }
+            .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
         }
         .onDisappear {

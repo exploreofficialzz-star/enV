@@ -137,7 +137,7 @@ struct Tool: Decodable, Identifiable, Hashable {
 
     var isPlanned: Bool { status.lowercased() == "planned" }
     var isUnderProduction: Bool {
-        !["a-book"].contains(id.lowercased()) &&
+        !["a-book", "zip-any-file"].contains(id.lowercased()) &&
         !["accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video"].contains(category.lowercased())
     }
     var searchText: String {
@@ -342,6 +342,48 @@ extension Catalog {
 }
 
 extension Catalog {
+    /// Registers local ZIP64 compression and extraction as a native tool.
+    func includingZipArchive() -> Catalog {
+        guard !tools.contains(where: { $0.id == "zip-any-file" }) else { return self }
+        let tool = Tool(
+            id: "zip-any-file",
+            name: "Zip any file",
+            slug: "zip-any-file",
+            description: "Compress one file or many files into a ZIP/ZIP64 archive, or safely extract archives locally on this device.",
+            category: "productivity",
+            subcategory: "Files & storage",
+            keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"],
+            tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
+            icon: "Archive",
+            popularity: 1450,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: ["file-converter", "pdf-merger", "document-editor"],
+            engine: ToolEngine(type: "custom", id: "zip-any-file", op: "zip-any-file", configuration: [:])
+        )
+        let updated = tools + [tool]
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: updated.sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory
+                    ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
+                    : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+}
+
+extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let sourceCandidates = includeRelatedReferences ? tools + (relatedReferenceTools ?? []) : tools
@@ -435,7 +477,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingDateTimeExtensions()
     }
 }
 

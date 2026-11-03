@@ -15,7 +15,7 @@ export const PRODUCTION_EXEMPT_CATEGORIES = new Set<CategoryId>([
 ]);
 
 /** Individually implemented tools may be available without opening their entire category. */
-export const PRODUCTION_EXEMPT_TOOL_IDS = new Set(["a-book"]);
+export const PRODUCTION_EXEMPT_TOOL_IDS = new Set(["a-book", "zip-any-file"]);
 
 /** Every other tool outside the category allowlist remains behind the production notice. */
 export function isToolUnderProduction(tool: Pick<ToolMeta, "id" | "category">): boolean {
