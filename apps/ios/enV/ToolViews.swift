@@ -15041,6 +15041,7 @@ private struct ABookArchiveDocument: FileDocument {
 }
 private struct NativeABookView: View {
     private let store = ABookLocalStore.shared
+    @State private var showWelcome = true
     @State private var notes: [ABookNativeNote] = []
     @State private var selectedID: UUID?
     @State private var title = ""
@@ -15078,7 +15079,11 @@ private struct NativeABookView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Group {
+            if showWelcome {
+                welcomeView
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("A book").font(.title2.weight(.semibold))
@@ -15091,16 +15096,10 @@ private struct NativeABookView: View {
                 Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
             }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
-                Button {
-                    showTrash = false
-                    showArchived = false
-                    selectedPDFIDs = []
-                    let now = Date()
-                    let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
-                                               pinned: false, archived: false, deletedAt: nil, createdAt: now, updatedAt: now, revision: 0)
-                    do { let saved = try store.save(note); reload(preferred: saved.id, includeDeleted: false, includeArchived: false) } catch { showError(error) }
-                } label: { Label("New note", systemImage: "plus") }
-                .buttonStyle(.borderedProminent)
+                Button(action: createNoteAndEnterWorkspace) { Label("New note", systemImage: "plus") }
+                    .buttonStyle(.borderedProminent)
+                Button(action: returnToStart) { Label("Start page", systemImage: "house") }
+                    .buttonStyle(.bordered)
                 Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
                 Button("Export backup") {
                     do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
@@ -15214,6 +15213,8 @@ private struct NativeABookView: View {
                     }
                 }
             }
+                }
+            }
         }
         .padding(12)
         .onAppear { reload() }
@@ -15271,6 +15272,125 @@ private struct NativeABookView: View {
         }
     }
 
+    private var welcomeView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("enV WORKSPACE").font(.caption2.weight(.semibold)).tracking(1.2).foregroundStyle(Color.envAccent)
+                        Text("A book").font(.title2.weight(.semibold)).foregroundStyle(Color.envInk)
+                    }
+                    Spacer()
+                    Text("PRIVATE · LOCAL ONLY")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.envAccent)
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(Color.envAccent.opacity(0.10), in: Capsule())
+                }
+                VStack(alignment: .leading, spacing: 14) {
+                    Image(systemName: "book.closed.fill")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(Color.envAccent)
+                        .frame(width: 52, height: 52)
+                        .background(Color.envAccent.opacity(0.10), in: RoundedRectangle(cornerRadius: 15))
+                    Text("Give every good idea a place to land.")
+                        .font(.system(size: 27, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.envInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Write notes, keep documents close, and work with PDFs in one calm space designed for everyday use.")
+                        .font(.subheadline).foregroundStyle(Color.envMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 10) {
+                        Button(action: createNoteAndEnterWorkspace) {
+                            Label("Create a note", systemImage: "plus").frame(maxWidth: .infinity)
+                        }.buttonStyle(.borderedProminent)
+                        Button(action: openLibrary) {
+                            Label("Open library", systemImage: "books.vertical").frame(maxWidth: .infinity)
+                        }.buttonStyle(.bordered)
+                    }
+                    .controlSize(.large)
+                    Text("Notes, attachments and PDF work stay on this device. No cloud sync or content upload.")
+                        .font(.caption).foregroundStyle(Color.envMuted)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(LinearGradient(colors: [Color.envSurface2, Color.envCard], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorder, lineWidth: 1))
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    welcomeFeature("Write", description: "Capture and organise your notes.", symbol: "square.and.pencil")
+                    welcomeFeature("Collect", description: "Keep related files together.", symbol: "paperclip")
+                    welcomeFeature("PDF tools", description: "Process supported PDFs locally.", symbol: "doc.richtext")
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Your local library").font(.headline).foregroundStyle(Color.envInk)
+                        Text(String(notes.count) + (notes.count == 1 ? " active note" : " active notes"))
+                            .font(.caption).foregroundStyle(Color.envMuted)
+                    }
+                    Spacer()
+                    Text(status).font(.caption2).foregroundStyle(Color.envMuted).multilineTextAlignment(.trailing)
+                }
+                if !errorText.isEmpty {
+                    Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                }
+                if notes.isEmpty {
+                    Text("Your library is ready for its first note. Create a note or restore a backup saved on this device.")
+                        .font(.subheadline).foregroundStyle(Color.envMuted)
+                        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(notes.prefix(3)) { note in
+                            Button {
+                                select(note)
+                                showWelcome = false
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(note.title.isEmpty ? "Untitled note" : note.title)
+                                        .font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+                                    Text(note.body.isEmpty ? "No preview yet. Open this note to continue writing." : String(note.body.prefix(110)))
+                                        .font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(13)
+                                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.envBorder, lineWidth: 1))
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                HStack(spacing: 10) {
+                    Button { importingArchive = true } label: { Label("Restore backup", systemImage: "square.and.arrow.down") }
+                        .buttonStyle(.bordered)
+                    Button {
+                        do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
+                        catch { showError(error) }
+                    } label: { Label("Export backup", systemImage: "square.and.arrow.up") }
+                        .buttonStyle(.bordered)
+                }
+                .controlSize(.regular)
+            }
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
+        .accessibilityLabel("A book start page")
+    }
+
+    private func welcomeFeature(_ title: String, description: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: symbol).font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.envAccent)
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
+            Text(description).font(.caption).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background(Color.envCard, in: RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.envBorder, lineWidth: 1))
+    }
+
     private var activePDFID: UUID? { activePDFSelection }
     private var filteredNotes: [ABookNativeNote] {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -15281,7 +15401,36 @@ private struct NativeABookView: View {
         "# " + (title.isEmpty ? "Untitled note" : title) + "\n\n" + bodyText + "\n\nNotebook: " + notebook + "\nTags: " + tags + "\n"
     }
 
-    private func safeFilename(_ value: String) -> String {
+    private func createNoteAndEnterWorkspace() {
+        showTrash = false
+        showArchived = false
+        selectedPDFIDs = []
+        let now = Date()
+        let note = ABookNativeNote(id: UUID(), title: "", body: "", notebook: "Inbox", tags: [],
+                                   pinned: false, archived: false, deletedAt: nil,
+                                   createdAt: now, updatedAt: now, revision: 0)
+        do {
+            let saved = try store.save(note)
+            reload(preferred: saved.id, includeDeleted: false, includeArchived: false)
+            showWelcome = false
+        } catch { showError(error) }
+    }
+
+    private func openLibrary() {
+        showTrash = false
+        showArchived = false
+        reload(includeDeleted: false, includeArchived: false)
+        showWelcome = false
+    }
+
+    private func returnToStart() {
+        Task {
+            await autosave()
+            showWelcome = true
+        }
+    }
+
+    private func safeFilename(_ value: String) {
         let output = value.replacingOccurrences(of: "[^a-zA-Z0-9._-]+", with: "-", options: .regularExpression)
         return output.isEmpty ? "a-book-note" : output
     }

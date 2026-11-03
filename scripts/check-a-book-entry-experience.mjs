@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const web = readFileSync("src/components/engines/a-book-engine.tsx", "utf8");
+const android = readFileSync("apps/android/app/src/main/java/com/chastech/env/NativeABook.kt", "utf8");
+const ios = readFileSync("apps/ios/enV/ToolViews.swift", "utf8");
+
+assert.match(web, /aria-label="A book start page"/, "Web A book must open a dedicated entry page");
+assert.match(web, /Create a note/);
+assert.match(web, /Open my library/);
+assert.match(web, /returnToEntry\(\)/, "Web workspace must provide a route back to the entry page");
+assert.match(android, /var showWelcome by rememberSaveable\{mutableStateOf\(true\)\}/, "Android must start at the native entry page");
+assert.match(android, /Create note/);
+assert.match(android, /Open library/);
+assert.match(android, /Start page/, "Android workspace must return to the entry page");
+assert.match(ios, /@State private var showWelcome = true/, "iOS must start at the native entry page");
+assert.match(ios, /accessibilityLabel\("A book start page"\)/);
+assert.match(ios, /Create a note/);
+assert.match(ios, /Open library/);
+assert.match(ios, /Start page/);
+assert.match(web, /data-local-only="true"/);
+assert.match(android, /Files are not uploaded/);
+assert.match(ios, /No cloud sync or content upload/);
+
+console.log("A book entry experience PASS: Web, Android and iOS each have a dedicated local-first start page and a workspace return action.");
