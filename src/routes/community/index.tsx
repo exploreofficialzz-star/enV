@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { AppShell } from "@/components/layout/app-shell";
 import { loadPublicCommunityIndex } from "@/lib/community/public-feed.functions";
 import { SITE_ORIGIN, seoPageHead } from "@/lib/seo-metadata";
 
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/community/")({
 function CommunityIndexPage() {
   const discussions = Route.useLoaderData();
   return (
+    <AppShell>
     <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">Home</Link>
@@ -73,5 +75,6 @@ function CommunityIndexPage() {
         </p>
       )}
     </main>
+    </AppShell>
   );
 }
