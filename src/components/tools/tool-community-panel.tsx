@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Ban, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
+import { Ban, Eye, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { recordAnalyticsEvent } from "@/lib/analytics/client";
@@ -308,9 +308,8 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
 
   return (
     <>
-      <section className="mt-5 rounded-2xl border border-border bg-surface px-3 py-3 shadow-sm" aria-label="Tool engagement">
-        <span className="sr-only">{compactCount(views)} views</span>
-        <div className="grid grid-cols-3 gap-2">
+      <section className="mt-5 border-t border-border pt-4" aria-label="Tool engagement">
+        <div className="grid grid-cols-4 gap-2">
           <button type="button" aria-label={"Like, " + likes} aria-pressed={feed?.myReaction === "like"} disabled={!visitorId || loading} onClick={() => void reactTo("like")} className={"flex min-w-0 items-center justify-center gap-2 rounded-full px-2 py-3 text-sm font-semibold transition-colors disabled:opacity-50 " + (feed?.myReaction === "like" ? "bg-accent/10 text-accent" : "bg-surface-2 text-fg hover:bg-surface-3")}>
             <ThumbsUp className="size-5 shrink-0" aria-hidden="true" /><span>{compactCount(likes)}</span>
           </button>
@@ -320,6 +319,9 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
           <button type="button" aria-label={"Dislike, " + dislikes} aria-pressed={feed?.myReaction === "dislike"} disabled={!visitorId || loading} onClick={() => void reactTo("dislike")} className={"flex min-w-0 items-center justify-center gap-2 rounded-full px-2 py-3 text-sm font-semibold transition-colors disabled:opacity-50 " + (feed?.myReaction === "dislike" ? "bg-accent/10 text-accent" : "bg-surface-2 text-fg hover:bg-surface-3")}>
             <ThumbsDown className="size-5 shrink-0" aria-hidden="true" /><span>{compactCount(dislikes)}</span>
           </button>
+          <div role="status" aria-label={compactCount(views) + " views"} className="flex min-w-0 items-center justify-center gap-2 rounded-full bg-surface-2 px-2 py-3 text-sm font-semibold text-muted">
+            <Eye className="size-5 shrink-0" aria-hidden="true" /><span>{compactCount(views)}</span>
+          </div>
         </div>
         {problem && !commentsOpen ? <p className="mt-2 text-xs text-danger" role="alert">{problem}</p> : null}
       </section>

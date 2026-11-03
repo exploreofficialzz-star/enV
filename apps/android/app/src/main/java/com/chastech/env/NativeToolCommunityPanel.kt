@@ -18,8 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.DropdownMenu
@@ -289,12 +287,10 @@ fun NativeToolCommunityPanel(toolId: String) {
     val current = feed
     val roots = current?.comments?.filter { it.parentId == null }.orEmpty()
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { sendReaction("like") },
@@ -319,11 +315,27 @@ fun NativeToolCommunityPanel(toolId: String) {
                     shape = CircleShape,
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
                 ) { Text("👎 ${compactCommunityCount(current?.dislikes ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge, color = if (current?.myReaction == "dislike") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            "👁 ${compactCommunityCount(current?.views ?: 0)}",
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             if (error != null && !showComments) {
                 Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-        }
     }
 
     if (showComments) {
