@@ -193,6 +193,7 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!visitorId || !body.trim()) return;
+    // Only an authenticated account may expose its verified public name.
     const publicAccountIdentity = Boolean(accountUser && identityMode === "public");
     setSending(true);
     setProblem("");

@@ -69,7 +69,7 @@ test("signed-in commenters can select account name or Anonymous; guests are alwa
   assert.match(web, /const publicAccountIdentity = Boolean\(accountUser && identityMode === "public"\)/);
   assert.match(web, /identityMode: publicAccountIdentity \? "public" : "anonymous"/);
   assert.doesNotMatch(web, /Choose a display name/);
-  assert.match(web, /identityMode: accountUser \? identityMode : "anonymous"/);
+  assert.match(web, /identityMode: publicAccountIdentity \? "public" : "anonymous"/);
   assert.match(web, /aria-label="Display identity">Anonymous/);
 
   assert.match(android, /NativeCommunityApi\.identity\(\)/);
