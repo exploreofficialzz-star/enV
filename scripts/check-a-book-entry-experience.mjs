@@ -17,6 +17,7 @@ assert.match(android, /Open library/);
 assert.match(android, /Search your library/);
 assert.match(android, /filtered\.take\(3\)/);
 assert.match(android, /Start page/, "Android workspace must return to the entry page");
+assert.match(android, /Column\(Modifier\.fillMaxWidth\(\),verticalArrangement=Arrangement\.spacedBy\(8\.dp\)\)\{\s*Card\(Modifier\.fillMaxWidth\(\)\)/, "Android entry feature cards must remain readable at phone widths");
 assert.match(ios, /@State private var showWelcome = true/, "iOS must start at the native entry page");
 assert.match(ios, /private var workspaceView: some View/, "iOS editor must be isolated from the welcome view for stable SwiftUI type checking");
 assert.match(ios, /private func safeFilename\(_ value: String\) -> String/);
