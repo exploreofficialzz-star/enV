@@ -2,3 +2,4 @@ focus-timer
 pomodoro-timer
 stopwatch
 a-book
+zip-any-file

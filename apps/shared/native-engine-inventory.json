@@ -2,7 +2,8 @@
   "catalogVersion": "c312e2fec397",
   "baseCatalogVersion": "58f9a538e469",
   "runtimeExtensionIds": [
-    "a-book"
+    "a-book",
+    "zip-any-file"
   ],
   "source": "src/data/catalog.ts",
   "platforms": {

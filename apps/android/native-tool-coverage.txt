@@ -7063,3 +7063,4 @@ youtube-earnings-estimator
 youtube-rpm-calculator
 youtube-shorts-calculator
 z-score-calculator
+zip-any-file
