@@ -39,8 +39,8 @@ test("Web, Android and iOS use the compact Like / Comments / Dislike action orde
 
 test("the duplicated reaction/count strip is removed on all three products", () => {
   assert.doesNotMatch(web, /aria-label=\{compactCount\(likes \+ dislikes\) \+ " reactions"\}/);
-  assert.doesNotMatch(android, /Text\("👍 \$\{compactCommunityCount\(current\?\.likes \?\? 0\)\}  👎/);
-  assert.doesNotMatch(android, /Text\("💬 \$\{compactCommunityCount\(current\?\.commentCount \?\? 0\)\}   👁/);
+  assert.doesNotMatch(android, /Text\("👍 \$\{compactCommunityCount\(current\?\.likes \?\? 0\)\} {2}👎/);
+  assert.doesNotMatch(android, /Text\("💬 \$\{compactCommunityCount\(current\?\.commentCount \?\? 0\)\} {3}👁/);
   const iosPanel = ios.split("struct ToolCommunityPanel: View")[1]?.split("struct ToolDestinationView: View")[0] ?? "";
   assert.doesNotMatch(iosPanel, /Image\(systemName: "hand\.thumbsup\.fill"\)/);
   assert.doesNotMatch(iosPanel, /Image\(systemName: "eye"\)/);
