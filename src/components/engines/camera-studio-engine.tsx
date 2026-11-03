@@ -224,7 +224,11 @@ export function CameraStudioEngine() {
       const videoTrack = stream.getVideoTracks()[0];
       videoTrack?.addEventListener("ended", () => {
         if (mountedRef.current && requestId === requestIdRef.current) {
-          setCameraError("The camera stopped. Restart it before taking another photo or video.");
+          setCameraError("The camera stopped. The active recording was stopped so the clip can be finalized.");
+          const activeRecorder = recorderRef.current;
+          if (activeRecorder && activeRecorder.state !== "inactive") {
+            try { activeRecorder.stop(); } catch { /* The recorder may already be finalizing. */ }
+          }
           setCameraStream(null);
           streamRef.current = null;
         }
@@ -311,6 +315,9 @@ export function CameraStudioEngine() {
       } catch {
         setCameraError("The recording could not be stopped cleanly. Check Recent captures before leaving this screen.");
       }
+    } else {
+      setIsRecording(false);
+      setCameraError("The recording session ended before it could be finalized. Check Recent captures for a saved clip.");
     }
   }, []);
 
@@ -326,6 +333,7 @@ export function CameraStudioEngine() {
     }
     setCameraError(null);
     setNotice(null);
+    setCameraBusy(true);
     const mimeType = recorderMimeType();
     let microphone: MediaStream | null = null;
     try {
@@ -363,6 +371,7 @@ export function CameraStudioEngine() {
         if (!mountedRef.current) return;
         setIsRecording(false);
         if (recording.size > 0) {
+          setCameraError(null);
           addToGallery("video", recording);
           setNotice("Recording saved to Recent captures. Download it to keep a copy on your device.");
         } else {
@@ -377,6 +386,8 @@ export function CameraStudioEngine() {
       microphone?.getTracks().forEach((track) => track.stop());
       microphoneRef.current = null;
       setCameraError(error instanceof Error ? error.message : "Video recording could not start on this device.");
+    } finally {
+      if (mountedRef.current) setCameraBusy(false);
     }
   }, [addToGallery]);
 
@@ -406,15 +417,13 @@ export function CameraStudioEngine() {
   }, [facing, requestCamera]);
 
   const removeFromGallery = useCallback((id: string) => {
-    setGallery((previous) => {
-      const removed = previous.find((item) => item.id === id);
-      if (removed) URL.revokeObjectURL(removed.url);
-      const next = previous.filter((item) => item.id !== id);
-      galleryRef.current = next;
-      if (lastCaptureId === id) setLastCaptureId(next[0]?.id ?? null);
-      return next;
-    });
-  }, [lastCaptureId]);
+    const removed = gallery.find((item) => item.id === id);
+    if (removed) URL.revokeObjectURL(removed.url);
+    const next = gallery.filter((item) => item.id !== id);
+    galleryRef.current = next;
+    setGallery(next);
+    if (lastCaptureId === id) setLastCaptureId(next[0]?.id ?? null);
+  }, [gallery, lastCaptureId]);
 
   const clearGallery = useCallback(() => {
     galleryRef.current.forEach((item) => URL.revokeObjectURL(item.url));
@@ -522,11 +531,11 @@ export function CameraStudioEngine() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-3 py-3 sm:px-4">
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="icon" aria-label="Switch camera" title="Switch camera" disabled={!cameraStream || cameraBusy || isRecording} onClick={() => void switchCamera()}>
+                <Button type="button" variant="outline" size="icon" aria-label="Switch camera" title="Switch camera" disabled={!cameraStream || cameraBusy || isRecording || countdown !== null} onClick={() => void switchCamera()}>
                   <SwitchCamera size={18} />
                 </Button>
                 {torchAvailable && (
-                  <Button type="button" variant="outline" size="icon" aria-label={torchEnabled ? "Turn light off" : "Turn light on"} title={torchEnabled ? "Turn light off" : "Turn light on"} disabled={!cameraStream || isRecording} onClick={() => void toggleTorch()}>
+                  <Button type="button" variant="outline" size="icon" aria-label={torchEnabled ? "Turn light off" : "Turn light on"} title={torchEnabled ? "Turn light off" : "Turn light on"} disabled={!cameraStream || isRecording || countdown !== null} onClick={() => void toggleTorch()}>
                     {torchEnabled ? <FlashlightOff size={18} /> : <Flashlight size={18} />}
                   </Button>
                 )}
@@ -596,13 +605,13 @@ export function CameraStudioEngine() {
           <section className="rounded-xl border border-border bg-surface p-3 shadow-[var(--shadow-border)] sm:p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-fg">Quick controls</h3>
-              {cameraStream && <Button type="button" variant="ghost" size="sm" disabled={isRecording} onClick={releaseCamera}>Stop camera</Button>}
+              {cameraStream && <Button type="button" variant="ghost" size="sm" disabled={isRecording || countdown !== null} onClick={releaseCamera}>Stop camera</Button>}
             </div>
 
             <div className="mt-4 space-y-4">
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-fg" htmlFor="camera-timer">Photo timer</label>
+                  <span className="text-sm font-medium text-fg">Photo timer</span>
                   <span className="text-xs text-muted">{timerSeconds === 0 ? "Off" : `${timerSeconds} seconds`}</span>
                 </div>
                 <div id="camera-timer" className="grid grid-cols-3 gap-2">
