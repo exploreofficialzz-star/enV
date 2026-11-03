@@ -30,9 +30,9 @@ function quotedValues(source, pattern, description) {
 const webExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_CATEGORIES\s*=\s*new Set<CategoryId>\(\[([\s\S]*?)\]\)/, "Web");
 const androidExempt = quotedValues(android, /productionExemptCategories\s*=\s*setOf\(([^)]*)\)/, "Android");
 const iosExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(category\.lowercased\(\)\)/, "iOS");
-const webToolExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_TOOL_IDS\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)/, "Web tool");
-const androidToolExempt = quotedValues(android, /productionExemptToolIds\\s*=\\s*setOf\\(([^)]*)\\)/, "Android tool");
-const iosToolExempt = quotedValues(ios, /!\\[([^\\]]+)\\]\\.contains\\(id\\.lowercased\\(\\)\\)/, "iOS tool");
+const webToolExempt = quotedValues(webPolicy, /PRODUCTION_EXEMPT_TOOL_IDS\s*=\s*new Set\(\[([\s\S]*?)\]\)/, "Web tool");
+const androidToolExempt = quotedValues(android, /productionExemptToolIds\s*=\s*setOf\(([^)]*)\)/, "Android tool");
+const iosToolExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(id\.lowercased\(\)\)/, "iOS tool");
 assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the implemented Web-ready categories");
 assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented native categories");
 assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented native categories");
