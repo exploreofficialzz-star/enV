@@ -134,8 +134,16 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
   return {
     toolId,
     counts:{comments:num(counts[0]?.comments),likes:num(counts[0]?.likes),dislikes:num(counts[0]?.dislikes),views:num(views[0]?.total),views30Days:num(views[0]?.recent)},
-    myReaction:reaction[0]?.reaction_type??null,
-    comments:comments.map(row=>({id:String(row.id),parentId:row.parentId?String(row.parentId):null,body:String(row.body),authorLabel:String(row.authorLabel),identityMode:String(row.identityMode),createdAt:row.createdAt,isMine:row.isMine===true})),
+    myReaction:reaction[0]?.reaction_type === "like" || reaction[0]?.reaction_type === "dislike" ? reaction[0].reaction_type : null,
+    comments:comments.map(row=>({
+      id:String(row.id),
+      parentId:row.parentId?String(row.parentId):null,
+      body:String(row.body),
+      authorLabel:String(row.authorLabel),
+      identityMode:row.identityMode === "anonymous" ? "anonymous" as const : "public" as const,
+      createdAt:row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+      isMine:row.isMine===true
+    })),
     generatedAt:new Date().toISOString(),
   };
 }
@@ -208,11 +216,6 @@ export async function toggleCommunityReaction(request: Request,input:unknown) {
   ensureTool(body.toolId);
   const {userId,actorDigest}=await actorFor(request,body.visitorId,secret);
   const sql=await getSql();
-  // Signed-in users cannot impersonate a different public author name. Guest
-  // visitors may opt into a supplied display name, or post anonymously.
-  const displayName = body.identityMode === "anonymous"
-    ? null
-    : userId ? await accountDisplayName(userId) : body.displayName;
   return sql.transaction(async tx=>{
     await enforceRateLimit(tx,request,actorDigest,secret,30);
     const existing=await tx.query<{reaction_type:string}>("select reaction_type from tool_community_reactions where tool_id=$1 and actor_digest=$2 for update",[body.toolId,actorDigest]);
@@ -240,6 +243,11 @@ export async function createCommunityComment(request: Request,input:unknown) {
   ensureTool(body.toolId);
   const {userId,actorDigest}=await actorFor(request,body.visitorId,secret);
   const sql=await getSql();
+  // Signed-in users cannot impersonate a different public author name.
+  // Guest visitors may opt into a supplied display name, or post anonymously.
+  const displayName = body.identityMode === "anonymous"
+    ? null
+    : userId ? await accountDisplayName(userId) : body.displayName;
   return sql.transaction(async tx=>{
     const prior=await tx.query<{id:string;created_at:string}>(
       "select id,created_at from tool_community_comments where author_digest=$1 and idempotency_key=$2 limit 1",
