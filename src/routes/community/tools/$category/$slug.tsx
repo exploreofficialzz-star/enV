@@ -62,7 +62,7 @@ function PublicToolDiscussionPage() {
   const roots = feed?.comments.filter((comment) => !comment.parentId) ?? [];
   return (
     <AppShell>
-    <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <section className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">Home</Link>
         <span aria-hidden="true"> / </span>
@@ -110,7 +110,7 @@ function PublicToolDiscussionPage() {
       <p className="mt-7 text-sm text-muted">
         Join the discussion from the <Link to={toolUrl} className="font-semibold text-accent underline underline-offset-4">{tool.name} page</Link>.
       </p>
-    </main>
+    </section>
     </AppShell>
   );
 }
