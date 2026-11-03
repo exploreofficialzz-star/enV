@@ -94,7 +94,7 @@ export function buildSeoArtifacts() {
   const paths = new Set([
     "/", "/tools", "/about", "/pricing", "/blog", "/contact", "/help",
     "/privacy", "/terms", "/disclaimer", "/responsible-use",
-    "/platform/android", "/platform/ios", "/token-guide",
+    "/platform/android", "/platform/ios", "/token-guide", "/community",
   ]);
   for (const category of categories) paths.add("/tools/" + category.id);
   for (const tool of tools) paths.add(toolPath(tool));
@@ -240,6 +240,7 @@ export function buildSeoArtifacts() {
     "- [Android](" + SITE_ORIGIN + "/platform/android): Native Android and Web tool handoff information.",
     "- [iOS](" + SITE_ORIGIN + "/platform/ios): Native iOS and Web tool handoff information.",
     "- [Token guide](" + SITE_ORIGIN + "/token-guide): Catalogue token estimates and billing classifications.",
+    "- [Public tool discussions](" + SITE_ORIGIN + "/community): Public comments and replies contributed by enV users.",
     "",
     "## Public tool categories",
     ...categoryLinks,
