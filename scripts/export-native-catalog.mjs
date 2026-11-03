@@ -38,6 +38,26 @@ const runtimeCatalogExtensions = [
     platformRuntimeExtension: true,
   },
   {
+    id: "zip-any-file",
+    name: "Zip any file",
+    slug: "zip-any-file",
+    description: "Compress one file or many files into a ZIP/ZIP64 archive, or safely extract archives locally on this device.",
+    category: "productivity",
+    subcategory: "Files & storage",
+    keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"],
+    tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
+    icon: "Archive",
+    popularity: 1450,
+    featured: true,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "active",
+    related: ["file-converter", "pdf-merger", "document-editor"],
+    engine: { type: "custom", id: "zip-any-file" },
+    platformRuntimeExtension: true,
+  },
+  {
     id: "a-book",
     name: "A book",
     slug: "a-book",
@@ -172,6 +192,7 @@ const inventory = {
     iosImplemented: iosToolIds.size,
   },
 };
+console.log(`Native runtime inventory: v${runtimeInventoryVersion}`);
 const inventoryOutput = new URL("../apps/shared/native-engine-inventory.json", import.meta.url);
 writeFileSync(inventoryOutput, `${JSON.stringify(inventory, null, 2)}\n`);
 console.log(
