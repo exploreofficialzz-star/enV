@@ -98,6 +98,9 @@ object OfflineWalletNativeApi {
 
     fun isPaired(context: Context): Boolean = sessionToken(context) != null
 
+    /** Verified account token for public community identity and account-bound comments. */
+    fun communityBearerToken(context: Context): String? = sessionToken(context)
+
     fun deviceKeyId(context: Context): String {
         val prefs = preferences(context)
         prefs.getString("device_key_id", null)?.let { return it }
