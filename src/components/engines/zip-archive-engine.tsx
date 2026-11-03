@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Archive, Check, FileArchive, FilePlus2, FolderOpen, LoaderCircle, ShieldCheck, Trash2 } from "lucide-react";
-import { BlobReader, ZipReader, ZipWriter } from "@zip.js/zip.js";
+import { BlobReader, ZipReader, ZipWriter, type FileEntry } from "@zip.js/zip.js";
 import { FileDropzone } from "@/components/tools/file-dropzone";
 import { formatArchiveBytes, MAX_ARCHIVE_ENTRIES, MAX_BROWSER_BUFFER_BYTES, MAX_EXTRACT_BYTES, sanitizeArchivePath, shouldStoreWithoutCompression } from "@/lib/zip/archive-utils";
 
@@ -15,6 +15,15 @@ type ArchiveWindow = Window & {
 };
 
 const archiveWindow = () => window as ArchiveWindow;
+
+function blobFromChunks(chunks: Uint8Array[], type = "application/octet-stream"): Blob {
+  const parts: BlobPart[] = chunks.map((chunk) => {
+    const buffer = new ArrayBuffer(chunk.byteLength);
+    new Uint8Array(buffer).set(chunk);
+    return buffer;
+  });
+  return new Blob(parts, { type });
+}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -128,7 +137,7 @@ export function ZipArchiveEngine() {
       await writer.close();
       setProgress(100);
       setStatus("Your ZIP archive is ready.");
-      if (!hasDiskHandle) downloadBlob(new Blob(bufferedChunks, { type: "application/zip" }), `${archiveName.trim() || "enV-archive"}.zip`);
+      if (!hasDiskHandle) downloadBlob(blobFromChunks(bufferedChunks, "application/zip"), `${archiveName.trim() || "enV-archive"}.zip`);
       setFiles([]);
     } catch (cause) {
       try { await output?.abort?.(cause); } catch { /* The browser may already have closed the stream. */ }
@@ -157,7 +166,7 @@ export function ZipArchiveEngine() {
         const path = sanitizeArchivePath(entry.filename);
         if (!path && !entry.directory) throw new Error(`Unsafe archive path rejected: ${entry.filename}`);
         return { entry, path };
-      }).filter((item): item is { entry: (typeof entries)[number]; path: string } => Boolean(item.path) && !item.entry.directory);
+      }).filter((item): item is { entry: FileEntry; path: string } => Boolean(item.path) && !item.entry.directory);
 
       const totalUncompressed = planned.reduce((sum, item) => sum + (item.entry.uncompressedSize || 0), 0);
       if (totalUncompressed > MAX_EXTRACT_BYTES) throw new Error("The archive expands beyond the 100 GB safety limit.");
@@ -192,7 +201,7 @@ export function ZipArchiveEngine() {
               setProgress(Math.min(99, Math.round(fraction * 100)));
             },
           });
-          downloadBlob(new Blob(chunks), item.path.split("/").pop() || "extracted-file");
+          downloadBlob(blobFromChunks(chunks), item.path.split("/").pop() || "extracted-file");
         } else {
           const parts = item.path.split("/");
           let parent = destination;
