@@ -646,11 +646,11 @@ struct ToolCommunityPanel: View {
             HStack(spacing: 8) {
                 if accountSignedIn {
                     Menu {
-                        Button("Display as ${displayName.isEmpty ? "enV member" : displayName}") { publicIdentity = true }
+                        Button("Display as \(displayName.isEmpty ? "enV member" : displayName)") { publicIdentity = true }
                         Button("Anonymous") { publicIdentity = false }
                     } label: {
                         Label(
-                            publicIdentity ? "Display as ${displayName.isEmpty ? "enV member" : displayName}" : "Anonymous",
+                            publicIdentity ? "Display as \(displayName.isEmpty ? "enV member" : displayName)" : "Anonymous",
                             systemImage: publicIdentity ? "person" : "person.crop.circle"
                         )
                         .font(.envScaled(size: 12, weight: .medium))
