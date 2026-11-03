@@ -211,7 +211,6 @@ fun NativeZipArchiveScreen() {
                                         status = "Extracted " + entries + " item(s)"
                                     }
                                 } ?: throw IOException("Could not write " + outputName + ".")
-                                zip.closeEntry()
                             }
                         }
                         progress = 1f
