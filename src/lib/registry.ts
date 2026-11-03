@@ -93,6 +93,29 @@ const aBookTool: ToolMeta = {
   isNew: true,
 };
 
+const cameraStudioTool: ToolMeta = {
+  id: "camera-studio",
+  name: "Camera Studio",
+  slug: "camera-studio",
+  description: "Take photos and record videos with a familiar camera, natural photo looks, front/rear switching and simple creator controls. Captures stay on your device unless you download or share them.",
+  category: "photography",
+  subcategory: "Camera",
+  keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "filters", "creator", "recording", "capture"],
+  tags: ["camera", "photo", "video", "creator"],
+  icon: "Camera",
+  iconBackground: "#171b1e",
+  iconAccent: "#2ec4b6",
+  popularity: 1200,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: [],
+  engine: { type: "custom", id: "camera-studio" },
+  isNew: true,
+};
+
 const retiredDesignBuildCalculatorIds = new Set([
   "math-exp-sum-math-design-build-delivery-effort-a",
   "math-exp-sum-math-design-build-delivery-effort-b",
@@ -157,6 +180,7 @@ const allTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === musicDownloaderTool.id) ? [musicDownloaderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
 ];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));
