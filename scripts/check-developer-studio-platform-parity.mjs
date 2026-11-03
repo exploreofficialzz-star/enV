@@ -119,7 +119,7 @@ const worldLabEntryWeb = readFileSync('src/components/world-lab/world-lab-entry.
 const worldLabEntryCss = readFileSync('src/components/world-lab/world-lab-entry.css', 'utf8');
 assert.ok(worldLabEntryWeb.includes('/world-lab-title.svg') && worldLabEntryWeb.includes('/logo-home-transparent.png') && worldLabEntryWeb.includes('🪐'), 'Web entry must use exact screenshot lettering, original enV logo and Saturn');
 assert.ok(worldLabEntryCss.includes('#f1f4f9') && worldLabEntryCss.includes('#f9fafc') && worldLabEntryCss.includes('#dbeaff'), 'Web entry palette must match the screenshot');
-assert.ok(worldLabAndroid.includes('R.drawable.world_lab_title') && worldLabAndroid.includes('R.drawable.world_lab_logo') && worldLabAndroid.includes('🪐'), 'Android must use the exact wordmark, original logo and Saturn artwork');
+assert.ok(nativeKotlin.includes('R.drawable.world_lab_title') && nativeKotlin.includes('R.drawable.world_lab_logo') && nativeKotlin.includes('🪐'), 'Android must use the exact wordmark, original logo and Saturn artwork');
 assert.ok(nativeKotlin.includes('Color(0xFFDBEAFF)') && nativeKotlin.includes('Color(0xFFF9FAFC)'), 'Android entry colors must match the screenshot');
 assert.ok(nativeSwift.includes('Image("WorldLabTitle")') && nativeSwift.includes('Image("WorldLabLogo")') && nativeSwift.includes('🪐'), 'iOS must use the exact wordmark, original logo and Saturn artwork');
 assert.ok(nativeSwift.includes('219 / 255') && nativeSwift.includes('249 / 255'), 'iOS entry colors must match the screenshot');
