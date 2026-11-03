@@ -1376,8 +1376,8 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
         }
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
         "developer" -> when (tool.id) {
+            "the-world-lab" -> NativeWorldLabForm()
             "ux-ui-studio" -> NativeUxUiStudioForm()
-            "artboard-studio" -> { val context = LocalContext.current; Button(onClick = { context.startActivity(android.content.Intent(context, NativeGamePreviewActivity::class.java)) }) { Text("Open Artboard Studio preview") } }
             else -> NativeDeveloperToolForm(tool, onRelatedTool)
         }
     "custom" -> when {

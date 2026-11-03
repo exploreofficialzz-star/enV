@@ -57,7 +57,7 @@ The chapter map predates some of the later specialist modules in the PR and must
 - [ ] Complete robust 3D solid/assembly/group authoring: constraints, mates/joints, snapping, measuring, hierarchy, reusable components, ports/connections, transforms, undo/redo and safe project revisions.
 - [ ] Bring Android and iOS authoring and visual interaction to tested functional parity with the Web editor while keeping each implementation native.
 - [ ] Complete accessible observer movement, camera gestures, keyboard alternatives, responsive layouts, renderer fallback and low-end device performance.
-- [ ] Preserve Artboard Studio, UX/UI Studio and existing project routes/formats until compatible import/export, migration, replacement parity and user-data recovery are proven. Do not remove legacy studios as part of this incomplete tranche.
+- [x] Replace the Artboard Studio catalog entry and launch routes with The World Lab across Web, Android and iOS. The old Web Artboard URL redirects to World Lab. Keep existing Artboard project files recoverable until their import/migration path has been verified; replacing the studio entry does not authorize deleting user data.
 
 ### Generalized and validated scientific systems
 
@@ -94,4 +94,46 @@ The chapter map predates some of the later specialist modules in the PR and must
 
 ## 7. Release rule
 
-**Do not call World Lab production-ready, universal, scientifically validated across the 205 chapters, or a full Artboard replacement while the above gates remain open.** Keep capability labels honest, preserve the existing studios and user projects, and update this note plus the acceptance CSVs as evidence is completed.
+**The World Lab is the replacement studio entry for Artboard Studio, but it is not yet production-ready, universal, or scientifically validated across the 205 chapters while the above gates remain open.** Keep capability labels honest, preserve existing user project files, and update this note plus the acceptance CSVs as evidence is completed.
+
+## Session update — 3 November 2026
+
+This entry supersedes the older snapshot metadata above for the 3 November continuation. The World Lab lane remains **under construction and not ready for production release or merge**.
+
+### Repository and integration state at this update
+
+- PR [#59](https://github.com/exploreofficialzz-star/enV/pull/59) remains **open and draft** on `feat/world-lab-foundation-20261030`.
+- The latest implementation commit in this session is `614abfab70af93fa27812ba6a13f7de608302073`. A subsequent documentation-only correction commit is `39982871b64278949b4cbd8b02a2ede5c99d85f4`.
+- `main` was `f191f9aebbdcc480ca65580393e090ef5679a913` at the latest refresh; PR #59's base was `977d873a3181efb16a8af661e4fce1c4e3d57b99`. The branch comparison reported 895 commits ahead and 1 behind. The one newer main-side change is unrelated community-panel work; preserve PR #73 and reconcile only through a reviewed, non-destructive integration.
+- No World Lab change from PR #59 has been merged into `main` by this continuation. Do not merge while the branch remains draft and the required acceptance evidence is absent.
+
+### Verified source and traceability refresh
+
+- Located the original 205-chapter master PDF, its expanded Markdown companion, and `world_lab_master_prompt.md` in the user's Library. The materialized PDF SHA-256 `14b0a7bdaf18609d08d8469ca4d3cf0b11fcee11e238831e6ba6d5e57f87af5f` and Markdown SHA-256 `dafa99bfa11313f653811867502e1ea030b44071d1328e81a887bf24a704f5a4` match the source manifest in the repository.
+- The master specification contains 205 unique chapter entries (001–205) and 105 unique acceptance IDs across CAM (12), VIS (10), TIME (14), PHY (16), NEW (11), GEO (12), DIG (10), and OPS (20).
+- The repository chapter tracker still contains 205 rows: 201 `NOT_IMPLEMENTED` and 4 `PARTIAL_TOPIC_REFERENCE`. A mapped chapter is not evidence of a working feature.
+- The acceptance tracker still contains all 105 IDs, all `NOT_VERIFIED`. Four source descriptions (VIS-05, PHY-03, NEW-09 and DIG-05) had PDF page-footer extraction noise in their text; those descriptions were corrected from the original Markdown in commit `39982871b64278949b4cbd8b02a2ede5c99d85f4`. No status was upgraded.
+
+### Implemented in this continuation
+
+- Corrected the iOS fixed-wing propulsion gate in `apps/ios/enV/NativeWorldLabView.swift`: fixed-wing propeller thrust is now available during the takeoff roll, while rotorcraft horizontal cruise thrust remains flight-only until airborne. This aligns the Swift rule with the existing Web and Kotlin implementations.
+- Added explicit takeoff-roll thrust and airborne-state regression assertions to the Swift and Kotlin native vehicle tests. The Kotlin assertion argument order was corrected after the exact-head Android job exposed a compile-time overload mismatch.
+- The implementation/test changes are present by code commit `614abfab70af93fa27812ba6a13f7de608302073`. The four-row acceptance-text cleanup is separate documentation-only commit `39982871b64278949b4cbd8b02a2ede5c99d85f4`.
+
+### Verification and remaining gates
+
+- World Lab reference-model workflow `41633547712` passed on predecessor implementation commit `a63c2537452350d6c89cc07a3e3beca7a0e8bf44`, including numerical reference cases, TypeScript contract, production bundle and rendered browser acceptance. This is not an exact-head result for the later Kotlin assertion correction.
+- Developer Studios quality gates `41633547600` passed on `a63c2537452350d6c89cc07a3e3beca7a0e8bf44`.
+- The first Android authoritative run `41633547680` on `a63c253...` failed in Kotlin test compilation because the newly added assertion used the wrong JUnit argument order. The precise compiler errors at `NativeWorldLabScienceTest.kt:518–519` were fixed in `614abfab...`; the corrected exact-head rerun is required before claiming Android passed.
+- The iOS authoritative and native accessibility checks on the corrected code were still pending/in progress at the last refresh. Pending jobs are not passes.
+- Exact-head workflows triggered for the subsequent tracker cleanup commit `39982871...` were queued/pending at this update, including World Lab reference models, Web/Android authoritative CI, iOS authoritative CI, native iOS accessibility and rendered Web accessibility. Refresh each job and inspect logs before changing any status.
+- The repository-wide Production Check is a separate lane. Its earlier failure reported 17 AI feature bindings where the release script expected 18. Do not invent an AI binding or modify unrelated AI files as part of World Lab.
+- Artboard replacement remains a catalog/route transition plus a bounded legacy `env-3d-game` v1 primitive importer. Full historical Artboard project, asset, texture, relationship and settings recovery is **not verified**; preserve original files and assets.
+
+### Next World Lab priorities
+
+1. Complete exact-head Web, Android, iOS, native accessibility and rendered-browser CI; fix only failures that belong to this World Lab lane.
+2. Expand observer-camera acceptance coverage, especially model-scale transitions, saved-view restoration, ENU/orbit fiducials, offline sample behavior, and real device safe-area/interaction evidence. The native Android viewport explicitly labels its ground/subsurface bands as schematic, and the iOS view describes its scene as representative rather than measured terrain.
+3. Continue WP-01/WP-02 foundational contracts and true interactive rendering before adding breadth to advanced domain engines.
+4. Reconcile all 205 chapter dispositions to real model/data/evidence and execute the 105 acceptance scenarios with test IDs, model versions, devices, observed outputs and release decisions.
+5. Keep cloud jobs disabled until database migrations, tenancy, worker deployment, native authentication and end-to-end authorization are verified.

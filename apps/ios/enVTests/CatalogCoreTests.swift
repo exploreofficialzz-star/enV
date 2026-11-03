@@ -105,6 +105,7 @@ final class CatalogCoreTests: XCTestCase {
         let studios = sut.developerStudioTools()
         XCTAssertEqual(studios.count, 14)
         XCTAssertEqual(Set(studios.map(\.id)).count, 14)
+        XCTAssertTrue(nativeDeveloperStudioSpecs.contains(where: { $0.id == "the-world-lab" }))
         XCTAssertTrue(studios.allSatisfy { $0.engine.type == "developer" })
         XCTAssertEqual(studios.first(where: { $0.id == "devops-studio" })?.engine.op, "developer-gitignore-generator")
         XCTAssertEqual(sut.webSearch("", includeRelatedReferences: true).filter { $0.tags.contains("developer-studio") }.count, 14)

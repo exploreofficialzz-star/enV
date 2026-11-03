@@ -89,4 +89,7 @@ test("UX/UI Studio exposes dedicated editor modes and keeps its original develop
   assert.ok(["workspace", "components", "icons", "tokens", "presets"].every((key) => studio?.modes.some((mode) => mode.key === key)));
   assert.equal(getToolByPath("developer", "ux-ui-studio")?.id, "ux-ui-studio");
   assert.ok(getSearchableTools().some((tool) => tool.id === "ux-ui-studio"));
+  assert.ok(getToolByPath("developer", "the-world-lab"), "World Lab remains discoverable");
+  assert.equal(getToolByPath("developer", "artboard-studio"), undefined, "Artboard Studio is replaced by World Lab");
+  assert.ok(getToolByPath("developer", "ux-ui-studio"), "UX/UI remains independently available");
 });

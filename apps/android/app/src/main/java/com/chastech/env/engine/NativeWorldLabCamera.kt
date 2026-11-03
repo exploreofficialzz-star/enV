@@ -1,0 +1,71 @@
+package com.chastech.env.engine
+
+import kotlin.math.*
+
+data class NativeWorldLabCameraPose(val yawRadians:Double,val elevationDegrees:Double,val distanceMeters:Double)
+
+data class NativeWorldLabScreenPoint(
+    val xPixels:Double,val yPixels:Double,val pixelsPerMeter:Double,
+    val depthMeters:Double,val visible:Boolean,
+)
+
+/** Deterministic pinhole-camera projection for the native World Lab observer. */
+object NativeWorldLabCamera {
+    /** Invert the saved position using the same basis as the perspective projector. */
+    fun poseFromPosition(position:NativeLabVector,target:NativeLabVector):NativeWorldLabCameraPose {
+        val dx=position.x-target.x
+        val dy=position.y-target.y
+        val dz=position.z-target.z
+        val horizontal=hypot(dx,dz)
+        val distance=hypot(horizontal,dy)
+        require(listOf(dx,dy,dz,distance).all{it.isFinite()}&&distance in 0.25..200000.0){
+            "Saved observer position is outside the supported camera range"
+        }
+        return NativeWorldLabCameraPose(atan2(-dx,-dz),Math.toDegrees(atan2(dy,horizontal)),distance)
+    }
+
+    fun positionFromPose(target:NativeLabVector,pose:NativeWorldLabCameraPose):NativeLabVector {
+        require(pose.yawRadians.isFinite()&&pose.elevationDegrees.isFinite()&&
+            pose.elevationDegrees in -89.0..89.0&&pose.distanceMeters.isFinite()&&
+            pose.distanceMeters in 0.25..200000.0){
+            "Observer camera pose is outside supported bounds"
+        }
+        val elevation=Math.toRadians(pose.elevationDegrees)
+        val horizontal=pose.distanceMeters*cos(elevation)
+        return NativeLabVector(
+            target.x-sin(pose.yawRadians)*horizontal,
+            target.y+pose.distanceMeters*sin(elevation),
+            target.z-cos(pose.yawRadians)*horizontal
+        )
+    }
+
+
+    fun project(
+        point:NativeLabVector,target:NativeLabVector,yawRadians:Double,
+        elevationDegrees:Double,cameraDistanceMeters:Double,focalLengthPixels:Double,
+        panXPixels:Double,panYPixels:Double,viewportWidthPixels:Double,
+        viewportHeightPixels:Double,nearMeters:Double=0.05,farMeters:Double=50_000_000.0,
+    ):NativeWorldLabScreenPoint {
+        val input=listOf(yawRadians,elevationDegrees,cameraDistanceMeters,
+            focalLengthPixels,panXPixels,panYPixels,viewportWidthPixels,
+            viewportHeightPixels,nearMeters,farMeters)
+        require(input.all{it.isFinite()}){"Camera parameters must be finite"}
+        require(cameraDistanceMeters>0&&focalLengthPixels>0&&viewportWidthPixels>0&&viewportHeightPixels>0){
+            "Camera distance, focal length and viewport dimensions must be positive"
+        }
+        require(nearMeters>0&&farMeters>nearMeters){"Camera clipping range must be positive and ordered"}
+        require(elevationDegrees in -89.0..89.0){"Camera elevation must be between -89° and 89°"}
+        val dx=point.x-target.x;val dy=point.y-target.y;val dz=point.z-target.z
+        val elevation=Math.toRadians(elevationDegrees)
+        val c=cos(yawRadians);val s=sin(yawRadians);val ce=cos(elevation);val se=sin(elevation)
+        val cameraX=dx*c-dz*s
+        val cameraY=dx*s*se+dy*ce+dz*c*se
+        val depth=cameraDistanceMeters+dx*s*ce-dy*se+dz*c*ce
+        if(!depth.isFinite()||depth<=nearMeters||depth>=farMeters)
+            return NativeWorldLabScreenPoint(Double.NaN,Double.NaN,0.0,depth,false)
+        val scale=focalLengthPixels/depth
+        val x=viewportWidthPixels/2+panXPixels+cameraX*scale
+        val y=viewportHeightPixels/2+panYPixels-cameraY*scale
+        return NativeWorldLabScreenPoint(x,y,scale,depth,x.isFinite()&&y.isFinite()&&scale.isFinite())
+    }
+}
