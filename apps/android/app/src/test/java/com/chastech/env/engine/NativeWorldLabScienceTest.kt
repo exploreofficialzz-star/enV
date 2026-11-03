@@ -515,6 +515,8 @@ class NativeWorldLabVehicleTests {
                 maxCruiseThrustN=4000.0,maxWheelForceN=10000.0,
                 motorMaxPowerW=350000.0,batteryMaxCurrentA=700.0,
                 durationSeconds=60.0,maxSpeedMps=100.0))
+        assertTrue(run.samples.any { !it.airborne && it.cruiseThrustN > 0.0 },
+            "Fixed-wing propeller thrust must remain available during the takeoff roll.")
         assertTrue(run.samples.any { it.airborne })
     }
 
