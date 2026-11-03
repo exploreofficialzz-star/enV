@@ -850,3 +850,21 @@ release-candidate evidence bundle are unfinished.
 - Android Compose and iOS SwiftUI connected-circuit readouts now call those tested resolvers and display the actual node labels and absolute amperes from the current DC result. The explanatory text explicitly describes a conventional branch-flow/topology view; no 3D current density, electric field or magnetic field is claimed.
 - Added JUnit and XCTest coverage for forward flow, polarity reversal, zero-current no-direction behavior, invalid/non-finite current and invalid self-connected node IDs. The Web path retains its corresponding signed-current resolver, SVG arrow markers and solver-backed tests.
 - **Verification:** native flow UI and tests are committed to `feat/world-lab-foundation-20261030`. Exact-head Android/Web and iOS CI for the newest resolver/UI commits is still running; no native pass is claimed until it completes.
+
+## Fixed-wing takeoff-roll propulsion parity — 2026-11-03
+
+- Audited the native takeoff implementation against the existing TypeScript `src/lib/world-lab/vehicle.ts` and Kotlin `NativeWorldLabVehicle.kt` rules. The Swift path in `apps/ios/enV/NativeWorldLabView.swift` had gated fixed-wing propeller thrust on `airborne`, preventing powered takeoff-roll acceleration before liftoff.
+- Updated the Swift gate so fixed-wing propeller thrust is available while rolling and airborne, while rotorcraft horizontal cruise thrust remains flight-only. This is a parity correction, not a claim of validated aerodynamic or aircraft-design fidelity.
+- Added explicit assertions in `apps/ios/enVTests/NativeWorldLabScienceTests.swift` and `apps/android/app/src/test/java/com/chastech/env/engine/NativeWorldLabScienceTest.kt` for positive fixed-wing thrust before liftoff and a subsequent airborne state.
+- Code commit: `614abfab70af93fa27812ba6a13f7de608302073`. The first Android rerun exposed a test-source overload mismatch (Boolean and message reversed); the assertion was corrected to the project's message-first JUnit signature in this code commit.
+- The prior World Lab reference-model run `41633547712` passed on predecessor commit `a63c2537452350d6c89cc07a3e3beca7a0e8bf44`; that is useful baseline evidence only, not proof of the corrected Android/iOS source.
+- The exact corrected-code reruns were triggered. The run on code commit `614abfab...` had World Lab reference and native iOS/Android work pending or in progress at the time of review. A subsequent tracker text cleanup commit `39982871b64278949b4cbd8b02a2ede5c99d85f4` and handoff note commit `e314b773077c628e30a70fe07c55ae6c3a6c6382` mean the current branch head must be refreshed and exact-head CI rechecked before any status is promoted.
+- No acceptance scenario was promoted. The chapter tracker remains 201 `NOT_IMPLEMENTED` and 4 `PARTIAL_TOPIC_REFERENCE`; the 105 acceptance scenarios remain `NOT_VERIFIED`.
+- Scope boundary: Artboard recovery remains partial; no legacy files/assets were deleted. PR #73 and all other unrelated agent lanes were left untouched. PR #59 remains draft/open; do not merge or claim production readiness from this parity fix.
+
+## Acceptance-source text hygiene — 2026-11-03
+
+- Compared `docs/world-lab/acceptance-scenarios.csv` directly with the original Library Markdown specification `world_lab_master_prompt.md`.
+- Removed extracted PDF page footer/header noise from the source requirement text in VIS-05, PHY-03, NEW-09 and DIG-05. The authoritative criterion wording is preserved; IDs, row count, status and evidence fields were not changed.
+- Documentation commit: `39982871b64278949b4cbd8b02a2ede5c99d85f4`. All 105 scenario statuses remain `NOT_VERIFIED`; this is a data-quality repair, not acceptance evidence.
+- The source PDF and expanded Markdown were verified against their manifest SHA-256 values: PDF `14b0a7bdaf18609d08d8469ca4d3cf0b11fcee11e238831e6ba6d5e57f87af5f`, expanded Markdown `dafa99bfa11313f653811867502e1ea030b44071d1328e81a887bf24a704f5a4`.
