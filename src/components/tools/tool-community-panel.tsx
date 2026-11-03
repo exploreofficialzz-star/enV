@@ -193,6 +193,7 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!visitorId || !body.trim()) return;
+    const publicAccountIdentity = Boolean(accountUser && identityMode === "public");
     setSending(true);
     setProblem("");
     setNotice("");
@@ -202,8 +203,8 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
         visitorId,
         idempotencyKey: newIdempotencyKey(),
         body,
-        identityMode: accountUser ? identityMode : "anonymous",
-        displayName: accountUser && identityMode === "public" ? accountDisplayName : null,
+        identityMode: publicAccountIdentity ? "public" : "anonymous",
+        displayName: publicAccountIdentity ? accountDisplayName : null,
         parentId: replyTarget,
       });
       recordAnalyticsEvent({ name: "comment_created", toolId, outcome: "success", properties: { action: replyTarget ? "reply" : "comment" } });

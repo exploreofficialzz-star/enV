@@ -66,6 +66,8 @@ test("signed-in commenters can select account name or Anonymous; guests are alwa
   assert.match(web, /useCurrentUserState/);
   assert.match(web, /accountUser/);
   assert.match(web, /setIdentityMode\(accountUser \? "public" : "anonymous"\)/);
+  assert.match(web, /const publicAccountIdentity = Boolean\(accountUser && identityMode === "public"\)/);
+  assert.match(web, /identityMode: publicAccountIdentity \? "public" : "anonymous"/);
   assert.doesNotMatch(web, /Choose a display name/);
   assert.match(web, /identityMode: accountUser \? identityMode : "anonymous"/);
   assert.match(web, /aria-label="Display identity">Anonymous/);
@@ -73,6 +75,8 @@ test("signed-in commenters can select account name or Anonymous; guests are alwa
   assert.match(android, /NativeCommunityApi\.identity\(\)/);
   assert.match(android, /accountSignedIn/);
   assert.match(android, /communityBearerToken\(context\)/);
+  assert.match(android, /val publicAccountIdentity = accountSignedIn && publicIdentity/);
+  assert.match(android, /if \(publicAccountIdentity\) "public" else "anonymous"/);
   assert.match(androidWallet, /fun communityBearerToken\(context: Context\)/);
   assert.match(android, /Display as/);
   assert.doesNotMatch(android, /Text\("Display name"\)/);
@@ -83,6 +87,8 @@ test("signed-in commenters can select account name or Anonymous; guests are alwa
   assert.match(iosClient, /communityBearerToken\(\)/);
   assert.match(iosPanel, /accountSignedIn/);
   assert.match(iosPanel, /if accountSignedIn/);
+  assert.match(iosPanel, /let publicAccountIdentity = accountSignedIn && publicIdentity/);
+  assert.match(iosPanel, /"identityMode": publicAccountIdentity \? "public" : "anonymous"/);
   assert.doesNotMatch(iosPanel, /Button\("Display name"\)/);
   assert.doesNotMatch(iosPanel, /Choose a public display name/);
   assert.match(iosWallet, /static func communityBearerToken\(\)/);

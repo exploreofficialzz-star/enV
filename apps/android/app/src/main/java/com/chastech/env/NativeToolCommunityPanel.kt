@@ -262,6 +262,7 @@ fun NativeToolCommunityPanel(toolId: String) {
 
     fun submitComment() {
         if (commentText.isBlank() || sending) return
+        val publicAccountIdentity = accountSignedIn && publicIdentity
         sending = true
         scope.launch {
             try {
@@ -270,8 +271,8 @@ fun NativeToolCommunityPanel(toolId: String) {
                     .put("visitorId", visitorId)
                     .put("idempotencyKey", UUID.randomUUID().toString())
                     .put("body", commentText.trim())
-                    .put("identityMode", if (accountSignedIn && publicIdentity) "public" else "anonymous")
-                    .put("displayName", if (accountSignedIn && publicIdentity) displayName.trim() else JSONObject.NULL)
+                    .put("identityMode", if (publicAccountIdentity) "public" else "anonymous")
+                    .put("displayName", if (publicAccountIdentity) displayName.trim() else JSONObject.NULL)
                     .put("parentId", replyTo ?: JSONObject.NULL)
                 withContext(Dispatchers.IO) { NativeCommunityApi.post("/api/community/comments", payload) }
                 NativeAnalytics.record(context, "comment_created", toolId, "success")

@@ -855,6 +855,7 @@ struct ToolCommunityPanel: View {
     private func submitComment() async {
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        let publicAccountIdentity = accountSignedIn && publicIdentity
         isSending = true
         defer { isSending = false }
         let payload: [String: Any] = [
@@ -862,8 +863,8 @@ struct ToolCommunityPanel: View {
             "visitorId": visitorID,
             "idempotencyKey": UUID().uuidString.lowercased(),
             "body": text,
-            "identityMode": accountSignedIn && publicIdentity ? "public" : "anonymous",
-            "displayName": accountSignedIn && publicIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
+            "identityMode": publicAccountIdentity ? "public" : "anonymous",
+            "displayName": publicAccountIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
             "parentId": replyTo as Any? ?? NSNull()
         ]
         do {
