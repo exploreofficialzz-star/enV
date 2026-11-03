@@ -11,6 +11,7 @@ const pageErrors=[];
 page.on("pageerror",err=>pageErrors.push(err.message));
 try{
   await page.goto(origin+"/tools/developer/the-world-lab",{waitUntil:"domcontentloaded",timeout:90000});
+  await page.waitForLoadState("load",{timeout:90000});
   await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
   await page.getByRole("button",{name:"Enter"}).waitFor({state:"visible",timeout:90000});
   const readEntryLayout=()=>page.locator(".world-lab-entry").evaluate((root)=>{
@@ -73,8 +74,9 @@ try{
     "The World Lab entry must not horizontally overflow on mobile");
   await page.setViewportSize({width:1280,height:900});
   await page.getByRole("button",{name:"Enter"}).click();
+  await page.locator(".world-lab-entry").waitFor({state:"detached",timeout:90000});
   await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
-  await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible"});
+  await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:90000});
   await page.getByRole("button",{name:"Add cube"}).click();
   await page.getByRole("button",{name:"Add sphere"}).click();
 
