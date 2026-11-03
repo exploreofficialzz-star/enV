@@ -79,6 +79,7 @@ jobs:
           xcodebuild \
             -project enV.xcodeproj \
             -scheme enV \
+            -arch arm64 \
             -configuration Release \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
@@ -117,6 +118,7 @@ jobs:
           xcodebuild \
             -project enV.xcodeproj \
             -scheme enV \
+            -arch arm64 \
             -configuration Debug \
             -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" \
             -derivedDataPath "$RUNNER_TEMP/env-ios-test-derived-data" \
