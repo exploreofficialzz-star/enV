@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Ban, Eye, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const commentsDialogRef = useRef<HTMLElement | null>(null);
   const [body, setBody] = useState("");
   const [identityMode, setIdentityMode] = useState<"anonymous" | "public">("anonymous");
   const [displayName, setDisplayName] = useState("");
@@ -122,11 +123,49 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
 
   useEffect(() => {
     if (!commentsOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const getFocusable = () => Array.from(
+      commentsDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      ) ?? []
+    ).filter((element) => element.offsetParent !== null);
+
+    const initialFocus = commentsDialogRef.current?.querySelector<HTMLElement>("[data-comments-initial-focus]");
+    (initialFocus ?? getFocusable()[0])?.focus();
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCommentsOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setCommentsOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = getFocusable();
+      if (!focusable.length) {
+        event.preventDefault();
+        commentsDialogRef.current?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
   }, [commentsOpen]);
 
   async function reactTo(reaction: "like" | "dislike") {
@@ -285,10 +324,10 @@ export function ToolCommunityPanel({ toolId }: { toolId: string }) {
 
       {commentsOpen ? (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/55 sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCommentsOpen(false); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby={"tool-comments-title-" + toolId} className="flex h-[min(92dvh,820px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl">
+          <section ref={commentsDialogRef} role="dialog" aria-modal="true" aria-labelledby={"tool-comments-title-" + toolId} tabIndex={-1} className="flex h-[min(92dvh,820px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl">
             <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h2 id={"tool-comments-title-" + toolId} className="text-base font-semibold text-fg">Comments</h2>
+                <h2 id={"tool-comments-title-" + toolId} data-comments-initial-focus tabIndex={-1} className="text-base font-semibold text-fg outline-none">Comments</h2>
                 <p className="text-xs text-muted">{compactCount(commentCount)}</p>
               </div>
               <div className="flex items-center gap-2">
