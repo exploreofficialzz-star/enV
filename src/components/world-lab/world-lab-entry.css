@@ -1,398 +1,149 @@
+@import url("https://fonts.googleapis.com/css2?family=Aguafina+Script&display=swap");
+
 @layer components {
   .world-lab-entry {
-    --world-lab-entry-accent: var(--color-accent);
-    position: relative;
-    isolation: isolate;
     display: flex;
     width: 100%;
     min-height: clamp(600px, calc(100svh - 176px), 850px);
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-    border-radius: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px 48px;
+    overflow: visible;
     color: var(--color-fg);
-    background:
-      radial-gradient(ellipse 46% 62% at 76% 45%, color-mix(in srgb, var(--world-lab-entry-accent) 16%, transparent), transparent 76%),
-      radial-gradient(ellipse 30% 38% at 12% 88%, color-mix(in srgb, var(--world-lab-entry-accent) 9%, transparent), transparent 82%),
-      linear-gradient(135deg, var(--color-bg) 0%, color-mix(in srgb, var(--color-surface) 88%, var(--world-lab-entry-accent) 12%) 100%);
-  }
-
-  .world-lab-entry__backdrop {
-    position: absolute;
-    z-index: -1;
-    inset: 0;
-    pointer-events: none;
-    opacity: .48;
-    background-image:
-      linear-gradient(color-mix(in srgb, var(--color-fg) 4%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--color-fg) 4%, transparent) 1px, transparent 1px);
-    background-size: 54px 54px;
-    mask-image: linear-gradient(110deg, transparent 5%, black 48%, black 88%, transparent);
+    background: var(--color-bg);
   }
 
   .world-lab-entry__inner {
-    display: grid;
-    grid-template-columns: minmax(0, .94fr) minmax(320px, 1.06fr);
-    grid-template-rows: auto auto;
-    grid-template-areas:
-      "copy visual"
-      "actions visual";
-    align-items: center;
-    gap: 12px clamp(20px, 4vw, 56px);
-    width: min(100%, 1260px);
+    display: flex;
+    width: min(100%, 390px);
     min-height: inherit;
-    margin-inline: auto;
-    padding: clamp(38px, 5vw, 76px) clamp(22px, 5.2vw, 78px);
-  }
-
-  .world-lab-entry__copy {
-    grid-area: copy;
-    position: relative;
-    z-index: 1;
-    max-width: 540px;
-  }
-
-  .world-lab-entry__eyebrow {
-    display: inline-flex;
+    flex-direction: column;
     align-items: center;
-    gap: 9px;
-    min-height: 36px;
-    padding: 6px 12px 6px 7px;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
-    border-radius: 999px;
-    color: var(--color-muted);
-    background: color-mix(in srgb, var(--color-surface) 78%, transparent);
-    font-size: .72rem;
-    font-weight: 700;
-    letter-spacing: .15em;
-  }
-
-  .world-lab-entry__eyebrow-mark {
-    display: inline-grid;
-    place-items: center;
-    width: 23px;
-    height: 23px;
-    border-radius: 50%;
-    color: var(--color-accent-fg);
-    background: var(--color-accent);
-  }
-
-  .world-lab-entry__overline {
-    margin: 30px 0 12px;
-    color: var(--color-accent);
-    font-size: .72rem;
-    font-weight: 800;
-    letter-spacing: .23em;
+    justify-content: center;
+    gap: 22px;
+    margin-inline: auto;
+    padding: 26px 0 58px;
   }
 
   .world-lab-entry__title {
-    margin: 0;
-    font-size: clamp(3.25rem, 6.5vw, 6rem);
-    font-weight: 760;
-    line-height: .94;
-    letter-spacing: -.075em;
-  }
-
-  .world-lab-entry__title span {
-    display: block;
-    color: var(--color-accent);
-  }
-
-  .world-lab-entry__description {
-    max-width: 470px;
-    margin: 24px 0 0;
-    color: var(--color-muted);
-    font-size: clamp(1rem, 1.35vw, 1.2rem);
-    line-height: 1.68;
-    letter-spacing: 0;
-  }
-
-  .world-lab-entry__visual {
-    grid-area: visual;
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: min(100%, 570px);
-    aspect-ratio: 1;
-    justify-self: center;
-    align-self: center;
-    min-width: 0;
-  }
-
-  .world-lab-entry__visual::before {
-    content: "";
-    position: absolute;
-    inset: 11%;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--color-accent) 22%, transparent);
-    filter: blur(70px);
-  }
-
-  .world-lab-entry__globe {
-    position: relative;
-    display: block;
     width: 100%;
-    height: auto;
-    overflow: visible;
-    filter: drop-shadow(0 24px 34px rgba(5, 25, 39, .22));
-  }
-
-  .world-lab-entry__orbit {
-    fill: none;
-    stroke: color-mix(in srgb, var(--color-accent) 45%, var(--color-muted));
-    stroke-width: 1.1;
-    stroke-dasharray: 3 8;
-    opacity: .48;
-  }
-
-  .world-lab-entry__orbit--wide {
-    transform-origin: 260px 260px;
-    animation: world-lab-entry-orbit 46s linear infinite;
-  }
-
-  .world-lab-entry__orbit--tall {
-    stroke-dasharray: 1 10;
-    opacity: .3;
-  }
-
-  .world-lab-entry__visual-badge,
-  .world-lab-entry__visual-caption {
-    position: absolute;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
-    border-radius: 999px;
-    color: var(--color-muted);
-    background: color-mix(in srgb, var(--color-surface) 78%, transparent);
-    box-shadow: 0 12px 34px rgba(11, 34, 48, .08);
-    backdrop-filter: blur(14px);
-    font-size: .63rem;
-    font-weight: 750;
-    letter-spacing: .13em;
+    margin: 0;
+    color: var(--color-fg);
+    font-family: "Aguafina Script", cursive;
+    font-size: clamp(46px, 13vw, 56px);
+    font-weight: 400;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-align: center;
     white-space: nowrap;
   }
 
-  .world-lab-entry__visual-badge {
-    top: 14%;
-    left: 3%;
-    padding: 10px 13px;
+  .world-lab-entry__artwork {
+    display: flex;
+    min-height: 112px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
   }
 
-  .world-lab-entry__status-dot {
-    width: 7px;
-    height: 7px;
+  .world-lab-entry__planet {
+    display: block;
     flex: 0 0 auto;
-    border-radius: 50%;
-    background: #24b78d;
-    box-shadow: 0 0 0 4px color-mix(in srgb, #24b78d 15%, transparent);
+    font-family: system-ui, sans-serif;
+    font-size: clamp(72px, 20vw, 90px);
+    line-height: 1;
   }
 
-  .world-lab-entry__visual-caption {
-    right: 0;
-    bottom: 15%;
-    padding: 10px 13px;
+  .world-lab-entry__brand {
+    display: block;
+    width: 112px;
+    height: 78px;
+    flex: 0 1 112px;
+    object-fit: contain;
+    filter: grayscale(1) brightness(0);
   }
 
-  .world-lab-entry__visual-caption span:first-child {
-    color: var(--color-accent);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .world-lab-entry__actions {
-    grid-area: actions;
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 17px;
-    padding-top: 12px;
-  }
-
-  .world-lab-entry__features {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 9px;
-  }
-
-  .world-lab-entry__features span {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    min-height: 34px;
-    padding: 6px 11px;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    color: var(--color-muted);
-    background: color-mix(in srgb, var(--color-surface) 78%, transparent);
-    font-size: .76rem;
-    font-weight: 650;
-  }
-
-  .world-lab-entry__features svg {
-    color: var(--color-accent);
+  .dark .world-lab-entry__brand {
+    filter: grayscale(1) brightness(0) invert(1);
   }
 
   .world-lab-entry__cta {
-    min-width: 190px;
-    min-height: 56px;
-    padding: 0 24px;
-    border: 1px solid color-mix(in srgb, var(--color-accent) 72%, transparent);
-    border-radius: 999px;
-    color: var(--color-accent-fg);
-    background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 76%, #0a4b48));
-    box-shadow: 0 13px 28px color-mix(in srgb, var(--color-accent) 23%, transparent);
-    font-size: .95rem;
-    font-weight: 750;
-    letter-spacing: .01em;
-    transition: box-shadow 180ms ease, transform 180ms ease, filter 180ms ease;
+    display: inline-flex;
+    width: 222px;
+    min-width: 222px;
+    min-height: 54px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+    border: 1px solid var(--color-fg);
+    border-radius: 24px;
+    color: var(--color-bg);
+    background: var(--color-fg);
+    box-shadow: none;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: opacity 150ms ease;
   }
 
   .world-lab-entry__cta:hover {
-    filter: brightness(1.06);
-    box-shadow: 0 17px 34px color-mix(in srgb, var(--color-accent) 30%, transparent);
-    transform: translateY(-2px);
-  }
-
-  .world-lab-entry__cta svg {
-    transition: transform 180ms ease;
-  }
-
-  .world-lab-entry__cta:hover svg {
-    transform: translateX(3px);
-  }
-
-  .world-lab-entry__hint {
-    margin: -6px 0 0;
-    color: var(--color-subtle);
-    font-size: .76rem;
-    letter-spacing: .01em;
+    opacity: .82;
   }
 
   .world-lab-entry__loading {
     display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 17px;
     min-height: clamp(540px, calc(100svh - 176px), 850px);
-    color: var(--color-muted);
-    text-align: center;
-  }
-
-  .world-lab-entry__loading p {
-    margin: 0;
-    font-size: .9rem;
+    place-items: center;
+    background: var(--color-bg);
   }
 
   .world-lab-entry__loading-mark {
-    width: 34px;
-    height: 34px;
-    border: 3px solid var(--color-border);
-    border-top-color: var(--color-accent);
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-fg);
     border-radius: 50%;
-    animation: world-lab-entry-orbit .8s linear infinite;
+    animation: world-lab-entry-spin .8s linear infinite;
   }
 
-  @keyframes world-lab-entry-orbit {
+  @keyframes world-lab-entry-spin {
     to { transform: rotate(360deg); }
   }
 
-  @media (max-width: 680px) {
+  @media (max-width: 480px) {
     .world-lab-entry {
-      min-height: auto;
-      border-radius: 20px;
+      min-height: clamp(560px, calc(100svh - 150px), 760px);
+      padding: 22px 16px 34px;
     }
 
     .world-lab-entry__inner {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto auto auto;
-      grid-template-areas:
-        "copy"
-        "visual"
-        "actions";
-      gap: 0;
-      padding: 34px 20px 38px;
-    }
-
-    .world-lab-entry__copy {
-      max-width: 560px;
-      margin-inline: auto;
-      text-align: center;
-    }
-
-    .world-lab-entry__eyebrow {
-      margin-inline: auto;
-    }
-
-    .world-lab-entry__overline {
-      margin-top: 22px;
-      font-size: .65rem;
+      gap: 20px;
+      padding: 12px 0 36px;
     }
 
     .world-lab-entry__title {
-      font-size: clamp(3rem, 14vw, 4.35rem);
-      line-height: .98;
+      font-size: clamp(44px, 13.5vw, 54px);
     }
 
-    .world-lab-entry__description {
-      margin: 15px auto 0;
-      font-size: .98rem;
-      line-height: 1.58;
+    .world-lab-entry__brand {
+      width: 96px;
+      height: 70px;
+      flex-basis: 96px;
     }
 
-    .world-lab-entry__visual {
-      width: min(100%, 370px);
-      margin: -2px auto -8px;
-    }
-
-    .world-lab-entry__visual-badge {
-      top: 12%;
-      left: -1%;
-      font-size: .56rem;
-    }
-
-    .world-lab-entry__visual-caption {
-      right: -1%;
-      bottom: 12%;
-      font-size: .55rem;
-    }
-
-    .world-lab-entry__actions {
-      align-items: center;
-      gap: 15px;
-      padding-top: 0;
-    }
-
-    .world-lab-entry__features {
-      justify-content: center;
-      gap: 7px;
-    }
-
-    .world-lab-entry__features span {
-      min-height: 32px;
-      padding: 5px 9px;
-      font-size: .7rem;
-    }
-
-    .world-lab-entry__cta {
-      width: min(100%, 330px);
-    }
-
-    .world-lab-entry__hint {
-      margin-top: -5px;
+    .world-lab-entry__artwork {
+      min-height: 100px;
+      gap: 8px;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .world-lab-entry__orbit--wide,
     .world-lab-entry__loading-mark {
       animation: none;
     }
 
-    .world-lab-entry__cta,
-    .world-lab-entry__cta svg {
+    .world-lab-entry__cta {
       transition: none;
     }
   }
