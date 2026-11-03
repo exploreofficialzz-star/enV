@@ -69,7 +69,6 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
   const commentsDialogRef = useRef<HTMLElement | null>(null);
   const [body, setBody] = useState("");
   const [identityMode, setIdentityMode] = useState<"anonymous" | "public">("anonymous");
-  const [displayName, setDisplayName] = useState("");
   const [replyTarget, setReplyTarget] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState<(typeof reportReasons)[number][0]>("spam");
@@ -77,13 +76,7 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
   const [problem, setProblem] = useState("");
   useEffect(() => {
     if (authPending) return;
-    if (accountUser) {
-      setIdentityMode("public");
-      setDisplayName(accountDisplayName);
-    } else {
-      setIdentityMode("anonymous");
-      setDisplayName("");
-    }
+    setIdentityMode(accountUser ? "public" : "anonymous");
   }, [authPending, accountUser?.id, accountDisplayName]);
   useEffect(() => {
     setFeed(initialFeed ?? null);
@@ -209,8 +202,8 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
         visitorId,
         idempotencyKey: newIdempotencyKey(),
         body,
-        identityMode,
-        displayName: identityMode === "public" ? (accountUser ? accountDisplayName : displayName.trim()) : null,
+        identityMode: accountUser ? identityMode : "anonymous",
+        displayName: accountUser && identityMode === "public" ? accountDisplayName : null,
         parentId: replyTarget,
       });
       recordAnalyticsEvent({ name: "comment_created", toolId, outcome: "success", properties: { action: replyTarget ? "reply" : "comment" } });
@@ -369,29 +362,25 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
                 className="w-full resize-none rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm text-fg outline-none focus:border-accent"
               />
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <label className="sr-only" htmlFor={"community-identity-" + toolId}>Display identity</label>
-                <select
-                  id={"community-identity-" + toolId}
-                  value={identityMode}
-                  disabled={authPending}
-                  onChange={(event) => setIdentityMode(event.target.value as "anonymous" | "public")}
-                  className="min-h-9 max-w-full rounded-md border border-border bg-surface px-2 text-xs text-fg"
-                >
-                  {accountUser ? (
-                    <>
+                {accountUser ? (
+                  <>
+                    <label className="sr-only" htmlFor={"community-identity-" + toolId}>Display identity</label>
+                    <select
+                      id={"community-identity-" + toolId}
+                      value={identityMode}
+                      disabled={authPending}
+                      onChange={(event) => setIdentityMode(event.target.value as "anonymous" | "public")}
+                      className="min-h-9 max-w-full rounded-md border border-border bg-surface px-2 text-xs text-fg"
+                    >
                       <option value="public">Display as {accountDisplayName}</option>
                       <option value="anonymous">Anonymous</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="anonymous">Anonymous</option>
-                      <option value="public">Display name</option>
-                    </>
-                  )}
-                </select>
-                {identityMode === "public" && !accountUser ? <input value={displayName} onChange={(event) => setDisplayName(event.target.value.slice(0, 32))} minLength={2} maxLength={32} required aria-label="Display name" placeholder="Choose a display name" className="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-xs text-fg" /> : null}
+                    </select>
+                  </>
+                ) : (
+                  <span className="rounded-md border border-border bg-surface px-2 py-2 text-xs text-muted" aria-label="Display identity">Anonymous</span>
+                )}
                 <span className="ml-auto text-[11px] text-muted">{body.length}/2000</span>
-                <Button type="submit" size="sm" disabled={sending || authPending || !visitorId || !body.trim() || (identityMode === "public" && !accountUser && displayName.trim().length < 2)}>
+                <Button type="submit" size="sm" disabled={sending || authPending || !visitorId || !body.trim()}>
                   <Send className="mr-1 size-3.5" />{sending ? "Posting…" : "Post"}
                 </Button>
               </div>

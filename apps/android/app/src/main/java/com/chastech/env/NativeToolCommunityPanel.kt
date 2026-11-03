@@ -261,7 +261,7 @@ fun NativeToolCommunityPanel(toolId: String) {
     }
 
     fun submitComment() {
-        if (commentText.isBlank() || sending || (publicIdentity && displayName.trim().length < 2)) return
+        if (commentText.isBlank() || sending) return
         sending = true
         scope.launch {
             try {
@@ -270,8 +270,8 @@ fun NativeToolCommunityPanel(toolId: String) {
                     .put("visitorId", visitorId)
                     .put("idempotencyKey", UUID.randomUUID().toString())
                     .put("body", commentText.trim())
-                    .put("identityMode", if (publicIdentity) "public" else "anonymous")
-                    .put("displayName", if (publicIdentity) displayName.trim() else JSONObject.NULL)
+                    .put("identityMode", if (accountSignedIn && publicIdentity) "public" else "anonymous")
+                    .put("displayName", if (accountSignedIn && publicIdentity) displayName.trim() else JSONObject.NULL)
                     .put("parentId", replyTo ?: JSONObject.NULL)
                 withContext(Dispatchers.IO) { NativeCommunityApi.post("/api/community/comments", payload) }
                 NativeAnalytics.record(context, "comment_created", toolId, "success")
@@ -406,19 +406,15 @@ fun NativeToolCommunityPanel(toolId: String) {
                         label = { Text(if (replyTo == null) "Write a comment" else "Write a reply") },
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box {
-                            TextButton(onClick = { identityMenuOpen = true }, enabled = !identityLoading) {
-                                Text(
-                                    when {
-                                        publicIdentity && accountSignedIn -> "Display as ${displayName.ifBlank { "enV member" }}"
-                                        publicIdentity -> "Display name"
-                                        else -> "Anonymous"
-                                    },
-                                    maxLines = 1,
-                                )
-                            }
-                            DropdownMenu(expanded = identityMenuOpen, onDismissRequest = { identityMenuOpen = false }) {
-                                if (accountSignedIn) {
+                        if (accountSignedIn) {
+                            Box {
+                                TextButton(onClick = { identityMenuOpen = true }, enabled = !identityLoading) {
+                                    Text(
+                                        if (publicIdentity) "Display as ${displayName.ifBlank { "enV member" }}" else "Anonymous",
+                                        maxLines = 1,
+                                    )
+                                }
+                                DropdownMenu(expanded = identityMenuOpen, onDismissRequest = { identityMenuOpen = false }) {
                                     DropdownMenuItem(
                                         text = { Text("Display as ${displayName.ifBlank { "enV member" }}") },
                                         onClick = { publicIdentity = true; identityMenuOpen = false },
@@ -427,32 +423,14 @@ fun NativeToolCommunityPanel(toolId: String) {
                                         text = { Text("Anonymous") },
                                         onClick = { publicIdentity = false; identityMenuOpen = false },
                                     )
-                                } else {
-                                    DropdownMenuItem(
-                                        text = { Text("Anonymous") },
-                                        onClick = { publicIdentity = false; identityMenuOpen = false },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Display name") },
-                                        onClick = { publicIdentity = true; identityMenuOpen = false },
-                                    )
                                 }
                             }
-                        }
-                        if (publicIdentity && !accountSignedIn) {
-                            OutlinedTextField(
-                                value = displayName,
-                                onValueChange = { displayName = it.take(32) },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                label = { Text("Display name") },
-                            )
                         } else {
-                            Spacer(Modifier.weight(1f))
+                            Text("Anonymous", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Button(
                             onClick = ::submitComment,
-                            enabled = !sending && !identityLoading && commentText.isNotBlank() && (!publicIdentity || accountSignedIn || displayName.trim().length >= 2),
+                            enabled = !sending && !identityLoading && commentText.isNotBlank(),
                         ) { Text(if (sending) "Posting…" else "Post") }
                     }
                     notice?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }

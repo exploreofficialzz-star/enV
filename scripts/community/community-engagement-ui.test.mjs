@@ -62,32 +62,39 @@ test("comments open in overlays with replies and moderation controls", () => {
   assert.ok(!ios.includes('enVCharacterSpacedText("Community")'));
 });
 
-test("comments retain verified account identity, guest anonymity and guest display-name choice", () => {
+test("signed-in commenters can select account name or Anonymous; guests are always Anonymous", () => {
   assert.match(web, /useCurrentUserState/);
   assert.match(web, /accountUser/);
   assert.match(web, /setIdentityMode\("public"\)/);
   assert.match(web, /setIdentityMode\("anonymous"\)/);
-  assert.match(web, /Choose a display name/);
+  assert.doesNotMatch(web, /Choose a display name/);
+  assert.match(web, /identityMode: accountUser \? identityMode : "anonymous"/);
+  assert.match(web, /aria-label="Display identity">Anonymous/);
 
   assert.match(android, /NativeCommunityApi\.identity\(\)/);
   assert.match(android, /accountSignedIn/);
   assert.match(android, /communityBearerToken\(context\)/);
   assert.match(androidWallet, /fun communityBearerToken\(context: Context\)/);
-  assert.match(android, /Display name/);
+  assert.match(android, /Display as/);
+  assert.doesNotMatch(android, /Text\("Display name"\)/);
 
   const iosPanel = ios.split("struct ToolCommunityPanel: View")[1]?.split("struct ToolDestinationView: View")[0] ?? "";
   const iosClient = ios.split("private enum NativeCommunityClient")[1]?.split("private enum NativeCommunityIdentity")[0] ?? "";
   assert.match(iosClient, /static func identity\(\)/);
   assert.match(iosClient, /communityBearerToken\(\)/);
   assert.match(iosPanel, /accountSignedIn/);
-  assert.match(iosPanel, /Choose a public display name/);
+  assert.match(iosPanel, /if accountSignedIn/);
+  assert.doesNotMatch(iosPanel, /Button\("Display name"\)/);
+  assert.doesNotMatch(iosPanel, /Choose a public display name/);
   assert.match(iosWallet, /static func communityBearerToken\(\)/);
 
   assert.match(identityRoute, /getCommunityIdentity/);
   assert.match(server, /async function communityUserId/);
   assert.match(server, /requireOfflineBillingUser/);
   assert.match(server, /select name from "user"/);
-  assert.match(server, /userId \? await accountDisplayName\(userId\) : body\.displayName/);
+  assert.match(server, /const identityMode = userId && body\.identityMode === "public" \? "public" : "anonymous"/);
+  assert.match(server, /const displayName = identityMode === "public" && userId \? await accountDisplayName\(userId\) : null/);
+  assert.match(server, /actorDigest,userId,identityMode,displayName,body\.body/);
 });
 
 test("comment composers disclose public visibility before submission on every product", () => {

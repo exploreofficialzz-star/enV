@@ -644,24 +644,23 @@ struct ToolCommunityPanel: View {
                 .foregroundStyle(Color.envMuted)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
-                Menu {
-                    if accountSignedIn {
-                        Button("Display as \(displayName.isEmpty ? "enV member" : displayName)") { publicIdentity = true }
+                if accountSignedIn {
+                    Menu {
+                        Button("Display as ${displayName.isEmpty ? "enV member" : displayName}") { publicIdentity = true }
                         Button("Anonymous") { publicIdentity = false }
-                    } else {
-                        Button("Anonymous") { publicIdentity = false }
-                        Button("Display name") { publicIdentity = true }
+                    } label: {
+                        Label(
+                            publicIdentity ? "Display as ${displayName.isEmpty ? "enV member" : displayName}" : "Anonymous",
+                            systemImage: publicIdentity ? "person" : "person.crop.circle"
+                        )
+                        .font(.envScaled(size: 12, weight: .medium))
                     }
-                } label: {
-                    Label(
-                        publicIdentity
-                            ? (accountSignedIn ? "Display as \(displayName.isEmpty ? "enV member" : displayName)" : "Display name")
-                            : "Anonymous",
-                        systemImage: publicIdentity ? "person" : "person.crop.circle"
-                    )
-                    .font(.envScaled(size: 12, weight: .medium))
+                    .disabled(identityLoading)
+                } else {
+                    Label("Anonymous", systemImage: "person.crop.circle")
+                        .font(.envScaled(size: 12, weight: .medium))
+                        .foregroundStyle(Color.envMuted)
                 }
-                .disabled(identityLoading)
                 Spacer()
                 enVCharacterSpacedText("\(commentText.count)/2000")
                     .font(.envScaled(size: 10, weight: .regular))
@@ -674,15 +673,7 @@ struct ToolCommunityPanel: View {
                         .background(Color.envAccent, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .disabled(identityLoading || isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && !accountSignedIn && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
-            }
-            if publicIdentity && !accountSignedIn {
-                TextField("Choose a public display name", text: $displayName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.envScaled(size: 14, weight: .regular))
-                    .onChange(of: displayName) { value in
-                        if value.count > 32 { displayName = String(value.prefix(32)) }
-                    }
+                .disabled(identityLoading || isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(12)
@@ -871,8 +862,8 @@ struct ToolCommunityPanel: View {
             "visitorId": visitorID,
             "idempotencyKey": UUID().uuidString.lowercased(),
             "body": text,
-            "identityMode": publicIdentity ? "public" : "anonymous",
-            "displayName": publicIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
+            "identityMode": accountSignedIn && publicIdentity ? "public" : "anonymous",
+            "displayName": accountSignedIn && publicIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
             "parentId": replyTo as Any? ?? NSNull()
         ]
         do {

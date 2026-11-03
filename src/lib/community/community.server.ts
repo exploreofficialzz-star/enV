@@ -243,11 +243,10 @@ export async function createCommunityComment(request: Request,input:unknown) {
   ensureTool(body.toolId);
   const {userId,actorDigest}=await actorFor(request,body.visitorId,secret);
   const sql=await getSql();
-  // Signed-in users cannot impersonate a different public author name.
-  // Guest visitors may opt into a supplied display name, or post anonymously.
-  const displayName = body.identityMode === "anonymous"
-    ? null
-    : userId ? await accountDisplayName(userId) : body.displayName;
+  // Public identity is reserved for verified accounts. Guest requests are
+  // forced to Anonymous even if a client submits a forged public name.
+  const identityMode = userId && body.identityMode === "public" ? "public" : "anonymous";
+  const displayName = identityMode === "public" && userId ? await accountDisplayName(userId) : null;
   return sql.transaction(async tx=>{
     const prior=await tx.query<{id:string;created_at:string}>(
       "select id,created_at from tool_community_comments where author_digest=$1 and idempotency_key=$2 limit 1",
@@ -266,7 +265,7 @@ export async function createCommunityComment(request: Request,input:unknown) {
     const rows=await tx.query<{id:string;created_at:string}>(
       `insert into tool_community_comments(id,idempotency_key,tool_id,parent_id,author_digest,author_user_id,identity_mode,display_name,body)
        values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id,created_at`,
-      [id,body.idempotencyKey,body.toolId,body.parentId,actorDigest,userId,body.identityMode,displayName,body.body],
+      [id,body.idempotencyKey,body.toolId,body.parentId,actorDigest,userId,identityMode,displayName,body.body],
     );
     return {commentId:rows[0]!.id,duplicate:false,createdAt:rows[0]!.created_at};
   });
