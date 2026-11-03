@@ -46,7 +46,7 @@ async function communityUserId(request: Request): Promise<string | null> {
 async function accountDisplayName(userId: string): Promise<string> {
   const sql = await getSql();
   const rows = await sql.query<{ name: string | null }>('select name from "user" where id=$1 limit 1', [userId]);
-  const name = rows[0]?.name?.normalize("NFC").replace(/\\s+/g, " ").trim().slice(0, 32) ?? "";
+  const name = rows[0]?.name?.normalize("NFC").replace(/\s+/g, " ").trim().slice(0, 32) ?? "";
   return name.length >= 2 ? name : "enV member";
 }
 async function actorFor(request: Request, visitorId: string, secret: string) {
