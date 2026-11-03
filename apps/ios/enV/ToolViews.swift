@@ -639,6 +639,10 @@ struct ToolCommunityPanel: View {
                 .onChange(of: commentText) { value in
                     if value.count > 2000 { commentText = String(value.prefix(2000)) }
                 }
+            Text("Comments are public and may appear in search results. Do not include private information.")
+                .font(.envScaled(size: 10, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Menu {
                     if accountSignedIn {
