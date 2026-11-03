@@ -882,19 +882,22 @@ fun NativeABookScreen(){
                     }
                 }
             }
+            if(notes.isNotEmpty()){
+                OutlinedTextField(search,{search=it},label={Text("Search your library")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+            }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
                 Text("Your local library",style=MaterialTheme.typography.titleMedium)
                 Text(notes.size.toString()+" "+(if(notes.size==1)"note" else "notes"),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if(notes.isEmpty()){
+            if(filtered.isEmpty()){
                 Card(Modifier.fillMaxWidth()){
                     Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
-                        Text("Your library is ready.",style=MaterialTheme.typography.titleSmall)
-                        Text("Create your first note or restore a backup saved on this device.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if(notes.isEmpty())"Your library is ready." else "No notes match that search.",style=MaterialTheme.typography.titleSmall)
+                        Text(if(notes.isEmpty())"Create your first note or restore a backup saved on this device." else "Try another title, notebook, tag or phrase.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }else{
-                notes.take(3).forEach{n->
+                filtered.take(3).forEach{n->
                     Card(Modifier.fillMaxWidth().clickable{showWelcome=false;reload(n.id,false)}){
                         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
                             Text(n.title.ifBlank{"Untitled note"},style=MaterialTheme.typography.titleSmall)

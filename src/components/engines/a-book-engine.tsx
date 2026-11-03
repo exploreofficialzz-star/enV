@@ -754,14 +754,22 @@ export function ABookEngine() {
           {notes.length ? <button type="button" onClick={openLibrary} className="text-sm font-medium text-accent underline-offset-4 hover:underline">View library</button> : null}
         </div>
         {notes.length ? (
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your local library" aria-label="Search your local library" className="min-h-11 w-full rounded-xl border border-border bg-surface px-4 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring" />
+        ) : null}
+        {visibleNotes.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {notes.slice(0, 3).map((note) => (
+            {visibleNotes.slice(0, 3).map((note) => (
               <button key={note.id} type="button" onClick={() => void enterRecentNote(note)} className="min-h-28 rounded-2xl border border-border bg-surface p-4 text-left transition hover:border-accent/60 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">Recent note</span>
                 <span className="mt-2 block truncate text-sm font-semibold text-foreground">{note.title || "Untitled note"}</span>
                 <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted">{note.body.trim() || "No preview yet. Open this note to continue writing."}</span>
               </button>
             ))}
+          </div>
+        ) : notes.length ? (
+          <div className="rounded-2xl border border-dashed border-border bg-surface p-5">
+            <p className="text-sm font-medium text-foreground">No notes match that search.</p>
+            <p className="mt-1 text-sm text-muted">Try another title, notebook, tag or phrase.</p>
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-border bg-surface p-5">

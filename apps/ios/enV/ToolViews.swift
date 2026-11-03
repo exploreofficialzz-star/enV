@@ -15328,6 +15328,11 @@ private struct NativeABookView: View {
                     welcomeFeature("PDF tools", description: "Process supported PDFs locally.", symbol: "doc.richtext")
                 }
 
+                if !notes.isEmpty {
+                    TextField("Search your library", text: $query)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Search your local library")
+                }
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Your local library").font(.headline).foregroundStyle(Color.envInk)
@@ -15340,14 +15345,16 @@ private struct NativeABookView: View {
                 if !errorText.isEmpty {
                     Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
                 }
-                if notes.isEmpty {
-                    Text("Your library is ready for its first note. Create a note or restore a backup saved on this device.")
+                if filteredNotes.isEmpty {
+                    Text(notes.isEmpty
+                         ? "Your library is ready for its first note. Create a note or restore a backup saved on this device."
+                         : "No notes match that search. Try another title, notebook, tag or phrase.")
                         .font(.subheadline).foregroundStyle(Color.envMuted)
                         .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
                 } else {
                     VStack(spacing: 8) {
-                        ForEach(notes.prefix(3)) { note in
+                        ForEach(filteredNotes.prefix(3)) { note in
                             Button {
                                 select(note)
                                 showWelcome = false
