@@ -102,6 +102,8 @@ test("public discussion index and per-tool pages expose public comments for sear
   assert.match(publicFeed, /loadPublicCommunityToolFeed/);
   assert.match(publicIndex, /CollectionPage/);
   assert.match(publicIndex, /Public tool discussions/);
+  assert.match(publicIndex, /<AppShell>/);
+  assert.match(publicDetail, /<AppShell>/);
   assert.match(publicDetail, /CollectionPage/);
   assert.match(publicDetail, /"@type": "Comment"/);
   assert.match(toolRoute, /loadPublicCommunityToolFeed/);
