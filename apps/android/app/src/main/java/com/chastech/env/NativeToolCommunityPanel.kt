@@ -1,24 +1,31 @@
 package com.chastech.env
 
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,11 +65,22 @@ private data class NativeCommunityFeed(
     val myReaction: String?,
 )
 
+private fun compactCommunityCount(value: Int): String {
+    val count = value.coerceAtLeast(0).toLong()
+    if (count < 1_000) return count.toString()
+    val divisor = if (count >= 1_000_000) 1_000_000.0 else 1_000.0
+    val suffix = if (count >= 1_000_000) "M" else "K"
+    val rounded = kotlin.math.round((count / divisor) * 10.0) / 10.0
+    val number = if (rounded % 1.0 == 0.0) rounded.toLong().toString()
+        else String.format(java.util.Locale.US, "%.1f", rounded)
+    return number + suffix
+}
+
 private object NativeCommunityApi {
     private val base get() = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
 
     private fun request(path: String, method: String = "GET", body: JSONObject? = null): JSONObject {
-        require(base.startsWith("https://")) { "enV community requires a secure API connection." }
+        require(base.startsWith("https://")) { "enV engagement requires a secure API connection." }
         val connection = (URL(base + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 15_000
@@ -80,7 +98,7 @@ private object NativeCommunityApi {
             val payload = stream?.use { it.readBytes().toString(Charsets.UTF_8) }.orEmpty()
             val envelope = runCatching { JSONObject(payload) }.getOrElse { JSONObject() }
             if (status !in 200..299 || !envelope.optBoolean("ok")) {
-                throw IllegalStateException(envelope.optString("message").ifBlank { "Community service is unavailable (HTTP $status)." })
+                throw IllegalStateException(envelope.optString("message").ifBlank { "Engagement is unavailable (HTTP $status)." })
             }
             return envelope.optJSONObject("data") ?: JSONObject()
         } finally {
@@ -128,6 +146,7 @@ fun NativeToolCommunityPanel(toolId: String) {
     var loading by rememberSaveable(toolId) { mutableStateOf(true) }
     var enabled by remember(toolId) { mutableStateOf(true) }
     var sending by rememberSaveable(toolId) { mutableStateOf(false) }
+    var showComments by rememberSaveable(toolId) { mutableStateOf(false) }
     var commentText by rememberSaveable(toolId) { mutableStateOf("") }
     var publicIdentity by rememberSaveable(toolId) { mutableStateOf(false) }
     var displayName by rememberSaveable(toolId) { mutableStateOf("") }
@@ -140,14 +159,14 @@ fun NativeToolCommunityPanel(toolId: String) {
         scope.launch {
             loading = true
             try {
-                val fresh = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
-                feed = fresh
-                error = null
+                feed = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
                 withContext(Dispatchers.IO) {
                     NativeCommunityApi.post("/api/community/view", JSONObject().put("toolId", toolId).put("visitorId", visitorId))
                 }
+                feed = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
+                error = null
             } catch (failure: Exception) {
-                val message = failure.message ?: "Community is temporarily unavailable."
+                val message = failure.message ?: "Engagement is temporarily unavailable."
                 if (message.contains("not enabled", ignoreCase = true)) enabled = false
                 else error = message
             } finally { loading = false }
@@ -164,7 +183,8 @@ fun NativeToolCommunityPanel(toolId: String) {
                     NativeCommunityApi.post("/api/community/reactions", JSONObject().put("toolId", toolId).put("visitorId", visitorId).put("reaction", reaction))
                 }
                 NativeAnalytics.record(context, "reaction_created", toolId, "success")
-                refresh()
+                feed = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
+                error = null
             } catch (failure: Exception) { error = failure.message ?: "Your reaction could not be saved." }
         }
     }
@@ -175,7 +195,7 @@ fun NativeToolCommunityPanel(toolId: String) {
                 withContext(Dispatchers.IO) {
                     NativeCommunityApi.post("/api/community/reports", JSONObject().put("commentId", commentId).put("visitorId", visitorId).put("reason", reason))
                 }
-                notice = "Report sent to the moderation team."
+                notice = "Report sent."
                 reportMenuFor = null
             } catch (failure: Exception) { error = failure.message ?: "The report could not be sent." }
         }
@@ -187,8 +207,8 @@ fun NativeToolCommunityPanel(toolId: String) {
                 withContext(Dispatchers.IO) {
                     NativeCommunityApi.post("/api/community/blocks", JSONObject().put("commentId", commentId).put("visitorId", visitorId))
                 }
-                notice = "The author is now hidden from your view."
-                refresh()
+                notice = "Author hidden."
+                feed = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
             } catch (failure: Exception) { error = failure.message ?: "The author could not be blocked." }
         }
     }
@@ -199,8 +219,8 @@ fun NativeToolCommunityPanel(toolId: String) {
                 withContext(Dispatchers.IO) {
                     NativeCommunityApi.post("/api/community/comments/delete", JSONObject().put("commentId", commentId).put("visitorId", visitorId))
                 }
-                notice = "Your comment was removed."
-                refresh()
+                notice = "Comment removed."
+                feed = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
             } catch (failure: Exception) { error = failure.message ?: "The comment could not be removed." }
         }
     }
@@ -222,130 +242,155 @@ fun NativeToolCommunityPanel(toolId: String) {
                 NativeAnalytics.record(context, "comment_created", toolId, "success")
                 commentText = ""
                 replyTo = null
-                notice = "Your comment was posted."
-                refresh()
+                notice = "Comment posted."
+                feed = withContext(Dispatchers.IO) { NativeCommunityApi.feed(toolId, visitorId) }
+                error = null
             } catch (failure: Exception) { error = failure.message ?: "Your comment could not be posted." }
             finally { sending = false }
         }
     }
 
+    val current = feed
+    val roots = current?.comments?.filter { it.parentId == null }.orEmpty()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(16.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("Community", style = MaterialTheme.typography.titleMedium)
-                    Text("Discuss this tool with other users.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                TextButton(onClick = ::refresh, enabled = !loading) { Text("Refresh") }
+                Text("👍 ${compactCommunityCount(current?.likes ?: 0)}  👎 ${compactCommunityCount(current?.dislikes ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("💬 ${compactCommunityCount(current?.commentCount ?: 0)}   👁 ${compactCommunityCount(current?.views ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { sendReaction("like") }) { Text("👍 ${feed?.likes ?: 0}") }
-                OutlinedButton(onClick = { sendReaction("dislike") }) { Text("👎 ${feed?.dislikes ?: 0}") }
-                Text("• ${feed?.views ?: 0} views", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { sendReaction("like") },
+                    enabled = !loading,
+                    modifier = Modifier.weight(1f),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
+                ) { Text("👍 ${compactCommunityCount(current?.likes ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge, color = if (current?.myReaction == "like") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
+                OutlinedButton(
+                    onClick = {
+                        showComments = true
+                        refresh()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
+                ) { Text("💬 ${compactCommunityCount(current?.commentCount ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge) }
+                OutlinedButton(
+                    onClick = { sendReaction("dislike") },
+                    enabled = !loading,
+                    modifier = Modifier.weight(1f),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 12.dp),
+                ) { Text("👎 ${compactCommunityCount(current?.dislikes ?: 0)}", maxLines = 1, style = MaterialTheme.typography.labelLarge, color = if (current?.myReaction == "dislike") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(if (replyTo == null) "Join the discussion" else "Write a reply", style = MaterialTheme.typography.titleSmall)
-                if (replyTo != null) {
-                    TextButton(onClick = { replyTo = null }) { Text("Cancel reply") }
-                }
-                OutlinedTextField(
-                    value = commentText,
-                    onValueChange = { commentText = it.take(2000) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 6,
-                    label = { Text("Your comment") },
-                    placeholder = { Text("Keep it helpful and respectful…") },
-                    supportingText = { Text("${commentText.length}/2000") },
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { publicIdentity = !publicIdentity }) {
-                        Text(if (publicIdentity) "Use a display name" else "Post anonymously")
-                    }
-                    if (publicIdentity) {
-                        Text("Public label", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
-                    }
-                }
-                if (publicIdentity) {
-                    OutlinedTextField(
-                        value = displayName,
-                        onValueChange = { displayName = it.take(32) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Display name") },
-                    )
-                }
-                Button(
-                    onClick = ::submitComment,
-                    enabled = !sending && commentText.isNotBlank() && (!publicIdentity || displayName.trim().length >= 2),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (sending) "Posting…" else "Post comment") }
-                Text(
-                    "Anonymous hides your display name, not the private abuse-prevention record. Never post passwords or payment details.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (error != null && !showComments) {
+                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            notice?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-            if (loading && feed == null) Text("Loading discussion…", style = MaterialTheme.typography.bodySmall)
-            val current = feed
-            if (current != null) {
-                Text("${current.commentCount} comments", style = MaterialTheme.typography.titleSmall)
-                val roots = current.comments.filter { it.parentId == null }
-                if (roots.isEmpty()) Text("No comments yet. Start the discussion.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                roots.forEach { comment ->
-                    Column(
-                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(comment.author, style = MaterialTheme.typography.labelMedium)
-                        Text(comment.body, style = MaterialTheme.typography.bodyMedium)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (comment.isMine) TextButton(onClick = { delete(comment.id) }) { Text("Remove") }
-                            else {
-                                TextButton(onClick = { replyTo = comment.id }) { Text("Reply") }
-                                Box {
-                                    TextButton(onClick = { reportMenuFor = comment.id }) { Text("Report") }
-                                    DropdownMenu(expanded = reportMenuFor == comment.id, onDismissRequest = { reportMenuFor = null }) {
-                                        listOf("spam", "harassment", "misinformation", "inappropriate", "other").forEach { reason ->
-                                            DropdownMenuItem(text = { Text(reason.replaceFirstChar { it.uppercase() }) }, onClick = { report(comment.id, reason) })
-                                        }
-                                    }
-                                }
-                                TextButton(onClick = { block(comment.id) }) { Text("Block") }
-                            }
+        }
+    }
+
+    if (showComments) {
+        Dialog(
+            onDismissRequest = { showComments = false; replyTo = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize().imePadding(),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(18.dp),
+            ) {
+                Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Comments", style = MaterialTheme.typography.titleLarge)
+                            Text("${compactCommunityCount(current?.commentCount ?: 0)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        current.comments.filter { it.parentId == comment.id }.forEach { reply ->
-                            Column(
-                                Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text(reply.author, style = MaterialTheme.typography.labelSmall)
-                                Text(reply.body, style = MaterialTheme.typography.bodySmall)
-                                if (reply.isMine) TextButton(onClick = { delete(reply.id) }) { Text("Remove") }
-                                else {
-                                    Row {
+                        Row {
+                            TextButton(onClick = ::refresh, enabled = !loading) { Text("Refresh") }
+                            TextButton(onClick = { showComments = false; replyTo = null }) { Text("Close") }
+                        }
+                    }
+                    if (loading && current == null) {
+                        Text("Loading…", style = MaterialTheme.typography.bodySmall)
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (roots.isEmpty() && !loading) {
+                            item { Text("No comments yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                        items(roots, key = { it.id }) { comment ->
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(comment.author, style = MaterialTheme.typography.labelMedium)
+                                Text(comment.body, style = MaterialTheme.typography.bodyMedium)
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (comment.isMine) {
+                                        TextButton(onClick = { delete(comment.id) }) { Text("Remove") }
+                                    } else {
+                                        TextButton(onClick = { replyTo = comment.id }) { Text("Reply") }
                                         Box {
-                                            TextButton(onClick = { reportMenuFor = reply.id }) { Text("Report") }
-                                            DropdownMenu(expanded = reportMenuFor == reply.id, onDismissRequest = { reportMenuFor = null }) {
+                                            TextButton(onClick = { reportMenuFor = comment.id }) { Text("Report") }
+                                            DropdownMenu(expanded = reportMenuFor == comment.id, onDismissRequest = { reportMenuFor = null }) {
                                                 listOf("spam", "harassment", "misinformation", "inappropriate", "other").forEach { reason ->
-                                                    DropdownMenuItem(text = { Text(reason.replaceFirstChar { it.uppercase() }) }, onClick = { report(reply.id, reason) })
+                                                    DropdownMenuItem(text = { Text(reason.replaceFirstChar { it.uppercase() }) }, onClick = { report(comment.id, reason) })
                                                 }
                                             }
                                         }
-                                        TextButton(onClick = { block(reply.id) }) { Text("Block") }
+                                        TextButton(onClick = { block(comment.id) }) { Text("Block") }
+                                    }
+                                }
+                                current?.comments?.filter { it.parentId == comment.id }?.forEach { reply ->
+                                    Column(Modifier.fillMaxWidth().padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(reply.author, style = MaterialTheme.typography.labelSmall)
+                                        Text(reply.body, style = MaterialTheme.typography.bodySmall)
+                                        if (reply.isMine) TextButton(onClick = { delete(reply.id) }) { Text("Remove") }
                                     }
                                 }
                             }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    replyTo?.let {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Replying to a comment", style = MaterialTheme.typography.labelSmall)
+                            TextButton(onClick = { replyTo = null }) { Text("Cancel") }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = commentText,
+                        onValueChange = { commentText = it.take(2000) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4,
+                        label = { Text(if (replyTo == null) "Write a comment" else "Write a reply") },
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { publicIdentity = !publicIdentity }) {
+                            Text(if (publicIdentity) "Display name" else "Anonymous")
+                        }
+                        if (publicIdentity) {
+                            OutlinedTextField(
+                                value = displayName,
+                                onValueChange = { displayName = it.take(32) },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                label = { Text("Display name") },
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
+                        Button(
+                            onClick = ::submitComment,
+                            enabled = !sending && commentText.isNotBlank() && (!publicIdentity || displayName.trim().length >= 2),
+                        ) { Text(if (sending) "Posting…" else "Post") }
+                    }
+                    notice?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall) }
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
