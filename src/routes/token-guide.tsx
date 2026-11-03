@@ -5,8 +5,17 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getSearchableTools } from "@/lib/registry";
 import { categoryLabel } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/token-guide")({ component: TokenGuide });
+export const Route = createFileRoute("/token-guide")({
+  head: () => seoPageHead({
+    title: "enV Token Guide | Usage Estimates and Billing",
+    description: "Understand enV's per-tool token classifications, usage units, provisional estimates, and the difference between catalogue estimates and actual recorded account activity.",
+    path: "/token-guide",
+    structuredData: pageSchema("enV Token Guide", "Platform-wide documentation for estimated token usage classifications and tool-level billing explanations.", "/token-guide", "WebPage")
+  }),
+  component: TokenGuide
+});
 
 function TokenGuide() {
   const [query, setQuery] = useState("");

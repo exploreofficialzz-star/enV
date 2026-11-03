@@ -1,0 +1,360 @@
+#!/usr/bin/env node
+
+import { CATEGORIES } from "../src/data/categories.ts";
+import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
+import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
+import { isIndexableTool, canonicalSeoTools, canonicalToolPath, toolSeoTitle, toolGuideSeoTitle } from "../src/lib/seo-metadata.ts";
+import { isToolUnderProduction } from "../src/lib/production-notice.ts";
+
+const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
+const routes = [
+  { path: "/", kind: "indexable", schema: "WebSite", homepageDiscovery: true, expectedTitle: "enV Digital Toolkit by chAs Technologies | Online Tools" },
+  { path: "/tools", kind: "indexable", schema: "CollectionPage", categoryDirectory: true },
+  { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
+  { path: "/blog/tool-json-studio", kind: "indexable", schema: "TechArticle" },
+  { path: "/blog/tool-json-formatter", kind: "indexable", schema: "TechArticle", aboutUrl: "https://envtools.store/tools/developer/json-studio", aboutName: "JSON Studio" },
+  { path: "/about", kind: "indexable", schema: "AboutPage" },
+  { path: "/pricing", kind: "indexable", schema: "WebPage" },
+  { path: "/help", kind: "indexable", schema: "CollectionPage" },
+  { path: "/contact", kind: "indexable", schema: "ContactPage" },
+  { path: "/privacy", kind: "indexable", schema: "WebPage" },
+  { path: "/terms", kind: "indexable", schema: "WebPage" },
+  { path: "/disclaimer", kind: "indexable", schema: "WebPage" },
+  { path: "/responsible-use", kind: "indexable", schema: "WebPage" },
+  { path: "/platform/android", kind: "indexable", schema: "WebPage" },
+  { path: "/platform/ios", kind: "indexable", schema: "WebPage" },
+  { path: "/token-guide", kind: "indexable", schema: "WebPage" },
+  { path: "/tools/calculators", kind: "indexable", schema: "CollectionPage" },
+  { path: "/tools/developer", kind: "indexable", schema: "CollectionPage" },
+  { path: "/tools/business", kind: "indexable", schema: "CollectionPage" },
+  { path: "/blog", kind: "indexable", schema: "CollectionPage" },
+  { path: "/blog/a-more-private-way-to-use-online-tools", kind: "indexable", schema: "Article" },
+  { path: "/search?q=json", kind: "noindex" },
+  { path: "/wallet", kind: "noindex" },
+  { path: "/updates", kind: "noindex" },
+  { path: "/3d-game-studio", kind: "noindex" },
+  { path: "/this-route-does-not-exist-seo-audit", kind: "noindex", expectedStatus: 404 },
+  { path: "/tools/developer/this-tool-does-not-exist-seo-audit", kind: "noindex", expectedStatus: 404 },
+  { path: "/tools/unknown-category-seo-audit", kind: "noindex", expectedStatus: 404 },
+];
+
+const routeMap = new Map(routes.map((route) => [route.path, route]));
+const seoCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+for (const tool of getToolsByCategory("accessibility")) seoCandidateMap.set(tool.id, tool);
+const canonicalSeoRecords = canonicalSeoTools([...seoCandidateMap.values()]);
+const canonicalToolPages = canonicalSeoRecords.filter((tool) =>
+  tool.category !== "developer" || tool.tags.includes("developer-studio")
+);
+
+function addTitleCollisionRoutes(tools, titleForTool, routeForTool, schema) {
+  const groups = new Map();
+  for (const tool of tools) {
+    const key = titleForTool(tool);
+    const group = groups.get(key) ?? [];
+    group.push(tool);
+    groups.set(key, group);
+  }
+  let added = 0;
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    for (const tool of group) {
+      const route = routeForTool(tool);
+      routeMap.set(route.path, {
+        ...route,
+        kind: "indexable",
+        schema,
+        expectedTitle: titleForTool(tool, tools),
+        titleCollision: true,
+      });
+      added += 1;
+    }
+  }
+  return added;
+}
+
+// Render every page participating in a truncated-title collision. This gives
+// real SSR coverage to the title disambiguation logic without fetching the
+// entire, rapidly growing catalogue on every CI run.
+const toolCollisionRoutes = addTitleCollisionRoutes(
+  canonicalToolPages,
+  toolSeoTitle,
+  (tool) => ({ path: canonicalToolPath(tool) }),
+  "SoftwareApplication",
+);
+const guideCollisionRoutes = addTitleCollisionRoutes(
+  canonicalSeoRecords,
+  toolGuideSeoTitle,
+  (tool) => ({ path: "/blog/tool-" + tool.id }),
+  "TechArticle",
+);
+// Generate live coverage from the catalogue so new categories, representative
+// canonical tools and their usage guides automatically enter this rendered audit.
+for (const category of CATEGORIES) {
+  const publicTools = canonicalSeoTools(getToolsByCategory(category.id).filter(isIndexableTool));
+  const categoryPath = "/tools/" + category.id;
+  routeMap.set(categoryPath, {
+    path: categoryPath,
+    kind: publicTools.length > 0 ? "indexable" : "noindex",
+    ...(publicTools.length > 0 ? { schema: "CollectionPage" } : {}),
+  });
+  const sampleTool = publicTools[0];
+  if (sampleTool) {
+    const sampleToolPath = toolPath(sampleTool);
+    routeMap.set(sampleToolPath, {
+      ...(routeMap.get(sampleToolPath) ?? {}),
+      path: sampleToolPath,
+      kind: "indexable",
+      schema: "SoftwareApplication",
+    });
+    const guidePath = "/blog/tool-" + sampleTool.id;
+    routeMap.set(guidePath, {
+      ...(routeMap.get(guidePath) ?? {}),
+      path: guidePath,
+      kind: "indexable",
+      schema: "TechArticle",
+    });
+  }
+}
+for (const article of BLOG_ARTICLES) {
+  const articlePath = "/blog/" + article.slug;
+  routeMap.set(articlePath, { path: articlePath, kind: "indexable", schema: "Article" });
+}
+const underProductionTool = getSearchableTools().find(isToolUnderProduction);
+if (underProductionTool) {
+  const path = toolPath(underProductionTool);
+  routeMap.set(path, { path, kind: "noindex" });
+}
+const renderedRoutes = [...routeMap.values()];
+
+function decodeHtmlEntities(value) {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&#x27;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function attribute(tag, name) {
+  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')", "i"));
+  return decodeHtmlEntities(match?.[1] ?? match?.[2] ?? "");
+}
+function metaContent(head, key, value) {
+  const tags = [...head.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]);
+  const tag = tags.find((item) => attribute(item, key).toLowerCase() === value.toLowerCase());
+  return tag ? attribute(tag, "content") : "";
+}
+
+const failures = [];
+const report = [];
+for (const route of renderedRoutes) {
+  const url = new URL(route.path, baseUrl);
+  let response;
+  let html = "";
+  try {
+    response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20_000) });
+    html = await response.text();
+  } catch (error) {
+    failures.push(route.path + ": request failed: " + String(error));
+    continue;
+  }
+
+  const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
+  const title = decodeHtmlEntities(head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "");
+  const description = metaContent(head, "name", "description");
+  const robots = metaContent(head, "name", "robots").toLowerCase();
+  const buildSha = metaContent(head, "name", "env-build-sha");
+  if (!buildSha || buildSha === "local") failures.push(route.path + ": missing Vercel/GitHub build SHA metadata.");
+  if (process.env.GITHUB_SHA && buildSha !== process.env.GITHUB_SHA) {
+    failures.push(route.path + ": rendered build SHA does not match the GitHub commit (expected " + process.env.GITHUB_SHA + ", received " + buildSha + ")");
+  }
+  const ogSiteName = metaContent(head, "property", "og:site_name");
+  const ogTitle = metaContent(head, "property", "og:title");
+  const ogDescription = metaContent(head, "property", "og:description");
+  const twitterSite = metaContent(head, "name", "twitter:site");
+  const ogUrl = metaContent(head, "property", "og:url");
+  const ogImage = metaContent(head, "property", "og:image");
+  const twitterCard = metaContent(head, "name", "twitter:card");
+  const twitterTitle = metaContent(head, "name", "twitter:title");
+  const twitterDescription = metaContent(head, "name", "twitter:description");
+  const twitterImage = metaContent(head, "name", "twitter:image");
+  const ogImageAlt = metaContent(head, "property", "og:image:alt");
+  if (route.homepageDiscovery) {
+    const requiredIntro = "Browse practical online calculators, unit converters, developer utilities, image and audio tools, and productivity workspaces across Web, Android, and iOS.";
+    if (!html.includes(requiredIntro)) failures.push(route.path + ": homepage must explain the platform's tool categories in rendered content.");
+    const requiredExploreLinks = ["/tools", "/blog", "/help", "/about", "/contact", "/pricing"];
+    const renderedHrefs = [...html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi)].map((match) => match[1]);
+    for (const href of requiredExploreLinks) {
+      if (!renderedHrefs.includes(href)) failures.push(route.path + ": footer/home discovery link is missing: " + href);
+    }
+  }
+
+  if (route.categoryDirectory) {
+    const hrefs = [...html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi)]
+      .map((match) => match[1]);
+    const categoryLinks = [...new Set(hrefs.filter((href) => /^\/tools\/[a-z0-9-]+\/?$/i.test(href)))];
+    if (categoryLinks.length < 20) {
+      failures.push(route.path + ": category directory must expose crawlable links to public category landing pages; found " + categoryLinks.length);
+    }
+  }
+
+  const canonicals = [...head.matchAll(/<link\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((tag) => attribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
+  const canonical = canonicals[0] ? attribute(canonicals[0], "href") : "";
+  const jsonLd = [...head.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((match) => match[1]);
+  const hasSchema = jsonLd.some((source) =>
+    source.includes('"@type":"' + (route.schema ?? "UNKNOWN") + '"')
+    || source.includes('"@type": "' + (route.schema ?? "UNKNOWN") + '"')
+  );
+  const hasCanonicalAbout = !route.aboutUrl || jsonLd.some((source) =>
+    source.includes('"@type":"SoftwareApplication"')
+    && source.includes('"url":"' + route.aboutUrl + '"')
+    && source.includes('"name":"' + route.aboutName + '"')
+  );
+
+  const expectedStatus = route.expectedStatus ?? 200;
+  if (response.status !== expectedStatus) failures.push(route.path + ": expected HTTP " + expectedStatus + ", received " + response.status);
+  if (!title || title.length < 8) failures.push(route.path + ": missing or unhelpful title");
+  if (route.expectedTitle && title !== route.expectedTitle) {
+    failures.push(route.path + ": rendered title does not match the canonical peer-aware title (expected " + JSON.stringify(route.expectedTitle) + ", received " + JSON.stringify(title) + ")");
+  }
+  if (route.kind === "indexable" && title.length > 65) failures.push(route.path + ": SEO title exceeds 65 characters (" + title.length + ")");
+  if (route.kind === "indexable") {
+    if (!description || description.length < 40 || description.length > 170) {
+      failures.push(route.path + ": missing or out-of-range meta description (" + description.length + ")");
+    }
+    if (!robots || robots.includes("noindex")) failures.push(route.path + ": indexable page is marked noindex");
+    if (canonicals.length !== 1) failures.push(route.path + ": expected exactly one canonical link, found " + canonicals.length);
+    if (canonical && canonical !== new URL(route.path, "https://envtools.store").href) {
+      failures.push(route.path + ": incorrect canonical URL: " + canonical);
+    }
+    if (!hasSchema) failures.push(route.path + ": expected JSON-LD schema type " + route.schema);
+    if (!hasCanonicalAbout) failures.push(route.path + ": guide must reference the canonical parent SoftwareApplication URL");
+    if (ogSiteName !== "enV Digital Toolkit") failures.push(route.path + ": Open Graph site name must disambiguate the enV brand");
+    if (twitterSite !== "@envtoolz") failures.push(route.path + ": Twitter site handle must match the official enV account");
+    if (!ogTitle || ogTitle !== title) failures.push(route.path + ": Open Graph title must match the page title");
+    if (!ogDescription || ogDescription !== description) failures.push(route.path + ": Open Graph description must match the page description");
+    if (!ogUrl || ogUrl !== canonical) failures.push(route.path + ": Open Graph URL must match the canonical URL");
+    if (!ogImage || !ogImage.startsWith("https://envtools.store/")) failures.push(route.path + ": Open Graph image must use the canonical host");
+    if (!ogImageAlt.trim()) failures.push(route.path + ": Open Graph image must have descriptive alt text");
+    if (twitterCard !== "summary_large_image") failures.push(route.path + ": Twitter card must use summary_large_image");
+    if (twitterTitle !== title) failures.push(route.path + ": Twitter title must match the page title");
+    if (twitterDescription !== description) failures.push(route.path + ": Twitter description must match the page description");
+    if (twitterImage !== ogImage) failures.push(route.path + ": Twitter image must match the Open Graph image");
+  } else if (!robots.includes("noindex")) {
+    failures.push(route.path + ": private or interaction-only route must be marked noindex");
+  }
+
+  report.push({
+    path: route.path,
+    status: response.status,
+    title,
+    descriptionLength: description.length,
+    robots,
+    buildSha,
+    canonical,
+    ogTitle,
+    ogUrl,
+    ogImage,
+    ogImageAlt,
+    twitterCard,
+    schema: hasSchema ? route.schema : null,
+  });
+}
+
+async function auditStaticDiscoveryFiles() {
+  const assets = [
+    { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
+    { path: "/sitemap.xml", required: [] },
+    { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "## Product articles", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/a-more-private-way-to-use-online-tools"] },
+    { path: "/og.jpg", image: true },
+  ];
+  for (const asset of assets) {
+    try {
+      const response = await fetch(new URL(asset.path, baseUrl), {
+        redirect: "follow",
+        signal: AbortSignal.timeout(20_000),
+      });
+      const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+      if (!response.ok) failures.push(asset.path + ": HTTP " + response.status);
+      if (asset.image) {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!contentType.startsWith("image/")) failures.push(asset.path + ": expected an image content type, received " + contentType);
+        if (bytes.length < 1_024) failures.push(asset.path + ": social preview image is unexpectedly small or empty");
+        report.push({ path: asset.path, status: response.status, contentType, contentLength: bytes.length });
+        continue;
+      }
+      const body = await response.text();
+      if (!body.trim() || body.trimStart().startsWith("<!doctype html")) {
+        failures.push(asset.path + ": expected a static discovery file, not an HTML fallback");
+      }
+      if (asset.path === "/sitemap.xml" && !/(application|text)\/xml/.test(contentType)) {
+        failures.push("/sitemap.xml: expected an XML content type, received " + contentType);
+      }
+      for (const phrase of asset.required) {
+        if (!body.includes(phrase)) failures.push(asset.path + ": missing required content " + phrase);
+      }
+      if (asset.path === "/robots.txt" && !body.includes("Disallow: /api/")) {
+        failures.push("/robots.txt: API routes must remain excluded from crawler access");
+      }
+      if (asset.path === "/sitemap.xml") {
+        const sitemapBodies = [];
+        if (body.includes("<sitemapindex")) {
+          const shardUrls = [...body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+          if (shardUrls.length < 2) failures.push("/sitemap.xml: sitemap index must reference multiple shards");
+          for (const shardUrl of shardUrls) {
+            if (!shardUrl.startsWith("https://envtools.store/")) {
+              failures.push("/sitemap.xml: shard URL must use the canonical host: " + shardUrl);
+              continue;
+            }
+            try {
+              const parsedShardUrl = new URL(shardUrl);
+              const localShardUrl = new URL(parsedShardUrl.pathname + parsedShardUrl.search, baseUrl);
+              const shardResponse = await fetch(localShardUrl, {
+                redirect: "follow",
+                signal: AbortSignal.timeout(20_000),
+              });
+              const shardBody = await shardResponse.text();
+              if (!shardResponse.ok) failures.push(shardUrl + ": HTTP " + shardResponse.status);
+              if (!shardBody.includes("<urlset")) failures.push(shardUrl + ": expected a sitemap urlset");
+              sitemapBodies.push(shardBody);
+            } catch (error) {
+              failures.push(shardUrl + ": request failed: " + String(error));
+            }
+          }
+        } else if (body.includes("<urlset")) {
+          sitemapBodies.push(body);
+        } else {
+          failures.push("/sitemap.xml: expected either a urlset or sitemapindex document");
+        }
+
+        const locations = sitemapBodies.flatMap((sitemapBody) =>
+          [...sitemapBody.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1])
+        );
+        if (locations.length < 20) failures.push("/sitemap.xml: expected the platform and public tool route inventory");
+        if (new Set(locations).size !== locations.length) failures.push("/sitemap.xml: duplicate canonical URL entries");
+        if (locations.some((url) => !url.startsWith("https://envtools.store/") && url !== "https://envtools.store")) {
+          failures.push("/sitemap.xml: every URL must use the canonical https://envtools.store host");
+        }
+        for (const privatePath of ["/wallet", "/account", "/settings", "/login", "/search", "/updates", "/3d-game-studio"]) {
+          if (locations.some((url) => url === "https://envtools.store" + privatePath || url.startsWith("https://envtools.store" + privatePath + "/"))) {
+            failures.push("/sitemap.xml: private or interaction-only route must not be listed: " + privatePath);
+          }
+        }
+      }
+      report.push({ path: asset.path, status: response.status, contentLength: body.length });
+    } catch (error) {
+      failures.push(asset.path + ": request failed: " + String(error));
+    }
+  }
+}
+
+await auditStaticDiscoveryFiles();
+process.stdout.write(JSON.stringify({ checked: report.length, report, failures }, null, 2) + "\n");
+if (failures.length) {
+  process.stderr.write("Rendered SEO audit failed with " + failures.length + " issue(s):\n" + failures.map((item) => "- " + item).join("\n") + "\n");
+  process.exit(1);
+}
+process.stdout.write("PASS: rendered metadata, canonicals, structured data, noindex policies, robots.txt, sitemap.xml and llms.txt (" + toolCollisionRoutes + " tool collision routes, " + guideCollisionRoutes + " guide collision routes).\n");

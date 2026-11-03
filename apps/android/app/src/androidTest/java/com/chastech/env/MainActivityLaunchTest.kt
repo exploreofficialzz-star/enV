@@ -31,4 +31,5 @@ class MainActivityLaunchTest {
             composeRule.onNodeWithText(label).assertDoesNotExist()
         }
     }
+
 }

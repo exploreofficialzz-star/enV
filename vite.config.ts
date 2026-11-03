@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import type { Plugin } from "vite";
@@ -40,7 +41,22 @@ function pgliteBootstrapPlugin(): Plugin {
   };
 }
 
+const BUILD_COMMIT_SHA = (
+  process.env.VERCEL_GIT_COMMIT_SHA
+  ?? process.env.GITHUB_SHA
+  ?? (() => {
+    try {
+      return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    } catch {
+      return "local";
+    }
+  })()
+).trim() || "local";
+
 export default defineConfig(({ command, isPreview }) => ({
+  define: {
+    __ENV_BUILD_SHA__: JSON.stringify(BUILD_COMMIT_SHA),
+  },
   server: { host: "0.0.0.0", port: 8080, strictPort: true },
   preview: { host: "127.0.0.1", port: 8081, strictPort: true },
   resolve: { tsconfigPaths: true },

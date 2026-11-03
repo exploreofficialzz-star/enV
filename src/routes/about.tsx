@@ -1,8 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SocialLinks } from "@/components/social/social-links";
 import { InfoPage } from "@/components/layout/info-page";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/about")({ component: About });
+export const Route = createFileRoute("/about")({
+  head: () => seoPageHead({
+    title: "About enV | Digital Tools and Creative Workspaces",
+    description: "Learn about enV, a cross-device toolkit bringing practical calculators, converters, developer utilities, creator tools, media workflows, and productivity features together.",
+    path: "/about",
+    structuredData: pageSchema("About enV", "Platform and company information for enV, developed by chAs Technologies LLC.", "/about", "AboutPage")
+  }),
+  component: About
+});
 
 function About() {
   return (

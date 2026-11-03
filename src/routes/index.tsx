@@ -10,11 +10,25 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { getPopularTools, getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/")({
+  head: () => seoPageHead({
+    title: "enV Digital Toolkit by chAs Technologies | Online Tools",
+    description: "enV Digital Toolkit by chAs Technologies LLC brings calculators, converters, developer utilities, media and productivity tools to Web, Android and iOS.",
+    path: "/",
+    structuredData: pageSchema(
+      "enV Digital Toolkit by chAs Technologies",
+      "A cross-device toolkit of practical browser-based utilities, calculators, converters, developer workspaces, media tools, and productivity tools.",
+      "/",
+      "WebPage"
+    )
+  }),
+  component: Home
+});
 
 function Home() {
   const navigate = useNavigate();
@@ -75,6 +89,9 @@ function Home() {
           <span className="sm:hidden">everyday work.</span>
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
+        <p className="mt-3 w-full max-w-3xl self-start text-left text-sm leading-6 text-muted sm:text-base">
+          Browse practical online calculators, unit converters, developer utilities, image and audio tools, and productivity workspaces across Web, Android, and iOS.
+        </p>
       </section>
       <ToolSection title="Trending tools" tools={trending} />
       </div>

@@ -217,13 +217,45 @@ export function normalizeHeadContext(ctx = {}) {
 }
 
 
+function addMissingShareMetaTags(html, tags) {
+  const source = String(html);
+  const hasCanonical = /<link\b(?=[^>]*\brel\s*=\s*["']canonical["'])[^>]*>/i.test(source);
+  if (!hasCanonical) {
+    return insertAfterHeadOpen(stripShareMetaTags(source), tags.join(""));
+  }
+  const matches = [...source.matchAll(/<meta\b[^>]*>/gi)];
+  const groups = new Map();
+  for (const match of matches) {
+    const attrs = [...match[0].matchAll(/\b(?:property|name)\s*=\s*["']([^"']+)["']/gi)];
+    const key = attrs.map((item) => String(item[1]).toLowerCase()).find((name) => SHARE_META_KEYS.has(name));
+    if (key) {
+      const existing = groups.get(key) ?? [];
+      existing.push({ index: match.index, length: match[0].length });
+      groups.set(key, existing);
+    }
+  }
+  // Keep the final route-specific value when an HTML shell supplied a generic default earlier.
+  const removals = [...groups.values()].flatMap((items) => items.slice(0, -1)).sort((a, b) => b.index - a.index);
+  let result = String(html);
+  for (const item of removals) result = result.slice(0, item.index) + result.slice(item.index + item.length);
+  const present = new Set(groups.keys());
+  const missing = [];
+  for (const tag of tags) {
+    const attr = tag.match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i);
+    const key = attr ? String(attr[1]).toLowerCase() : "";
+    if (!key || present.has(key)) continue;
+    present.add(key);
+    missing.push(tag);
+  }
+  return missing.length ? insertAfterHeadOpen(result, missing.join("")) : result;
+}
+
 export function injectSiteMetadata(html, ctx = {}) {
   if (typeof html !== "string") return html;
   const normalized = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(normalized.site, normalized.appName, normalized.host, documentTitle);
-  const next = stripShareMetaTags(html);
-  const withSharing = insertAfterHeadOpen(next, ogHeadTags({ ...normalized, appName, documentTitle }).join(""));
+  const withSharing = addMissingShareMetaTags(html, ogHeadTags({ ...normalized, appName, documentTitle }));
   const creatorTags = xCreatorHeadTags(normalized.creator, normalized.creatorId);
   const missing = [];
   if (creatorTags.length) {

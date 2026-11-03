@@ -206,6 +206,7 @@ class MainActivity : ComponentActivity() {
                         themeMode = "system"
                         favorites.setThemeMode(themeMode)
                     },
+                    onExit = { finishAffinity() },
                 )
             }
         }
@@ -213,7 +214,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
+private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, onExit: () -> Unit) {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -231,16 +232,39 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
     when {
         catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme)
         loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
-        else -> NativeLaunchScreen(darkMode)
+        else -> NativeLaunchScreen(darkMode, onExit)
     }
 }
 
 @Composable
-private fun NativeLaunchScreen(darkMode: Boolean) {
+internal fun NativeLaunchScreen(darkMode: Boolean, onExit: () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             EnVLogo(Modifier.width(112.dp).height(75.dp), darkTheme = darkMode)
-            Text("Useful tools, ready when you are.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                "enV is still under development",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 28.dp)
+            )
+            Text(
+                "We're working on the app. Some features may change as development continues.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            )
+            OutlinedButton(
+                onClick = onExit,
+                modifier = Modifier.widthIn(min = 160.dp, max = 240.dp).fillMaxWidth().padding(top = 28.dp)
+            ) {
+                Text("Exit app")
+            }
         }
     }
 }

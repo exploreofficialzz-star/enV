@@ -122,5 +122,51 @@
       ],
       "destination": "/developer"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.envtools.store"
+        }
+      ],
+      "destination": "https://envtools.store/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "envtools.site"
+        }
+      ],
+      "destination": "https://envtools.store/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.envtools.site"
+        }
+      ],
+      "destination": "https://envtools.store/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "en-v.vercel.app"
+        }
+      ],
+      "destination": "https://envtools.store/:path*",
+      "permanent": true
+    }
   ]
 }

@@ -1,8 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { PrivacyControls } from "@/components/layout/privacy-controls";
 
-export const Route = createFileRoute("/privacy")({ component: Privacy });
+export const Route = createFileRoute("/privacy")({
+  head: () => seoPageHead({
+    title: "enV Privacy Policy | Web, Android and iOS Data Handling",
+    description: "Read how enV and chAs Technologies LLC handle device-stored preferences, local tool processing, connected media and AI services, account information, and operational data.",
+    path: "/privacy",
+    structuredData: pageSchema("enV Privacy Policy", "Privacy information for the enV Web, Android, and iOS experiences.", "/privacy", "WebPage")
+  }),
+  component: Privacy
+});
 
 function Privacy() {
   return (

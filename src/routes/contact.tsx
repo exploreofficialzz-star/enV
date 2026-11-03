@@ -2,8 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Mail } from "lucide-react";
 import { SocialLinks } from "@/components/social/social-links";
 import { InfoPage } from "@/components/layout/info-page";
+import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
-export const Route = createFileRoute("/contact")({ component: Contact });
+export const Route = createFileRoute("/contact")({
+  head: () => seoPageHead({
+    title: "Contact enV Support and chAs Technologies LLC",
+    description: "Contact enV for product support, bug reports, accessibility feedback and tool suggestions, or contact chAs Technologies LLC for partnerships and business enquiries.",
+    path: "/contact",
+    structuredData: pageSchema("Contact enV", "Official contact routes for enV product support and chAs Technologies LLC.", "/contact", "ContactPage")
+  }),
+  component: Contact
+});
 
 function Contact() {
   return (

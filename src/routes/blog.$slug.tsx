@@ -11,6 +11,7 @@ import { getBlogArticle, type BlogArticle } from "@/data/blog-articles";
 import {
   getRelatedTools,
   getSearchableTools,
+  getToolsByCategory,
   getToolById,
   toolPath,
 } from "@/lib/registry";
@@ -23,6 +24,11 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 import type { ToolMeta } from "@/types/tool";
+import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, articleSeoTitle, toolGuideSeoTitle, canonicalSeoTools, canonicalSeoToolFor } from "@/lib/seo-metadata";
+
+const seoGuideCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+for (const tool of getToolsByCategory("accessibility")) seoGuideCandidateMap.set(tool.id, tool);
+const CANONICAL_SEO_GUIDES = canonicalSeoTools([...seoGuideCandidateMap.values()]);
 
 export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
@@ -49,22 +55,56 @@ export const Route = createFileRoute("/blog/$slug")({
 
     throw notFound();
   },
-  head: ({ loaderData }) => {
-    if (!loaderData) return {};
+  head: ({ loaderData, params }) => {
+    if (!loaderData) return { meta: [{ name: "robots", content: "noindex,follow" }] };
     if (loaderData.kind === "article") {
+      const path = "/blog/" + params.slug;
+      return seoPageHead({
+        title: articleSeoTitle(loaderData.article.title),
+        description: loaderData.article.summary,
+        path,
+        type: "article",
+        structuredData: articleSchema(loaderData.article.title, loaderData.article.summary, path, loaderData.article.category)
+      });
+    }
+    const path = "/blog/tool-" + loaderData.tool.id;
+    const description = toolDocumentationSummary(loaderData.tool);
+    if (!isIndexableTool(loaderData.tool)) {
       return {
         meta: [
-          { title: loaderData.article.title + " | enV Blogs & Guides" },
-          { name: "description", content: loaderData.article.summary },
-        ],
+          { title: toolGuideSeoTitle(loaderData.tool) },
+          { name: "description", content: description },
+          { name: "robots", content: "noindex,follow" }
+        ]
       };
     }
-    return {
-      meta: [
-        { title: loaderData.tool.name + " documentation | enV" },
-        { name: "description", content: toolDocumentationSummary(loaderData.tool) },
-      ],
-    };
+    const canonicalGuideTool = canonicalSeoToolFor(loaderData.tool, CANONICAL_SEO_GUIDES);
+    if (!canonicalGuideTool) {
+      return {
+        meta: [
+          { title: toolGuideSeoTitle(loaderData.tool) },
+          { name: "description", content: description },
+          { name: "robots", content: "noindex,follow" }
+        ]
+      };
+    }
+    if (canonicalGuideTool.id !== loaderData.tool.id) {
+      return {
+        meta: [
+          { title: toolGuideSeoTitle(loaderData.tool) },
+          { name: "description", content: description },
+          { name: "robots", content: "noindex,follow" }
+        ],
+        links: [{ rel: "canonical", href: "https://envtools.store/blog/tool-" + canonicalGuideTool.id }]
+      };
+    }
+    return seoPageHead({
+      title: toolGuideSeoTitle(loaderData.tool, CANONICAL_SEO_GUIDES),
+      description,
+      path,
+      type: "article",
+      structuredData: technicalArticleSchema(loaderData.tool, description, path)
+    });
   },
   component: BlogResourcePage,
 });

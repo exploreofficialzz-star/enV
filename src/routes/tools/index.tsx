@@ -5,12 +5,24 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { CATEGORIES } from "@/data/categories";
-import { getSearchableTools } from "@/lib/registry";
+import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
+import { isIndexableTool, seoPageHead, categorySchema, canonicalSeoTools } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/tools/")({
   validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
+  head: () => {
+    const visibleTools = CATEGORIES.flatMap((category) =>
+      canonicalSeoTools(getToolsByCategory(category.id).filter(isIndexableTool)).slice(0, 3)
+    );
+    return seoPageHead({
+      title: "All Online Tools | Calculators, Converters and Utilities | enV",
+      description: "Browse enV's collection of practical online tools by category. Find calculators, converters, developer utilities, image and audio tools, productivity helpers, and more.",
+      path: "/tools",
+      structuredData: categorySchema("All enV tools", "Browse practical online tools across supported enV categories.", "/tools", visibleTools)
+    });
+  },
   component: Tools,
 });
 
@@ -57,7 +69,15 @@ function Tools() {
                       <Icon className="size-5" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <h2 className="text-lg font-bold text-accent">{category.name}</h2>
+                      <h2 className="text-lg font-bold text-accent">
+                        <a
+                          href={"/tools/" + category.id}
+                          aria-label={"Browse " + category.name + " tools"}
+                          className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          {category.name}
+                        </a>
+                      </h2>
                       <p className="text-xs text-muted">{category.blurb}</p>
                     </div>
                   </div>

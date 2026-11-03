@@ -135,35 +135,21 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
-            keystore_path="$RUNNER_TEMP/env-release.keystore"
-            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
-            test -s "$keystore_path"
-            {
-              echo "ANDROID_KEYSTORE_FILE=$keystore_path"
-              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
-              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
-              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
-            } >> "$GITHUB_ENV"
-            echo "Production signing configured; release APK/AAB use the stable production key."
-          elif [ -z "$ANDROID_KEYSTORE_BASE64" ] && [ -z "$ANDROID_KEYSTORE_PASSWORD" ] && [ -z "$ANDROID_KEY_ALIAS" ] && [ -z "$ANDROID_KEY_PASSWORD" ]; then
-            keystore_path="$RUNNER_TEMP/env-ci-test.keystore"
-            test_password="$(openssl rand -hex 24)"
-            keytool -genkeypair -noprompt -storetype PKCS12 -keystore "$keystore_path" \
-              -storepass "$test_password" -keypass "$test_password" -alias env-ci-test \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=enV CI Test Build, OU=CI, O=enV, C=US"
-            {
-              echo "ANDROID_KEYSTORE_FILE=$keystore_path"
-              echo "ANDROID_KEYSTORE_PASSWORD=$test_password"
-              echo "ANDROID_KEY_ALIAS=env-ci-test"
-              echo "ANDROID_KEY_PASSWORD=$test_password"
-            } >> "$GITHUB_ENV"
-            echo "Production signing secrets are absent; the test-only key supports a fresh install, not upgrades."
-          else
-            echo "Some Android production signing secrets are missing; refusing an incomplete signing configuration." >&2
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Production Android signing secrets are required for upload builds; refusing to create test-signed release artifacts." >&2
             exit 1
           fi
+          keystore_path="$RUNNER_TEMP/env-release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          test -s "$keystore_path"
+          keytool -list -keystore "$keystore_path" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
+          {
+            echo "ANDROID_KEYSTORE_FILE=$keystore_path"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Production Android upload signing configured."
       # Native launch and accessibility checks are release gates. An emulator
       # infrastructure failure must remain visible and must not publish unverified artifacts.
       # Enable host KVM first: prior runs silently used software acceleration and lost
@@ -182,6 +168,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          disk-size: 4096M
           disable-linux-hw-accel: false
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
@@ -197,13 +184,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
       - name: Build signed release APK and AAB
-        run: ./gradlew --no-daemon --max-workers=2 --stacktrace :app:assembleRelease :app:bundleRelease
+        run: ./gradlew --no-daemon --max-workers=2 --stacktrace -PenvRequireProductionSigning=true :app:assembleRelease :app:bundleRelease
       - name: Verify release APK signature
         working-directory: ${{ github.workspace }}
         run: |
           apk="apps/android/app/build/outputs/apk/release/app-release.apk"
+          aab="apps/android/app/build/outputs/bundle/release/app-release.aab"
           test -s "$apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          test -s "$aab"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk"
+          jarsigner -verify -certs "$aab"
+          echo "Production-signed release APK and AAB are present and signature verification passed."
       - name: Upload Android build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
