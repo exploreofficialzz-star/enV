@@ -110,8 +110,8 @@ test("public comment text is safely escaped before JSON-LD is embedded in HTML",
   assert.ok(seoMetadata.includes(String.raw`.replace(/</g, "\\u003c")`));
   assert.ok(seoMetadata.includes(String.raw`.replace(/>/g, "\\u003e")`));
   assert.ok(seoMetadata.includes(String.raw`.replace(/&/g, "\\u0026")`));
-  assert.ok(seoMetadata.includes(String.raw`.replace(/\\u2028/g, "\\u2028")`));
-  assert.ok(seoMetadata.includes(String.raw`.replace(/\\u2029/g, "\\u2029")`));
+  assert.ok(seoMetadata.includes(String.raw`.replace(/\u2028/g, "\\u2028")`));
+  assert.ok(seoMetadata.includes(String.raw`.replace(/\u2029/g, "\\u2029")`));
 });
 
 test("engagement counters remain wired to likes, dislikes, comments and views", () => {
