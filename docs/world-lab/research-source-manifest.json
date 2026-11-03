@@ -1,0 +1,66 @@
+{
+  "title": "World Lab source research archive evidence inventory",
+  "reviewedOn": "2026-10-30",
+  "archiveName": "The_Interconnected_World_205_Chapter_Book_and_Specialist_Expansion_2026.zip",
+  "archiveContents": [
+    {
+      "path": "The_Interconnected_World_205_Chapters_Master_Book_2026.pdf",
+      "bytes": 3299932,
+      "sha256": "14b0a7bdaf18609d08d8469ca4d3cf0b11fcee11e238831e6ba6d5e57f87af5f"
+    },
+    {
+      "path": "The_Interconnected_World_Specialist_Depth_12_Chapters_2026.pdf",
+      "bytes": 422879,
+      "sha256": "b3f725295c3173264e39a15eaa704dcb7333cf93900b5ba0fe3772b3b63601e2"
+    },
+    {
+      "path": "The_Interconnected_World_205_Chapters_Research_Expanded_2026.md",
+      "bytes": 1353441,
+      "sha256": "dafa99bfa11313f653811867502e1ea030b44071d1328e81a887bf24a704f5a4",
+      "numberedChapters": 205,
+      "firstChapter": 1,
+      "lastChapter": 205
+    },
+    {
+      "path": "The_Interconnected_World_Specialist_Depth_12_Chapters_2026.md",
+      "bytes": 80379,
+      "sha256": "015e30f5bc950d53e9279a81dccd62649e135a785e839976219a577ae52dcdf3",
+      "numberedChapters": 12,
+      "firstChapter": 194,
+      "lastChapter": 205
+    },
+    {
+      "path": "calculations_verified.csv",
+      "bytes": 744,
+      "sha256": "922dd4d95e07b7925a1c8de7940bdf8dff98f83e4ec142d335fe5a16cbc53997"
+    },
+    {
+      "path": "illustrations/thermal_gradient.png",
+      "bytes": 63847,
+      "sha256": "badf764a1d79598e16d920d0ce759e491b43e11e49d9242c1050fc8abae50ba5"
+    },
+    {
+      "path": "illustrations/inverse_ambiguity.png",
+      "bytes": 79764,
+      "sha256": "5cdfd4538f6df2fde7e3dd606bff3b36933fe27cd40dafb5e96c201a8803bc9c"
+    },
+    {
+      "path": "illustrations/pk_decay.png",
+      "bytes": 57158,
+      "sha256": "da8099ff53ba738869b30169b0fe546b3f22efe9963fb8bbaba31cca09583973"
+    },
+    {
+      "path": "illustrations/carbon_pool.png",
+      "bytes": 71678,
+      "sha256": "f32d28f773281ddf51ea8dd16889cbbed3ce3a206ac73f162d415bada54de912"
+    }
+  ],
+  "chapterAudit": {
+    "masterNumberedChapters": "1-205 exactly once",
+    "supplementNumberedChapters": "194-205 exactly once",
+    "caveat": "Supplement overlaps the master, so there are 205 unique numbered chapters, not 217.",
+    "interpretation": "Research/source inventory only. A chapter in this list is not evidence of a validated simulation or completed production acceptance scenario.",
+    "coverageLedger": "docs/world-lab/chapter-coverage.csv",
+    "acceptanceLedger": "docs/world-lab/acceptance-scenarios.csv"
+  }
+}

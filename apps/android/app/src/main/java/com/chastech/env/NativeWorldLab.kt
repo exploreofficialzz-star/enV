@@ -1,0 +1,2502 @@
+package com.chastech.env
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import kotlin.math.abs
+import com.chastech.env.engine.NativeLabInput
+import com.chastech.env.engine.NativeLabResult
+import com.chastech.env.engine.NativeWorldLabBranch
+import com.chastech.env.engine.NativeWorldLabBranchRecord
+import com.chastech.env.engine.toJson
+import com.chastech.env.engine.NativeWorldLabProject
+import com.chastech.env.engine.NativeWorldLabEditor
+import com.chastech.env.engine.NativeWorldLabEditHistory
+import com.chastech.env.engine.NativeWorldLabProjectCodec
+import com.chastech.env.engine.NativeWorldLabDemoCheckpoint
+import com.chastech.env.engine.NativeWorldLabDemoCheckpointCodec
+import com.chastech.env.engine.nextWorldLabEventTime
+import com.chastech.env.engine.advanceWorldLabEventTime
+import com.chastech.env.engine.NativeWorldLabRecordedRun
+import com.chastech.env.engine.NativeWorldLabRecordedClock
+import com.chastech.env.engine.NativeWorldLabRecordedTime
+import com.chastech.env.engine.NativeWorldLabReplayCodec
+import com.chastech.env.engine.NativeWorldLabRecordedCheckpointCodec
+import com.chastech.env.engine.NativeWorldLabChemicalThermal
+import com.chastech.env.engine.NativeChemicalThermalInput
+import com.chastech.env.engine.NativeChemicalThermalResult
+import com.chastech.env.engine.NativeWorldLabHydrostatics
+import com.chastech.env.engine.NativeWorldLabFluidMotion
+import com.chastech.env.engine.NativeLabFluidMotionInput
+import com.chastech.env.engine.NativeLabFluidMotionRun
+import com.chastech.env.engine.NativeLabHydroResult
+import com.chastech.env.engine.NativeWorldLabSpatial
+import com.chastech.env.engine.NativeWorldLabDigitalLogic
+import com.chastech.env.engine.NativeWorldLabStructural
+import com.chastech.env.engine.NativeLabBeamBendingResult
+import com.chastech.env.engine.NativeWorldLabCollision
+import com.chastech.env.engine.NativeLabCollisionResult
+import com.chastech.env.engine.NativeWorldLabSphereImpact
+import com.chastech.env.engine.NativeSphereImpactResult
+import com.chastech.env.engine.NativeLabVector
+import com.chastech.env.engine.NativeWorldLabDc
+import com.chastech.env.engine.NativeLabDcResult
+import com.chastech.env.engine.NativeWorldLabPortableArchiveStore
+import com.chastech.env.engine.NativeWorldLabProjectStore
+import com.chastech.env.engine.WorldLabSavedLocal
+import com.chastech.env.engine.NativeWorldLabScience
+import com.chastech.env.engine.NativeDropInput
+import com.chastech.env.engine.NativeDropResult
+import com.chastech.env.engine.NativeWorldLabDropScience
+import com.chastech.env.engine.NativeActuatorInput
+import com.chastech.env.engine.NativeActuatorResult
+import com.chastech.env.engine.NativeActuatorThermal
+import com.chastech.env.engine.NativeActuatorNumericalAudit
+import com.chastech.env.engine.NativeWorldLabActuator
+import com.chastech.env.engine.NativeWorldLabSolarEvents
+import com.chastech.env.engine.NativeWorldLabSolarStatus
+import com.chastech.env.engine.NativeWorldLabTimeScales
+import com.chastech.env.engine.NativeWorldLabEarthOrientationSeries
+import com.chastech.env.engine.NativeWorldLabEarthOrientationQuality
+
+import com.chastech.env.engine.NativeWorldLabDigitalMotor
+import com.chastech.env.engine.NativeDigitalMotorResult
+import com.chastech.env.engine.NativeWorldLabNetworkMotor
+import com.chastech.env.engine.NativeLabNetworkMotorRun
+import kotlin.math.PI
+import java.io.ByteArrayOutputStream
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private data class NativeWorldLabDemoRecording(
+    val clockRun:NativeWorldLabRecordedRun,
+    val samples:List<NativeLabResult>,
+    val input:NativeLabInput
+)
+
+private data class NativeWorldLabImportResult(
+    val projectJson:String,val project:NativeWorldLabProject,
+    val isArchive:Boolean=false,val isCadGeometry:Boolean=false,
+)
+
+/** Offline bounded World Lab science. Canvas is a schematic, never a measured field. */
+@Composable
+fun NativeWorldLabForm() {
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    val localProjects=remember(context){NativeWorldLabProjectStore(context.filesDir)}
+    var kind by remember { mutableStateOf("spring") }
+    var time by remember { mutableFloatStateOf(0f) }
+    var speed by remember { mutableFloatStateOf(1f) }
+    var playing by remember { mutableStateOf(false) }
+    var reversePlayback by remember { mutableStateOf(false) }
+    var demoClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
+    var pendingDemoWallTimeUTC by remember { mutableStateOf<String?>(null) }
+    var worldEpochUTC by remember { mutableStateOf(java.time.Instant.now().toString()) }
+    var solarDateUTC by remember { mutableStateOf(java.time.Instant.now().toString().take(10)) }
+    var earthOrientation by remember { mutableStateOf<NativeWorldLabEarthOrientationSeries?>(null) }
+    var earthOrientationStatus by remember { mutableStateOf("") }
+    var mass by remember { mutableFloatStateOf(1f) }
+    var spring by remember { mutableFloatStateOf(4f) }
+    var resistance by remember { mutableFloatStateOf(1000f) }
+    var diffusivity by remember { mutableFloatStateOf(0.02f) }
+    var springDamping by remember { mutableFloatStateOf(0.5f) }
+    var springInitialDisplacement by remember { mutableFloatStateOf(0.5f) }
+    var springInitialVelocity by remember { mutableFloatStateOf(0f) }
+    var capacitance by remember { mutableFloatStateOf(0.001f) }
+    var supplyVoltage by remember { mutableFloatStateOf(10f) }
+    var initialVoltage by remember { mutableFloatStateOf(0f) }
+    var heatLength by remember { mutableFloatStateOf(2f) }
+    var ambientTemperature by remember { mutableFloatStateOf(293.15f) }
+    var centerTemperature by remember { mutableFloatStateOf(373.15f) }
+    var inside by remember { mutableStateOf(false) }
+    var timelineStatus by remember { mutableStateOf("") }
+    var branchSourceInput by remember { mutableStateOf<NativeLabInput?>(null) }
+    var branchSourceRunId by remember { mutableStateOf("") }
+    var branchSourceTime by remember { mutableFloatStateOf(0f) }
+    var branchRecord by remember { mutableStateOf<NativeWorldLabBranchRecord?>(null) }
+    var branchStatus by remember { mutableStateOf("") }
+    var pendingTimelineJson by remember { mutableStateOf<String?>(null) }
+    var pendingReplayJson by remember { mutableStateOf<String?>(null) }
+    var replayManifestStatus by remember { mutableStateOf("") }
+    var inspection by remember { mutableStateOf(com.chastech.env.engine.NativeInspectionSettings()) }
+    var inspectionHistory by remember { mutableStateOf(com.chastech.env.engine.NativeWorldLabInspectionHistory()) }
+    fun updateInspection(next:com.chastech.env.engine.NativeInspectionSettings){
+        val committed=inspectionHistory.commit(next)
+        inspectionHistory=committed;inspection=committed.present
+    }
+    fun travelInspection(redo:Boolean){
+        val next=if(redo)inspectionHistory.redo() else inspectionHistory.undo()
+        inspectionHistory=next;inspection=next.present
+    }
+    var project by remember { mutableStateOf<NativeWorldLabProject?>(null) }
+    var projectJson by remember { mutableStateOf<String?>(null) }
+    var dcRun by remember { mutableStateOf<NativeLabDcResult?>(null) }
+    var savedSnapshot by remember { mutableStateOf<String?>(null) }
+    var recoveryDrafts by remember { mutableStateOf<List<WorldLabSavedLocal>>(emptyList()) }
+    var selectedDraftId by remember { mutableStateOf("") }
+    var confirmingDraftDelete by remember { mutableStateOf(false) }
+    val editHistory=remember { NativeWorldLabEditHistory() }
+    var confirmation by remember { mutableStateOf<String?>(null) }
+    var requestImport by remember { mutableStateOf(false) }
+    var proposedName by remember { mutableStateOf("") }
+    var proposedDensity by remember { mutableStateOf("") }
+    var proposedModulus by remember { mutableStateOf("") }
+    var proposedConductivity by remember { mutableStateOf("") }
+    var proposedSpecificHeat by remember { mutableStateOf("") }
+    var proposedRefraction by remember { mutableStateOf("") }
+    var editingMaterialId by remember { mutableStateOf<String?>(null) }
+    var beamForce by remember { mutableStateOf("1000") }
+    var beamRun by remember { mutableStateOf<NativeLabBeamBendingResult?>(null) }
+    var collisionTargetIndex by remember { mutableIntStateOf(0) }
+    var collisionLeftSpeed by remember { mutableStateOf("2") }
+    var collisionRightSpeed by remember { mutableStateOf("0") }
+    var collisionRestitution by remember { mutableFloatStateOf(0.5f) }
+    var collisionRun by remember { mutableStateOf<NativeLabCollisionResult?>(null) }
+    var collisionTime by remember { mutableFloatStateOf(0f) }
+    var collisionPlaying by remember { mutableStateOf(false) }
+    var collisionReversePlayback by remember { mutableStateOf(false) }
+    var collisionSpeed by remember { mutableFloatStateOf(1f) }
+    var sphereTargetIndex by remember { mutableIntStateOf(0) }
+    var sphereFirstVelocity by remember { mutableStateOf("2,0,0") }
+    var sphereSecondVelocity by remember { mutableStateOf("0,0,0") }
+    var sphereRestitution by remember { mutableFloatStateOf(0.65f) }
+    var sphereRun by remember { mutableStateOf<NativeSphereImpactResult?>(null) }
+    var sphereTime by remember { mutableFloatStateOf(0f) }
+    var spherePlaying by remember { mutableStateOf(false) }
+    var sphereReversePlayback by remember { mutableStateOf(false) }
+    var sphereSpeed by remember { mutableFloatStateOf(1f) }
+    var deviceName by remember { mutableStateOf("") }
+    var deviceAssumption by remember { mutableStateOf("") }
+    var deviceResistance by remember { mutableStateOf("") }
+    var junctionName by remember { mutableStateOf("") }
+    var cadSketchWidth by remember { mutableStateOf("2") }
+    var cadSketchDepth by remember { mutableStateOf("2") }
+    var cadSketchHeight by remember { mutableStateOf("1") }
+    var cadSketchRadius by remember { mutableStateOf("0.5") }
+    var cadSketchX by remember { mutableStateOf("0") }
+    var cadSketchY by remember { mutableStateOf("0") }
+    var cadSketchZ by remember { mutableStateOf("0") }
+    var cadSketchRotationX by remember { mutableStateOf("0") }
+    var cadSketchRotationY by remember { mutableStateOf("0") }
+    var cadSketchRotationZ by remember { mutableStateOf("0") }
+    var positiveWire by remember { mutableStateOf("supply") }
+    var negativeWire by remember { mutableStateOf("ground") }
+    var selected by remember { mutableIntStateOf(0) }
+    var reactionResult by remember { mutableStateOf<NativeChemicalThermalResult?>(null) }
+    var reactionFrame by remember { mutableIntStateOf(0) }
+    var reactionPlaying by remember { mutableStateOf(false) }
+    var reactionHeat by remember { mutableFloatStateOf(50000f) }
+    var reactionFactor by remember { mutableFloatStateOf(0.5f) }
+    var reactionHeating by remember { mutableFloatStateOf(0f) }
+    var hydroRun by remember { mutableStateOf<NativeLabHydroResult?>(null) }
+    var fluidMotion by remember { mutableStateOf<NativeLabFluidMotionRun?>(null) }
+    var fluidFrame by remember { mutableIntStateOf(0) }
+    var fluidPlaying by remember { mutableStateOf(false) }
+    var waterSurfaceHeight by remember { mutableFloatStateOf(1f) }
+    var fluidDrag by remember { mutableFloatStateOf(200f) }
+    var fluidDensity by remember { mutableStateOf(1000.0) }
+    var immersionFraction by remember { mutableFloatStateOf(0.5f) }
+    var dropRun by remember { mutableStateOf<NativeDropResult?>(null) }
+    var dropEntityId by remember { mutableStateOf<String?>(null) }
+    var dropFrame by remember { mutableIntStateOf(0) }
+    var dropPlaying by remember { mutableStateOf(false) }
+    var dropSpeed by remember { mutableFloatStateOf(1f) }
+    var motorResult by remember { mutableStateOf<NativeActuatorResult?>(null) }
+    var wiredMotor by remember { mutableStateOf<NativeLabNetworkMotorRun?>(null) }
+    var digitalMotor by remember { mutableStateOf<NativeDigitalMotorResult?>(null) }
+    var motorAudit by remember { mutableStateOf<NativeActuatorNumericalAudit?>(null) }
+    var motorEntityId by remember { mutableStateOf<String?>(null) }
+    var motorFrame by remember { mutableIntStateOf(0) }
+    var motorPlaying by remember { mutableStateOf(false) }
+    var motorReversePlayback by remember { mutableStateOf(false) }
+    var motorRunIdentity by remember { mutableStateOf("") }
+    var motorClock by remember { mutableStateOf<NativeWorldLabRecordedClock?>(null) }
+    var pendingMotorCheckpointJson by remember { mutableStateOf<String?>(null) }
+    var motorCheckpointStatus by remember { mutableStateOf("") }
+    var motorThermalEnabled by remember { mutableStateOf(false) }
+    var motorPowerOffAtSeconds by remember { mutableStateOf<Double?>(null) }
+    var motorSpeed by remember { mutableFloatStateOf(1f) }
+    val motorRecordedRun=remember(motorResult,motorRunIdentity,worldEpochUTC,motorPowerOffAtSeconds) {
+        motorResult?.let { result->
+            runCatching {
+                NativeWorldLabRecordedRun(
+                    runId=motorRunIdentity,modelId="native-actuator",modelVersion=result.modelVersion,
+                    worldEpochUTC=worldEpochUTC,
+                    sampleTimesSeconds=result.samples.map { it.timeSeconds },
+                    mandatoryEventTimesSeconds=if(result.modelVersion=="1.2.0")
+                        listOfNotNull(motorPowerOffAtSeconds) else emptyList()
+                ).also { it.validate() }
+            }.getOrNull()
+        }
+    }
+    var warning by remember { mutableStateOf("") }
+    var assemblyName by remember { mutableStateOf("My invention") }
+    var secondAssemblyIndex by remember { mutableIntStateOf(0) }
+    var assemblyMoveStep by remember { mutableStateOf(0.5) }
+    var digitalShowCases by remember { mutableStateOf(false) }
+    var savedProjects by remember { mutableStateOf<List<WorldLabSavedLocal>>(emptyList()) }
+    var selectedSavedId by remember { mutableStateOf("") }
+    var savedMenuOpen by remember { mutableStateOf(false) }
+    var confirmingSavedDelete by remember { mutableStateOf(false) }
+    var digitalNewGateName by remember { mutableStateOf("Invented device") }
+    var digitalAssumption by remember { mutableStateOf("User-assumed Boolean behavior") }
+    var digitalSourceA by remember { mutableStateOf("input_a") }
+    var digitalSourceB by remember { mutableStateOf("") }
+    var snapMeters by remember { mutableStateOf(0.5) }
+    var measurementTargetIndex by remember { mutableIntStateOf(0) }
+    val model=when(kind) {
+        "spring"->NativeLabInput.Spring(massKg=mass.toDouble(),springNPerM=spring.toDouble(),
+            dampingNsPerM=springDamping.toDouble(),x0=springInitialDisplacement.toDouble(),v0=springInitialVelocity.toDouble())
+        "rc"->NativeLabInput.RC(resistanceOhm=resistance.toDouble(),capacitanceF=capacitance.toDouble(),
+            supplyV=supplyVoltage.toDouble(),initialV=initialVoltage.toDouble())
+        else->NativeLabInput.Heat(diffusivityM2S=diffusivity.toDouble(),lengthM=heatLength.toDouble(),
+            backgroundK=ambientTemperature.toDouble(),centerK=centerTemperature.toDouble())
+    }
+    val demoRecording=remember(model,worldEpochUTC) {
+        runCatching {
+            val samples=(0..120).map { index ->
+                NativeWorldLabScience.evaluate(model,index/10.0)
+            }
+            val clockRun=NativeWorldLabRecordedRun(
+                runId=java.util.UUID.randomUUID().toString(),
+                modelId=when(kind){"spring"->"native-spring";"rc"->"native-rc";else->"native-heat"},
+                modelVersion="1.0.0",worldEpochUTC=worldEpochUTC,
+                sampleTimesSeconds=samples.map{it.timeSeconds})
+            clockRun.validate()
+            NativeWorldLabDemoRecording(clockRun,samples,model)
+        }.getOrNull()
+    }
+    val result=remember(model,time,demoRecording,demoClock?.sampleIndex) { runCatching {
+        val recording=demoRecording
+        val index=demoClock?.sampleIndex
+        if(recording!=null&&index!=null) recording.samples.getOrNull(index)
+            ?:throw IllegalStateException("Recorded native sample index is unavailable.")
+        else NativeWorldLabScience.evaluate(model,time.toDouble())
+    } }
+    val observation=result.getOrNull()
+    fun captureBranchSource(){
+        branchSourceInput=model
+        branchSourceRunId=java.util.UUID.randomUUID().toString()
+        branchSourceTime=time
+        branchRecord=null
+        branchStatus="Source snapshot captured. Change a model or parameter, then calculate a new branch."
+    }
+    fun calculateNativeBranch(){
+        val source=branchSourceInput?:return
+        runCatching{
+            val record=NativeWorldLabBranch.create(source,model,branchSourceTime.toDouble(),
+                branchSourceRunId,java.time.Instant.now().toString())
+            NativeWorldLabBranch.recompute(model,record)
+            branchRecord=record
+            time=branchSourceTime
+            playing=false;reversePlayback=false
+            branchStatus="New branch recomputed from the source time. The captured source inputs remain unchanged."
+        }.onFailure{branchStatus=it.message?:"The requested branch could not be calculated safely."}
+    }
+    val solid=project?.entities?.getOrNull(selected)
+    val material=project?.materials?.firstOrNull { it.id==solid?.materialId }
+    val derivedMass=if(solid!=null && material?.densityKgM3!=null)
+        solid.volumeMetersCubed()*material.densityKgM3 else null
+    fun applyProjectEdit(transform:(String)->String){
+        runCatching {
+            val previous=projectJson?:error("Create or import a project first.")
+            val next=transform(previous)
+            val parsed=NativeWorldLabProjectCodec.decode(next)
+            editHistory.record(previous,next)
+            projectJson=next
+            project=parsed
+            dcRun=null;wiredMotor=null;digitalMotor=null;beamRun=null;hydroRun=null;fluidPlaying=false;fluidMotion=null
+            selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
+            warning=""
+        }.onFailure{warning=it.message?:"Project edit failed; previous project retained."}
+    }
+    fun travelEdit(redo:Boolean){
+        runCatching{
+            val current=projectJson?:error("Open a project before changing its history")
+            val recovered=if(redo)editHistory.redo(current) else editHistory.undo(current)
+            if(recovered!=null){
+                val parsed=NativeWorldLabProjectCodec.decode(recovered)
+                projectJson=recovered;project=parsed
+                dcRun=null;wiredMotor=null;hydroRun=null
+                fluidPlaying=false;fluidMotion=null
+                selected=selected.coerceIn(0,(parsed.entities.size-1).coerceAtLeast(0))
+            }
+            warning=""
+        }.onFailure{warning=it.message?:"This edit cannot be restored safely"}
+    }
+    fun newProject(){
+        runCatching {
+            val json=NativeWorldLabEditor.blank()
+            val parsed=NativeWorldLabProjectCodec.decode(json)
+            project=parsed;projectJson=json;savedSnapshot=null;selected=0;warning=""
+            editHistory.clear()
+        }.onFailure{warning=it.message?:"Could not create a World Lab project."}
+    }
+    fun loadSavedProject(){
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO){localProjects.loadLatest()} }
+                .onSuccess { stored->
+                    if(stored==null) warning="There is no saved World Lab project on this device."
+                    else {
+                        projectJson=stored.json;project=NativeWorldLabProjectCodec.decode(stored.json)
+                        savedSnapshot=stored.json;selectedSavedId=stored.id;selected=0;warning=""
+                        editHistory.clear()
+                    }
+                }.onFailure{warning=it.message?:"The saved project could not be recovered safely."}
+        }
+    }
+    fun refreshSavedProjects(){
+        scope.launch {
+            runCatching {withContext(Dispatchers.IO){localProjects.listProjects()}}
+                .onSuccess { items->
+                    savedProjects=items
+                    if(items.none{it.id==selectedSavedId})selectedSavedId=items.firstOrNull()?.id?:""
+                }.onFailure {warning=it.message?:"Cannot list saved projects safely."}
+        }
+    }
+    fun loadSelectedProject(){
+        val id=selectedSavedId
+        if(id.isEmpty()){warning="Choose a saved World Lab project.";return}
+        scope.launch {
+            runCatching {withContext(Dispatchers.IO){localProjects.read(id)}}
+                .onSuccess { stored->
+                    projectJson=stored.json;project=NativeWorldLabProjectCodec.decode(stored.json)
+                    savedSnapshot=stored.json;selected=0;warning="";editHistory.clear()
+                }.onFailure{warning=it.message?:"Could not open this saved project."}
+        }
+    }
+    fun restoreSelectedDraft(){
+        val id=selectedDraftId
+        if(id.isEmpty())return
+        scope.launch{
+            runCatching {withContext(Dispatchers.IO){
+                val draft=localProjects.readDraft(id)
+                val baseline=runCatching{localProjects.read(id).json}.getOrNull()
+                draft to baseline
+            }}.onSuccess{(draft,baseline)->
+                projectJson=draft.json
+                project=NativeWorldLabProjectCodec.decode(draft.json)
+                savedSnapshot=baseline
+                selected=0;warning="Recovered an unfinished invention. Save locally to commit."
+                editHistory.clear()
+            }.onFailure{warning=it.message?:"The draft could not be recovered."}
+        }
+    }
+    fun deleteSelectedDraft(){
+        val id=selectedDraftId
+        if(id.isEmpty())return
+        scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                localProjects.deleteDraft(id)
+                localProjects.listDrafts()
+            }}.onSuccess{list->
+                recoveryDrafts=list
+                selectedDraftId=list.firstOrNull()?.id?:""
+                warning="Selected cached draft discarded. Saved projects are unchanged."
+            }.onFailure{warning=it.message?:"Recovery cache deletion failed."}
+        }
+    }
+    fun deleteSelectedProject(){
+        val id=selectedSavedId
+        if(id.isEmpty())return
+        scope.launch {
+            runCatching {withContext(Dispatchers.IO) {
+                localProjects.delete(id)
+                localProjects.listProjects()
+            }}.onSuccess { remaining->
+                savedProjects=remaining
+                selectedSavedId=remaining.firstOrNull()?.id?:""
+                if(project?.id==id)savedSnapshot=null
+                warning=""
+            }.onFailure {warning=it.message?:"Unable to safely delete the selected project."}
+        }
+    }
+    LaunchedEffect(Unit){
+        runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
+            .onSuccess{items->
+                recoveryDrafts=items
+                selectedDraftId=items.firstOrNull()?.id?:""
+            }.onFailure{warning=it.message?:"Recovery cache is unreadable; export your invention."}
+        runCatching{withContext(Dispatchers.IO){localProjects.listProjects()}}
+            .onSuccess{items->
+                savedProjects=items
+                selectedSavedId=items.firstOrNull()?.id?:""
+            }.onFailure{warning=it.message?:"Could not load saved World Lab project index."}
+    }
+    fun askReplace(action:String){
+        if(projectJson!=null && savedSnapshot!=projectJson) confirmation=action
+        else when(action){
+            "new"->newProject()
+            "open"->loadSavedProject()
+            "open-selected"->loadSelectedProject()
+            "import"->requestImport=true
+            "restore-draft"->restoreSelectedDraft()
+        }
+    }
+    val exportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if(uri!=null){
+            val json=projectJson
+            if(json!=null)scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO){
+                        val bytes=json.toByteArray(Charsets.UTF_8)
+                        require(bytes.size<=NativeWorldLabProjectCodec.MAX_BYTES)
+                        context.contentResolver.openOutputStream(uri,"wt")?.use{
+                            it.write(bytes);it.flush()
+                        }?:error("Could not open an export destination.")
+                    }
+                }.onSuccess{warning=""}
+                    .onFailure{warning=it.message?:"Project export failed."}
+            }
+        }
+    }
+    val cadExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null)scope.launch {
+            runCatching{withContext(Dispatchers.IO){
+                val source=projectJson?:error("Create or open an invention first")
+                val json=NativeWorldLabEditor.exportCadExchange(source)
+                val bytes=json.toByteArray(Charsets.UTF_8)
+                require(bytes.size<=NativeWorldLabProjectCodec.MAX_BYTES){"CAD geometry file exceeds the 1 MB interchange limit"}
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(bytes);it.flush()
+                }?:error("Cannot open CAD geometry export destination")
+            }}.onSuccess{warning="Supported CAD geometry exported in metres and LOCAL_ENU coordinates."}
+                .onFailure{warning=it.message?:"CAD geometry export failed."}
+        }
+    }
+    val archiveExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null)scope.launch {
+            runCatching{withContext(Dispatchers.IO){
+                val json=projectJson?:error("Create a World Lab invention first")
+                val portable=NativeWorldLabPortableArchiveStore(context.filesDir).export(json)
+                val bytes=portable.toByteArray(Charsets.UTF_8)
+                require(bytes.size<=24*1024*1024){"Archive exceeds 24 MB"}
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(bytes);it.flush()
+                }?:error("Cannot open portable archive export destination")
+            }}.onSuccess{warning="Complete portable invention archive exported."}
+                .onFailure{warning=it.message?:"Portable archive could not be exported"}
+        }
+    }
+    val sphereEvidencePicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null){
+            val run=sphereRun
+            if(run!=null)scope.launch{
+                runCatching{withContext(Dispatchers.IO){
+                    val evidence=run.toEvidenceJson().toByteArray(Charsets.UTF_8)
+                    require(evidence.size<=NativeWorldLabProjectCodec.MAX_BYTES)
+                    context.contentResolver.openOutputStream(uri,"wt")?.use{
+                        it.write(evidence);it.flush()
+                    }?:error("Unable to open sphere-impact evidence destination")
+                }}.onFailure{warning=it.message?:"Could not export 3D impact evidence"}
+            }
+        }
+    }
+    val motorCheckpointExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        val json=pendingMotorCheckpointJson
+        if(uri!=null&&json!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                require(json.toByteArray(Charsets.UTF_8).size<=16*1024)
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(json.toByteArray(Charsets.UTF_8));it.flush()
+                }?:error("Cannot write recorded motor checkpoint")
+            }}.onSuccess{motorCheckpointStatus="Recorded motor checkpoint saved."}
+                .onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint export failed."}
+        }
+    }
+    val motorCheckpointImportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{
+            val recording=motorRecordedRun
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                    val out=ByteArrayOutputStream();val buffer=ByteArray(4096)
+                    while(true){val count=input.read(buffer);if(count<0)break
+                        require(out.size()+count<=16*1024){"Motor checkpoint exceeds 16 KB"}
+                        out.write(buffer,0,count)
+                    }
+                    out.toByteArray()
+                }?:error("Cannot read recorded motor checkpoint")
+                val run=recording?:error("Run the same motor experiment before restoring its checkpoint.")
+                val checkpoint=NativeWorldLabRecordedCheckpointCodec.decode(
+                    bytes.toString(Charsets.UTF_8),run)
+                NativeWorldLabRecordedTime.restore(run,checkpoint)
+            }}.onSuccess{restored->
+                motorPlaying=false;motorClock=restored;motorFrame=restored.sampleIndex
+                motorReversePlayback=restored.direction=="reverse-recording"
+                motorSpeed=restored.playbackRate.toFloat()
+                motorCheckpointStatus="Matching current recorded motor run restored at sample "+(restored.sampleIndex+1)+"."
+            }.onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint restore failed."}
+        }
+    }
+    val replayExportPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+        val json=pendingReplayJson
+        if(uri!=null&&json!=null)scope.launch{runCatching{withContext(Dispatchers.IO){
+            context.contentResolver.openOutputStream(uri,"wt")?.use{it.write(json.toByteArray(Charsets.UTF_8));it.flush()}
+                ?:error("Cannot write deterministic replay manifest")
+        }}.onSuccess{replayManifestStatus="Deterministic replay manifest saved."}
+            .onFailure{replayManifestStatus=it.message?:"Replay manifest export failed."}}
+    }
+    val replayImportPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{runCatching{withContext(Dispatchers.IO){
+            val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                val out=ByteArrayOutputStream();val buffer=ByteArray(4096)
+                while(true){val n=input.read(buffer);if(n<0)break
+                    require(out.size()+n<=NativeWorldLabReplayCodec.MAX_BYTES){"Replay manifest exceeds 64 KB"}
+                    out.write(buffer,0,n)}
+                out.toByteArray()
+            }?:error("Cannot read replay manifest")
+            NativeWorldLabReplayCodec.decodeAndReplay(bytes)
+        }}.onSuccess{replayed->
+            when(val input=replayed.input){
+                is NativeLabInput.Spring->{kind="spring";mass=input.massKg.toFloat();spring=input.springNPerM.toFloat()
+                    springDamping=input.dampingNsPerM.toFloat();springInitialDisplacement=input.x0.toFloat();springInitialVelocity=input.v0.toFloat()}
+                is NativeLabInput.RC->{kind="rc";resistance=input.resistanceOhm.toFloat();capacitance=input.capacitanceF.toFloat()
+                    supplyVoltage=input.supplyV.toFloat();initialVoltage=input.initialV.toFloat()}
+                is NativeLabInput.Heat->{kind="heat";diffusivity=input.diffusivityM2S.toFloat();heatLength=input.lengthM.toFloat()
+                    ambientTemperature=input.backgroundK.toFloat();centerTemperature=input.centerK.toFloat()}
+            }
+            worldEpochUTC=replayed.manifest.worldEpochUTC
+            time=0f;playing=false;reversePlayback=false;demoClock=null
+            replayManifestStatus="Validated ${replayed.manifest.modelId} ${replayed.manifest.modelVersion}; rebuilt ${replayed.samples.size} output samples from its fingerprinted inputs."
+        }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be restored."}}
+    }
+    val timelineExportPicker=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null){
+            val json=pendingTimelineJson
+            if(json!=null)scope.launch{runCatching{withContext(Dispatchers.IO){
+                context.contentResolver.openOutputStream(uri,"wt")?.use{it.write(json.toByteArray(Charsets.UTF_8));it.flush()}
+                    ?:error("Cannot write timeline checkpoint")
+            }}.onSuccess{timelineStatus="Reference experiment checkpoint saved."}
+                .onFailure{timelineStatus=it.message?:"Timeline checkpoint export failed."}}
+        }
+    }
+    val branchExportPicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        val record=branchRecord
+        if(uri!=null&&record!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=record.toJson().toByteArray(Charsets.UTF_8)
+                require(bytes.size<=64*1024){"Branch evidence exceeds 64 KB"}
+                context.contentResolver.openOutputStream(uri,"wt")?.use{
+                    it.write(bytes);it.flush()
+                }?:error("Cannot open experiment branch export destination")
+            }}.onSuccess{branchStatus="Versioned branch evidence exported."}
+                .onFailure{branchStatus=it.message?:"Branch evidence export failed."}
+        }
+    }
+    val iersBulletinPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                    val out=ByteArrayOutputStream();val buffer=ByteArray(8192)
+                    while(true){val n=input.read(buffer);if(n<0)break
+                        require(out.size()+n<=2*1024*1024){"IERS Bulletin A exceeds 2 MB"}
+                        out.write(buffer,0,n)}
+                    out.toByteArray()
+                }?:error("Cannot read IERS Bulletin A")
+                NativeWorldLabTimeScales.parseBulletinA(bytes.toString(Charsets.UTF_8))
+            }}.onSuccess{series->earthOrientation=series;earthOrientationStatus="IERS Bulletin A imported · Vol. ${series.volume} No. ${series.number} · issued ${series.issuedDateUTC}"}
+                .onFailure{earthOrientation=null;earthOrientationStatus=it.message?:"IERS Bulletin A import failed."}
+        }
+    }
+    val timelineImportPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->
+        if(uri!=null)scope.launch{
+            runCatching{withContext(Dispatchers.IO){
+                val bytes=context.contentResolver.openInputStream(uri)?.use{input->
+                    val out=ByteArrayOutputStream();val buffer=ByteArray(4096)
+                    while(true){val n=input.read(buffer);if(n<0)break
+                        require(out.size()+n<=16*1024){"Timeline checkpoint exceeds 16 KB"}
+                        out.write(buffer,0,n)}
+                    out.toByteArray()
+                }?:error("Cannot read timeline checkpoint")
+                NativeWorldLabDemoCheckpointCodec.decode(bytes.toString(Charsets.UTF_8))
+            }}.onSuccess{checkpoint->
+                val expectedModelId=when(checkpoint.modelId){
+                    "spring"->"native-spring";"rc"->"native-rc";else->"native-heat"
+                }
+                val expectedEpoch=checkpoint.worldEpochUTC?:worldEpochUTC
+                val expectedInput=when(checkpoint.modelId){
+                    "spring"->NativeLabInput.Spring(massKg=checkpoint.massKg,
+                        springNPerM=checkpoint.springNPerM)
+                    "rc"->NativeLabInput.RC(resistanceOhm=checkpoint.resistanceOhm)
+                    else->NativeLabInput.Heat(diffusivityM2S=checkpoint.diffusivityM2PerS)
+                }
+                val sameRecordedRun=demoRecording?.let{recording->
+                    recording.clockRun.modelId==expectedModelId&&
+                        recording.clockRun.worldEpochUTC==expectedEpoch&&
+                        recording.input==expectedInput
+                }==true
+                pendingDemoWallTimeUTC=if(sameRecordedRun)null else checkpoint.wallTimeUTC
+                kind=checkpoint.modelId;time=checkpoint.timeSeconds.toFloat()
+                mass=checkpoint.massKg.toFloat();spring=checkpoint.springNPerM.toFloat()
+                resistance=checkpoint.resistanceOhm.toFloat();diffusivity=checkpoint.diffusivityM2PerS.toFloat()
+                playing=false;reversePlayback=checkpoint.playbackDirection=="reverse-recording"
+                checkpoint.worldEpochUTC?.let{worldEpochUTC=it}
+                checkpoint.playbackRate?.let{speed=it.toFloat()}
+                if(sameRecordedRun){
+                    demoRecording?.let{recording->demoClock?.let{clock->
+                        runCatching {
+                            val selected=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                                checkpoint.timeSeconds)
+                            selected.copy(
+                                wallTimeUTC=checkpoint.wallTimeUTC?:selected.wallTimeUTC,
+                                solverInternalTimeSeconds=recording.samples[selected.sampleIndex].timeSeconds,
+                                playbackRate=checkpoint.playbackRate?:selected.playbackRate,
+                                direction=checkpoint.playbackDirection?:selected.direction)
+                        }.onSuccess{selected->
+                            demoClock=selected;time=selected.simulationTimeSeconds.toFloat()
+                        }.onFailure{warning=it.message?:"Recorded timeline restore was rejected."}
+                    }}
+                }
+                timelineStatus="Reference experiment inputs and recorded-sample clock restored."
+            }.onFailure{timelineStatus=it.message?:"Timeline checkpoint restore failed."}
+        }
+    }
+    val collisionEvidencePicker=rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")){uri->
+        if(uri!=null){
+            val run=collisionRun
+            if(run!=null)scope.launch{
+                runCatching {withContext(Dispatchers.IO){
+                    val json=run.toEvidenceJson().toByteArray(Charsets.UTF_8)
+                    require(json.size<=NativeWorldLabProjectCodec.MAX_BYTES){
+                        "Collision evidence exceeds portable export size"
+                    }
+                    context.contentResolver.openOutputStream(uri,"wt")?.use{
+                        it.write(json);it.flush()
+                    }?:error("Could not open collision evidence destination")
+                }}.onFailure{warning=it.message?:"Collision evidence export failed"}
+            }
+        }
+    }
+    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if(uri!=null)scope.launch {
+            runCatching { withContext(Dispatchers.IO) {
+                val out=ByteArrayOutputStream()
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    val buffer=ByteArray(16384)
+                    while(true) {
+                        val read=input.read(buffer)
+                        if(read<0)break
+                        require(out.size()+read<=24*1024*1024) {
+                            "Portable project or archive must be 24 MB or smaller."
+                        }
+                        out.write(buffer,0,read)
+                    }
+                }?:error("File could not be opened.")
+                val json=out.toString(Charsets.UTF_8.name())
+                val format=org.json.JSONObject(json).optString("format")
+                if(format=="env-world-lab-cad"){
+                    val current=projectJson?:error("Create or open an invention before importing CAD geometry.")
+                    val merged=NativeWorldLabEditor.importCadExchange(current,json)
+                    NativeWorldLabImportResult(merged,NativeWorldLabProjectCodec.decode(merged),
+                        isArchive=false,isCadGeometry=true)
+                }else if(format=="env-world-lab-archive"){
+                    val imported=NativeWorldLabPortableArchiveStore(context.filesDir).import(json)
+                    NativeWorldLabImportResult(imported.projectJson,imported.project,isArchive=true)
+                }else{
+                    require(out.size()<=NativeWorldLabProjectCodec.MAX_BYTES){
+                        "Standalone projects cannot exceed 1 MB"}
+                    NativeWorldLabImportResult(json,NativeWorldLabProjectCodec.decode(json))
+                }
+            } }.onSuccess {result->
+                projectJson=result.projectJson;project=result.project
+                if(!result.isCadGeometry){
+                    savedSnapshot=if(result.isArchive)result.projectJson else null
+                    selectedSavedId=result.project.id
+                }
+                selected=if(result.isCadGeometry)(result.project.entities.size-1).coerceAtLeast(0) else 0
+                warning=when {
+                    result.isArchive->"Portable project and scientific history imported and saved on device."
+                    result.isCadGeometry->"CAD geometry merged into the current invention. Save locally to preserve it."
+                    else->""
+                }
+                editHistory.clear()
+                if(result.isArchive)refreshSavedProjects()
+            }
+                .onFailure { warning=it.message?:"Unable to inspect this project." }
+        }
+    }
+    LaunchedEffect(projectJson,savedSnapshot){
+        val draft=projectJson
+        if(draft!=null&&draft!=savedSnapshot){
+            delay(700)
+            runCatching{withContext(Dispatchers.IO){
+                localProjects.saveDraft(draft)
+                localProjects.listDrafts()
+            }}.onSuccess{items->recoveryDrafts=items;selectedDraftId=
+                if(items.any{it.id==selectedDraftId})selectedDraftId else items.firstOrNull()?.id?:""}
+                .onFailure{warning=it.message?:"Recovery cache failed. Export your invention."}
+        }
+    }
+    LaunchedEffect(projectJson) {
+        // Edited/imported geometry and materials invalidate earlier hypothetical drop results.
+        dropPlaying=false;dropRun=null;dropEntityId=null;dropFrame=0
+        motorPlaying=false;motorResult=null;motorEntityId=null;motorFrame=0;digitalMotor=null
+        motorRunIdentity="";motorClock=null;motorReversePlayback=false
+        collisionPlaying=false;collisionRun=null;collisionTime=0f
+        spherePlaying=false;sphereRun=null;sphereTime=0f
+    }
+    LaunchedEffect(requestImport) {
+        if(requestImport){
+            requestImport=false
+            picker.launch(arrayOf("application/json","text/plain","*/*"))
+        }
+    }
+    LaunchedEffect(reactionPlaying,reactionResult) {
+        while(reactionPlaying){
+            delay(40)
+            val result=reactionResult?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04/result.stepSeconds).toInt())
+            reactionFrame=(reactionFrame+stride).coerceAtMost(result.samples.lastIndex)
+            if(reactionFrame>=result.samples.lastIndex)reactionPlaying=false
+        }
+    }
+    LaunchedEffect(fluidPlaying,fluidMotion) {
+        while(fluidPlaying){
+            delay(40)
+            val run=fluidMotion?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04/run.stepSeconds).toInt())
+            fluidFrame=(fluidFrame+stride).coerceAtMost(run.samples.lastIndex)
+            if(fluidFrame>=run.samples.lastIndex)fluidPlaying=false
+        }
+    }
+    LaunchedEffect(dropPlaying,dropSpeed,dropRun) {
+        while(dropPlaying) {
+            delay(40)
+            val result=dropRun?:break
+            val stride=kotlin.math.max(1,kotlin.math.round(0.04f*dropSpeed/result.stepSeconds).toInt())
+            dropFrame=(dropFrame+stride).coerceAtMost(result.samples.lastIndex)
+            if(dropFrame==result.samples.lastIndex)dropPlaying=false
+        }
+    }
+    LaunchedEffect(spherePlaying,sphereSpeed,sphereRun,sphereReversePlayback) {
+        while(spherePlaying){
+            delay(40)
+            val run=sphereRun?:break
+            sphereTime=advanceWorldLabEventTime(sphereTime.toDouble(),0.04,sphereSpeed.toDouble(),
+                run.durationSeconds,listOf(run.impactTimeSeconds),sphereReversePlayback).toFloat()
+            if((sphereReversePlayback&&sphereTime<=0f)||(!sphereReversePlayback&&sphereTime>=run.durationSeconds.toFloat()))spherePlaying=false
+        }
+    }
+    LaunchedEffect(collisionPlaying,collisionSpeed,collisionRun,collisionReversePlayback) {
+        while(collisionPlaying){
+            delay(40)
+            val run=collisionRun?:break
+            collisionTime=advanceWorldLabEventTime(collisionTime.toDouble(),0.04,
+                collisionSpeed.toDouble(),run.durationSeconds,listOf(run.impactTimeSeconds),collisionReversePlayback).toFloat()
+            if((collisionReversePlayback&&collisionTime<=0f)||(!collisionReversePlayback&&collisionTime>=run.durationSeconds.toFloat()))collisionPlaying=false
+        }
+    }
+    LaunchedEffect(motorRecordedRun) {
+        val recording=motorRecordedRun
+        if(recording==null) {
+            motorClock=null;motorFrame=0;motorPlaying=false
+        } else {
+            motorClock=NativeWorldLabRecordedTime.start(recording,
+                java.time.Instant.now().toString(),java.time.ZoneId.systemDefault().id,
+                playbackRate=motorSpeed.toDouble(),
+                direction=if(motorReversePlayback)"reverse-recording" else "forward")
+            motorFrame=0
+        }
+    }
+    LaunchedEffect(motorRecordedRun,motorPlaying,motorSpeed,motorReversePlayback) {
+        val recording=motorRecordedRun?:return@LaunchedEffect
+        var previousNanos=System.nanoTime()
+        while(motorRecordedRun==recording) {
+            delay(40)
+            val now=System.nanoTime()
+            val elapsed=((now-previousNanos).coerceAtLeast(0L)/1_000_000_000.0).coerceIn(0.0,0.25)
+            previousNanos=now
+            val current=motorClock?:continue
+            val before=current.simulationTimeSeconds
+            val state=current.copy(playbackRate=motorSpeed.toDouble(),
+                direction=if(motorReversePlayback)"reverse-recording" else "forward",
+                paused=!motorPlaying)
+            val transition=runCatching {
+                NativeWorldLabRecordedTime.advance(recording,state,elapsed,paused=!motorPlaying)
+            }
+            if(transition.isFailure) {
+                warning=transition.exceptionOrNull()?.message?: "Recorded motor clock rejected an invalid transition."
+                motorPlaying=false
+                continue
+            }
+            val next=transition.getOrThrow()
+            motorClock=next
+            if(motorPlaying) {
+                motorFrame=next.sampleIndex
+                val hitEvent=recording.mandatoryEventTimesSeconds.any {
+                    kotlin.math.abs(it-next.simulationTimeSeconds)<=1e-9 &&
+                        kotlin.math.abs(it-before)>1e-9
+                }
+                val atEnd=next.simulationTimeSeconds>=recording.durationSeconds-1e-9
+                val atBeginning=next.simulationTimeSeconds<=1e-9
+                if(hitEvent || (motorReversePlayback&&atBeginning) || (!motorReversePlayback&&atEnd))
+                    motorPlaying=false
+            }
+        }
+    }
+    LaunchedEffect(demoRecording) {
+        val recording=demoRecording
+        if(recording==null){
+            demoClock=null;time=0f;playing=false
+        }else{
+            runCatching{
+                val started=NativeWorldLabRecordedTime.start(recording.clockRun,
+                    pendingDemoWallTimeUTC?:java.time.Instant.now().toString(),
+                    java.time.ZoneId.systemDefault().id,speed.toDouble(),
+                    if(reversePlayback)"reverse-recording" else "forward")
+                val target=time.toDouble().coerceIn(0.0,recording.clockRun.durationSeconds)
+                val selected=NativeWorldLabRecordedTime.seek(recording.clockRun,started,target)
+                selected.copy(solverInternalTimeSeconds=recording.samples[selected.sampleIndex].timeSeconds)
+            }.onSuccess{
+                demoClock=it;time=it.simulationTimeSeconds.toFloat();playing=false
+                pendingDemoWallTimeUTC=null
+            }.onFailure{
+                demoClock=null;playing=false;warning=it.message?:"Recorded model timeline could not be initialized."
+            }
+        }
+    }
+    LaunchedEffect(demoRecording,playing,speed,reversePlayback) {
+        val recording=demoRecording?:return@LaunchedEffect
+        var previousNanos=System.nanoTime()
+        while(demoRecording==recording){
+            delay(40)
+            val now=System.nanoTime()
+            val elapsed=((now-previousNanos).coerceAtLeast(0L)/1_000_000_000.0).coerceIn(0.0,0.25)
+            previousNanos=now
+            val current=demoClock?:continue
+            val state=current.copy(playbackRate=speed.toDouble(),
+                direction=if(reversePlayback)"reverse-recording" else "forward",
+                paused=!playing)
+            val transition=runCatching{
+                NativeWorldLabRecordedTime.advance(recording.clockRun,state,elapsed,paused=!playing)
+            }
+            if(transition.isFailure){
+                warning=transition.exceptionOrNull()?.message?:"Native recorded playback rejected an invalid transition."
+                playing=false
+                continue
+            }
+            val transitioned=transition.getOrThrow()
+            val next=transitioned.copy(solverInternalTimeSeconds=
+                recording.samples[transitioned.sampleIndex].timeSeconds)
+            demoClock=next;time=next.simulationTimeSeconds.toFloat()
+            if(playing && ((reversePlayback&&next.simulationTimeSeconds<=1e-9)||
+                (!reversePlayback&&next.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9))){
+                playing=false
+            }
+        }
+    }
+    if(confirmation!=null) AlertDialog(
+        onDismissRequest={confirmation=null},
+        title={Text("Discard unsaved changes?")},
+        text={Text("Your current unsaved project will be replaced. Save locally or export JSON first if you want to keep it.")},
+        confirmButton={TextButton(onClick={
+            val choice=confirmation;confirmation=null
+            when(choice){
+                "new"->newProject()
+                "open"->loadSavedProject()
+                "open-selected"->loadSelectedProject()
+                "import"->requestImport=true
+                "restore-draft"->restoreSelectedDraft()
+            }
+        }){Text("Discard and continue")}},
+        dismissButton={TextButton(onClick={confirmation=null}){Text("Keep editing")}}
+    )
+    if(confirmingSavedDelete) AlertDialog(
+        onDismissRequest={confirmingSavedDelete=false},
+        title={Text("Delete this saved World Lab project?")},
+        text={Text("Only this local-device saved copy will be removed. Export JSON before deleting if you need a backup.")},
+        confirmButton={TextButton(onClick={
+            confirmingSavedDelete=false
+            deleteSelectedProject()
+        }){Text("Delete saved copy")}},
+        dismissButton={TextButton(onClick={confirmingSavedDelete=false}){Text("Cancel")}}
+    )
+    if(confirmingDraftDelete)AlertDialog(
+        onDismissRequest={confirmingDraftDelete=false},
+        title={Text("Discard cached invention?")},
+        text={Text("Only this temporary recovery draft is deleted; saved projects remain.")},
+        confirmButton={TextButton(onClick={
+            confirmingDraftDelete=false;deleteSelectedDraft()
+        }){Text("Discard draft")}},
+        dismissButton={TextButton(onClick={confirmingDraftDelete=false}){Text("Cancel")}}
+    )
+    // Keep the two largest editor panels out of NativeWorldLabForm's bytecode.
+    val digitalCircuitContent: @Composable () -> Unit = {
+            Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
+            Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
+                style=MaterialTheme.typography.bodySmall)
+            if(project!!.digitalNetworks.isEmpty()){
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.startDigitalInvention(it)
+                }}){Text("Start invented logic")}
+            }else {
+                val digital=project!!.digitalNetworks.first()
+                digital.inputs.forEach{input->
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        Checkbox(checked=input.value,onCheckedChange={value->
+                            applyProjectEdit{NativeWorldLabEditor.digitalSwitch(
+                                it,digital.id,input.id,value)}
+                        })
+                        Text(input.label+" = "+if(input.value)"1" else "0")
+                    }
+                }
+                digital.gates.forEach{gate->
+                    Text(gate.name+" · "+gate.assumption,
+                        style=MaterialTheme.typography.bodySmall)
+                    gate.truthTable.forEachIndexed{index,bit->
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                            Text(index.toString(2).padStart(gate.inputNodeIds.size,'0')+" → "+bit)
+                            OutlinedButton(onClick={applyProjectEdit{
+                                NativeWorldLabEditor.digitalTruthBit(
+                                    it,digital.id,gate.id,index,1-bit)
+                            }}){Text("Toggle")}
+                        }
+                    }
+                }
+                val signalNodes=digital.inputs.map{it.id to it.label}+
+                    digital.gates.map{it.id to it.name}
+                OutlinedTextField(value=digitalNewGateName,
+                    onValueChange={digitalNewGateName=it.take(120)},
+                    label={Text("Name your invented digital gate")},singleLine=true)
+                OutlinedTextField(value=digitalAssumption,
+                    onValueChange={digitalAssumption=it.take(500)},
+                    label={Text("Assumed Boolean behavior")},singleLine=true)
+                val firstIndex=signalNodes.indexOfFirst{it.first==digitalSourceA}
+                OutlinedButton(onClick={
+                    digitalSourceA=signalNodes[(firstIndex+1).mod(signalNodes.size)].first
+                }){
+                    Text("First input: "+
+                        (signalNodes.getOrNull(firstIndex)?.second?:"choose a switch or gate"))
+                }
+                val secondNodes=listOf("" to "No second input")+signalNodes
+                val secondIndex=secondNodes.indexOfFirst{it.first==digitalSourceB}
+                OutlinedButton(onClick={
+                    digitalSourceB=secondNodes[(secondIndex+1).mod(secondNodes.size)].first
+                }){
+                    Text("Optional second input: "+
+                        (secondNodes.getOrNull(secondIndex)?.second?:"None"))
+                }
+                val ports=listOf(digitalSourceA)+
+                    listOfNotNull(digitalSourceB.takeIf{it.isNotEmpty()})
+                OutlinedButton(onClick={applyProjectEdit{json->
+                    NativeWorldLabEditor.addDigitalGate(json,digital.id,
+                        digitalNewGateName,digitalAssumption,ports)
+                }},enabled=digital.gates.size<32&&digitalNewGateName.isNotBlank()&&
+                    digitalAssumption.isNotBlank()&&
+                    ports.all{port->signalNodes.any{it.first==port}}&&
+                    ports.distinct().size==ports.size){
+                    Text("Connect a new invented gate")
+                }
+                Text("Choose source switches or earlier gates. Define the new truth-table rows,"+
+                    " then wire an output indicator.",
+                    style=MaterialTheme.typography.bodySmall)
+                digital.outputs.forEach{output->
+                    val current=signalNodes.indexOfFirst{it.first==output.sourceNodeId}
+                    OutlinedButton(onClick={
+                        if(signalNodes.isNotEmpty()){
+                            val next=signalNodes[(current+1)%signalNodes.size].first
+                            applyProjectEdit{json->
+                                NativeWorldLabEditor.digitalOutputSource(
+                                    json,digital.id,output.id,next)
+                            }
+                        }
+                    }){
+                        Text(output.label+" reads "+
+                            (signalNodes.getOrNull(current)?.second?:"unknown")+
+                            " · tap to change source")
+                    }
+                }
+                OutlinedButton(onClick={digitalShowCases=!digitalShowCases}){
+                    Text(if(digitalShowCases)"Hide all logic cases" else "Check every input combination")
+                }
+                if(digitalShowCases) {
+                    runCatching{NativeWorldLabDigitalLogic.truthTable(digital)}
+                        .onSuccess{cases->
+                            Text("Checked "+cases.size+" Boolean combinations (assumed truth tables)")
+                            cases.take(16).forEachIndexed{index,outputs->
+                                Text(index.toString(2).padStart(digital.inputs.size,'0')+
+                                    " → "+digital.outputs.joinToString(""){(outputs[it.id]?:0).toString()},
+                                    style=MaterialTheme.typography.bodySmall)
+                            }
+                            if(cases.size>16)Text("First 16 shown; complete test is bounded at 256.")
+                        }.onFailure{Text("Exhaustive check requires at most eight switches.",
+                            color=MaterialTheme.colorScheme.error)}
+                }
+                runCatching{NativeWorldLabDigitalLogic.evaluate(digital)}
+                    .onSuccess{result->
+                        digital.outputs.forEach{output->
+                            Text(output.label+": "+(result[output.id]?:0),
+                                style=MaterialTheme.typography.bodyMedium)
+                        }
+                    }.onFailure{Text("Digital model cannot be evaluated.",
+                        color=MaterialTheme.colorScheme.error)}
+            }
+            Text("Invent chemical heat",style=MaterialTheme.typography.titleSmall)
+            Text("Hypothetical chemistry only. Reaction rate and heat feedback use your assumptions.",
+                style=MaterialTheme.typography.bodySmall)
+            Text("Assumed heat released: "+labNumber(reactionHeat.toDouble())+" J/mol")
+            Slider(value=reactionHeat,onValueChange={reactionHeat=it;reactionPlaying=false;
+                reactionResult=null},valueRange=-50000f..100000f,
+                modifier=Modifier.semantics {contentDescription="Hypothetical reaction heat"})
+            Text("Assumed reaction factor: "+labNumber(reactionFactor.toDouble())+" 1/s")
+            Slider(value=reactionFactor,onValueChange={reactionFactor=it;reactionPlaying=false;
+                reactionResult=null},valueRange=0f..5f,
+                modifier=Modifier.semantics {contentDescription="Hypothetical reaction factor"})
+            Text("External heater: "+labNumber(reactionHeating.toDouble())+" W")
+            Slider(value=reactionHeating,onValueChange={reactionHeating=it;reactionPlaying=false;
+                reactionResult=null},valueRange=-200f..200f,
+                modifier=Modifier.semantics {contentDescription="External thermal heater power"})
+            OutlinedButton(onClick={
+                runCatching{
+                    reactionResult=NativeWorldLabChemicalThermal.evaluate(
+                        NativeChemicalThermalInput(
+                            reactionHeatReleasedJPerMol=reactionHeat.toDouble(),
+                            preExponentialPerS=reactionFactor.toDouble(),
+                            externalHeatingW=reactionHeating.toDouble()))
+                    reactionFrame=0;reactionPlaying=true;warning=""
+                }.onFailure{reactionPlaying=false;reactionResult=null
+                    warning=it.message?:"Invalid hypothetical reaction parameters"}
+            }){Text("Calculate reaction temperature")}
+            reactionResult?.let{run->
+                val sample=run.samples[reactionFrame.coerceIn(0,run.samples.lastIndex)]
+                Text("Time: "+labNumber(sample.timeSeconds)+" s")
+                Text("Reactant converted: "+labNumber(sample.productFormedMol)+" mol")
+                Text("Temperature: "+labNumber(sample.temperatureK)+" K")
+                Text("Chemical heat: "+labNumber(sample.reactionPowerW)+" W")
+                Text("Energy residual: "+labNumber(sample.energyResidualJ)+" J")
+                Slider(value=reactionFrame.toFloat()/run.samples.lastIndex,
+                    onValueChange={reactionPlaying=false
+                        reactionFrame=(it*run.samples.lastIndex).toInt()},
+                    modifier=Modifier.semantics {contentDescription="Explore reaction time"})
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={reactionPlaying=!reactionPlaying}){
+                        Text(if(reactionPlaying)"Pause reaction" else "Play reaction")
+                    }
+                    OutlinedButton(onClick={reactionPlaying=false;reactionFrame=0}){
+                        Text("Reset reaction")
+                    }
+                }
+                Text(run.validity,style=MaterialTheme.typography.bodySmall)
+            }
+            Text("Connected DC circuits",style=MaterialTheme.typography.titleSmall)
+            if(project!!.networks.isEmpty()){
+                OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.addStarterCircuit(it)}}){
+                    Text("Build first circuit")
+                }
+            }else{
+                val net=project!!.networks.first()
+                Text(net.name+" · "+net.components.size+" wired parts")
+                NativeWorldLabCircuitSchematicPanel(net,dcRun?.takeIf{
+                    it.projectId==project!!.id&&it.projectRevision==project!!.revision&&it.networkId==net.id
+                })
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={applyProjectEdit{
+                        NativeWorldLabEditor.addParallelCircuitResistor(it)
+                    }},enabled=net.components.size<48){
+                        Text("Add parallel resistor")
+                    }
+                    OutlinedButton(onClick={
+                        runCatching{dcRun=NativeWorldLabDc.solve(net,project!!);warning=""}
+                            .onFailure{dcRun=null;warning=it.message?:"Circuit not solvable"}
+                    }){Text("Calculate circuit")}
+                }
+                OutlinedTextField(value=deviceName,onValueChange={deviceName=it},
+                    label={Text("Invented electrical component name")},singleLine=true)
+                OutlinedTextField(value=deviceAssumption,onValueChange={deviceAssumption=it},
+                    label={Text("Unverified behavior assumption")},singleLine=true)
+                OutlinedTextField(value=deviceResistance,onValueChange={deviceResistance=it},
+                    label={Text("Optional assumed resistance Ω")},singleLine=true)
+                OutlinedButton(onClick={
+                    runCatching{
+                        val ohms=if(deviceResistance.isBlank())null else
+                            deviceResistance.toDoubleOrNull()?:error("Enter a valid assumed resistance")
+                        applyProjectEdit{NativeWorldLabEditor.inventOhmicDevice(
+                            it,deviceName,deviceAssumption,ohms)}
+                        deviceName="";deviceAssumption="";deviceResistance=""
+                    }.onFailure{warning=it.message?:"Device cannot be added"}
+                },enabled=net.components.size<48&&deviceName.isNotBlank()&&
+                    deviceAssumption.isNotBlank()){
+                    Text("Add hypothetical component")
+                }
+                Text("A new material has no electrical law unless you explicitly assume one.",
+                    style=MaterialTheme.typography.bodySmall)
+                Text("Connect more parts and wires",style=MaterialTheme.typography.titleSmall)
+                OutlinedTextField(value=junctionName,onValueChange={junctionName=it},
+                    label={Text("New junction name")},singleLine=true)
+                OutlinedButton(onClick={
+                    applyProjectEdit{NativeWorldLabEditor.addCircuitNode(it,junctionName)}
+                    junctionName=""
+                },enabled=junctionName.isNotBlank()&&net.nodes.size<24){
+                    Text("Add wire junction")
+                }
+                net.nodes.forEach{node->
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        Text(node.label,modifier=Modifier.weight(1f))
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.removeUnusedCircuitNode(it,node.id)
+                        }},enabled=net.nodes.size>2&&node.id!=net.groundNodeId&&
+                            net.components.none{
+                                it.positiveNodeId==node.id||it.negativeNodeId==node.id
+                            }){Text("Remove unused")}
+                    }
+                }
+                fun cycleWire(current:String,exclude:String):String{
+                    val candidates=net.nodes.map{it.id}.filter{it!=exclude}
+                    val pos=candidates.indexOf(current)
+                    return candidates[(pos+1).coerceAtLeast(0)%candidates.size]
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={
+                        positiveWire=cycleWire(positiveWire,negativeWire)
+                    }){Text("From: "+(net.nodes.firstOrNull{it.id==positiveWire}?.label?:"Choose"))}
+                    OutlinedButton(onClick={
+                        negativeWire=cycleWire(negativeWire,positiveWire)
+                    }){Text("To: "+(net.nodes.firstOrNull{it.id==negativeWire}?.label?:"Choose"))}
+                }
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.addCircuitResistor(it,positiveWire,negativeWire)
+                }},enabled=net.components.size<48&&positiveWire!=negativeWire&&
+                    net.nodes.any{it.id==positiveWire}&&net.nodes.any{it.id==negativeWire}){
+                    Text("Connect 200 Ω resistor")
+                }
+                net.components.forEach{part->
+                    Text((if(part.kind=="dc-source")"Source" else part.name?:part.kind)+
+                        " · "+part.positiveNodeId+" → "+part.negativeNodeId,
+                        style=MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.rewireCircuitPart(it,part.id,
+                                cycleWire(part.positiveNodeId,part.negativeNodeId),
+                                part.negativeNodeId)
+                        }}){Text("Change from")}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.rewireCircuitPart(it,part.id,
+                                part.positiveNodeId,
+                                cycleWire(part.negativeNodeId,part.positiveNodeId))
+                        }}){Text("Change to")}
+                    }
+                }
+                net.components.filter{it.kind=="dc-source"||it.kind=="resistor"}.forEach{part->
+                    Text((if(part.kind=="dc-source")"Voltage: " else "Resistance: ")+
+                        labNumber(part.voltageV?:part.resistanceOhm)+
+                        (if(part.kind=="dc-source")" V" else " Ω"))
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        val step=if(part.kind=="dc-source")1.0 else 10.0
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.adjustCircuitComponent(it,part.id,-step)
+                        }}){Text("−")}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.adjustCircuitComponent(it,part.id,step)
+                        }}){Text("+")}
+                        if(part.kind=="resistor"){
+                            OutlinedButton(onClick={applyProjectEdit{
+                                NativeWorldLabEditor.removeCircuitComponent(it,part.id)
+                            }}){Text("Remove")}
+                        }
+                    }
+                }
+                net.components.filter{it.kind=="hypothetical-device"}.forEach{invented->
+                    Text(invented.name.orEmpty()+
+                        (invented.assumedResistanceOhm?.let{" — assumed "+labNumber(it)+" Ω"}
+                            ?:" — unknown electrical law"),
+                        style=MaterialTheme.typography.bodySmall)
+                }
+                dcRun?.takeIf{it.projectId==project!!.id &&
+                    it.projectRevision==project!!.revision && it.networkId==net.id}?.let{result->
+                    Text("Delivered DC power: "+labNumber(result.deliveredPowerW)+" W")
+                    Text("Resistor heat: "+labNumber(result.resistorHeatW)+" W")
+                    Text("Power residual: "+labNumber(result.powerResidualW)+" W")
+                    Text(result.validity,style=MaterialTheme.typography.bodySmall)
+                }
+            }
+    }
+    val selectedSolidContent: @Composable () -> Unit = {
+            if(solid!=null) {
+                Row {
+                    TextButton(onClick={selected=(selected-1+project!!.entities.size)%project!!.entities.size}) {
+                        Text("Previous")
+                    }
+                    Text(solid.name,modifier=Modifier.weight(1f).padding(top=12.dp))
+                    TextButton(onClick={selected=(selected+1)%project!!.entities.size}) {
+                        Text("Next")
+                    }
+                }
+                Text("Ideal "+solid.shape+" volume: "+labNumber(solid.volumeMetersCubed())+" m³")
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={
+                        applyProjectEdit{NativeWorldLabEditor.scaleSolid(it,solid.id,listOf(0.9,0.9,0.9))}
+                    }){Text("Smaller")}
+                    OutlinedButton(onClick={
+                        applyProjectEdit{NativeWorldLabEditor.scaleSolid(it,solid.id,listOf(1.1,1.1,1.1))}
+                    }){Text("Larger")}
+                }
+                Text("Rotate and transform",style=MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.rotateSolid(it,solid.id,0,15.0)}}){Text("Rotate X")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.rotateSolid(it,solid.id,1,15.0)}}){Text("Rotate Y")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.rotateSolid(it,solid.id,2,15.0)}}){Text("Rotate Z")}
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.duplicateSolid(it,solid.id,listOf(snapMeters,0.0,0.0))}}){Text("Duplicate +X")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.linearPattern(it,solid.id,0,snapMeters,2)}}){Text("Linear pattern")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.mirrorSolid(it,solid.id,0,0.0)}}){Text("Mirror X")}
+                    OutlinedButton(onClick={applyProjectEdit{NativeWorldLabEditor.circularPattern(it,solid.id,2,listOf(0.0,0.0,0.0),4)}}){Text("Circular pattern")}
+                }
+                Text("Rotation X/Y/Z: "+listOf(solid.rotationRadians.x,solid.rotationRadians.y,solid.rotationRadians.z)
+                    .joinToString(" / "){labNumber(it)}+" rad",style=MaterialTheme.typography.bodySmall)
+                Text("2D sketch and extrusion",style=MaterialTheme.typography.titleSmall)
+                Text("Create a closed rectangle or circle on the X/Z plane and extrude along Y.",
+                    style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchWidth,onValueChange={cadSketchWidth=it},
+                        label={Text("Width m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchDepth,onValueChange={cadSketchDepth=it},
+                        label={Text("Depth m")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchHeight,onValueChange={cadSketchHeight=it},
+                        label={Text("Height m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchRadius,onValueChange={cadSketchRadius=it},
+                        label={Text("Circle radius m")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Text("Sketch centre on base plane (X/Y/Z metres)",style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchX,onValueChange={cadSketchX=it},label={Text("X m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchY,onValueChange={cadSketchY=it},label={Text("Y m")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchZ,onValueChange={cadSketchZ=it},label={Text("Z m")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Text("Extrusion orientation (X/Y/Z degrees)",style=MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedTextField(value=cadSketchRotationX,onValueChange={cadSketchRotationX=it},label={Text("X °")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchRotationY,onValueChange={cadSketchRotationY=it},label={Text("Y °")},singleLine=true,modifier=Modifier.weight(1f))
+                    OutlinedTextField(value=cadSketchRotationZ,onValueChange={cadSketchRotationZ=it},label={Text("Z °")},singleLine=true,modifier=Modifier.weight(1f))
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={
+                        runCatching{
+                            val base=listOf(cadSketchX.toDouble(),cadSketchY.toDouble(),cadSketchZ.toDouble())
+                            val rotation=listOf(cadSketchRotationX,cadSketchRotationY,cadSketchRotationZ)
+                                .map{it.toDouble()*Math.PI/180.0}
+                            applyProjectEdit{NativeWorldLabEditor.extrudeRectangle(it,
+                                cadSketchWidth.toDouble(),cadSketchDepth.toDouble(),cadSketchHeight.toDouble(),
+                                centerMeters=base,rotationRadians=rotation)}
+                        }.onFailure{warning=it.message?:"Rectangle sketch could not be extruded"}
+                    },enabled=project!!.entities.size<200){Text("Extrude rectangle")}
+                    OutlinedButton(onClick={
+                        runCatching{
+                            val base=listOf(cadSketchX.toDouble(),cadSketchY.toDouble(),cadSketchZ.toDouble())
+                            val rotation=listOf(cadSketchRotationX,cadSketchRotationY,cadSketchRotationZ)
+                                .map{it.toDouble()*Math.PI/180.0}
+                            applyProjectEdit{NativeWorldLabEditor.extrudeCircle(it,
+                                cadSketchRadius.toDouble(),cadSketchHeight.toDouble(),
+                                centerMeters=base,rotationRadians=rotation)}
+                        }.onFailure{warning=it.message?:"Circle sketch could not be extruded"}
+                    },enabled=project!!.entities.size<200){Text("Extrude circle")}
+                }
+                Text("Place with precision",style=MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={
+                        snapMeters=when(snapMeters){0.1->0.5;0.5->1.0;1.0->5.0;else->0.1}
+                    }){Text("Grid "+labNumber(snapMeters)+" m")}
+                    OutlinedButton(onClick={
+                        applyProjectEdit{NativeWorldLabEditor.snapSolid(it,solid.id,snapMeters)}
+                    }){Text("Snap center")}
+                }
+                val alternatives=project!!.entities.filter{it.id!=solid.id}
+                if(alternatives.isNotEmpty()){
+                    val target=alternatives[measurementTargetIndex%alternatives.size]
+                    OutlinedButton(onClick={
+                        measurementTargetIndex=(measurementTargetIndex+1)%alternatives.size
+                    }){Text("Measure to: "+target.name+" (change)")}
+                    val measured=NativeWorldLabEditor.measureCenters(project!!,solid.id,target.id)
+                    Text("Center distance: "+labNumber(measured.centerDistanceM)+" m")
+                    Text("Horizontal distance: "+labNumber(measured.horizontalDistanceM)+" m")
+                    Text("Offset X/Y/Z: "+labNumber(measured.offsetXM)+" / "+
+                        labNumber(measured.offsetYM)+" / "+labNumber(measured.offsetZM)+" m")
+                    val clearance=NativeWorldLabSpatial.inspect(solid,target)
+                    Text("Bounding-box clearance lower bound: "+
+                        labNumber(clearance.gapLowerBoundMeters)+" m")
+                    Text("Bounds: "+clearance.status.replace('-',' '))
+                    if(clearance.status=="box-intersection")
+                        Text("Overlap X/Y/Z: "+clearance.overlapDepthMeters
+                            .joinToString(" / "){labNumber(it)}+" m")
+                    Text(clearance.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Collide spheres in three dimensions",
+                    style=MaterialTheme.typography.titleSmall)
+                Text("One true off-axis first contact between smooth spheres. Assumed inventor densities and restitution; no arbitrary shape physics, rolling, fracture or gravity.",
+                    style=MaterialTheme.typography.bodySmall)
+                val sphereCandidates=project!!.entities.filter{
+                    it.shape=="sphere"&&it.id!=solid.id
+                }
+                if(solid.shape=="sphere"&&sphereCandidates.isNotEmpty()){
+                    val other=sphereCandidates[sphereTargetIndex%sphereCandidates.size]
+                    OutlinedButton(onClick={
+                        sphereTargetIndex=(sphereTargetIndex+1)%sphereCandidates.size
+                        sphereRun=null;spherePlaying=false
+                    }){Text("Spatial impact with: "+other.name+" (change)")}
+                    OutlinedTextField(value=sphereFirstVelocity,onValueChange={
+                        sphereFirstVelocity=it;sphereRun=null;spherePlaying=false
+                    },label={Text("First sphere X,Y,Z speeds (m/s)")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=sphereSecondVelocity,onValueChange={
+                        sphereSecondVelocity=it;sphereRun=null;spherePlaying=false
+                    },label={Text("Second sphere X,Y,Z speeds (m/s)")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    Text("Assumed restitution: "+labNumber(sphereRestitution.toDouble()))
+                    Slider(value=sphereRestitution,onValueChange={
+                        sphereRestitution=it;sphereRun=null;spherePlaying=false
+                    },valueRange=0f..1f,
+                        modifier=Modifier.semantics{contentDescription="Three-dimensional restitution"})
+                    OutlinedButton(onClick={
+                        runCatching{
+                            val p=project?:error("Project unavailable")
+                            sphereRun=NativeWorldLabSphereImpact.evaluate(
+                                p,solid.id,other.id,
+                                nativeLabImpactVelocity(sphereFirstVelocity),
+                                nativeLabImpactVelocity(sphereSecondVelocity),
+                                sphereRestitution.toDouble())
+                            sphereTime=0f;spherePlaying=false
+                            collisionRun=null;collisionPlaying=false;warning=""
+                        }.onFailure{warning=it.message?:"Invalid spatial impact";sphereRun=null}
+                    }){Text("Calculate three-dimensional sphere impact")}
+                }else Text("Select a sphere and add a second invented sphere with material density.")
+                sphereRun?.takeIf{run->
+                    run.projectId==project!!.id&&run.projectRevision==project!!.revision&&
+                    (run.firstEntityId==solid.id||run.secondEntityId==solid.id)
+                }?.let{run->
+                    val motion=run.sample(sphereTime.toDouble()
+                        .coerceIn(0.0,run.durationSeconds))
+                    Text("Spatial contact at "+labNumber(run.impactTimeSeconds)+" s")
+                    Text("3D impulse X/Y/Z: "+labNumber(run.impulseNs.x)+" / "+
+                        labNumber(run.impulseNs.y)+" / "+labNumber(run.impulseNs.z)+" N·s")
+                    Text("Momentum X/Y/Z before: "+labNumber(run.momentumBeforeKgMps.x)+
+                        " / "+labNumber(run.momentumBeforeKgMps.y)+" / "+
+                        labNumber(run.momentumBeforeKgMps.z)+" kg·m/s")
+                    Text("Momentum X/Y/Z after: "+labNumber(run.momentumAfterKgMps.x)+
+                        " / "+labNumber(run.momentumAfterKgMps.y)+" / "+
+                        labNumber(run.momentumAfterKgMps.z)+" kg·m/s")
+                    Text("Angular momentum Z before/after: "+
+                        labNumber(run.angularMomentumBeforeKgM2PerS.z)+" / "+
+                        labNumber(run.angularMomentumAfterKgM2PerS.z)+" kg·m²/s")
+                    Text("Energy before/after/lost: "+labNumber(run.energyBeforeJ)+
+                        " / "+labNumber(run.energyAfterJ)+" / "+
+                        labNumber(run.dissipatedEnergyJ)+" J")
+                    Canvas(Modifier.fillMaxWidth().height(120.dp)
+                        .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                        .semantics{
+                            contentDescription="Real 3D sphere impact XY projection; X Y Z coordinates are shown below"
+                        }){
+                        val start=run.sample(0.0)
+                        val last=run.sample(run.durationSeconds)
+                        val xs=listOf(start.firstCentreM.x,start.secondCentreM.x,
+                            last.firstCentreM.x,last.secondCentreM.x,
+                            motion.firstCentreM.x,motion.secondCentreM.x)
+                        val ys=listOf(start.firstCentreM.y,start.secondCentreM.y,
+                            last.firstCentreM.y,last.secondCentreM.y,
+                            motion.firstCentreM.y,motion.secondCentreM.y)
+                        val rangeX=(xs.maxOrNull()!!-xs.minOrNull()!!+
+                            run.firstRadiusM+run.secondRadiusM).coerceAtLeast(0.001)
+                        val rangeY=(ys.maxOrNull()!!-ys.minOrNull()!!+
+                            run.firstRadiusM+run.secondRadiusM).coerceAtLeast(0.001)
+                        val extentX=xs.minOrNull()!!-run.firstRadiusM
+                        val extentY=ys.minOrNull()!!-run.firstRadiusM
+                        val factorX=size.width*0.85f/rangeX.toFloat()
+                        val factorY=size.height*0.8f/rangeY.toFloat()
+                        fun loc(v:NativeLabVector)=Offset(
+                            size.width*0.07f+(v.x-extentX).toFloat()*factorX,
+                            size.height*0.91f-(v.y-extentY).toFloat()*factorY)
+                        drawCircle(Color(0xFF69C3C3),
+                            run.firstRadiusM.toFloat()*minOf(factorX,factorY),
+                            loc(motion.firstCentreM))
+                        drawCircle(Color(0xFFF2B877),
+                            run.secondRadiusM.toFloat()*minOf(factorX,factorY),
+                            loc(motion.secondCentreM))
+                    }
+                    Text("First sphere centre X/Y/Z: "+
+                        labNumber(motion.firstCentreM.x)+" / "+
+                        labNumber(motion.firstCentreM.y)+" / "+
+                        labNumber(motion.firstCentreM.z)+" m")
+                    Text("Second sphere centre X/Y/Z: "+
+                        labNumber(motion.secondCentreM.x)+" / "+
+                        labNumber(motion.secondCentreM.y)+" / "+
+                        labNumber(motion.secondCentreM.z)+" m")
+                    Slider(value=sphereTime,onValueChange={
+                        spherePlaying=false;sphereTime=it
+                    },valueRange=0f..run.durationSeconds.toFloat(),
+                        modifier=Modifier.semantics{contentDescription="Explore spatial impact time"})
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={sphereReversePlayback=false;spherePlaying=!spherePlaying}){
+                            Text(if(spherePlaying)"Pause 3D impact" else "Play 3D impact")
+                        }
+                        OutlinedButton(onClick={sphereReversePlayback=true;spherePlaying=sphereTime>0f}){
+                            Text("Rewind recording")
+                        }
+                        OutlinedButton(onClick={spherePlaying=false;sphereReversePlayback=false;sphereTime=0f}){
+                            Text("Reset 3D impact")
+                        }
+}
+                    Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        listOf(0.01f,0.1f,1f,10f,100f).forEach{rate->
+                            OutlinedButton(onClick={sphereSpeed=rate},modifier=Modifier.weight(1f),
+                                contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)){
+                                Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick={
+                        sphereEvidencePicker.launch("world-lab-spatial-sphere-impact.json")
+                    }){Text("Export 3D impact evidence")}
+                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                NativeWorldLabMultiSpherePanel(project!!){ warning=it }
+                NativeWorldLabGravityPanel(project!!){ warning=it }
+                NativeWorldLabWavePanel(project!!){ warning=it }
+                NativeWorldLabRadiationPanel(project!!){ warning=it }
+                NativeWorldLabOpticsPanel(project!!){ warning=it }
+                NativeWorldLabRayPanel(project!!){ warning=it }
+                NativeWorldLabHeatPanel(project!!){ warning=it }
+                NativeWorldLabEvidencePanel(project!!){ warning=it }
+                NativeWorldLabVehiclePanel(project!!){ warning=it }
+                Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
+                Text("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.",
+                    style=MaterialTheme.typography.bodySmall)
+                val collisionCandidates=project!!.entities.filter{it.id!=solid.id}
+                if(collisionCandidates.isNotEmpty()){
+                    val other=collisionCandidates[collisionTargetIndex%collisionCandidates.size]
+                    OutlinedButton(onClick={
+                        collisionTargetIndex=(collisionTargetIndex+1)%collisionCandidates.size
+                        collisionRun=null;collisionPlaying=false
+                    }){Text("Collide with: "+other.name+" (change)")}
+                    OutlinedTextField(value=collisionLeftSpeed,
+                        onValueChange={collisionLeftSpeed=it;collisionRun=null;collisionPlaying=false},
+                        label={Text("Left object speed (m/s)")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=collisionRightSpeed,
+                        onValueChange={collisionRightSpeed=it;collisionRun=null;collisionPlaying=false},
+                        label={Text("Right object speed (m/s)")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    Text("Assumed restitution: "+labNumber(collisionRestitution.toDouble()))
+                    Slider(value=collisionRestitution,onValueChange={
+                        collisionRestitution=it;collisionRun=null;collisionPlaying=false
+                    },valueRange=0f..1f,
+                        modifier=Modifier.semantics{contentDescription="Collision restitution"})
+                    OutlinedButton(onClick={
+                        runCatching{
+                            collisionRun=NativeWorldLabCollision.evaluate(
+                                project!!,solid.id,other.id,
+                                collisionLeftSpeed.toDouble(),collisionRightSpeed.toDouble(),
+                                collisionRestitution.toDouble())
+                            collisionTime=0f;collisionPlaying=false;warning=""
+                        }.onFailure{collisionRun=null;collisionPlaying=false
+                            warning=it.message?:"Invalid two-body collision assumptions"}
+                    }){Text("Calculate two-body collision")}
+                } else Text("Add another solid and assign an assumed material to each.")
+                collisionRun?.takeIf{run->
+                    run.projectId==project!!.id&&run.projectRevision==project!!.revision&&
+                    (run.leftEntityId==solid.id||run.rightEntityId==solid.id)
+                }?.let{run->
+                    val state=run.sample(collisionTime.toDouble()
+                        .coerceIn(0.0,run.durationSeconds))
+                    Canvas(Modifier.fillMaxWidth().height(105.dp)
+                        .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                        .semantics{
+                            contentDescription="Calculated one-dimensional two-object impact scene; exact mass and motion are displayed below"
+                        }){
+                        val boundary=listOf(
+                            run.sample(0.0),
+                            run.sample(run.impactTimeSeconds),
+                            run.sample(run.durationSeconds))
+                        val minX=boundary.minOf{
+                            minOf(it.leftCenterXM-run.leftHalfWidthM,
+                                it.rightCenterXM-run.rightHalfWidthM)
+                        }
+                        val maxX=boundary.maxOf{
+                            maxOf(it.leftCenterXM+run.leftHalfWidthM,
+                                it.rightCenterXM+run.rightHalfWidthM)
+                        }
+                        val scale=size.width*0.86f/(maxX-minX).toFloat()
+                        val origin=size.width*0.07f
+                        fun screenX(x:Double):Float=
+                            origin+((x-minX).toFloat()*scale)
+                        val leftWidth=(run.leftHalfWidthM*2*scale).toFloat()
+                        val rightWidth=(run.rightHalfWidthM*2*scale).toFloat()
+                        val baseline=size.height*0.7f
+                        drawLine(Color.LightGray,Offset(0f,baseline+15f),
+                            Offset(size.width,baseline+15f),strokeWidth=2f)
+                        drawRect(Color(0xFF69C3C3),
+                            Offset(screenX(state.leftCenterXM)-leftWidth/2,baseline-22f),
+                            Size(leftWidth,43f))
+                        drawRect(Color(0xFFF2B877),
+                            Offset(screenX(state.rightCenterXM)-rightWidth/2,baseline-22f),
+                            Size(rightWidth,43f))
+                    }
+                    Text("Impact at "+labNumber(run.impactTimeSeconds)+" s")
+                    Text("Impulse: "+labNumber(run.impulseNs)+" N·s")
+                    Text("Post-impact left/right speed: "+
+                        labNumber(run.leftFinalVelocityMps)+" / "+
+                        labNumber(run.rightFinalVelocityMps)+" m/s")
+                    Text("Momentum before/after: "+labNumber(run.momentumBeforeKgMps)+
+                        " / "+labNumber(run.momentumAfterKgMps)+" kg·m/s")
+                    Text("Kinetic energy before/after: "+labNumber(run.energyBeforeJ)+
+                        " / "+labNumber(run.energyAfterJ)+" J")
+                    Text("Dissipated kinetic energy: "+labNumber(run.dissipatedEnergyJ)+" J")
+                    Text("Left/right centre X at this time: "+
+                        labNumber(state.leftCenterXM)+" / "+labNumber(state.rightCenterXM)+" m")
+                    Slider(value=collisionTime,onValueChange={
+                        collisionPlaying=false;collisionTime=it
+                    },valueRange=0f..run.durationSeconds.toFloat(),
+                        modifier=Modifier.semantics{contentDescription="Explore collision time"})
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={collisionReversePlayback=false;collisionPlaying=!collisionPlaying}){
+                            Text(if(collisionPlaying)"Pause collision" else "Play collision")
+                        }
+                        OutlinedButton(onClick={collisionReversePlayback=true;collisionPlaying=collisionTime>0f}){
+                            Text("Rewind recording")
+                        }
+                        OutlinedButton(onClick={collisionPlaying=false;collisionReversePlayback=false;collisionTime=0f}){
+                            Text("Reset collision")
+                        }
+}
+                    Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
+                        listOf(0.01f,0.1f,1f,10f,100f).forEach{rate->
+                            OutlinedButton(onClick={collisionSpeed=rate},modifier=Modifier.weight(1f),
+                                contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)){
+                                Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick={
+                        collisionEvidencePicker.launch("world-lab-two-body-collision-evidence.json")
+                    }){Text("Export collision evidence")}
+                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
+                if(material!=null) OutlinedButton(onClick={
+                    editingMaterialId=material.id
+                    proposedName=material.name
+                    proposedDensity=material.densityKgM3?.toString()?:""
+                    proposedModulus=material.youngModulusPa?.toString()?:""
+                    proposedConductivity=material.thermalConductivityWPerMK?.toString()?:""
+                    proposedSpecificHeat=material.specificHeatJPerKgK?.toString()?:""
+                    proposedRefraction=material.refractiveIndex?.toString()?:""
+                }){Text("Revise this material's assumptions")}
+                Text("Assumed mass: "+labNumber(derivedMass)+" kg")
+                Text("Assumed Young's modulus: "+labNumber(material?.youngModulusPa)+" Pa")
+                Text("Calculate how an invented elastic beam bends",
+                    style=MaterialTheme.typography.titleSmall)
+                Text("Rectangular beam: X = clamped length, Y = vertical depth, Z = width. "+
+                    "Downward tip load and linear elasticity are assumed, not observed.",
+                    style=MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value=beamForce,onValueChange={beamForce=it;beamRun=null},
+                    label={Text("Downward cantilever end load (newtons)")},
+                    singleLine=true,modifier=Modifier.fillMaxWidth())
+                OutlinedButton(onClick={
+                    runCatching {
+                        val force=beamForce.toDouble()
+                        beamRun=NativeWorldLabStructural.bending(project!!,solid.id,force)
+                        warning=""
+                    }.onFailure{
+                        beamRun=null
+                        warning=it.message?:"Unsupported elastic beam assumptions."
+                    }
+                },enabled=solid.shape=="box"&&(material?.youngModulusPa?:0.0)>0.0){
+                    Text("Calculate elastic bending")
+                }
+                beamRun?.takeIf{it.projectId==project!!.id&&
+                    it.projectRevision==project!!.revision&&it.entityId==solid.id&&
+                    it.forceN==beamForce.toDoubleOrNull()}?.let{run->
+                    Text("Free-end deflection: "+labNumber(run.tipDeflectionM)+" m")
+                    Text("Maximum bending stress: "+labNumber(run.maximumStressPa)+" Pa")
+                    Text("Maximum surface strain: "+labNumber(run.surfaceStrain))
+                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Try floating your invention",style=MaterialTheme.typography.titleSmall)
+                Text("Fluid surface above ground: "+labNumber(waterSurfaceHeight.toDouble())+" m")
+                Slider(value=waterSurfaceHeight,onValueChange={
+                    waterSurfaceHeight=it;fluidPlaying=false;fluidMotion=null
+                },valueRange=0f..5f,
+                    modifier=Modifier.semantics {contentDescription="Liquid surface height"})
+                Text("Assumed fluid drag: "+labNumber(fluidDrag.toDouble())+" N·s/m")
+                Slider(value=fluidDrag,onValueChange={
+                    fluidDrag=it;fluidPlaying=false;fluidMotion=null
+                },valueRange=0f..1000f,
+                    modifier=Modifier.semantics {contentDescription="Assumed viscous damping"})
+                OutlinedButton(onClick={
+                    runCatching{
+                        val start=(solid.positionMeters.y-solid.dimensionsMeters.y/2)
+                            .coerceAtLeast(0.0)
+                        fluidMotion=NativeWorldLabFluidMotion.evaluate(
+                            project!!,solid.id,NativeLabFluidMotionInput(
+                                fluidDensity,waterSurfaceHeight.toDouble(),start,
+                                fluidDrag.toDouble()))
+                        fluidFrame=0;fluidPlaying=true;warning=""
+                    }.onFailure{fluidMotion=null;fluidPlaying=false
+                        warning=it.message?:"Buoyant motion cannot be calculated"}
+                }){Text("Simulate floating or sinking")}
+                fluidMotion?.takeIf{it.projectId==project!!.id&&
+                    it.projectRevision==project!!.revision&&it.entityId==solid.id}?.let{motion->
+                    val observation=motion.samples[fluidFrame.coerceIn(0,motion.samples.lastIndex)]
+                    Text("Fluid simulation: "+labNumber(observation.timeSeconds)+" seconds")
+                    Text("Bottom height: "+labNumber(observation.bottomHeightM)+" m")
+                    Text("Velocity: "+labNumber(observation.velocityMps)+" m/s")
+                    Text("Buoyancy: "+labNumber(observation.buoyancyForceN)+" N")
+                    Text("Submerged depth: "+labNumber(observation.immersionDepthM)+" m")
+                    Text("Energy residual: "+labNumber(observation.energyResidualJ)+" J")
+                    Slider(value=fluidFrame.toFloat()/motion.samples.lastIndex,
+                        onValueChange={fluidPlaying=false
+                            fluidFrame=(it*motion.samples.lastIndex).toInt()},
+                        modifier=Modifier.semantics {contentDescription="Explore fluid motion time"})
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        OutlinedButton(onClick={fluidPlaying=!fluidPlaying}){
+                            Text(if(fluidPlaying)"Pause fluid" else "Play fluid")
+                        }
+                        OutlinedButton(onClick={fluidPlaying=false;fluidFrame=0}){
+                            Text("Reset fluid")
+                        }
+                    }
+                    Text(motion.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Assumed fluid density: "+labNumber(fluidDensity)+" kg/m³")
+                Slider(value=fluidDensity.toFloat(),onValueChange={
+                    fluidDensity=it.toDouble();hydroRun=null
+                    fluidPlaying=false;fluidMotion=null;fluidFrame=0
+                },valueRange=100f..2500f,
+                    modifier=Modifier.semantics {contentDescription="Fluid density"})
+                Text("Immersion: "+labNumber(immersionFraction.toDouble()*100)+"% of height")
+                Slider(value=immersionFraction,onValueChange={
+                    immersionFraction=it;hydroRun=null
+                },valueRange=0f..1f,
+                    modifier=Modifier.semantics {contentDescription="Fraction of solid submerged"})
+                OutlinedButton(onClick={
+                    runCatching{
+                        hydroRun=NativeWorldLabHydrostatics.evaluate(project!!,solid.id,
+                            fluidDensity,solid.dimensionsMeters.y*immersionFraction.toDouble())
+                        warning=""
+                    }.onFailure{hydroRun=null;warning=it.message?:"Fluid experiment failed"}
+                }){Text("Calculate buoyancy")}
+                hydroRun?.takeIf{it.projectId==project!!.id &&
+                    it.projectRevision==project!!.revision && it.entityId==solid.id}?.let{fluid->
+                    Text("Displaced liquid: "+labNumber(fluid.displacedVolumeM3)+" m³")
+                    Text("Buoyancy force: "+labNumber(fluid.buoyancyForceN)+" N")
+                    Text("Bottom pressure: "+labNumber(fluid.bottomGaugePressurePa)+" Pa")
+                    Text("Status: "+fluid.status)
+                    Text("Net upward force: "+labNumber(fluid.netUpwardForceN)+" N")
+                    Text("Equilibrium draft: "+labNumber(fluid.equilibriumDraftM)+" m")
+                    Text(fluid.validity,style=MaterialTheme.typography.bodySmall)
+                }
+                if(derivedMass!=null && derivedMass in 0.001..10000.0){
+                    OutlinedButton(onClick={mass=derivedMass.toFloat();kind="spring";time=0f;playing=false}) {
+                        Text("Test assumed mass as spring mass")
+                    }
+                    OutlinedButton(onClick={
+                        runCatching {
+                            val dimensions=solid.dimensionsMeters
+                            val area=if(solid.shape=="box")dimensions.x*dimensions.z
+                                else PI*dimensions.x*dimensions.z/4.0
+                            val result=NativeWorldLabDropScience.evaluate(NativeDropInput(
+                                massKg=derivedMass,supportingHalfHeightM=dimensions.y/2,
+                                projectedAreaM2=area,
+                                dragCoefficient=if(solid.shape=="sphere")0.47 else 1.05))
+                            dropRun=result;dropEntityId=solid.id;dropFrame=0;dropPlaying=true;warning=""
+                            playing=false
+                        }.onFailure{warning=it.message?:"This drop test exceeded the supported model."}
+                    }) { Text("Drop this solid") }
+                    OutlinedButton(onClick={
+                        motorThermalEnabled=!motorThermalEnabled
+                        motorResult=null;motorAudit=null;motorPlaying=false
+                    }) { Text(if(motorThermalEnabled)"Coil heating: on" else "Coil heating: off") }
+                    Row {
+                        Checkbox(checked=motorPowerOffAtSeconds!=null,onCheckedChange={enabled->
+                            motorPowerOffAtSeconds=if(enabled)2.0 else null
+                            motorPlaying=false;motorResult=null;motorAudit=null
+                        })
+                        Text("Open supply switch during standalone motor run")
+                    }
+                    motorPowerOffAtSeconds?.let{cutoff->
+                        Text("Supply switch opens at "+labNumber(cutoff)+" s")
+                        Slider(value=cutoff.toFloat(),onValueChange={value->
+                            motorPowerOffAtSeconds=value.toDouble()
+                            motorPlaying=false;motorResult=null;motorAudit=null
+                        },valueRange=0f..4f,modifier=Modifier.semantics {
+                            contentDescription="Motor supply isolation event time"
+                        })
+                        Text("The modeled coil current remains continuous and decays after source isolation; fuse arcing and contact bounce are not modeled.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedButton(onClick={
+                        runCatching {
+                            val input=NativeActuatorInput(massKg=derivedMass,
+                                powerOffAtSeconds=motorPowerOffAtSeconds,
+                                thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
+                            val result=NativeWorldLabActuator.evaluate(input)
+                            motorAudit=NativeWorldLabActuator.numericalAudit(input,result)
+                            motorResult=result;wiredMotor=null;digitalMotor=null;motorEntityId=solid.id
+                            motorRunIdentity=java.util.UUID.randomUUID().toString()
+                            motorFrame=0;motorReversePlayback=false;motorPlaying=true
+                            dropPlaying=false;playing=false;warning=""
+                        }.onFailure{warning=it.message?:"This powered mechanism is outside the local solver limits."}
+                    }) { Text("Power this solid") }
+                    if(project!!.networks.isNotEmpty()){
+                        OutlinedButton(onClick={
+                            runCatching{
+                                val connected=NativeWorldLabNetworkMotor.evaluate(
+                                    project!!,project!!.networks.first(),solid.id,
+                                    derivedMass,motorThermalEnabled)
+                                val sourceVoltage=project!!.networks.first().components
+                                    .first{it.kind=="dc-source"}.voltageV?:0.0
+                                val input=NativeActuatorInput(massKg=derivedMass,
+                                    supplyVoltageV=sourceVoltage,
+                                    thermal=if(motorThermalEnabled)NativeActuatorThermal() else null)
+                                wiredMotor=connected;digitalMotor=null;motorResult=connected.motor
+                                motorAudit=NativeWorldLabActuator.numericalAudit(input,connected.motor)
+                                motorEntityId=solid.id;motorRunIdentity=java.util.UUID.randomUUID().toString()
+                                motorFrame=0;motorReversePlayback=false;motorPlaying=true
+                                dropPlaying=false;playing=false;warning=""
+                            }.onFailure{warning=it.message?:"Connected motor cannot be calculated."}
+                        }){Text("Wire motor to circuit")}
+                    }
+                    project!!.digitalNetworks.firstOrNull()?.let{logic->
+                        logic.outputs.forEach{output->
+                            OutlinedButton(onClick={
+                                runCatching {
+                                    val run=NativeWorldLabDigitalMotor.evaluate(
+                                        project!!,logic.id,output.id,solid.id,
+                                        derivedMass,thermal=motorThermalEnabled)
+                                    val selfCheck=NativeWorldLabActuator.numericalAudit(
+                                        run.input,run.motor)
+                                    digitalMotor=run;wiredMotor=null
+                                    motorResult=run.motor;motorAudit=selfCheck
+                                    motorEntityId=solid.id;motorRunIdentity=java.util.UUID.randomUUID().toString()
+                                    motorFrame=0;motorReversePlayback=false;motorPlaying=true
+                                    dropPlaying=false;playing=false;warning=""
+                                }.onFailure{cause->
+                                    digitalMotor=null
+                                    warning=cause.message?:"Invented digital motor cannot run"
+                                }
+                            }){
+                                Text("Drive with invented logic: "+output.label)
+                            }
+                        }
+                    }
+                    if(motorEntityId==solid.id && motorResult!=null){
+                        val run=checkNotNull(motorResult)
+                        val sample=run.samples[motorFrame.coerceIn(0,run.samples.lastIndex)]
+                        Canvas(Modifier.fillMaxWidth().height(100.dp)
+                            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                            .semantics { contentDescription="Calculated electromechanical lifting scene" }) {
+                            val y=size.height*0.86f
+                            val frac=(sample.heightM/4).coerceIn(0.0,1.0).toFloat()
+                            drawLine(Color.LightGray,Offset(0f,y),Offset(size.width,y),strokeWidth=3f)
+                            drawCircle(Color(0xFF69C3C3),size.minDimension*0.09f,
+                                Offset(size.width/2,y-frac*size.height*0.72f))
+                        }
+                        digitalMotor?.takeIf{it.projectId==project!!.id &&
+                            it.projectRevision==project!!.revision &&
+                            it.entityId==solid.id && it.motor===run}?.let{linked->
+                            Text("Invented logic output: "+linked.logicBit)
+                            Text("Applied ideal voltage: "+
+                                labNumber(linked.input.supplyVoltageV)+" V")
+                            Text(linked.validity,style=MaterialTheme.typography.bodySmall)
+                        }
+                        Text("Applied source voltage: "+labNumber(sample.sourceVoltageV)+" V")
+                        if(run.modelVersion=="1.2.0"){
+                            Text(if((motorClock?.simulationTimeSeconds?:sample.timeSeconds)<(motorPowerOffAtSeconds?:Double.POSITIVE_INFINITY))
+                                "Supply connected" else if(abs(sample.currentA)>1e-4)
+                                "Supply isolated · coil current decaying" else "Supply isolated · current near zero")
+                        }
+                        Text("Electrical current: "+labNumber(sample.currentA)+" A")
+                        Text("Powered height: "+labNumber(sample.heightM)+" m")
+                        Text("Upward force: "+labNumber(sample.motorForceN)+" N")
+                        Text("Back-EMF: "+labNumber(sample.backEmfV)+" V")
+                        Text("Coil heating: "+labNumber(sample.resistiveHeatW)+" W")
+                        sample.coilTemperatureK?.let{Text("Coil temperature: "+labNumber(it)+" K")}
+                        sample.coilResistanceOhm?.let{Text("Hot resistance: "+labNumber(it)+" Ω")}
+                        if(sample.coilTemperatureK!=null){
+                            Text("Stored coil heat: "+labNumber(sample.thermalEnergyJ)+" J")
+                            Text("Cooling: "+labNumber(sample.coolingPowerW)+" W")
+                        }
+                        Text("Energy balance residual: "+labNumber(sample.energyResidualJ)+" J")
+                        wiredMotor?.takeIf{it.projectId==project!!.id &&
+                            it.projectRevision==project!!.revision &&
+                            it.entityId==solid.id}?.let{wired->
+                            val observed=wired.samples[motorFrame.coerceIn(0,wired.samples.lastIndex)]
+                            Text("Total DC source current: "+labNumber(observed.totalSourceCurrentA)+" A")
+                            Text("Passive resistor heat: "+labNumber(observed.passiveResistorHeatW)+" W")
+                            Text("Combined energy residual: "+labNumber(observed.combinedEnergyResidualJ)+" J")
+                            Text(wired.validity,style=MaterialTheme.typography.bodySmall)
+                        }
+                        motorAudit?.let { audit ->
+                            Text("Numerical self-check: "+audit.status+". "+audit.explanation)
+                        }
+                        Slider(value=motorFrame.toFloat(),onValueChange={value->
+                            motorPlaying=false
+                            val index=value.toInt().coerceIn(0,run.samples.lastIndex)
+                            motorRecordedRun?.let { recording->
+                                motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.seek(recording,clock,
+                                        recording.sampleTimesSeconds[index])
+                                    motorFrame=motorClock!!.sampleIndex
+                                } ?: run { motorFrame=index }
+                            } ?: run { motorFrame=index }
+                        },valueRange=0f..run.samples.lastIndex.toFloat(),
+                            modifier=Modifier.semantics { contentDescription="Motor recorded sample position" })
+                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(onClick={
+                                runCatching {
+                                    val recording=motorRecordedRun?:error("A valid recorded motor run is required.")
+                                    val clock=motorClock?:error("Motor timeline is not ready.")
+                                    val checkpoint=NativeWorldLabRecordedTime.checkpoint(recording,clock)
+                                    pendingMotorCheckpointJson=NativeWorldLabRecordedCheckpointCodec.encode(checkpoint,recording)
+                                    motorCheckpointExportPicker.launch("world-lab-motor-clock.json")
+                                    motorCheckpointStatus=""
+                                }.onFailure{motorCheckpointStatus=it.message?:"Motor checkpoint could not be created."}
+                            }){Text("Save motor checkpoint")}
+                            OutlinedButton(onClick={
+                                if(motorRecordedRun==null)motorCheckpointStatus="Run the motor experiment before restoring a matching checkpoint."
+                                else motorCheckpointImportPicker.launch(arrayOf("application/json"))
+                            }){Text("Restore motor checkpoint")}
+                        }
+                        if(motorCheckpointStatus.isNotBlank())Text(motorCheckpointStatus,
+                            style=MaterialTheme.typography.bodySmall)
+                        Text("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.",
+                            style=MaterialTheme.typography.bodySmall)
+                        Text("Playback rate: "+labNumber(motorSpeed.toDouble())+"×")
+                        Slider(value=motorSpeed,onValueChange={motorSpeed=it},
+                            valueRange=0.01f..100f,modifier=Modifier.semantics {
+                                contentDescription="Motor recorded playback speed"
+                            })
+                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(onClick={
+                                motorPlaying=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.step(recording,clock,-1)
+                                    motorFrame=motorClock!!.sampleIndex
+                                }}
+                            }){Text("Prev")}
+                            OutlinedButton(onClick={
+                                motorPlaying=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.step(recording,clock,1)
+                                    motorFrame=motorClock!!.sampleIndex
+                                }}
+                            }){Text("Next")}
+                            OutlinedButton(onClick={
+                                motorReversePlayback=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    if(clock.simulationTimeSeconds>=recording.durationSeconds-1e-9){
+                                        motorClock=NativeWorldLabRecordedTime.seek(recording,clock,0.0);motorFrame=0
+                                    }
+                                }}
+                                motorPlaying=!motorPlaying
+                            }){Text(if(motorPlaying&&!motorReversePlayback) "Pause" else "Play")}
+                            OutlinedButton(onClick={
+                                motorReversePlayback=true
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    if(clock.simulationTimeSeconds<=1e-9){
+                                        motorClock=NativeWorldLabRecordedTime.seek(recording,clock,recording.durationSeconds)
+                                        motorFrame=motorClock!!.sampleIndex
+                                    }
+                                }}
+                                motorPlaying=true
+                            }){Text("Rewind")}
+                            OutlinedButton(onClick={
+                                motorPlaying=false
+                                motorRecordedRun?.let { recording->motorClock?.let { clock->
+                                    motorClock=NativeWorldLabRecordedTime.seek(recording,clock,0.0);motorFrame=0
+                                }}
+                            }){Text("Beginning")}
+                        }
+                        motorClock?.let { clock->
+                            Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
+                                (clock.sampleIndex+1)+"/"+run.samples.size+" · world UTC "+clock.worldDateUTC,
+                                style=MaterialTheme.typography.bodySmall)
+                            Text("Wall UTC "+clock.wallTimeUTC+" · local zone "+clock.timezoneDisplay+
+                                " · cached solver output",style=MaterialTheme.typography.bodySmall)
+                        }
+                        Text("Hypothetical values, coupled 1D coil and lift calculation. Not measured or certified.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    if(dropEntityId==solid.id && dropRun!=null) {
+                        val drop=checkNotNull(dropRun)
+                        val sample=drop.samples[dropFrame.coerceIn(0,drop.samples.lastIndex)]
+                        Canvas(Modifier.fillMaxWidth().height(100.dp)
+                            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                            .semantics { contentDescription="Calculated vertical drop and ground contact" }) {
+                            val floorY=size.height*0.85f
+                            val fraction=(sample.heightAboveGroundM/5.0).coerceIn(0.0,1.0).toFloat()
+                            drawLine(Color.LightGray,Offset(0f,floorY),Offset(size.width,floorY),strokeWidth=3f)
+                            drawCircle(Color(0xFFF2B877),size.minDimension*0.08f,
+                                Offset(size.width/2,floorY-fraction*size.height*0.7f))
+                        }
+                        Text("Computed drop height: "+labNumber(sample.heightAboveGroundM)+" m")
+                        Text("Computed vertical speed: "+labNumber(kotlin.math.abs(sample.velocityMps))+" m/s")
+                        Text("Estimated surface impacts: "+drop.impactCount)
+                        Slider(value=dropFrame.toFloat(),onValueChange={
+                            dropPlaying=false;dropFrame=it.toInt().coerceIn(0,drop.samples.lastIndex)
+                        },valueRange=0f..drop.samples.lastIndex.toFloat(),
+                            modifier=Modifier.semantics { contentDescription="Drop simulated time" })
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick={dropPlaying=!dropPlaying}){
+                                Text(if(dropPlaying)"Pause drop" else "Play drop")
+                            }
+                            OutlinedButton(onClick={dropPlaying=false;dropFrame=0}){Text("Reset drop")}
+                        }
+                        Text("Simplified gravity, drag and flat-ground contact; assumed density, not verified strength.",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+    }
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text("The World Lab",style=MaterialTheme.typography.titleLarge)
+        Text("Native offline reference models. Ground and shapes are illustrative, not measured or certified.",
+            style=MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            listOf("spring" to "Spring","rc" to "Circuit","heat" to "Heat").forEach { pair ->
+                if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
+                    modifier=Modifier.weight(1f)) { Text(pair.second) }
+                else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
+                    modifier=Modifier.weight(1f)) { Text(pair.second) }
+            }
+        }
+        Canvas(Modifier.fillMaxWidth().height(170.dp)
+            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+            .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
+        if(kind=="spring") {
+                drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
+                    Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
+                val x=((observation?.xMeters?:0.0).coerceIn(-1.0,1.0)*size.width*0.3).toFloat()
+                drawCircle(Color(0xFFF2B877),size.minDimension*0.11f,
+                    Offset(size.width/2+x,size.height/2))
+            }else if(kind=="rc") {
+                drawRect(Color.Gray,Offset(size.width*0.28f,size.height*0.2f),
+                    Size(size.width*0.44f,size.height*0.6f))
+                val ratio=((observation?.voltageV?:0.0)/10.0).coerceIn(0.0,1.0).toFloat()
+                drawRect(Color(0xFF65B7CD),
+                    Offset(size.width*0.28f,size.height*(0.8f-0.6f*ratio)),
+                    Size(size.width*0.44f,size.height*0.6f*ratio))
+            }else {
+                val temperatures=observation?.temperatureK?:List(21){293.15}
+                temperatures.forEachIndexed { i,kelvin ->
+                    val hot=((kelvin-293.15)/80.0).coerceIn(0.0,1.0).toFloat()
+                    drawRect(Color(0.2f+0.78f*hot,0.32f+0.47f*hot,0.56f),
+                        Offset(size.width*(0.07f+0.86f*i/21),size.height*0.38f),
+                        Size(size.width*0.86f/21*0.96f,size.height*0.24f))
+                }
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+            OutlinedButton(onClick={
+                runCatching{
+                    pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
+                        NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
+                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble(),
+                            wallTimeUTC=java.time.Instant.now().toString(),worldEpochUTC=worldEpochUTC,
+                            solverInternalTimeSeconds=time.toDouble(),displaySampleTimeSeconds=time.toDouble(),
+                            playbackRate=speed.toDouble(),
+                            playbackDirection=if(reversePlayback)"reverse-recording" else "forward",
+                            timezoneDisplay=java.time.ZoneId.systemDefault().id,
+                            solverStepSeconds=observation?.solverStepSeconds?:1.0/240.0))
+                    timelineExportPicker.launch("world-lab-time-checkpoint.json")
+                }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
+            }){Text("Save checkpoint")}
+            OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
+                Text("Restore checkpoint")
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                Button(onClick={runCatching{
+                    val manifest=NativeWorldLabReplayCodec.create(model,worldEpochUTC,java.time.ZoneId.systemDefault().id)
+                    pendingReplayJson=NativeWorldLabReplayCodec.encode(manifest).toString(Charsets.UTF_8)
+                    replayExportPicker.launch("world-lab-replay-manifest.json")
+                    replayManifestStatus=""
+                }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be created."}}){
+                    Text("Save deterministic replay")
+                }
+                OutlinedButton(onClick={replayImportPicker.launch(arrayOf("application/json"))}){
+                    Text("Open & replay manifest")
+                }
+            }
+            if(replayManifestStatus.isNotBlank())Text(replayManifestStatus,style=MaterialTheme.typography.bodySmall)
+        }
+        if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
+        demoClock?.let{clock->
+            Text("Wall UTC "+clock.wallTimeUTC+" · World UTC "+clock.worldDateUTC+
+                " · "+clock.timezoneDisplay,style=MaterialTheme.typography.bodySmall)
+            Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
+                labNumber(clock.displaySampleTimeSeconds)+" s · cached model output",
+                style=MaterialTheme.typography.bodySmall)
+        }
+        Text("Astronomical time scales · UTC / TAI / TT / UT1",style=MaterialTheme.typography.titleSmall)
+        val currentWorldUTC=demoClock?.worldDateUTC?:worldEpochUTC
+        val taiTtResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTaiTt(currentWorldUTC)}}
+        val tcgResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTcg(currentWorldUTC)}}
+        taiTtResult.fold(onSuccess={times->
+            Text("TAI ${times.first} · TT ${times.second}",style=MaterialTheme.typography.bodySmall)
+        },onFailure={error->
+            Text(error.message?: "TAI/TT unavailable.",style=MaterialTheme.typography.bodySmall,
+                color=MaterialTheme.colorScheme.error)
+        })
+        tcgResult.fold(onSuccess={tcg->Text("TCG ${tcg.tcg} · IAU 2000 fixed-rate relation",style=MaterialTheme.typography.bodySmall)},
+            onFailure={error->Text(error.message?: "TCG conversion unavailable.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)})
+        Text("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived here without a barycentric ephemeris.",
+            style=MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick={iersBulletinPicker.launch(arrayOf("text/plain","application/octet-stream"))}){
+            Text("Import IERS Bulletin A (ser7.dat)")
+        }
+        if(earthOrientation!=null){
+            val ut1Result=remember(currentWorldUTC,earthOrientation){
+                runCatching{NativeWorldLabTimeScales.utcToUt1(currentWorldUTC,earthOrientation!!)}
+            }
+            ut1Result.fold(onSuccess={reading->
+                Text("UT1 ${reading.ut1} · DUT1 ${labNumber(reading.dut1Seconds!!)} s ± ${labNumber(reading.ut1UncertaintySeconds!!)} s · ${reading.quality}",
+                    style=MaterialTheme.typography.bodySmall)
+                Text("${reading.bulletin} · issued ${reading.issuedDateUTC}",
+                    style=MaterialTheme.typography.bodySmall)
+            },onFailure={error->
+                Text(error.message?: "UT1 is unavailable for this date.",style=MaterialTheme.typography.bodySmall)
+            })
+        }
+        if(earthOrientationStatus.isNotBlank())Text(earthOrientationStatus,style=MaterialTheme.typography.bodySmall)
+        NativeWorldLabFieldImportPanel(timeSeconds=demoClock?.simulationTimeSeconds?:time.toDouble())
+        Text("Approximate sunrise and sunset",style=MaterialTheme.typography.titleSmall)
+        OutlinedTextField(value=solarDateUTC,onValueChange={solarDateUTC=it.take(10)},
+            label={Text("UTC date · YYYY-MM-DD")},singleLine=true,
+            modifier=Modifier.fillMaxWidth())
+        val solarOrigin=project?.geodeticOrigin
+        if(solarOrigin==null){
+            Text("Save a WGS84 Earth reference to calculate solar events for this project.",
+                style=MaterialTheme.typography.bodySmall)
+        }else{
+            val solarResult=remember(solarDateUTC,solarOrigin){
+                runCatching{NativeWorldLabSolarEvents.calculate(solarDateUTC,
+                    solarOrigin.latitudeDegrees,solarOrigin.longitudeDegrees)}
+            }
+            val solarZone=remember(demoClock?.timezoneDisplay){
+                runCatching{java.time.ZoneId.of(demoClock?.timezoneDisplay?:java.time.ZoneId.systemDefault().id)}
+                    .getOrDefault(java.time.ZoneId.systemDefault())
+            }
+            val solarFormatter=remember(solarZone){
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm z",Locale.getDefault()).withZone(solarZone)
+            }
+            solarResult.fold(onSuccess={events->
+                when(events.status){
+                    NativeWorldLabSolarStatus.NORMAL->{
+                        Text("Sunrise "+solarFormatter.format(java.time.Instant.parse(events.sunriseUTC!!))+
+                            " · Sunset "+solarFormatter.format(java.time.Instant.parse(events.sunsetUTC!!)),
+                            style=MaterialTheme.typography.bodyMedium)
+                        Text("Solar noon "+solarFormatter.format(java.time.Instant.parse(events.solarNoonUTC))+
+                            " · Daylight "+labNumber(events.daylightMinutes!!/60.0)+" h",
+                            style=MaterialTheme.typography.bodySmall)
+                    }
+                    NativeWorldLabSolarStatus.POLAR_DAY->Text(
+                        "Polar day · Sun remains above the model's apparent horizon for this UTC date.",
+                        style=MaterialTheme.typography.bodySmall)
+                    NativeWorldLabSolarStatus.POLAR_NIGHT->Text(
+                        "Polar night · Sun remains below the model's apparent horizon for this UTC date.",
+                        style=MaterialTheme.typography.bodySmall)
+                }
+                Text("NOAA general solar-position estimate · WGS84 project origin · "+
+                    "local display zone "+solarZone.id+
+                    ". Not an observed horizon, weather forecast or precision ephemeris.",
+                    style=MaterialTheme.typography.bodySmall)
+            },onFailure={error->
+                Text(error.message?: "Solar estimate is unavailable.",style=MaterialTheme.typography.bodySmall,
+                    color=MaterialTheme.colorScheme.error)
+            })
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(onClick={
+                playing=false;reversePlayback=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("Beginning") }
+            OutlinedButton(onClick={
+                playing=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,-1)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("Previous") }
+            Button(onClick={
+                reversePlayback=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    if(clock.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9){
+                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
+                        time=0f
+                    }
+                }}
+                playing=!playing
+            }) { Text(if(playing&&!reversePlayback)"Pause" else "Play forward") }
+            OutlinedButton(onClick={
+                reversePlayback=true
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    if(clock.simulationTimeSeconds<=1e-9){
+                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                            recording.clockRun.durationSeconds)
+                        time=demoClock!!.simulationTimeSeconds.toFloat()
+                    }
+                }}
+                playing=true
+            }) { Text("Rewind recording") }
+            OutlinedButton(onClick={
+                playing=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,1)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("Next") }
+            OutlinedButton(onClick={
+                playing=false;reversePlayback=false
+                demoRecording?.let{recording->demoClock?.let{clock->
+                    demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                        recording.clockRun.durationSeconds)
+                    time=demoClock!!.simulationTimeSeconds.toFloat()
+                }}
+            }) { Text("End") }
+        }
+        Text("Simulated time: "+labNumber(time.toDouble())+" s")
+        Slider(value=time,onValueChange={value->
+            playing=false
+            demoRecording?.let{recording->demoClock?.let{clock->
+                demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,value.toDouble())
+                time=demoClock!!.simulationTimeSeconds.toFloat()
+            }}
+        },valueRange=0f..12f,
+            modifier=Modifier.semantics { contentDescription="Recorded simulation sample position" })
+        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+            listOf(0.01f,0.1f,1f,10f,100f).forEach { rate ->
+                OutlinedButton(onClick={speed=rate},modifier=Modifier.weight(1f),
+                    contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)) {
+                    Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        if(kind=="spring") {
+            Text("Assumed mass: "+labNumber(mass.toDouble())+" kg")
+            Slider(value=mass.coerceIn(0.1f,100f),onValueChange={mass=it;playing=false},
+                valueRange=0.1f..100f)
+            Text("Spring stiffness: "+labNumber(spring.toDouble())+" N/m")
+            Slider(value=spring,onValueChange={spring=it;playing=false},valueRange=0.1f..30f)
+        }else if(kind=="rc") {
+            Text("Resistance: "+labNumber(resistance.toDouble())+" Ω")
+            Slider(value=resistance,onValueChange={resistance=it;playing=false},valueRange=100f..10000f)
+        }else{
+            Text("Thermal diffusivity: "+labNumber(diffusivity.toDouble())+" m²/s")
+            Slider(value=diffusivity,onValueChange={diffusivity=it;playing=false},valueRange=0.001f..0.08f)
+        }
+        HorizontalDivider()
+        Text("Experiment branches",style=MaterialTheme.typography.titleMedium)
+        Text("Capture the current model inputs as an immutable source, edit inputs, then calculate a separate child run at the same simulation time. Rewind remains cached playback only.",
+            style=MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            OutlinedButton(onClick={captureBranchSource()}){Text("Capture source")}
+            OutlinedButton(onClick={calculateNativeBranch()},
+                enabled=branchSourceInput!=null&&branchSourceInput!=model){Text("Calculate new branch")}
+        }
+        branchRecord?.let{branch->
+            Text("Branch "+branch.branchId+" · "+branch.sourceModelId+" → "+branch.targetModelId,
+                style=MaterialTheme.typography.bodySmall)
+            Text("Source run "+branch.sourceRunId+" · "+branch.inputDiff.size+" changed inputs · "+
+                branch.targetTimeSeconds+" s · "+branch.fidelity,style=MaterialTheme.typography.bodySmall)
+            branch.inputDiff.forEach{change->
+                Text(change.field+": "+(change.previous?.let{labNumber(it)}?:"unset")+
+                    " → "+(change.next?.let{labNumber(it)}?:"unset"),
+                    style=MaterialTheme.typography.bodySmall)
+            }
+            OutlinedButton(onClick={branchExportPicker.launch("world-lab-native-branch.json")}){
+                Text("Export branch evidence")
+            }
+        }
+        if(branchStatus.isNotBlank())Text(branchStatus,style=MaterialTheme.typography.bodySmall)
+        Text("Computed observations",style=MaterialTheme.typography.titleMedium)
+        if(observation==null) Text(result.exceptionOrNull()?.message?:"Unsupported input",
+            color=MaterialTheme.colorScheme.error)
+        else if(kind=="spring") {
+            Text("Position: "+labNumber(observation.xMeters)+" m")
+            Text("Velocity: "+labNumber(observation.velocityMPerS)+" m/s")
+            Text("Mechanical energy: "+labNumber(observation.mechanicalEnergyJ)+" J")
+        }else if(kind=="rc") {
+            Text("Capacitor voltage: "+labNumber(observation.voltageV)+" V")
+            Text("Current: "+labNumber(observation.currentA)+" A")
+            Text("Resistor heating: "+labNumber(observation.resistorHeatW)+" W")
+        }else{
+            Text("Mean temperature: "+labNumber(observation.meanTemperatureK)+" K")
+            Text("Hottest cell: "+labNumber(observation.peakTemperatureK)+" K")
+            if(inside) Text("21 computed internal cell temperatures (K): "+
+                observation.temperatureK.orEmpty().joinToString(", "){labNumber(it)},
+                style=MaterialTheme.typography.bodySmall)
+        }
+        if(inside && kind!="heat") Text("This is a model illustration, not X-ray imaging.",
+            style=MaterialTheme.typography.bodySmall)
+        HorizontalDivider()
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            Button(onClick={askReplace("new")}){Text("New project")}
+            OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
+                enabled=projectJson!=null){Text("Export JSON")}
+            OutlinedButton(onClick={projectJson?.let{cadExportPicker.launch("world-lab-cad.envcad.json")}},
+                enabled=projectJson!=null&&project!!.entities.isNotEmpty()){Text("Export CAD")}
+            OutlinedButton(onClick={
+                if(projectJson!=null)archiveExportPicker.launch(
+                    "world-lab-complete-archive.json")
+            },enabled=projectJson!=null){Text("Export complete archive")}
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+            OutlinedButton(onClick={askReplace("import")}) {
+                Text("Import project or archive")
+            }
+            OutlinedButton(onClick={picker.launch(arrayOf("application/json"))}){
+                Text("Import CAD geometry")
+            }
+        }
+        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Button(onClick={
+                val json=projectJson
+                if(json!=null)scope.launch{
+                    val prior=savedSnapshot
+                    runCatching { withContext(Dispatchers.IO){
+                        val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
+                        val current=NativeWorldLabProjectCodec.decode(json)
+                        val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
+                        localProjects.save(json,expectedSavedRevision=expected)
+                        localProjects.deleteDraft(current.id)
+                        localProjects.listProjects()
+                    } }.onSuccess{items->
+                        savedSnapshot=json;savedProjects=items
+                        selectedSavedId=project?.id?:""
+                        warning="";editHistory.clear()
+                        scope.launch {
+                            runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
+                                .onSuccess{recoveryDrafts=it}
+                        }
+                    }
+                        .onFailure{warning=it.message?:"Could not save the project locally."}
+                }
+            },enabled=projectJson!=null){Text("Save locally")}
+            OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
+        }
+        if(savedProjects.isNotEmpty()){
+            Box {
+                OutlinedButton(onClick={savedMenuOpen=true}){
+                    Text("Saved projects: "+
+                        (savedProjects.firstOrNull{it.id==selectedSavedId}?.title?:"Choose"))
+                }
+                DropdownMenu(expanded=savedMenuOpen,onDismissRequest={savedMenuOpen=false}){
+                    savedProjects.forEach{item->
+                        DropdownMenuItem(
+                            text={Text(item.title+" · revision "+item.revision)},
+                            onClick={selectedSavedId=item.id;savedMenuOpen=false})
+                    }
+                }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={askReplace("open-selected")},
+                    enabled=selectedSavedId.isNotEmpty()){Text("Open selected")}
+                OutlinedButton(onClick={confirmingSavedDelete=true},
+                    enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
+            }
+        }
+        if(recoveryDrafts.isNotEmpty()){
+            Text("Recover unfinished inventions",style=MaterialTheme.typography.titleSmall)
+            Text("Cached drafts never replace the open project unless you choose Restore.",
+                style=MaterialTheme.typography.bodySmall)
+            recoveryDrafts.take(10).forEach{draft->
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    Text(draft.title,modifier=Modifier.weight(1f))
+                    OutlinedButton(onClick={
+                        selectedDraftId=draft.id;askReplace("restore-draft")
+                    }){Text("Restore")}
+                    OutlinedButton(onClick={
+                        selectedDraftId=draft.id;confirmingDraftDelete=true
+                    }){Text("Discard")}
+                }
+            }
+            if(recoveryDrafts.size>10)Text("Older cached drafts: "+
+                (recoveryDrafts.size-10)+" (export or clean up your project cache).")
+        }
+        if(projectJson!=null && savedSnapshot!=projectJson)
+            Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
+                style=MaterialTheme.typography.bodySmall)
+        if(project!=null){
+            Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+            NativeWorldLabViewport(project!!,project!!.entities.getOrNull(selected)?.id,
+                onSelect={id->selected=project!!.entities.indexOfFirst{it.id==id}.coerceAtLeast(0)},
+                onSaveView={position,target->applyProjectEdit{
+                    NativeWorldLabEditor.saveCameraViewpoint(it,position,target)
+                }},
+                onResetView={applyProjectEdit{
+                    NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
+                }},
+                onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
+                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}},
+                inspection=inspection,onInspectionChange={updateInspection(it)},
+                canUndoInspectionView=inspectionHistory.past.isNotEmpty(),
+                canRedoInspectionView=inspectionHistory.future.isNotEmpty(),
+                onUndoInspectionView={travelInspection(false)},
+                onRedoInspectionView={travelInspection(true)})
+            NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
+                applyProjectEdit(transform)
+            }
+            digitalCircuitContent()
+            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
+                    .forEach { (shape,label) ->
+                        OutlinedButton(onClick={applyProjectEdit { NativeWorldLabEditor.addSolid(it,shape) }},
+                            enabled=project!!.entities.size<200,modifier=Modifier.weight(1f)){
+                            Text(label)
+                        }
+                    }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                OutlinedButton(onClick={travelEdit(false)},enabled=editHistory.canUndo){
+                    Text("Undo")
+                }
+                OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
+                    Text("Redo")
+                }
+            }
+            Text("Build from connected visual parts",style=MaterialTheme.typography.titleSmall)
+            Text("Group solids and move them together. A visual assembly is not a simulated joint.",
+                style=MaterialTheme.typography.bodySmall)
+            if(solid!=null){
+                val candidates=project!!.entities.filter{it.id!=solid.id &&
+                    project!!.assemblies.none{a->a.entityIds.contains(it.id)}}
+                if(candidates.isNotEmpty()){
+                    val other=candidates[secondAssemblyIndex%candidates.size]
+                    OutlinedTextField(value=assemblyName,onValueChange={assemblyName=it},
+                        label={Text("Invention group name")},singleLine=true)
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                        OutlinedButton(onClick={
+                            secondAssemblyIndex=(secondAssemblyIndex+1)%candidates.size
+                        }){Text("Second part: "+other.name)}
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.createVisualAssembly(
+                                it,assemblyName,listOf(solid.id,other.id))
+                        }},enabled=project!!.assemblies.size<50&&assemblyName.isNotBlank()&&
+                            project!!.assemblies.none{it.entityIds.contains(solid.id)}){
+                            Text("Group parts")
+                        }
+                    }
+                }
+            }
+            project!!.assemblies.forEach{group->
+                Text(group.name+" · "+group.entityIds.size+" parts",
+                    style=MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    listOf(0 to "X",1 to "Y",2 to "Z").forEach{(axis,label)->
+                        OutlinedButton(onClick={applyProjectEdit{
+                            NativeWorldLabEditor.moveVisualAssembly(it,group.id,
+                                List(3){j->if(j==axis)assemblyMoveStep else 0.0})
+                        }}){Text("Move +"+label)}
+                    }
+                }
+                OutlinedButton(onClick={applyProjectEdit{
+                    NativeWorldLabEditor.ungroupVisualAssembly(it,group.id)
+                }}){Text("Ungroup safely")}
+            }
+            selectedSolidContent()
+            OutlinedTextField(value=proposedName,onValueChange={proposedName=it},
+                label={Text("Invented material name")},singleLine=true,
+                modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedDensity,onValueChange={proposedDensity=it},
+                label={Text("Hypothetical density (kg/m³), or blank")},singleLine=true,
+                modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedModulus,onValueChange={proposedModulus=it},
+                label={Text("Hypothetical Young's modulus (Pa), or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedConductivity,
+                onValueChange={proposedConductivity=it},
+                label={Text("Assumed thermal conductivity (W/m K), or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedSpecificHeat,
+                onValueChange={proposedSpecificHeat=it},
+                label={Text("Assumed specific heat (J/kg K), or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(value=proposedRefraction,
+                onValueChange={proposedRefraction=it},
+                label={Text("Assumed optical refractive index 1–5, or blank")},
+                singleLine=true,modifier=Modifier.fillMaxWidth())
+            Button(onClick={
+                runCatching {
+                    require(proposedName.isNotBlank()){"Name your invented material first."}
+                    val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val conductivity=proposedConductivity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val heatCapacity=proposedSpecificHeat.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val refraction=proposedRefraction.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                    val materialId=editingMaterialId
+                    val freshId=java.util.UUID.randomUUID().toString()
+                    val previous=projectJson
+                    applyProjectEdit{json->
+                        if(materialId!=null){
+                            NativeWorldLabEditor.reviseHypotheticalMaterial(
+                                json,materialId,proposedName,density,modulus,
+                                thermalConductivityWPerMK=conductivity,
+                                specificHeatJPerKgK=heatCapacity,
+                                refractiveIndex=refraction)
+                        }else{
+                            val proposed=NativeWorldLabEditor.addHypotheticalMaterial(
+                                json,proposedName,density,youngModulusPa=modulus,id=freshId,
+                                thermalConductivityWPerMK=conductivity,
+                                specificHeatJPerKgK=heatCapacity,
+                                refractiveIndex=refraction)
+                            solid?.let{NativeWorldLabEditor.assignMaterial(
+                                proposed,it.id,freshId)}?:proposed
+                        }
+                    }
+                    if(projectJson!=previous){
+                        proposedName="";proposedDensity="";proposedModulus=""
+                        proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
+                        editingMaterialId=null;beamRun=null
+                    }
+                }.onFailure{warning=it.message?:"Material edit was not saved."}
+            }){Text(if(editingMaterialId==null)"Save invented material" else "Save revised material")}
+            if(editingMaterialId!=null)OutlinedButton(onClick={
+                editingMaterialId=null;proposedName="";proposedDensity="";proposedModulus=""
+                proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
+            }){Text("Cancel material revision")}
+            Text("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.",
+                style=MaterialTheme.typography.bodySmall)
+        }
+        if(warning.isNotBlank()) Text(warning,color=MaterialTheme.colorScheme.error)
+        Text("Science model 1.0.0 · hypothesis, not engineering certification.",
+            style=MaterialTheme.typography.labelSmall)
+    }
+}
+private fun labNumber(n:Double?):String =
+    n?.takeIf{it.isFinite()}?.let{"%.5g".format(Locale.US,it)}?:"Unknown"
+
+private fun nativeLabImpactVelocity(text:String):NativeLabVector {
+    val values=text.split(",").map{it.trim().toDouble()}
+    require(values.size==3&&values.all{it.isFinite()}){
+        "Provide three finite X,Y,Z velocity components separated by commas"
+    }
+    return NativeLabVector(values[0],values[1],values[2])
+}

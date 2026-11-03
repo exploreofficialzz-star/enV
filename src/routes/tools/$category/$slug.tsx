@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate, notFound } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
-const ArtboardStudio = lazy(() => import("@/components/game-studio/game-studio"));
+const WorldLab = lazy(() => import("@/components/world-lab/world-lab"));
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolViewAnalytics } from "@/components/tools/tool-view-analytics";
 import { ToolShell } from "@/components/tools/tool-shell";
@@ -93,7 +93,12 @@ export const Route = createFileRoute("/tools/$category/$slug")({
 function Tool() {
   const { category, slug } = Route.useParams();
   const { mode, action, op } = Route.useSearch();
-  if (category === "developer" && slug === "artboard-studio") return <AppShell><ToolViewAnalytics toolId="artboard-studio" /><Suspense fallback={<p>Loading Artboard Studio…</p>}><ArtboardStudio /></Suspense></AppShell>;
+  if (category === "developer" && slug === "artboard-studio") {
+    return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: "the-world-lab" }} search={{ mode: undefined, action: undefined, op: undefined }} replace />;
+  }
+  if (category === "developer" && slug === "the-world-lab") {
+    return <AppShell><ToolViewAnalytics toolId="the-world-lab" /><Suspense fallback={<p className="p-5">Loading The World Lab…</p>}><WorldLab /></Suspense></AppShell>;
+  }
   if ((category === "business" || category === "calculators") && slug === "break-even-calculator") {
     return <Navigate to="/tools/$category/$slug" params={{ category: "business", slug: "finance-studio" }} search={{ mode: "break-even", action: undefined, op: undefined }} replace />;
   }
