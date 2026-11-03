@@ -122,7 +122,7 @@ assert.ok(worldLabEntryCss.includes('#f1f4f9') && worldLabEntryCss.includes('#f9
 assert.ok(nativeKotlin.includes('R.drawable.world_lab_title') && nativeKotlin.includes('R.drawable.world_lab_logo') && nativeKotlin.includes('🪐'), 'Android must use the exact wordmark, original logo and Saturn artwork');
 assert.ok(nativeKotlin.includes('Color(0xFFDBEAFF)') && nativeKotlin.includes('Color(0xFFF9FAFC)'), 'Android entry colors must match the screenshot');
 assert.ok(nativeSwift.includes('Image("WorldLabTitle")') && nativeSwift.includes('Image("WorldLabLogo")') && nativeSwift.includes('🪐'), 'iOS must use the exact wordmark, original logo and Saturn artwork');
-assert.ok(nativeSwift.includes('219 / 255') && nativeSwift.includes('249 / 255'), 'iOS entry colors must match the screenshot');
+assert.ok(nativeSwift.includes('219.0 / 255.0') && nativeSwift.includes('249.0 / 255.0'), 'iOS entry colors must match the screenshot');
 
 const worldLabEntryCssPositionCheck = readFileSync('src/components/world-lab/world-lab-entry.css', 'utf8');
 assert.ok(worldLabEntryCssPositionCheck.includes('translateY(-16svh)'), 'Web World Lab entry must align the group in the upper third of the screen');
