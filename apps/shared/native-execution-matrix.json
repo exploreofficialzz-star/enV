@@ -6,11 +6,11 @@
     "active": 10002,
     "planned": 0,
     "offlineNative": 7752,
-    "backendNative": 1624,
-    "webOnly": 626,
-    "missingActive": 626,
+    "backendNative": 1620,
+    "webOnly": 630,
+    "missingActive": 630,
     "divergentActive": 0,
-    "fullyExecutable": 9376
+    "fullyExecutable": 9372
   },
   "tools": [
     {
