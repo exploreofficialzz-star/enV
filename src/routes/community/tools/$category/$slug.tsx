@@ -10,8 +10,10 @@ export const Route = createFileRoute("/community/tools/$category/$slug")({
     const feed = await loadPublicCommunityToolFeed({ data: { toolId: tool.id } });
     return { tool, feed };
   },
-  head: ({ loaderData }) => {
-    const { tool, feed } = loaderData;
+  head: ({ params, loaderData }) => {
+    const tool = loaderData?.tool ?? getToolByPath(params.category, params.slug);
+    if (!tool) return { meta: [{ title: "Public discussion | enV" }, { name: "robots", content: "noindex,follow" }] };
+    const feed = loaderData?.feed ?? null;
     const path = "/community/tools/" + tool.category + "/" + tool.slug;
     if (!feed || feed.comments.length === 0) {
       return {
