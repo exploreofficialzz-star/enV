@@ -37,10 +37,10 @@ test("engagement counters retain likes, dislikes, comments and views", () => {
   assert.match(web, /counts\.dislikes/);
   assert.match(web, /counts\.comments/);
   assert.match(web, /counts\.views/);
-  assert.match(android, /counts\.likes/);
-  assert.match(android, /counts\.dislikes/);
-  assert.match(android, /counts\.comments/);
-  assert.match(android, /counts\.views/);
+  assert.match(android, /optInt\("likes"\)/);
+  assert.match(android, /optInt\("dislikes"\)/);
+  assert.match(android, /optInt\("comments"\)/);
+  assert.match(android, /optInt\("views"\)/);
   assert.match(ios, /counts\.likes/);
   assert.match(ios, /counts\.dislikes/);
   assert.match(ios, /counts\.comments/);
