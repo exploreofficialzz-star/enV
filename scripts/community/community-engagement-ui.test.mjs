@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (path) => readFile(resolve(root, path), "utf8");
 const [
   web, android, ios, androidWallet, iosWallet, server, identityRoute,
-  publicFeed, publicIndex, publicDetail, toolRoute, footer, seoGenerator,
+  publicFeed, publicIndex, publicDetail, toolRoute, footer, seoGenerator, seoMetadata,
 ] = await Promise.all([
   read("src/components/tools/tool-community-panel.tsx"),
   read("apps/android/app/src/main/java/com/chastech/env/NativeToolCommunityPanel.kt"),
@@ -23,6 +23,7 @@ const [
   read("src/routes/tools/$category/$slug.tsx"),
   read("src/components/layout/footer.tsx"),
   read("scripts/generate-seo-artifacts.mjs"),
+  read("src/lib/seo-metadata.ts"),
 ]);
 
 function assertOrdered(source, like, comments, dislike, platform) {
@@ -102,6 +103,15 @@ test("public discussion index and per-tool pages expose public comments for sear
   assert.match(footer, /to: "\/community", label: "Public discussions"/);
   assert.match(seoGenerator, /"\/community"/);
   assert.match(seoGenerator, /Public tool discussions/);
+});
+
+test("public comment text is safely escaped before JSON-LD is embedded in HTML", () => {
+  assert.match(seoMetadata, /children: structuredDataJson/);
+  assert.ok(seoMetadata.includes(String.raw`.replace(/</g, "\\u003c")`));
+  assert.ok(seoMetadata.includes(String.raw`.replace(/>/g, "\\u003e")`));
+  assert.ok(seoMetadata.includes(String.raw`.replace(/&/g, "\\u0026")`));
+  assert.ok(seoMetadata.includes(String.raw`.replace(/\\u2028/g, "\\u2028")`));
+  assert.ok(seoMetadata.includes(String.raw`.replace(/\\u2029/g, "\\u2029")`));
 });
 
 test("engagement counters remain wired to likes, dislikes, comments and views", () => {
