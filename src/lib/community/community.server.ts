@@ -186,7 +186,7 @@ export async function getRecentCommunityDiscussions(request: Request, limit = 10
     }];
   });
 }
-\nexport async function recordCommunityView(request: Request,input:unknown) {
+export async function recordCommunityView(request: Request,input:unknown) {
   const secret=enabled();
   let body; try{body=validateCommunityView(input);}catch(e){throw new CommunityError("INVALID_COMMUNITY_VIEW",e instanceof Error?e.message:"Invalid view event.",400);}
   ensureTool(body.toolId);
