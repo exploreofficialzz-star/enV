@@ -13626,6 +13626,140 @@ private struct NativeMusicDataSandboxView: View {
             if case .failure(let error) = result { message = error.localizedDescription } else { message = "ZIP exported." }
         }
     }
+    private var workspaceView: some View {
+                VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("A book").font(.title2.weight(.semibold))
+                    Text("Private notes and documents on this device").font(.caption).foregroundStyle(Color.envMuted)
+                }
+                Spacer()
+                Text(status).font(.caption2).foregroundStyle(Color.envMuted).multilineTextAlignment(.trailing)
+            }
+            if !errorText.isEmpty {
+                Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
+                Button(action: createNoteAndEnterWorkspace) { Label("New note", systemImage: "plus") }
+                    .buttonStyle(.borderedProminent)
+                Button(action: returnToStart) { Label("Start page", systemImage: "house") }
+                    .buttonStyle(.bordered)
+                Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
+                Button("Export backup") {
+                    do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
+                    catch { showError(error) }
+                }.buttonStyle(.bordered)
+                Button("Import backup") { importingArchive = true }.buttonStyle(.bordered)
+                Button(showArchived ? "Active notes" : "Archive") {
+                    showArchived.toggle()
+                    showTrash = false
+                    reload(includeDeleted: false, includeArchived: showArchived)
+                }.buttonStyle(.bordered)
+                Button(showTrash ? "All notes" : "Trash") {
+                    showTrash.toggle()
+                    if showTrash { showArchived = false }
+                    reload(includeDeleted: showTrash, includeArchived: false)
+                }.buttonStyle(.bordered)
+            }
+            TextField("Search notes", text: $query)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Search local notes")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !filteredNotes.isEmpty {
+                        ForEach(filteredNotes) { note in
+                            Button { select(note) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text((note.pinned ? "★ " : "") + (note.title.isEmpty ? "Untitled note" : note.title))
+                                        .font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                                    Text(note.body.isEmpty ? "No content yet" : String(note.body.prefix(120)))
+                                        .font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(selectedID == note.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        Text("No notes yet. Create your first note.").font(.footnote).foregroundStyle(Color.envMuted)
+                    }
+                    if selectedID != nil {
+                        Divider().padding(.vertical, 4)
+                        TextField("Note title", text: $title).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).font(.title3.weight(.semibold))
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Notebook", text: $notebook).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
+                        TextField("Tags, separated by commas", text: $tags).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
+                        TextEditor(text: $bodyText)
+                            .frame(minHeight: 220)
+                            .padding(6)
+                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                            .accessibilityLabel("Note content")
+                            .disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 8) {
+                            if let selected = notes.first(where: { $0.id == selectedID }), selected.deletedAt != nil {
+                                Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
+                                Button("Delete permanently") { confirmPermanentDelete = true }.buttonStyle(.bordered)
+                            } else {
+                                Button((notes.first(where: { $0.id == selectedID })?.pinned ?? false) ? "Unpin" : "Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
+                                Button((notes.first(where: { $0.id == selectedID })?.archived ?? false) ? "Unarchive" : "Archive") { updateSelected(archived: !(notes.first(where: { $0.id == selectedID })?.archived ?? false)) }.buttonStyle(.bordered)
+                                Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
+                                Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
+                            }
+                        }
+                        Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                        let pdfAttachments = attachments.filter { $0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf") }
+                        if !pdfAttachments.isEmpty {
+                            TextField("Extract pages · 1-3,5", text: $extractPageRange).textFieldStyle(.roundedBorder)
+                            TextField("Split parts · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
+                                Button("Merge PDFs") { mergeSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.count < 2)
+                                Button("Rotate batch") { rotateSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                                Button("Extract pages") { extractSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                                Button("Split selected PDFs") { splitSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
+                            }
+                            Text("All selected PDF operations stay on this device").font(.caption2).foregroundStyle(Color.envMuted)
+                        }
+                        ForEach(attachments) { attachment in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(attachment.name).font(.caption.weight(.medium)).lineLimit(1)
+                                    Text(String(format: "%.0f KB", Double(attachment.size) / 1024)).font(.caption2).foregroundStyle(Color.envMuted)
+                                }
+                                Spacer()
+                                if attachment.mime == "application/pdf" || attachment.name.lowercased().hasSuffix(".pdf") {
+                                    Button {
+                                        if selectedPDFIDs.contains(attachment.id) { selectedPDFIDs.remove(attachment.id) }
+                                        else { selectedPDFIDs.insert(attachment.id) }
+                                    } label: {
+                                        Image(systemName: selectedPDFIDs.contains(attachment.id) ? "checkmark.circle.fill" : "circle")
+                                    }.buttonStyle(.plain).accessibilityLabel(selectedPDFIDs.contains(attachment.id) ? "Deselect PDF" : "Select PDF")
+                                    Button("PDF tools") { selectedPDFIDs.insert(attachment.id); activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
+                                }
+                                Button("Remove", role: .destructive) { removeAttachment(attachment) }.buttonStyle(.bordered)
+                            }
+                        }
+                        if let active = attachments.first(where: { $0.id == activePDFID }) {
+                            pdfTools(for: active)
+                        }
+                        if !revisions.isEmpty {
+                            Text("REVISION HISTORY").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
+                            ForEach(revisions) { revision in
+                                HStack {
+                                    Text("Revision " + String(revision.revision) + " · " + revision.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption)
+                                    Spacer()
+                                    Button("Restore") { restore(revision) }.buttonStyle(.bordered)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+                }
+    }
+
     private var welcomeView: some View {
         VStack(spacing: 8) {
             Spacer()
@@ -15083,137 +15217,7 @@ private struct NativeABookView: View {
             if showWelcome {
                 welcomeView
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("A book").font(.title2.weight(.semibold))
-                    Text("Private notes and documents on this device").font(.caption).foregroundStyle(Color.envMuted)
-                }
-                Spacer()
-                Text(status).font(.caption2).foregroundStyle(Color.envMuted).multilineTextAlignment(.trailing)
-            }
-            if !errorText.isEmpty {
-                Text(errorText).font(.footnote).foregroundStyle(.red).padding(10).background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-            }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
-                Button(action: createNoteAndEnterWorkspace) { Label("New note", systemImage: "plus") }
-                    .buttonStyle(.borderedProminent)
-                Button(action: returnToStart) { Label("Start page", systemImage: "house") }
-                    .buttonStyle(.bordered)
-                Button("Export note") { exportingNote = true }.buttonStyle(.bordered).disabled(selectedID == nil)
-                Button("Export backup") {
-                    do { archiveData = try store.exportBackupArchive(); exportingArchive = true }
-                    catch { showError(error) }
-                }.buttonStyle(.bordered)
-                Button("Import backup") { importingArchive = true }.buttonStyle(.bordered)
-                Button(showArchived ? "Active notes" : "Archive") {
-                    showArchived.toggle()
-                    showTrash = false
-                    reload(includeDeleted: false, includeArchived: showArchived)
-                }.buttonStyle(.bordered)
-                Button(showTrash ? "All notes" : "Trash") {
-                    showTrash.toggle()
-                    if showTrash { showArchived = false }
-                    reload(includeDeleted: showTrash, includeArchived: false)
-                }.buttonStyle(.bordered)
-            }
-            TextField("Search notes", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search local notes")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !filteredNotes.isEmpty {
-                        ForEach(filteredNotes) { note in
-                            Button { select(note) } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text((note.pinned ? "★ " : "") + (note.title.isEmpty ? "Untitled note" : note.title))
-                                        .font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
-                                    Text(note.body.isEmpty ? "No content yet" : String(note.body.prefix(120)))
-                                        .font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
-                                .background(selectedID == note.id ? Color.envSurface2 : Color.envCard, in: RoundedRectangle(cornerRadius: 9))
-                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.envBorder, lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    } else {
-                        Text("No notes yet. Create your first note.").font(.footnote).foregroundStyle(Color.envMuted)
-                    }
-                    if selectedID != nil {
-                        Divider().padding(.vertical, 4)
-                        TextField("Note title", text: $title).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).font(.title3.weight(.semibold))
-                            .textFieldStyle(.roundedBorder)
-                        TextField("Notebook", text: $notebook).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
-                        TextField("Tags, separated by commas", text: $tags).disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil).textFieldStyle(.roundedBorder)
-                        TextEditor(text: $bodyText)
-                            .frame(minHeight: 220)
-                            .padding(6)
-                            .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                            .accessibilityLabel("Note content")
-                            .disabled(notes.first(where: { $0.id == selectedID })?.deletedAt != nil)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 8) {
-                            if let selected = notes.first(where: { $0.id == selectedID }), selected.deletedAt != nil {
-                                Button("Restore") { restoreTrashedNote() }.buttonStyle(.borderedProminent)
-                                Button("Delete permanently") { confirmPermanentDelete = true }.buttonStyle(.bordered)
-                            } else {
-                                Button((notes.first(where: { $0.id == selectedID })?.pinned ?? false) ? "Unpin" : "Pin") { updateSelected(pinned: !(notes.first(where: { $0.id == selectedID })?.pinned ?? false)) }.buttonStyle(.bordered)
-                                Button((notes.first(where: { $0.id == selectedID })?.archived ?? false) ? "Unarchive" : "Archive") { updateSelected(archived: !(notes.first(where: { $0.id == selectedID })?.archived ?? false)) }.buttonStyle(.bordered)
-                                Button("Trash") { updateSelected(deleted: true) }.buttonStyle(.bordered)
-                                Button("Add files") { importingFiles = true }.buttonStyle(.borderedProminent)
-                            }
-                        }
-                        Text("FILES ON THIS DEVICE").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
-                        let pdfAttachments = attachments.filter { $0.mime == "application/pdf" || $0.name.lowercased().hasSuffix(".pdf") }
-                        if !pdfAttachments.isEmpty {
-                            TextField("Extract pages · 1-3,5", text: $extractPageRange).textFieldStyle(.roundedBorder)
-                            TextField("Split parts · 1-3;4-6", text: $splitPageGroups).textFieldStyle(.roundedBorder)
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], alignment: .leading, spacing: 8) {
-                                Button("Merge PDFs") { mergeSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.count < 2)
-                                Button("Rotate batch") { rotateSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
-                                Button("Extract pages") { extractSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
-                                Button("Split selected PDFs") { splitSelectedPDFs() }.buttonStyle(.bordered).disabled(selectedPDFIDs.isEmpty)
-                            }
-                            Text("All selected PDF operations stay on this device").font(.caption2).foregroundStyle(Color.envMuted)
-                        }
-                        ForEach(attachments) { attachment in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(attachment.name).font(.caption.weight(.medium)).lineLimit(1)
-                                    Text(String(format: "%.0f KB", Double(attachment.size) / 1024)).font(.caption2).foregroundStyle(Color.envMuted)
-                                }
-                                Spacer()
-                                if attachment.mime == "application/pdf" || attachment.name.lowercased().hasSuffix(".pdf") {
-                                    Button {
-                                        if selectedPDFIDs.contains(attachment.id) { selectedPDFIDs.remove(attachment.id) }
-                                        else { selectedPDFIDs.insert(attachment.id) }
-                                    } label: {
-                                        Image(systemName: selectedPDFIDs.contains(attachment.id) ? "checkmark.circle.fill" : "circle")
-                                    }.buttonStyle(.plain).accessibilityLabel(selectedPDFIDs.contains(attachment.id) ? "Deselect PDF" : "Select PDF")
-                                    Button("PDF tools") { selectedPDFIDs.insert(attachment.id); activePDFSelection = attachment.id; processPDF(attachment, operation: "extract") }.buttonStyle(.bordered)
-                                }
-                                Button("Remove", role: .destructive) { removeAttachment(attachment) }.buttonStyle(.bordered)
-                            }
-                        }
-                        if let active = attachments.first(where: { $0.id == activePDFID }) {
-                            pdfTools(for: active)
-                        }
-                        if !revisions.isEmpty {
-                            Text("REVISION HISTORY").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
-                            ForEach(revisions) { revision in
-                                HStack {
-                                    Text("Revision " + String(revision.revision) + " · " + revision.createdAt.formatted(date: .abbreviated, time: .shortened)).font(.caption)
-                                    Spacer()
-                                    Button("Restore") { restore(revision) }.buttonStyle(.bordered)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-                }
+                workspaceView
             }
         }
         .padding(12)
@@ -15255,7 +15259,8 @@ private struct NativeABookView: View {
         .fileExporter(isPresented: $exportingPDF, document: ABookPDFDocument(data: pdfData),
                       contentType: .pdf, defaultFilename: pdfName) { result in
             if case .failure(let error) = result { showError(error) }
-        }        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
+        }
+        .fileExporter(isPresented: $exportingArchive, document: ABookArchiveDocument(data: archiveData),
                       contentType: .zip, defaultFilename: archiveFilename) { result in
             if case .failure(let error) = result { showError(error) }
         }
@@ -15430,7 +15435,7 @@ private struct NativeABookView: View {
         }
     }
 
-    private func safeFilename(_ value: String) {
+    private func safeFilename(_ value: String) -> String {
         let output = value.replacingOccurrences(of: "[^a-zA-Z0-9._-]+", with: "-", options: .regularExpression)
         return output.isEmpty ? "a-book-note" : output
     }

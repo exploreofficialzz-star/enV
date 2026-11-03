@@ -14,6 +14,8 @@ assert.match(android, /Create note/);
 assert.match(android, /Open library/);
 assert.match(android, /Start page/, "Android workspace must return to the entry page");
 assert.match(ios, /@State private var showWelcome = true/, "iOS must start at the native entry page");
+assert.match(ios, /private var workspaceView: some View/, "iOS editor must be isolated from the welcome view for stable SwiftUI type checking");
+assert.match(ios, /private func safeFilename\(_ value: String\) -> String/);
 assert.match(ios, /accessibilityLabel\("A book start page"\)/);
 assert.match(ios, /Create a note/);
 assert.match(ios, /Open library/);
