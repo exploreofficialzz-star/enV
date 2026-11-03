@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { getOptionalBillingUserId } from "../billing/http.server";
+import { getOptionalBillingUserId, requireOfflineBillingUser } from "../billing/http.server";
 import { getSql } from "../db";
 import { hasDeveloperAdminSession } from "../developer-admin.server";
 import { getToolById } from "../registry";
@@ -31,8 +31,26 @@ function adminMatches(request: Request) {
 function ensureTool(toolId: string) {
   if (!getToolById(toolId)) throw new CommunityError("COMMUNITY_TOOL_NOT_FOUND", "The selected tool is not in the enV catalogue.", 404);
 }
+async function communityUserId(request: Request): Promise<string | null> {
+  // Native app account identity is only accepted through the existing paired,
+  // revocable device session. An explicit invalid bearer never falls back to a guest.
+  if (request.headers.has("authorization")) {
+    const principal = await requireOfflineBillingUser(request);
+    if (principal.response || !principal.userId) {
+      throw new CommunityError("COMMUNITY_AUTH_SESSION_INVALID", "The paired account session is invalid or expired. Re-pair this device from the signed-in enV wallet.", 401);
+    }
+    return principal.userId;
+  }
+  return getOptionalBillingUserId(request);
+}
+async function accountDisplayName(userId: string): Promise<string> {
+  const sql = await getSql();
+  const rows = await sql.query<{ name: string | null }>('select name from "user" where id=$1 limit 1', [userId]);
+  const name = rows[0]?.name?.normalize("NFC").replace(/\s+/g, " ").trim().slice(0, 32) ?? "";
+  return name.length >= 2 ? name : "enV member";
+}
 async function actorFor(request: Request, visitorId: string, secret: string) {
-  const userId = await getOptionalBillingUserId(request);
+  const userId = await communityUserId(request);
   return { userId, actorDigest: digest(userId ? "user:"+userId : "visitor:"+visitorId, secret) };
 }
 function networkDigest(request: Request, secret: string) {
@@ -70,7 +88,7 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
   catch(error) { throw new CommunityError("INVALID_COMMUNITY_QUERY",error instanceof Error?error.message:"Invalid community query.",400); }
   ensureTool(toolId);
   const secret=signingSecret();
-  const userId=visitorId ? await getOptionalBillingUserId(request) : null;
+  const userId=visitorId ? await communityUserId(request) : null;
   const actorDigest=visitorId ? digest(userId ? "user:"+userId : "visitor:"+visitorId,secret) : null;
   const sql=await getSql();
   const [counts,comments,reaction,views]=await Promise.all([
@@ -116,10 +134,65 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
   return {
     toolId,
     counts:{comments:num(counts[0]?.comments),likes:num(counts[0]?.likes),dislikes:num(counts[0]?.dislikes),views:num(views[0]?.total),views30Days:num(views[0]?.recent)},
-    myReaction:reaction[0]?.reaction_type??null,
-    comments:comments.map(row=>({id:String(row.id),parentId:row.parentId?String(row.parentId):null,body:String(row.body),authorLabel:String(row.authorLabel),identityMode:String(row.identityMode),createdAt:row.createdAt,isMine:row.isMine===true})),
+    myReaction:reaction[0]?.reaction_type === "like" || reaction[0]?.reaction_type === "dislike" ? reaction[0].reaction_type : null,
+    comments:comments.map(row=>({
+      id:String(row.id),
+      parentId:row.parentId?String(row.parentId):null,
+      body:String(row.body),
+      authorLabel:String(row.authorLabel),
+      identityMode:row.identityMode === "anonymous" ? "anonymous" as const : "public" as const,
+      createdAt:row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+      isMine:row.isMine===true
+    })),
     generatedAt:new Date().toISOString(),
   };
+}
+
+export async function getCommunityIdentity(request: Request) {
+  enabled();
+  const userId = await communityUserId(request);
+  return userId
+    ? { signedIn: true, displayName: await accountDisplayName(userId) }
+    : { signedIn: false, displayName: null };
+}
+
+export async function getRecentCommunityDiscussions(request: Request, limit = 100) {
+  enabled();
+  const boundedLimit = Number.isSafeInteger(limit) ? Math.max(1, Math.min(200, limit)) : 100;
+  const sql = await getSql();
+  const rows = await sql.query<{
+    toolId: string; commentCount: string | number; latestAt: string;
+    latestBody: string; latestAuthor: string;
+  }>(
+    `select c.tool_id as "toolId", count(*)::bigint as "commentCount", max(c.created_at) as "latestAt",
+       (select recent.body from tool_community_comments recent
+        where recent.tool_id=c.tool_id and recent.moderation_status='visible'
+        order by recent.created_at desc limit 1) as "latestBody",
+       (select case when recent.identity_mode='anonymous' then 'Anonymous' else recent.display_name end
+        from tool_community_comments recent
+        where recent.tool_id=c.tool_id and recent.moderation_status='visible'
+        order by recent.created_at desc limit 1) as "latestAuthor"
+     from tool_community_comments c
+     where c.moderation_status='visible'
+     group by c.tool_id
+     order by max(c.created_at) desc
+     limit $1`,
+    [boundedLimit],
+  );
+  return rows.flatMap((row) => {
+    const tool = getToolById(row.toolId);
+    if (!tool) return [];
+    return [{
+      toolId: tool.id,
+      toolName: tool.name,
+      category: tool.category,
+      slug: tool.slug,
+      commentCount: Number(row.commentCount) || 0,
+      latestAt: row.latestAt,
+      latestBody: row.latestBody,
+      latestAuthor: row.latestAuthor,
+    }];
+  });
 }
 export async function recordCommunityView(request: Request,input:unknown) {
   const secret=enabled();
@@ -170,6 +243,10 @@ export async function createCommunityComment(request: Request,input:unknown) {
   ensureTool(body.toolId);
   const {userId,actorDigest}=await actorFor(request,body.visitorId,secret);
   const sql=await getSql();
+  // Public identity is reserved for verified accounts. Guest requests are
+  // forced to Anonymous even if a client submits a forged public name.
+  const identityMode = userId && body.identityMode === "public" ? "public" : "anonymous";
+  const displayName = identityMode === "public" && userId ? await accountDisplayName(userId) : null;
   return sql.transaction(async tx=>{
     const prior=await tx.query<{id:string;created_at:string}>(
       "select id,created_at from tool_community_comments where author_digest=$1 and idempotency_key=$2 limit 1",
@@ -188,7 +265,7 @@ export async function createCommunityComment(request: Request,input:unknown) {
     const rows=await tx.query<{id:string;created_at:string}>(
       `insert into tool_community_comments(id,idempotency_key,tool_id,parent_id,author_digest,author_user_id,identity_mode,display_name,body)
        values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id,created_at`,
-      [id,body.idempotencyKey,body.toolId,body.parentId,actorDigest,userId,body.identityMode,body.displayName,body.body],
+      [id,body.idempotencyKey,body.toolId,body.parentId,actorDigest,userId,identityMode,displayName,body.body],
     );
     return {commentId:rows[0]!.id,duplicate:false,createdAt:rows[0]!.created_at};
   });

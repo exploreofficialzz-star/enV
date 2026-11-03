@@ -13,6 +13,7 @@ import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
+import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
@@ -20,9 +21,11 @@ import { isToolUnderProduction } from "@/lib/production-notice";
 export function ToolShell({
   tool,
   children,
+  initialCommunityFeed,
 }: {
   tool: ToolMeta;
   children: React.ReactNode;
+  initialCommunityFeed?: PublicCommunityFeed | null;
 }) {
   const related = useMemo(() => getRelatedTools(tool, Number.MAX_SAFE_INTEGER), [tool]);
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
@@ -292,7 +295,7 @@ export function ToolShell({
       </section>
 
       <AiAssistPanel toolId={tool.id} />
-      <ToolCommunityPanel toolId={tool.id} />
+      <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>

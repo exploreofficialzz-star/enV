@@ -476,6 +476,16 @@ private enum NativeCommunityClient {
         return url
     }
 
+    static func identity() async throws -> (signedIn: Bool, displayName: String?) {
+        guard let base = baseURL else { throw URLError(.badURL) }
+        let url = base.appendingPathComponent("api").appendingPathComponent("community").appendingPathComponent("identity")
+        let data = try await perform(URLRequest(url: url))
+        guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let payload = envelope["data"] as? [String: Any],
+              envelope["ok"] as? Bool == true else { throw URLError(.cannotParseResponse) }
+        return (payload["signedIn"] as? Bool ?? false, payload["displayName"] as? String)
+    }
+
     static func feed(toolID: String, visitorID: String) async throws -> NativeCommunityFeedData {
         guard let base = baseURL else { throw URLError(.badURL) }
         var components = URLComponents(url: base.appendingPathComponent("api").appendingPathComponent("community"), resolvingAgainstBaseURL: false)
@@ -502,7 +512,11 @@ private enum NativeCommunityClient {
         _ = try await perform(request)
     }
 
-    private static func perform(_ request: URLRequest) async throws -> Data {
+    private static func perform(_ originalRequest: URLRequest) async throws -> Data {
+        var request = originalRequest
+        if let bearer = OfflineWalletNativeAPI.communityBearerToken() {
+            request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        }
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         guard (200...299).contains(http.statusCode) else {
@@ -538,6 +552,8 @@ struct ToolCommunityPanel: View {
     @State private var showingComments = false
     @State private var commentText = ""
     @State private var publicIdentity = false
+    @State private var accountSignedIn = false
+    @State private var identityLoading = true
     @State private var displayName = ""
     @State private var replyTo: String?
     @State private var reportTarget: NativeCommunityComment?
@@ -564,26 +580,6 @@ struct ToolCommunityPanel: View {
 
     private var reactionBar: some View {
         VStack(spacing: 9) {
-            HStack(spacing: 4) {
-                Image(systemName: "hand.thumbsup.fill")
-                    .foregroundStyle(Color.envAccent)
-                Image(systemName: "hand.thumbsdown.fill")
-                    .foregroundStyle(Color.envMuted)
-                Text(compactCount((feed?.counts.likes ?? 0) + (feed?.counts.dislikes ?? 0)))
-                    .font(.envScaled(size: 11, weight: .medium))
-                    .foregroundStyle(Color.envMuted)
-                Spacer()
-                HStack(spacing: 4) {
-                    Image(systemName: "bubble.left")
-                    Text(compactCount(feed?.counts.comments ?? 0))
-                }
-                HStack(spacing: 4) {
-                    Image(systemName: "eye")
-                    Text(compactCount(feed?.counts.views ?? 0))
-                }
-                .foregroundStyle(Color.envMuted)
-                .font(.envScaled(size: 11, weight: .regular))
-            }
             HStack(spacing: 8) {
                 Button { Task { await react("like") } } label: {
                     Label(compactCount(feed?.counts.likes ?? 0), systemImage: "hand.thumbsup")
@@ -643,12 +639,28 @@ struct ToolCommunityPanel: View {
                 .onChange(of: commentText) { value in
                     if value.count > 2000 { commentText = String(value.prefix(2000)) }
                 }
+            Text("Comments are public and may appear in search results. Do not include private information.")
+                .font(.envScaled(size: 10, weight: .regular))
+                .foregroundStyle(Color.envMuted)
+                .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
-                Button { publicIdentity.toggle() } label: {
-                    Label(publicIdentity ? "Display name" : "Anonymous", systemImage: publicIdentity ? "person" : "person.crop.circle")
+                if accountSignedIn {
+                    Menu {
+                        Button("Display as \(displayName.isEmpty ? "enV member" : displayName)") { publicIdentity = true }
+                        Button("Anonymous") { publicIdentity = false }
+                    } label: {
+                        Label(
+                            publicIdentity ? "Display as \(displayName.isEmpty ? "enV member" : displayName)" : "Anonymous",
+                            systemImage: publicIdentity ? "person" : "person.crop.circle"
+                        )
                         .font(.envScaled(size: 12, weight: .medium))
+                    }
+                    .disabled(identityLoading)
+                } else {
+                    Label("Anonymous", systemImage: "person.crop.circle")
+                        .font(.envScaled(size: 12, weight: .medium))
+                        .foregroundStyle(Color.envMuted)
                 }
-                .buttonStyle(.bordered)
                 Spacer()
                 enVCharacterSpacedText("\(commentText.count)/2000")
                     .font(.envScaled(size: 10, weight: .regular))
@@ -661,15 +673,7 @@ struct ToolCommunityPanel: View {
                         .background(Color.envAccent, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .disabled(isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
-            }
-            if publicIdentity {
-                TextField("Choose a public display name", text: $displayName)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.envScaled(size: 14, weight: .regular))
-                    .onChange(of: displayName) { value in
-                        if value.count > 32 { displayName = String(value.prefix(32)) }
-                    }
+                .disabled(identityLoading || isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(12)
@@ -807,6 +811,20 @@ struct ToolCommunityPanel: View {
     @MainActor
     private func refresh() async {
         loading = true
+        if identityLoading {
+            do {
+                let identity = try await NativeCommunityClient.identity()
+                accountSignedIn = identity.signedIn
+                displayName = identity.displayName ?? ""
+                publicIdentity = identity.signedIn
+            } catch {
+                accountSignedIn = false
+                publicIdentity = false
+                displayName = ""
+                errorMessage = error.localizedDescription
+            }
+            identityLoading = false
+        }
         do {
             let data = try await NativeCommunityClient.feed(toolID: toolID, visitorID: visitorID)
             feed = data
@@ -837,6 +855,7 @@ struct ToolCommunityPanel: View {
     private func submitComment() async {
         let text = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        let publicAccountIdentity = accountSignedIn && publicIdentity
         isSending = true
         defer { isSending = false }
         let payload: [String: Any] = [
@@ -844,8 +863,8 @@ struct ToolCommunityPanel: View {
             "visitorId": visitorID,
             "idempotencyKey": UUID().uuidString.lowercased(),
             "body": text,
-            "identityMode": publicIdentity ? "public" : "anonymous",
-            "displayName": publicIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
+            "identityMode": publicAccountIdentity ? "public" : "anonymous",
+            "displayName": publicAccountIdentity ? (displayName.trimmingCharacters(in: .whitespacesAndNewlines) as Any) : NSNull(),
             "parentId": replyTo as Any? ?? NSNull()
         ]
         do {
