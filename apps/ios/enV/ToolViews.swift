@@ -476,6 +476,16 @@ private enum NativeCommunityClient {
         return url
     }
 
+    static func identity() async throws -> (signedIn: Bool, displayName: String?) {
+        guard let base = baseURL else { throw URLError(.badURL) }
+        let url = base.appendingPathComponent("api").appendingPathComponent("community").appendingPathComponent("identity")
+        let data = try await perform(URLRequest(url: url))
+        guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let payload = envelope["data"] as? [String: Any],
+              envelope["ok"] as? Bool == true else { throw URLError(.cannotParseResponse) }
+        return (payload["signedIn"] as? Bool ?? false, payload["displayName"] as? String)
+    }
+
     static func feed(toolID: String, visitorID: String) async throws -> NativeCommunityFeedData {
         guard let base = baseURL else { throw URLError(.badURL) }
         var components = URLComponents(url: base.appendingPathComponent("api").appendingPathComponent("community"), resolvingAgainstBaseURL: false)
@@ -538,6 +548,8 @@ struct ToolCommunityPanel: View {
     @State private var showingComments = false
     @State private var commentText = ""
     @State private var publicIdentity = false
+    @State private var accountSignedIn = false
+    @State private var identityLoading = true
     @State private var displayName = ""
     @State private var replyTo: String?
     @State private var reportTarget: NativeCommunityComment?
@@ -564,26 +576,6 @@ struct ToolCommunityPanel: View {
 
     private var reactionBar: some View {
         VStack(spacing: 9) {
-            HStack(spacing: 4) {
-                Image(systemName: "hand.thumbsup.fill")
-                    .foregroundStyle(Color.envAccent)
-                Image(systemName: "hand.thumbsdown.fill")
-                    .foregroundStyle(Color.envMuted)
-                Text(compactCount((feed?.counts.likes ?? 0) + (feed?.counts.dislikes ?? 0)))
-                    .font(.envScaled(size: 11, weight: .medium))
-                    .foregroundStyle(Color.envMuted)
-                Spacer()
-                HStack(spacing: 4) {
-                    Image(systemName: "bubble.left")
-                    Text(compactCount(feed?.counts.comments ?? 0))
-                }
-                HStack(spacing: 4) {
-                    Image(systemName: "eye")
-                    Text(compactCount(feed?.counts.views ?? 0))
-                }
-                .foregroundStyle(Color.envMuted)
-                .font(.envScaled(size: 11, weight: .regular))
-            }
             HStack(spacing: 8) {
                 Button { Task { await react("like") } } label: {
                     Label(compactCount(feed?.counts.likes ?? 0), systemImage: "hand.thumbsup")
@@ -644,11 +636,24 @@ struct ToolCommunityPanel: View {
                     if value.count > 2000 { commentText = String(value.prefix(2000)) }
                 }
             HStack(spacing: 8) {
-                Button { publicIdentity.toggle() } label: {
-                    Label(publicIdentity ? "Display name" : "Anonymous", systemImage: publicIdentity ? "person" : "person.crop.circle")
-                        .font(.envScaled(size: 12, weight: .medium))
+                Menu {
+                    if accountSignedIn {
+                        Button("Display as \(displayName.isEmpty ? "enV member" : displayName)") { publicIdentity = true }
+                        Button("Anonymous") { publicIdentity = false }
+                    } else {
+                        Button("Anonymous") { publicIdentity = false }
+                        Button("Display name") { publicIdentity = true }
+                    }
+                } label: {
+                    Label(
+                        publicIdentity
+                            ? (accountSignedIn ? "Display as \(displayName.isEmpty ? "enV member" : displayName)" : "Display name")
+                            : "Anonymous",
+                        systemImage: publicIdentity ? "person" : "person.crop.circle"
+                    )
+                    .font(.envScaled(size: 12, weight: .medium))
                 }
-                .buttonStyle(.bordered)
+                .disabled(identityLoading)
                 Spacer()
                 enVCharacterSpacedText("\(commentText.count)/2000")
                     .font(.envScaled(size: 10, weight: .regular))
@@ -661,9 +666,9 @@ struct ToolCommunityPanel: View {
                         .background(Color.envAccent, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .disabled(isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
+                .disabled(identityLoading || isSending || commentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (publicIdentity && !accountSignedIn && displayName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2))
             }
-            if publicIdentity {
+            if publicIdentity && !accountSignedIn {
                 TextField("Choose a public display name", text: $displayName)
                     .textFieldStyle(.roundedBorder)
                     .font(.envScaled(size: 14, weight: .regular))
@@ -807,6 +812,20 @@ struct ToolCommunityPanel: View {
     @MainActor
     private func refresh() async {
         loading = true
+        if identityLoading {
+            do {
+                let identity = try await NativeCommunityClient.identity()
+                accountSignedIn = identity.signedIn
+                displayName = identity.displayName ?? ""
+                publicIdentity = identity.signedIn
+            } catch {
+                accountSignedIn = false
+                publicIdentity = false
+                displayName = ""
+                errorMessage = error.localizedDescription
+            }
+            identityLoading = false
+        }
         do {
             let data = try await NativeCommunityClient.feed(toolID: toolID, visitorID: visitorID)
             feed = data
