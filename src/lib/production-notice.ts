@@ -14,7 +14,10 @@ export const PRODUCTION_EXEMPT_CATEGORIES = new Set<CategoryId>([
   "video",
 ]);
 
-/** All catalog tools outside the explicitly exempt categories open the production notice. */
-export function isToolUnderProduction(tool: Pick<ToolMeta, "category">): boolean {
-  return !PRODUCTION_EXEMPT_CATEGORIES.has(tool.category);
+/** Individually implemented tools may be available without opening their entire category. */
+export const PRODUCTION_EXEMPT_TOOL_IDS = new Set(["a-book"]);
+
+/** Every other tool outside the category allowlist remains behind the production notice. */
+export function isToolUnderProduction(tool: Pick<ToolMeta, "id" | "category">): boolean {
+  return !PRODUCTION_EXEMPT_TOOL_IDS.has(tool.id) && !PRODUCTION_EXEMPT_CATEGORIES.has(tool.category);
 }
