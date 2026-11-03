@@ -3,18 +3,13 @@ import {
   Camera,
   CameraOff,
   Check,
-  Circle,
   Download,
   Flashlight,
   FlashlightOff,
   Grid2X2,
   Image as ImageIcon,
-  Mic,
-  MicOff,
-  RotateCcw,
   Settings2,
   SwitchCamera,
-  Timer,
   Video,
   X,
 } from "lucide-react";
@@ -184,6 +179,7 @@ export function CameraStudioEngine() {
     current?.getTracks().forEach((track) => track.stop());
     setCameraStream(null);
     setTorchEnabled(false);
+    setCameraBusy(false);
   }, []);
 
   const requestCamera = useCallback(async (nextFacing: FacingMode) => {
@@ -455,6 +451,7 @@ export function CameraStudioEngine() {
                   type="button"
                   aria-pressed={mode === "photo"}
                   onClick={() => setMode("photo")}
+                  disabled={isRecording || countdown !== null}
                   className={`inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${mode === "photo" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}
                 >
                   <Camera size={16} /> Photo
@@ -463,6 +460,7 @@ export function CameraStudioEngine() {
                   type="button"
                   aria-pressed={mode === "video"}
                   onClick={() => setMode("video")}
+                  disabled={isRecording || countdown !== null}
                   className={`inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors ${mode === "video" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}
                 >
                   <Video size={16} /> Video
@@ -487,8 +485,8 @@ export function CameraStudioEngine() {
                   />
                   {gridVisible && (
                     <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
-                      {Array.from({ length: 4 }, (_, index) => (
-                        <span key={index} className={`border-white/45 ${index < 2 ? "border-r" : ""} ${index % 2 === 0 ? "border-b" : ""}`} />
+                      {Array.from({ length: 9 }, (_, index) => (
+                        <span key={index} className={`border-white/45 ${index % 3 !== 2 ? "border-r" : ""} ${Math.floor(index / 3) !== 2 ? "border-b" : ""}`} />
                       ))}
                     </div>
                   )}
@@ -598,7 +596,7 @@ export function CameraStudioEngine() {
           <section className="rounded-xl border border-border bg-surface p-3 shadow-[var(--shadow-border)] sm:p-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-fg">Quick controls</h3>
-              {cameraStream && <Button type="button" variant="ghost" size="sm" onClick={releaseCamera}>Stop camera</Button>}
+              {cameraStream && <Button type="button" variant="ghost" size="sm" disabled={isRecording} onClick={releaseCamera}>Stop camera</Button>}
             </div>
 
             <div className="mt-4 space-y-4">
