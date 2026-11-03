@@ -25,6 +25,8 @@ test("tool engagement uses the compact Like / Comments / Dislike action order", 
 
 test("comments open in an overlay rather than an always-visible community feed", () => {
   assert.match(web, /role="dialog" aria-modal="true"/);
+  assert.match(web, /event\.key !== "Tab"/, "Web comments dialog traps keyboard focus");
+  assert.match(web, /previousFocus\?\.focus\(\)/, "Web comments dialog restores focus on close");
   assert.match(android, /DialogProperties\(usePlatformDefaultWidth = false\)/);
   assert.match(ios, /\.fullScreenCover\(isPresented: \$showingComments\)\s*\{\s*commentsOverlay\s*\}/);
   assert.ok(!web.includes("Share feedback and discuss this tool with other users."));
