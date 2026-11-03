@@ -15498,6 +15498,15 @@ private struct NativeABookView: View {
                                       createdAt: notes.first(where: { $0.id == id })?.createdAt ?? Date(),
                                       updatedAt: Date(), revision: notes.first(where: { $0.id == id })?.revision ?? 0)
         do {
+            if let baseline = notes.first(where: { $0.id == id }),
+               baseline.title == current.title,
+               baseline.body == current.body,
+               baseline.notebook == (current.notebook.isEmpty ? "Inbox" : current.notebook),
+               baseline.tags == current.tags {
+                status = "Saved on this device"
+                errorText = ""
+                return
+            }
             let saved = try store.save(current)
             notes = try store.notes(includeArchived: showArchived, includeDeleted: showTrash)
             if let index = notes.firstIndex(where: { $0.id == id }) { notes[index] = saved }
