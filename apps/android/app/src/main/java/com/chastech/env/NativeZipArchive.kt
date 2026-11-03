@@ -130,7 +130,6 @@ fun NativeZipArchiveScreen() {
                                 val stored = extension in nativePrecompressedExtensions && sourceSize > 0L
                                 val parameters = ZipParameters().apply {
                                     fileNameInZip = safeName
-                                    isSourceExternalStream = true
                                     compressionMethod = if (stored) CompressionMethod.STORE else CompressionMethod.DEFLATE
                                     if (stored) entrySize = sourceSize
                                     else compressionLevel = if (compressionMaximum) CompressionLevel.MAXIMUM else CompressionLevel.NORMAL
