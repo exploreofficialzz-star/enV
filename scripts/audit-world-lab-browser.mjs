@@ -14,6 +14,7 @@ try{
   await page.waitForLoadState("load",{timeout:90000});
   await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
   await page.getByRole("button",{name:"Enter"}).waitFor({state:"visible",timeout:90000});
+  await page.locator('.world-lab-entry[data-world-lab-entry-ready="true"]').waitFor({state:"visible",timeout:90000});
   const readEntryLayout=()=>page.locator(".world-lab-entry").evaluate((root)=>{
     const title=root.querySelector("h1")?.getBoundingClientRect();
     const artwork=root.querySelector(".world-lab-entry__artwork")?.getBoundingClientRect();

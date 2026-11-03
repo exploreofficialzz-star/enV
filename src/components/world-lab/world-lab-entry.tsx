@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import "./world-lab-entry.css";
 
@@ -6,6 +6,11 @@ const WorldLabWorkspace = lazy(() => import("./world-lab"));
 
 export function WorldLabEntry() {
   const [hasEntered, setHasEntered] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   if (hasEntered) {
     return (
@@ -22,7 +27,7 @@ export function WorldLabEntry() {
   }
 
   return (
-    <section className="world-lab-entry" aria-labelledby="world-lab-entry-title">
+    <section className="world-lab-entry" aria-labelledby="world-lab-entry-title" data-world-lab-entry-ready={isHydrated ? "true" : "false"}>
       <div className="world-lab-entry__inner">
         <div className="world-lab-entry__content">
           <h1 id="world-lab-entry-title" className="world-lab-entry__title">
