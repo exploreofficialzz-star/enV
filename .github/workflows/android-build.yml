@@ -168,6 +168,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          disk-size: 4096M
           disable-linux-hw-accel: false
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 3072 -cores 2
