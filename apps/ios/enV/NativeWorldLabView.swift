@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreText
 import SceneKit
 import UniformTypeIdentifiers
 
@@ -4669,6 +4670,107 @@ private struct NativeWorldLabFieldImportPanel:View {
                 } catch {status=error.localizedDescription}
             case .failure(let error):status=error.localizedDescription
             }
+        }
+    }
+}
+
+
+/// Minimal SwiftUI entry matching the approved black-and-white World Lab design.
+
+private func nativeWorldLabEntryScriptFontName() -> String {
+    guard let url = Bundle.main.url(
+        forResource: "caveat",
+        withExtension: "ttf",
+        subdirectory: "StudioAssets/fonts"
+    ) else {
+        return "Caveat-Regular"
+    }
+
+    var registrationError: Unmanaged<CFError>?
+    let registered = CTFontManagerRegisterFontsForURL(
+        url as CFURL,
+        .process,
+        &registrationError
+    )
+    guard registered || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil,
+          let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
+          let descriptor = descriptors.first else {
+        return "Caveat-Regular"
+    }
+    return CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String
+        ?? "Caveat-Regular"
+}
+
+struct NativeWorldLabEntryView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var entered = false
+    @State private var scriptFontName = "Caveat-Regular"
+
+    private var backgroundColor: Color {
+        colorScheme == .dark ? .black : .white
+    }
+
+    private var foregroundColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
+
+    var body: some View {
+        Group {
+            if entered {
+                NativeWorldLabView()
+            } else {
+                ZStack {
+                    backgroundColor.ignoresSafeArea()
+                    VStack(spacing: 22) {
+                        Text("The World Lab")
+                            .font(.custom(scriptFontName, size: 56, relativeTo: .largeTitle))
+                            .foregroundStyle(foregroundColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .stroke(foregroundColor, lineWidth: 2.5)
+                                    .frame(width: 54, height: 54)
+                                Ellipse()
+                                    .stroke(foregroundColor, lineWidth: 2.5)
+                                    .frame(width: 104, height: 30)
+                                    .rotationEffect(.degrees(-24))
+                                Circle()
+                                    .fill(foregroundColor)
+                                    .frame(width: 7, height: 7)
+                                    .offset(x: 27, y: -17)
+                            }
+                            .frame(width: 108, height: 94)
+
+                            Text("enV")
+                                .font(.system(size: 38, weight: .bold, design: .rounded))
+                                .tracking(-1.5)
+                                .foregroundStyle(foregroundColor)
+                        }
+
+                        Button {
+                            entered = true
+                        } label: {
+                            Text("Enter")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(backgroundColor)
+                                .frame(width: 222, height: 54)
+                                .background(foregroundColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 24))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: 390)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 48)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .onAppear {
+            scriptFontName = nativeWorldLabEntryScriptFontName()
         }
     }
 }

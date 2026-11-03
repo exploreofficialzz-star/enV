@@ -9,6 +9,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -2499,4 +2506,96 @@ private fun nativeLabImpactVelocity(text:String):NativeLabVector {
         "Provide three finite X,Y,Z velocity components separated by commas"
     }
     return NativeLabVector(values[0],values[1],values[2])
+}
+
+
+/** Native monochrome entry for the World Lab; the existing workspace stays independent. */
+@Composable
+fun NativeWorldLabEntryForm() {
+    var entered by remember { mutableStateOf(false) }
+    if (entered) {
+        NativeWorldLabForm()
+        return
+    }
+
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val background = if (dark) Color.Black else Color.White
+    val foreground = if (dark) Color.White else Color.Black
+
+    Surface(modifier = Modifier.fillMaxSize(), color = background) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier.widthIn(max = 390.dp).padding(bottom = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
+                Text(
+                    text = "The World Lab",
+                    color = foreground,
+                    fontFamily = FontFamily(Font(R.font.world_lab_caveat)),
+                    fontSize = 52.sp,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.sp,
+                    softWrap = false,
+                    maxLines = 1
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Canvas(modifier = Modifier.size(100.dp)) {
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        drawOval(
+                            color = foreground,
+                            topLeft = Offset(size.width * 0.06f, size.height * 0.34f),
+                            size = Size(size.width * 0.88f, size.height * 0.32f),
+                            style = Stroke(width = 2.5.dp.toPx())
+                        )
+                        drawCircle(
+                            color = foreground,
+                            radius = size.minDimension * 0.25f,
+                            center = center,
+                            style = Stroke(width = 2.5.dp.toPx())
+                        )
+                        drawCircle(
+                            color = foreground,
+                            radius = 3.dp.toPx(),
+                            center = Offset(size.width * 0.76f, size.height * 0.29f)
+                        )
+                    }
+                    Text(
+                        text = "enV",
+                        color = foreground,
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-1).sp,
+                        softWrap = false
+                    )
+                }
+                Button(
+                    onClick = { entered = true },
+                    modifier = Modifier.width(222.dp).height(54.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = foreground,
+                        contentColor = background
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp
+                    )
+                ) {
+                    Text(
+                        text = "Enter",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.sp
+                    )
+                }
+            }
+        }
+    }
 }

@@ -1378,7 +1378,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
         }
         "generator", "network", "seo", "cssgen" -> NativeUtilityToolForm(tool)
         "developer" -> when (tool.id) {
-            "the-world-lab" -> NativeWorldLabForm()
+            "the-world-lab" -> NativeWorldLabEntryForm()
             "ux-ui-studio" -> NativeUxUiStudioForm()
             else -> NativeDeveloperToolForm(tool, onRelatedTool)
         }

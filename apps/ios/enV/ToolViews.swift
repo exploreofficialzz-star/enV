@@ -918,7 +918,7 @@ struct ToolDestinationView: View {
 
     @ViewBuilder var body: some View {
         if tool.id == "the-world-lab" {
-            NativeWorldLabView()
+            NativeWorldLabEntryView()
         } else if tool.id == "ux-ui-studio" {
             NativeUxUiStudioView()
         } else if let studio = store.catalog.developerStudio(forLegacyTool: tool) {
