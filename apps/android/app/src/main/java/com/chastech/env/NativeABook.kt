@@ -864,21 +864,21 @@ fun NativeABookScreen(){
                     Text("Your notes, attachments and PDF work stay on this device.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                Card(Modifier.weight(1f)){
-                    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+            Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                Card(Modifier.fillMaxWidth()){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
                         Text("WRITE",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
                         Text("Capture and organise notes.",style=MaterialTheme.typography.bodySmall)
                     }
                 }
-                Card(Modifier.weight(1f)){
-                    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                Card(Modifier.fillMaxWidth()){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
                         Text("COLLECT",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
                         Text("Keep related files together.",style=MaterialTheme.typography.bodySmall)
                     }
                 }
-                Card(Modifier.weight(1f)){
-                    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+                Card(Modifier.fillMaxWidth()){
+                    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
                         Text("PDF TOOLS",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
                         Text("Process supported PDFs locally.",style=MaterialTheme.typography.bodySmall)
                     }
