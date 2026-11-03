@@ -20,6 +20,7 @@ assert.match(notice, /"zip-any-file"/);
 assert.match(engine, /tool\.id === "zip-any-file"/);
 assert.match(zipEngine, /new ZipWriter/);
 assert.match(zipEngine, /compressionMethod: stored \? 0 : 8/);
+assert.match(zipEngine, /uncompressedSize: file\.size/);
 assert.doesNotMatch(zipEngine, /zip64: true/);
 assert.match(zipEngine, /checkCrc32: true/);
 assert.match(zipEngine, /showDirectoryPicker/);

@@ -114,6 +114,7 @@ export function ZipArchiveEngine() {
         await writer.add(proposedPath, file.stream(), {
           level: stored ? 0 : compression === "maximum" ? 9 : 6,
           compressionMethod: stored ? 0 : 8,
+          uncompressedSize: file.size,
           lastModDate: new Date(file.lastModified),
           onprogress: (current: number) => {
             const fraction = totalBytes ? (completedBytes + current) / totalBytes : 1;
