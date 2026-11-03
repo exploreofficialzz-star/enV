@@ -392,6 +392,11 @@ fun NativeToolCommunityPanel(toolId: String) {
                             TextButton(onClick = { replyTo = null }) { Text("Cancel") }
                         }
                     }
+                    Text(
+                        "Comments are public and may appear in search results. Do not include private information.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     OutlinedTextField(
                         value = commentText,
                         onValueChange = { commentText = it.take(2000) },
