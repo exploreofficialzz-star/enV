@@ -26,6 +26,8 @@ assert.match(ios, /Create a note/);
 assert.match(ios, /Open library/);
 assert.match(ios, /TextField\("Search your library", text: \$query\)/);
 assert.match(ios, /filteredNotes\.prefix\(3\)/);
+assert.match(ios, /GridItem\(\.adaptive\(minimum: 220\), spacing: 10\)/, "iOS entry features must adapt to compact phone widths");
+assert.match(ios, /await autosave\(\)\s+if errorText\.isEmpty \{ showWelcome = true \}/, "iOS must not leave the editor when the local draft save fails");
 assert.match(ios, /Start page/);
 assert.match(web, /data-local-only="true"/);
 assert.match(android, /Files are not uploaded/);
