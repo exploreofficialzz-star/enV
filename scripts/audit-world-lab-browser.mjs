@@ -16,17 +16,50 @@ try{
   const readEntryLayout=()=>page.locator(".world-lab-entry").evaluate((root)=>{
     const title=root.querySelector("h1")?.getBoundingClientRect();
     const artwork=root.querySelector(".world-lab-entry__artwork")?.getBoundingClientRect();
+    const planet=root.querySelector(".world-lab-entry__planet")?.getBoundingClientRect();
+    const brand=root.querySelector(".world-lab-entry__brand")?.getBoundingClientRect();
     const button=root.querySelector("button")?.getBoundingClientRect();
+    const buttonStyle=button?getComputedStyle(root.querySelector("button")):null;
     return {
       titleBottom:title?.bottom,artworkTop:artwork?.top,
       artworkBottom:artwork?.bottom,buttonTop:button?.top,
+      buttonWidth:button?.width,buttonHeight:button?.height,
+      buttonBackground:buttonStyle?.backgroundColor,buttonColor:buttonStyle?.color,
+      pageBackground:getComputedStyle(root).backgroundColor,
+      canvasBackground:getComputedStyle(root.querySelector(".world-lab-entry__inner")).backgroundColor,
+      titleSrc:root.querySelector(".world-lab-entry__title img")?.getAttribute("src"),
+      brandSrc:root.querySelector(".world-lab-entry__brand")?.getAttribute("src"),
+      brandFilter:getComputedStyle(root.querySelector(".world-lab-entry__brand")).filter,
+      planetFilter:getComputedStyle(root.querySelector(".world-lab-entry__planet")).filter,
+      artworkOverlaps:!!(planet&&brand&&planet.right>brand.left&&planet.bottom>brand.top),
+      hasHeader:!!document.querySelector("header"),
+      hasFooter:!!document.querySelector("footer"),
     };
   });
   const desktopEntryLayout=await readEntryLayout();
   assert.ok(desktopEntryLayout.titleBottom<=desktopEntryLayout.artworkTop,
-    "The World Lab heading must not be covered by its artwork");
+    "The exact title wordmark must sit above the Saturn/logo artwork");
   assert.ok(desktopEntryLayout.artworkBottom<=desktopEntryLayout.buttonTop,
-    "The World Lab artwork must not cover the Enter button");
+    "The artwork must sit above the Enter button");
+  assert.equal(desktopEntryLayout.buttonBackground,"rgb(219, 234, 255)",
+    "The Enter button must use the reference pale-blue fill");
+  assert.equal(desktopEntryLayout.buttonColor,"rgb(16, 23, 41)",
+    "The Enter label must use the reference dark ink");
+  assert.ok(Math.abs(desktopEntryLayout.buttonWidth-214)<3 && Math.abs(desktopEntryLayout.buttonHeight-52)<3,
+    "The Enter button must match the reference pill dimensions");
+  assert.equal(desktopEntryLayout.pageBackground,"rgb(241, 244, 249)",
+    "The entry surround must use the reference cool-grey tint");
+  assert.equal(desktopEntryLayout.canvasBackground,"rgb(249, 250, 252)",
+    "The inner canvas must use the reference near-white tone");
+  assert.ok(desktopEntryLayout.titleSrc?.endsWith("/world-lab-title.svg"),
+    "The title must use the exact supplied screenshot wordmark vector");
+  assert.ok(desktopEntryLayout.brandSrc?.endsWith("/logo-home-transparent.png"),
+    "The artwork must use the original enV logo asset");
+  assert.equal(desktopEntryLayout.brandFilter,"none","The enV logo must retain its original colours");
+  assert.equal(desktopEntryLayout.planetFilter,"none","Saturn must retain its full-colour emoji");
+  assert.ok(desktopEntryLayout.artworkOverlaps,"Saturn must overlap the left edge of the enV logo");
+  assert.equal(desktopEntryLayout.hasHeader,false,"The reference entry must not show the app header");
+  assert.equal(desktopEntryLayout.hasFooter,false,"The reference entry must not show the app footer");
   await page.setViewportSize({width:390,height:844});
   const mobileEntryLayout=await readEntryLayout();
   assert.ok(mobileEntryLayout.titleBottom<=mobileEntryLayout.artworkTop,

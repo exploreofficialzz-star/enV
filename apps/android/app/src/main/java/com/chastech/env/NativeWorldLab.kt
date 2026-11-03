@@ -20,6 +20,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -2509,7 +2512,7 @@ private fun nativeLabImpactVelocity(text:String):NativeLabVector {
 }
 
 
-/** Native monochrome entry for the World Lab; the existing workspace stays independent. */
+/** Native World Lab entry matching the exact supplied wordmark and artwork. */
 @Composable
 fun NativeWorldLabEntryForm() {
     var entered by remember { mutableStateOf(false) }
@@ -2518,80 +2521,57 @@ fun NativeWorldLabEntryForm() {
         return
     }
 
-    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val background = if (dark) Color.Black else Color.White
-    val foreground = if (dark) Color.White else Color.Black
+    val outer = Color(0xFFF1F4F9)
+    val canvas = Color(0xFFF9FAFC)
+    val buttonFill = Color(0xFFDBEAFF)
+    val buttonInk = Color(0xFF101729)
 
-    Surface(modifier = Modifier.fillMaxSize(), color = background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = outer) {
         Box(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            modifier = Modifier.fillMaxSize().padding(10.dp).background(canvas),
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.widthIn(max = 390.dp).padding(bottom = 48.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(22.dp)
+                modifier = Modifier.offset(y = (-27).dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "The World Lab",
-                    color = foreground,
-                    fontFamily = FontFamily(Font(R.font.world_lab_caveat)),
-                    fontSize = 52.sp,
-                    fontWeight = FontWeight.Normal,
-                    letterSpacing = 0.sp,
-                    softWrap = false,
-                    maxLines = 1
+                Image(
+                    painter = painterResource(R.drawable.world_lab_title),
+                    contentDescription = "The World Lab",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.width(236.dp).height(50.dp)
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Canvas(modifier = Modifier.size(100.dp)) {
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        drawOval(
-                            color = foreground,
-                            topLeft = Offset(size.width * 0.06f, size.height * 0.34f),
-                            size = Size(size.width * 0.88f, size.height * 0.32f),
-                            style = Stroke(width = 2.5.dp.toPx())
-                        )
-                        drawCircle(
-                            color = foreground,
-                            radius = size.minDimension * 0.25f,
-                            center = center,
-                            style = Stroke(width = 2.5.dp.toPx())
-                        )
-                        drawCircle(
-                            color = foreground,
-                            radius = 3.dp.toPx(),
-                            center = Offset(size.width * 0.76f, size.height * 0.29f)
-                        )
-                    }
+                Spacer(Modifier.height(6.dp))
+                Box(Modifier.width(160.dp).height(82.dp)) {
+                    Image(
+                        painter = painterResource(R.drawable.world_lab_logo),
+                        contentDescription = "enV",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.align(Alignment.BottomEnd).width(120.dp).height(45.dp)
+                    )
                     Text(
-                        text = "enV",
-                        color = foreground,
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-1).sp,
-                        softWrap = false
+                        text = "🪐",
+                        fontSize = 84.sp,
+                        modifier = Modifier.align(Alignment.TopStart).offset(y = (-7).dp)
                     )
                 }
+                Spacer(Modifier.height(28.dp))
                 Button(
                     onClick = { entered = true },
-                    modifier = Modifier.width(222.dp).height(54.dp),
-                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.width(214.dp).height(52.dp),
+                    shape = RoundedCornerShape(999.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = foreground,
-                        contentColor = background
+                        containerColor = buttonFill,
+                        contentColor = buttonInk
                     ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp,
-                        pressedElevation = 0.dp
-                    )
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
                         text = "Enter",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        color = buttonInk,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.sp
                     )
                 }

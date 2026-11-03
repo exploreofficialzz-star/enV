@@ -7,7 +7,7 @@ import { synchronizeSelectedWebOfflineAllowance } from "@/lib/billing/offline-cl
 import { flushAnalyticsEvents, recordAnalyticsEvent } from "@/lib/analytics/client";
 import { usePrefs } from "@/lib/storage";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, showChrome = true }: { children: React.ReactNode; showChrome?: boolean }) {
   useHydratePrefs();
   const viewMode = usePrefs((state) => state.viewMode);
   const widthClass = viewMode === "mobile" ? "mx-auto w-full max-w-[430px]" : viewMode === "tablet" ? "mx-auto w-full max-w-[768px]" : "mx-auto w-full max-w-[1440px]";
@@ -29,9 +29,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <div className={"env-app-shell flex min-h-dvh flex-col bg-bg text-fg " + widthClass}>
-      <Header />
+      {showChrome && <Header />}
       <main className="flex-1">{children}</main>
-      <Footer />
+      {showChrome && <Footer />}
       <AnalyticsConsent />
     </div>
   );

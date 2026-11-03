@@ -96,7 +96,7 @@ function Tool() {
   const { mode, action, op } = Route.useSearch();
   const { communityFeed } = Route.useLoaderData();
   if (category === "developer" && slug === "artboard-studio") return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: "the-world-lab" }} search={{ mode: undefined, action: undefined, op: undefined }} replace />;
-  if (category === "developer" && slug === "the-world-lab") return <AppShell><ToolViewAnalytics toolId="the-world-lab" /><WorldLabEntry /></AppShell>;
+  if (category === "developer" && slug === "the-world-lab") return <AppShell showChrome={false}><ToolViewAnalytics toolId="the-world-lab" /><WorldLabEntry /></AppShell>;
   if ((category === "business" || category === "calculators") && slug === "break-even-calculator") {
     return <Navigate to="/tools/$category/$slug" params={{ category: "business", slug: "finance-studio" }} search={{ mode: "break-even", action: undefined, op: undefined }} replace />;
   }

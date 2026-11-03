@@ -4675,44 +4675,9 @@ private struct NativeWorldLabFieldImportPanel:View {
 }
 
 
-/// Minimal SwiftUI entry matching the approved black-and-white World Lab design.
-
-private func nativeWorldLabEntryScriptFontName() -> String {
-    guard let url = Bundle.main.url(
-        forResource: "caveat",
-        withExtension: "ttf",
-        subdirectory: "StudioAssets/fonts"
-    ) else {
-        return "Caveat-Regular"
-    }
-
-    var registrationError: Unmanaged<CFError>?
-    let registered = CTFontManagerRegisterFontsForURL(
-        url as CFURL,
-        .process,
-        &registrationError
-    )
-    guard registered || CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) != nil,
-          let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
-          let descriptor = descriptors.first else {
-        return "Caveat-Regular"
-    }
-    return CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String
-        ?? "Caveat-Regular"
-}
-
+/// Native World Lab entry matching the exact supplied wordmark and artwork.
 struct NativeWorldLabEntryView: View {
-    @Environment(\.colorScheme) private var colorScheme
     @State private var entered = false
-    @State private var scriptFontName = "Caveat-Regular"
-
-    private var backgroundColor: Color {
-        colorScheme == .dark ? .black : .white
-    }
-
-    private var foregroundColor: Color {
-        colorScheme == .dark ? .white : .black
-    }
 
     var body: some View {
         Group {
@@ -4720,57 +4685,59 @@ struct NativeWorldLabEntryView: View {
                 NativeWorldLabView()
             } else {
                 ZStack {
-                    backgroundColor.ignoresSafeArea()
-                    VStack(spacing: 22) {
-                        Text("The World Lab")
-                            .font(.custom(scriptFontName, size: 56, relativeTo: .largeTitle))
-                            .foregroundStyle(foregroundColor)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
+                    Color(red: 241 / 255, green: 244 / 255, blue: 249 / 255)
+                        .ignoresSafeArea()
 
-                        HStack(spacing: 10) {
-                            ZStack {
-                                Circle()
-                                    .stroke(foregroundColor, lineWidth: 2.5)
-                                    .frame(width: 54, height: 54)
-                                Ellipse()
-                                    .stroke(foregroundColor, lineWidth: 2.5)
-                                    .frame(width: 104, height: 30)
-                                    .rotationEffect(.degrees(-24))
-                                Circle()
-                                    .fill(foregroundColor)
-                                    .frame(width: 7, height: 7)
-                                    .offset(x: 27, y: -17)
+                    VStack(spacing: 0) {
+                        VStack(spacing: 0) {
+                            Image("WorldLabTitle")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 236, height: 50)
+                                .accessibilityLabel("The World Lab")
+
+                            Spacer().frame(height: 6)
+
+                            ZStack(alignment: .topLeading) {
+                                Image("WorldLabLogo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 120, height: 45)
+                                    .offset(x: 40, y: 37)
+                                    .accessibilityLabel("enV")
+
+                                Text("🪐")
+                                    .font(.system(size: 84))
+                                    .frame(width: 100, height: 82, alignment: .topLeading)
+                                    .offset(x: 0, y: -7)
+                                    .accessibilityHidden(true)
                             }
-                            .frame(width: 108, height: 94)
+                            .frame(width: 160, height: 82)
 
-                            Text("enV")
-                                .font(.system(size: 38, weight: .bold, design: .rounded))
-                                .tracking(-1.5)
-                                .foregroundStyle(foregroundColor)
-                        }
+                            Spacer().frame(height: 28)
 
-                        Button {
-                            entered = true
-                        } label: {
-                            Text("Enter")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(backgroundColor)
-                                .frame(width: 222, height: 54)
-                                .background(foregroundColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 24))
+                            Button {
+                                entered = true
+                            } label: {
+                                Text("Enter")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(Color(red: 16 / 255, green: 23 / 255, blue: 41 / 255))
+                                    .frame(width: 214, height: 52)
+                                    .background(Color(red: 219 / 255, green: 234 / 255, blue: 255 / 255))
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Enter")
                         }
-                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .offset(y: -27)
                     }
-                    .frame(maxWidth: 390)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 48)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(red: 249 / 255, green: 250 / 255, blue: 252 / 255))
+                    .padding(10)
                 }
             }
         }
-        .onAppear {
-            scriptFontName = nativeWorldLabEntryScriptFontName()
-        }
+        .toolbar(entered ? .automatic : .hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(!entered)
     }
 }

@@ -1,172 +1,126 @@
-@import url("https://fonts.googleapis.com/css2?family=Aguafina+Script&display=swap");
-
 @layer components {
   .world-lab-entry {
-    display: flex;
+    box-sizing: border-box;
+    display: grid;
     width: 100%;
-    min-height: clamp(600px, calc(100svh - 176px), 850px);
-    align-items: center;
-    justify-content: center;
-    padding: 32px 20px 48px;
-    overflow: visible;
-    color: #000;
-    background: #fff;
-  }
-
-  .dark .world-lab-entry {
-    color: #fff;
-    background: #000;
+    min-height: 100svh;
+    padding: 10px;
+    background: #f1f4f9;
   }
 
   .world-lab-entry__inner {
+    display: grid;
+    min-width: 0;
+    min-height: calc(100svh - 20px);
+    place-items: center;
+    background: #f9fafc;
+  }
+
+  .world-lab-entry__content {
     display: flex;
-    width: min(100%, 390px);
-    min-height: inherit;
+    width: min(100%, 360px);
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 22px;
-    margin-inline: auto;
-    padding: 26px 0 58px;
+    transform: translateY(-27px);
   }
 
   .world-lab-entry__title {
-    width: 100%;
-    max-width: 100%;
+    display: block;
+    width: min(100%, 236px);
+    height: 50px;
     margin: 0;
-    color: inherit;
-    font-family: "Aguafina Script", cursive;
-    font-size: clamp(46px, 13vw, 56px);
-    font-weight: 400;
-    line-height: 1.25;
-    letter-spacing: 0;
-    text-align: center;
-    white-space: nowrap;
+    padding: 0;
+    line-height: 0;
+  }
+
+  .world-lab-entry__title img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .world-lab-entry__artwork {
-    display: flex;
-    min-height: 112px;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
+    position: relative;
+    width: 160px;
+    height: 82px;
+    margin-top: 6px;
   }
 
   .world-lab-entry__planet {
+    position: absolute;
+    z-index: 2;
+    top: -7px;
+    left: 0;
     display: block;
-    flex: 0 0 auto;
     font-family: system-ui, sans-serif;
-    font-size: clamp(72px, 20vw, 90px);
+    font-size: 84px;
     line-height: 1;
-    filter: grayscale(1);
+    filter: none;
   }
 
   .world-lab-entry__brand {
+    position: absolute;
+    right: 0;
+    bottom: 0;
     display: block;
-    width: 112px;
-    height: 78px;
-    flex: 0 1 112px;
+    width: 120px;
+    height: 45px;
     object-fit: contain;
-    filter: grayscale(1) brightness(0);
+    filter: none;
   }
 
-  .dark .world-lab-entry__brand {
-    filter: grayscale(1) brightness(0) invert(1);
-  }
-
-  .world-lab-entry__cta {
+  button.world-lab-entry__cta {
     display: inline-flex;
-    width: 222px;
-    min-width: 222px;
-    min-height: 54px;
+    box-sizing: border-box;
+    width: 214px;
+    min-width: 214px;
+    height: 52px;
+    min-height: 52px;
+    margin-top: 28px;
+    padding: 0 16px;
     align-items: center;
     justify-content: center;
-    margin-top: 2px;
-    border: 1px solid #000;
-    border-radius: 24px;
-    color: #fff;
-    background: #000;
+    border: 0;
+    border-radius: 9999px;
+    color: #101729 !important;
+    background: #dbeaff !important;
     box-shadow: none;
-    font-size: 1.05rem;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 650;
     line-height: 1;
-    transition: opacity 150ms ease;
+    transition: filter 120ms ease;
   }
 
-  .dark .world-lab-entry__cta {
-    border-color: #fff;
-    color: #000;
-    background: #fff;
-  }
-
-  .world-lab-entry__cta:hover {
-    opacity: .82;
-  }
+  button.world-lab-entry__cta:hover { filter: brightness(.985); }
 
   .world-lab-entry__loading {
     display: grid;
-    min-height: clamp(540px, calc(100svh - 176px), 850px);
+    min-height: 100svh;
+    padding: 10px;
     place-items: center;
-    background: #fff;
-  }
-
-  .dark .world-lab-entry__loading {
-    background: #000;
+    background: #f1f4f9;
   }
 
   .world-lab-entry__loading-mark {
-    width: 30px;
-    height: 30px;
-    border: 2px solid #b8b8b8;
-    border-top-color: #000;
+    width: 28px;
+    height: 28px;
+    border: 2px solid #cbd5e1;
+    border-top-color: #101729;
     border-radius: 50%;
     animation: world-lab-entry-spin .8s linear infinite;
   }
 
-  .dark .world-lab-entry__loading-mark {
-    border-color: #555;
-    border-top-color: #fff;
-  }
+  @keyframes world-lab-entry-spin { to { transform: rotate(360deg); } }
 
-  @keyframes world-lab-entry-spin {
-    to { transform: rotate(360deg); }
-  }
-
-  @media (max-width: 480px) {
-    .world-lab-entry {
-      min-height: clamp(560px, calc(100svh - 150px), 760px);
-      padding: 22px 16px 34px;
-    }
-
-    .world-lab-entry__inner {
-      gap: 20px;
-      padding: 12px 0 36px;
-    }
-
-    .world-lab-entry__title {
-      font-size: clamp(44px, 13.5vw, 54px);
-    }
-
-    .world-lab-entry__brand {
-      width: 96px;
-      height: 70px;
-      flex-basis: 96px;
-    }
-
-    .world-lab-entry__artwork {
-      min-height: 100px;
-      gap: 8px;
-    }
+  @media (max-height: 520px) {
+    .world-lab-entry { min-height: 520px; overflow: auto; }
+    .world-lab-entry__inner { min-height: 500px; }
+    .world-lab-entry__content { transform: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .world-lab-entry__loading-mark {
-      animation: none;
-    }
-
-    .world-lab-entry__cta {
-      transition: none;
-    }
+    .world-lab-entry__loading-mark,
+    button.world-lab-entry__cta { animation: none; transition: none; }
   }
 }

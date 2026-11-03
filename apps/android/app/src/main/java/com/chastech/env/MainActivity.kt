@@ -355,10 +355,11 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     else if (showExchange) BackHandler { showExchange = false }
     else if (tab == AppTab.Assistant.name) BackHandler { tab = AppTab.Home.name }
     val currentTab = AppTab.entries.firstOrNull { it.name == tab } ?: AppTab.Home
+    val isWorldLabTool = selected?.id == "the-world-lab"
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (isWorldLabTool) Color(0xFFF1F4F9) else MaterialTheme.colorScheme.background,
         topBar = {
-            if (!isToolFullscreen) {
+            if (!isToolFullscreen && !isWorldLabTool) {
             TopAppBar(
                 title = {},
                 navigationIcon = {
@@ -409,7 +410,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
         Box(Modifier.padding(padding).fillMaxSize()) {
             Column(
                 Modifier.align(Alignment.TopCenter).then(
-                    if (isToolFullscreen) Modifier.fillMaxSize()
+                    if (isToolFullscreen || isWorldLabTool) Modifier.fillMaxSize()
                     else Modifier.widthIn(max = 1152.dp).fillMaxHeight()
                 )
             ) {
@@ -423,7 +424,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                         onCategory = { value -> detailStack = emptyList(); category = value; query = ""; tab = AppTab.Tools.name },
                         onRelatedTool = openRelatedTool,
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
-                        isFullscreen = isToolFullscreen,
+                        isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
                     )
                 } else {
@@ -1081,15 +1082,15 @@ private fun ToolDetail(
                 Box(Modifier.fillMaxSize()) {
                     Card(
                         modifier = Modifier.fillMaxSize(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+                        colors = CardDefaults.cardColors(containerColor = if (tool.id == "the-world-lab") Color(0xFFF1F4F9) else MaterialTheme.colorScheme.background),
                         shape = RoundedCornerShape(0.dp),
                         border = BorderStroke(0.dp, MaterialTheme.colorScheme.background),
                     ) {
                         Column(
-                            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
+                            Modifier.fillMaxSize().then(if (tool.id == "the-world-lab") Modifier else Modifier.padding(horizontal = 16.dp, vertical = 8.dp)),
                             verticalArrangement = Arrangement.spacedBy(0.dp),
                         ) {
-                            Row(
+                            if (tool.id != "the-world-lab") Row(
                                 Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(bottom = 8.dp),
                                 horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically,
