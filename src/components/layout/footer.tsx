@@ -5,8 +5,6 @@ import { activeCount } from "@/lib/registry";
 
 const EXPLORE_LINKS = [
   { to: "/tools", label: "All tools" },
-  { to: "/blog", label: "Blogs & guides" },
-  { to: "/help", label: "Help center" },
   { to: "/about", label: "About enV" },
   { to: "/contact", label: "Contact" },
   { to: "/pricing", label: "Pricing" },

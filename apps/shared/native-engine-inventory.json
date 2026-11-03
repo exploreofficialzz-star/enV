@@ -24,8 +24,8 @@
       "total": 110,
       "active": 110,
       "planned": 0,
-      "androidImplemented": 21,
-      "iosImplemented": 21,
+      "androidImplemented": 25,
+      "iosImplemented": 25,
       "uniqueConfigurations": 105
     },
     {
@@ -302,8 +302,11 @@
     "audio-file-inspector",
     "audio-file-size-calculator",
     "audio-hum-reducer",
+    "audio-joiner-local",
+    "audio-metronome",
     "audio-normalizer",
     "audio-peak-meter",
+    "audio-recorder",
     "audio-reverser",
     "audio-rms-meter",
     "audio-sample-rate-converter",
@@ -311,6 +314,7 @@
     "audio-to-mono",
     "audio-to-stereo",
     "audio-to-wav",
+    "audio-tone-generator",
     "audio-trimmer",
     "audio-volume-control",
     "automotive-braking-force",
@@ -8052,8 +8056,11 @@
     "audio-file-inspector",
     "audio-file-size-calculator",
     "audio-hum-reducer",
+    "audio-joiner-local",
+    "audio-metronome",
     "audio-normalizer",
     "audio-peak-meter",
+    "audio-recorder",
     "audio-reverser",
     "audio-rms-meter",
     "audio-sample-rate-converter",
@@ -8061,6 +8068,7 @@
     "audio-to-mono",
     "audio-to-stereo",
     "audio-to-wav",
+    "audio-tone-generator",
     "audio-trimmer",
     "audio-volume-control",
     "automotive-braking-force",
@@ -15759,7 +15767,7 @@
     "activeTools": 10002,
     "plannedTools": 0,
     "engineFamilies": 27,
-    "androidImplemented": 7748,
-    "iosImplemented": 7748
+    "androidImplemented": 7752,
+    "iosImplemented": 7752
   }
 }
