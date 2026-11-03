@@ -547,6 +547,17 @@ struct ToolCommunityPanel: View {
 
     private let reportReasons = ["spam", "harassment", "misinformation", "inappropriate", "other"]
 
+
+    private func compactCount(_ value: Int) -> String {
+        let count = max(0, value)
+        guard count >= 1_000 else { return String(count) }
+        let divisor = count >= 1_000_000 ? 1_000_000.0 : 1_000.0
+        let suffix = count >= 1_000_000 ? "M" : "K"
+        let rounded = (Double(count) / divisor * 10).rounded() / 10
+        let number = rounded.rounded() == rounded ? String(Int(rounded)) : String(format: "%.1f", rounded)
+        return number + suffix
+    }
+
     private var rootComments: [NativeCommunityComment] {
         (feed?.comments ?? []).filter { $0.parentId == nil }
     }
@@ -558,24 +569,24 @@ struct ToolCommunityPanel: View {
                     .foregroundStyle(Color.envAccent)
                 Image(systemName: "hand.thumbsdown.fill")
                     .foregroundStyle(Color.envMuted)
-                Text("\((feed?.counts.likes ?? 0) + (feed?.counts.dislikes ?? 0))")
+                Text(compactCount((feed?.counts.likes ?? 0) + (feed?.counts.dislikes ?? 0)))
                     .font(.envScaled(size: 11, weight: .medium))
                     .foregroundStyle(Color.envMuted)
                 Spacer()
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.left")
-                    Text("\(feed?.counts.comments ?? 0)")
+                    Text(compactCount(feed?.counts.comments ?? 0))
                 }
                 HStack(spacing: 4) {
                     Image(systemName: "eye")
-                    Text("\(feed?.counts.views ?? 0)")
+                    Text(compactCount(feed?.counts.views ?? 0))
                 }
                 .foregroundStyle(Color.envMuted)
                 .font(.envScaled(size: 11, weight: .regular))
             }
             HStack(spacing: 8) {
                 Button { Task { await react("like") } } label: {
-                    Label("\(feed?.counts.likes ?? 0)", systemImage: "hand.thumbsup")
+                    Label(compactCount(feed?.counts.likes ?? 0), systemImage: "hand.thumbsup")
                         .font(.envScaled(size: 13, weight: .semibold))
                         .foregroundStyle(feed?.myReaction == "like" ? Color.envAccent : Color.envInk)
                         .frame(maxWidth: .infinity)
@@ -588,7 +599,7 @@ struct ToolCommunityPanel: View {
                     showingComments = true
                     Task { await refresh() }
                 } label: {
-                    Label("\(feed?.counts.comments ?? 0)", systemImage: "bubble.left")
+                    Label(compactCount(feed?.counts.comments ?? 0), systemImage: "bubble.left")
                         .font(.envScaled(size: 13, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                         .frame(maxWidth: .infinity)
@@ -597,7 +608,7 @@ struct ToolCommunityPanel: View {
                 }
                 .buttonStyle(.plain)
                 Button { Task { await react("dislike") } } label: {
-                    Label("\(feed?.counts.dislikes ?? 0)", systemImage: "hand.thumbsdown")
+                    Label(compactCount(feed?.counts.dislikes ?? 0), systemImage: "hand.thumbsdown")
                         .font(.envScaled(size: 13, weight: .semibold))
                         .foregroundStyle(feed?.myReaction == "dislike" ? Color.envAccent : Color.envInk)
                         .frame(maxWidth: .infinity)
