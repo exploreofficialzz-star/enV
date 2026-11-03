@@ -66,6 +66,17 @@ private data class NativeCommunityFeed(
     val myReaction: String?,
 )
 
+private fun compactCommunityCount(value: Int): String {
+    val count = value.coerceAtLeast(0).toLong()
+    if (count < 1_000) return count.toString()
+    val divisor = if (count >= 1_000_000) 1_000_000.0 else 1_000.0
+    val suffix = if (count >= 1_000_000) "M" else "K"
+    val rounded = kotlin.math.round((count / divisor) * 10.0) / 10.0
+    val number = if (rounded % 1.0 == 0.0) rounded.toLong().toString()
+        else String.format(java.util.Locale.US, "%.1f", rounded)
+    return number + suffix
+}
+
 private object NativeCommunityApi {
     private val base get() = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
 
