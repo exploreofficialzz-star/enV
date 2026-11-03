@@ -20,6 +20,7 @@ type CaptureMode = "photo" | "video";
 type FacingMode = "user" | "environment";
 type LookId = "natural" | "warm" | "cool" | "mono" | "vivid";
 type MediaKind = "photo" | "video";
+type NumericRange = { min: number; max: number; step?: number };
 
 type StudioMediaItem = {
   id: string;
@@ -115,6 +116,10 @@ export function CameraStudioEngine() {
   const [gridVisible, setGridVisible] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchEnabled, setTorchEnabled] = useState(false);
+  const [zoomRange, setZoomRange] = useState<NumericRange | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [exposureRange, setExposureRange] = useState<NumericRange | null>(null);
+  const [exposureValue, setExposureValue] = useState(0);
   const [showCameraInfo, setShowCameraInfo] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -163,12 +168,30 @@ export function CameraStudioEngine() {
     if (!cameraStream) {
       setTorchAvailable(false);
       setTorchEnabled(false);
+      setZoomRange(null);
+      setZoomLevel(1);
+      setExposureRange(null);
+      setExposureValue(0);
       return;
     }
     const track = cameraStream.getVideoTracks()[0];
-    const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined;
+    const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & {
+      torch?: boolean;
+      zoom?: NumericRange;
+      exposureCompensation?: NumericRange;
+    }) | undefined;
+    const settings = track?.getSettings() as (MediaTrackSettings & {
+      zoom?: number;
+      exposureCompensation?: number;
+    }) | undefined;
     setTorchAvailable(Boolean(capabilities?.torch));
     setTorchEnabled(false);
+    const zoom = capabilities?.zoom;
+    setZoomRange(zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min ? zoom : null);
+    setZoomLevel(settings?.zoom ?? zoom?.min ?? 1);
+    const exposure = capabilities?.exposureCompensation;
+    setExposureRange(exposure && Number.isFinite(exposure.min) && Number.isFinite(exposure.max) && exposure.max > exposure.min ? exposure : null);
+    setExposureValue(settings?.exposureCompensation ?? 0);
   }, [cameraStream]);
 
 
@@ -426,6 +449,30 @@ export function CameraStudioEngine() {
     }
   }, [addToGallery]);
 
+  const applyZoom = useCallback(async (value: number) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !zoomRange) return;
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: value } as unknown as MediaTrackConstraintSet] });
+      setZoomLevel(value);
+    } catch {
+      setZoomRange(null);
+      setNotice("Hardware zoom control is unavailable on this camera.");
+    }
+  }, [zoomRange]);
+
+  const applyExposure = useCallback(async (value: number) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !exposureRange) return;
+    try {
+      await track.applyConstraints({ advanced: [{ exposureCompensation: value } as unknown as MediaTrackConstraintSet] });
+      setExposureValue(value);
+    } catch {
+      setExposureRange(null);
+      setNotice("Exposure adjustment is unavailable on this camera.");
+    }
+  }, [exposureRange]);
+
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
     if (!track || !torchAvailable) return;
@@ -644,6 +691,48 @@ export function CameraStudioEngine() {
             </div>
 
             <div className="mt-4 space-y-4">
+              {zoomRange && (
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label htmlFor="camera-zoom" className="text-sm font-medium text-fg">Zoom</label>
+                    <span className="text-xs tabular-nums text-muted">{zoomLevel.toFixed(1)}×</span>
+                  </div>
+                  <input
+                    id="camera-zoom"
+                    type="range"
+                    min={zoomRange.min}
+                    max={zoomRange.max}
+                    step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 0.1}
+                    value={Math.min(zoomRange.max, Math.max(zoomRange.min, zoomLevel))}
+                    onChange={(event) => void applyZoom(Number(event.currentTarget.value))}
+                    disabled={!cameraStream || cameraBusy || isRecording}
+                    className="h-2 w-full cursor-pointer accent-[var(--color-accent)] disabled:opacity-40"
+                  />
+                  <p className="mt-1 text-xs text-muted">Uses the zoom range reported by the active camera.</p>
+                </div>
+              )}
+
+              {exposureRange && (
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label htmlFor="camera-exposure" className="text-sm font-medium text-fg">Exposure</label>
+                    <span className="text-xs tabular-nums text-muted">{exposureValue > 0 ? "+" : ""}{exposureValue.toFixed(1)}</span>
+                  </div>
+                  <input
+                    id="camera-exposure"
+                    type="range"
+                    min={exposureRange.min}
+                    max={exposureRange.max}
+                    step={exposureRange.step && exposureRange.step > 0 ? exposureRange.step : 0.1}
+                    value={Math.min(exposureRange.max, Math.max(exposureRange.min, exposureValue))}
+                    onChange={(event) => void applyExposure(Number(event.currentTarget.value))}
+                    disabled={!cameraStream || cameraBusy || isRecording}
+                    className="h-2 w-full cursor-pointer accent-[var(--color-accent)] disabled:opacity-40"
+                  />
+                  <p className="mt-1 text-xs text-muted">Shown only when the camera exposes exposure compensation.</p>
+                </div>
+              )}
+
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-medium text-fg">Photo timer</span>
