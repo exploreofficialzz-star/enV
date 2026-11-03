@@ -400,8 +400,7 @@ extension NativeWorldLabTimeCheckpointTests {
         let result=try NativeWorldLabTimeScales.utcToTcg("2026-11-01T12:00:00Z")
         XCTAssertEqual(result.source,"IAU 2000 Resolution B1.9")
         XCTAssertGreaterThan(result.tcgMjd,result.ttMjd)
-        let expectedOffsetSeconds=(result.ttMjd-NativeWorldLabTimeScales.iauReferenceMJD)
-            *NativeWorldLabTimeScales.iauLG/(1-NativeWorldLabTimeScales.iauLG)*86400
+        let expectedOffsetSeconds=(result.ttMjd-NativeWorldLabTimeScales.iauReferenceMJD)*NativeWorldLabTimeScales.iauLG/(1-NativeWorldLabTimeScales.iauLG)*86400
         XCTAssertEqual((result.tcgMjd-result.ttMjd)*86400,expectedOffsetSeconds,accuracy:0.01)
     }
 }
