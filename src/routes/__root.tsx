@@ -1,7 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import { useEffect } from "react";
-import { registerEnVServiceWorker } from "@/lib/offline/tool-package-client";
+import { prepareEnVOfflineShell } from "@/lib/offline/tool-package-client";
 import appCss from "../styles.css?url";
 import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolByPath, getToolsByCategory } from "@/lib/registry";
@@ -56,7 +56,7 @@ const INITIAL_THEME_SCRIPT = `(() => {
 
 function RootDocument() {
   useEffect(() => {
-    void registerEnVServiceWorker();
+    void prepareEnVOfflineShell();
   }, []);
 
   return (
