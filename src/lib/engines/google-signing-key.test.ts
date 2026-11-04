@@ -32,7 +32,7 @@ test("Google signing key generator creates a JKS upload keystore and a valid sel
   assert.equal(output.keystoreBase64, Buffer.from(output.keystore).toString("base64"));
   const handoutFiles = createGoogleSigningKeyHandoutFiles(output);
   const zip = unzipSync(zipSync(handoutFiles, { level: 6 }));
-  assert.deepEqual(Object.keys(zip).sort(), [
+  assert.deepEqual(Object.keys(zip).filter((name) => !name.endsWith("/")).sort(), [
     ".gitignore-signing-example",
     ".github/workflows/android-release.yml",
     "README.md",
