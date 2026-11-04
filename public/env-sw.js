@@ -396,8 +396,9 @@ self.addEventListener("message", (event) => {
             await setPackage({ ...previous, status: previous.version ? "ready" : "failed", updatedAt: new Date().toISOString() });
           }
         }
-        await removeSession(clientId);
-        return reply({ ok: true, ready, status: ready ? "ready" : "failed", assetCount: keys.length, message: ready ? "Offline tool package installed." : "No complete tool asset set was captured; this tool remains online-only." });
+        // Keep capturing lazy-loaded engine, worker and feature assets until the tool route unmounts.
+        // END_TOOL_PACKAGE closes this visit session; assets fetched after readiness remain in this package.
+        return reply({ ok: true, ready, status: ready ? "ready" : "failed", assetCount: keys.length, message: ready ? "Offline tool package installed; visit capture remains active." : "No complete tool asset set was captured; this tool remains online-only." });
       }
 
       return reply({ ok: false, message: "Unknown offline package command." });
