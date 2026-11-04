@@ -144,6 +144,7 @@ import com.chastech.env.data.fromJson
 import com.chastech.env.data.withMusicDownloader
 import com.chastech.env.data.withSongMetadataAnalyzer
 import com.chastech.env.data.withABook
+import com.chastech.env.data.withCameraStudio
 import com.chastech.env.data.withZipArchive
 import com.chastech.env.data.withDateTimeExtensions
 import com.chastech.env.data.search
@@ -224,7 +225,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withABook().withZipArchive().withDateTimeExtensions() }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withABook().withZipArchive().withCameraStudio().withDateTimeExtensions() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
@@ -282,7 +283,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
 }
 
 private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video")
-private val productionExemptToolIds = setOf("a-book", "zip-any-file")
+private val productionExemptToolIds = setOf("a-book", "zip-any-file", "camera-studio")
 
 private fun ToolRecord.isUnderProduction(): Boolean =
     !productionExemptToolIds.contains(id.lowercase(Locale.ROOT)) &&
@@ -1020,7 +1021,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1357,6 +1358,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, startInWorkspace: Boolean = false) {
     if (tool.id == "a-book") { NativeABookScreen(); return }
     if (tool.id == "zip-any-file") { NativeZipArchiveScreen(); return }
+    if (tool.id == "camera-studio") { NativeCameraStudioScreen(); return }
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
     if (tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio") { NativeMusicDataSandboxScreen(startInWorkspace); return }
     when (tool.engine.type) {

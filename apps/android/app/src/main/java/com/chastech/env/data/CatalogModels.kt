@@ -261,6 +261,35 @@ fun Catalog.withZipArchive(): Catalog {
     )
 }
 
+/** Registers Camera Studio in the native tool catalogue without changing the generated shared catalogue. */
+fun Catalog.withCameraStudio(): Catalog {
+    if (tools.any { it.id == "camera-studio" }) return this
+    val tool = ToolRecord(
+        id = "camera-studio",
+        name = "Camera Studio",
+        slug = "camera-studio",
+        description = "Take photos and record videos using your phone camera. Switch front/rear cameras and save captures locally.",
+        category = "photography",
+        keywords = listOf("camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "recording", "capture", "flash", "torch"),
+        tags = listOf("camera", "photo", "video", "creator"),
+        icon = "Camera",
+        popularity = 1200,
+        featured = true,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = emptyList(),
+        engine = EngineInfo("custom", "camera-studio"),
+        subcategory = "Camera",
+    )
+    val updated = tools + tool
+    return copy(
+        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+    )
+}
+
 private val webSearchSynonyms = mapOf(
     "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
     "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),

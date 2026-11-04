@@ -1,0 +1,85 @@
+enV CAMERA STUDIO — PROFESSIONAL CAMERA UPGRADE PROMPT
+Version: 1.0
+Purpose: Continue the Camera Studio implementation into a dependable, phone-first camera experience while preserving enV's familiar, ordinary interface.
+
+ROLE
+Act as a senior mobile camera engineer, computer-vision engineer, performance engineer and product designer working inside the existing enV repository. Inspect the current implementation and project conventions before changing files. Do not create a separate camera application or replace enV's design system.
+
+PRODUCT GOAL
+Build a simple camera that feels familiar to anyone who has used a normal phone camera. Keep the main screen uncluttered: live preview, Photo/Video switch, one capture button, front/rear switch, recent captures and a small set of quick controls. Put advanced settings behind a simple settings area. Professional capability must not make the interface complicated.
+
+CURRENT BASELINE
+The browser Camera Studio first release is implemented in the Photography category. It includes permission-gated camera preview, front/rear switching, photo capture, video recording with microphone fallback, photo/video color looks, 720p/1080p/4K resolution targets, 24/30/60 fps targets, hardware-reported zoom/exposure/torch controls, a framing grid, photo timer, local session gallery, download controls, recording recovery and privacy copy.
+
+Important current limitations:
+- This is a browser-first implementation. It is not yet a native CameraX or AVFoundation camera screen.
+- The browser reports the actual capture size/frame rate; requested quality presets are not guaranteed.
+- Current looks are color filters, not face-tracking AR effects.
+- Browser simultaneous front/rear recording is not implemented.
+- The in-session gallery is temporary until the user downloads files.
+Treat these as real gaps. Never report them as completed.
+
+PHASE 1 — COMPLETE NATIVE CAMERA INTEGRATION
+1. Add a dedicated native Camera Studio route on Android and iOS. Use each platform's real camera frameworks rather than embedding the web camera.
+2. Android: use AndroidX CameraX (Preview, ImageCapture and VideoCapture/Recorder) with lifecycle-aware binding. Use the existing enV theme and permission patterns.
+3. iOS: use AVFoundation (AVCaptureSession, AVCapturePhotoOutput, AVCaptureMovieFileOutput or a supported video-data pipeline). Use the existing SwiftUI navigation, theme and file-saving conventions.
+4. Camera and microphone permission requests must be contextual. Explain why microphone permission is requested and allow silent video when microphone access is declined.
+5. Implement start/stop preview, photo capture, video recording, camera switching, timer, grid, flash/torch, zoom, focus, exposure and supported quality modes.
+6. Add clear camera-busy, permission-denied, no-camera, capture-failed, storage-low and recording-finalization states.
+7. Stop sessions and release all camera, microphone, encoder and preview resources when the screen closes or the app enters a lifecycle state that requires release.
+
+PHASE 2 — DEVICE-AWARE PRO CAMERA CONTROLS
+1. Offer sensible targets: 720p, 1080p and 4K where supported; 24, 30 and 60 fps where supported. Never show a requested value as if it were the actual output. Read back and display actual device settings.
+2. Add focus modes and tap-to-focus only where the device framework supports them.
+3. Add exposure compensation, white-balance modes, hardware zoom, flash and stabilization only when the device reports support.
+4. Add aspect-ratio choices such as 4:3, 16:9 and square. Ensure preview framing matches the exported result.
+5. Avoid promising RAW/DNG, HDR, optical zoom, 4K60 or high-frame-rate slow motion until the exact device and encoder path can produce and save those formats.
+6. Include a simple reset-to-auto option so users can recover from manual settings.
+
+PHASE 3 — TRUE FRONT + REAR SIMULTANEOUS RECORDING
+This is not the same as switching between cameras.
+1. Android: investigate CameraX ConcurrentCamera. Check FEATURE_CAMERA_CONCURRENT and the available concurrent camera combinations before presenting the feature. Respect platform/device limits, camera resource pressure and supported output resolutions. Provide picture-in-picture or split-screen composition with a clear layout toggle.
+2. iOS: investigate AVCaptureMultiCamSession and check isMultiCamSupported before creating the session. Respect hardwareCost and systemPressureCost; gracefully disable or lower quality when the session exceeds resource limits.
+3. On devices that do not support simultaneous capture, show a clear unavailable state and retain normal single-camera operation.
+4. Test front + rear capture, audio synchronization, orientation, device heat, battery drain, app backgrounding, and recording finalization on real devices.
+5. Do not simulate dual camera by showing the same stream twice, and do not imply that a device supports dual capture just because it has two lenses.
+
+PHASE 4 — CREATOR FILTERS AND FACE EFFECTS
+1. Keep simple color looks such as Natural, Warm, Cool, Mono, Vivid, Fade, Sunset and Glow.
+2. Add optional real-time face effects only through a genuine face-landmark pipeline. Evaluate MediaPipe Face Landmarker for web and appropriate native face/landmark solutions for Android/iOS.
+3. Use face landmarks, blendshape scores and transformation matrices to anchor original overlays and effects to faces. Example effects: glasses, hats, small sparkles, color tints and simple seasonal overlays.
+4. Add a beauty/soft-light option carefully. Do not claim skin retouching or face tracking if the algorithm only applies a global CSS color filter.
+5. Process video filters in the same media pipeline that is saved. The exported file must match the preview filter/effect.
+6. Keep model assets and filter assets versioned, licensed and packaged appropriately. Do not download arbitrary code or assets at runtime.
+7. Face detection must be opt-in, local by default, and disabled when performance or device support is insufficient. Keep inference off the UI thread where possible.
+
+PHASE 5 — STORAGE, EXPORT AND PRIVACY
+1. Save captures to the user's device gallery/library with platform-appropriate permissions and clear success/failure confirmation.
+2. Keep a recent-captures view with preview, delete, share and save actions.
+3. Preserve meaningful filenames, correct MIME types, timestamps, orientation and supported photo metadata.
+4. Avoid silently keeping large originals in memory. Stream or write recordings safely and handle storage pressure before recording.
+5. Do not upload camera frames, photos, videos, audio or face landmarks to enV servers unless the user explicitly invokes a feature that requires upload and confirms it.
+6. Provide clear privacy messaging before camera and microphone access.
+7. Add leave-page/app-background handling so in-progress videos are either finalized, explicitly discarded or recovered safely.
+
+DESIGN RULES
+- Preserve enV's current typography, spacing, border, surface, radius, theme and button conventions.
+- Make the default path feel like a normal phone camera, not a video-editing dashboard.
+- Keep the capture button visually central and the most important control.
+- Use labels that ordinary users understand: Photo, Video, Switch camera, Timer, Filters, Quality, Flash and Recent captures.
+- Avoid decorative panels, excessive cards, oversized headings and unnecessary status badges.
+- On narrow screens, keep preview and capture actions prominent; put additional controls below or behind Settings.
+- Support light and dark themes, keyboard accessibility on web, screen readers and large text.
+
+TESTING AND RELEASE GATES
+1. Run the repository's full type-check, lint, unit tests, catalog checks, build checks and native Android/iOS CI.
+2. Add specific Camera Studio regression tests for permissions, switching, photo capture, video recording, filter rendering, quality read-back, lifecycle cleanup, local save and error handling.
+3. Test on multiple real Android devices including Android 10/11+ and at least one low-memory phone; do not assume CameraX concurrent-camera support is universal.
+4. Test multiple iPhones/iPads with and without multi-camera support.
+5. Test front/back switching, denied permissions, missing microphone, low storage, app backgrounding, calls/interruptions, landscape orientation and long recordings.
+6. Record measured output resolution, fps, file size, thermal behaviour and battery usage. Avoid marketing claims that have not been measured.
+7. Keep feature flags or capability gates for dual-camera and face effects until real-device acceptance passes.
+8. Update the native catalogue, billing profile/audit contracts, documentation and tests together whenever the tool's platform scope changes.
+
+DELIVERY EXPECTATION
+Work in small, reviewable commits on a feature branch. Do not alter unrelated enV categories or tool behaviour. After each phase, run its checks and inspect the diff. Keep a clear implemented / device-dependent / not-yet-implemented list. Only request or perform the merge once required CI is green and the PR is mergeable. Never mark a native or device-specific feature complete based only on source code compiling.

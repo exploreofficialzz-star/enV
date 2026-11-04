@@ -1,6 +1,6 @@
 {
   "pricingVersion": "env-metering-preview-2026-10-18-v1",
-  "toolCount": 1,
+  "toolCount": 2,
   "profiles": [
     {
       "toolId": "a-book",
@@ -24,6 +24,31 @@
       "priceStatus": "provisional",
       "manualAuditRequired": true,
       "classificationReason": "Local execution metadata; general local utility fallback pending individual review.",
+      "pricingVersion": "env-metering-preview-2026-10-18-v1"
+    },
+    {
+      "toolId": "camera-studio",
+      "toolName": "Camera Studio",
+      "category": "photography",
+      "toolStatus": "active",
+      "engineType": "custom",
+      "clientSide": true,
+      "requiresBackend": false,
+      "executionMode": "local-device",
+      "billingKey": "local.media_processing",
+      "pricingMode": "per-unit-hypothesis",
+      "provisionalSubunitsPerUnit": 500,
+      "unitLabel": "capture",
+      "meteringDimensions": [
+        "operation-count",
+        "duration-seconds"
+      ],
+      "optionalAiAssistProfile": null,
+      "premiumRequired": false,
+      "adsEligible": false,
+      "priceStatus": "provisional",
+      "manualAuditRequired": true,
+      "classificationReason": "Native camera capture and video encoding run locally; device workload and actual user value require individual review before pricing.",
       "pricingVersion": "env-metering-preview-2026-10-18-v1"
     }
   ]

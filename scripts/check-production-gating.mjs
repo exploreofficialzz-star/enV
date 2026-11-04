@@ -36,12 +36,15 @@ const iosToolExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(id\.lowercased
 assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the implemented Web-ready categories");
 assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented native categories");
 assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented native categories");
-assert.deepEqual(webToolExempt, ["a-book", "zip-any-file"], "Web exposes only implemented tool-specific exceptions");
-assert.deepEqual(androidToolExempt, ["a-book", "zip-any-file"], "Android exposes only implemented tool-specific exceptions");
-assert.deepEqual(iosToolExempt, ["a-book", "zip-any-file"], "iOS exposes only implemented tool-specific exceptions");
+assert.deepEqual(webToolExempt, ["a-book", "zip-any-file", "camera-studio"], "Web exposes only implemented tool-specific exceptions");
+assert.deepEqual(androidToolExempt, ["a-book", "zip-any-file", "camera-studio"], "Android exposes only implemented tool-specific exceptions");
+assert.deepEqual(iosToolExempt, ["a-book", "zip-any-file", "camera-studio"], "iOS exposes only implemented tool-specific exceptions");
 assert.ok(webRegistry.includes('id: "a-book"'), "Web registry includes A book");
+assert.ok(webRegistry.includes('id: "camera-studio"'), "Web registry includes Camera Studio");
 assert.ok(androidCatalog.includes('id = "a-book"'), "Android catalog extension includes A book");
+assert.ok(androidCatalog.includes('id = "camera-studio"'), "Android catalog extension includes Camera Studio");
 assert.ok(iosCatalog.includes('id: "a-book"'), "iOS catalog extension includes A book");
+assert.ok(iosCatalog.includes('id: "camera-studio"'), "iOS catalog extension includes Camera Studio");
 
 assert.ok(Array.isArray(tools) && tools.length > 0, "catalog tools load");
 const categories = new Set(tools.map((tool) => tool.category));

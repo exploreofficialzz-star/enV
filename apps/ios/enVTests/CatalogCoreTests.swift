@@ -143,6 +143,25 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.webSearch("A book").first?.id, "a-book")
     }
 
+    func testCameraStudioRuntimeExtensionIsUniqueAndSearchable() {
+        let base = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "test",
+            counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 1),
+            categories: [],
+            tools: [],
+            relatedReferenceTools: nil
+        )
+        let catalog = base.includingCameraStudio()
+        XCTAssertEqual(catalog.tools.filter { $0.id == "camera-studio" }.count, 1)
+        XCTAssertEqual(catalog.counts.total, 1)
+        XCTAssertEqual(catalog.counts.active, 1)
+        XCTAssertEqual(catalog.tools.first?.category, "photography")
+        XCTAssertEqual(catalog.tools.first?.engine.type, "custom")
+        XCTAssertEqual(catalog.includingCameraStudio().tools.filter { $0.id == "camera-studio" }.count, 1)
+        XCTAssertEqual(catalog.webSearch("camera studio").first?.id, "camera-studio")
+    }
+
     func testRelatedToolsExcludePlannedAndFillFromCategoryAlphabetically() {
         let current = Tool(id: "current", name: "Current", slug: "current", description: "", category: "text", subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil, related: ["word-count", "future-tool"], engine: ToolEngine(type: "text", id: "current", op: nil))
         let testCatalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: catalog.tools + [current], relatedReferenceTools: nil)

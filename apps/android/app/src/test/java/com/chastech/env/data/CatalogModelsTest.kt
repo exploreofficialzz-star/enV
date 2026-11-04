@@ -29,6 +29,19 @@ class CatalogModelsTest {
         assertEquals(catalog, catalog.withABook())
     }
 
+    @Test fun runtimeCameraStudioAdditionIsUniqueAndSearchable() {
+        val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
+        val catalog = base.withCameraStudio()
+        assertEquals(1, catalog.tools.count { it.id == "camera-studio" })
+        assertEquals(1, catalog.counts.total)
+        assertEquals(1, catalog.counts.active)
+        assertEquals("camera-studio", catalog.search("camera studio").first().id)
+        assertEquals("photography", catalog.tools.single().category)
+        assertEquals("custom", catalog.tools.single().engine.type)
+        assertEquals("camera-studio", catalog.tools.single().engine.id)
+        assertEquals(catalog, catalog.withCameraStudio())
+    }
+
     @Test fun runtimeMusicDownloaderAdditionIsUniqueAndSearchable() {
         val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
         val catalog = base.withMusicDownloader()

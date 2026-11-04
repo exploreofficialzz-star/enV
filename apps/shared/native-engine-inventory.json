@@ -1,9 +1,10 @@
 {
-  "catalogVersion": "47f7b208f5a8",
+  "catalogVersion": "e60f06b40882",
   "baseCatalogVersion": "58f9a538e469",
   "runtimeExtensionIds": [
     "zip-any-file",
-    "a-book"
+    "a-book",
+    "camera-studio"
   ],
   "source": "src/data/catalog.ts",
   "platforms": {
@@ -103,12 +104,12 @@
     },
     {
       "family": "custom",
-      "total": 1666,
-      "active": 1666,
+      "total": 1667,
+      "active": 1667,
       "planned": 0,
-      "androidImplemented": 56,
-      "iosImplemented": 56,
-      "uniqueConfigurations": 1663
+      "androidImplemented": 57,
+      "iosImplemented": 57,
+      "uniqueConfigurations": 1664
     },
     {
       "family": "datetime",
@@ -447,6 +448,7 @@
     "calorie-macro-calculator",
     "calories-burned-calculator",
     "camel-case-converter",
+    "camera-studio",
     "canonical-generator",
     "caption-generator",
     "card-builder",
@@ -8202,6 +8204,7 @@
     "calorie-macro-calculator",
     "calories-burned-calculator",
     "camel-case-converter",
+    "camera-studio",
     "canonical-generator",
     "caption-generator",
     "card-builder",
@@ -15766,11 +15769,11 @@
     "zip-any-file"
   ],
   "summary": {
-    "totalTools": 10003,
-    "activeTools": 10003,
+    "totalTools": 10004,
+    "activeTools": 10004,
     "plannedTools": 0,
     "engineFamilies": 27,
-    "androidImplemented": 7753,
-    "iosImplemented": 7753
+    "androidImplemented": 7754,
+    "iosImplemented": 7754
   }
 }
