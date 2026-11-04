@@ -138,7 +138,6 @@ export async function listLocalWebOfflineAllowances() {
  * when the browser reports connectivity. Unlisted tools remain local and are not charged by
  * this journal until their execution boundary is explicitly wired and audited. */
 export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: string }, operation: () => T | Promise<T>): Promise<T> {
-  const offline = typeof navigator !== "undefined" && !navigator.onLine;
   const profile = offlineEligibleById.get(input.toolId);
   if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) {
     // Monetization is deliberately being wired after the offline feature rollout.
