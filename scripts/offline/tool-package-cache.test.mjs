@@ -38,25 +38,29 @@ test("package readiness requires at least one installed asset and a complete eng
   assert.match(engine, /OfflinePackageReadySignal/);
 });
 
-
 test("tool asset capture remains active through the whole route visit", () => {
   const completionStart = serviceWorker.indexOf('if (data.type === "COMPLETE_TOOL_PACKAGE")');
   const endStart = serviceWorker.indexOf('if (data.type === "END_TOOL_PACKAGE")');
   assert.ok(completionStart >= 0 && endStart > completionStart, "completion and route-exit commands must exist");
   const completion = serviceWorker.slice(completionStart, endStart);
-  assert.doesNotMatch(completion, /removeSession\\(clientId\\)/, "ready packages must keep capturing lazy assets until route exit");
+  assert.equal(completion.includes("removeSession(clientId)"), false, "ready packages must keep capturing lazy assets until route exit");
   const exit = serviceWorker.slice(endStart, endStart + 600);
-  assert.match(exit, /removeSession\\(sourceClientId\\)/, "leaving the tool route must close its capture session");
-  assert.match(serviceWorker, /if \\(session && toolCache\\)[\\s\\S]*await toolCache\\.put\\(request, response\\.clone\\(\\)\\)/,
+  assert.ok(exit.includes("removeSession(sourceClientId)"), "leaving the tool route must close its capture session");
+  assert.ok(serviceWorker.includes("if (session && toolCache)") &&
+    serviceWorker.includes("await toolCache.put(request, response.clone())"),
     "same-origin assets requested after initial readiness must be added to the active tool cache");
 });
 
 test("local tools remain interactive in the pre-monetization offline rollout", () => {
   const toolShell = readFileSync(new URL("../../src/components/tools/tool-shell.tsx", import.meta.url), "utf8");
   const offlineClient = readFileSync(new URL("../../src/lib/billing/offline-client.ts", import.meta.url), "utf8");
-  assert.doesNotMatch(toolShell, /offlineTokenLocked|surface\\.inert/, "the disabled wallet verifier must not make local tools inert");
+  assert.equal(toolShell.includes("offlineTokenLocked") || toolShell.includes("surface.inert"), false,
+    "the disabled wallet verifier must not make local tools inert");
   assert.match(toolShell, /Offline mode: the operations marked as local can run on this device/);
-  assert.match(offlineClient, /if \\(!selectedAllowanceId\\)[\\s\\S]*return await operation\\(\\)/,
+  const noAllowanceStart = offlineClient.indexOf("if (!selectedAllowanceId)");
+  const noAllowanceEnd = offlineClient.indexOf("\n  }", noAllowanceStart);
+  assert.ok(noAllowanceStart >= 0 && noAllowanceEnd > noAllowanceStart &&
+    offlineClient.slice(noAllowanceStart, noAllowanceEnd).includes("return await operation();"),
     "local operations without an allowance remain runnable while monetization is pending");
 });
 
