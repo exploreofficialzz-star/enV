@@ -2943,3 +2943,286 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 .uxui-chroma-picker > .uxui-chroma-sample-readout { grid-column:2; grid-row:3; font-size:11px; justify-content:center; }
 .uxui-chroma-picker .uxui-chroma-sample-readout canvas { margin-left:0; }
 .uxui-chroma-picker .uxui-chroma-sample-readout > span { width:20px; height:20px; }
+
+
+/* UX/UI Studio viewport-bounded home and compacting project launcher. */
+.uxui-home {
+  box-sizing:border-box !important;
+  display:flex !important;
+  flex-direction:column !important;
+  gap:clamp(8px,1.35vh,13px) !important;
+  height:var(--uxui-home-height,calc(100dvh - 160px)) !important;
+  max-height:var(--uxui-home-height,calc(100dvh - 160px)) !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+  padding:clamp(10px,1.4vw,18px) !important;
+}
+.uxui-home-heading { flex:0 0 auto !important; margin:0 !important; }
+.uxui-home-heading h2 { margin:0 !important; font-size:clamp(20px,2.1vw,28px) !important; line-height:1.15 !important; }
+.uxui-home-heading p { margin:4px auto 0 !important; max-width:620px; line-height:1.35 !important; }
+.uxui-home-device-picker { flex:0 0 auto !important; min-height:34px; gap:8px !important; }
+.uxui-home-device-picker-label { font-size:11px !important; }
+.uxui-home-projects {
+  display:flex !important;
+  flex:1 1 0 !important;
+  flex-direction:column !important;
+  gap:8px !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+.uxui-home-create-wrap {
+  flex:0 0 auto !important;
+  min-height:0 !important;
+  transition:height 240ms cubic-bezier(.2,.7,.2,1), padding 240ms ease;
+}
+.uxui-new-project-card {
+  display:flex !important;
+  width:100% !important;
+  max-width:none !important;
+  height:78px !important;
+  min-height:78px !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:14px !important;
+  padding:10px 16px !important;
+  border-radius:14px !important;
+  transition:height 240ms cubic-bezier(.2,.7,.2,1), min-height 240ms cubic-bezier(.2,.7,.2,1), padding 240ms ease, gap 240ms ease, border-radius 240ms ease !important;
+}
+.uxui-new-project-plus {
+  width:48px !important;
+  height:48px !important;
+  flex:0 0 48px !important;
+  border-width:1.5px !important;
+  transition:width 240ms ease,height 240ms ease,flex-basis 240ms ease,border-radius 240ms ease !important;
+}
+.uxui-new-project-copy { display:flex; min-width:0; flex-direction:column; align-items:flex-start; gap:3px; }
+.uxui-new-project-copy strong { line-height:1.2; }
+.uxui-new-project-copy > span { line-height:1.25; }
+.uxui-home-create-wrap.is-compact .uxui-new-project-card {
+  height:52px !important;
+  min-height:52px !important;
+  padding:6px 12px !important;
+  gap:10px !important;
+  border-radius:11px !important;
+}
+.uxui-home-create-wrap.is-compact .uxui-new-project-plus {
+  width:36px !important;
+  height:36px !important;
+  flex-basis:36px !important;
+}
+.uxui-home-create-wrap.is-compact .uxui-new-project-copy > span { display:none !important; }
+.uxui-home-create-wrap.is-compact .uxui-new-project-copy strong { font-size:13px !important; }
+.uxui-drafts {
+  display:flex !important;
+  flex:1 1 0 !important;
+  flex-direction:column !important;
+  gap:8px !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+.uxui-drafts-header {
+  display:flex !important;
+  flex:0 0 auto !important;
+  min-width:0 !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:10px !important;
+}
+.uxui-drafts-header h3 { font-size:15px !important; line-height:1.2 !important; }
+.uxui-drafts-header > div:first-child > span { display:block; margin-top:2px; }
+.uxui-drafts-filter { display:flex; min-width:0; align-items:center; gap:6px; }
+.uxui-drafts-filter input { width:min(230px,28vw); min-height:36px; }
+.uxui-drafts-filter button { min-height:36px; white-space:nowrap; }
+.uxui-draft-list {
+  box-sizing:border-box;
+  flex:1 1 0 !important;
+  min-height:0 !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  padding:1px 2px 5px 0;
+}
+.uxui-draft-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-content:start; gap:8px; }
+.uxui-draft-card {
+  display:flex !important;
+  min-width:0 !important;
+  flex-direction:column !important;
+  gap:8px !important;
+  padding:8px !important;
+  border-radius:11px !important;
+  background:var(--color-surface) !important;
+}
+.uxui-draft-open {
+  display:flex !important;
+  min-width:0 !important;
+  flex:1 1 auto;
+  flex-direction:row !important;
+  align-items:center !important;
+  gap:8px !important;
+  padding:2px !important;
+}
+.uxui-draft-open > span:first-child { width:36px !important; height:36px !important; flex:0 0 36px !important; }
+.uxui-draft-details { display:block; min-width:0; flex:1 1 auto; }
+.uxui-draft-details > strong { font-size:11px !important; line-height:1.25 !important; }
+.uxui-draft-details > span { margin-top:3px; font-size:9px !important; line-height:1.25 !important; }
+.uxui-draft-actions {
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:4px !important;
+  border-top:1px solid var(--color-border);
+  padding-top:6px;
+}
+.uxui-draft-actions > label { grid-column:1/-1; min-width:0; }
+.uxui-draft-rename { min-height:30px !important; font-size:10px !important; }
+.uxui-draft-actions > button {
+  display:flex;
+  min-width:0;
+  min-height:30px;
+  align-items:center;
+  justify-content:center;
+  padding:3px 2px !important;
+  overflow:hidden;
+  font-size:9px !important;
+  line-height:1.1;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.uxui-empty-drafts { display:grid; min-height:150px; height:100%; place-content:center; justify-items:center; }
+.uxui-empty-drafts p { margin-top:6px; }
+.uxui-home :is(button,input,select) { max-width:100%; }
+@media (min-width:768px) {
+  .uxui-draft-grid { grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+  .uxui-draft-card { padding:9px !important; }
+  .uxui-draft-open { flex-direction:column !important; align-items:flex-start !important; }
+  .uxui-draft-open > span:first-child { width:40px !important; height:40px !important; flex-basis:40px !important; }
+  .uxui-draft-details > strong { font-size:12px !important; }
+  .uxui-draft-details > span { font-size:10px !important; }
+  .uxui-draft-actions > button { font-size:10px !important; }
+}
+@media (min-width:1024px) {
+  .uxui-home { padding:18px !important; }
+  .uxui-draft-grid { grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; }
+}
+@media (max-width:600px) {
+  .uxui-home { gap:7px !important; padding:9px !important; border-radius:14px !important; }
+  .uxui-home-heading h2 { font-size:21px !important; }
+  .uxui-home-heading p { max-width:360px; font-size:11px !important; }
+  .uxui-home-device-picker { gap:5px !important; }
+  .uxui-home-device-picker-label { font-size:10px !important; }
+  .uxui-home-device-picker .uxui-target-switch { gap:2px !important; }
+  .uxui-home-device-picker .uxui-target-switch button { min-width:0; min-height:32px !important; padding-inline:7px !important; gap:4px !important; }
+  .uxui-home-device-picker .uxui-target-switch button svg { width:15px; height:15px; }
+  .uxui-home-device-picker .uxui-target-switch button span { font-size:10px; }
+  .uxui-home-projects { gap:6px !important; }
+  .uxui-new-project-card { height:64px !important; min-height:64px !important; padding:8px 11px !important; gap:10px !important; }
+  .uxui-new-project-plus { width:40px !important; height:40px !important; flex-basis:40px !important; }
+  .uxui-new-project-copy strong { font-size:14px !important; }
+  .uxui-new-project-copy > span { font-size:11px !important; }
+  .uxui-home-create-wrap.is-compact .uxui-new-project-card { height:46px !important; min-height:46px !important; padding:5px 9px !important; }
+  .uxui-home-create-wrap.is-compact .uxui-new-project-plus { width:34px !important; height:34px !important; flex-basis:34px !important; }
+  .uxui-drafts { gap:6px !important; }
+  .uxui-drafts-header { align-items:flex-start !important; }
+  .uxui-drafts-header h3 { font-size:14px !important; }
+  .uxui-drafts-filter { flex:0 1 58%; gap:4px !important; }
+  .uxui-drafts-filter input { width:100%; min-width:0; min-height:32px; padding-inline:8px !important; font-size:10px !important; }
+  .uxui-drafts-filter button { min-height:32px; padding-inline:7px !important; font-size:9px !important; }
+  .uxui-draft-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .uxui-draft-card { gap:6px !important; padding:6px !important; }
+  .uxui-draft-open { flex-direction:column !important; align-items:stretch !important; gap:5px !important; }
+  .uxui-draft-open > span:first-child { width:31px !important; height:31px !important; flex-basis:31px !important; border-radius:8px !important; }
+  .uxui-draft-open > span:first-child svg { width:17px; height:17px; }
+  .uxui-draft-details > strong { font-size:10px !important; }
+  .uxui-draft-details > span { font-size:8px !important; margin-top:2px; }
+  .uxui-draft-description { display:none !important; }
+  .uxui-draft-actions { gap:3px !important; padding-top:5px; }
+  .uxui-draft-rename { min-height:28px !important; padding-inline:5px !important; font-size:9px !important; }
+  .uxui-draft-actions > button { min-height:28px; font-size:8px !important; }
+  .uxui-empty-drafts { min-height:120px; padding:14px 8px !important; }
+}
+@media (max-height:620px) {
+  .uxui-home { gap:6px !important; padding-block:7px !important; }
+  .uxui-home-heading p { display:none !important; }
+  .uxui-new-project-card { height:56px !important; min-height:56px !important; }
+  .uxui-home-create-wrap.is-compact .uxui-new-project-card { height:44px !important; min-height:44px !important; }
+  .uxui-drafts-header h3 { font-size:13px !important; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .uxui-home-create-wrap, .uxui-new-project-card, .uxui-new-project-plus { transition:none !important; }
+}
+
+/* Unified enV editor header: zoom, devices, export and exit share one toolbar. */
+.ux-ui-studio .uxui-fullscreen-brand {
+  display:flex !important;
+  flex:0 0 auto !important;
+  min-width:0 !important;
+}
+.ux-ui-studio > .uxui-topbar {
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:clamp(5px,1vw,12px) !important;
+  min-width:0 !important;
+}
+.ux-ui-studio .uxui-topbar-left {
+  display:flex !important;
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:clamp(4px,.7vw,9px) !important;
+}
+.ux-ui-studio .uxui-header-zoom {
+  display:grid !important;
+  flex:0 0 36px !important;
+  width:36px !important;
+  min-width:36px !important;
+  min-height:36px !important;
+  place-items:center !important;
+  border:1px solid var(--color-border) !important;
+  border-radius:9px !important;
+  color:var(--color-fg) !important;
+  background:var(--color-surface) !important;
+}
+.ux-ui-studio .uxui-header-zoom:disabled { opacity:.35; cursor:not-allowed; }
+.ux-ui-studio .uxui-topbar-left .uxui-target-switch { flex:0 1 auto !important; min-width:0 !important; }
+.ux-ui-studio .uxui-topbar-left .uxui-target-switch button { min-width:34px; min-height:36px; padding-inline:7px; }
+.ux-ui-studio .uxui-topbar-actions {
+  display:flex !important;
+  flex:0 0 auto !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:clamp(6px,.8vw,10px) !important;
+  min-width:0 !important;
+}
+.ux-ui-studio .uxui-topbar-actions > .uxui-export-trigger,
+.ux-ui-studio .uxui-topbar-actions > .uxui-projects-trigger {
+  display:inline-flex !important;
+  min-height:36px !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:6px !important;
+  margin:0 !important;
+  padding:0 10px !important;
+  border:1px solid var(--color-border) !important;
+  border-radius:9px !important;
+  white-space:nowrap !important;
+}
+.ux-ui-studio .uxui-topbar-actions > .uxui-export-trigger { background:var(--color-fg) !important; color:var(--color-surface) !important; }
+.ux-ui-studio .uxui-topbar-actions > .uxui-projects-trigger { background:var(--color-surface) !important; color:var(--color-fg) !important; }
+@media (max-width:700px) {
+  .ux-ui-studio > .uxui-topbar { gap:4px !important; padding-inline:5px !important; }
+  .ux-ui-studio .uxui-fullscreen-logo { max-width:46px !important; }
+  .ux-ui-studio .uxui-topbar-left { flex:1 1 auto !important; gap:3px !important; }
+  .ux-ui-studio .uxui-header-zoom { flex-basis:30px !important; width:30px !important; min-width:30px !important; min-height:34px !important; }
+  .ux-ui-studio .uxui-topbar-left .uxui-target-switch { gap:1px !important; padding:2px !important; }
+  .ux-ui-studio .uxui-topbar-left .uxui-target-switch button { flex:0 0 29px !important; width:29px !important; min-width:29px !important; min-height:32px !important; padding:0 !important; }
+  .ux-ui-studio .uxui-topbar-left .uxui-target-switch button span { display:none !important; }
+  .ux-ui-studio .uxui-topbar-actions { flex:0 0 auto !important; gap:3px !important; }
+  .ux-ui-studio .uxui-topbar-actions > .uxui-export-trigger,
+  .ux-ui-studio .uxui-topbar-actions > .uxui-projects-trigger { width:34px !important; min-width:34px !important; min-height:34px !important; padding:0 !important; }
+  .ux-ui-studio .uxui-topbar-actions > .uxui-export-trigger span,
+  .ux-ui-studio .uxui-topbar-actions > .uxui-projects-trigger span { display:none !important; }
+}
