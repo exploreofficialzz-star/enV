@@ -579,7 +579,7 @@ struct NativeGoogleSigningKeyView: View {
         defer { try? manager.removeItem(at: folder) }
         let entries: [(String, Data)] = [
             ("upload-keystore.jks", value.keystore),
-            ("upload-keystore.base64.txt", Data((value.keystoreBase64 + "\\n").utf8)),
+            ("upload-keystore.base64.txt", Data((value.keystoreBase64 + "\n").utf8)),
             ("upload_certificate.pem", Data(value.certificatePEM.utf8)),
             ("github-secrets.txt", Data(value.githubSecrets.utf8)),
             ("signing-info.txt", Data(value.signingInfo.utf8)),
