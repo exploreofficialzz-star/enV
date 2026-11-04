@@ -90,10 +90,15 @@ export function GoogleSigningKeyGenerator() {
 
   const zipBytes = artifacts ? zipSync({
     "upload-keystore.jks": artifacts.keystore,
+    "upload-keystore.base64.txt": strToU8(artifacts.keystoreBase64 + "\n"),
     "upload_certificate.pem": strToU8(artifacts.certificatePem),
+    "github-secrets.txt": strToU8(artifacts.githubSecrets),
+    "signing-info.txt": strToU8(artifacts.signingInfo),
     "release-signing.gradle.kts": strToU8(artifacts.gradleKotlin),
     "release-signing.gradle": strToU8(artifacts.gradleGroovy),
-    "README.txt": strToU8("Android upload-key files generated locally by enV. The JKS is password-protected. Passwords are intentionally not included in this archive. Keep your passwords separately and never commit this archive to a public repository. Google Play App Signing is a separate Google-managed key.")
+    ".github/workflows/android-release.yml": strToU8(artifacts.githubActionsWorkflow),
+    ".gitignore-signing-example": strToU8(".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n"),
+    "README.md": strToU8(artifacts.handoutReadme),
   }, { level: 6 }) : null;
 
   const shareZip = async () => {
@@ -172,18 +177,22 @@ export function GoogleSigningKeyGenerator() {
       </div> : null}
 
       {artifacts && stage === "ready" ? (
-        <section className="space-y-4 rounded-xl border border-border p-3 sm:p-4" aria-labelledby="google-signing-result">
+        <section className="space-y-3 rounded-xl border border-border p-3 sm:p-4" aria-labelledby="google-signing-result">
           <div className="space-y-1">
-            <h3 id="google-signing-result" className="text-sm font-semibold">Your signing files are ready</h3>
+            <h3 id="google-signing-result" className="text-sm font-semibold">Complete signing handout ready</h3>
             <p className="text-xs text-muted">Alias: <span className="font-mono text-foreground">{artifacts.alias}</span> · RSA {keySize} · Valid until {new Date(artifacts.validUntil).toLocaleDateString()}</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" onClick={() => zipBytes && downloadFile("android-upload-key-package.zip", zipBytes, "application/zip")} className="min-h-10"><Archive className="mr-2 size-4" />ZIP</Button>
-            <Button type="button" variant="outline" onClick={() => void shareZip()} className="min-h-10"><Share2 className="mr-2 size-4" />More apps</Button>
+            <Button type="button" onClick={() => zipBytes && downloadFile("android-signing-full-handout.zip", zipBytes, "application/zip")} className="min-h-10"><Archive className="mr-2 size-4" />Full handout ZIP</Button>
+            <Button type="button" variant="outline" onClick={() => void shareZip()} className="min-h-10"><Share2 className="mr-2 size-4" />Share / save</Button>
+            <Button type="button" variant="outline" onClick={() => downloadFile("upload-keystore.base64.txt", artifacts.keystoreBase64 + "\n", "text/plain")} className="min-h-10"><Download className="mr-2 size-4" />Base64</Button>
+            <Button type="button" variant="outline" onClick={() => downloadFile("github-secrets.txt", artifacts.githubSecrets, "text/plain")} className="min-h-10"><Download className="mr-2 size-4" />GitHub secrets</Button>
+            <Button type="button" variant="outline" onClick={() => downloadFile("android-release.yml", artifacts.githubActionsWorkflow, "text/yaml")} className="min-h-10"><Download className="mr-2 size-4" />Workflow</Button>
             <Button type="button" variant="outline" onClick={() => downloadFile("upload-keystore.jks", new Uint8Array(artifacts.keystore).buffer, "application/octet-stream")} className="min-h-10"><Download className="mr-2 size-4" />JKS</Button>
-            <Button type="button" variant="outline" onClick={() => downloadFile("upload_certificate.pem", artifacts.certificatePem, "application/x-pem-file")} className="min-h-10"><Download className="mr-2 size-4" />PEM</Button>
+            <Button type="button" variant="outline" onClick={() => downloadFile("upload_certificate.pem", artifacts.certificatePem, "application/x-pem-file")} className="min-h-10"><Download className="mr-2 size-4" />PEM certificate</Button>
+            <Button type="button" variant="outline" onClick={() => downloadFile("signing-info.txt", artifacts.signingInfo, "text/plain")} className="min-h-10"><Download className="mr-2 size-4" />Fingerprints</Button>
           </div>
-          <p className="text-xs text-muted">Your device shows available storage apps with their official icons.</p>
+          <p className="text-xs text-muted">The full ZIP includes Base64 and password values. Keep it private. Share opens your device’s available storage apps.</p>
           <details className="rounded-lg border border-border p-3">
             <summary className="cursor-pointer text-sm font-medium">Fingerprints</summary>
             <div className="space-y-2 pt-2">
@@ -194,6 +203,23 @@ export function GoogleSigningKeyGenerator() {
                 </div>
               ))}
             </div>
+          </details>
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">GitHub Actions secrets</summary>
+            <p className="pt-2 text-xs text-muted">Create these four repository secrets under Settings → Secrets and variables → Actions. Values are generated locally.</p>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-2 p-2 text-xs"><code>{artifacts.githubSecrets}</code></pre>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyText(artifacts.githubSecrets).then(()=>setNotice("GitHub secrets copied. Keep them private.")).catch((cause)=>setError(cause instanceof Error?cause.message:"Could not copy GitHub secrets."))}><Copy className="mr-2 size-3.5" />Copy all GitHub secrets</Button>
+          </details>
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">Keystore Base64</summary>
+            <p className="pt-2 text-xs text-muted">One-line Base64 for ANDROID_KEYSTORE_BASE64. This is encoding, not encryption.</p>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-surface-2 p-2 text-xs"><code>{artifacts.keystoreBase64}</code></pre>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyText(artifacts.keystoreBase64).then(()=>setNotice("Keystore Base64 copied.")).catch((cause)=>setError(cause instanceof Error?cause.message:"Could not copy Base64."))}><Copy className="mr-2 size-3.5" />Copy Base64</Button>
+          </details>
+          <details className="rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">GitHub Actions workflow</summary>
+            <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-surface-2 p-2 text-xs"><code>{artifacts.githubActionsWorkflow}</code></pre>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyText(artifacts.githubActionsWorkflow).then(()=>setNotice("Workflow copied.")).catch((cause)=>setError(cause instanceof Error?cause.message:"Could not copy workflow."))}><Copy className="mr-2 size-3.5" />Copy workflow</Button>
           </details>
           <details className="rounded-lg border border-border p-3">
             <summary className="cursor-pointer text-sm font-medium">Gradle configuration</summary>
