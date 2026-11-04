@@ -202,7 +202,7 @@ struct AssistantChatView: View {
                                                                         if tool.isUnderProduction {
                                                                             enVCharacterSpacedText("Under production").font(.caption2.weight(.semibold)).foregroundStyle(Color.envSubtle)
                                                                         }
-                                                                        enVCharacterSpacedText(tool.description).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
+                                                                        enVCharacterSpacedText(tool.offlineDescription).font(.caption).foregroundStyle(Color.envMuted).lineLimit(2)
                                                                     }
                                                                     Spacer(minLength: 4)
                                                                     Image(systemName: "arrow.right").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
