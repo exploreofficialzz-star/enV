@@ -49,7 +49,7 @@ class OfflineWalletJournal(context: Context) : SQLiteOpenHelper(context.applicat
             .put("checkpointSequence", checkpointSequence).put("checkpointSignature", checkpointSignature).put("finalized", finalized)
     }
 
-    data class EligibleTool(val billingKey: String, val subunitsPerUnit: Long)
+    data class EligibleTool(val billingKey: String, val subunitsPerUnit: Long, val platforms: Set<String>)
     private data class AllowanceRow(
         val allowanceId: String, val deviceKeyId: String, val token: String, val subunits: Long,
         val pricingVersion: String, val issuedAt: String, val expiresAt: String, val nextSequence: Long, val lastAckSequence: Long,
@@ -137,7 +137,7 @@ class OfflineWalletJournal(context: Context) : SQLiteOpenHelper(context.applicat
         require(toolId.matches(Regex("[A-Za-z0-9._-]{1,160}")) && unitCount == 1L) { "Protocol v1 meters one fixed-price invocation per signed record." }
         val (pricingVersion, eligibleTools) = loadEligibility(context)
         val profile = eligibleTools[toolId] ?: error("This tool is not approved for offline token metering.")
-        require(profile.billingKey in setOf("local.calculator"))
+        require(profile.billingKey.startsWith("local.") && "android" in profile.platforms)
         val cost = Math.multiplyExact(profile.subunitsPerUnit, unitCount)
         require(cost > 0)
         val db = writableDatabase
@@ -337,14 +337,23 @@ class OfflineWalletJournal(context: Context) : SQLiteOpenHelper(context.applicat
         val version = root.getString("pricingVersion")
         val array = root.getJSONArray("profiles")
         val profiles = HashMap<String, EligibleTool>(array.length())
+        val seenIds = HashSet<String>(array.length())
+        val supportedPlatforms = setOf("web", "android", "ios")
         for (i in 0 until array.length()) {
             val item = array.getJSONObject(i)
             val id = item.getString("toolId")
             val rate = item.getLong("subunitsPerUnit")
+            val platformArray = item.getJSONArray("platforms")
+            val platforms = (0 until platformArray.length()).map { platformArray.getString(it) }.toSet()
             check(id.matches(Regex("[A-Za-z0-9._-]{1,160}")) && rate > 0)
-            check(profiles.put(id, EligibleTool(item.getString("billingKey"), rate)) == null) { "Offline pricing index contains duplicate tool IDs." }
+            check(platforms.isNotEmpty() && platforms.all { it in supportedPlatforms }) { "Offline eligibility contains an invalid platform scope." }
+            check(seenIds.add(id)) { "Offline pricing index contains duplicate tool IDs." }
+            if ("android" in platforms) {
+                check(item.getString("billingKey").startsWith("local.")) { "Offline metering requires a local billing profile." }
+                profiles[id] = EligibleTool(item.getString("billingKey"), rate, platforms)
+            }
         }
-        check(root.getInt("toolCount") == profiles.size) { "Offline pricing index count does not match contents." }
+        check(root.getInt("toolCount") == array.length()) { "Offline pricing index count does not match contents." }
         return version to profiles
     }
 
