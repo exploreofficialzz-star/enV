@@ -151,10 +151,22 @@ export async function completeOfflineToolPackage(toolId: string): Promise<boolea
   if (typeof window === "undefined" || !navigator.onLine) return false;
   const worker = await activeWorker();
   if (!worker) return false;
+  const assets = performance.getEntriesByType("resource")
+    .map((entry) => entry.name)
+    .filter((name) => {
+      try {
+        const url = new URL(name);
+        return url.origin === window.location.origin &&
+          /\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname) &&
+          !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/_serverFn/");
+      } catch { return false; }
+    })
+    .slice(0, 500);
   try {
     const result = await sendWorkerMessage<WorkerReply>(worker, "COMPLETE_TOOL_PACKAGE", {
       toolId,
       version: buildVersion(),
+      assets,
     });
     return result.ready === true;
   } catch {
