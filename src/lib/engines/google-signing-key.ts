@@ -164,108 +164,96 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 function createGitHubActionsWorkflow(): string {
-  return `name: Android release
-
-on:
-  workflow_dispatch:
-  push:
-    tags:
-      - "v*"
-
-permissions:
-  contents: read
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Restore upload keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
-          chmod 600 "$RUNNER_TEMP/upload-keystore.jks"
-
-      - name: Build signed Android App Bundle
-        run: ./gradlew bundleRelease
-        env:
-          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-
-      - name: Remove signing material
-        if: always()
-        run: rm -f "$RUNNER_TEMP/upload-keystore.jks"
-`;
+  const dollar = "$";
+  return [
+    "name: Android release",
+    "",
+    "on:",
+    "  workflow_dispatch:",
+    "  push:",
+    "    tags:",
+    "      - \"v*\"",
+    "",
+    "permissions:",
+    "  contents: read",
+    "",
+    "jobs:",
+    "  build:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    "      - name: Check out source",
+    "        uses: actions/checkout@v4",
+    "      - name: Set up Java",
+    "        uses: actions/setup-java@v4",
+    "        with:",
+    "          distribution: temurin",
+    "          java-version: \"17\"",
+    "      - name: Set up Gradle",
+    "        uses: gradle/actions/setup-gradle@v4",
+    "      - name: Restore upload keystore",
+    "        env:",
+    "          ANDROID_KEYSTORE_BASE64: " + dollar + "{{ secrets.ANDROID_KEYSTORE_BASE64 }}",
+    "        run: |",
+    "          test -n \"" + dollar + "ANDROID_KEYSTORE_BASE64\"",
+    "          printf '%s' \"" + dollar + "ANDROID_KEYSTORE_BASE64\" | base64 --decode > \"" + dollar + "RUNNER_TEMP/upload-keystore.jks\"",
+    "          chmod 600 \"" + dollar + "RUNNER_TEMP/upload-keystore.jks\"",
+    "      - name: Build signed Android App Bundle",
+    "        run: ./gradlew bundleRelease",
+    "        env:",
+    "          ANDROID_KEYSTORE_FILE: " + dollar + "{{ runner.temp }}/upload-keystore.jks",
+    "          ANDROID_KEYSTORE_PASSWORD: " + dollar + "{{ secrets.ANDROID_KEYSTORE_PASSWORD }}",
+    "          ANDROID_KEY_ALIAS: " + dollar + "{{ secrets.ANDROID_KEY_ALIAS }}",
+    "          ANDROID_KEY_PASSWORD: " + dollar + "{{ secrets.ANDROID_KEY_PASSWORD }}",
+    "      - name: Remove signing material",
+    "        if: always()",
+    "        run: rm -f \"" + dollar + "RUNNER_TEMP/upload-keystore.jks\"",
+  ].join("\n") + "\n";
 }
 
 function createHandoutReadme(alias: string, sha1: string, sha256: string, validUntil: string): string {
-  return `# Android upload-key handout
-
-Generated locally by enV. This package contains sensitive signing material.
-
-## Files
-
-- `upload-keystore.jks` — password-protected Android upload keystore.
-- `upload-keystore.base64.txt` — one-line Base64 value for the GitHub Actions secret.
-- `github-secrets.txt` — exact secret names and values, including passwords.
-- `upload_certificate.pem` — public upload certificate for Google Play Console.
-- `signing-info.txt` — alias, validity and certificate fingerprints.
-- `release-signing.gradle.kts` — Gradle Kotlin DSL signing block.
-- `release-signing.gradle` — Gradle Groovy signing block.
-- `.github/workflows/android-release.yml` — a ready GitHub Actions release workflow.
-- `.gitignore-signing-example` — ignore rules for local signing files.
-
-## Add the GitHub secrets
-
-Open your repository in GitHub, then go to **Settings → Secrets and variables → Actions → New repository secret**. Create these four repository secrets using the matching values in `github-secrets.txt`:
-
-1. `ANDROID_KEYSTORE_BASE64`
-2. `ANDROID_KEYSTORE_PASSWORD`
-3. `ANDROID_KEY_ALIAS`
-4. `ANDROID_KEY_PASSWORD`
-
-The Base64 value is a single line. Do not add quotation marks, spaces or line breaks around it.
-
-## Connect Gradle
-
-Copy the matching signing block into the Android **app module** Gradle file, inside its existing `android { }` block. The generated block reads the file path and passwords from environment variables; it does not hard-code passwords.
-
-The included workflow decodes the Base64 keystore into the runner's temporary directory, builds `bundleRelease`, and removes the temporary JKS file even when the build fails. Adapt the Java version or Gradle task only if your project requires a different version or task.
-
-## Register with Google Play
-
-Upload `upload_certificate.pem` in Play Console when it asks for the upload certificate. The SHA-1 and SHA-256 values below are the fingerprints of that upload certificate.
-
-- Alias: ${alias}
-- SHA-1: ${sha1}
-- SHA-256: ${sha256}
-- Certificate valid until: ${validUntil}
-
-## Keep the package private
-
-This ZIP includes the JKS, its Base64 representation, and a text file containing both passwords. Anyone who obtains the package can attempt to use the upload key. Store it in private encrypted storage, do not commit it to Git, do not attach it to public issues, and do not share it in chat.
-
-The Base64 text is not encryption. It is only an encoding of the keystore bytes.
-
-## Which key is this?
-
-This is your **developer upload key**. When Play App Signing is enabled, Google separately manages the app-signing key used to sign APKs delivered to users. This tool does not create, retrieve or export Google's private app-signing key.
-`;
+  return [
+    "# Android upload-key handout",
+    "",
+    "Generated locally by enV. This package contains sensitive signing material.",
+    "",
+    "## Files",
+    "- upload-keystore.jks — password-protected Android upload keystore.",
+    "- upload-keystore.base64.txt — one-line Base64 value for the GitHub Actions secret.",
+    "- github-secrets.txt — exact secret names and values, including passwords.",
+    "- upload_certificate.pem — public upload certificate for Google Play Console.",
+    "- signing-info.txt — alias, validity and certificate fingerprints.",
+    "- release-signing.gradle.kts — Gradle Kotlin DSL signing block.",
+    "- release-signing.gradle — Gradle Groovy signing block.",
+    "- .github/workflows/android-release.yml — ready GitHub Actions release workflow.",
+    "- .gitignore-signing-example — ignore rules for local signing files.",
+    "",
+    "## Add the GitHub secrets",
+    "Open your repository in GitHub, then go to Settings > Secrets and variables > Actions > New repository secret.",
+    "Create these four repository secrets using the matching values in github-secrets.txt:",
+    "1. ANDROID_KEYSTORE_BASE64",
+    "2. ANDROID_KEYSTORE_PASSWORD",
+    "3. ANDROID_KEY_ALIAS",
+    "4. ANDROID_KEY_PASSWORD",
+    "The Base64 value is a single line. Do not add quotation marks, spaces or line breaks around it.",
+    "",
+    "## Connect Gradle",
+    "Copy the matching signing block into the Android app module Gradle file, inside its existing android block. The generated block reads the file path and passwords from environment variables.",
+    "The included workflow decodes the Base64 keystore into the runner's temporary directory, builds bundleRelease, and removes the temporary JKS file even when the build fails.",
+    "",
+    "## Register with Google Play",
+    "Upload upload_certificate.pem in Play Console when it asks for the upload certificate. The SHA-1 and SHA-256 values below are the fingerprints of that upload certificate.",
+    "Alias: " + alias,
+    "SHA-1: " + sha1,
+    "SHA-256: " + sha256,
+    "Certificate valid until: " + validUntil,
+    "",
+    "## Keep the package private",
+    "This ZIP includes the JKS, its Base64 representation, and both password values in github-secrets.txt. Anyone who obtains the package can attempt to use the upload key.",
+    "Store it in private encrypted storage, do not commit it to Git, do not attach it to public issues, and do not share it in chat.",
+    "The Base64 text is not encryption. It is only an encoding of the keystore bytes.",
+    "",
+    "This is your developer upload key. Google separately manages the Play App Signing key when Play App Signing is enabled.",
+  ].join("\n") + "\n";
 }
 
 export type GoogleSigningKeyInput = {
@@ -305,8 +293,8 @@ export async function generateGoogleSigningKey(input: GoogleSigningKeyInput): Pr
   const sha256 = toHex(await digest("SHA-256", certificateDer)).match(/.{2}/g)?.join(":") ?? "";
   const from = new Date(Date.now() - 5 * 60_000);
   const until = new Date(from); until.setUTCFullYear(until.getUTCFullYear() + input.validityYears);
-  const gradleGroovy = `android {\n    signingConfigs {\n        release {\n            storeFile file(System.getenv("ANDROID_KEYSTORE_FILE") ?: "upload-keystore.jks")\n            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n            keyAlias "${input.alias}"\n            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n        }\n    }\n    buildTypes {\n        release { signingConfig signingConfigs.release }\n    }\n}`;
-  const gradleKotlin = `android {\n    signingConfigs {\n        create("release") {\n            storeFile = file(System.getenv("ANDROID_KEYSTORE_FILE") ?: "upload-keystore.jks")\n            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")\n            keyAlias = "${input.alias}"\n            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")\n        }\n    }\n    buildTypes {\n        getByName("release") { signingConfig = signingConfigs.getByName("release") }\n    }\n}`;
+  const gradleGroovy = `android {\n    signingConfigs {\n        release {\n            storeFile file(System.getenv("ANDROID_KEYSTORE_FILE") ?: "upload-keystore.jks")\n            storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")\n            keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "${input.alias}"\n            keyPassword System.getenv("ANDROID_KEY_PASSWORD")\n        }\n    }\n    buildTypes {\n        release { signingConfig signingConfigs.release }\n    }\n}`;
+  const gradleKotlin = `android {\n    signingConfigs {\n        create("release") {\n            storeFile = file(System.getenv("ANDROID_KEYSTORE_FILE") ?: "upload-keystore.jks")\n            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")\n            keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "${input.alias}"\n            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")\n        }\n    }\n    buildTypes {\n        getByName("release") { signingConfig = signingConfigs.getByName("release") }\n    }\n}`;
   const keystoreBase64 = toBase64(keystore);
   const githubSecrets = [
     "# Paste each value into GitHub > Settings > Secrets and variables > Actions.",
