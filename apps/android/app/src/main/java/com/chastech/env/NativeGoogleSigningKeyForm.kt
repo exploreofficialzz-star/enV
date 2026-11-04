@@ -98,7 +98,7 @@ internal fun NativeGoogleSigningKeyForm() {
             add("release-signing.gradle.kts", result.gradleKotlin.toByteArray(Charsets.UTF_8))
             add("release-signing.gradle", result.gradleGroovy.toByteArray(Charsets.UTF_8))
             add(".github/workflows/android-release.yml", result.githubActionsWorkflow.toByteArray(Charsets.UTF_8))
-            add(".gitignore-signing-example", ".android-signing/\\n/upload-keystore.jks\\n/*.jks\\n/*.keystore\\n".toByteArray(Charsets.UTF_8))
+            add(".gitignore-signing-example", ".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n".toByteArray(Charsets.UTF_8))
             add("README.md", result.handoutReadme.toByteArray(Charsets.UTF_8))
         }
         return output.toByteArray()
