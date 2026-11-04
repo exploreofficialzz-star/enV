@@ -8,6 +8,7 @@ import { getRelatedTools, toolPath } from "@/lib/registry";
 import { applyViewMode, usePrefs } from "@/lib/storage";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
+import { offlineAwareToolDescription } from "@/lib/offline/capabilities";
 import { Button } from "@/components/ui/button";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
@@ -235,7 +236,7 @@ export function ToolShell({
               </button>
               {tool.status === "planned" ? <ComingSoonBadge /> : null}
             </div>
-            <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{tool.description}</p>
+            <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p>
           </div>
         </div>
         {!isFullscreen ? <Button
@@ -253,17 +254,12 @@ export function ToolShell({
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button> : null}
-        <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{tool.description}</p>
+        <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p>
       </header>
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
-      {isOffline ? (
-        <p className="mt-4 rounded-lg border border-border bg-surface-2 px-3 py-3 text-sm text-muted" role="status">
-          Offline mode: the operations marked as local can run on this device. Account sync, community features, remote lookups and server processing need an internet connection.
-        </p>
-      ) : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
@@ -319,7 +315,7 @@ export function ToolShell({
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
-        <p className="mt-3 text-sm leading-6 text-muted">{tool.description}</p>
+        <p className="mt-3 text-sm leading-6 text-muted">{offlineAwareToolDescription(tool)}</p>
         <a
           href={toolDocumentationPath(tool)}
           className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
