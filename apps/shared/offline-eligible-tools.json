@@ -1,8 +1,8 @@
 {
   "pricingVersion": "env-metering-preview-2026-10-18-v1",
-  "toolCount": 9797,
+  "toolCount": 9804,
   "platformCounts": {
-    "web": 9794,
+    "web": 9804,
     "android": 7065,
     "ios": 7065
   },
@@ -1606,6 +1606,7 @@
       "billingKey": "local.audio_processing",
       "subunitsPerUnit": 500,
       "platforms": [
+        "web",
         "android",
         "ios"
       ]
@@ -1827,6 +1828,7 @@
       "billingKey": "local.audio_processing",
       "subunitsPerUnit": 500,
       "platforms": [
+        "web",
         "android",
         "ios"
       ]
@@ -1928,6 +1930,7 @@
       "billingKey": "local.audio_processing",
       "subunitsPerUnit": 500,
       "platforms": [
+        "web",
         "android",
         "ios"
       ]
@@ -8314,6 +8317,14 @@
     },
     {
       "toolId": "docker-validator",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "docx-text-extractor",
       "billingKey": "local.general",
       "subunitsPerUnit": 200,
       "platforms": [
@@ -80310,6 +80321,54 @@
     },
     {
       "toolId": "payslip-template",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "pdf-merger",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "pdf-metadata-tool",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "pdf-metadata-viewer",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "pdf-page-extractor",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "pdf-rotator",
+      "billingKey": "local.general",
+      "subunitsPerUnit": 200,
+      "platforms": [
+        "web"
+      ]
+    },
+    {
+      "toolId": "pdf-splitter",
       "billingKey": "local.general",
       "subunitsPerUnit": 200,
       "platforms": [
