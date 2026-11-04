@@ -8,7 +8,6 @@ import { getToolByPath, getToolById, getSearchableTools, getToolsByCategory } fr
 import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioModeAllowed } from "@/lib/business-studios-catalog";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 import { isToolUnderProduction } from "@/lib/production-notice";
-import { loadPublicCommunityToolFeed } from "@/lib/community/public-feed.functions";
 import { UnderProductionPage } from "@/components/tools/under-production";
 import { CATEGORY_MAP } from "@/data/categories";
 import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool, canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath } from "@/lib/seo-metadata";
@@ -28,9 +27,9 @@ export const Route = createFileRoute("/tools/$category/$slug")({
     const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
     if (!matchedTool) throw notFound();
     if (isToolUnderProduction(matchedTool) || !isIndexableTool(matchedTool)) return { communityFeed: null };
-    const offlineNavigation = typeof navigator !== "undefined" && !navigator.onLine;
-    const communityFeed = offlineNavigation ? null : await loadPublicCommunityToolFeed({ data: { toolId: matchedTool.id } });
-    return { communityFeed };
+    // Engagement loads in ToolCommunityPanel after the tool interface mounts.
+    // Do not delay navigation while waiting for a non-essential server feed.
+    return { communityFeed: null };
   },
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
   head: ({ params }) => {
