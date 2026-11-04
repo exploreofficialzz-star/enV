@@ -353,6 +353,7 @@ self.addEventListener("message", (event) => {
           requiredAssets.every((value) => assets.includes(value)));
         if (record) {
           if (ready) {
+            const previousVersion = record.version;
             await setPackage({
               toolId: data.toolId,
               pathname: isPending ? record.pendingPathname : record.pathname,
@@ -363,6 +364,9 @@ self.addEventListener("message", (event) => {
               updatedAt: new Date().toISOString(),
               completedAt: new Date().toISOString(),
             });
+            if (previousVersion && previousVersion !== data.version) {
+              await caches.delete(packageCacheName(data.toolId, previousVersion));
+            }
           } else if (isPending) {
             const { pendingVersion, pendingPathname, pendingAssets, ...previous } = record;
             await setPackage({ ...previous, status: previous.version ? "ready" : "failed", updatedAt: new Date().toISOString() });
