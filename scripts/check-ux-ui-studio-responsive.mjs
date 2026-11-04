@@ -74,6 +74,9 @@ assert.ok(homeRules.includes("overflow-y:auto !important;") && homeRules.include
 assert.ok(homeRules.includes("grid-template-columns:repeat(3,minmax(0,1fr))") && homeRules.includes("grid-template-columns:repeat(5,minmax(0,1fr))") && homeRules.includes("grid-template-columns:repeat(6,minmax(0,1fr))"), "Draft grid adapts to three mobile, five tablet and six desktop columns");
 assert.ok(homeRules.includes(".uxui-home-create-wrap.is-compact") && homeRules.includes("transition:height 240ms"), "Add project has an animated compact state that frees room for drafts");
 assert.ok(engine.includes('aria-label="Add elements"') && engine.includes("openToolkitHome"), "The main Add elements action remains available after removing the separate Text strip");
+const bottomToolbarStart = engine.indexOf('className="uxui-bottom-toolbar"');
+const bottomAddText = engine.indexOf('aria-label="Add text"', bottomToolbarStart);
+assert.ok(bottomToolbarStart >= 0 && bottomAddText > bottomToolbarStart && bottomAddText < engine.indexOf("</div>", bottomToolbarStart), "Add text remains available as a compact bottom-toolbar action, not a separate settings card");
 assert.ok(engine.includes('className="uxui-home-projects"') && engine.includes('className="uxui-draft-list"'), "The project home uses a bounded drafts region");
 assert.ok(engine.includes("setAvailableHomeHeight") && engine.includes("--uxui-home-height"), "Project home measures the visible viewport rather than growing with the draft count");
 assert.ok(engine.includes("setAvailableHomeHeight(Math.max(160, Math.floor(remaining)))"), "Home height follows short and tall device viewports without an arbitrary desktop cap");
