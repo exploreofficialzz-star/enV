@@ -117,11 +117,11 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
-      - name: Check Studio in phone, landscape, tablet and desktop layouts
-        run: npm run audit:ux-ui-studio:browser
-
       - name: Verify Zip any file compression and extraction in the browser
         run: npm run audit:zip-any-file:browser
+
+      - name: Check Studio in phone, landscape, tablet and desktop layouts
+        run: npm run audit:ux-ui-studio:browser
 
       - name: Upload Studio visual checks
         if: always()
