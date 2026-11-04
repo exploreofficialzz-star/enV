@@ -340,7 +340,7 @@
   border-left: 1px solid var(--color-border);
 }
 .env-device-image-studio .space-y-3 > p { display: none; }
-.env-device-image-studio .space-y-1\\.5.rounded-md.bg-surface-2.p-3.text-xs.leading-relaxed.text-muted { display: none; }
+.env-device-image-studio [class~="space-y-1.5"][class~="rounded-md"] { display: none; }
 @media (max-width: 639px) {
   .env-creator-calculator .env-creator-workspace__body { grid-template-rows: minmax(0, auto) minmax(0, 1fr); }
   .env-creator-calculator .env-creator-workspace__form { max-height: 42dvh; }
