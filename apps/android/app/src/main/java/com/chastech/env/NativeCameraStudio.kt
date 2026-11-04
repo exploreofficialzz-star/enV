@@ -125,9 +125,14 @@ fun NativeCameraStudioScreen() {
         startNativeCameraVideo(context, controller, granted,
             onRecording = { next -> recording = next; recordingActive = true; error = null; status = if (granted) "Recording video with microphone audio." else "Recording video without microphone audio." },
             onFinalized = { file, message ->
+                val disposing = disposeAfterRecording.get()
                 recording = null
                 recordingActive = false
-                if (file != null) {
+                if (disposing) {
+                    file?.delete()
+                    pendingFile?.delete()
+                    pendingFile = null
+                } else if (file != null) {
                     pendingFile = file
                     pendingMime = "video/mp4"
                     status = "Recording complete. Save your video to keep it."
@@ -159,6 +164,8 @@ fun NativeCameraStudioScreen() {
                 // CameraX finalizes MP4 asynchronously after stop(). Keep the controller
                 // bound until the Finalize event arrives instead of unbinding mid-write.
                 disposeAfterRecording.set(true)
+                pendingFile?.delete()
+                pendingFile = null
                 runCatching { activeRecording.stop() }
             } else {
                 runCatching { controller.enableTorch(false) }
@@ -203,14 +210,21 @@ fun NativeCameraStudioScreen() {
             startNativeCameraVideo(context, controller, microphoneGranted,
                 onRecording = { next -> recording = next; recordingActive = true; error = null; status = if (microphoneGranted) "Recording video with microphone audio." else "Recording video without microphone audio." },
                 onFinalized = { file, message ->
+                    val disposing = disposeAfterRecording.get()
                     recording = null
                     recordingActive = false
-                    if (file != null) {
+                    if (disposing) {
+                        file?.delete()
+                        pendingFile?.delete()
+                        pendingFile = null
+                    } else if (file != null) {
                         pendingFile?.delete()
                         pendingFile = file
                         pendingMime = "video/mp4"
                         status = "Recording complete. Save your video to keep it."
-                    } else error = message
+                    } else {
+                        error = message
+                    }
                     if (disposeAfterRecording.compareAndSet(true, false)) {
                         runCatching { controller.enableTorch(false) }
                         runCatching { controller.unbind() }

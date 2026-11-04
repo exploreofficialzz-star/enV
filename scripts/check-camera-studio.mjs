@@ -82,6 +82,8 @@ assert.match(androidCamera, /disposeAfterRecording\.set\(true\)/);
 assert.match(androidCamera, /activeRecording\.stop\(\)/);
 assert.match(androidCamera, /rememberUpdatedState\(recording\)/);
 assert.match(androidCamera, /latestRecording\.value/);
+assert.ok((androidCamera.match(/if \(disposing\) \{/g) ?? []).length >= 2, "Android discards a recording finalized after Camera Studio closes");
+assert.match(androidCamera, /file\?\.delete\(\)/);
 assert.ok((androidCamera.match(/disposeAfterRecording\.compareAndSet\(true, false\)/g) ?? []).length >= 4, "Android always unbinds after success or failed recording finalization");
 assert.match(androidMain, /NativeCameraStudioScreen\(\)/);
 assert.match(androidMain, /tool\.id == "camera-studio" -> true/);
