@@ -30,6 +30,13 @@ export function isOfflineLocalTool(toolId: string): boolean {
   return getOfflineToolCapability(toolId)?.execution === "device-local";
 }
 
+/** A short card/detail description for operations verified to run without a network. */
+export function offlineAwareToolDescription(tool: Pick<ToolMeta, "id" | "description">): string {
+  const description = tool.description.trim();
+  if (!isOfflineLocalTool(tool.id) || /^works offline\b/i.test(description)) return description;
+  return description ? `Works offline. ${description}` : "Works offline.";
+}
+
 export function canSpendTokensOffline(): false {
   return offlineTokenSpendLocked();
 }
