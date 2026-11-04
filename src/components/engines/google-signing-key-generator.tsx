@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Archive, Copy, Download, Share2, ShieldCheck } from "lucide-react";
-import { strToU8, zipSync } from "fflate";
+import { zipSync } from "fflate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  createGoogleSigningKeyHandoutFiles,
   generateGoogleSigningKey,
   type GoogleSigningKeyArtifacts,
   type GoogleSigningKeyInput,
@@ -88,18 +89,7 @@ export function GoogleSigningKeyGenerator() {
     setArtifacts(null); setError(""); setNotice(""); setStage("details");
   };
 
-  const zipBytes = artifacts ? zipSync({
-    "upload-keystore.jks": artifacts.keystore,
-    "upload-keystore.base64.txt": strToU8(artifacts.keystoreBase64 + "\n"),
-    "upload_certificate.pem": strToU8(artifacts.certificatePem),
-    "github-secrets.txt": strToU8(artifacts.githubSecrets),
-    "signing-info.txt": strToU8(artifacts.signingInfo),
-    "release-signing.gradle.kts": strToU8(artifacts.gradleKotlin),
-    "release-signing.gradle": strToU8(artifacts.gradleGroovy),
-    ".github/workflows/android-release.yml": strToU8(artifacts.githubActionsWorkflow),
-    ".gitignore-signing-example": strToU8(".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n"),
-    "README.md": strToU8(artifacts.handoutReadme),
-  }, { level: 6 }) : null;
+  const zipBytes = artifacts ? zipSync(createGoogleSigningKeyHandoutFiles(artifacts), { level: 6 }) : null;
 
   const shareZip = async () => {
     if (!zipBytes) return;
