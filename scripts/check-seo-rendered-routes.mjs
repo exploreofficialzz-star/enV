@@ -183,15 +183,15 @@ for (const route of renderedRoutes) {
   if (route.homepageDiscovery) {
     const removedIntro = "Browse practical online calculators, unit converters, developer utilities, image and audio tools, and productivity workspaces across Web, Android, and iOS.";
     if (html.includes(removedIntro)) failures.push(route.path + ": removed homepage introductory copy is still rendered.");
-    const footerHtml = html.match(/<footer\\b[\\s\\S]*?<\\/footer>/i)?.[0] ?? "";
+    const footerHtml = html.match(/<footer\b[\s\S]*?<\/footer>/i)?.[0] ?? "";
     if (!footerHtml) failures.push(route.path + ": homepage footer is missing.");
-    const footerLinkLabels = [...footerHtml.matchAll(/<a\\b[^>]*>([\\s\\S]*?)<\\/a>/gi)]
-      .map((match) => decodeHtmlEntities(match[1].replace(/<[^>]+>/g, "").replace(/\\s+/g, " ").trim()));
+    const footerLinkLabels = [...footerHtml.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a>/gi)]
+      .map((match) => decodeHtmlEntities(match[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()));
     const removedFooterLabels = ["All tools", "Public discussions", "About enV", "Contact", "Pricing"];
     for (const label of removedFooterLabels) {
       if (footerLinkLabels.includes(label)) failures.push(route.path + ": removed Explore footer link is still rendered: " + label);
     }
-    if (/<nav\\b[^>]*aria-label=["']Explore["'][^>]*>/i.test(footerHtml)) {
+    if (/<nav\b[^>]*aria-label=["']Explore["'][^>]*>/i.test(footerHtml)) {
       failures.push(route.path + ": removed Explore footer navigation is still rendered.");
     }
   }
