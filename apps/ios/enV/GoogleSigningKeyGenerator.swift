@@ -200,12 +200,19 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
           chmod 600 "$RUNNER_TEMP/upload-keystore.jks"
       - name: Build signed Android App Bundle
-        run: ./gradlew bundleRelease
+        run: ./gradlew --no-daemon --max-workers=2 -PenvRequireProductionSigning=true :app:bundleRelease
         env:
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Verify signed Android App Bundle
+        run: test -s app/build/outputs/bundle/release/app-release.aab && jarsigner -verify -certs app/build/outputs/bundle/release/app-release.aab
+      - name: Upload signed App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ github.sha }}
+          path: apps/android/app/build/outputs/bundle/release/app-release.aab
       - name: Remove signing material
         if: always()
         run: rm -f "$RUNNER_TEMP/upload-keystore.jks"
