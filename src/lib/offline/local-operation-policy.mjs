@@ -6,6 +6,18 @@
  * local sub-operations even when the legacy tool-level flags still point at a backend;
  * those are explicit allowlist overrides, never inferred from category names alone.
  */
+
+/**
+ * @typedef {object} OfflineToolRecord
+ * @property {string} id
+ * @property {string} category
+ * @property {string} status
+ * @property {boolean} clientSide
+ * @property {boolean} requiresBackend
+ * @property {boolean} requiresAuth
+ * @property {{type?: string, op?: string}} [engine]
+ */
+
 export const OFFLINE_LOCAL_DOCUMENT_TOOL_IDS = new Set([
   "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor",
   "pdf-splitter", "pdf-rotator", "docx-text-extractor", "text-to-docx", "txt-to-docx",
@@ -58,6 +70,9 @@ const SERVER_TOOL_IDS = new Set([
 
 const REMOTE_ENGINE_TYPES = new Set(["url-media", "url-media-info"]);
 
+/**
+ * @param {OfflineToolRecord | null | undefined} tool
+ */
 export function offlineRemoteOperationReason(tool) {
   const engine = tool?.engine ?? {};
   const op = typeof engine.op === "string" ? engine.op : "";
@@ -71,6 +86,9 @@ export function offlineRemoteOperationReason(tool) {
   return null;
 }
 
+/**
+ * @param {OfflineToolRecord | null | undefined} tool
+ */
 export function isOfflineLocalToolRecord(tool) {
   if (!tool || typeof tool.id !== "string" || !["active", "beta"].includes(tool.status)) return false;
   // These document operations are implemented in runLocalDocument even though their
