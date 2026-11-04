@@ -1685,7 +1685,7 @@ private struct NativeTokenGuideView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(tool.category.replacingOccurrences(of: "-", with: " ").capitalized).font(.caption2).foregroundStyle(Color.envMuted)
                                 Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                                Text(tool.description).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading)
+                                Text(tool.offlineDescription).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 4)
                             Image(systemName: selectedToolID == tool.id ? "chevron.up" : "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted).padding(.top, 8)
