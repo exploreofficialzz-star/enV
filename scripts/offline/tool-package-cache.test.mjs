@@ -35,3 +35,22 @@ test("package readiness requires at least one installed asset and a complete eng
   assert.match(serviceWorker, /keys\.length > 0 && assets\.length > 0/);
   assert.match(engine, /OfflinePackageReadySignal/);
 });
+
+test("first offline document boot resolves its installed tool package before the UI message handshake", () => {
+  assert.match(serviceWorker, /findReadyPackageForClient/);
+  assert.match(serviceWorker, /self\.clients\.get\(clientId\)/);
+  assert.match(serviceWorker, /installedCache\.match\(request\)/);
+});
+
+test("package installation verifies every captured same-origin tool asset", () => {
+  assert.match(client, /assets: requiredAssets/);
+  assert.match(serviceWorker, /requiredAssets\.every/);
+  assert.match(serviceWorker, /assetInstallFailed/);
+});
+
+test("A book's deferred PDF worker is warmed and included before offline readiness", () => {
+  const pdfWorkerClient = readFileSync(new URL("../../src/lib/a-book/pdf-worker-client.ts", import.meta.url), "utf8");
+  assert.match(engine, /warmABookPdfWorker/);
+  assert.match(pdfWorkerClient, /action: "warmup"/);
+  assert.match(pdfWorkerClient, /return workerUrl\.href/);
+});
