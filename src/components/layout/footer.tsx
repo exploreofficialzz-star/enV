@@ -3,14 +3,6 @@ import { Logo } from "@/components/brand/logo";
 import { CATEGORIES } from "@/data/categories";
 import { activeCount } from "@/lib/registry";
 
-const EXPLORE_LINKS = [
-  { to: "/tools", label: "All tools" },
-  { to: "/community", label: "Public discussions" },
-  { to: "/about", label: "About enV" },
-  { to: "/contact", label: "Contact" },
-  { to: "/pricing", label: "Pricing" },
-] as const;
-
 const LEGAL_LINKS = [
   { to: "/privacy", label: "Privacy" },
   { to: "/terms", label: "Terms" },
@@ -22,7 +14,7 @@ export function Footer() {
   const count = activeCount();
   return (
     <footer className="mt-auto border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 md:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 md:grid-cols-3">
         <div className="md:col-span-2">
           <Logo />
           <p className="mt-3 max-w-sm text-sm leading-6 text-muted">
@@ -30,16 +22,6 @@ export function Footer() {
             Files and text stay on your device unless a tool says otherwise.
           </p>
         </div>
-        <nav aria-label="Explore" className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Explore</p>
-          <ul className="mt-3 space-y-2">
-            {EXPLORE_LINKS.map((link) => (
-              <li key={link.to}>
-                <Link to={link.to} className="text-sm text-muted hover:text-fg">{link.label}</Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
         <nav aria-label="Legal" className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Legal</p>
           <ul className="mt-3 space-y-2">
