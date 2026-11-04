@@ -177,7 +177,7 @@ async function handleNavigation(request) {
       const installed = await findReadyPackageForPath(url.pathname);
       if (installed) {
         const pages = await caches.open(NAVIGATION_CACHE);
-        const exact = await pages.match(request, { ignoreSearch: true });
+        const exact = await pages.match(request);
         if (exact) return exact;
       }
       return offlineUnavailableResponse();
@@ -259,6 +259,18 @@ self.addEventListener("message", (event) => {
           }
         }
         return reply({ ok: true, cached });
+      }
+
+      if (data.type === "GET_CLIENT_ID") {
+        const clientId = event.source && event.source.id;
+        return reply({ ok: true, clientId: clientId || null });
+      }
+
+      if (data.type === "END_TOOL_PACKAGE") {
+        const sourceClientId = event.source && event.source.id;
+        if (!sourceClientId || data.clientId !== sourceClientId) return reply({ ok: false, message: "The package session does not belong to this browser tab." });
+        await removeSession(sourceClientId);
+        return reply({ ok: true });
       }
 
       if (data.type === "GET_TOOL_PACKAGE") {
