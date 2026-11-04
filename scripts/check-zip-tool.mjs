@@ -33,6 +33,6 @@ assert.doesNotMatch(androidEngine, /zip\.finish\(\)/);
 assert.match(iosCatalog, /includingZipArchive/);
 assert.match(iosViews, /NativeZipArchiveScreen/);
 assert.match(iosProject, /ZIPFoundation/);
-assert.match(iosProject, /EXCLUDED_ARCHS\[sdk=iphonesimulator\*\] = x86_64/);
+assert.match(iosProject, /"EXCLUDED_ARCHS\[sdk=iphonesimulator\*\]"\s*=\s*x86_64/);
 
 console.log("Zip any file registration and safety checks passed.");
