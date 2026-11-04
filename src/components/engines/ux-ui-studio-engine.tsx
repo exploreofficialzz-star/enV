@@ -2164,6 +2164,7 @@ export function UxUiStudioEngine() {
   }
 
   function returnToProjects() {
+    setHomeScrolled(false);
     setOnboarding(true);
     setIsExpanded(false);
     closeToolkit();
