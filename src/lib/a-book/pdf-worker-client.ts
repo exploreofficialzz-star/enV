@@ -83,7 +83,6 @@ function runInWorker(task: ABookPdfWorkerTask, signal?: AbortSignal): Promise<un
         : "The selected PDFs could not be passed to the local worker."));
     }
   });
-  return workerUrl.href;
 }
 
 function outputBytes(value: unknown): Uint8Array {
@@ -152,4 +151,5 @@ export async function warmABookPdfWorker(): Promise<string> {
     };
     worker.postMessage({ action: "warmup", requestId: "a-book-offline-precache" } satisfies ABookPdfWorkerRequest);
   });
+  return workerUrl.href;
 }
