@@ -17,6 +17,7 @@ import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions"
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { canSpendTokensOffline } from "@/lib/offline/capabilities";
 
 export function ToolShell({
   tool,
@@ -38,6 +39,8 @@ export function ToolShell({
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
+  const [networkState, setNetworkState] = useState<"unknown" | "online" | "offline">("unknown");
+  const offlineTokenLocked = networkState !== "online" && !canSpendTokensOffline();
   const toolStartedRef = useRef(false);
   const toolFinishedRef = useRef(false);
   const toolAbandonmentRecordedRef = useRef(false);
@@ -79,6 +82,24 @@ export function ToolShell({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
+
+  useEffect(() => {
+    const updateNetworkState = () => setNetworkState(navigator.onLine ? "online" : "offline");
+    updateNetworkState();
+    window.addEventListener("online", updateNetworkState);
+    window.addEventListener("offline", updateNetworkState);
+    return () => {
+      window.removeEventListener("online", updateNetworkState);
+      window.removeEventListener("offline", updateNetworkState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const surface = toolInterfaceRef.current;
+    if (!surface) return;
+    surface.inert = offlineTokenLocked;
+    return () => { surface.inert = false; };
+  }, [offlineTokenLocked]);
 
   useEffect(() => {
     if (isFullscreen && isMusicSandbox) window.dispatchEvent(new Event("env-music-sandbox-fullscreen"));
@@ -246,6 +267,11 @@ export function ToolShell({
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {networkState === "offline" && offlineTokenLocked ? (
+        <p className="mt-4 rounded-lg border border-border bg-surface-2 px-3 py-3 text-sm text-muted" role="status">
+          This tool's saved offline copy can load, but token authorization is currently online-only. Reconnect to verify your enV Token balance before running an operation. Nothing has run or been charged.
+        </p>
+      ) : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
@@ -256,6 +282,7 @@ export function ToolShell({
         aria-modal={isFullscreen || undefined}
         aria-label={isFullscreen ? `${tool.name} working interface` : undefined}
         onClickCapture={(event) => {
+          if (offlineTokenLocked) { event.preventDefault(); event.stopPropagation(); return; }
           const target = event.target;
           if (!(target instanceof Element) || target.closest(".env-tool-fullscreen__toolbar")) return;
           const action = target.closest("button,[role=button]");
@@ -265,7 +292,10 @@ export function ToolShell({
             startToolExecution("action_button");
           }
         }}
-        onSubmitCapture={() => startToolExecution("form_submit")}
+        onSubmitCapture={(event) => {
+          if (offlineTokenLocked) { event.preventDefault(); event.stopPropagation(); return; }
+          startToolExecution("form_submit");
+        }}
       >
         <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
         {isMusicSandbox ? (
