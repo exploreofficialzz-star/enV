@@ -136,6 +136,15 @@ struct Tool: Decodable, Identifiable, Hashable {
     let engine: ToolEngine
 
     var isPlanned: Bool { status.lowercased() == "planned" }
+    var isOfflineCapable: Bool {
+        ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
+        clientSide && !requiresBackend && !requiresAuth && id != "music-downloader" &&
+        !NativeCopy.isWebRuntimeOnly(id)
+    }
+    var offlineDescription: String {
+        guard isOfflineCapable else { return description }
+        return description.lowercased().hasPrefix("works offline") ? description : "Works offline. \(description)"
+    }
     var isUnderProduction: Bool {
         !["a-book", "zip-any-file"].contains(id.lowercased()) &&
         !["accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video"].contains(category.lowercased())
