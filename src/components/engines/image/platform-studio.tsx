@@ -164,5 +164,5 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
 
 export function PlatformStudio({ op, toolId }: { op: string; toolId: string }) {
   const state = useSource(toolId);
-  return <SourceGate toolId={toolId} state={state}>{(source) => <Workspace key={source.id} source={source} toolId={toolId} op={op.toLowerCase()} />}</SourceGate>;
+  return <SourceGate toolId={toolId} state={state} label="Choose image" hint="JPG, PNG or WebP. Nothing is uploaded.">{(source) => <Workspace key={source.id} source={source} toolId={toolId} op={op.toLowerCase()} />}</SourceGate>;
 }
