@@ -1172,7 +1172,7 @@ export function UxUiStudioEngine() {
       frame = window.requestAnimationFrame(() => {
         const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
         const remaining = viewportHeight - home.getBoundingClientRect().top - 16;
-        setAvailableHomeHeight(Math.max(280, Math.min(960, Math.floor(remaining))));
+        setAvailableHomeHeight(Math.max(160, Math.floor(remaining)));
       });
     };
     measure();
