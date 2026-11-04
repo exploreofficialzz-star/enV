@@ -244,6 +244,12 @@ async function checkRenderedRoute(path, schema) {
   assert(twitterTitle === title, path + " Twitter title does not match its page title");
   assert(jsonLd.some((json) => json.includes('"@type":"' + schema + '"') || json.includes('"@type": "' + schema + '"')),
     path + " is missing JSON-LD schema type " + schema);
+  if (path === "/tools/productivity/zip-any-file") {
+    assert(html.includes("Zip any file"), "Zip any file route does not render its tool name");
+    assert(html.includes("Compress") && html.includes("Extract"), "Zip any file route is missing compression or extraction controls");
+    assert(html.includes("Private and on-device"), "Zip any file route is missing its local privacy notice");
+    assert(!html.includes("Under production"), "Zip any file is incorrectly blocked by the production notice");
+  }
   checked.push({ path, status: response.status, title, canonical, schema, buildSha });
 }
 
@@ -259,6 +265,7 @@ async function main() {
       ["/tools/developer/json-studio", "SoftwareApplication"],
       ["/blog", "CollectionPage"],
       ["/blog/tool-json-studio", "TechArticle"],
+      ["/tools/productivity/zip-any-file", "SoftwareApplication"],
     ]) await checkRenderedRoute(path, schema);
   } catch (error) {
     failures.push(String(error));
