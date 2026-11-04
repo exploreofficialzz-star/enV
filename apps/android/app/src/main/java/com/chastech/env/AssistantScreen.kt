@@ -347,7 +347,7 @@ private fun AssistantRecommendationCard(tool: ToolRecord, onClick: () -> Unit, m
             EnVToolAppIcon(tool, size = 36.dp)
             Column(Modifier.weight(1f)) {
                 Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal)
-                Text(tool.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
             EnVIcon("ArrowRight", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
