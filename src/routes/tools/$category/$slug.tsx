@@ -28,7 +28,8 @@ export const Route = createFileRoute("/tools/$category/$slug")({
     const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
     if (!matchedTool) throw notFound();
     if (isToolUnderProduction(matchedTool) || !isIndexableTool(matchedTool)) return { communityFeed: null };
-    const communityFeed = await loadPublicCommunityToolFeed({ data: { toolId: matchedTool.id } });
+    const offlineNavigation = typeof navigator !== "undefined" && !navigator.onLine;
+    const communityFeed = offlineNavigation ? null : await loadPublicCommunityToolFeed({ data: { toolId: matchedTool.id } });
     return { communityFeed };
   },
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
