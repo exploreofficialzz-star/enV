@@ -1,5 +1,7 @@
 import ImageIO
 import SwiftUI
+import CryptoKit
+import Security
 import AVFoundation
 import AVKit
 import AudioToolbox
@@ -1636,6 +1638,10 @@ private struct NativeDeveloperToolView: View {
     }
 
     var body:some View {
+        Group {
+            if op == "google-signing-key-generator" {
+                NativeGoogleSigningKeyView()
+            } else {
         VStack(alignment:.leading,spacing:12) {
             if studioSpec == nil {
                 Text("Runs entirely on this device. Nothing is uploaded.").font(.footnote).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading).padding(10).background(Color.envSurface2,in:RoundedRectangle(cornerRadius:10))
@@ -1830,6 +1836,8 @@ private struct NativeDeveloperToolView: View {
                 }
             }
             NativeOutputView(output:output,error:error)
+        }
+            }
         }
         .onChange(of: studioModeKey) { newValue in
             if let studioSpec { UserDefaults.standard.set(newValue, forKey: "env.developer.mode.\(studioSpec.id)") }

@@ -119,7 +119,7 @@ export const DEVELOPER_STUDIOS: DeveloperStudioDefinition[] = [
   {
     id: "devops-studio", slug: "devops-studio", name: "DevOps Config Studio",
     description: "Generate copy-ready project configuration, starter docs, container files, API schemas, Git conventions, and release metadata with useful comments and editable presets.",
-    sourceId: "developer-gitignore-generator", icon: "Container", keywords: ["devops", "docker", "compose", "nginx", "gitignore", "editorconfig", "environment", "openapi", "graphql", "license", "readme", "commit", "semver"],
+    sourceId: "developer-gitignore-generator", icon: "Container", keywords: ["devops", "docker", "compose", "nginx", "gitignore", "editorconfig", "environment", "openapi", "graphql", "license", "readme", "commit", "semver", "Google Play", "Android upload key", "JKS", "keystore", "signing key"],
     modes: [
       { key: "gitignore", label: ".gitignore", op: "developer-gitignore-generator" }, { key: "dockerfile", label: "Dockerfile", op: "developer-dockerfile-helper" },
       { key: "compose", label: "Compose", op: "developer-docker-compose-generator" }, { key: "nginx", label: "Nginx", op: "developer-nginx-config-generator" },
@@ -129,6 +129,7 @@ export const DEVELOPER_STUDIOS: DeveloperStudioDefinition[] = [
       { key: "commit", label: "Commit message", op: "developer-commit-message-helper" }, { key: "branch", label: "Branch name", op: "developer-branch-name-generator" },
       { key: "changelog", label: "Changelog", op: "developer-changelog-generator" }, { key: "semver", label: "Semver", op: "developer-semantic-version-calculator" },
       { key: "mock", label: "API / webhook fixtures", op: "developer-api-mock-response-generator" },
+      { key: "google-signing-key", label: "Google signing key", op: "google-signing-key-generator" },
     ],
   },
   {

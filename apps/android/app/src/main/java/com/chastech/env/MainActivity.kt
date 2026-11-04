@@ -2758,6 +2758,10 @@ private fun NativeDeveloperToolForm(tool: ToolRecord, onRelatedTool: (String) ->
         encodingDirection == "decode" && selectedStudioMode.decodeOp != null -> selectedStudioMode.decodeOp
         else -> selectedStudioMode.op
     }
+    if (op == "google-signing-key-generator") {
+        NativeGoogleSigningKeyForm()
+        return
+    }
     val activeTool = remember(tool, op) { tool.copy(engine = tool.engine.copy(extras = tool.engine.extras + ("op" to op))) }
     val fileHash = NativeDeveloperToolFormPolicy.isFileHash(op)
     val recipeRunner = op == "developer-recipe-runner"

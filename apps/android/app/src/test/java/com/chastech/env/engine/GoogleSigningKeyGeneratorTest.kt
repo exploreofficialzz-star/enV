@@ -1,0 +1,54 @@
+package com.chastech.env.engine
+
+import java.io.ByteArrayInputStream
+import java.security.KeyStore
+import java.security.Signature
+import java.security.cert.X509Certificate
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class GoogleSigningKeyGeneratorTest {
+    @Test fun createsLoadableJksWithSeparatelyProtectedPrivateKeyAndCertificate() {
+        val storePassword = "A-Strong-Store-Password-2026!"
+        val keyPassword = "A-Different-Key-Password-2026!"
+        val result = GoogleSigningKeyGenerator.generate(
+            GoogleSigningKeyGenerator.Input(
+                alias = "upload", storePassword = storePassword, keyPassword = keyPassword,
+                commonName = "enV Android Upload", organization = "chAs Technologies LLC",
+                organizationalUnit = "Mobile", city = "Port Harcourt", state = "Rivers",
+                country = "NG", keySize = 2048, validityYears = 25,
+            )
+        )
+        val keyStore = KeyStore.getInstance("JKS")
+        keyStore.load(ByteArrayInputStream(result.keystore), storePassword.toCharArray())
+        assertTrue(keyStore.isKeyEntry("upload"))
+        val certificate = keyStore.getCertificate("upload") as X509Certificate
+        certificate.verify(certificate.publicKey)
+        assertTrue(certificate.subjectX500Principal.name.contains("CN=enV Android Upload"))
+        val privateKey = keyStore.getKey("upload", keyPassword.toCharArray())
+        assertNotNull(privateKey)
+        val signature = Signature.getInstance("SHA256withRSA")
+        signature.initSign(privateKey as java.security.PrivateKey)
+        signature.update("enV upload keystore self-test".toByteArray())
+        val signed = signature.sign()
+        signature.initVerify(certificate.publicKey)
+        signature.update("enV upload keystore self-test".toByteArray())
+        assertTrue(signature.verify(signed))
+        assertTrue(result.certificatePem.startsWith("-----BEGIN CERTIFICATE-----"))
+        assertEquals(20, result.sha1.split(":").size)
+        assertEquals(32, result.sha256.split(":").size)
+    }
+
+    @Test fun rejectsWeakPasswordsAndUnsafeKeySettings() {
+        val base = GoogleSigningKeyGenerator.Input(
+            alias = "upload", storePassword = "A-Strong-Store-Password-2026!", keyPassword = "A-Different-Key-Password-2026!",
+            commonName = "enV", country = "NG", keySize = 2048, validityYears = 25,
+        )
+        assertTrue(runCatching { GoogleSigningKeyGenerator.generate(base.copy(storePassword = "short")) }.isFailure)
+        assertTrue(runCatching { GoogleSigningKeyGenerator.generate(base.copy(country = "Nigeria")) }.isFailure)
+        assertTrue(runCatching { GoogleSigningKeyGenerator.generate(base.copy(keySize = 1024)) }.isFailure)
+        assertTrue(runCatching { GoogleSigningKeyGenerator.generate(base.copy(validityYears = 0)) }.isFailure)
+    }
+}

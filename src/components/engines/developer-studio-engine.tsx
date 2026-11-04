@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ChevronRight, ScanSearch } from "lucide-react";
 import { DeveloperEngine } from "@/components/engines/developer-engine";
 import { DeveloperRecipeWorkbench } from "@/components/engines/developer-recipe-workbench";
+import { GoogleSigningKeyGenerator } from "@/components/engines/google-signing-key-generator";
 import { Button } from "@/components/ui/button";
 import { DEVELOPER_STUDIOS, type DeveloperStudioDefinition } from "@/lib/developer-studios-catalog";
 import { detectDeveloperInputKind } from "@/lib/engines/developer-utils";
@@ -184,9 +185,11 @@ export function DeveloperStudioEngine({ tool, initialMode, initialAction, initia
         </div>
       </details>
 
-      {activeOp === "developer-recipe-runner"
-        ? <DeveloperRecipeWorkbench />
-        : <DeveloperEngine key={studio.id} op={activeOp} tool={tool} initialInput={presetInput} />}
+      {activeOp === "google-signing-key-generator"
+        ? <GoogleSigningKeyGenerator />
+        : activeOp === "developer-recipe-runner"
+          ? <DeveloperRecipeWorkbench />
+          : <DeveloperEngine key={studio.id} op={activeOp} tool={tool} initialInput={presetInput} />}
     </section>
   );
 }
