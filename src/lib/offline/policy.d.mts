@@ -6,7 +6,7 @@ export interface OfflineToolCapability {
   tokenPolicy: OfflineTokenPolicy;
   mayRunWithoutNetwork: boolean;
   reason: string;
-  policyVersion: "2026-10-30.v1";
+  policyVersion: "2026-11-04.v2";
 }
 export const OFFLINE_CAPABILITY_POLICY_VERSION: "2026-10-30.v1";
 export function classifyOfflineToolRecord(tool: {
