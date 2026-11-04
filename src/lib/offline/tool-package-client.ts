@@ -40,7 +40,7 @@ export async function registerEnVServiceWorker(): Promise<ServiceWorkerRegistrat
   return registrationPromise;
 }
 
-async function activeWorker(): Promise<ServiceWorker | null> {
+async function activeWorker(captureCurrentPage = false): Promise<ServiceWorker | null> {
   const registration = await registerEnVServiceWorker();
   if (!registration) return null;
   if (!navigator.serviceWorker.controller) {
@@ -63,6 +63,9 @@ async function activeWorker(): Promise<ServiceWorker | null> {
       .slice(0, 300);
     if (assets.length) {
       await sendWorkerMessage(controller, "CACHE_CORE_ASSETS", { assets }).catch(() => undefined);
+    }
+    if (captureCurrentPage && navigator.onLine) {
+      await sendWorkerMessage(controller, "CACHE_CURRENT_NAVIGATION", { url: window.location.href }).catch(() => undefined);
     }
   }
   return controller ?? null;
@@ -107,7 +110,7 @@ export async function prepareOfflineToolPackage(input: {
       : { open: false, status: "not-installed", message: "This browser cannot load this tool's saved offline package." };
   }
 
-  const worker = await activeWorker();
+  const worker = await activeWorker(true);
   if (!worker) {
     return online
       ? { open: true, status: "unsupported" }
