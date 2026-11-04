@@ -41,7 +41,7 @@ export async function registerEnVServiceWorker(): Promise<ServiceWorkerRegistrat
   return registrationPromise;
 }
 
-async function activeWorker(captureCurrentPage = false): Promise<ServiceWorker | null> {
+async function activeWorker(captureCurrentPage = false, captureShellAssets = false): Promise<ServiceWorker | null> {
   const registration = await registerEnVServiceWorker();
   if (!registration) return null;
   if (!navigator.serviceWorker.controller) {
@@ -51,7 +51,7 @@ async function activeWorker(captureCurrentPage = false): Promise<ServiceWorker |
     ]);
   }
   const controller = navigator.serviceWorker.controller;
-  if (controller) {
+  if (controller && captureShellAssets) {
     const assets = performance.getEntriesByType("resource")
       .map((entry) => entry.name)
       .filter((name) => {
@@ -65,9 +65,9 @@ async function activeWorker(captureCurrentPage = false): Promise<ServiceWorker |
     if (assets.length) {
       await sendWorkerMessage(controller, "CACHE_CORE_ASSETS", { assets }).catch(() => undefined);
     }
-    if (captureCurrentPage && navigator.onLine) {
-      await sendWorkerMessage(controller, "CACHE_CURRENT_NAVIGATION", { url: window.location.href }).catch(() => undefined);
-    }
+  }
+  if (controller && captureCurrentPage && navigator.onLine) {
+    await sendWorkerMessage(controller, "CACHE_CURRENT_NAVIGATION", { url: window.location.href }).catch(() => undefined);
   }
   return controller ?? null;
 }
@@ -94,7 +94,7 @@ async function sendWorkerMessage<T extends WorkerReply>(
 }
 
 export async function prepareEnVOfflineShell(): Promise<void> {
-  await activeWorker(true);
+  await activeWorker(true, true);
 }
 
 export async function prepareOfflineToolPackage(input: {
@@ -139,7 +139,7 @@ export async function prepareOfflineToolPackage(input: {
       version,
       pathname,
     });
-    return { open: true, status: result.ready ? "ready" : "preparing" };
+    return { open: true, status: "preparing" };
   } catch (error) {
     return online
       ? { open: true, status: "unsupported", message: error instanceof Error ? error.message : "Offline package preparation is unavailable." }
@@ -160,4 +160,25 @@ export async function completeOfflineToolPackage(toolId: string): Promise<boolea
   } catch {
     return false;
   }
+}
+
+/** Stop attributing new resource requests to the tool when its route is left. */
+export async function endOfflineToolPackage(): Promise<void> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  const worker = await activeWorker();
+  if (!worker) return;
+  const clientId = await new Promise<string | null>((resolve) => {
+    const controller = navigator.serviceWorker.controller;
+    if (!controller) return resolve(null);
+    const channel = new MessageChannel();
+    const timer = window.setTimeout(() => { channel.port1.close(); resolve(null); }, 1_500);
+    channel.port1.onmessage = (event) => {
+      window.clearTimeout(timer);
+      channel.port1.close();
+      resolve(typeof event.data?.clientId === "string" ? event.data.clientId : null);
+    };
+    controller.postMessage({ type: "GET_CLIENT_ID" }, [channel.port2]);
+  });
+  if (!clientId) return;
+  await sendWorkerMessage(worker, "END_TOOL_PACKAGE", { clientId }).catch(() => undefined);
 }
