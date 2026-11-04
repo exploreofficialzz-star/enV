@@ -209,7 +209,7 @@ try {
           draft.textContent = "Audit draft " + (index + 1);
           grid.append(draft);
         }
-        const columns = getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length;
+        const columns = getComputedStyle(grid).gridTemplateColumns.trim().split(" ").length;
         const expectedColumns = innerWidth >= 1024 ? 6 : innerWidth >= 768 ? 5 : 3;
         const listHeight = list.clientHeight;
         const contentHeight = list.scrollHeight;
