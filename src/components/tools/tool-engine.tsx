@@ -199,11 +199,12 @@ function OfflinePackageReadySignal({ toolId, onReady }: { toolId: string; onRead
   useEffect(() => {
     let mounted = true;
     void (async () => {
+      const additionalAssets: string[] = [];
       if (toolId === "a-book") {
         const pdfWorker = await import("@/lib/a-book/pdf-worker-client");
-        await pdfWorker.warmABookPdfWorker();
+        additionalAssets.push(await pdfWorker.warmABookPdfWorker());
       }
-      const ready = await completeOfflineToolPackage(toolId);
+      const ready = await completeOfflineToolPackage(toolId, additionalAssets);
       if (mounted) onReady(ready);
     })().catch(() => { if (mounted) onReady(false); });
     return () => { mounted = false; };
