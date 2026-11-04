@@ -401,6 +401,7 @@ struct NativeGoogleSigningKeyView: View {
     @State private var exportBase64 = false
     @State private var exportSecrets = false
     @State private var exportWorkflow = false
+    @State private var exportInfo = false
     @State private var archiveData: Data?
 
     var body: some View {
@@ -472,6 +473,23 @@ struct NativeGoogleSigningKeyView: View {
                     Button { exportSecrets = true } label: { Label("GitHub secrets", systemImage: "key.fill") }.buttonStyle(.bordered)
                     Button { exportWorkflow = true } label: { Label("Workflow", systemImage: "chevron.left.forwardslash.chevron.right") }.buttonStyle(.bordered)
                 }
+                HStack(spacing: 8) {
+                    Button { exportInfo = true } label: { Label("Info", systemImage: "info.circle") }.buttonStyle(.bordered)
+                    Button { UIPasteboard.general.string = artifacts.keystoreBase64; notice = "Base64 copied." } label: { Label("Copy Base64", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
+                    Button { UIPasteboard.general.string = artifacts.githubSecrets; notice = "GitHub secrets copied. Keep them private." } label: { Label("Copy secrets", systemImage: "key") }.buttonStyle(.bordered)
+                }
+                DisclosureGroup("GitHub secrets") {
+                    Text(artifacts.githubSecrets).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                    Button("Copy all GitHub secrets") { UIPasteboard.general.string = artifacts.githubSecrets; notice = "GitHub secrets copied. Keep them private." }
+                }
+                DisclosureGroup("Keystore Base64") {
+                    Text(artifacts.keystoreBase64).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                    Button("Copy Base64") { UIPasteboard.general.string = artifacts.keystoreBase64; notice = "Base64 copied." }
+                }
+                DisclosureGroup("GitHub Actions workflow") {
+                    Text(artifacts.githubActionsWorkflow).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                    Button("Copy workflow") { UIPasteboard.general.string = artifacts.githubActionsWorkflow; notice = "Workflow copied." }
+                }
                 Text("Full ZIP includes Base64 and both password values. Keep it private; Base64 is not encryption.")
                     .font(.caption2).foregroundStyle(Color.envMuted)
                 DisclosureGroup("Fingerprints") {
@@ -494,7 +512,7 @@ struct NativeGoogleSigningKeyView: View {
                         .font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
                     Button("Copy Gradle") { UIPasteboard.general.string = showGroovy ? artifacts.gradleGroovy : artifacts.gradleKotlin; notice = "Copied." }
                 }
-                Text("ZIP excludes passwords. Store them separately. Google manages its own signing key.")
+                Text("Full ZIP includes the Base64 keystore and both password values. Keep it private. Base64 is not encryption.")
                     .font(.caption2).foregroundStyle(Color.envMuted)
                 if !notice.isEmpty { Text(notice).font(.caption2).foregroundStyle(Color.envMuted) }
             }
@@ -516,6 +534,9 @@ struct NativeGoogleSigningKeyView: View {
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
         }
         .fileExporter(isPresented: $exportWorkflow, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubActionsWorkflow.utf8)) }, contentType: .plainText, defaultFilename: "android-release.yml") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $exportInfo, document: artifacts.map { NativeSigningArtifactDocument(Data($0.signingInfo.utf8)) }, contentType: .plainText, defaultFilename: "signing-info.txt") { result in
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
         }
     }
