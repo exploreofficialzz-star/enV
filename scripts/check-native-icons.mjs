@@ -59,7 +59,8 @@ const androidApi27Styles = readFileSync(path.join(root, "apps/android/app/src/ma
 const iosApp = readFileSync(path.join(root, "apps/ios/enV/enVApp.swift"), "utf8");
 const iosHome = readFileSync(path.join(root, "apps/ios/enV/ContentViews.swift"), "utf8");
 const iosInformation = iosHome.slice(iosHome.indexOf("struct NativeInformationPageView: View {"));
-const iosCards = readFileSync(path.join(root, "apps/ios/enV/ContentViews.swift"), "utf8");
+const iosContentViews = readFileSync(path.join(root, "apps/ios/enV/ContentViews.swift"), "utf8");
+const iosCards = iosContentViews.slice(iosContentViews.indexOf("private struct DiscoveryToolCard"), iosContentViews.indexOf("private struct WebHomeSearchSuggestion"));
 const xcodeProject = readFileSync(path.join(root, "apps/ios/enV.xcodeproj/project.pbxproj"), "utf8");
 assert.ok(androidAssets.includes('"native-icons/icons/'), "Android must read the shared icon assets");
 assert.ok(iosApp.includes('native-icons/icons/'), "iOS must read the shared icon assets");
