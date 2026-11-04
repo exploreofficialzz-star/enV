@@ -2,6 +2,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { getSql } from "../db";
 import { PRICING_VERSION } from "./catalog";
+import offlineEligibilitySource from "../../data/offline-eligible-tools.json";
 import { getToolBillingProfile } from "./tool-profiles.server";
 import { canResumeOfflineSync, isLocalTestFinalizationEnabled } from "./offline-recovery-policy";
 import {
@@ -31,7 +32,16 @@ const MAX_ALLOWANCE_SUBUNITS = 20 * TOKEN_SUBUNITS_PER_TOKEN;
 const MAX_ACTIVE_ALLOWANCES_PER_USER = 3;
 const MAX_TRANSACTIONS_PER_BATCH = 250;
 const SYNC_GRACE_SECONDS = 14 * 24 * 60 * 60;
-const OFFLINE_BILLABLE_KEYS = new Set(["local.calculator"]);
+type OfflineEligibilityIndex = {
+  pricingVersion: string;
+  toolCount: number;
+  profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: OfflinePlatform[] }[];
+};
+const offlineEligibility = offlineEligibilitySource as OfflineEligibilityIndex;
+if (offlineEligibility.pricingVersion !== PRICING_VERSION || offlineEligibility.toolCount !== offlineEligibility.profiles.length) {
+  throw new Error("Offline operation eligibility is out of sync with the approved billing profile version.");
+}
+const offlineEligibleById = new Map(offlineEligibility.profiles.map((item) => [item.toolId, item]));
 
 type OfflineErrorCode =
   | "OFFLINE_FEATURE_DISABLED" | "OFFLINE_PRODUCTION_LOCKED" | "OFFLINE_SIGNING_NOT_CONFIGURED"
@@ -679,9 +689,13 @@ export async function syncOfflineAllowance(input: SyncOfflineAllowanceRequest) {
       }
       if (txRecord.sequenceNumber !== lastSequence + 1) { recoveryReason = "SEQUENCE_GAP"; break; }
       const profile = getToolBillingProfile(txRecord.toolId);
-      if (!profile || !OFFLINE_BILLABLE_KEYS.has(profile.billingKey) || profile.pricingMode !== "per-unit-hypothesis" ||
-          !profile.provisionalSubunitsPerUnit ||
-          txRecord.pricingVersion !== allowance.pricing_version) {
+      const eligibility = offlineEligibleById.get(txRecord.toolId);
+      const platformAllowed = eligibility?.platforms.includes(allowance.platform as OfflinePlatform) === true;
+      if (!profile || !profile.billingKey.startsWith("local.") || profile.pricingMode !== "per-unit-hypothesis" ||
+          !profile.provisionalSubunitsPerUnit || !eligibility ||
+          eligibility.billingKey !== profile.billingKey ||
+          eligibility.subunitsPerUnit !== profile.provisionalSubunitsPerUnit ||
+          !platformAllowed || txRecord.pricingVersion !== allowance.pricing_version) {
         await tx.query(
           `insert into billing_offline_transactions
             (id, allowance_id, transaction_id, sequence_number, tool_id, pricing_version, unit_count,
