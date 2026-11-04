@@ -3019,6 +3019,7 @@ export function UxUiStudioEngine() {
             <div className="uxui-bottom-group">
               <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks || prototypePreview} aria-label="Preview connected screen flow" title="Preview connected screen flow"><LayoutTemplate size={20} /></button>
               <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={20} /></button>
+              <button type="button" onClick={() => { addLayer("text"); setEditTool("text"); }} aria-label="Add text" title="Add text"><Type size={20} /></button>
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
