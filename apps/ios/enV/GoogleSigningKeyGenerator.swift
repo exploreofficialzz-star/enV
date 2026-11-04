@@ -97,8 +97,7 @@ enum NativeGoogleSigningKeyGenerator {
             ("C", input.country),
         ].filter { !$0.1.isEmpty }
 
-        let subjectPublicKeyInfo = sequence(algorithmIdentifier(rsaEncryptionOID), bitString(publicRepresentation))
-        let certificate = try makeCertificate(privateKey: privateKey, publicKey: publicRepresentation, subjectPublicKeyInfo: subjectPublicKeyInfo, subject: subjectFields, notBefore: now, notAfter: validUntil)
+        let certificate = try makeCertificate(privateKey: privateKey, publicKey: publicRepresentation, subject: subjectFields, notBefore: now, notAfter: validUntil)
         var privateKeyInfo = sequence(integer(0), algorithmIdentifier(rsaEncryptionOID), octet(privateRepresentation))
         defer { privateKeyInfo.resetBytes(in: 0..<privateKeyInfo.count) }
         let protectedKey = try protectPrivateKey(privateKeyInfo, password: input.keyPassword)
