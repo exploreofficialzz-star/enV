@@ -51,7 +51,7 @@ async function activeWorker(captureCurrentPage = false, captureShellAssets = fal
     ]);
   }
   const controller = navigator.serviceWorker.controller;
-  if (controller && captureShellAssets) {
+  if (controller && captureShellAssets && navigator.onLine) {
     const assets = performance.getEntriesByType("resource")
       .map((entry) => entry.name)
       .filter((name) => {
