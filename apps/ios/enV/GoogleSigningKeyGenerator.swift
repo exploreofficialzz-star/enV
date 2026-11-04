@@ -586,7 +586,7 @@ struct NativeGoogleSigningKeyView: View {
             ("release-signing.gradle.kts", Data(value.gradleKotlin.utf8)),
             ("release-signing.gradle", Data(value.gradleGroovy.utf8)),
             (".github/workflows/android-release.yml", Data(value.githubActionsWorkflow.utf8)),
-            (".gitignore-signing-example", Data(".android-signing/\\n/upload-keystore.jks\\n/*.jks\\n/*.keystore\\n".utf8)),
+            (".gitignore-signing-example", Data(".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n".utf8)),
             ("README.md", Data(value.handoutReadme.utf8)),
         ]
         let archiveURL = folder.appendingPathComponent("package.zip")
