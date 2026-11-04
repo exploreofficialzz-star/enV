@@ -196,9 +196,11 @@ internal fun NativeGoogleSigningKeyForm() {
                 OutlinedButton(onClick = { pendingFile = (result.keystoreBase64 + "\\n").toByteArray(Charsets.US_ASCII); fileSaver.launch("upload-keystore.base64.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save Base64 for GitHub") }
                 OutlinedButton(onClick = { pendingFile = result.githubSecrets.toByteArray(Charsets.UTF_8); fileSaver.launch("github-secrets.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save GitHub secrets") }
                 OutlinedButton(onClick = { pendingFile = result.githubActionsWorkflow.toByteArray(Charsets.UTF_8); fileSaver.launch("android-release.yml") }, modifier = Modifier.fillMaxWidth()) { Text("Save GitHub Actions workflow") }
+                OutlinedButton(onClick = { pendingFile = result.signingInfo.toByteArray(Charsets.UTF_8); fileSaver.launch("signing-info.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save signing details and fingerprints") }
                 OutlinedButton(onClick = { copy(result.githubSecrets, "GitHub secrets") }) { Text("Copy all GitHub secrets") }
                 OutlinedButton(onClick = { copy(result.keystoreBase64, "Keystore Base64") }) { Text("Copy Base64") }
                 OutlinedButton(onClick = { copy(result.githubActionsWorkflow, "GitHub Actions workflow") }) { Text("Copy workflow") }
+                OutlinedButton(onClick = { copy(result.signingInfo, "Signing details") }) { Text("Copy signing details") }
                 Text("The full ZIP contains the Base64 keystore and both password values. Keep it private. Base64 is encoding, not encryption.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 var showFingerprints by rememberSaveable { mutableStateOf(false) }
                 var showGradle by rememberSaveable { mutableStateOf(false) }
