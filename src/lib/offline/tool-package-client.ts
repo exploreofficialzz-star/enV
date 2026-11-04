@@ -76,13 +76,14 @@ async function sendWorkerMessage<T extends WorkerReply>(
   worker: ServiceWorker,
   type: string,
   payload: Record<string, unknown>,
+  timeoutMs = 10_000,
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const channel = new MessageChannel();
     const timeout = window.setTimeout(() => {
       channel.port1.close();
       reject(new Error("The offline package manager did not respond."));
-    }, 10_000);
+    }, timeoutMs);
     channel.port1.onmessage = (event: MessageEvent<T>) => {
       window.clearTimeout(timeout);
       channel.port1.close();
@@ -147,7 +148,7 @@ export async function prepareOfflineToolPackage(input: {
   }
 }
 
-export async function completeOfflineToolPackage(toolId: string): Promise<boolean> {
+export async function completeOfflineToolPackage(toolId: string, additionalAssets: string[] = []): Promise<boolean> {
   if (typeof window === "undefined" || !navigator.onLine) return false;
   const worker = await activeWorker();
   if (!worker) return false;
@@ -162,12 +163,13 @@ export async function completeOfflineToolPackage(toolId: string): Promise<boolea
       } catch { return false; }
     })
     .slice(0, 500);
+  const requiredAssets = [...new Set([...assets, ...additionalAssets])].slice(0, 500);
   try {
     const result = await sendWorkerMessage<WorkerReply>(worker, "COMPLETE_TOOL_PACKAGE", {
       toolId,
       version: buildVersion(),
-      assets,
-    });
+      assets: requiredAssets,
+    }, 90_000);
     return result.ready === true;
   } catch {
     return false;
