@@ -38,7 +38,7 @@ const LOCAL_CUSTOM_CATEGORIES = new Set([
 ]);
 
 const LOCAL_NAMED_CUSTOM_TOOLS = new Set([
-  "a-book", "zip-any-file", "music-downloader", "song-metadata-analyzer",
+  "a-book", "zip-any-file", "song-metadata-analyzer",
   "qr-payload-inspector", "image-comparison-tool", "image-screenshot-tool",
   "image-print-layout-helper",
 ]);
