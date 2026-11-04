@@ -319,10 +319,38 @@ self.addEventListener("message", (event) => {
         if (!session || session.toolId !== data.toolId || session.version !== data.version) return reply({ ok: false, message: "The tool installation session is no longer active." });
         const record = await getPackage(data.toolId);
         const cache = await caches.open(packageCacheName(data.toolId, data.version));
-        const keys = await cache.keys();
         const isPending = record?.pendingVersion === data.version;
-        const assets = isPending ? (record?.pendingAssets || []) : (record?.assets || []);
-        const ready = Boolean(record && ((record.version === data.version && !isPending) || isPending) && keys.length > 0 && assets.length > 0);
+        const recordedAssets = isPending ? (record?.pendingAssets || []) : (record?.assets || []);
+        const requiredAssets = Array.isArray(data.assets) ? data.assets.slice(0, 500) : [];
+        let assetInstallFailed = false;
+        for (const value of requiredAssets) {
+          try {
+            const url = new URL(value);
+            if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") ||
+                url.pathname.startsWith("/_serverFn/") ||
+                !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) {
+              assetInstallFailed = true;
+              continue;
+            }
+            const request = new Request(url.href, { credentials: "same-origin" });
+            if (await cache.match(request)) continue;
+            const response = await fetch(request);
+            if (!response.ok) {
+              assetInstallFailed = true;
+              continue;
+            }
+            await cache.put(request, response.clone());
+            if (!recordedAssets.includes(request.url)) recordedAssets.push(request.url);
+          } catch {
+            assetInstallFailed = true;
+          }
+        }
+        const keys = await cache.keys();
+        const assets = recordedAssets;
+        const ready = Boolean(record && !assetInstallFailed &&
+          ((record.version === data.version && !isPending) || isPending) &&
+          keys.length > 0 && assets.length > 0 &&
+          requiredAssets.every((value) => assets.includes(value)));
         if (record) {
           if (ready) {
             await setPackage({
