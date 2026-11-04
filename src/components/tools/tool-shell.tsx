@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
@@ -18,6 +18,7 @@ import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions"
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import "@/components/engines/creator-engine.css";
 
 export function ToolShell({
   tool,
@@ -190,7 +191,8 @@ export function ToolShell({
   const cat = CATEGORY_MAP[tool.category];
 
   return (
-    <article className={"mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10" + (isMusicSandbox ? " env-music-sandbox-shell" : "")}>
+    <article className={tool.category === "creators" ? "env-device-tool-page" : "mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10" + (isMusicSandbox ? " env-music-sandbox-shell" : "")}>
+      {tool.category !== "creators" ? (
       <nav className="flex flex-wrap items-center gap-2 text-xs text-muted" aria-label="Breadcrumb">
         <Link to="/" className="hover:text-fg">
           Home
@@ -206,8 +208,11 @@ export function ToolShell({
         <span aria-hidden="true">/</span>
         <span className="text-fg">{tool.name}</span>
       </nav>
+      ) : null}
 
-      <header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3">
+
+      <header className={tool.category === "creators" ? "env-device-tool-header" : "mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-3 gap-y-2 sm:flex sm:justify-between sm:gap-3"}>
+        {tool.category === "creators" ? <Link to="/tools/$category" params={{ category: "creators" }} className="env-device-tool-back" aria-label="Back to Creator and Music tools" title="Back"><ArrowLeft aria-hidden="true" /></Link> : null}
         <ToolAppIcon tool={tool} className="row-span-2 size-11 sm:row-span-1" />
         <div className="col-start-2 row-start-1 min-w-0 sm:flex sm:min-w-0 sm:flex-1 sm:gap-3">
           <div className="min-w-0">
@@ -225,7 +230,7 @@ export function ToolShell({
               </button>
               {tool.status === "planned" ? <ComingSoonBadge /> : null}
             </div>
-            <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p>
+            {tool.category !== "creators" ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p> : null}
           </div>
         </div>
         {!isFullscreen ? <Button
@@ -243,17 +248,18 @@ export function ToolShell({
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button> : null}
-        <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p>
+        {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {note && tool.category !== "creators" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
+          : tool.category === "creators" ? "env-device-tool-interface"
           : ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id) ? "env-tool-interface relative mt-6" : "env-tool-interface relative mt-6 rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)] sm:p-6"}
         role={isFullscreen ? "dialog" : undefined}
         aria-modal={isFullscreen || undefined}
@@ -297,9 +303,11 @@ export function ToolShell({
           </>
         ) : children}
         </ToolExecutionTelemetryContext.Provider>
-        {!isFullscreen ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
+        {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
+      {tool.category !== "creators" ? (
+        <>
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
@@ -362,6 +370,8 @@ export function ToolShell({
             </div>
           ) : null}
         </section>
+      ) : null}
+        </>
       ) : null}
       <UnderProductionDialog
         open={productionTool !== null}

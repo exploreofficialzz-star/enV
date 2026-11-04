@@ -201,12 +201,22 @@ export function runGenerator(op: string, opts: Record<string, string>): string {
       const prefix = (opts.prefix || "SKU").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "SKU";
       return Array.from({ length: count }, (_, i) => `${prefix}-${hex(3).toUpperCase()}${i}`).join("\n");
     }
-    case "hashtags":
-      return seed
-        .split(/\s+/)
-        .filter(Boolean)
-        .flatMap((w) => [`#${w}`, `#${w}tips`, `#${pick(ADJ)}${w}`])
-        .join(" ");
+    case "hashtags": {
+      const cleanTag = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      const phrases = [cleanTag(seed), cleanTag(opts.niche || "")].filter((x) => x.length > 1);
+      const words = [...new Set(`${seed} ${opts.niche || ""}`.split(/[\s,;]+/).map(cleanTag).filter((x) => x.length > 1))];
+      if (!words.length) throw new Error("Enter at least one relevant keyword or niche.");
+      const platform = opts.platform || "instagram";
+      const platformTags: Record<string, string[]> = {
+        instagram: ["InstagramCreator", "Reels", "CreatorCommunity"], tiktok: ["TikTokCreator", "CreatorTips", "TikTokCommunity"],
+        youtube: ["YouTubeCreator", "VideoCreator", "CreatorEducation"], facebook: ["FacebookCreator", "CommunityBuilding"],
+        x: ["BuildInPublic", "CreatorCommunity"], linkedin: ["LinkedInCreator", "ProfessionalCommunity"],
+        spotify: ["IndependentArtist", "NewMusic"], podcast: ["PodcastCreator", "PodcastEpisode"],
+      };
+      const tags = [...new Set([...phrases, ...words, ...(platformTags[platform] || []), ...words.map((x) => `${x}tips`), ...words.slice(0, 2).map((x) => `learn${x}`)])];
+      const limit = Math.max(3, Math.min(20, Math.floor(Number(opts.count || 12))));
+      return `${tags.slice(0, limit).map((tag) => `#${tag}`).join(" ")}\n\nTag set generated from your keywords and selected platform context. It does not use live trend data or guarantee reach. Keep only tags that accurately describe this specific post and check current platform conventions.`;
+    }
     case "uuid-list":
       return Array.from({ length: count }, () => uuid()).join("\n");
     case "coin-flip":

@@ -99,13 +99,13 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
 
   switch (tool.engine.type) {
     case "calculator":
-      return <CalculatorEngine formula={tool.engine.formula} toolId={tool.id} />;
+      return <CalculatorEngine formula={tool.engine.formula} toolId={tool.id} deviceMode={tool.category === "creators"} />;
     case "converter":
       return <ConverterEngine system={tool.engine.system} mode={tool.engine.mode} />;
     case "text":
       return <TextEngine op={tool.engine.op} />;
     case "generator":
-      return <GeneratorEngine op={tool.engine.op} />;
+      return <GeneratorEngine op={tool.engine.op} deviceMode={tool.category === "creators"} />;
     case "codec":
       return <CodecEngine op={tool.engine.op} />;
     case "color":

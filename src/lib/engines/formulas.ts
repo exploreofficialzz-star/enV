@@ -783,10 +783,53 @@ calculators["yt-earn"] = { fields: [f("views", "Views"), f("rpmLow", "RPM low", 
 ]};
 earn("tt-earn", [f("views", "Views"), f("rpm", "RPM", { defaultValue: 0.02 })], (v) => (n(v.views) / 1000) * n(v.rpm));
 calculators["ig-eng"] = { fields: [f("likes", "Likes"), f("comments", "Comments"), f("followers", "Followers")], compute: (v) => [out("Engagement %", ((n(v.likes) + n(v.comments)) / pos(v.followers, "followers")) * 100, { primary: true })] };
-calculators.twitch = { fields: [f("subs", "Subs"), f("subPrice", "Net / sub", { defaultValue: 2.5 }), f("bits", "Bits", { defaultValue: 0 }), f("bitValue", "Bit value", { defaultValue: 0.01 }), f("adMinutes", "Ad minutes", { defaultValue: 0 }), f("cpm", "Ad CPM", { defaultValue: 5 })], compute: (v) => [out("Estimate", n(v.subs) * n(v.subPrice) + n(v.bits) * n(v.bitValue) + (n(v.adMinutes) / 1000) * n(v.cpm) * 100, { primary: true, hint: "rough" })] };
-earn("spotify", [f("streams", "Streams"), f("perStream", "Per stream", { defaultValue: 0.003 })], (v) => n(v.streams) * n(v.perStream));
-earn("apple-music", [f("streams", "Streams"), f("perStream", "Per stream", { defaultValue: 0.006 })], (v) => n(v.streams) * n(v.perStream));
-earn("podcast", [f("downloads", "Downloads"), f("cpm", "CPM", { defaultValue: 18 }), f("adsPerEpisode", "Ads", { defaultValue: 2 })], (v) => (n(v.downloads) / 1000) * n(v.cpm) * n(v.adsPerEpisode));
+calculators.twitch = { fields: [
+  f("subs", "Paid / gifted subscriptions", { defaultValue: 0 }), f("subNet", "Your net amount per subscription", { defaultValue: 0, hint: "Use the amount shown in your own payout reporting." }),
+  f("bits", "Bits received", { defaultValue: 0 }), f("bitNet", "Your amount per Bit", { defaultValue: 0.01 }),
+  f("adImpressions", "Ad impressions served", { defaultValue: 0 }), f("adCpm", "Net creator amount per 1,000 ad impressions", { defaultValue: 0, hint: "Use your creator-side net payout per 1,000 impressions; do not enter advertiser CPM unless it already reflects your share." }),
+  f("tips", "Tips / donations", { defaultValue: 0 }), f("sponsors", "Sponsorship income", { defaultValue: 0 }),
+], compute: (v) => {
+  const subs = nonneg(v.subs, "Subscriptions") * nonneg(v.subNet, "Net per subscription"), bits = nonneg(v.bits, "Bits") * nonneg(v.bitNet, "Net per Bit"), ads = (nonneg(v.adImpressions, "Ad impressions") / 1000) * nonneg(v.adCpm, "Net ad amount per 1,000 impressions"), tips = nonneg(v.tips, "Tips / donations"), sponsors = nonneg(v.sponsors, "Sponsorship income");
+  return [out("Subscriptions", subs), out("Bits", bits), out("Net ad estimate", ads), out("Tips / donations", tips), out("Sponsorships", sponsors), out("Estimated total", subs + bits + ads + tips + sponsors, { primary: true })];
+}};
+function historicalRoyaltyCalculator(key: string, platform: string) {
+  const unit = platform === "Apple Music" ? "plays / royalty units" : "streams";
+  calculators[key] = {
+    fields: [
+      f("historyStreams", `${unit[0]!.toUpperCase()}${unit.slice(1)} in statement period`, { min: 1 }),
+      f("historyPayout", "Your actual payout for that period", { hint: "Use your distributor statement; enter in your chosen currency." }),
+      f("forecastStreams", `Forecast ${unit}`, { defaultValue: 50000 }),
+      f("artistShare", "Your share of royalties", { defaultValue: 100, min: 0, max: 100, suffix: "%" }),
+      f("feePct", "Additional distributor / team fee", { defaultValue: 0, min: 0, max: 100, suffix: "%" }),
+    ],
+    formula: `Historical effective payout ÷ historical ${unit} × forecast ${unit} × your ownership share (illustrative only)`,
+    compute: (v) => {
+      const historicalStreams = pos(v.historyStreams, `historical ${unit}`), payout = nonneg(v.historyPayout, "historical payout"), forecast = nonneg(v.forecastStreams, `forecast ${unit}`);
+      const share = nonneg(v.artistShare, "artist share"), fee = nonneg(v.feePct, "fee");
+      if (share > 100 || fee > 100) throw new Error("Ownership and fee percentages must be between 0% and 100%.");
+      const effectiveRate = payout / historicalStreams;
+      const gross = effectiveRate * forecast;
+      const net = gross * share / 100 * (1 - fee / 100);
+      return [out(`Historical effective payout / ${platform === "Apple Music" ? "play or royalty unit" : "stream"}`, effectiveRate), out("Forecast before entered shares / fees", gross), out("Your illustrative amount", net, { primary: true }), out("Platform note", `${platform} does not guarantee a fixed payout per ${platform === "Apple Music" ? "play" : "stream"}. This is extrapolated from your historical statement only.`)];
+    },
+  };
+}
+historicalRoyaltyCalculator("spotify", "Spotify");
+historicalRoyaltyCalculator("apple-music", "Apple Music");
+calculators.podcast = { fields: [
+  f("downloadsPerEpisode", "Downloads per episode", { defaultValue: 1000 }), f("episodes", "Episodes in campaign", { defaultValue: 1 }),
+  f("cpm", "Sponsorship CPM", { defaultValue: 0, hint: "Enter the deal rate per 1,000 delivered ad impressions." }),
+  f("adsPerEpisode", "Ad slots per episode", { defaultValue: 1 }), f("fillRate", "Ad fill rate", { defaultValue: 100, min: 0, max: 100, suffix: "%" }),
+  f("otherIncome", "Other sponsorship / membership income", { defaultValue: 0 }),
+], compute: (v) => {
+  const downloadsPerEpisode = nonneg(v.downloadsPerEpisode, "Downloads per episode"), episodes = nonneg(v.episodes, "Episodes");
+  const downloads = downloadsPerEpisode * episodes, cpm = nonneg(v.cpm, "Sponsorship CPM"), ads = nonneg(v.adsPerEpisode, "Ad slots"), fill = nonneg(v.fillRate, "Ad fill rate");
+  if (fill > 100) throw new Error("Ad fill rate must be between 0% and 100%.");
+  const deliveredImpressions = downloads * ads * fill / 100;
+  const sponsor = deliveredImpressions / 1000 * cpm;
+  const other = nonneg(v.otherIncome, "Other sponsorship / membership income");
+  return [out("Estimated delivered ad impressions", deliveredImpressions), out("Sponsorship estimate", sponsor), out("Other income", other), out("Estimated total", sponsor + other, { primary: true })];
+}};
 
 
 // Fitness calculators — educational estimates, not medical diagnosis or treatment.

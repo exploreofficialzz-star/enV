@@ -9,20 +9,31 @@ import { DEFAULT_DISPLAY, applyDisplaySettings, buildCalculationSummary, describ
 import { calculators, type CalcOutput } from "@/lib/engines/formulas";
 import { runOfflineMeteredOperationIfSelected } from "@/lib/billing/offline-client";
 import { recordToolExecutionResult } from "@/lib/analytics/client";
-import { Clock3, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Clipboard, Clock3, RotateCcw, Trash2, X } from "lucide-react";
 
 type CalcError = { message: string; /** Name of the input the error is about, when known. */ field: string | null };
 type Computed = { outputs: CalcOutput[]; inputs: Record<string, string>; steps: string[] };
 type HistoryItem = { id: string; summary: string; result: string; time: string; values: Record<string, string> };
 
-export function CalculatorEngine({ formula, toolId }: { formula: string; toolId?: string }) {
+export function CalculatorEngine({ formula, toolId, deviceMode = false }: { formula: string; toolId?: string; deviceMode?: boolean }) {
   // Keyed by tool and formula so navigating between calculators never carries over inputs, results or errors.
-  return <CalculatorForm key={`${toolId ?? formula}:${formula}`} formula={formula} toolId={toolId} />;
+  return <CalculatorForm key={`${toolId ?? formula}:${formula}`} formula={formula} toolId={toolId} deviceMode={deviceMode} />;
 }
 
-function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string }) {
+function compactCalculatorLabel(name: string, label: string) {
+  const map: Record<string, string> = {
+    historyStreams: "Past streams / plays", historyPayout: "Past payout", forecastStreams: "Forecast streams / plays",
+    artistShare: "Your share", feePct: "Extra fees", impressions: "Ad impressions", adImpressions: "Ad impressions",
+    netPerThousand: "Net creator payout / 1k", downloadsPerEpisode: "Downloads / episode", episodes: "Episodes",
+    cpm: "Sponsor CPM", adsPerEpisode: "Ad slots", fillRate: "Ad fill", otherIncome: "Other income",
+    subNet: "Net / sub", bitNet: "Net / Bit", adCpm: "Net ad payout / 1k", tips: "Tips", sponsors: "Sponsors",
+  };
+  return map[name] ?? label.replace(/\s*\([^)]*\)/g, "").split(/[—–]/)[0]?.trim() ?? label;
+}
+
+function CalculatorForm({ formula, toolId, deviceMode }: { formula: string; toolId?: string; deviceMode: boolean }) {
   const def = calculators[formula];
-  const fields = useMemo(() => def?.fields ?? [], [def]);
+  const fields = useMemo(() => (def?.fields ?? []).map((field) => deviceMode ? ({ ...field, label: compactCalculatorLabel(field.name, field.label), hint: undefined }) : field), [def, deviceMode]);
   const errorId = useId();
   const [values, setValues] = useState(() => initialValues(fields));
   const [error, setError] = useState<CalcError | null>(null);
@@ -30,6 +41,7 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
   const [display, setDisplay] = useState<DisplaySettings>(DEFAULT_DISPLAY);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [status, setStatus] = useState("");
+  const [copied, setCopied] = useState(false);
 
   // Move focus to the input an error is about so keyboard and screen-reader users land on it.
   useEffect(() => {
@@ -48,7 +60,7 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
   const stale = computed !== null && fields.some((field) => (values[field.name] ?? "") !== (computed.inputs[field.name] ?? ""));
   const hasNumericResults = computed?.outputs.some((item) => item.raw !== undefined) ?? false;
 
-  const onChange = (name: string, value: string) => setValues((current) => ({ ...current, [name]: value }));
+  const onChange = (name: string, value: string) => { setCopied(false); setValues((current) => ({ ...current, [name]: value })); };
 
   const [isRunning, setIsRunning] = useState(false);
 
@@ -103,6 +115,7 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
     setComputed(null);
     setError(null);
     setStatus("");
+    setCopied(false);
   };
 
   const reuse = (item: HistoryItem) => {
@@ -116,13 +129,58 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
 
   return (
     <form
-      className="space-y-5"
+      className={deviceMode ? "env-creator-workspace env-creator-calculator" : "space-y-5"}
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
         run();
       }}
     >
+      {deviceMode ? (
+        <>
+          <div className="env-creator-workspace__topline">
+            <span className="env-creator-workspace__platform">Calculator</span>
+            <button type="button" className="env-creator-workspace__icon-button" onClick={reset} aria-label="Reset" title="Reset">
+              <RotateCcw aria-hidden="true" />
+            </button>
+          </div>
+          <div className="env-creator-workspace__body">
+            <div className="env-creator-workspace__form">
+              <CalculatorFields fields={fields} values={values} onChange={onChange} invalidField={error?.field ?? null} errorId={errorId} />
+            </div>
+            <section className="env-creator-workspace__result" aria-live="polite" aria-label="Result">
+              <div className="env-creator-workspace__result-head">
+                <span className="env-creator-workspace__result-title">Result</span>
+                <button type="button" className="env-creator-workspace__icon-button" disabled={!computed} onClick={() => {
+                  if (!computed) return;
+                  const value = shown.map((item) => item.label + ": " + item.value + (item.unit ? " " + item.unit : "")).join("\n");
+                  if (!navigator.clipboard?.writeText) { setError({ message: "Copy is unavailable in this browser.", field: null }); return; }
+                  void navigator.clipboard.writeText(value).then(() => { setCopied(true); setError(null); }).catch(() => setError({ message: "Copy is unavailable in this browser.", field: null }));
+                }} aria-label={copied ? "Copied" : "Copy result"} title={copied ? "Copied" : "Copy result"}>
+                  {copied ? <Check aria-hidden="true" /> : <Clipboard aria-hidden="true" />}
+                </button>
+              </div>
+              {computed ? (
+                <div className="env-creator-calculator__metrics">
+                  {shown.map((item, index) => (
+                    <div key={item.label + index} className={item.primary ? "env-creator-calculator__metric is-primary" : "env-creator-calculator__metric"}>
+                      <span>{item.label}</span>
+                      <strong>{item.value}{item.unit ? <small> {item.unit}</small> : null}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : <div className="env-creator-workspace__blank" aria-hidden="true" />}
+              {stale ? <span className="env-creator-calculator__stale">Inputs changed</span> : null}
+            </section>
+          </div>
+          <p role="status" className="sr-only">{status}</p>
+          <div className="env-creator-workspace__bottom">
+            <div id={errorId} className="env-creator-calculator__error"><ErrorBanner message={error?.message ?? null} /></div>
+            <Button type="submit" className="env-creator-workspace__primary" disabled={isRunning}>{isRunning ? "Calculating…" : "Calculate"}</Button>
+          </div>
+        </>
+      ) : (
+      <>
       <CalculatorFields fields={fields} values={values} onChange={onChange} invalidField={error?.field ?? null} errorId={errorId} />
       {def.formula ? <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-subtle">Formula: {def.formula}</p> : null}
       <div className="flex flex-wrap gap-2">
@@ -181,7 +239,8 @@ function CalculatorForm({ formula, toolId }: { formula: string; toolId?: string 
             ))}
           </ul>
         </section>
-      ) : null}
-    </form>
+      ) : null}      </>
+
+      )}    </form>
   );
 }

@@ -13,13 +13,15 @@ export interface FrameV { fit: "fill" | "fit"; zoom: number; posX: number; posY:
 interface V { platform: PlatformId; placement: PlacementId; variant: number; custom: boolean; cw: number; ch: number; fit: "fill" | "fit"; zoom: number; posX: number; posY: number; bgMode: "blur" | "color" | "transparent"; bg: string; showSafe: boolean; showClear: boolean; showShape: boolean; underLimit: boolean }
 
 /** Final composition at exact output size (Lanczos), shared by the live preview scale and export. */
-export function renderPlatform(src: HTMLCanvasElement, v: FrameV, outW: number, outH: number): HTMLCanvasElement {
+export function renderPlatform(src: HTMLCanvasElement, v: FrameV, outW: number, outH: number, allowAlpha = true): HTMLCanvasElement {
   const fill = v.fit === "fill";
   const place = computePlacement({ width: src.width, height: src.height }, { width: outW, height: outH }, { fit: fill ? "cover" : "contain", posX: v.posX, posY: v.posY, zoom: fill ? Math.max(1, v.zoom) : clamp(v.zoom, 0.05, 1) });
   const out = makeCanvas(outW, outH); const ctx = ctxOf(out);
   if (!fill) {
     if (v.bgMode === "color") { ctx.fillStyle = v.bg; ctx.fillRect(0, 0, outW, outH); }
-    else if (v.bgMode === "blur") {
+    else if (v.bgMode === "blur" || !allowAlpha) {
+      if (v.bgMode !== "blur") { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, outW, outH); }
+      else {
       const small = scaledCanvas(src, src.width, src.height, Math.max(8, Math.round(outW / 8)), Math.max(8, Math.round(outH / 8)));
       const p = readPixels(small);
       // cover-fit the tiny copy into the small box first so the blur background fills the frame
@@ -28,6 +30,7 @@ export function renderPlatform(src: HTMLCanvasElement, v: FrameV, outW: number, 
       bctx.drawImage(src, cover.sourceRect.x, cover.sourceRect.y, cover.sourceRect.width, cover.sourceRect.height, 0, 0, sw, sh);
       const q = readPixels(bgc); gaussianBlur(q.data, sw, sh, Math.max(2, sw / 30)); ctxOf(bgc).putImageData(q, 0, 0);
       ctx.imageSmoothingQuality = "high"; ctx.drawImage(bgc, 0, 0, outW, outH); void p;
+      }
     }
     const dw = Math.max(1, Math.round(place.dest.width)), dh = Math.max(1, Math.round(place.dest.height));
     const body = canvasFrom(resizeRGBA(readPixels(src).data, src.width, src.height, dw, dh, "lanczos3"), dw, dh);
@@ -36,7 +39,14 @@ export function renderPlatform(src: HTMLCanvasElement, v: FrameV, outW: number, 
   }
   const r = place.sourceRect; const cw = Math.max(1, Math.round(r.width)), ch = Math.max(1, Math.round(r.height));
   const crop = makeCanvas(cw, ch); ctxOf(crop).drawImage(src, Math.round(r.x), Math.round(r.y), cw, ch, 0, 0, cw, ch);
-  return canvasFrom(resizeRGBA(readPixels(crop).data, cw, ch, outW, outH, "lanczos3"), outW, outH);
+  const resized = canvasFrom(resizeRGBA(readPixels(crop).data, cw, ch, outW, outH, "lanczos3"), outW, outH);
+  if (allowAlpha) return resized;
+  const flattened = makeCanvas(outW, outH);
+  const flattenedContext = ctxOf(flattened);
+  flattenedContext.fillStyle = "#ffffff";
+  flattenedContext.fillRect(0, 0, outW, outH);
+  flattenedContext.drawImage(resized, 0, 0);
+  return flattened;
 }
 
 export function FrameEditor({ source, v, outW, outH, onPan, onZoom, safe, clear, circle, shapeGuide }: { shapeGuide?: string; source: SourceImage; v: FrameV; outW: number; outH: number; onPan: (x: number, y: number) => void; onZoom: (z: number) => void; safe?: { x: number; y: number; width: number; height: number; label: string }; clear?: { x: number; y: number; width: number; height: number; label: string }[]; circle: boolean }) {
@@ -92,6 +102,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
   }, [source, lockedPlatform, parsed?.placement]);
   const st = useSettings<V>(start); const v = st.values;
   const pl = getPlacement(v.platform, v.placement) ?? getPlacement(v.platform, "post")!;
+  const frame = pl.alphaAllowed === false && v.bgMode === "transparent" ? { ...v, bgMode: "blur" as const } : v;
   const choices = placementsFor(v.platform);
   const variant = pl.variants[Math.min(v.variant, pl.variants.length - 1)];
   const outW = Math.round(v.custom ? v.cw : variant.width), outH = Math.round(v.custom ? v.ch : variant.height);
@@ -99,7 +110,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
   const enlarge = v.fit === "fill" ? outW / Math.max(1, place.sourceRect.width) : place.scale;
   const tooSmall = (pl.minWidth && outW < pl.minWidth) || (pl.minHeight && outH < pl.minHeight);
   const centre = () => st.set({ posX: 0.5, posY: 0.5, zoom: 1 });
-  const pickPlacement = (platform: PlatformId, placement: PlacementId) => { const p = getPlacement(platform, placement)!; st.set({ platform, placement: p.placement, variant: 0, custom: false, cw: p.variants[0].width, ch: p.variants[0].height, posX: 0.5, posY: 0.5, zoom: 1 }); };
+  const pickPlacement = (platform: PlatformId, placement: PlacementId) => { const p = getPlacement(platform, placement)!; st.set({ platform, placement: p.placement, variant: 0, custom: false, cw: p.variants[0].width, ch: p.variants[0].height, posX: 0.5, posY: 0.5, zoom: 1, bgMode: p.alphaAllowed === false ? "blur" : v.bgMode }); };
   const dirty = JSON.stringify(v) !== JSON.stringify(st.initial);
   const ar = `${exactRatio(outW, outH)}${nearestCommonRatio(outW, outH) && nearestCommonRatio(outW, outH) !== exactRatio(outW, outH) ? ` (≈ ${nearestCommonRatio(outW, outH)})` : ""}`;
   const conf = { official: { t: "Official", tone: "ok" as const }, documented: { t: "Documented", tone: "info" as const }, approximate: { t: "Approximate", tone: "warn" as const } }[pl.confidence];
@@ -109,7 +120,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-3">
-        <FrameEditor source={source} v={v} outW={outW} outH={outH} safe={pl.safe} clear={pl.keepClear} circle={pl.shape === "circle"} onPan={(x, y) => st.set({ posX: x, posY: y }, "pan")} onZoom={(z) => st.set({ zoom: v.fit === "fill" ? clamp(z, 1, 8) : clamp(z, 0.05, 1) }, "zoom")} />
+        <FrameEditor source={source} v={frame} outW={outW} outH={outH} safe={pl.safe} clear={pl.keepClear} circle={pl.shape === "circle"} onPan={(x, y) => st.set({ posX: x, posY: y }, "pan")} onZoom={(z) => st.set({ zoom: v.fit === "fill" ? clamp(z, 1, 8) : clamp(z, 0.05, 1) }, "zoom")} />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Stat label="Output" value={`${outW} × ${outH}`} /><Stat label="Aspect ratio" value={ar} /><Stat label="Source region" value={v.fit === "fill" ? `${Math.round(place.sourceRect.width)} × ${Math.round(place.sourceRect.height)}` : `${source.width} × ${source.height}`} /><Stat label="Enlarged" value={enlarge > 1.01 ? `${enlarge.toFixed(2)}×` : "No"} tone={enlarge > 2 ? "warn" : undefined} /></div>
         {enlarge > 1.5 ? <Notice tone="warn">The chosen area is smaller than the output, so it is enlarged {enlarge.toFixed(1)}× and may look soft. Use a larger source image or a smaller zoom.</Notice> : null}
         {tooSmall ? <Notice tone="danger">{info.name} needs at least {pl.minWidth}×{pl.minHeight}px for this placement.</Notice> : null}
@@ -125,7 +136,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
           <div className="space-y-1.5 rounded-md bg-surface-2 p-3 text-xs leading-relaxed text-muted">
             <p><span className={`mr-1.5 rounded-full px-2 py-0.5 text-[11.1px] font-semibold ${conf.tone === "ok" ? "bg-ok/15 text-ok" : conf.tone === "warn" ? "bg-warn/20 text-fg" : "bg-accent-soft text-fg"}`}>{conf.t}</span>{pl.basis}</p>
             {pl.note ? <p>{pl.note}</p> : null}
-            <p>Checked {SPEC_VERIFIED_ON} · <a className="underline" href={info.sourceUrl} target="_blank" rel="noopener noreferrer">{info.sourceLabel}</a></p>
+            <p>Checked {info.verified} · <a className="underline" href={info.sourceUrl} target="_blank" rel="noopener noreferrer">{info.sourceLabel}</a></p>
           </div>
           {!pl.exists ? <Notice tone="warn">{pl.note || `${info.name} doesn't publish a dedicated spec for this placement.`} Size and framing are your choice — adjust the custom size if you know better.</Notice> : null}
         </Section>
@@ -135,7 +146,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
           <div className="grid grid-cols-2 gap-3"><Slider label="Horizontal" value={Math.round(v.posX * 100)} onChange={(x) => st.set({ posX: x / 100 }, "px")} min={0} max={100} unit="%" def={50} /><Slider label="Vertical" value={Math.round(v.posY * 100)} onChange={(y) => st.set({ posY: y / 100 }, "py")} min={0} max={100} unit="%" def={50} /></div>
           <div className="space-y-1.5"><span className="text-[14.4px] font-medium text-fg">Snap to</span><div className="grid w-28 grid-cols-3 gap-1">{ANCHORS.map((a: Anchor) => <button key={a} type="button" aria-label={`Snap ${a}`} onClick={() => st.set({ ...anchorFractions(a) })} className="size-8 rounded-sm bg-surface-2 hover:bg-accent" />)}</div></div>
           <div className="flex flex-wrap gap-2"><Btn onClick={centre}>Centre</Btn><Btn onClick={() => st.set({ posX: start.posX, posY: start.posY, zoom: 1 })} title="Re-run the automatic positioning, which favours the most detailed part of the picture">Auto-position</Btn></div>
-          {v.fit === "fit" ? <><Seg label="Empty space" value={v.bgMode} onChange={(bgMode) => st.set({ bgMode })} options={[{ value: "blur", label: "Blurred copy" }, { value: "color", label: "Colour" }, { value: "transparent", label: "Transparent" }]} />{v.bgMode === "color" ? <ColorField label="Fill colour" value={v.bg} onChange={(bg) => st.set({ bg }, "bg")} /> : null}</> : null}
+          {v.fit === "fit" ? <><Seg label="Empty space" value={frame.bgMode} onChange={(bgMode) => st.set({ bgMode })} options={[{ value: "blur", label: "Blurred copy" }, { value: "color", label: "Colour" }, ...(pl.alphaAllowed === false ? [] : [{ value: "transparent", label: "Transparent" }])]} />{v.bgMode === "color" ? <ColorField label="Fill colour" value={v.bg} onChange={(bg) => st.set({ bg }, "bg")} /> : null}</> : null}
         </Section>
         <Section title="Guides (preview only)" defaultOpen={false}>
           <Toggle label="Safe area" checked={v.showSafe} onChange={(showSafe) => st.set({ showSafe })} hint={pl.safe ? pl.safe.label : "No safe-area guidance for this placement."} />
@@ -143,7 +154,7 @@ function Workspace({ source, toolId, op }: { source: SourceImage; toolId: string
           <Toggle label="Circular display mask" checked={v.showShape} onChange={(showShape) => st.set({ showShape })} hint={pl.shape === "circle" ? `${info.name} shows this as a circle.` : "This placement is not shown as a circle."} />
         </Section>
         <ExportPanel source={source} toolId={toolId} suffix={`${v.platform}-${pl.placement}`} formats={pl.formats} defaultFormat={source.hasAlphaChannel && pl.formats.includes("png") && pl.shape === "circle" ? "png" : pl.formats[0]} defaultQuality={90} deps={[v, outW, outH]} maxBytes={limit}
-          render={() => renderPlatform(fullCanvas(source), v, outW, outH)} target={limit && v.underLimit ? { bytes: Math.floor(limit * 0.98), allowDownscale: false, minQuality: 0.4 } : undefined}>
+          render={() => renderPlatform(fullCanvas(source), frame, outW, outH, pl.alphaAllowed !== false)} target={limit && v.underLimit ? { bytes: Math.floor(limit * 0.98), allowDownscale: false, minQuality: 0.4 } : undefined}>
           {limit ? <Toggle label={`Keep under ${pl.maxBytes ? "the upload limit" : "the recommended size"}`} checked={v.underLimit} onChange={(underLimit) => st.set({ underLimit })} hint="Finds the best quality that fits, without changing the dimensions." /> : null}
         </ExportPanel>
       </div>

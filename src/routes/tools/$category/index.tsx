@@ -7,6 +7,7 @@ import { getToolsByCategory } from "@/lib/registry";
 import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
+import { CreatorCategoryLauncher } from "@/components/tools/creator-category-launcher";
 import type { CategoryId } from "@/types/tool";
 import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle, canonicalSeoTools } from "@/lib/seo-metadata";
 
@@ -42,6 +43,7 @@ function Category() {
   const meta = CATEGORY_MAP[category as CategoryId];
   const Icon = meta ? toolIcon(meta.icon) : Folder;
   useEffect(() => setVisibleCount(6), [category]);
+  if (category === "creators") return <AppShell showChrome={false}><CreatorCategoryLauncher tools={tools} /></AppShell>;
   return (
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">

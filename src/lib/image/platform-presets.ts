@@ -12,7 +12,7 @@ import type { PlatformPlacementSpec } from "./types.ts";
  * Dimensions are *export* sizes. Variants list other valid shapes (first = default). Checked 2026-09-30.
  */
 
-export type PlatformId = "instagram" | "facebook" | "x" | "linkedin" | "pinterest" | "tiktok" | "reddit" | "snapchat" | "threads" | "twitch" | "youtube" | "discord";
+export type PlatformId = "instagram" | "facebook" | "x" | "linkedin" | "pinterest" | "tiktok" | "reddit" | "snapchat" | "threads" | "twitch" | "youtube" | "discord" | "spotify" | "apple-music" | "podcast";
 export type PlacementId = "profile" | "banner" | "cover" | "post" | "story" | "thumbnail" | "square" | "portrait" | "landscape" | "image";
 export type Confidence = "official" | "documented" | "approximate";
 export type OutFormat = "jpeg" | "png" | "webp";
@@ -42,6 +42,7 @@ export interface Placement {
   confidence: Confidence;
   basis: string;
   note: string;
+  alphaAllowed?: boolean;
 }
 
 export interface PlatformInfo { id: PlatformId; name: string; sourceUrl: string; sourceLabel: string; verified: string }
@@ -63,6 +64,9 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
   twitch: info("twitch", "Twitch", "https://help.twitch.tv/s/article/profile-settings", "Twitch Help"),
   youtube: info("youtube", "YouTube", "https://support.google.com/youtube/answer/10456525", "YouTube Help"),
   discord: info("discord", "Discord", "https://support.discord.com/hc/en-us/articles/4403147417623-Custom-Profiles", "Discord Support"),
+  spotify: { ...info("spotify", "Spotify", "https://support.spotify.com/ws/artists/article/cover-art-requirements/", "Spotify for Artists — cover art requirements"), verified: "2026-11-04" },
+  "apple-music": { ...info("apple-music", "Apple Music", "https://artists.apple.com/support/1120-cover-art", "Apple Music for Artists — cover art guidelines"), verified: "2026-11-04" },
+  podcast: { ...info("podcast", "Apple Podcasts", "https://podcasters.apple.com/support/5514-show-cover-template", "Apple Podcasts for Creators — show cover specifications"), verified: "2026-11-04" },
 };
 
 export const PLATFORM_IDS = Object.keys(PLATFORMS) as PlatformId[];
@@ -73,7 +77,7 @@ type V = [number, number, string];
 type Z = [number, number, number, number, string];
 interface Row {
   v: V[]; label: string; c: Confidence; basis: string; note?: string; exists?: boolean;
-  min?: [number, number]; max?: number; rec?: number; circle?: boolean; safe?: Z; clear?: Z[]; fmt?: OutFormat[];
+  min?: [number, number]; max?: number; rec?: number; circle?: boolean; safe?: Z; clear?: Z[]; fmt?: OutFormat[]; alpha?: boolean;
 }
 const ALL: OutFormat[] = ["jpeg", "png", "webp"];
 const JP: OutFormat[] = ["jpeg", "png"];
@@ -215,6 +219,26 @@ const DATA: Record<PlatformId, Partial<Record<PlacementId, Row>>> = {
     thumbnail: { label: "Server icon", v: [[512, 512, "1:1 (shown as a circle)"]], min: [128, 128], circle: true, c: "documented", basis: "Server icons: 512×512 recommended, 128×128 minimum.", note: "Used as the small square image Discord shows in lists." },
     story: { label: "Vertical (9:16)", v: [[1080, 1920, "9:16"]], exists: false, c: "approximate", basis: "Discord has no Stories.", note: "Discord has no Stories placement; this is a vertical composition." },
   },
+  spotify: {
+    profile: { label: "Artist avatar", v: [[750, 750, "1:1 minimum"]], min: [750, 750], max: 20 * MB, circle: true, c: "official", basis: "Spotify for Artists image guidelines: artist avatars must be at least 750×750 px. See official artist image guidelines.", note: "Keep a centred crop; artist profile presentation may vary by surface.", fmt: JP },
+    banner: { label: "Artist header", v: [[2660, 1140, "≈2.33:1"]], min: [2660, 1140], max: 20 * MB, c: "official", basis: "Spotify for Artists image guidelines: header images must be at least 2660×1140 px.", note: "Check desktop and mobile crops in the artist profile.", fmt: JP },
+    post: { label: "Release cover art", v: [[3000, 3000, "1:1 working master"], [640, 640, "1:1 minimum"], [10000, 10000, "1:1 maximum"]], min: [640, 640], c: "official", basis: "Spotify cover-art requirements: square 1:1, 640–10000 px in both dimensions, sRGB, 24-bit, TIFF/PNG/JPG using lossless encoding. Official source: support.spotify.com/tv/artists/article/cover-art-requirements/.", note: "3000×3000 is a practical high-resolution working master. Do not upscale a smaller source; this tool exports JPG/PNG.", fmt: JP },
+    square: { label: "Square release art", v: [[3000, 3000, "1:1 working master"], [640, 640, "1:1 minimum"]], min: [640, 640], c: "official", basis: "Spotify cover art must be square and between 640 and 10000 px.", fmt: JP },
+    thumbnail: { label: "Release thumbnail", v: [[3000, 3000, "1:1"]], min: [640, 640], c: "official", basis: "Uses Spotify's square release cover-art limits.", fmt: JP },
+  },
+  "apple-music": {
+    profile: { label: "Artist image", v: [[2400, 2400, "1:1 preferred"], [800, 800, "1:1 minimum"]], min: [800, 800], c: "official", basis: "Apple Music for Artists: 2400×2400 px or greater preferred, 800×800 minimum. Do not upscale.", note: "Artist profile images are not release artwork; keep a fully opaque background.", fmt: JP },
+    post: { label: "Release cover art (distributor)", v: [[3000, 3000, "1:1 recommended working master"], [4000, 4000, "1:1 higher-resolution master"]], min: [1400, 1400], c: "official", basis: "Apple Music Provider Support recommends 3000×3000 px or larger and accepts at least 1400×1400 for delivery.", note: "This is the distributor-delivery preset. Direct Apple Music for Artists cover-art submission has a separate 4000×4000 px minimum; choose the direct-upload preset for that route.", fmt: JP },
+    cover: { label: "Direct Apple Music for Artists cover", v: [[4000, 4000, "1:1 direct-upload minimum"]], min: [4000, 4000], c: "official", basis: "Apple Music for Artists direct cover-art specifications: JPG, PNG or GIF; perfect square; at least 4000×4000 px.", note: "This preset is for direct artist-page cover-art upload. Distributor delivery uses its own requirements.", fmt: JP },
+    square: { label: "Square release art (distributor)", v: [[3000, 3000, "1:1 recommended"], [4000, 4000, "1:1 higher-resolution"]], min: [1400, 1400], c: "official", basis: "Apple Music Provider Support recommends 3000×3000 px or larger and accepts at least 1400×1400 for delivery.", note: "For direct Apple Music for Artists cover-art uploads, use the dedicated 4000×4000 cover preset.", fmt: JP },
+    thumbnail: { label: "Release thumbnail", v: [[3000, 3000, "1:1"]], min: [1400, 1400], c: "official", basis: "Uses Apple Music's square distributor-delivery artwork format.", fmt: JP },
+  },
+  podcast: {
+    post: { label: "Show cover", v: [[3000, 3000, "1:1 preferred"], [1400, 1400, "1:1 RSS minimum"]], min: [1400, 1400], c: "official", basis: "Apple Podcasts for Creators: 3000×3000 px preferred; RSS show cover range 1400×1400 to 3000×3000. PNG/JPG only, no transparency or alpha channel.", note: "Use a solid background; keep the title legible at small sizes and reserve room for UI overlays.", fmt: JP, alpha: false },
+    cover: { label: "Show cover", v: [[3000, 3000, "1:1 preferred"], [1400, 1400, "1:1 RSS minimum"]], min: [1400, 1400], c: "official", basis: "Apple Podcasts show-cover specifications: 3000×3000 preferred, 1400×1400–3000×3000 via RSS, PNG/JPG, opaque background.", fmt: JP, alpha: false },
+    square: { label: "Square episode / show art", v: [[3000, 3000, "1:1"], [1400, 1400, "RSS minimum"]], min: [1400, 1400], c: "official", basis: "Apple Podcasts show and episode artwork specifications use a 1:1 square, 1400–3000 px via RSS, PNG/JPG without transparency.", fmt: JP, alpha: false },
+    thumbnail: { label: "Episode artwork", v: [[3000, 3000, "1:1 preferred"], [1400, 1400, "1:1 RSS minimum"]], min: [1400, 1400], c: "official", basis: "Apple Podcasts episode-art specifications: 3000×3000 preferred; RSS range 1400×1400 to 3000×3000, opaque PNG/JPG.", fmt: JP, alpha: false },
+  },
 };
 
 const FALLBACK: PlacementId[] = ["post", "landscape", "square", "portrait"];
@@ -226,6 +250,7 @@ function build(platform: PlatformId, placement: PlacementId, row: Row): Placemen
     platform, placement, label: row.label, variants: row.v.map(([width, height, label]) => ({ width, height, label })),
     minWidth: row.min?.[0], minHeight: row.min?.[1], maxBytes: row.max, recommendedBytes: row.rec,
     shape: row.circle ? "circle" : "rect", safe: row.safe ? zone(row.safe) : undefined, keepClear: row.clear?.map(zone),
+    alphaAllowed: row.alpha !== false,
     formats: row.fmt ?? ALL, exists: row.exists !== false, confidence: row.c, basis: row.basis, note: row.note ?? "",
   };
 }
@@ -268,7 +293,7 @@ export interface ParsedPlatformOp { platform: PlatformId; placement: PlacementId
 
 /** "discord-banner-resizer" → { discord, banner }; "x-image-compressor" → { x, image, compressor }. Null for non-platform ops. */
 export function parsePlatformOp(op: string): ParsedPlatformOp | null {
-  const m = op.toLowerCase().match(/^(instagram|facebook|x|linkedin|pinterest|tiktok|reddit|snapchat|threads|twitch|youtube|discord)-(.+)$/);
+  const m = op.toLowerCase().match(/^(instagram|facebook|x|linkedin|pinterest|tiktok|reddit|snapchat|threads|twitch|youtube|discord|spotify|apple-music|podcast)-(.+)$/);
   if (!m) return null;
   const rest = m[2];
   if (!/(resizer|maker|compressor)$/.test(rest)) return null;
@@ -302,7 +327,7 @@ export const PLATFORM_PRESETS: PlatformPlacementSpec[] = PLATFORM_IDS.flatMap((p
       platform, contentType, version: SPEC_VERIFIED_ON, sourceUrl: PLATFORMS[platform].sourceUrl, lastVerified: SPEC_VERIFIED_ON,
       dimensions: { width, height }, aspectRatio: ratioText(width, height),
       minDimensions: p.minWidth && p.minHeight ? { width: p.minWidth, height: p.minHeight } : undefined, maxFileSizeBytes: p.maxBytes,
-      allowedFormats: p.formats.map((f) => (f === "jpeg" ? "JPG" : f === "png" ? "PNG" : "WebP")), alphaAllowed: true,
+      allowedFormats: p.formats.map((f) => (f === "jpeg" ? "JPG" : f === "png" ? "PNG" : "WebP")), alphaAllowed: p.alphaAllowed !== false,
       safeAreas: p.safe ? [{ x: p.safe.x * width, y: p.safe.y * height, width: p.safe.width * width, height: p.safe.height * height, unit: "px" as const }] : undefined,
       cropBehavior: "reposition" as const, notes: [`${p.confidence === "approximate" ? "Approximate — " : ""}${p.basis}`, ...(p.note ? [p.note] : [])],
     } satisfies PlatformPlacementSpec];

@@ -14,6 +14,7 @@ import { runGenerator } from "@/lib/engines/generators";
 import { runDateTime } from "@/lib/engines/datetime";
 import { runSeo } from "@/lib/engines/seo";
 import { ResultPanel } from "@/components/engines/result-panel";
+import { Check, Clipboard, RotateCcw } from "lucide-react";
 
 function useRunner() {
   const [error, setError] = useState<string | null>(null);
@@ -260,7 +261,16 @@ const GEN_FIELDS: Record<string, UiField[]> = {
   ],
   "secret-santa": [{ name: "names", label: "Names (one per line)", type: "textarea" }],
   decision: [{ name: "options", label: "Options (one per line)", type: "textarea" }],
-  hashtags: [{ name: "seed", label: "Keywords", type: "text", placeholder: "travel coffee japan" }],
+  hashtags: [
+    { name: "seed", label: "Topic / keywords", type: "text", defaultValue: "independent music release", placeholder: "independent music release" },
+    { name: "niche", label: "Specific niche / audience", type: "text", defaultValue: "independent artists" },
+    { name: "platform", label: "Platform", type: "select", defaultValue: "instagram", options: [
+      { value: "instagram", label: "Instagram" }, { value: "tiktok", label: "TikTok" }, { value: "youtube", label: "YouTube" },
+      { value: "facebook", label: "Facebook" }, { value: "x", label: "X" }, { value: "linkedin", label: "LinkedIn" },
+      { value: "spotify", label: "Spotify promotion" }, { value: "podcast", label: "Podcast promotion" },
+    ] },
+    { name: "count", label: "Maximum tags", type: "number", defaultValue: 12, min: 3, max: 20 },
+  ],
   sku: [{ name: "prefix", label: "Prefix", type: "text", defaultValue: "SKU" }],
   "biz-name": [{ name: "seed", label: "Keyword", type: "text" }],
   "company-name": [{ name: "seed", label: "Keyword", type: "text" }],
@@ -288,7 +298,64 @@ function genFieldsFor(op: string): UiField[] {
   return [{ name: "count", label: "Count", type: "number", defaultValue: 8 }];
 }
 
-export function GeneratorEngine({ op }: { op: string }) {
+function CreatorGeneratorWorkspace({ op }: { op: string }) {
+  const fields = genFieldsFor(op);
+  const [opts, setOpts] = useState(() => initialValues(fields));
+  const { error, out, wrap, setOut, setError } = useRunner();
+  const [copied, setCopied] = useState(false);
+  const reset = () => {
+    setOpts(initialValues(fields));
+    setOut("");
+    setError(null);
+    setCopied(false);
+  };
+  const copy = async () => {
+    if (!out) return;
+    try {
+      await navigator.clipboard.writeText(out);
+      setCopied(true);
+      setError(null);
+    } catch {
+      setError("Copy is unavailable in this browser.");
+    }
+  };
+  return (
+    <div className="env-creator-workspace">
+      <div className="env-creator-workspace__topline">
+        <span className="env-creator-workspace__platform">Hashtags</span>
+        <button type="button" className="env-creator-workspace__icon-button" onClick={reset} aria-label="Reset" title="Reset">
+          <RotateCcw aria-hidden="true" />
+        </button>
+      </div>
+      <div className="env-creator-workspace__body">
+        <div className="env-creator-workspace__form">
+          <FieldGrid fields={fields} values={opts} onChange={(name, value) => setOpts((current) => ({ ...current, [name]: value }))} />
+        </div>
+        <section className="env-creator-workspace__result" aria-live="polite" aria-label="Result">
+          <div className="env-creator-workspace__result-head">
+            <span className="env-creator-workspace__result-title">Result</span>
+            <button type="button" className="env-creator-workspace__icon-button" disabled={!out} onClick={() => void copy()} aria-label={copied ? "Copied" : "Copy result"} title={copied ? "Copied" : "Copy result"}>
+              {copied ? <Check aria-hidden="true" /> : <Clipboard aria-hidden="true" />}
+            </button>
+          </div>
+          {out ? <pre className="env-creator-workspace__output">{out}</pre> : <div className="env-creator-workspace__blank" aria-hidden="true" />}
+        </section>
+      </div>
+      <div className="env-creator-workspace__bottom">
+        {error ? <ErrorBanner message={error} /> : null}
+        <Button type="button" className="env-creator-workspace__primary" onClick={() => { setCopied(false); void wrap(() => runGenerator(op, opts)); }}>
+          Generate
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function GeneratorEngine({ op, deviceMode = false }: { op: string; deviceMode?: boolean }) {
+  return deviceMode ? <CreatorGeneratorWorkspace op={op} /> : <LegacyGeneratorEngine op={op} />;
+}
+
+function LegacyGeneratorEngine({ op }: { op: string }) {
   const fields = genFieldsFor(op);
   const [opts, setOpts] = useState(() => initialValues(fields));
 

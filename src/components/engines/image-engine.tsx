@@ -43,8 +43,8 @@ export function studioFor(op: string): Studio | null {
 }
 
 export function ImageEngine({ op, category, toolId }: { op: string; category?: string; toolId?: string }) {
-  const studio = category === "image" ? studioFor(op) : null;
+  const studio = category === "image" || (category === "creators" && op === "social-resize") ? studioFor(op) : null;
   if (!studio) return <LegacyImageEngine op={op} />;
-  try { return <>{studio({ op, toolId: toolId ?? op })}</>; }
+  try { return category === "creators" ? <div className="env-device-image-studio">{studio({ op, toolId: toolId ?? op })}</div> : <>{studio({ op, toolId: toolId ?? op })}</>; }
   catch (e) { return <ErrorBanner message={e instanceof ImageToolError ? e.message : "This tool couldn't start."} />; }
 }

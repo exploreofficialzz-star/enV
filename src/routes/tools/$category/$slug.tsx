@@ -112,5 +112,5 @@ function Tool() {
   if (isToolUnderProduction(tool)) return <AppShell><UnderProductionPage toolName={tool.name} /></AppShell>;
   const studioDefaultMode = category === "business" ? businessStudioDefaultMode(slug) : undefined;
   const resolvedMode = studioDefaultMode ? (mode && businessStudioModeAllowed(slug, mode) ? mode : studioDefaultMode) : mode;
-  return <AppShell><ToolViewAnalytics toolId={tool.id} /><ToolShell tool={tool} initialCommunityFeed={communityFeed}><ToolEngine tool={tool} initialMode={resolvedMode} initialAction={action} initialOp={op} /></ToolShell></AppShell>;
+  return <AppShell showChrome={tool.category !== "creators"}><ToolViewAnalytics toolId={tool.id} /><ToolShell tool={tool} initialCommunityFeed={communityFeed}><ToolEngine tool={tool} initialMode={resolvedMode} initialAction={action} initialOp={op} /></ToolShell></AppShell>;
 }
