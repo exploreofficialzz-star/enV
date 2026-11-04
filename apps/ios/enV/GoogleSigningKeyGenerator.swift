@@ -40,6 +40,11 @@ struct NativeGoogleSigningKeyInput: Sendable {
 
 struct NativeGoogleSigningKeyArtifacts: Sendable {
     let keystore: Data
+    let keystoreBase64: String
+    let githubSecrets: String
+    let githubActionsWorkflow: String
+    let handoutReadme: String
+    let signingInfo: String
     let certificatePEM: String
     let sha1: String
     let sha256: String
@@ -116,7 +121,7 @@ enum NativeGoogleSigningKeyGenerator {
 android {
     signingConfigs {
         create("release") {
-            storeFile = file("upload-keystore.jks")
+            storeFile = file(System.getenv("ANDROID_KEYSTORE_FILE") ?? "upload-keystore.jks")
             storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias = "\(input.alias)"
             keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
@@ -131,7 +136,7 @@ android {
 android {
     signingConfigs {
         release {
-            storeFile file("upload-keystore.jks")
+            storeFile file(System.getenv("ANDROID_KEYSTORE_FILE") ?? "upload-keystore.jks")
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
             keyAlias "\(input.alias)"
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
@@ -142,7 +147,110 @@ android {
     }
 }
 """
-        return NativeGoogleSigningKeyArtifacts(keystore: keystore, certificatePEM: pem("CERTIFICATE", certificate), sha1: sha1, sha256: sha256, alias: input.alias, validUntil: validUntil, gradleKotlin: gradleKotlin, gradleGroovy: gradleGroovy)
+        let keystoreBase64 = keystore.base64EncodedString()
+        let githubSecrets = """
+# Paste each value into GitHub > Settings > Secrets and variables > Actions.
+# Keep this file private. It contains passwords and the Base64 keystore.
+ANDROID_KEYSTORE_BASE64=\(keystoreBase64)
+ANDROID_KEYSTORE_PASSWORD=\(input.storePassword)
+ANDROID_KEY_ALIAS=\(input.alias)
+ANDROID_KEY_PASSWORD=\(input.keyPassword)
+"""
+        let signingInfo = """
+Android upload-key certificate
+Alias: \(input.alias)
+RSA key size: \(input.keySize) bits
+Valid until: \(ISO8601DateFormatter().string(from: validUntil))
+SHA-1: \(sha1)
+SHA-256: \(sha256)
+"""
+        let githubActionsWorkflow = """
+name: Android release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Restore upload keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
+          chmod 600 "$RUNNER_TEMP/upload-keystore.jks"
+      - name: Build signed Android App Bundle
+        run: ./gradlew bundleRelease
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload-keystore.jks"
+"""
+        let handoutReadme = """
+# Android upload-key handout
+
+Generated locally by enV. This package contains sensitive signing material.
+
+## Included files
+- upload-keystore.jks — password-protected Android upload keystore.
+- upload-keystore.base64.txt — one-line Base64 value for GitHub Actions.
+- github-secrets.txt — exact secret names and values, including passwords.
+- upload_certificate.pem — public certificate for Google Play Console.
+- signing-info.txt — alias, validity and SHA fingerprints.
+- release-signing.gradle.kts and release-signing.gradle — Gradle signing blocks.
+- .github/workflows/android-release.yml — ready GitHub Actions release workflow.
+
+## Add GitHub secrets
+Open GitHub repository Settings > Secrets and variables > Actions > New repository secret.
+Create ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD using the matching values in github-secrets.txt. The Base64 value is one line. Do not add quotation marks or line breaks.
+
+## Connect Gradle and Actions
+Copy the matching signing block into the Android app module Gradle file, inside its existing android block. The workflow restores the JKS into the runner's temporary directory, builds bundleRelease, and removes the temporary file.
+
+## Google Play
+Upload upload_certificate.pem in Play Console when asked for the upload certificate. SHA-1 and SHA-256 are the upload certificate fingerprints.
+
+## Keep private
+This archive includes the JKS, its Base64 representation and both password values in github-secrets.txt. Anyone who obtains the package can attempt to use the upload key. Store it in private encrypted storage, never commit it to Git, and do not share it in public chats or issues. Base64 is encoding, not encryption.
+
+This is the developer upload key. Google separately manages the Play App Signing key when Play App Signing is enabled.
+"""
+        return NativeGoogleSigningKeyArtifacts(
+            keystore: keystore,
+            keystoreBase64: keystoreBase64,
+            githubSecrets: githubSecrets,
+            githubActionsWorkflow: githubActionsWorkflow,
+            handoutReadme: handoutReadme,
+            signingInfo: signingInfo,
+            certificatePEM: pem("CERTIFICATE", certificate),
+            sha1: sha1,
+            sha256: sha256,
+            alias: input.alias,
+            validUntil: validUntil,
+            gradleKotlin: gradleKotlin,
+            gradleGroovy: gradleGroovy
+        )
     }
 
     private static func makeCertificate(privateKey: SecKey, publicKey: Data, subject: [(String, String)], notBefore: Date, notAfter: Date) throws -> Data {
@@ -259,7 +367,7 @@ android {
 }
 
 private struct NativeSigningArtifactDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.data] }
+    static var readableContentTypes: [UTType] { [.data, .zip, .plainText] }
     let data: Data
     init(_ data: Data) { self.data = data }
     init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
@@ -290,6 +398,9 @@ struct NativeGoogleSigningKeyView: View {
     @State private var exportKeystore = false
     @State private var exportCertificate = false
     @State private var exportArchive = false
+    @State private var exportBase64 = false
+    @State private var exportSecrets = false
+    @State private var exportWorkflow = false
     @State private var archiveData: Data?
 
     var body: some View {
@@ -352,10 +463,17 @@ struct NativeGoogleSigningKeyView: View {
                 Text("\(artifacts.alias) · RSA \(keySize) · \(artifacts.validUntil.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption).foregroundStyle(Color.envMuted)
                 HStack(spacing: 8) {
-                    Button { exportArchive = true } label: { Label("ZIP", systemImage: "archivebox") }.buttonStyle(.borderedProminent)
+                    Button { exportArchive = true } label: { Label("Full ZIP", systemImage: "archivebox") }.buttonStyle(.borderedProminent)
                     Button { exportKeystore = true } label: { Label("JKS", systemImage: "key.horizontal") }.buttonStyle(.bordered)
                     Button { exportCertificate = true } label: { Label("PEM", systemImage: "doc.text") }.buttonStyle(.bordered)
                 }
+                HStack(spacing: 8) {
+                    Button { exportBase64 = true } label: { Label("Base64", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
+                    Button { exportSecrets = true } label: { Label("GitHub secrets", systemImage: "key.fill") }.buttonStyle(.bordered)
+                    Button { exportWorkflow = true } label: { Label("Workflow", systemImage: "chevron.left.forwardslash.chevron.right") }.buttonStyle(.bordered)
+                }
+                Text("Full ZIP includes Base64 and both password values. Keep it private; Base64 is not encryption.")
+                    .font(.caption2).foregroundStyle(Color.envMuted)
                 DisclosureGroup("Fingerprints") {
                     HStack {
                         Text("SHA-1").font(.caption.weight(.semibold))
@@ -389,6 +507,15 @@ struct NativeGoogleSigningKeyView: View {
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
         }
         .fileExporter(isPresented: $exportCertificate, document: artifacts.map { NativeSigningArtifactDocument(Data($0.certificatePEM.utf8)) }, contentType: .data, defaultFilename: "upload_certificate.pem") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $exportBase64, document: artifacts.map { NativeSigningArtifactDocument(Data($0.keystoreBase64.utf8)) }, contentType: .plainText, defaultFilename: "upload-keystore.base64.txt") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $exportSecrets, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubSecrets.utf8)) }, contentType: .plainText, defaultFilename: "github-secrets.txt") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+        .fileExporter(isPresented: $exportWorkflow, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubActionsWorkflow.utf8)) }, contentType: .plainText, defaultFilename: "android-release.yml") { result in
             if case .failure(let error) = result { errorMessage = error.localizedDescription }
         }
     }
@@ -431,10 +558,15 @@ struct NativeGoogleSigningKeyView: View {
         defer { try? manager.removeItem(at: folder) }
         let entries: [(String, Data)] = [
             ("upload-keystore.jks", value.keystore),
+            ("upload-keystore.base64.txt", Data((value.keystoreBase64 + "\\n").utf8)),
             ("upload_certificate.pem", Data(value.certificatePEM.utf8)),
+            ("github-secrets.txt", Data(value.githubSecrets.utf8)),
+            ("signing-info.txt", Data(value.signingInfo.utf8)),
             ("release-signing.gradle.kts", Data(value.gradleKotlin.utf8)),
             ("release-signing.gradle", Data(value.gradleGroovy.utf8)),
-            ("README.txt", Data("Passwords are excluded. Store them separately. Never commit the keystore or archive. Google Play App Signing is a separate Google-managed key.".utf8)),
+            (".github/workflows/android-release.yml", Data(value.githubActionsWorkflow.utf8)),
+            (".gitignore-signing-example", Data(".android-signing/\\n/upload-keystore.jks\\n/*.jks\\n/*.keystore\\n".utf8)),
+            ("README.md", Data(value.handoutReadme.utf8)),
         ]
         let archiveURL = folder.appendingPathComponent("package.zip")
         let archive = try Archive(url: archiveURL, accessMode: .create)
