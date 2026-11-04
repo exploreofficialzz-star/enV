@@ -410,7 +410,7 @@ struct NativeGoogleSigningKeyView: View {
         Task.detached(priority: .userInitiated) {
             let result = Result { () throws -> (NativeGoogleSigningKeyArtifacts, Data) in
                 let value = try NativeGoogleSigningKeyGenerator.generate(request)
-                let zip = try makeArchiveDetached(value)
+                let zip = try Self.makeArchiveDetached(value)
                 return (value, zip)
             }
             await MainActor.run {
