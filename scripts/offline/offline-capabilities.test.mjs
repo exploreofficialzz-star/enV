@@ -25,8 +25,19 @@ test("all audited local engine families are eligible, not only calculators", () 
     const result = classifyOfflineToolRecord(tool({ engine: { type, op: "local-operation" } }));
     assert.equal(result.execution, "device-local", type);
     assert.equal(result.mayRunWithoutNetwork, true, type);
-    assert.equal(result.tokenPolicy, "offline-allowance-required", type);
+    assert.equal(result.tokenPolicy, "monetization-pending", type);
   }
+});
+
+
+test("remote music downloading remains online-only", () => {
+  const result = classifyOfflineToolRecord(tool({
+    id: "music-downloader",
+    category: "audio",
+    engine: { type: "custom", id: "music-downloader" },
+  }));
+  assert.notEqual(result.execution, "device-local");
+  assert.equal(result.mayRunWithoutNetwork, false);
 });
 
 test("local custom tool categories are eligible while unknown custom engines fail closed", () => {
@@ -81,7 +92,7 @@ test("backend, auth, remote URL and planned tools are never classified as local"
   }
 });
 
-test("offline token spending is not enabled without the production verifier", () => {
+test("local tools are available before billing is wired, but offline token spending stays disabled", () => {
   assert.equal(canSpendTokensOffline(), false);
   assert.equal(OFFLINE_CAPABILITY_POLICY_VERSION, "2026-11-04.v3");
 });
