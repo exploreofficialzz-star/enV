@@ -76,6 +76,7 @@ assert.ok(homeRules.includes(".uxui-home-create-wrap.is-compact") && homeRules.i
 assert.ok(engine.includes('aria-label="Add elements"') && engine.includes("openToolkitHome"), "The main Add elements action remains available after removing the separate Text strip");
 assert.ok(engine.includes('className="uxui-home-projects"') && engine.includes('className="uxui-draft-list"'), "The project home uses a bounded drafts region");
 assert.ok(engine.includes("setAvailableHomeHeight") && engine.includes("--uxui-home-height"), "Project home measures the visible viewport rather than growing with the draft count");
+assert.ok(engine.includes("setAvailableHomeHeight(Math.max(160, Math.floor(remaining)))"), "Home height follows short and tall device viewports without an arbitrary desktop cap");
 assert.ok(engine.includes("setHomeScrolled(event.currentTarget.scrollTop > 12)") && engine.includes("is-compact"), "Scrolling drafts animates the Add project card into its compact state");
 assert.ok(/function returnToProjects\(\)\s*\{\s*setHomeScrolled\(false\)/.test(engine), "Returning to projects restores the full-size Add project card");
 assert.ok(!engine.includes("Your blank canvas is ready.") && !engine.includes("Tap + to add your first element"), "Starting a blank project does not show a throwaway canvas announcement");
