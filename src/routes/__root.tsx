@@ -1,5 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
+import { useEffect } from "react";
+import { registerEnVServiceWorker } from "@/lib/offline/tool-package-client";
 import appCss from "../styles.css?url";
 import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolByPath, getToolsByCategory } from "@/lib/registry";
@@ -52,6 +54,27 @@ const INITIAL_THEME_SCRIPT = `(() => {
 })();`;
 
 
+function RootDocument() {
+  useEffect(() => {
+    void registerEnVServiceWorker();
+  }, []);
+
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: INITIAL_THEME_SCRIPT }} />
+        <HeadContent />
+      </head>
+      <body>
+        <AssistantStateProvider>
+          <Outlet />
+        </AssistantStateProvider>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
 export const Route = createRootRoute({
   head: ({ matches }: { matches: Array<{ pathname: string; routeId?: string }> }) => ({
     meta: [
@@ -73,18 +96,5 @@ export const Route = createRootRoute({
       children: JSON.stringify(websiteSchema())
     }],
   }),
-  component: () => (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: INITIAL_THEME_SCRIPT }} />
-        <HeadContent />
-      </head>
-      <body>
-        <AssistantStateProvider>
-          <Outlet />
-        </AssistantStateProvider>
-        <Scripts />
-      </body>
-    </html>
-  ),
+  component: RootDocument,
 });
