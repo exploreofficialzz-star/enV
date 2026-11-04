@@ -91,10 +91,15 @@ internal fun NativeGoogleSigningKeyForm() {
                 zip.putNextEntry(ZipEntry(name)); zip.write(value); zip.closeEntry()
             }
             add("upload-keystore.jks", result.keystore)
+            add("upload-keystore.base64.txt", (result.keystoreBase64 + "\\n").toByteArray(Charsets.US_ASCII))
             add("upload_certificate.pem", result.certificatePem.toByteArray(Charsets.US_ASCII))
+            add("github-secrets.txt", result.githubSecrets.toByteArray(Charsets.UTF_8))
+            add("signing-info.txt", result.signingInfo.toByteArray(Charsets.UTF_8))
             add("release-signing.gradle.kts", result.gradleKotlin.toByteArray(Charsets.UTF_8))
             add("release-signing.gradle", result.gradleGroovy.toByteArray(Charsets.UTF_8))
-            add("README.txt", "The JKS keystore is password-protected. Passwords are not included in this archive. Keep both passwords separately. Never commit this archive to a public repository. Google Play App Signing is a separate Google-managed key.".toByteArray(Charsets.UTF_8))
+            add(".github/workflows/android-release.yml", result.githubActionsWorkflow.toByteArray(Charsets.UTF_8))
+            add(".gitignore-signing-example", ".android-signing/\\n/upload-keystore.jks\\n/*.jks\\n/*.keystore\\n".toByteArray(Charsets.UTF_8))
+            add("README.md", result.handoutReadme.toByteArray(Charsets.UTF_8))
         }
         return output.toByteArray()
     }
@@ -188,6 +193,13 @@ internal fun NativeGoogleSigningKeyForm() {
                     OutlinedButton(onClick = { pendingFile = result.keystore; fileSaver.launch("upload-keystore.jks") }, modifier = Modifier.weight(1f)) { Text("Save JKS") }
                 }
                 OutlinedButton(onClick = { pendingFile = result.certificatePem.toByteArray(Charsets.US_ASCII); fileSaver.launch("upload_certificate.pem") }, modifier = Modifier.fillMaxWidth()) { Text("Save public certificate") }
+                OutlinedButton(onClick = { pendingFile = (result.keystoreBase64 + "\\n").toByteArray(Charsets.US_ASCII); fileSaver.launch("upload-keystore.base64.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save Base64 for GitHub") }
+                OutlinedButton(onClick = { pendingFile = result.githubSecrets.toByteArray(Charsets.UTF_8); fileSaver.launch("github-secrets.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save GitHub secrets") }
+                OutlinedButton(onClick = { pendingFile = result.githubActionsWorkflow.toByteArray(Charsets.UTF_8); fileSaver.launch("android-release.yml") }, modifier = Modifier.fillMaxWidth()) { Text("Save GitHub Actions workflow") }
+                OutlinedButton(onClick = { copy(result.githubSecrets, "GitHub secrets") }) { Text("Copy all GitHub secrets") }
+                OutlinedButton(onClick = { copy(result.keystoreBase64, "Keystore Base64") }) { Text("Copy Base64") }
+                OutlinedButton(onClick = { copy(result.githubActionsWorkflow, "GitHub Actions workflow") }) { Text("Copy workflow") }
+                Text("The full ZIP contains the Base64 keystore and both password values. Keep it private. Base64 is encoding, not encryption.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 var showFingerprints by rememberSaveable { mutableStateOf(false) }
                 var showGradle by rememberSaveable { mutableStateOf(false) }
                 TextButton(onClick = { showFingerprints = !showFingerprints }) { Text(if (showFingerprints) "Hide fingerprints" else "Fingerprints") }
