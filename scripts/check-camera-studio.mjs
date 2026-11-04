@@ -61,6 +61,7 @@ assert.match(registry, /engine: \{ type: "custom", id: "camera-studio" \}/);
 assert.match(registry, /status: "active"/);
 
 assert.match(androidCamera, /LifecycleCameraController/);
+assert.match(androidCamera, /import androidx\.compose\.runtime\.livedata\.observeAsState/);
 assert.match(androidCamera, /DisposableEffect\(controller, lifecycleOwner, cameraGranted\)/);
 assert.match(androidCamera, /if \(cameraGranted\) controller\.bindToLifecycle\(lifecycleOwner\)/);
 assert.match(androidCamera, /PreviewView/);
@@ -116,5 +117,8 @@ assert.ok(iosCoverage.split(/\r?\n/).includes("camera-studio"), "iOS native tool
 assert.ok(inventory.runtimeExtensionIds.includes("camera-studio"), "native runtime inventory includes Camera Studio");
 assert.ok(inventory.androidToolIds.includes("camera-studio") && inventory.iosToolIds.includes("camera-studio"), "native runtime inventory records both implementations");
 assert.ok(billingProfiles.profiles.some((profile) => profile.toolId === "camera-studio" && profile.manualAuditRequired === true), "Camera Studio has an auditable local billing profile");
+
+const androidBuild = read("apps/android/app/build.gradle.kts");
+assert.match(androidBuild, /androidx\.compose\.runtime:runtime-livedata/);
 
 console.log("Camera Studio checks passed: browser capture, Android CameraX, iOS AVFoundation, native catalogue routes, dual-platform coverage manifests, billing profile and runtime inventory.");
