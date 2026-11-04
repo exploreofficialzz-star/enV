@@ -58,7 +58,7 @@ async function activeWorker(captureCurrentPage = false): Promise<ServiceWorker |
         try {
           const url = new URL(name);
           return url.origin === window.location.origin &&
-            /\\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname);
+            /\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname);
         } catch { return false; }
       })
       .slice(0, 300);
