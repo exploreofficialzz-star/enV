@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { canSpendTokensOffline, classifyOfflineToolRecord, OFFLINE_CAPABILITY_POLICY_VERSION } from "../../src/lib/offline/policy.mjs";
 
 function tool(overrides = {}) {
@@ -95,4 +96,22 @@ test("backend, auth, remote URL and planned tools are never classified as local"
 test("local tools are available before billing is wired, but offline token spending stays disabled", () => {
   assert.equal(canSpendTokensOffline(), false);
   assert.equal(OFFLINE_CAPABILITY_POLICY_VERSION, "2026-11-04.v3");
+});
+
+test("local capability catalog includes runtime-only tools without billing profiles", () => {
+  const capabilities = JSON.parse(readFileSync(new URL("../../src/data/offline-local-capabilities.json", import.meta.url), "utf8"));
+  assert.equal(capabilities.toolCount, capabilities.profiles.length);
+  const zip = capabilities.profiles.find((profile) => profile.toolId === "zip-any-file");
+  assert.ok(zip, "Zip any file must be included even without a billing profile");
+  assert.equal(zip.billingKey, null);
+  assert.equal(zip.subunitsPerUnit, null);
+  assert.deepEqual(new Set(zip.platforms), new Set(["web", "android", "ios"]));
+  assert.equal(capabilities.platformCounts.android, capabilities.profiles.filter((profile) => profile.platforms.includes("android")).length);
+  assert.equal(capabilities.platformCounts.ios, capabilities.profiles.filter((profile) => profile.platforms.includes("ios")).length);
+  assert.equal(capabilities.platformCounts.web, capabilities.profiles.filter((profile) => profile.platforms.includes("web")).length);
+});
+
+test("remote media downloads are not advertised as device-local capabilities", () => {
+  const capabilities = JSON.parse(readFileSync(new URL("../../src/data/offline-local-capabilities.json", import.meta.url), "utf8"));
+  assert.equal(capabilities.profiles.some((profile) => profile.toolId === "music-downloader"), false);
 });
