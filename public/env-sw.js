@@ -126,10 +126,14 @@ async function handleAssetRequest(event) {
         const db = await openPackageDb();
         try {
           const record = await readRow(db, "packages", session.toolId);
-          if (record && record.version === session.version) {
-            const assets = Array.isArray(record.assets) ? record.assets : [];
-            if (!assets.includes(request.url)) assets.push(request.url);
-            await writeRow(db, "packages", { ...record, assets, updatedAt: new Date().toISOString() });
+          if (record) {
+            const writingPendingVersion = record.pendingVersion === session.version;
+            if (writingPendingVersion || record.version === session.version) {
+              const field = writingPendingVersion ? "pendingAssets" : "assets";
+              const assets = Array.isArray(record[field]) ? record[field] : [];
+              if (!assets.includes(request.url)) assets.push(request.url);
+              await writeRow(db, "packages", { ...record, [field]: assets, updatedAt: new Date().toISOString() });
+            }
           }
         } finally {
           db.close();
@@ -220,6 +224,24 @@ self.addEventListener("message", (event) => {
   const reply = (value) => { if (port) port.postMessage(value); };
   event.waitUntil((async () => {
     try {
+      if (data.type === "CACHE_CORE_ASSETS") {
+        const cache = await caches.open(CORE_CACHE);
+        const assets = Array.isArray(data.assets) ? data.assets.slice(0, 300) : [];
+        let cached = 0;
+        for (const value of assets) {
+          try {
+            const url = new URL(value);
+            if (url.origin !== self.location.origin || !/\\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
+            const request = new Request(url.href, { credentials: "same-origin" });
+            const response = await fetch(request);
+            if (response.ok) { await cache.put(request, response.clone()); cached += 1; }
+          } catch {
+            // A failed optional shell asset is retried automatically on the next visit.
+          }
+        }
+        return reply({ ok: true, cached });
+      }
+
       if (data.type === "GET_TOOL_PACKAGE") {
         if (!validToolId(data.toolId) || typeof data.version !== "string") return reply({ ok: false, message: "Invalid tool package request." });
         const record = await getPackage(data.toolId);
@@ -241,12 +263,22 @@ self.addEventListener("message", (event) => {
           return reply({ ok: true, ready: true, status: "ready", assetCount: existing.assets?.length || 0 });
         }
         const keepReady = existing && existing.status === "ready" && existing.version === data.version && existing.pathname === data.pathname;
-        await setPackage({
+        const preservePrevious = existing && existing.status === "ready" && !keepReady;
+        await setPackage(keepReady ? {
+          ...existing,
+          pendingVersion: undefined,
+          pendingPathname: undefined,
+          pendingAssets: undefined,
+          updatedAt: new Date().toISOString(),
+        } : {
           toolId: data.toolId,
-          pathname: data.pathname,
-          version: data.version,
-          status: keepReady ? "ready" : "installing",
-          assets: keepReady ? (existing.assets || []) : [],
+          pathname: preservePrevious ? existing.pathname : null,
+          version: preservePrevious ? existing.version : null,
+          status: preservePrevious ? "ready" : "installing",
+          assets: preservePrevious ? (existing.assets || []) : [],
+          pendingVersion: data.version,
+          pendingPathname: data.pathname,
+          pendingAssets: [],
           updatedAt: new Date().toISOString(),
         });
         await setSession({ clientId, toolId: data.toolId, version: data.version, openedAt: new Date().toISOString() });
@@ -262,10 +294,25 @@ self.addEventListener("message", (event) => {
         const record = await getPackage(data.toolId);
         const cache = await caches.open(packageCacheName(data.toolId, data.version));
         const keys = await cache.keys();
-        const assets = record?.assets || [];
-        const ready = Boolean(record && record.version === data.version && keys.length > 0 && assets.length > 0);
+        const isPending = record?.pendingVersion === data.version;
+        const assets = isPending ? (record?.pendingAssets || []) : (record?.assets || []);
+        const ready = Boolean(record && ((record.version === data.version && !isPending) || isPending) && keys.length > 0 && assets.length > 0);
         if (record) {
-          await setPackage({ ...record, status: ready ? "ready" : "failed", assetCount: keys.length, completedAt: new Date().toISOString() });
+          if (ready) {
+            await setPackage({
+              toolId: data.toolId,
+              pathname: isPending ? record.pendingPathname : record.pathname,
+              version: data.version,
+              status: "ready",
+              assets,
+              assetCount: keys.length,
+              updatedAt: new Date().toISOString(),
+              completedAt: new Date().toISOString(),
+            });
+          } else if (isPending) {
+            const { pendingVersion, pendingPathname, pendingAssets, ...previous } = record;
+            await setPackage({ ...previous, status: previous.version ? "ready" : "failed", updatedAt: new Date().toISOString() });
+          }
         }
         await removeSession(clientId);
         return reply({ ok: true, ready, status: ready ? "ready" : "failed", assetCount: keys.length, message: ready ? "Offline tool package installed." : "No complete tool asset set was captured; this tool remains online-only." });
