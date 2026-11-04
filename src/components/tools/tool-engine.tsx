@@ -1,62 +1,71 @@
 import type { ToolMeta } from "@/types/tool";
-import { useEffect } from "react";
-import { CalculatorEngine } from "@/components/engines/calculator-engine";
-import { ConverterEngine } from "@/components/engines/converter-engine";
-import { ColorEngine } from "@/components/engines/color-engine";
-import { CssGenEngine } from "@/components/engines/cssgen-engine";
-import { ImageEngine } from "@/components/engines/image-engine";
-import { MockupEngine, PostEngine } from "@/components/engines/mockup-engine";
-import { QrEngine, BarcodeEngine } from "@/components/engines/qr-engine";
-import { BarcodeReaderEngine } from "@/components/engines/barcode-reader-engine";
-import { TextEngine, CodecEngine, GeneratorEngine, DateTimeEngine, SeoEngine } from "@/components/engines/io-engines";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { isOfflineLocalTool } from "@/lib/offline/capabilities";
+import { prepareOfflineToolPackage, completeOfflineToolPackage, type ToolPackageInstallStatus } from "@/lib/offline/tool-package-client";
+import { OfflineToolUnavailable } from "@/components/tools/offline-tool-unavailable";
+const CalculatorEngine = lazy(() => import("@/components/engines/calculator-engine").then((m) => ({ default: m.CalculatorEngine })));
+const ConverterEngine = lazy(() => import("@/components/engines/converter-engine").then((m) => ({ default: m.ConverterEngine })));
+const ColorEngine = lazy(() => import("@/components/engines/color-engine").then((m) => ({ default: m.ColorEngine })));
+const CssGenEngine = lazy(() => import("@/components/engines/cssgen-engine").then((m) => ({ default: m.CssGenEngine })));
+const ImageEngine = lazy(() => import("@/components/engines/image-engine").then((m) => ({ default: m.ImageEngine })));
+const MockupEngine = lazy(() => import("@/components/engines/mockup-engine").then((m) => ({ default: m.MockupEngine })));
+const PostEngine = lazy(() => import("@/components/engines/mockup-engine").then((m) => ({ default: m.PostEngine })));
+const QrEngine = lazy(() => import("@/components/engines/qr-engine").then((m) => ({ default: m.QrEngine })));
+const BarcodeEngine = lazy(() => import("@/components/engines/qr-engine").then((m) => ({ default: m.BarcodeEngine })));
+const BarcodeReaderEngine = lazy(() => import("@/components/engines/barcode-reader-engine").then((m) => ({ default: m.BarcodeReaderEngine })));
+const TextEngine = lazy(() => import("@/components/engines/io-engines").then((m) => ({ default: m.TextEngine })));
+const CodecEngine = lazy(() => import("@/components/engines/io-engines").then((m) => ({ default: m.CodecEngine })));
+const GeneratorEngine = lazy(() => import("@/components/engines/io-engines").then((m) => ({ default: m.GeneratorEngine })));
+const DateTimeEngine = lazy(() => import("@/components/engines/io-engines").then((m) => ({ default: m.DateTimeEngine })));
+const SeoEngine = lazy(() => import("@/components/engines/io-engines").then((m) => ({ default: m.SeoEngine })));
 import { ComingSoonPanel } from "@/components/tools/coming-soon";
-import { DocumentEngine } from "@/components/engines/document-engine";
-import { FileConverterEngine } from "@/components/engines/file-converter-engine";
-import { DeveloperEngine } from "@/components/engines/developer-engine";
-import { DeveloperStudioEngine } from "@/components/engines/developer-studio-engine";
-import { UxUiStudioEngine } from "@/components/engines/ux-ui-studio-engine";
-import { PdfEngine } from "@/components/engines/pdf-engine";
-import { MimeEngine } from "@/components/engines/mime-engine";
-import { SecurityEngine } from "@/components/engines/security-engine";
-import { ProductivityEngine } from "@/components/engines/productivity-engine";
-import { PersonalEngine } from "@/components/engines/personal-engine";
-import { CommunicationEngine } from "@/components/engines/communication-engine";
-import { StreamingEngine } from "@/components/engines/streaming-engine";
-import { MarketingEngine } from "@/components/engines/marketing-engine";
-import { AccessibilityEngine } from "@/components/engines/accessibility-engine";
-import { CreatorEngine } from "@/components/engines/creator-engine";
-import { BusinessEngine } from "@/components/engines/business-engine";
-import { AudioEngine } from "@/components/engines/audio-engine";
-import { NetworkEngine } from "@/components/engines/network-engine";
-import { AiEngine } from "@/components/engines/ai-engine";
-import { VideoEngine } from "@/components/engines/video-engine";
-import { UrlMediaEngine } from "@/components/engines/url-media-engine";
-import { UrlMediaInfoEngine } from "@/components/engines/url-media-info-engine";
-import { WebDesignEngine } from "@/components/engines/webdesign-engine";
-import { EcommerceEngine } from "@/components/engines/ecommerce-engine";
-import { CareerEngine } from "@/components/engines/career-engine";
-import { RelationshipEngine } from "@/components/engines/relationship-engine";
-import { InteractiveEngine } from "@/components/engines/interactive-engine";
-import { GamingEngine } from "@/components/engines/gaming-engine";
-import { ScreenshotEngine } from "@/components/engines/screenshot-engine";
-import { MockupsCategoryEngine } from "@/components/engines/mockups-category-engine";
-import { SocialEngine } from "@/components/engines/social-engine";
-import { PlannedLocalEngine } from "@/components/engines/planned-local-engine";
-import { TranscriptionEngine } from "@/components/engines/transcription-engine";
-import { ImageToolsEngine } from "@/components/engines/image-tools-engine";
-import { DocumentToolsEngine } from "@/components/engines/document-tools-engine";
-import { BackendToolEngine } from "@/components/engines/backend-tool-engine";
-import { EventTemplateEngine } from "@/components/engines/event-template-engine";
-import { ABookEngine } from "@/components/engines/a-book-engine";
-import { MusicDownloaderEngine } from "@/components/engines/music-downloader-engine";
-import { AiMusicDataSandbox } from "@/components/engines/ai-music-data-sandbox";
-import { ZipArchiveEngine } from "@/components/engines/zip-archive-engine";
+const DocumentEngine = lazy(() => import("@/components/engines/document-engine").then((m) => ({ default: m.DocumentEngine })));
+const FileConverterEngine = lazy(() => import("@/components/engines/file-converter-engine").then((m) => ({ default: m.FileConverterEngine })));
+const DeveloperEngine = lazy(() => import("@/components/engines/developer-engine").then((m) => ({ default: m.DeveloperEngine })));
+const DeveloperStudioEngine = lazy(() => import("@/components/engines/developer-studio-engine").then((m) => ({ default: m.DeveloperStudioEngine })));
+const UxUiStudioEngine = lazy(() => import("@/components/engines/ux-ui-studio-engine").then((m) => ({ default: m.UxUiStudioEngine })));
+const PdfEngine = lazy(() => import("@/components/engines/pdf-engine").then((m) => ({ default: m.PdfEngine })));
+const MimeEngine = lazy(() => import("@/components/engines/mime-engine").then((m) => ({ default: m.MimeEngine })));
+const SecurityEngine = lazy(() => import("@/components/engines/security-engine").then((m) => ({ default: m.SecurityEngine })));
+const ProductivityEngine = lazy(() => import("@/components/engines/productivity-engine").then((m) => ({ default: m.ProductivityEngine })));
+const PersonalEngine = lazy(() => import("@/components/engines/personal-engine").then((m) => ({ default: m.PersonalEngine })));
+const CommunicationEngine = lazy(() => import("@/components/engines/communication-engine").then((m) => ({ default: m.CommunicationEngine })));
+const StreamingEngine = lazy(() => import("@/components/engines/streaming-engine").then((m) => ({ default: m.StreamingEngine })));
+const MarketingEngine = lazy(() => import("@/components/engines/marketing-engine").then((m) => ({ default: m.MarketingEngine })));
+const AccessibilityEngine = lazy(() => import("@/components/engines/accessibility-engine").then((m) => ({ default: m.AccessibilityEngine })));
+const CreatorEngine = lazy(() => import("@/components/engines/creator-engine").then((m) => ({ default: m.CreatorEngine })));
+const BusinessEngine = lazy(() => import("@/components/engines/business-engine").then((m) => ({ default: m.BusinessEngine })));
+const AudioEngine = lazy(() => import("@/components/engines/audio-engine").then((m) => ({ default: m.AudioEngine })));
+const NetworkEngine = lazy(() => import("@/components/engines/network-engine").then((m) => ({ default: m.NetworkEngine })));
+const AiEngine = lazy(() => import("@/components/engines/ai-engine").then((m) => ({ default: m.AiEngine })));
+const VideoEngine = lazy(() => import("@/components/engines/video-engine").then((m) => ({ default: m.VideoEngine })));
+const UrlMediaEngine = lazy(() => import("@/components/engines/url-media-engine").then((m) => ({ default: m.UrlMediaEngine })));
+const UrlMediaInfoEngine = lazy(() => import("@/components/engines/url-media-info-engine").then((m) => ({ default: m.UrlMediaInfoEngine })));
+const WebDesignEngine = lazy(() => import("@/components/engines/webdesign-engine").then((m) => ({ default: m.WebDesignEngine })));
+const EcommerceEngine = lazy(() => import("@/components/engines/ecommerce-engine").then((m) => ({ default: m.EcommerceEngine })));
+const CareerEngine = lazy(() => import("@/components/engines/career-engine").then((m) => ({ default: m.CareerEngine })));
+const RelationshipEngine = lazy(() => import("@/components/engines/relationship-engine").then((m) => ({ default: m.RelationshipEngine })));
+const InteractiveEngine = lazy(() => import("@/components/engines/interactive-engine").then((m) => ({ default: m.InteractiveEngine })));
+const GamingEngine = lazy(() => import("@/components/engines/gaming-engine").then((m) => ({ default: m.GamingEngine })));
+const ScreenshotEngine = lazy(() => import("@/components/engines/screenshot-engine").then((m) => ({ default: m.ScreenshotEngine })));
+const MockupsCategoryEngine = lazy(() => import("@/components/engines/mockups-category-engine").then((m) => ({ default: m.MockupsCategoryEngine })));
+const SocialEngine = lazy(() => import("@/components/engines/social-engine").then((m) => ({ default: m.SocialEngine })));
+const PlannedLocalEngine = lazy(() => import("@/components/engines/planned-local-engine").then((m) => ({ default: m.PlannedLocalEngine })));
+const TranscriptionEngine = lazy(() => import("@/components/engines/transcription-engine").then((m) => ({ default: m.TranscriptionEngine })));
+const ImageToolsEngine = lazy(() => import("@/components/engines/image-tools-engine").then((m) => ({ default: m.ImageToolsEngine })));
+const DocumentToolsEngine = lazy(() => import("@/components/engines/document-tools-engine").then((m) => ({ default: m.DocumentToolsEngine })));
+const BackendToolEngine = lazy(() => import("@/components/engines/backend-tool-engine").then((m) => ({ default: m.BackendToolEngine })));
+const EventTemplateEngine = lazy(() => import("@/components/engines/event-template-engine").then((m) => ({ default: m.EventTemplateEngine })));
+const ABookEngine = lazy(() => import("@/components/engines/a-book-engine").then((m) => ({ default: m.ABookEngine })));
+const MusicDownloaderEngine = lazy(() => import("@/components/engines/music-downloader-engine").then((m) => ({ default: m.MusicDownloaderEngine })));
+const AiMusicDataSandbox = lazy(() => import("@/components/engines/ai-music-data-sandbox").then((m) => ({ default: m.AiMusicDataSandbox })));
+const ZipArchiveEngine = lazy(() => import("@/components/engines/zip-archive-engine").then((m) => ({ default: m.ZipArchiveEngine })));
 import { isEventTemplateTool } from "@/lib/events/event-templates";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
 type ToolEngineProps = { tool: ToolMeta; initialMode?: string; initialAction?: "encode" | "decode"; initialOp?: string };
 
-function ToolEngineContent({ tool, initialMode, initialAction, initialOp }: ToolEngineProps) {
+function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEngineProps) {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.envToolHydrated = tool.id;
@@ -186,9 +195,79 @@ function LegacyDeveloperStudioLink({ tool }: { tool: ToolMeta }) {
   </div>;
 }
 
+function OfflinePackageReadySignal({ toolId, onReady }: { toolId: string; onReady: (ready: boolean) => void }) {
+  useEffect(() => {
+    let mounted = true;
+    void completeOfflineToolPackage(toolId).then((ready) => { if (mounted) onReady(ready); });
+    return () => { mounted = false; };
+  }, [toolId, onReady]);
+  return null;
+}
+
+function ToolEngineContent(props: ToolEngineProps & {
+  completePackage: boolean;
+  onPackageReady: (ready: boolean) => void;
+}) {
+  return (
+    <Suspense fallback={<div className="rounded-lg bg-surface-2 px-4 py-6 text-sm text-muted" role="status">Loading {props.tool.name}…</div>}>
+      <ToolEngineView {...props} />
+      {props.completePackage ? <OfflinePackageReadySignal toolId={props.tool.id} onReady={props.onPackageReady} /> : null}
+    </Suspense>
+  );
+}
+
+type PackageUiState = "checking" | ToolPackageInstallStatus;
+
 export function ToolEngine(props: ToolEngineProps) {
   const { tool } = props;
+  const [packageState, setPackageState] = useState<PackageUiState>("checking");
+  const [mayRenderEngine, setMayRenderEngine] = useState(false);
+  const offlineEligible = isOfflineLocalTool(tool.id);
   const needsStudioLink = tool.category === "developer" && tool.engine.type !== "developer" && !tool.tags.includes("developer-studio");
-  if (needsStudioLink) return <div className="space-y-4"><LegacyDeveloperStudioLink tool={tool} /><ToolEngineContent {...props} /></div>;
-  return <ToolEngineContent {...props} />;
+
+  useEffect(() => {
+    let active = true;
+    setPackageState("checking");
+    setMayRenderEngine(false);
+    void prepareOfflineToolPackage({
+      toolId: tool.id,
+      pathname: window.location.pathname,
+      offlineEligible,
+    }).then((result) => {
+      if (!active) return;
+      setPackageState(result.status);
+      setMayRenderEngine(result.open);
+    }).catch(() => {
+      if (!active) return;
+      setPackageState(navigator.onLine ? "unsupported" : "not-installed");
+      setMayRenderEngine(navigator.onLine);
+    });
+    return () => { active = false; };
+  }, [tool.id, offlineEligible]);
+
+  const handlePackageReady = useCallback((ready: boolean) => {
+    if (ready) setPackageState("ready");
+    else setPackageState((current) => current === "preparing" ? "failed" : current);
+  }, []);
+
+  if (!mayRenderEngine) {
+    if (packageState === "checking") {
+      return <div className="rounded-lg bg-surface-2 px-4 py-6 text-sm text-muted" role="status">Preparing {tool.name}…</div>;
+    }
+    return <OfflineToolUnavailable toolName={tool.name} message={packageState === "not-installed"
+      ? "This tool has not been prepared on this device yet. Open it once while online; enV will automatically download and install its offline package."
+      : "This tool depends on an online service or does not have a complete, verified offline package."} />;
+  }
+
+  const engine = <ToolEngineContent {...props} completePackage={packageState === "preparing"} onPackageReady={handlePackageReady} />;
+  return (
+    <div className="space-y-2">
+      {packageState === "preparing" ? <p className="text-xs text-muted" role="status">Preparing this tool for offline use automatically…</p> : null}
+      {packageState === "ready" ? <p className="text-xs text-muted" role="status">Offline package ready on this device.</p> : null}
+      {packageState === "failed" ? <p className="text-xs text-muted" role="status">This tool is available online. Its offline package could not be completed and will be retried on your next visit.</p> : null}
+      {needsStudioLink
+        ? <div className="space-y-4"><LegacyDeveloperStudioLink tool={tool} />{engine}</div>
+        : engine}
+    </div>
+  );
 }
