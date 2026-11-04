@@ -339,6 +339,7 @@ self.addEventListener("message", (event) => {
         if (!session || session.toolId !== data.toolId || session.version !== data.version) return reply({ ok: false, message: "The tool installation session is no longer active." });
         const record = await getPackage(data.toolId);
         const cache = await caches.open(packageCacheName(data.toolId, data.version));
+        const coreCache = await caches.open(CORE_CACHE);
         const isPending = record?.pendingVersion === data.version;
         const recordedAssets = isPending ? (record?.pendingAssets || []) : (record?.assets || []);
         const requiredAssets = Array.isArray(data.assets) ? data.assets.slice(0, 500) : [];
@@ -353,7 +354,7 @@ self.addEventListener("message", (event) => {
               continue;
             }
             const request = new Request(url.href, { credentials: "same-origin" });
-            if (await cache.match(request)) {
+            if (await cache.match(request) || await coreCache.match(request)) {
               if (!recordedAssets.includes(request.url)) recordedAssets.push(request.url);
               continue;
             }
