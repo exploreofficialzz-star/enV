@@ -91,7 +91,7 @@ internal fun NativeGoogleSigningKeyForm() {
                 zip.putNextEntry(ZipEntry(name)); zip.write(value); zip.closeEntry()
             }
             add("upload-keystore.jks", result.keystore)
-            add("upload-keystore.base64.txt", (result.keystoreBase64 + "\\n").toByteArray(Charsets.US_ASCII))
+            add("upload-keystore.base64.txt", (result.keystoreBase64 + "\n").toByteArray(Charsets.US_ASCII))
             add("upload_certificate.pem", result.certificatePem.toByteArray(Charsets.US_ASCII))
             add("github-secrets.txt", result.githubSecrets.toByteArray(Charsets.UTF_8))
             add("signing-info.txt", result.signingInfo.toByteArray(Charsets.UTF_8))
@@ -193,7 +193,7 @@ internal fun NativeGoogleSigningKeyForm() {
                     OutlinedButton(onClick = { pendingFile = result.keystore; fileSaver.launch("upload-keystore.jks") }, modifier = Modifier.weight(1f)) { Text("Save JKS") }
                 }
                 OutlinedButton(onClick = { pendingFile = result.certificatePem.toByteArray(Charsets.US_ASCII); fileSaver.launch("upload_certificate.pem") }, modifier = Modifier.fillMaxWidth()) { Text("Save public certificate") }
-                OutlinedButton(onClick = { pendingFile = (result.keystoreBase64 + "\\n").toByteArray(Charsets.US_ASCII); fileSaver.launch("upload-keystore.base64.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save Base64 for GitHub") }
+                OutlinedButton(onClick = { pendingFile = (result.keystoreBase64 + "\n").toByteArray(Charsets.US_ASCII); fileSaver.launch("upload-keystore.base64.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save Base64 for GitHub") }
                 OutlinedButton(onClick = { pendingFile = result.githubSecrets.toByteArray(Charsets.UTF_8); fileSaver.launch("github-secrets.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save GitHub secrets") }
                 OutlinedButton(onClick = { pendingFile = result.githubActionsWorkflow.toByteArray(Charsets.UTF_8); fileSaver.launch("android-release.yml") }, modifier = Modifier.fillMaxWidth()) { Text("Save GitHub Actions workflow") }
                 OutlinedButton(onClick = { pendingFile = result.signingInfo.toByteArray(Charsets.UTF_8); fileSaver.launch("signing-info.txt") }, modifier = Modifier.fillMaxWidth()) { Text("Save signing details and fingerprints") }
