@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash, X509Certificate } from "node:crypto";
 import { test } from "node:test";
-import { generateGoogleSigningKey, type GoogleSigningKeyInput } from "./google-signing-key.ts";
+import { strFromU8, unzipSync, zipSync } from "fflate";
+import { createGoogleSigningKeyHandoutFiles, generateGoogleSigningKey, type GoogleSigningKeyInput } from "./google-signing-key.ts";
 
 const baseInput: GoogleSigningKeyInput = {
   alias: "upload",
@@ -29,6 +30,25 @@ test("Google signing key generator creates a JKS upload keystore and a valid sel
   assert.equal(output.sha1, createHash("sha1").update(output.certificateDer).digest("hex").toUpperCase().match(/.{2}/g)?.join(":") ?? "");
   assert.equal(output.sha256, createHash("sha256").update(output.certificateDer).digest("hex").toUpperCase().match(/.{2}/g)?.join(":") ?? "");
   assert.equal(output.keystoreBase64, Buffer.from(output.keystore).toString("base64"));
+  const handoutFiles = createGoogleSigningKeyHandoutFiles(output);
+  const zip = unzipSync(zipSync(handoutFiles, { level: 6 }));
+  assert.deepEqual(Object.keys(zip).sort(), [
+    ".gitignore-signing-example",
+    ".github/workflows/android-release.yml",
+    "README.md",
+    "github-secrets.txt",
+    "release-signing.gradle",
+    "release-signing.gradle.kts",
+    "signing-info.txt",
+    "upload-keystore.base64.txt",
+    "upload-keystore.jks",
+    "upload_certificate.pem",
+  ].sort());
+  assert.deepEqual(zip["upload-keystore.jks"], output.keystore);
+  assert.equal(strFromU8(zip["upload-keystore.base64.txt"]).trim(), output.keystoreBase64);
+  assert.equal(strFromU8(zip["github-secrets.txt"]), output.githubSecrets);
+  assert.equal(strFromU8(zip[".github/workflows/android-release.yml"]), output.githubActionsWorkflow);
+  assert.equal(strFromU8(zip["README.md"]), output.handoutReadme);
   assert.ok(output.githubSecrets.includes("\n"));
   assert.equal(output.githubSecrets.includes("\\n"), false);
   assert.ok(output.signingInfo.includes("\n"));
