@@ -83,6 +83,10 @@ assert.ok(engine.includes("setAvailableHomeHeight(Math.max(160, Math.floor(remai
 assert.ok(engine.includes("setHomeScrolled(event.currentTarget.scrollTop > 12)") && engine.includes("is-compact"), "Scrolling drafts animates the Add project card into its compact state");
 assert.ok(/function returnToProjects\(\)\s*\{\s*setHomeScrolled\(false\)/.test(engine), "Returning to projects restores the full-size Add project card");
 assert.ok(!engine.includes("Your blank canvas is ready.") && !engine.includes("Tap + to add your first element"), "Starting a blank project does not show a throwaway canvas announcement");
+const embeddedHeaderRules = styles.slice(styles.lastIndexOf("Embedded editor header remains visible below the global navigation."));
+assert.ok(embeddedHeaderRules.includes("overflow:visible !important;") && embeddedHeaderRules.includes("position:sticky !important;") && embeddedHeaderRules.includes("top:64px !important;"), "Embedded toolbar stays above the editor content and below the app navigation while the page scrolls");
+assert.ok(embeddedHeaderRules.includes(".ux-ui-studio:not(.is-expanded) .uxui-fullscreen-brand") && embeddedHeaderRules.includes("display:flex !important;"), "enV branding stays visible in the embedded editor as well as full-screen mode");
+assert.ok(embeddedHeaderRules.includes(".uxui-topbar-left .uxui-target-switch button span") && embeddedHeaderRules.includes("display:none !important;"), "Embedded device controls remain icon-only and avoid overlapping the zoom and exit actions");
 assert.ok(!engine.includes("setShowAdvancedContext"), "Removed visual dock has no stale state setter references");
 assert.ok(!engine.includes("Local-first editor · Exact pixel dimensions"), "Redundant Studio footer removed");
 assert.ok(engine.includes('selected.kind === "image"') && engine.includes("<span>Replace</span>"), "Image selection offers connected replace action");
