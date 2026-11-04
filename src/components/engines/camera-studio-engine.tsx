@@ -397,6 +397,29 @@ export function CameraStudioEngine() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isRecording || !cameraStream) return;
+    const cameraTrack = cameraStream.getVideoTracks()[0];
+    if (!cameraTrack) return;
+    const finalizeOnCameraEnd = () => {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+          if (mountedRef.current) {
+            setNotice("The camera connection ended. The current clip is being finalized where possible.");
+          }
+        } catch {
+          if (mountedRef.current) {
+            setCameraError("The camera connection ended and the clip could not be finalized. Check Recent captures.");
+          }
+        }
+      }
+    };
+    cameraTrack.addEventListener("ended", finalizeOnCameraEnd);
+    return () => cameraTrack.removeEventListener("ended", finalizeOnCameraEnd);
+  }, [cameraStream, isRecording]);
+
   const startRecording = useCallback(async () => {
     const currentStream = streamRef.current;
     if (!currentStream || !currentStream.getVideoTracks().some((track) => track.readyState === "live")) {
