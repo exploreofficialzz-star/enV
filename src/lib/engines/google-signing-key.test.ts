@@ -28,6 +28,17 @@ test("Google signing key generator creates a JKS upload keystore and a valid sel
   assert.equal(certificate.verify(certificate.publicKey), true);
   assert.equal(output.sha1, createHash("sha1").update(output.certificateDer).digest("hex").toUpperCase().match(/.{2}/g)?.join(":") ?? "");
   assert.equal(output.sha256, createHash("sha256").update(output.certificateDer).digest("hex").toUpperCase().match(/.{2}/g)?.join(":") ?? "");
+  assert.equal(output.keystoreBase64, Buffer.from(output.keystore).toString("base64"));
+  assert.match(output.githubSecrets, /^ANDROID_KEYSTORE_BASE64=/m);
+  assert.match(output.githubSecrets, /^ANDROID_KEYSTORE_PASSWORD=A-Strong-Store-Password-2026!$/m);
+  assert.match(output.githubSecrets, /^ANDROID_KEY_ALIAS=upload$/m);
+  assert.match(output.githubSecrets, /^ANDROID_KEY_PASSWORD=A-Different-Key-Password-2026!$/m);
+  assert.match(output.githubActionsWorkflow, /secrets\.ANDROID_KEYSTORE_BASE64/);
+  assert.match(output.githubActionsWorkflow, /bundleRelease/);
+  assert.match(output.githubActionsWorkflow, /rm -f.*upload-keystore\.jks/);
+  assert.match(output.handoutReadme, /Settings → Secrets and variables → Actions/);
+  assert.match(output.signingInfo, /SHA-256:/);
+  assert.match(output.gradleKotlin, /ANDROID_KEYSTORE_FILE/);
   assert.match(output.gradleKotlin, /ANDROID_KEYSTORE_PASSWORD/);
   assert.match(output.gradleKotlin, /ANDROID_KEY_PASSWORD/);
   assert.doesNotMatch(output.gradleKotlin, new RegExp(baseInput.storePassword));
