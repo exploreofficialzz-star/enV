@@ -16,7 +16,8 @@ test("offline packages are created only by an explicit tool visit", () => {
 test("tool packages are kept separate and tied to a build version", () => {
   assert.match(serviceWorker, /env-tool-package-/);
   assert.match(serviceWorker, /record\.version === data\.version/);
-  assert.match(serviceWorker, /pathname: data\.pathname/);
+  assert.match(serviceWorker, /pendingPathname: data\.pathname/);
+  assert.match(serviceWorker, /existing\.pathname === data\.pathname/);
 });
 
 test("only cacheable same-origin assets are stored; APIs are excluded", () => {
@@ -27,7 +28,8 @@ test("only cacheable same-origin assets are stored; APIs are excluded", () => {
 
 test("unvisited tools do not receive offline navigation access", () => {
   assert.match(serviceWorker, /findReadyPackageForPath/);
-  assert.match(serviceWorker, /installed\.status === "ready"/);
+  assert.match(serviceWorker, /item\.status === "ready" && item\.pathname === pathname/);
+  assert.match(serviceWorker, /installed\) \{/);
   assert.match(client, /status: "not-installed"/);
 });
 
