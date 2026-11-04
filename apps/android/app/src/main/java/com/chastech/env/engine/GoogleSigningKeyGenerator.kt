@@ -237,7 +237,7 @@ object GoogleSigningKeyGenerator {
             add("release-signing.gradle.kts", artifacts.gradleKotlin.toByteArray(Charsets.UTF_8))
             add("release-signing.gradle", artifacts.gradleGroovy.toByteArray(Charsets.UTF_8))
             add(".github/workflows/android-release.yml", artifacts.githubActionsWorkflow.toByteArray(Charsets.UTF_8))
-            add(".gitignore-signing-example", ".android-signing/\\n/upload-keystore.jks\\n/*.jks\\n/*.keystore\\n".toByteArray(Charsets.UTF_8))
+            add(".gitignore-signing-example", ".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n".toByteArray(Charsets.UTF_8))
             add("README.md", artifacts.handoutReadme.toByteArray(Charsets.UTF_8))
         }
         return output.toByteArray()
