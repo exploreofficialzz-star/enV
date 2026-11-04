@@ -186,7 +186,61 @@ try {
     try {
       await page.goto(baseUrl + "/tools/developer/ux-ui-studio", { waitUntil: "domcontentloaded", timeout: 120000 });
       await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === "ux-ui-studio", null, { timeout });
+      const home = page.locator(".uxui-home");
+      await checkBounds(home, "Projects home", viewport);
+      const draftList = page.locator(".uxui-draft-list");
+      await checkBounds(draftList, "Projects draft scroller", viewport);
+      const homeAudit = await page.evaluate(async () => {
+        const list = document.querySelector(".uxui-draft-list");
+        const create = document.querySelector(".uxui-home-create-wrap");
+        const add = create?.querySelector(".uxui-new-project-card");
+        if (!list || !create || !add) throw new Error("Projects home must render its bounded draft list and Add project card");
+        let grid = list.querySelector(".uxui-draft-grid");
+        if (!grid) {
+          list.replaceChildren();
+          grid = document.createElement("div");
+          grid.className = "uxui-draft-grid";
+          list.append(grid);
+        }
+        for (let index = 0; index < 36; index++) {
+          const draft = document.createElement("article");
+          draft.className = "uxui-draft-card";
+          draft.style.minHeight = "104px";
+          draft.textContent = "Audit draft " + (index + 1);
+          grid.append(draft);
+        }
+        const columns = getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length;
+        const expectedColumns = innerWidth >= 1024 ? 6 : innerWidth >= 768 ? 5 : 3;
+        const listHeight = list.clientHeight;
+        const contentHeight = list.scrollHeight;
+        const fullCardHeight = add.getBoundingClientRect().height;
+        if (contentHeight <= listHeight) throw new Error("Draft list should scroll internally when many projects exist");
+        list.scrollTop = list.scrollHeight;
+        list.dispatchEvent(new Event("scroll", { bubbles: true }));
+        await new Promise((resolve) => window.setTimeout(resolve, 320));
+        return {
+          columns, expectedColumns, listHeight, contentHeight,
+          compact: create.classList.contains("is-compact"),
+          fullCardHeight, compactCardHeight: add.getBoundingClientRect().height,
+          homeHeight: document.querySelector(".uxui-home").getBoundingClientRect().height,
+          homeBottom: document.querySelector(".uxui-home").getBoundingClientRect().bottom,
+        };
+      });
+      assert.equal(homeAudit.columns, homeAudit.expectedColumns, "Project drafts use the expected responsive grid column count");
+      assert.ok(homeAudit.contentHeight > homeAudit.listHeight, "Many drafts overflow only the internal draft scroller");
+      assert.ok(homeAudit.compact && homeAudit.compactCardHeight < homeAudit.fullCardHeight, "Scrolling drafts animates the Add project card into its smaller state");
+      assert.ok(homeAudit.homeBottom <= viewport.height + 1, "The Projects home remains inside the visible viewport");
+      entry.checks.push("Projects home stays viewport-bounded; draft scrolling, responsive columns and compact Add project transition work");
+
       await page.getByRole("button", { name: "Add project", exact: true }).click();
+      const editorHeader = page.locator(".uxui-topbar");
+      await checkBounds(editorHeader, "Unified editor header", viewport);
+      const headerActions = await editorHeader.locator("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label") || button.textContent.trim()));
+      assert.deepEqual(headerActions, ["Zoom out", "Mobile", "Tablet", "Desktop", "Zoom in", "Export", "Exit Studio"], "Editor header keeps zoom, device, export and exit controls in the requested order");
+      assert.equal(await page.locator(".uxui-responsive-scope").count(), 0, "The redundant responsive settings card is removed");
+      assert.equal(await page.locator(".uxui-canvas-heading").count(), 0, "The separate mockup zoom card is removed");
+      assert.equal(await editorHeader.getByRole("button", { name: "Studio help", exact: true }).count(), 0, "The irrelevant question-mark help control is removed from the top toolbar");
+      entry.checks.push("Unified editor header fits and orders zoom/device/export/exit controls without redundant cards");
       await page.getByRole("button", { name: "Add elements", exact: true }).click();
       let drawer = page.getByRole("dialog", { name: "Studio toolkit", exact: true });
       await checkBounds(drawer, "Toolkit modal", viewport);
