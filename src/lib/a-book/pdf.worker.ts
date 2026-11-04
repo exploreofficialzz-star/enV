@@ -25,8 +25,11 @@ workerScope.onmessage = async (event) => {
   if (!request || typeof request.requestId !== "string") return;
 
   try {
-    let value: ABookPdfInfo | Uint8Array;
+    let value: ABookPdfInfo | Uint8Array | { ready: true };
     switch (request.action) {
+      case "warmup":
+        value = { ready: true };
+        break;
       case "inspect":
         value = await inspectPdf(request.blob);
         break;
