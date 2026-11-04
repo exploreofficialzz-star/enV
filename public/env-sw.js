@@ -353,7 +353,10 @@ self.addEventListener("message", (event) => {
               continue;
             }
             const request = new Request(url.href, { credentials: "same-origin" });
-            if (await cache.match(request)) continue;
+            if (await cache.match(request)) {
+              if (!recordedAssets.includes(request.url)) recordedAssets.push(request.url);
+              continue;
+            }
             const response = await fetch(request);
             if (!response.ok) {
               assetInstallFailed = true;
