@@ -39,7 +39,6 @@ export function ToolShell({
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
-  const [isOffline, setIsOffline] = useState(false);
   const toolStartedRef = useRef(false);
   const toolFinishedRef = useRef(false);
   const toolAbandonmentRecordedRef = useRef(false);
@@ -82,16 +81,6 @@ export function ToolShell({
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
 
-  useEffect(() => {
-    const updateNetworkState = () => setIsOffline(!navigator.onLine);
-    updateNetworkState();
-    window.addEventListener("online", updateNetworkState);
-    window.addEventListener("offline", updateNetworkState);
-    return () => {
-      window.removeEventListener("online", updateNetworkState);
-      window.removeEventListener("offline", updateNetworkState);
-    };
-  }, []);
 
 
   useEffect(() => {
