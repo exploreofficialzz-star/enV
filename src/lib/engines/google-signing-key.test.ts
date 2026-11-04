@@ -61,6 +61,10 @@ test("Google signing key generator creates a JKS upload keystore and a valid sel
   assert.match(output.githubSecrets, /^ANDROID_KEY_PASSWORD=A-Different-Key-Password-2026!$/m);
   assert.match(output.githubActionsWorkflow, /secrets\.ANDROID_KEYSTORE_BASE64/);
   assert.match(output.githubActionsWorkflow, /bundleRelease/);
+  assert.match(output.githubActionsWorkflow, /working-directory: apps\/android/);
+  assert.match(output.githubActionsWorkflow, /envRequireProductionSigning=true/);
+  assert.match(output.githubActionsWorkflow, /jarsigner -verify/);
+  assert.match(output.githubActionsWorkflow, /actions\/upload-artifact@v4/);
   assert.match(output.githubActionsWorkflow, /rm -f.*upload-keystore\.jks/);
   assert.match(output.handoutReadme, /Settings → Secrets and variables → Actions/);
   assert.match(output.signingInfo, /SHA-256:/);
