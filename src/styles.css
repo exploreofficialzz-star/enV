@@ -3226,3 +3226,38 @@ html[data-env-view-mode="tablet"] .env-app-shell {
   .ux-ui-studio .uxui-topbar-actions > .uxui-export-trigger span,
   .ux-ui-studio .uxui-topbar-actions > .uxui-projects-trigger span { display:none !important; }
 }
+
+
+/* Keep the focused editor chrome visible in the expanded Studio workspace. */
+.ux-ui-studio.is-expanded { overflow:hidden !important; }
+.ux-ui-studio.is-expanded > .uxui-topbar {
+  display:flex !important;
+  flex:0 0 auto !important;
+  min-width:0 !important;
+  margin:0 0 8px !important;
+}
+.ux-ui-studio.is-expanded .uxui-workspace {
+  display:flex !important;
+  flex:1 1 auto !important;
+  flex-direction:column !important;
+  min-width:0 !important;
+  min-height:0 !important;
+}
+.ux-ui-studio.is-expanded .uxui-canvas-panel {
+  display:flex !important;
+  flex:1 1 auto !important;
+  flex-direction:column !important;
+  height:auto !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+.ux-ui-studio.is-expanded .uxui-bottom-toolbar {
+  display:flex !important;
+  flex:0 0 auto !important;
+}
+.ux-ui-studio.is-expanded .uxui-canvas-stage {
+  flex:1 1 0 !important;
+  height:0 !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
