@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { toolPath } from "@/lib/registry";
 import type { ToolMeta } from "@/types/tool";
-import "./creator-engine.css";
+import "@/components/engines/creator-engine.css";
 
 const FILTERS = [
   ["All", "all"], ["YouTube", "youtube"], ["TikTok", "tiktok"],
